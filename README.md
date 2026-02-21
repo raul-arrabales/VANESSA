@@ -1,56 +1,97 @@
 # VANESSA
-### Versatile AI Navigator for Enhanced Semantic Search &amp; Automation
+### Versatile AI Navigator for Enhanced Semantic Search & Automation
 
-VANESSA is an open-source personal AI assistant designed to orchestrate Large Language Models, perform semantic search via Retrieval-Augmented Generation (RAG), and automate complex workflows.
-The system is containerized, modular, and fully extensible — ideal for developers exploring multi-component LLM architectures.
+VANESSA is a modular, containerized AI assistant stack with:
 
-🚀 Key Features
+- Frontend service
+- Flask backend API
+- Agent orchestration service
+- Sandbox service for controlled code execution
+- Private LLM service
+- Weaviate vector store
+- PostgreSQL database
 
-- Modular microservice architecture using Docker (frontend, backend, vector store, database).
-- Python/Flask backend with clean separation between API endpoints and LLM orchestration logic.
-- RAG pipeline with semantic search backed by an open-source vector database (e.g., Weaviate).
-- OpenAI-compatible orchestration layer built with LangChain / LlamaIndex (or custom modules).
-- Frontend-agnostic API, ready for React, Vue, Svelte, or plain HTML/JS.
-- Fully open source, welcoming contributions and improvements.
+## Run Containers For Testing
 
-🧩 Architecture Overview
+These steps verify that Docker services are correctly defined and can start.
 
-- Container #1. Responsive Web Frontend.
-- Container #2. Backend (Flask API).
-- Container #3. Private LLM server (Hugging Face).
-- Container #4. Custom Agent Orchestration Engine.
-- Container #5. Python env sandbox for agents.
-- Container #6. Persistent semantic index for RAG (Weviate).
-- Container #7. Database (PostgreSQL).
+### 1. Prerequisites
 
-📦 Tech Stack
+- Docker and Docker Compose installed
+- Run commands from repository root: `VANESSA/`
 
-- Backend: Python 3.10+, Flask, LangChain
-- Vector Store: Weaviate (self-hosted, persistent)
-- Database: PostgreSQL or MongoDB (optional)
-- Orchestration: Docker + Docker Compose
-- Frontend: TBD (any SPA or static site)
-- Dev Tools: VS Code + GitHub + Codex plugin
+### 2. Validate Compose Configuration
 
-🧪 Development Mode
+```bash
+docker compose -f infra/docker-compose.yml config
+```
 
-- You can develop incrementally without launching all containers:
-- Run Flask backend directly in VS Code for fast debugging.
-- Mock LLM responses locally for unit tests.
-- Only build full stack with Docker Compose when integrating.
+Expected:
 
-📄 Project Goals
+- Command succeeds
+- You may see a warning that `version` in compose is obsolete
 
-- Provide an extensible base for LLM-powered assistants.
-- Serve as a high-quality, documented reference for RAG systems.
-- Enable automation workflows using natural language.
-- Foster open-source collaboration in AI architecture.
+### 3. Build And Start All Services
 
-🤝 Contributing
+```bash
+docker compose -f infra/docker-compose.yml up -d --build
+```
 
-VANESSA is open to contributions!
-Feel free to open issues, create PRs, or propose new architectural modules.
+### 4. Check Runtime Status
 
-📜 License
+```bash
+docker compose -f infra/docker-compose.yml ps -a
+```
 
-MIT License — free to use, modify, and redistribute.
+Expected containers:
+
+- `vanessa-backend`
+- `vanessa-agent-engine`
+- `vanessa-llm`
+- `vanessa-sandbox`
+- `vanessa-weaviate`
+- `vanessa-postgres`
+- `vanessa-frontend`
+
+Current known behavior:
+
+- `vanessa-frontend` exits immediately with code `0` because `frontend/package.json` uses a placeholder script:
+  - `"dev": "echo 'frontend scaffold pending'"`
+
+### 5. Review Logs (If Any Service Fails)
+
+```bash
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200
+```
+
+Service-specific logs:
+
+```bash
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm weaviate postgres frontend
+```
+
+### 6. Stop And Clean Up Test Run
+
+```bash
+docker compose -f infra/docker-compose.yml down
+```
+
+To also remove named volumes (will delete local Weaviate/Postgres data):
+
+```bash
+docker compose -f infra/docker-compose.yml down -v
+```
+
+## Architecture
+
+- Container #1: Responsive Web Frontend
+- Container #2: Backend (Flask API)
+- Container #3: Private LLM Server
+- Container #4: Custom Agent Orchestration Engine
+- Container #5: Python Sandbox
+- Container #6: Weaviate (RAG index)
+- Container #7: PostgreSQL
+
+## License
+
+MIT

@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-slim
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN if [ -f package.json ]; then npm install; else echo "No package.json yet"; fi
