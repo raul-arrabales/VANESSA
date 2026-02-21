@@ -1,0 +1,92 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/docker/frontend/Dockerfile
+    container_name: vanessa-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    env_file:
+      - .env.example
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend/Dockerfile
+    container_name: vanessa-backend
+    ports:
+      - "5000:5000"
+    depends_on:
+      - agent_engine
+      - weaviate
+      - postgres
+      - llm
+      - sandbox
+    env_file:
+      - .env.example
+
+  llm:
+    build:
+      context: ..
+      dockerfile: infra/docker/llm/Dockerfile
+    container_name: vanessa-llm
+    ports:
+      - "8000:8000"
+
+  agent_engine:
+    build:
+      context: ..
+      dockerfile: infra/docker/agent_engine/Dockerfile
+    container_name: vanessa-agent-engine
+    ports:
+      - "7000:7000"
+    depends_on:
+      - llm
+      - weaviate
+      - postgres
+      - sandbox
+    env_file:
+      - .env.example
+
+  sandbox:
+    build:
+      context: ..
+      dockerfile: infra/docker/sandbox/Dockerfile
+    container_name: vanessa-sandbox
+    ports:
+      - "6000:6000"
+
+  weaviate:
+    image: semitechnologies/weaviate:1.27.6
+    container_name: vanessa-weaviate
+    ports:
+      - "8080:8080"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      DEFAULT_VECTORIZER_MODULE: "none"
+      CLUSTER_HOSTNAME: "node1"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+  postgres:
+    image: postgres:16
+    container_name: vanessa-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: vanessa
+      POSTGRES_PASSWORD: vanessa
+      POSTGRES_DB: vanessa
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+
+volumes:
+  weaviate_data:
+  postgres_data:

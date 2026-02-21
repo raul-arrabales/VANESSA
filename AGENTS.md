@@ -243,6 +243,8 @@ When making changes or adding features:
 - If you introduce new patterns, record them in this file or in dedicated docs.
 - Add docstrings for non-trivial functions and classes.
 
+8. Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+
 ## 8. Future directions (for agents to keep in mind)
 
 These are planned but not necessarily implemented yet:
