@@ -15,29 +15,13 @@ The system is containerized, modular, and fully extensible — ideal for develop
 
 🧩 Architecture Overview
 
-+--------------------+       +----------------------+
-|     Frontend       | <---> |       Flask API      |
-|   (Container #1)   |       |  (Container #2)      |
-+--------------------+       +----------+-----------+
-                                          |
-                                          v
-                           +------------------------------+
-                           |   LLM Orchestration Engine   |
-                           |     (LangChain / Custom)     |
-                           +---------------+--------------+
-                                           |
-                                           v
-              +-----------------------------------------------+
-              |  Vector Store (Weaviate) — Container #3        |
-              |  Persistent semantic index for RAG             |
-              +----------------------+-------------------------+
-                                     |
-                                     v
-                         +------------------------+
-                         |   Database (optional)  |
-                         |   PostgreSQL / Mongo   |
-                         |   Container #4         |
-                         +------------------------+
+- Container #1. Responsive Web Frontend.
+- Container #2. Backend (Flask API).
+- Container #3. Private LLM server (Hugging Face).
+- Container #4. Custom Agent Orchestration Engine.
+- Container #5. Python env sandbox for agents.
+- Container #6. Persistent semantic index for RAG (Weviate).
+- Container #7. Database (PostgreSQL).
 
 📦 Tech Stack
 
