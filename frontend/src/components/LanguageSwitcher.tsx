@@ -13,9 +13,9 @@ export default function LanguageSwitcher(): JSX.Element {
   };
 
   return (
-    <label className="language-switcher">
-      <span className="label">{t("language.label")}</span>
-      <select value={activeLanguage} onChange={handleLanguageChange}>
+    <label className="control-group language-switcher">
+      <span className="field-label">{t("language.label")}</span>
+      <select className="field-input" value={activeLanguage} onChange={handleLanguageChange}>
         {supportedLanguages.map((language) => (
           <option key={language} value={language}>
             {t(`language.${language}`)}

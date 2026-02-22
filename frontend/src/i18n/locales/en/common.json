@@ -1,7 +1,21 @@
 {
   "app": {
+    "eyebrow": "Versatile AI Navigator",
     "title": "VANESSA",
-    "subtitle": "Dummy frontend bootstrap"
+    "subtitle": "Mission console for semantic search and automation",
+    "controls": "Application controls"
+  },
+  "nav": {
+    "aria": "Primary navigation",
+    "home": "Home",
+    "styleGuide": "Style guide"
+  },
+  "theme": {
+    "toggle": {
+      "aria": "Toggle light and dark mode",
+      "toDark": "Night mode",
+      "toLight": "Day mode"
+    }
   },
   "language": {
     "label": "Language",
@@ -9,6 +23,7 @@
     "es": "Spanish"
   },
   "backend": {
+    "sectionTitle": "Backend health",
     "url": {
       "label": "Backend URL"
     },

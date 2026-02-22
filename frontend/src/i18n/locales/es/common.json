@@ -1,7 +1,21 @@
 {
   "app": {
+    "eyebrow": "Navegador IA versatil",
     "title": "VANESSA",
-    "subtitle": "Interfaz inicial de prueba"
+    "subtitle": "Consola de mision para busqueda semantica y automatizacion",
+    "controls": "Controles de aplicacion"
+  },
+  "nav": {
+    "aria": "Navegacion principal",
+    "home": "Inicio",
+    "styleGuide": "Guia de estilo"
+  },
+  "theme": {
+    "toggle": {
+      "aria": "Alternar modo claro y oscuro",
+      "toDark": "Modo noche",
+      "toLight": "Modo dia"
+    }
   },
   "language": {
     "label": "Idioma",
@@ -9,6 +23,7 @@
     "es": "Espanol"
   },
   "backend": {
+    "sectionTitle": "Salud del backend",
     "url": {
       "label": "URL del backend"
     },

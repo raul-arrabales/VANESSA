@@ -1,6 +1,22 @@
 # Frontend
 
-React + Vite + TypeScript dummy UI for VANESSA.
+React + Vite + TypeScript UI for VANESSA.
+
+## Design System
+
+The frontend uses a token-driven design system in `src/styles.css`.
+
+- Theme storage key: `localStorage["vanessa.theme"]`
+- Supported themes: `light`, `dark`
+- Theme source: system preference on first load, then persisted user selection
+- Live reference page: `/style-guide`
+
+### Design Rules
+
+- No raw hex color values in component-level styles.
+- Use semantic tokens only (for example `--bg-surface`, `--text-primary`).
+- Reuse primitive classes/components before introducing custom styles.
+- Add new reusable patterns to `/style-guide` in the same change.
 
 ## Internationalization (i18n)
 
@@ -33,7 +49,13 @@ Translation bundles are lazy-loaded by language/namespace through dynamic import
 docker compose -f infra/docker-compose.yml up -d --build frontend backend
 ```
 
-## Run E2E Smoke Tests
+## Run Tests
+
+Run unit tests:
+
+```bash
+docker compose -f infra/docker-compose.yml exec -T frontend npm run test:unit
+```
 
 Install Playwright browser + OS deps in the running frontend container (first run):
 
@@ -42,7 +64,7 @@ docker compose -f infra/docker-compose.yml exec -T frontend npx playwright insta
 docker compose -f infra/docker-compose.yml exec -T frontend npx playwright install chromium
 ```
 
-Run smoke tests:
+Run e2e tests:
 
 ```bash
 docker compose -f infra/docker-compose.yml exec -T frontend npm run test:e2e
