@@ -11,6 +11,17 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Weaviate vector store
 - PostgreSQL database
 
+## Local Staging-Like Manual Testing
+
+Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflow:
+
+- `./ops/local-staging/start.sh`
+- `./ops/local-staging/health.sh`
+- `./ops/local-staging/logs.sh --follow`
+- `./ops/local-staging/stop.sh`
+
+Full guide: `ops/local-staging/README.md`
+
 ## Run Containers For Testing
 
 These steps verify that Docker services are correctly defined and can start.
@@ -52,11 +63,6 @@ Expected containers:
 - `vanessa-weaviate`
 - `vanessa-postgres`
 - `vanessa-frontend`
-
-Current known behavior:
-
-- `vanessa-frontend` exits immediately with code `0` because `frontend/package.json` uses a placeholder script:
-  - `"dev": "echo 'frontend scaffold pending'"`
 
 ### 5. Review Logs (If Any Service Fails)
 

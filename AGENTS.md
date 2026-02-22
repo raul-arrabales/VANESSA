@@ -243,6 +243,10 @@ When making changes or adding features:
 - If you introduce new patterns, record them in this file or in dedicated docs.
 - Add docstrings for non-trivial functions and classes.
 
+7. Keep local staging tooling in sync.
+- If a code/config change impacts local manual runtime behavior (service names, ports, health endpoints, compose files, env vars, startup order, or required dependencies), update `ops/local-staging/` scripts and `ops/local-staging/README.md` in the same change.
+- Treat `ops/local-staging/` as a maintained interface for human staging-like validation on Ubuntu, not as optional docs.
+
 8. Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
 
 ## 8. Future directions (for agents to keep in mind)
@@ -254,4 +258,3 @@ These are planned but not necessarily implemented yet:
 - Observability stack (logging, metrics, tracing).
 
 When implementing new features, consider how they will interact with these future plans and keep the design extensible.
-
