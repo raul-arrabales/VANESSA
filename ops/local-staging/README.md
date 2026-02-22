@@ -94,5 +94,21 @@ Note: service runtime environment still comes from compose/env files (for exampl
   - The frontend should call `/api/health` (proxied by Vite), not `http://backend:5000/health` from browser context.
 - Rebuild needed after Dockerfile/dependency changes:
   - Run `./ops/local-staging/start.sh` (default includes `--build`)
+- Build fails with `parent snapshot ... does not exist`:
+  - This is usually Docker/BuildKit cache state corruption on the host, not an application code regression.
+  - Stop the stack:
+    - `./ops/local-staging/stop.sh`
+  - Run moderate cleanup:
+    - `docker builder prune -f`
+    - `docker image prune -f`
+  - Start again:
+    - `./ops/local-staging/start.sh`
+  - Validate:
+    - `./ops/local-staging/health.sh`
+    - `./ops/local-staging/logs.sh --tail 200`
+  - If it still fails with the same snapshot error, run one escalation cleanup and retry:
+    - `docker system prune -f`
+    - `./ops/local-staging/start.sh`
+  - Keep volume pruning as a last resort only.
 - Need clean DB/vector state:
   - Run `./ops/local-staging/reset-data.sh --yes`

@@ -57,9 +57,15 @@ fi
 
 log_info "Starting VANESSA stack"
 if [[ -n "${build_flag}" ]]; then
-  compose up -d --build || die "Failed to start stack"
+  if ! compose up -d --build; then
+    log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
+    die "Failed to start stack"
+  fi
 else
-  compose up -d || die "Failed to start stack"
+  if ! compose up -d; then
+    log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
+    die "Failed to start stack"
+  fi
 fi
 
 log_info "Waiting for readiness (timeout: ${timeout_seconds}s)"
