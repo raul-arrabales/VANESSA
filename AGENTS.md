@@ -16,6 +16,7 @@ VANESSA is a multi-container AI assistant that:
   - A **private LLM server** (Hugging Face-based).
   - A **custom agent orchestration engine**.
   - A **Python sandbox environment** where agents can execute code safely.
+  - A **wake-word (KWS) service** for offline voice activation.
   - A **persistent semantic index** (Weaviate) for RAG.
   - A **relational database** (PostgreSQL) for structured data.
 
@@ -73,9 +74,15 @@ Please respect these boundaries when generating or modifying code or configurati
    - Persistence must be enabled (data should survive container restarts).
 
 7. **Container #7 — Database (PostgreSQL)**
-   - Stores structured data (users, sessions, logs, configs, etc.).
-   - Access restricted to backend and agent engine through a data access layer.
-   - No direct SQL from the frontend.
+  - Stores structured data (users, sessions, logs, configs, etc.).
+  - Access restricted to backend and agent engine through a data access layer.
+  - No direct SQL from the frontend.
+
+8. **Container #8 — Wake-word (KWS) service**
+   - Runs offline wake-word detection and emits wake events.
+   - Integrates with backend through a webhook/event API.
+   - Model files must be downloadable and runnable in air-gapped environments.
+   - No direct frontend dependency on this container.
 
 ---
 
@@ -98,6 +105,12 @@ Agents should keep to this structure or evolve it consistently.
 - `sandbox/`
   - Code related to the Python sandbox container.
   - Security checks, execution policies, etc.
+- `kws/`
+  - Wake-word service code and API/webhook adapter logic.
+  - Model loading checks and detection event handling.
+- `models/`
+  - Local model assets mounted into containers for offline/air-gapped runtime.
+  - Includes wake-word model directories under `models/kws/`.
 - `infra/`
   - `docker-compose.yml` and container-specific Dockerfiles.
   - Scripts for local setup and deployment.

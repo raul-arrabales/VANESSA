@@ -8,6 +8,7 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Agent orchestration service
 - Sandbox service for controlled code execution
 - Private LLM service
+- Wake-word (KWS) service
 - Weaviate vector store
 - PostgreSQL database
 
@@ -40,7 +41,6 @@ docker compose -f infra/docker-compose.yml config
 Expected:
 
 - Command succeeds
-- You may see a warning that `version` in compose is obsolete
 
 ### 3. Build And Start All Services
 
@@ -60,6 +60,7 @@ Expected containers:
 - `vanessa-agent-engine`
 - `vanessa-llm`
 - `vanessa-sandbox`
+- `vanessa-kws`
 - `vanessa-weaviate`
 - `vanessa-postgres`
 - `vanessa-frontend`
@@ -73,7 +74,7 @@ docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 Service-specific logs:
 
 ```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm weaviate postgres frontend
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm kws weaviate postgres frontend
 ```
 
 ### 6. Stop And Clean Up Test Run
@@ -97,6 +98,7 @@ docker compose -f infra/docker-compose.yml down -v
 - Container #5: Python Sandbox
 - Container #6: Weaviate (RAG index)
 - Container #7: PostgreSQL
+- Container #8: Wake-word service (KWS)
 
 ## License
 

@@ -57,6 +57,13 @@ run_checks() {
     failures=$((failures + 1))
   fi
 
+  if http_ok "http://localhost:10400/health"; then
+    printf 'kws: OK\n'
+  else
+    printf 'kws: FAIL\n'
+    failures=$((failures + 1))
+  fi
+
   if http_ok "http://localhost:3000/"; then
     printf 'frontend: OK\n'
   else

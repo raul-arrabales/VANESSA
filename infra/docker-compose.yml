@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   frontend:
     build:
@@ -59,6 +57,22 @@ services:
     container_name: vanessa-sandbox
     ports:
       - "6000:6000"
+
+  kws:
+    build:
+      context: ..
+      dockerfile: infra/docker/kws/Dockerfile
+    container_name: vanessa-kws
+    ports:
+      - "10400:10400"
+    depends_on:
+      - backend
+    env_file:
+      - .env.example
+    volumes:
+      - ../models/kws:/models/kws:ro
+    devices:
+      - "/dev/snd:/dev/snd"
 
   weaviate:
     image: semitechnologies/weaviate:1.27.6

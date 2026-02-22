@@ -8,14 +8,14 @@ type HealthResponse = {
 type LoadState = "idle" | "loading" | "success" | "error";
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() ||
-  "http://backend:5000";
+  "/api";
 
 export default function App(): JSX.Element {
   const [state, setState] = useState<LoadState>("idle");
   const [result, setResult] = useState<HealthResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const healthUrl = useMemo(() => `${backendBaseUrl.replace(/\/$/, "")}/health`, []);
+  const healthUrl = useMemo(() => `${backendBaseUrl.replace(/\/$/, "")}/health`, [backendBaseUrl]);
 
   const checkBackend = async (): Promise<void> => {
     setState("loading");

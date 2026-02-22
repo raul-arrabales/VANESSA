@@ -18,7 +18,7 @@ START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-180}"
 LOG_TAIL_LINES="${LOG_TAIL_LINES:-200}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}"
 
-readonly SERVICES=(frontend backend llm agent_engine sandbox weaviate postgres)
+readonly SERVICES=(frontend backend llm agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"

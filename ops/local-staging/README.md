@@ -7,6 +7,8 @@ Manual scripts to run VANESSA locally in a staging-like mode for human feature c
 - Ubuntu with Docker Engine and Docker Compose plugin (`docker compose`)
 - `curl`
 - Optional: `nc` (netcat) for PostgreSQL liveness checks
+- Host microphone device available at `/dev/snd` for wake-word container
+- Local wake-word model files under `models/kws/` (for example `models/kws/custom/`)
 
 ## Quickstart
 
@@ -29,7 +31,7 @@ From repository root:
   - Shows `docker compose ps -a` and a short running/exited/total summary.
   - Flag: `--json`
 - `health.sh`
-  - Checks frontend, backend, agent engine, sandbox, llm, weaviate, and postgres.
+  - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
 - `logs.sh`
@@ -63,18 +65,33 @@ Note: service runtime environment still comes from compose/env files (for exampl
 1. Fresh run: `./ops/local-staging/start.sh`
 2. Validate readiness: `./ops/local-staging/health.sh`
 3. Use app in browser: `http://localhost:3000`
-4. Check API health: `http://localhost:5000/health`
-5. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-6. Stop while keeping state: `./ops/local-staging/stop.sh`
+4. In the UI, use "Check backend" and expect success. The frontend calls `/api/health` and Vite proxies to backend.
+5. Check API health directly (host-to-container): `http://localhost:5000/health`
+6. Check wake-word service health: `http://localhost:10400/health`
+7. Simulate wake detection event:
+   `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
+8. Validate backend voice endpoints:
+   - `http://localhost:5000/voice/health`
+   - `http://localhost:5000/health`
+9. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+10. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 ## Troubleshooting
 
 - Port already in use:
   - Run `./ops/local-staging/status.sh`
-  - Free ports `3000, 5000, 6000, 7000, 8000, 8080, 5432` or adjust compose mapping.
+  - Free ports `3000, 5000, 6000, 7000, 8000, 8080, 10400, 5432` or adjust compose mapping.
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`
+- `kws` fails at startup:
+  - Confirm `/dev/snd` exists and Docker can map audio devices.
+  - Confirm `models/kws/` and `models/kws/custom/` exist.
+  - If `KWS_MODEL_PRELOAD` is set, make sure matching model files exist under `models/kws/`.
+- Frontend says backend fetch failed:
+  - Confirm frontend is loaded from `http://localhost:3000`.
+  - Confirm backend health is reachable at `http://localhost:5000/health`.
+  - The frontend should call `/api/health` (proxied by Vite), not `http://backend:5000/health` from browser context.
 - Rebuild needed after Dockerfile/dependency changes:
   - Run `./ops/local-staging/start.sh` (default includes `--build`)
 - Need clean DB/vector state:
