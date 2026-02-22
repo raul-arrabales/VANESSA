@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "./components/LanguageSwitcher";
 
 type HealthResponse = {
   status: string;
@@ -11,6 +13,7 @@ const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefi
   "/api";
 
 export default function App(): JSX.Element {
+  const { t } = useTranslation("common");
   const [state, setState] = useState<LoadState>("idle");
   const [result, setResult] = useState<HealthResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -47,21 +50,26 @@ export default function App(): JSX.Element {
   return (
     <main className="page">
       <section className="panel">
-        <h1>VANESSA</h1>
-        <p className="subtitle">Dummy frontend bootstrap</p>
+        <header className="panel-header">
+          <div>
+            <h1>{t("app.title")}</h1>
+            <p className="subtitle">{t("app.subtitle")}</p>
+          </div>
+          <LanguageSwitcher />
+        </header>
 
         <div className="status-row">
-          <span className="label">Backend URL</span>
+          <span className="label">{t("backend.url.label")}</span>
           <code>{healthUrl}</code>
         </div>
 
         <div className="status-row">
-          <span className="label">Backend status</span>
-          <strong data-state={state}>{state.toUpperCase()}</strong>
+          <span className="label">{t("backend.status.label")}</span>
+          <strong data-state={state}>{t(`backend.state.${state}`)}</strong>
         </div>
 
         <button type="button" onClick={checkBackend} disabled={state === "loading"}>
-          {state === "loading" ? "Checking..." : "Check backend"}
+          {state === "loading" ? t("backend.check.loading") : t("backend.check.cta")}
         </button>
 
         {state === "success" && result && (
@@ -69,7 +77,7 @@ export default function App(): JSX.Element {
         )}
 
         {state === "error" && (
-          <p className="error">Request failed: {errorMessage}</p>
+          <p className="error">{`${t("backend.error.prefix")} ${errorMessage}`}</p>
         )}
       </section>
     </main>

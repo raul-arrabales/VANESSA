@@ -1,0 +1,32 @@
+{
+  "app": {
+    "title": "VANESSA",
+    "subtitle": "Interfaz inicial de prueba"
+  },
+  "language": {
+    "label": "Idioma",
+    "en": "Ingles",
+    "es": "Espanol"
+  },
+  "backend": {
+    "url": {
+      "label": "URL del backend"
+    },
+    "status": {
+      "label": "Estado del backend"
+    },
+    "state": {
+      "idle": "INACTIVO",
+      "loading": "CARGANDO",
+      "success": "EXITO",
+      "error": "ERROR"
+    },
+    "check": {
+      "cta": "Comprobar backend",
+      "loading": "Comprobando..."
+    },
+    "error": {
+      "prefix": "La solicitud fallo:"
+    }
+  }
+}

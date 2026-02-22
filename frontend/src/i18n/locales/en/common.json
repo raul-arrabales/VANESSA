@@ -1,0 +1,32 @@
+{
+  "app": {
+    "title": "VANESSA",
+    "subtitle": "Dummy frontend bootstrap"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "es": "Spanish"
+  },
+  "backend": {
+    "url": {
+      "label": "Backend URL"
+    },
+    "status": {
+      "label": "Backend status"
+    },
+    "state": {
+      "idle": "IDLE",
+      "loading": "LOADING",
+      "success": "SUCCESS",
+      "error": "ERROR"
+    },
+    "check": {
+      "cta": "Check backend",
+      "loading": "Checking..."
+    },
+    "error": {
+      "prefix": "Request failed:"
+    }
+  }
+}

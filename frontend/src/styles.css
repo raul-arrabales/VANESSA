@@ -29,6 +29,13 @@ body {
   box-shadow: 0 12px 40px rgba(20, 40, 70, 0.14);
 }
 
+.panel-header {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 h1 {
   margin: 0;
   font-size: 2rem;
@@ -89,4 +96,18 @@ strong[data-state="error"] {
 .error {
   color: #b42318;
   font-weight: 600;
+}
+
+.language-switcher {
+  display: grid;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.language-switcher select {
+  border: 1px solid #bfd1eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+  color: #102a43;
 }
