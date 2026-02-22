@@ -18,6 +18,29 @@ The frontend uses a token-driven design system in `src/styles.css`.
 - Reuse primitive classes/components before introducing custom styles.
 - Add new reusable patterns to `/style-guide` in the same change.
 
+## Auth Routing
+
+Frontend auth uses local JWT bearer tokens returned by backend auth endpoints.
+
+- Token storage key: `localStorage["vanessa.auth_token"]`
+- Cached user storage key: `localStorage["vanessa.auth_user"]`
+- Authorization header: `Authorization: Bearer <token>`
+
+Current routes:
+
+- `/` home
+- `/style-guide` design reference
+- `/login` login form
+- `/register` registration form
+- `/me` authenticated profile page
+- `/admin/approvals` admin/superadmin activation page
+
+Role-based behavior:
+
+- login redirect: `admin` and `superadmin` -> `/admin/approvals`
+- login redirect: `user` -> `/me`
+- route guards enforce authentication and minimum role on protected pages.
+
 ## Internationalization (i18n)
 
 The frontend uses `react-i18next` with file-based locale bundles.

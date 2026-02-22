@@ -8,7 +8,11 @@
   "nav": {
     "aria": "Navegacion principal",
     "home": "Inicio",
-    "styleGuide": "Guia de estilo"
+    "styleGuide": "Guia de estilo",
+    "login": "Iniciar sesion",
+    "register": "Registro",
+    "me": "Perfil",
+    "approvals": "Aprobaciones"
   },
   "theme": {
     "toggle": {
@@ -42,6 +46,56 @@
     },
     "error": {
       "prefix": "La solicitud fallo:"
+    }
+  },
+  "auth": {
+    "logout": "Cerrar sesion",
+    "error": {
+      "unknown": "Algo salio mal. Intentalo de nuevo."
+    },
+    "login": {
+      "title": "Iniciar sesion",
+      "subtitle": "Usa tu cuenta local de VANESSA",
+      "identifier": "Correo o usuario",
+      "identifierPlaceholder": "admin@example.com o admin",
+      "password": "Contrasena",
+      "submit": "Entrar",
+      "submitting": "Entrando..."
+    },
+    "register": {
+      "title": "Registro",
+      "subtitle": "Crear una cuenta local",
+      "email": "Correo",
+      "username": "Usuario",
+      "password": "Contrasena",
+      "role": "Rol",
+      "pendingNote": "Las cuentas nuevas requieren aprobacion de admin o superadmin antes de iniciar sesion.",
+      "submit": "Crear cuenta",
+      "submitting": "Creando...",
+      "successPending": "Cuenta creada. Pendiente de activacion.",
+      "successActive": "Cuenta creada y activa."
+    },
+    "me": {
+      "title": "Mi perfil",
+      "missing": "No hay usuario activo.",
+      "email": "Correo",
+      "username": "Usuario",
+      "role": "Rol",
+      "active": "Activo",
+      "activeYes": "SI",
+      "activeNo": "NO",
+      "refresh": "Actualizar"
+    },
+    "approvals": {
+      "title": "Aprobaciones pendientes",
+      "subtitle": "Activa usuarios pendientes por ID.",
+      "note": "La lista de usuarios pendientes no esta disponible en esta version del backend.",
+      "userId": "ID de usuario",
+      "userIdPlaceholder": "42",
+      "invalidId": "Proporciona un ID numerico valido.",
+      "submit": "Activar usuario",
+      "submitting": "Activando...",
+      "success": "{{username}} activado ({{role}})."
     }
   }
 }

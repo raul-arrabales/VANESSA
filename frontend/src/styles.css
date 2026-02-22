@@ -162,6 +162,8 @@ a {
 .nav-links {
   display: inline-flex;
   gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .link-chip {
@@ -271,6 +273,11 @@ a {
   color: var(--text-primary);
 }
 
+.nav-logout {
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
+}
+
 .status-pill {
   width: fit-content;
   border-radius: 999px;
@@ -299,9 +306,18 @@ a {
   color: var(--text-secondary);
 }
 
+.success-text {
+  color: var(--status-success);
+  font-weight: 600;
+}
+
 .error-text {
   color: var(--status-error);
   font-weight: 600;
+}
+
+.auth-panel {
+  width: min(620px, 100%);
 }
 
 .style-guide {
@@ -364,6 +380,11 @@ a {
 
 .status-demo {
   align-items: center;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .field-input:focus-visible,

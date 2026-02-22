@@ -8,7 +8,11 @@
   "nav": {
     "aria": "Primary navigation",
     "home": "Home",
-    "styleGuide": "Style guide"
+    "styleGuide": "Style guide",
+    "login": "Login",
+    "register": "Register",
+    "me": "Profile",
+    "approvals": "Approvals"
   },
   "theme": {
     "toggle": {
@@ -42,6 +46,56 @@
     },
     "error": {
       "prefix": "Request failed:"
+    }
+  },
+  "auth": {
+    "logout": "Logout",
+    "error": {
+      "unknown": "Something went wrong. Please try again."
+    },
+    "login": {
+      "title": "Login",
+      "subtitle": "Use your local VANESSA account",
+      "identifier": "Email or username",
+      "identifierPlaceholder": "admin@example.com or admin",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in..."
+    },
+    "register": {
+      "title": "Register",
+      "subtitle": "Create a local account",
+      "email": "Email",
+      "username": "Username",
+      "password": "Password",
+      "role": "Role",
+      "pendingNote": "New accounts require approval by an admin or superadmin before login.",
+      "submit": "Create account",
+      "submitting": "Creating...",
+      "successPending": "Account created. It is pending activation.",
+      "successActive": "Account created and active."
+    },
+    "me": {
+      "title": "My profile",
+      "missing": "No active user found.",
+      "email": "Email",
+      "username": "Username",
+      "role": "Role",
+      "active": "Active",
+      "activeYes": "YES",
+      "activeNo": "NO",
+      "refresh": "Refresh"
+    },
+    "approvals": {
+      "title": "Pending user approvals",
+      "subtitle": "Activate pending users by ID.",
+      "note": "Listing pending users is not available yet in this backend version.",
+      "userId": "User ID",
+      "userIdPlaceholder": "42",
+      "invalidId": "Provide a valid numeric user ID.",
+      "submit": "Activate user",
+      "submitting": "Activating...",
+      "success": "Activated {{username}} ({{role}})."
     }
   }
 }

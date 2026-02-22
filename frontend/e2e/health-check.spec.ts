@@ -120,3 +120,144 @@ test("keeps critical text contrast at WCAG AA levels", async ({ page }) => {
 
   expect(contrastRatio).toBeGreaterThanOrEqual(4.5);
 });
+
+test("logs in and redirects by role", async ({ page }) => {
+  await page.route("**/auth/login", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        access_token: "admin-token",
+        token_type: "bearer",
+        expires_in: 28800,
+        user: {
+          id: 1,
+          email: "admin@example.com",
+          username: "admin",
+          role: "admin",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/login");
+  await page.getByLabel("Email or username").fill("admin");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/approvals$/);
+  await expect(page.getByRole("heading", { name: "Pending user approvals" })).toBeVisible();
+});
+
+test("shows login error for invalid credentials", async ({ page }) => {
+  await page.route("**/auth/login", async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "invalid_credentials", message: "Invalid credentials" }),
+    });
+  });
+
+  await page.goto("/login");
+  await page.getByLabel("Email or username").fill("user");
+  await page.getByLabel("Password").fill("wrong");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByText("Invalid credentials")).toBeVisible();
+});
+
+test("redirects protected route without auth", async ({ page }) => {
+  await page.goto("/me");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
+});
+
+test("blocks standard user from admin approvals", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("vanessa.auth_token", "user-token");
+    window.localStorage.setItem(
+      "vanessa.auth_user",
+      JSON.stringify({
+        id: 9,
+        email: "user@example.com",
+        username: "user",
+        role: "user",
+        is_active: true,
+      }),
+    );
+  });
+
+  await page.route("**/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: 9,
+          email: "user@example.com",
+          username: "user",
+          role: "user",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/admin/approvals");
+  await expect(page.getByText("You do not have permission to access this page.")).toBeVisible();
+});
+
+test("admin activates pending user by id", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("vanessa.auth_token", "admin-token");
+    window.localStorage.setItem(
+      "vanessa.auth_user",
+      JSON.stringify({
+        id: 2,
+        email: "admin@example.com",
+        username: "admin",
+        role: "admin",
+        is_active: true,
+      }),
+    );
+  });
+
+  await page.route("**/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: 2,
+          email: "admin@example.com",
+          username: "admin",
+          role: "admin",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.route("**/auth/users/42/activate", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: 42,
+          email: "pending@example.com",
+          username: "pending",
+          role: "user",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/admin/approvals");
+  await page.getByLabel("User ID").fill("42");
+  await page.getByRole("button", { name: "Activate user" }).click();
+
+  await expect(page.getByText("Activated pending (user).")).toBeVisible();
+});
