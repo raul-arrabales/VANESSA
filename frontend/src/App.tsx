@@ -6,12 +6,15 @@ import { useAuth } from "./auth/AuthProvider";
 import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
+import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
 import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
+import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
+import UserWelcomePage from "./pages/UserWelcomePage";
 import WelcomePage from "./pages/WelcomePage";
 
 function AppHeader(): JSX.Element {
@@ -108,6 +111,9 @@ export default function App(): JSX.Element {
         <Route
           path="/welcome/user"
           element={(
+            <RequireRole role="user">
+              <UserWelcomePage />
+            </RequireRole>
             <RequireAuth>
               <WelcomePage role="user" />
             </RequireAuth>
@@ -116,6 +122,9 @@ export default function App(): JSX.Element {
         <Route
           path="/welcome/admin"
           element={(
+            <RequireRole role="admin">
+              <AdminWelcomePage />
+            </RequireRole>
             <RequireAuth>
               <WelcomePage role="admin" />
             </RequireAuth>
@@ -124,6 +133,9 @@ export default function App(): JSX.Element {
         <Route
           path="/welcome/superadmin"
           element={(
+            <RequireRole role="superadmin">
+              <SuperAdminWelcomePage />
+            </RequireRole>
             <RequireAuth>
               <WelcomePage role="superadmin" />
             </RequireAuth>
