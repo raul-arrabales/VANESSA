@@ -6,11 +6,14 @@ import { useAuth } from "./auth/AuthProvider";
 import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
+import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
+import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
+import UserWelcomePage from "./pages/UserWelcomePage";
 
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
@@ -98,6 +101,30 @@ export default function App(): JSX.Element {
           element={(
             <RequireRole role="admin">
               <AdminApprovalsPage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/user"
+          element={(
+            <RequireRole role="user">
+              <UserWelcomePage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/admin"
+          element={(
+            <RequireRole role="admin">
+              <AdminWelcomePage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/superadmin"
+          element={(
+            <RequireRole role="superadmin">
+              <SuperAdminWelcomePage />
             </RequireRole>
           )}
         />
