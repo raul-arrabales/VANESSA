@@ -12,7 +12,12 @@
     "login": "Login",
     "register": "Register",
     "me": "Profile",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "welcome": {
+      "user": "Welcome",
+      "admin": "Admin welcome",
+      "superadmin": "Superadmin welcome"
+    }
   },
   "theme": {
     "toggle": {
@@ -96,6 +101,36 @@
       "submit": "Activate user",
       "submitting": "Activating...",
       "success": "Activated {{username}} ({{role}})."
+    },
+    "welcome": {
+      "availableItems": "Items available for this role:",
+      "user": {
+        "title": "Welcome, user",
+        "subtitle": "You can manage your own assistant workspace.",
+        "items": {
+          "item1": "View and edit your profile details.",
+          "item2": "Run personal semantic search tasks.",
+          "item3": "Track your own automation sessions."
+        }
+      },
+      "admin": {
+        "title": "Welcome, admin",
+        "subtitle": "You can moderate users and monitor operations.",
+        "items": {
+          "item1": "Approve pending user accounts.",
+          "item2": "Manage standard user access.",
+          "item3": "Review system usage for your team."
+        }
+      },
+      "superadmin": {
+        "title": "Welcome, superadmin",
+        "subtitle": "You have full platform governance controls.",
+        "items": {
+          "item1": "Access all admin approvals and workflows.",
+          "item2": "Configure platform-wide policies and roles.",
+          "item3": "Audit sensitive system-wide activity."
+        }
+      }
     }
   }
 }

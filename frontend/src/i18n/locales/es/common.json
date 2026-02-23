@@ -12,7 +12,12 @@
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
-    "approvals": "Aprobaciones"
+    "approvals": "Aprobaciones",
+    "welcome": {
+      "user": "Bienvenida",
+      "admin": "Bienvenida admin",
+      "superadmin": "Bienvenida superadmin"
+    }
   },
   "theme": {
     "toggle": {
@@ -96,6 +101,36 @@
       "submit": "Activar usuario",
       "submitting": "Activando...",
       "success": "{{username}} activado ({{role}})."
+    },
+    "welcome": {
+      "availableItems": "Elementos disponibles para este rol:",
+      "user": {
+        "title": "Bienvenida, usuario",
+        "subtitle": "Puedes gestionar tu propio espacio del asistente.",
+        "items": {
+          "item1": "Ver y editar los detalles de tu perfil.",
+          "item2": "Ejecutar tareas personales de busqueda semantica.",
+          "item3": "Seguir tus propias sesiones de automatizacion."
+        }
+      },
+      "admin": {
+        "title": "Bienvenida, admin",
+        "subtitle": "Puedes moderar usuarios y supervisar operaciones.",
+        "items": {
+          "item1": "Aprobar cuentas de usuario pendientes.",
+          "item2": "Gestionar el acceso de usuarios estandar.",
+          "item3": "Revisar el uso del sistema de tu equipo."
+        }
+      },
+      "superadmin": {
+        "title": "Bienvenida, superadmin",
+        "subtitle": "Tienes controles completos de gobernanza de la plataforma.",
+        "items": {
+          "item1": "Acceder a todas las aprobaciones y flujos de admin.",
+          "item2": "Configurar politicas y roles para toda la plataforma.",
+          "item3": "Auditar actividad sensible de todo el sistema."
+        }
+      }
     }
   }
 }

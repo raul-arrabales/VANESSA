@@ -11,8 +11,13 @@ export function hasRequiredRole(current: Role, required: Role): boolean {
 }
 
 export function getDefaultRouteForRole(role: Role): string {
-  if (role === "admin" || role === "superadmin") {
-    return "/admin/approvals";
+  if (role === "superadmin") {
+    return "/welcome/superadmin";
   }
-  return "/me";
+
+  if (role === "admin") {
+    return "/welcome/admin";
+  }
+
+  return "/welcome/user";
 }
