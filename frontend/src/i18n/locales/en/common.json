@@ -13,11 +13,7 @@
     "register": "Register",
     "me": "Profile",
     "approvals": "Approvals",
-    "welcome": {
-      "user": "Welcome",
-      "admin": "Admin welcome",
-      "superadmin": "Superadmin welcome"
-    }
+    "backendHealth": "Backend health"
   },
   "theme": {
     "toggle": {
@@ -131,6 +127,22 @@
           "item3": "Audit sensitive system-wide activity."
         }
       }
+    }
+  },
+  "home": {
+    "guest": {
+      "title": "Welcome to VANESSA",
+      "description": "Sign in or create an account to start using your local AI mission console.",
+      "actions": "Guest quick actions",
+      "login": "Go to login",
+      "register": "Create an account"
+    },
+    "authenticated": {
+      "title": "Welcome back",
+      "description": "You are signed in as {{username}}. Open your profile or run backend diagnostics.",
+      "actions": "Signed-in quick actions",
+      "profile": "View profile",
+      "backendHealth": "Run backend diagnostics"
     }
   }
 }

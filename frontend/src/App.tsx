@@ -8,12 +8,14 @@ import { getDefaultRouteForRole } from "./auth/roles";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
 import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
+import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
-import SuperadminWelcomePage from "./pages/SuperadminWelcomePage";
+import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
 import UserWelcomePage from "./pages/UserWelcomePage";
+import WelcomePage from "./pages/WelcomePage";
 
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
@@ -34,6 +36,7 @@ function AppHeader(): JSX.Element {
         <nav className="nav-links" aria-label={t("nav.aria")}>
           <Link to="/" className="link-chip">{t("nav.home")}</Link>
           <Link to="/style-guide" className="link-chip">{t("nav.styleGuide")}</Link>
+          <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
           {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
           {!isAuthenticated && <Link to="/register" className="link-chip">{t("nav.register")}</Link>}
           {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
@@ -75,6 +78,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/style-guide" element={<StyleGuidePage />} />
+        <Route path="/backend-health" element={<BackendHealthPage />} />
         <Route
           path="/login"
           element={(
@@ -129,6 +133,39 @@ export default function App(): JSX.Element {
             <RequireRole role="admin">
               <AdminApprovalsPage />
             </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/user"
+          element={(
+            <RequireRole role="user">
+              <UserWelcomePage />
+            </RequireRole>
+            <RequireAuth>
+              <WelcomePage role="user" />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/welcome/admin"
+          element={(
+            <RequireRole role="admin">
+              <AdminWelcomePage />
+            </RequireRole>
+            <RequireAuth>
+              <WelcomePage role="admin" />
+            </RequireAuth>
+          )}
+        />
+        <Route
+          path="/welcome/superadmin"
+          element={(
+            <RequireRole role="superadmin">
+              <SuperAdminWelcomePage />
+            </RequireRole>
+            <RequireAuth>
+              <WelcomePage role="superadmin" />
+            </RequireAuth>
           )}
         />
         <Route path="*" element={<Navigate to="/" replace />} />

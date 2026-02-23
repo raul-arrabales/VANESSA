@@ -13,11 +13,7 @@
     "register": "Registro",
     "me": "Perfil",
     "approvals": "Aprobaciones",
-    "welcome": {
-      "user": "Bienvenida",
-      "admin": "Bienvenida admin",
-      "superadmin": "Bienvenida superadmin"
-    }
+    "backendHealth": "Salud del backend"
   },
   "theme": {
     "toggle": {
@@ -131,6 +127,22 @@
           "item3": "Auditar actividad sensible de todo el sistema."
         }
       }
+    }
+  },
+  "home": {
+    "guest": {
+      "title": "Bienvenido a VANESSA",
+      "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola local de IA.",
+      "actions": "Acciones rapidas para invitados",
+      "login": "Ir a inicio de sesion",
+      "register": "Crear una cuenta"
+    },
+    "authenticated": {
+      "title": "Bienvenido de nuevo",
+      "description": "Has iniciado sesion como {{username}}. Abre tu perfil o ejecuta diagnosticos del backend.",
+      "actions": "Acciones rapidas con sesion iniciada",
+      "profile": "Ver perfil",
+      "backendHealth": "Ejecutar diagnosticos del backend"
     }
   }
 }
