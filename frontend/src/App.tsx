@@ -22,6 +22,8 @@ function AppHeader(): JSX.Element {
   const { user, isAuthenticated, logout } = useAuth();
 
   const canAccessApprovals = user?.role === "admin" || user?.role === "superadmin";
+  const welcomeLabelKey = user?.role ? `nav.welcome.${user.role}` : "nav.welcome.user";
+  const welcomeRoute = user?.role ? getDefaultRouteForRole(user.role) : "/welcome/user";
 
   return (
     <header className="app-header panel">
@@ -37,6 +39,7 @@ function AppHeader(): JSX.Element {
           <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
           {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
           {!isAuthenticated && <Link to="/register" className="link-chip">{t("nav.register")}</Link>}
+          {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
           {isAuthenticated && <Link to="/me" className="link-chip">{t("nav.me")}</Link>}
           {isAuthenticated && canAccessApprovals && (
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
@@ -90,6 +93,30 @@ export default function App(): JSX.Element {
             <AuthRedirect>
               <RegisterPage />
             </AuthRedirect>
+          )}
+        />
+        <Route
+          path="/welcome/user"
+          element={(
+            <RequireRole role="user">
+              <UserWelcomePage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/admin"
+          element={(
+            <RequireRole role="admin">
+              <AdminWelcomePage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/superadmin"
+          element={(
+            <RequireRole role="superadmin">
+              <SuperadminWelcomePage />
+            </RequireRole>
           )}
         />
         <Route
