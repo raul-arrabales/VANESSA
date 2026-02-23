@@ -7,6 +7,7 @@ import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
 import HomePage from "./pages/HomePage";
+import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
@@ -29,6 +30,7 @@ function AppHeader(): JSX.Element {
         <nav className="nav-links" aria-label={t("nav.aria")}>
           <Link to="/" className="link-chip">{t("nav.home")}</Link>
           <Link to="/style-guide" className="link-chip">{t("nav.styleGuide")}</Link>
+          <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
           {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
           {!isAuthenticated && <Link to="/register" className="link-chip">{t("nav.register")}</Link>}
           {isAuthenticated && <Link to="/me" className="link-chip">{t("nav.me")}</Link>}
@@ -69,6 +71,7 @@ export default function App(): JSX.Element {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/style-guide" element={<StyleGuidePage />} />
+        <Route path="/backend-health" element={<BackendHealthPage />} />
         <Route
           path="/login"
           element={(
