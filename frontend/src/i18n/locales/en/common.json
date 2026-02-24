@@ -176,6 +176,18 @@
       "title": "User settings",
       "description": "Manage your account preferences and personal workspace access."
     },
+    "personalization": {
+      "title": "Personalization",
+      "description": "Configure how the interface appears and behaves for your account.",
+      "language": {
+        "title": "Language",
+        "description": "Choose your preferred interface language."
+      },
+      "theme": {
+        "title": "Theme mode",
+        "description": "Switch between day and night mode."
+      }
+    },
     "navigation": {
       "title": "Settings navigation",
       "overview": "Overview",

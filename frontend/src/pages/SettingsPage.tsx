@@ -1,7 +1,9 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProfileSection from "../components/ProfileSection";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function SettingsPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -21,6 +23,23 @@ export default function SettingsPage(): JSX.Element {
           <article className="panel card-stack">
             <h2 className="section-title">{t("settings.user.title")}</h2>
             <p className="status-text">{t("settings.user.description")}</p>
+          </article>
+
+          <article className="panel card-stack">
+            <h2 className="section-title">{t("settings.personalization.title")}</h2>
+            <p className="status-text">{t("settings.personalization.description")}</p>
+            <section className="card-stack" aria-label={t("settings.personalization.language.title")}>
+              <h3 className="section-title">{t("settings.personalization.language.title")}</h3>
+              <p className="status-text">{t("settings.personalization.language.description")}</p>
+              <LanguageSwitcher />
+            </section>
+            <section className="card-stack" aria-label={t("settings.personalization.theme.title")}>
+              <h3 className="section-title">{t("settings.personalization.theme.title")}</h3>
+              <p className="status-text">{t("settings.personalization.theme.description")}</p>
+              <div className="button-row">
+                <ThemeToggle />
+              </div>
+            </section>
           </article>
 
           {isAdmin && (

@@ -18,6 +18,7 @@ From repository root:
 ./ops/local-staging/start.sh
 ./ops/local-staging/health.sh
 ./ops/local-staging/logs.sh --follow
+./ops/local-staging/restart-service.sh --service frontend
 ./ops/local-staging/stop.sh
 ```
 
@@ -40,6 +41,10 @@ From repository root:
 - `logs.sh`
   - Shows or streams logs for all services or one service.
   - Flags: `--service <name>`, `--tail <n>`, `--follow`
+- `restart-service.sh`
+  - Rebuilds/restarts one service for fast iteration; defaults to `--build --no-deps --wait`.
+  - Flags: `--service <name>`, `--no-build`, `--with-deps`, `--no-wait`, `--timeout <seconds>`, `--env-file <path>`
+  - Exit codes: `0` success, `2` readiness timeout
 - `stop.sh`
   - Stops stack and preserves data by default.
   - Flag: `--volumes` to run `down -v`
@@ -115,6 +120,21 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - `http://localhost:5000/health`
 10. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
 11. Stop while keeping state: `./ops/local-staging/stop.sh`
+
+## Fast Rebuild/Restart (Single Service)
+
+Use the targeted restart script when only one service changed:
+
+```bash
+# Frontend-only change
+./ops/local-staging/restart-service.sh --service frontend
+
+# Backend Python code change without image rebuild
+./ops/local-staging/restart-service.sh --service backend --no-build
+
+# Restart backend and dependencies if needed
+./ops/local-staging/restart-service.sh --service backend --with-deps
+```
 
 ## Troubleshooting
 

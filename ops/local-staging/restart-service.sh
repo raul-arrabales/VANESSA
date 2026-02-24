@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib/common.sh"
+
+target_service=""
+build_mode=true
+wait_mode=true
+with_deps=false
+timeout_seconds=90
+
+usage() {
+  cat <<USAGE
+Usage: $(basename "$0") --service <name> [--no-build] [--with-deps] [--no-wait] [--timeout <seconds>] [--env-file <path>]
+
+Rebuilds/restarts a single VANESSA service for faster local iteration.
+Defaults to --build, --no-deps, and waiting for the target service readiness check.
+USAGE
+}
+
+http_ok() {
+  local url="$1"
+  curl --silent --show-error --max-time 2 --fail "$url" >/dev/null
+}
+
+tcp_ok() {
+  local host="$1"
+  local port="$2"
+
+  if command -v nc >/dev/null 2>&1; then
+    nc -z -w 2 "$host" "$port" >/dev/null 2>&1
+    return $?
+  fi
+
+  timeout 2 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1
+}
+
+check_service_ready() {
+  case "${target_service}" in
+    frontend) http_ok "http://localhost:3000/" ;;
+    backend) http_ok "http://localhost:5000/health" ;;
+    agent_engine) http_ok "http://localhost:7000/health" ;;
+    sandbox) http_ok "http://localhost:6000/health" ;;
+    kws) http_ok "http://localhost:10400/health" ;;
+    llm) http_ok "http://localhost:8000/" ;;
+    weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
+    postgres) tcp_ok "localhost" "5432" ;;
+    *) return 1 ;;
+  esac
+}
+
+wait_for_service() {
+  local deadline=$((SECONDS + timeout_seconds))
+
+  log_info "Waiting for ${target_service} readiness (timeout: ${timeout_seconds}s)"
+  while (( SECONDS < deadline )); do
+    if check_service_ready; then
+      log_info "${target_service} is ready"
+      return 0
+    fi
+    sleep 2
+  done
+
+  log_error "Timeout waiting for ${target_service} readiness"
+  return 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --service)
+      [[ $# -ge 2 ]] || die "--service requires a value"
+      target_service="$2"
+      shift 2
+      ;;
+    --no-build)
+      build_mode=false
+      shift
+      ;;
+    --with-deps)
+      with_deps=true
+      shift
+      ;;
+    --no-wait)
+      wait_mode=false
+      shift
+      ;;
+    --timeout)
+      [[ $# -ge 2 ]] || die "--timeout requires a value"
+      timeout_seconds="$2"
+      shift 2
+      ;;
+    --env-file)
+      [[ $# -ge 2 ]] || die "--env-file requires a path"
+      COMPOSE_ENV_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      die "Unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ -n "${target_service}" ]] || die "--service is required"
+[[ "${timeout_seconds}" =~ ^[0-9]+$ ]] || die "--timeout must be an integer"
+is_valid_service "${target_service}" || die "Invalid service: ${target_service}. Valid services: ${SERVICES[*]}"
+
+if [[ -n "${COMPOSE_ENV_FILE}" ]]; then
+  [[ -f "${COMPOSE_ENV_FILE}" ]] || die "--env-file does not exist: ${COMPOSE_ENV_FILE}"
+fi
+
+require_prerequisites
+
+log_info "Validating compose configuration"
+compose config >/dev/null || die "Compose configuration is invalid"
+
+compose_args=(-d)
+if [[ "${build_mode}" == true ]]; then
+  compose_args+=(--build)
+fi
+if [[ "${with_deps}" == false ]]; then
+  compose_args+=(--no-deps)
+fi
+
+log_info "Restarting service '${target_service}'"
+compose up "${compose_args[@]}" "${target_service}" || die "Failed to restart service: ${target_service}"
+
+if [[ "${wait_mode}" == true ]]; then
+  wait_for_service || exit 2
+fi
+
+exit 0

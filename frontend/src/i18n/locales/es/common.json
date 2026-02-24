@@ -176,6 +176,18 @@
       "title": "Configuración de usuario",
       "description": "Gestiona las preferencias de tu cuenta y el acceso a tu espacio personal."
     },
+    "personalization": {
+      "title": "Personalización",
+      "description": "Configura cómo se muestra y se comporta la interfaz para tu cuenta.",
+      "language": {
+        "title": "Idioma",
+        "description": "Elige tu idioma preferido para la interfaz."
+      },
+      "theme": {
+        "title": "Modo de tema",
+        "description": "Alterna entre modo de día y de noche."
+      }
+    },
     "navigation": {
       "title": "Navegación de configuración",
       "overview": "Resumen",

@@ -171,6 +171,9 @@ a {
 }
 
 .user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-muted);
   border-radius: 999px;
@@ -178,6 +181,32 @@ a {
   color: var(--text-primary);
   font: inherit;
   cursor: pointer;
+}
+
+.user-menu-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  color: var(--accent-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-menu-icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: currentColor;
+}
+
+.user-menu-label {
+  max-width: 12rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-menu-panel {

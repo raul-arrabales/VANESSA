@@ -1,8 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
-import LanguageSwitcher from "./components/LanguageSwitcher";
-import ThemeToggle from "./components/ThemeToggle";
 import { useAuth } from "./auth/AuthProvider";
 import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
@@ -60,8 +58,8 @@ function AppHeader(): JSX.Element {
       </div>
       <div className="toolbar" role="group" aria-label={t("app.controls") }>
         <nav className="nav-links" aria-label={t("nav.aria")}>
-          <Link to="/" className="link-chip">{t("nav.home")}</Link>
-          <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
+          {!isAuthenticated && <Link to="/" className="link-chip">{t("nav.home")}</Link>}
+          {isAuthenticated && <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>}
           {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
           {isAuthenticated && canAccessApprovals && (
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
@@ -75,7 +73,13 @@ function AppHeader(): JSX.Element {
             aria-controls={menuId}
             onClick={() => setIsMenuOpen((currentState) => !currentState)}
           >
-            {displayName}
+            <span className="user-menu-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 12.5a4.25 4.25 0 1 0-4.25-4.25A4.25 4.25 0 0 0 12 12.5Z" />
+                <path d="M12 13.75c-4.28 0-7.75 2.69-7.75 6v.5h15.5v-.5c0-3.31-3.47-6-7.75-6Z" />
+              </svg>
+            </span>
+            <span className="user-menu-label">{displayName}</span>
           </button>
           {isMenuOpen && (
             <div id={menuId} className="user-menu-panel">
@@ -98,8 +102,6 @@ function AppHeader(): JSX.Element {
             </div>
           )}
         </div>
-        <ThemeToggle />
-        <LanguageSwitcher />
       </div>
     </header>
   );

@@ -15,9 +15,12 @@ test("renders app shell and shows backend health success", async ({ page }) => {
 
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "VANESSA" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "VANESSA", exact: true })).toBeVisible();
+  const identityTrigger = page.getByRole("button", { name: "Guest" });
+  await expect(identityTrigger).toBeVisible();
+  await expect(identityTrigger.locator("svg")).toBeVisible();
+  await page.goto("/backend-health");
   await expect(page.getByText("Backend status")).toBeVisible();
-  await expect(page.getByLabel("Language")).toHaveValue("en");
 
   await page.getByRole("button", { name: "Check backend" }).click();
 
@@ -43,20 +46,81 @@ test("shows clear error state when backend request fails", async ({ page }) => {
 });
 
 test("switches language to Spanish and persists preference", async ({ page }) => {
-  await page.goto("/");
+  await page.addInitScript(() => {
+    window.localStorage.setItem("vanessa.auth_token", "user-token");
+    window.localStorage.setItem(
+      "vanessa.auth_user",
+      JSON.stringify({
+        id: 9,
+        email: "user@example.com",
+        username: "user",
+        role: "user",
+        is_active: true,
+      }),
+    );
+  });
+
+  await page.route("**/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: 9,
+          email: "user@example.com",
+          username: "user",
+          role: "user",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/settings");
 
   await page.getByLabel("Language").selectOption("es");
-  await expect(page.getByText("Estado del backend")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Comprobar backend" })).toBeVisible();
+  await expect(page.getByText("Idioma")).toBeVisible();
+  await expect(page.getByTestId("theme-toggle")).toContainText("Modo noche");
   await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("vanessa.locale"))).toBe("es");
 
   await page.reload();
-  await expect(page.getByText("Estado del backend")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Comprobar backend" })).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByText("Idioma")).toBeVisible();
+  await expect(page.getByTestId("theme-toggle")).toContainText("Modo noche");
 });
 
 test("toggles theme and persists mode after reload", async ({ page }) => {
-  await page.goto("/");
+  await page.addInitScript(() => {
+    window.localStorage.setItem("vanessa.auth_token", "user-token");
+    window.localStorage.setItem(
+      "vanessa.auth_user",
+      JSON.stringify({
+        id: 9,
+        email: "user@example.com",
+        username: "user",
+        role: "user",
+        is_active: true,
+      }),
+    );
+  });
+
+  await page.route("**/auth/me", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: 9,
+          email: "user@example.com",
+          username: "user",
+          role: "user",
+          is_active: true,
+        },
+      }),
+    });
+  });
+
+  await page.goto("/settings");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
   await page.getByTestId("theme-toggle").click();
@@ -64,6 +128,7 @@ test("toggles theme and persists mode after reload", async ({ page }) => {
   await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("vanessa.theme"))).toBe("dark");
 
   await page.reload();
+  await expect(page).toHaveURL(/\/settings$/);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.getByTestId("theme-toggle")).toContainText("Day mode");
 });

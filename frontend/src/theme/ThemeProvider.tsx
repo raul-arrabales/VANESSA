@@ -3,8 +3,11 @@ import {
   EDITABLE_COLOR_TOKENS,
   THEME_COLOR_OVERRIDES_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  type StoredColorOverrides,
+  type ThemeColorOverrides,
   type ThemeContextValue,
   type ThemeMode,
+  getThemeEffectiveColors,
   getInitialTheme,
   getStoredColorOverrides,
   getToggledTheme,
@@ -18,9 +21,9 @@ type ThemeProviderProps = {
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
   const [theme, setThemeState] = useState<ThemeMode>(() => getInitialTheme());
-  const [allColorOverrides, setAllColorOverrides] = useState<Partial<Record<ThemeMode, Partial<Record<string, string>>>>>(() => getStoredColorOverrides());
+  const [allColorOverrides, setAllColorOverrides] = useState<StoredColorOverrides>(() => getStoredColorOverrides());
 
-  const colorOverrides = allColorOverrides[theme] ?? {};
+  const colorOverrides: ThemeColorOverrides = allColorOverrides[theme] ?? {};
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -47,13 +50,15 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
     colorOverrides,
+    allColorOverrides,
     setTheme: (mode: ThemeMode) => {
       setThemeState(mode);
     },
     toggleTheme: () => {
       setThemeState((current) => getToggledTheme(current));
     },
-    applyColorOverrides: (nextOverrides: Partial<Record<string, string>>) => {
+    getEffectiveColors: (mode: ThemeMode) => getThemeEffectiveColors(mode, allColorOverrides),
+    applyColorOverrides: (nextOverrides: ThemeColorOverrides) => {
       setAllColorOverrides((currentOverrides) => ({
         ...currentOverrides,
         [theme]: nextOverrides,
@@ -65,7 +70,7 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
         [theme]: {},
       }));
     },
-  }), [colorOverrides, theme]);
+  }), [allColorOverrides, colorOverrides, theme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

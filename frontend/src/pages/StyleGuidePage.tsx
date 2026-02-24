@@ -1,32 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { EDITABLE_COLOR_TOKENS } from "../theme/theme";
+import { EDITABLE_COLOR_TOKENS, type ThemeColors } from "../theme/theme";
 import { useTheme } from "../theme/ThemeProvider";
 
 const spacingTokens = ["--space-1", "--space-2", "--space-3", "--space-4", "--space-5", "--space-6"] as const;
 const radiusTokens = ["--radius-sm", "--radius-md", "--radius-lg"] as const;
 const shadowTokens = ["--shadow-1", "--shadow-2", "--shadow-3"] as const;
 
-function getComputedTokenValue(token: string): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-}
-
 export default function StyleGuidePage(): JSX.Element {
-  const { theme, colorOverrides, applyColorOverrides, resetColorOverrides } = useTheme();
+  const { theme, colorOverrides, getEffectiveColors, applyColorOverrides, resetColorOverrides } = useTheme();
+  const activeThemeColors = useMemo<ThemeColors>(() => getEffectiveColors(theme), [getEffectiveColors, theme]);
 
-  const [draftColors, setDraftColors] = useState<Record<string, string>>(
-    Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)])),
-  );
+  const [draftColors, setDraftColors] = useState<ThemeColors>(activeThemeColors);
 
   useEffect(() => {
-    setDraftColors(Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)])));
-  }, [theme, colorOverrides]);
+    setDraftColors(activeThemeColors);
+  }, [activeThemeColors, theme, colorOverrides]);
 
   const isDirty = useMemo(
-    () => EDITABLE_COLOR_TOKENS.some((token) => draftColors[token] !== getComputedTokenValue(token)),
-    [draftColors],
+    () => EDITABLE_COLOR_TOKENS.some((token) => draftColors[token] !== activeThemeColors[token]),
+    [activeThemeColors, draftColors],
   );
 
   const handleColorChange = (token: string, color: string): void => {
@@ -42,8 +34,6 @@ export default function StyleGuidePage(): JSX.Element {
 
   const resetThemeChanges = (): void => {
     resetColorOverrides();
-    const nextDefaults = Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)]));
-    setDraftColors(nextDefaults);
   };
 
   return (
