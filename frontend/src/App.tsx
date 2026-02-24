@@ -35,19 +35,21 @@ function AppHeader(): JSX.Element {
         <nav className="nav-links" aria-label={t("nav.aria")}>
           <Link to="/" className="link-chip">{t("nav.home")}</Link>
           <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
-          {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
-          {!isAuthenticated && <Link to="/register" className="link-chip">{t("nav.register")}</Link>}
           {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
-          {isAuthenticated && <Link to="/settings" className="link-chip">{t("nav.settings")}</Link>}
           {isAuthenticated && canAccessApprovals && (
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
           )}
+        </nav>
+        <div className="nav-links" role="group" aria-label={t("nav.settingsMenuLabel")}>
+          <span className="link-chip">{isAuthenticated ? user?.username : t("nav.guest")}</span>
+          {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
+          {isAuthenticated && <Link to="/settings" className="link-chip">{t("nav.settings")}</Link>}
           {isAuthenticated && (
             <button type="button" className="btn btn-ghost nav-logout" onClick={() => void logout()}>
               {t("auth.logout")}
             </button>
           )}
-        </nav>
+        </div>
         <ThemeToggle />
         <LanguageSwitcher />
       </div>
