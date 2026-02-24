@@ -31,10 +31,10 @@ describe("RouteGuards", () => {
     mockAuthState = { user: null, isAuthenticated: false, isLoading: false };
 
     render(
-      <MemoryRouter initialEntries={["/me"]}>
+      <MemoryRouter initialEntries={["/settings"]}>
         <Routes>
           <Route
-            path="/me"
+            path="/settings"
             element={(
               <RequireAuth>
                 <div>profile</div>

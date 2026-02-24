@@ -13,7 +13,7 @@ const availableItems: AvailableItem[] = [
   {
     title: "View your profile",
     description: "Confirm identity, account status, and role information.",
-    to: "/me",
+    to: "/settings",
     minimumRole: "user",
   },
   {

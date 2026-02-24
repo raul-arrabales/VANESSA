@@ -13,7 +13,8 @@
     "register": "Registro",
     "me": "Perfil",
     "approvals": "Aprobaciones",
-    "backendHealth": "Salud del backend"
+    "backendHealth": "Salud del backend",
+    "settings": "Configuración"
   },
   "theme": {
     "toggle": {
@@ -143,6 +144,22 @@
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
       "backendHealth": "Ejecutar diagnosticos del backend"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "profile": {
+      "title": "Perfil y cuenta"
+    },
+    "admin": {
+      "title": "Configuración de administrador",
+      "description": "Gestiona los flujos de aprobación y la activación de cuentas.",
+      "approvals": "Abrir aprobaciones"
+    },
+    "superadmin": {
+      "title": "Configuración de superadministrador",
+      "description": "Accede a controles de plataforma y recursos de diseño.",
+      "styleGuide": "Abrir guía de estilo"
     }
   }
 }
