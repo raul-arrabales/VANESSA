@@ -13,7 +13,7 @@ const availableItems: AvailableItem[] = [
   {
     title: "Review account profile",
     description: "Inspect your own account metadata and role assignment.",
-    to: "/me",
+    to: "/settings",
     minimumRole: "user",
   },
   {

@@ -8,12 +8,16 @@
   "nav": {
     "aria": "Navegacion principal",
     "home": "Inicio",
-    "styleGuide": "Guia de estilo",
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
+    "guest": "Invitado",
     "approvals": "Aprobaciones",
-    "backendHealth": "Salud del backend"
+    "backendHealth": "Salud del backend",
+    "settings": "Configuración",
+    "settingsMenuLabel": "Menú de identidad y configuración",
+    "settingsHome": "Configuración",
+    "settingsDesign": "Recursos de diseño"
   },
   "theme": {
     "toggle": {
@@ -151,6 +155,31 @@
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
       "backendHealth": "Ejecutar diagnosticos del backend"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "profile": {
+      "title": "Perfil y cuenta"
+    },
+    "admin": {
+      "title": "Configuración de administrador",
+      "description": "Gestiona los flujos de aprobación y la activación de cuentas.",
+      "approvals": "Abrir aprobaciones"
+    },
+    "superadmin": {
+      "title": "Configuración de superadministrador",
+      "description": "Accede a controles de plataforma y recursos de diseño.",
+      "styleGuide": "Abrir guía de estilo"
+    },
+    "user": {
+      "title": "Configuración de usuario",
+      "description": "Gestiona las preferencias de tu cuenta y el acceso a tu espacio personal."
+    },
+    "navigation": {
+      "title": "Navegación de configuración",
+      "overview": "Resumen",
+      "design": "Diseño"
     }
   }
 }

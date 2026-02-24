@@ -8,12 +8,16 @@
   "nav": {
     "aria": "Primary navigation",
     "home": "Home",
-    "styleGuide": "Style guide",
     "login": "Login",
     "register": "Register",
     "me": "Profile",
+    "guest": "Guest",
     "approvals": "Approvals",
-    "backendHealth": "Backend health"
+    "backendHealth": "Backend health",
+    "settings": "Settings",
+    "settingsMenuLabel": "Identity and settings menu",
+    "settingsHome": "Settings",
+    "settingsDesign": "Design resources"
   },
   "theme": {
     "toggle": {
@@ -151,6 +155,31 @@
       "actions": "Signed-in quick actions",
       "profile": "View profile",
       "backendHealth": "Run backend diagnostics"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": {
+      "title": "Profile and account"
+    },
+    "admin": {
+      "title": "Admin settings",
+      "description": "Manage approval workflows and account activation.",
+      "approvals": "Open approvals"
+    },
+    "superadmin": {
+      "title": "Superadmin settings",
+      "description": "Access platform-level controls and design resources.",
+      "styleGuide": "Open style guide"
+    },
+    "user": {
+      "title": "User settings",
+      "description": "Manage your account preferences and personal workspace access."
+    },
+    "navigation": {
+      "title": "Settings navigation",
+      "overview": "Overview",
+      "design": "Design"
     }
   }
 }

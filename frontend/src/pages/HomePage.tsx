@@ -28,7 +28,7 @@ export default function HomePage(): JSX.Element {
         })}
       </p>
       <div className="toolbar" role="group" aria-label={t("home.authenticated.actions") }>
-        <Link to="/me" className="btn btn-primary">{t("home.authenticated.profile")}</Link>
+        <Link to="/settings" className="btn btn-primary">{t("home.authenticated.profile")}</Link>
         <Link to="/backend-health" className="btn btn-secondary">{t("home.authenticated.backendHealth")}</Link>
       </div>
     </section>

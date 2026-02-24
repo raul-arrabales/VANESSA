@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import LanguageSwitcher from "./components/LanguageSwitcher";
@@ -10,8 +11,8 @@ import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
 import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
-import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
+import SettingsPage from "./pages/SettingsPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
 import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
 import UserWelcomePage from "./pages/UserWelcomePage";
@@ -19,10 +20,36 @@ import UserWelcomePage from "./pages/UserWelcomePage";
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
 
   const canAccessApprovals = user?.role === "admin" || user?.role === "superadmin";
   const welcomeLabelKey = user?.role ? `nav.welcome.${user.role}` : "nav.welcome.user";
   const welcomeRoute = user?.role ? getDefaultRouteForRole(user.role) : "/welcome/user";
+  const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent): void => {
+      if (!menuContainerRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleEscapePress = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscapePress);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscapePress);
+    };
+  }, []);
 
   return (
     <header className="app-header panel">
@@ -34,21 +61,43 @@ function AppHeader(): JSX.Element {
       <div className="toolbar" role="group" aria-label={t("app.controls") }>
         <nav className="nav-links" aria-label={t("nav.aria")}>
           <Link to="/" className="link-chip">{t("nav.home")}</Link>
-          <Link to="/style-guide" className="link-chip">{t("nav.styleGuide")}</Link>
           <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>
-          {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
-          {!isAuthenticated && <Link to="/register" className="link-chip">{t("nav.register")}</Link>}
           {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
-          {isAuthenticated && <Link to="/me" className="link-chip">{t("nav.me")}</Link>}
           {isAuthenticated && canAccessApprovals && (
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
           )}
-          {isAuthenticated && (
-            <button type="button" className="btn btn-ghost nav-logout" onClick={() => void logout()}>
-              {t("auth.logout")}
-            </button>
-          )}
         </nav>
+        <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
+          <button
+            type="button"
+            className="user-menu-trigger"
+            aria-expanded={isMenuOpen}
+            aria-controls={menuId}
+            onClick={() => setIsMenuOpen((currentState) => !currentState)}
+          >
+            {displayName}
+          </button>
+          {isMenuOpen && (
+            <div id={menuId} className="user-menu-panel">
+              {!isAuthenticated && <Link to="/login" className="user-menu-item" onClick={() => setIsMenuOpen(false)}>{t("nav.login")}</Link>}
+              {isAuthenticated && (
+                <>
+                  <Link to="/settings" className="user-menu-item" onClick={() => setIsMenuOpen(false)}>{t("nav.settings")}</Link>
+                  <button
+                    type="button"
+                    className="user-menu-item user-menu-button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      void logout();
+                    }}
+                  >
+                    {t("auth.logout")}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         <ThemeToggle />
         <LanguageSwitcher />
       </div>
@@ -76,7 +125,6 @@ export default function App(): JSX.Element {
       <AppHeader />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/style-guide" element={<StyleGuidePage />} />
         <Route path="/backend-health" element={<BackendHealthPage />} />
         <Route
           path="/login"
@@ -119,13 +167,22 @@ export default function App(): JSX.Element {
           )}
         />
         <Route
-          path="/me"
+          path="/settings"
           element={(
             <RequireAuth>
-              <ProfilePage />
+              <SettingsPage />
             </RequireAuth>
           )}
-        />
+        >
+          <Route
+            path="design"
+            element={(
+              <RequireRole role="superadmin">
+                <StyleGuidePage />
+              </RequireRole>
+            )}
+          />
+        </Route>
         <Route
           path="/admin/approvals"
           element={(
