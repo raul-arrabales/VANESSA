@@ -13,13 +13,7 @@ const availableItems: AvailableItem[] = [
   {
     title: "View your profile",
     description: "Review your account details, active status, and role membership.",
-    to: "/me",
-    minimumRole: "user",
-  },
-  {
-    title: "Browse the style guide",
-    description: "See the UI patterns used throughout VANESSA's frontend.",
-    to: "/style-guide",
+    to: "/settings",
     minimumRole: "user",
   },
   {

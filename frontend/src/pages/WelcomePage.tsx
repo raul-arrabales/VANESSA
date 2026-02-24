@@ -23,7 +23,7 @@ export default function WelcomePage({ role }: WelcomePageProps): JSX.Element {
       <h2 className="section-title">Welcome, {role}</h2>
       <p className="status-text">You are signed in with {role} access.</p>
       <div className="form-actions">
-        <Link to="/me" className="btn btn-primary">View profile</Link>
+        <Link to="/settings" className="btn btn-primary">View profile</Link>
         {(role === "admin" || role === "superadmin") && (
           <Link to="/admin/approvals" className="btn btn-ghost">Open approvals</Link>
         )}
