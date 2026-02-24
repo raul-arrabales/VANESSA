@@ -7,10 +7,11 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 build_flag="--build"
 timeout_seconds="${START_TIMEOUT_SECONDS}"
+seed_sample_users=false
 
 usage() {
   cat <<USAGE
-Usage: $(basename "$0") [--no-build] [--timeout <seconds>] [--env-file <path>]
+Usage: $(basename "$0") [--no-build] [--timeout <seconds>] [--env-file <path>] [--seed-sample-users]
 
 Starts the full VANESSA stack using Docker Compose and waits for readiness.
 USAGE
@@ -31,6 +32,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--env-file requires a path"
       COMPOSE_ENV_FILE="$2"
       shift 2
+      ;;
+    --seed-sample-users)
+      seed_sample_users=true
+      shift
       ;;
     -h|--help)
       usage
@@ -74,6 +79,10 @@ set +e
 status=$?
 set -e
 if [[ ${status} -eq 0 ]]; then
+  if [[ "${seed_sample_users}" == true ]]; then
+    log_info "Seeding sample users for local manual testing"
+    COMPOSE_FILE="${COMPOSE_FILE}" COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE}" "${SCRIPT_DIR}/seed-users.sh" || die "Failed to seed sample users"
+  fi
   log_info "Stack is ready"
   exit 0
 fi

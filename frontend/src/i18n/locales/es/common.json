@@ -90,13 +90,21 @@
     "approvals": {
       "title": "Aprobaciones pendientes",
       "subtitle": "Activa usuarios pendientes por ID.",
+      "subtitleWithList": "Revisa y procesa los usuarios pendientes abajo.",
       "note": "La lista de usuarios pendientes no esta disponible en esta version del backend.",
       "userId": "ID de usuario",
       "userIdPlaceholder": "42",
       "invalidId": "Proporciona un ID numerico valido.",
       "submit": "Activar usuario",
       "submitting": "Activando...",
-      "success": "{{username}} activado ({{role}})."
+      "success": "{{username}} activado ({{role}}).",
+      "promote": "Promover a admin",
+      "promoteSuccess": "{{username}} promovido a admin.",
+      "loading": "Cargando usuarios pendientes...",
+      "refresh": "Actualizar lista",
+      "empty": "No hay usuarios pendientes.",
+      "tableAria": "Lista de usuarios pendientes",
+      "roleLabel": "Rol: {{role}}"
     },
     "welcome": {
       "availableItems": "Elementos disponibles para este rol:",

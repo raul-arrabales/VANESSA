@@ -25,8 +25,11 @@ From repository root:
 
 - `start.sh`
   - Starts all services with compose and waits until healthy.
-  - Flags: `--no-build`, `--timeout <seconds>`, `--env-file <path>`
+  - Flags: `--no-build`, `--timeout <seconds>`, `--env-file <path>`, `--seed-sample-users`
   - Exit codes: `0` ready, `1` failure, `2` readiness timeout
+- `seed-users.sh`
+  - Idempotently ensures one sample `superadmin`, one sample `admin`, and one sample `user`.
+  - Flags: `--timeout <seconds>`
 - `status.sh`
   - Shows `docker compose ps -a` and a short running/exited/total summary.
   - Flag: `--json`
@@ -57,24 +60,61 @@ Supported launcher variables:
 - `COMPOSE_FILE` (default: `infra/docker-compose.yml`)
 - `START_TIMEOUT_SECONDS` (default: `180`)
 - `LOG_TAIL_LINES` (default: `200`)
+- `SAMPLE_SUPERADMIN_USERNAME` (default: `sample-superadmin`)
+- `SAMPLE_SUPERADMIN_EMAIL` (default: `sample-superadmin@local.test`)
+- `SAMPLE_SUPERADMIN_PASSWORD` (default: `sample-superadmin-123`)
+- `SAMPLE_ADMIN_USERNAME` (default: `sample-admin`)
+- `SAMPLE_ADMIN_EMAIL` (default: `sample-admin@local.test`)
+- `SAMPLE_ADMIN_PASSWORD` (default: `sample-admin-123`)
+- `SAMPLE_USER_USERNAME` (default: `sample-user`)
+- `SAMPLE_USER_EMAIL` (default: `sample-user@local.test`)
+- `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 
+## Sample Auth Seeding
+
+Use sample seeding when you want fixed test users for manual auth and role workflows.
+
+- Seed as part of startup:
+  - `./ops/local-staging/start.sh --seed-sample-users`
+- Seed against an already running stack:
+  - `./ops/local-staging/seed-users.sh`
+- The seeding step is idempotent:
+  - Missing sample users are created.
+  - Existing sample users are updated only when role or active status differs.
+  - Password hashes are not overwritten for existing users.
+
+Default sample credentials:
+
+- Superadmin:
+  - username: `sample-superadmin`
+  - password: `sample-superadmin-123`
+- Admin:
+  - username: `sample-admin`
+  - password: `sample-admin-123`
+- User:
+  - username: `sample-user`
+  - password: `sample-user-123`
+
+Override these defaults in `ops/local-staging/.env.local` if needed.
+
 ## Manual Testing Flow Suggestions
 
-1. Fresh run: `./ops/local-staging/start.sh`
+1. Fresh run with sample users: `./ops/local-staging/start.sh --seed-sample-users`
 2. Validate readiness: `./ops/local-staging/health.sh`
 3. Use app in browser: `http://localhost:3000`
-4. In the UI, use "Check backend" and expect success. The frontend calls `/api/health` and Vite proxies to backend.
-5. Check API health directly (host-to-container): `http://localhost:5000/health`
-6. Check wake-word service health: `http://localhost:10400/health`
-7. Simulate wake detection event:
+4. Login as `sample-superadmin` and validate approvals/promotion flows.
+5. In the UI, use "Check backend" and expect success. The frontend calls `/api/health` and Vite proxies to backend.
+6. Check API health directly (host-to-container): `http://localhost:5000/health`
+7. Check wake-word service health: `http://localhost:10400/health`
+8. Simulate wake detection event:
    `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
-8. Validate backend voice endpoints:
+9. Validate backend voice endpoints:
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
-9. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-10. Stop while keeping state: `./ops/local-staging/stop.sh`
+10. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+11. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 ## Troubleshooting
 

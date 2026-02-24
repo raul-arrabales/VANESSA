@@ -36,6 +36,15 @@ def count_users(database_url: str) -> int:
     return int(row["total"]) if row else 0
 
 
+def count_users_by_role(database_url: str, role: str) -> int:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            "SELECT COUNT(*) AS total FROM users WHERE role = %s",
+            (role,),
+        ).fetchone()
+    return int(row["total"]) if row else 0
+
+
 def create_user(
     database_url: str,
     *,
@@ -109,3 +118,35 @@ def activate_user(database_url: str, user_id: int) -> UserRecord | None:
             (user_id,),
         ).fetchone()
     return dict(row) if row else None
+
+
+def update_user_role(database_url: str, user_id: int, role: str) -> UserRecord | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE users
+            SET role = %s, updated_at = NOW()
+            WHERE id = %s
+            RETURNING id, email, username, role, is_active, created_at, updated_at
+            """,
+            (role, user_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_users(database_url: str, *, is_active: bool | None = None) -> list[UserRecord]:
+    query = """
+        SELECT id, email, username, role, is_active, created_at, updated_at
+        FROM users
+    """
+    params: tuple[Any, ...] = ()
+
+    if is_active is not None:
+        query += " WHERE is_active = %s"
+        params = (is_active,)
+
+    query += " ORDER BY id ASC"
+
+    with get_connection(database_url) as connection:
+        rows = connection.execute(query, params).fetchall()
+    return [dict(row) for row in rows]

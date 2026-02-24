@@ -7,9 +7,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ApiError, activateUser as activateUserRequest, fetchMe, loginUser, logoutUser, registerUser } from "./authApi";
+import {
+  ApiError,
+  activateUser as activateUserRequest,
+  fetchMe,
+  listUsers as listUsersRequest,
+  loginUser,
+  logoutUser,
+  registerUser,
+  updateUserRole as updateUserRoleRequest,
+} from "./authApi";
 import { clearAuthStorage, persistAuth, readStoredToken, readStoredUser } from "./storage";
-import type { AuthUser, RegisterPayload } from "./types";
+import type { AuthUser, RegisterPayload, Role } from "./types";
 
 type AuthContextValue = {
   user: AuthUser | null;
@@ -21,6 +30,8 @@ type AuthContextValue = {
   refreshMe: () => Promise<AuthUser | null>;
   register: (payload: RegisterPayload) => Promise<AuthUser>;
   activatePendingUser: (userId: number) => Promise<AuthUser>;
+  listPendingUsers: () => Promise<AuthUser[]>;
+  updateUserRole: (userId: number, role: Role) => Promise<AuthUser>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -127,6 +138,40 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     }
   }, [clearAuth, token]);
 
+  const listPendingUsers = useCallback(async (): Promise<AuthUser[]> => {
+    const activeToken = token || readStoredToken();
+    if (!activeToken) {
+      throw new ApiError("Authentication required", 401, "missing_auth");
+    }
+
+    try {
+      const result = await listUsersRequest(activeToken, "pending");
+      return result.users;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuth();
+      }
+      throw error;
+    }
+  }, [clearAuth, token]);
+
+  const updateUserRole = useCallback(async (userId: number, role: Role): Promise<AuthUser> => {
+    const activeToken = token || readStoredToken();
+    if (!activeToken) {
+      throw new ApiError("Authentication required", 401, "missing_auth");
+    }
+
+    try {
+      const result = await updateUserRoleRequest(userId, role, activeToken);
+      return result.user;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearAuth();
+      }
+      throw error;
+    }
+  }, [clearAuth, token]);
+
   const value = useMemo<AuthContextValue>(() => ({
     user,
     token,
@@ -137,7 +182,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     refreshMe,
     register,
     activatePendingUser,
-  }), [activatePendingUser, isLoading, login, logout, refreshMe, register, token, user]);
+    listPendingUsers,
+    updateUserRole,
+  }), [activatePendingUser, isLoading, listPendingUsers, login, logout, refreshMe, register, token, updateUserRole, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

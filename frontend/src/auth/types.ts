@@ -35,3 +35,11 @@ export type MeResult = {
 export type ActivateResult = {
   user: AuthUser;
 };
+
+export type UsersResult = {
+  users: AuthUser[];
+};
+
+export type UpdateRoleResult = {
+  user: AuthUser;
+};

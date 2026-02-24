@@ -1,9 +1,18 @@
-import type { ActivateResult, LoginResult, MeResult, RegisterPayload, RegisterResult } from "./types";
+import type {
+  ActivateResult,
+  LoginResult,
+  MeResult,
+  RegisterPayload,
+  RegisterResult,
+  Role,
+  UpdateRoleResult,
+  UsersResult,
+} from "./types";
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH";
   body?: unknown;
   token?: string;
 };
@@ -75,4 +84,17 @@ export function logoutUser(token?: string): Promise<Record<string, unknown>> {
 
 export function activateUser(userId: number, token: string): Promise<ActivateResult> {
   return requestJson<ActivateResult>(`/auth/users/${userId}/activate`, { method: "POST", token });
+}
+
+export function listUsers(token: string, status?: "pending" | "active"): Promise<UsersResult> {
+  const query = status ? `?status=${status}` : "";
+  return requestJson<UsersResult>(`/auth/users${query}`, { token });
+}
+
+export function updateUserRole(userId: number, role: Role, token: string): Promise<UpdateRoleResult> {
+  return requestJson<UpdateRoleResult>(`/auth/users/${userId}/role`, {
+    method: "PATCH",
+    token,
+    body: { role },
+  });
 }

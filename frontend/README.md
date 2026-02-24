@@ -33,7 +33,7 @@ Current routes:
 - `/login` login form
 - `/register` registration form
 - `/me` authenticated profile page
-- `/admin/approvals` admin/superadmin activation page
+- `/admin/approvals` admin/superadmin pending approvals page (activate pending users, superadmin can promote users to admin)
 
 Role-based behavior:
 

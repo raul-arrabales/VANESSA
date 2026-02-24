@@ -38,6 +38,17 @@ Role hierarchy: `superadmin > admin > user`.
 - `admin` can activate only `user` role accounts.
 - `superadmin` can activate any role.
 
+6. `GET /auth/users?status=<pending|active>`
+- Requires `admin` or `superadmin`.
+- Returns sanitized user records.
+- `status=pending` returns inactive users; `status=active` returns active users.
+
+7. `PATCH /auth/users/<id>/role`
+- Requires `superadmin`.
+- Body: `{ "role": "user" | "admin" | "superadmin" }`
+- Updates role without changing activation status.
+- Demoting the last remaining `superadmin` is blocked.
+
 ## Environment Variables
 
 Required / important backend auth settings (see `infra/.env.example`):
@@ -61,6 +72,7 @@ On a fresh deployment with no users:
 2. Start backend once.
 3. Backend migrates schema and creates the first `superadmin` automatically.
 4. Remove bootstrap password from env after first successful startup.
+5. Restart backend after clearing bootstrap env vars to ensure the bootstrap secret is not retained in runtime environment.
 
 ## Security Notes
 

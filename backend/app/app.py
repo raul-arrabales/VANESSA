@@ -15,11 +15,14 @@ from .config import AuthConfig, get_auth_config
 from .db import run_auth_schema_migration
 from .repositories.users import (
     activate_user,
+    count_users_by_role,
     count_users,
     create_user,
     find_user_by_id,
     find_user_by_identifier,
+    list_users,
     sanitize_user_record,
+    update_user_role,
 )
 from .security import hash_password, verify_password
 
@@ -347,6 +350,66 @@ def activate_pending_user(user_id: int):
         return _json_error(404, "user_not_found", "User not found")
 
     return jsonify({"user": sanitize_user_record(updated)}), 200
+
+
+@app.get("/auth/users")
+@require_role("admin")
+def auth_users_list():
+    if (ready_error := _auth_ready_or_503()) is not None:
+        return ready_error
+
+    status = str(request.args.get("status", "")).strip().lower()
+    if status and status not in {"pending", "active"}:
+        return _json_error(400, "invalid_status", "status must be one of: pending, active")
+
+    active_filter: bool | None
+    if status == "pending":
+        active_filter = False
+    elif status == "active":
+        active_filter = True
+    else:
+        active_filter = None
+
+    users = [
+        sanitize_user_record(user)
+        for user in list_users(_get_config().database_url, is_active=active_filter)
+    ]
+    return jsonify({"users": users}), 200
+
+
+@app.patch("/auth/users/<int:user_id>/role")
+@require_role("superadmin")
+def update_role(user_id: int):
+    if (ready_error := _auth_ready_or_503()) is not None:
+        return ready_error
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    requested_role = str(payload.get("role", "")).strip().lower()
+    if requested_role not in AUTH_ROLES:
+        return _json_error(400, "invalid_role", "Invalid role value")
+
+    target_user = find_user_by_id(_get_config().database_url, user_id)
+    if target_user is None:
+        return _json_error(404, "user_not_found", "User not found")
+
+    target_role = str(target_user.get("role", "user"))
+    if target_role == "superadmin" and requested_role != "superadmin":
+        superadmin_count = count_users_by_role(_get_config().database_url, "superadmin")
+        if superadmin_count <= 1:
+            return _json_error(
+                409,
+                "last_superadmin_demote_forbidden",
+                "Cannot demote the last remaining superadmin",
+            )
+
+    updated_user = update_user_role(_get_config().database_url, user_id, requested_role)
+    if updated_user is None:
+        return _json_error(404, "user_not_found", "User not found")
+
+    return jsonify({"user": sanitize_user_record(updated_user)}), 200
 
 
 @app.get("/admin/ping")

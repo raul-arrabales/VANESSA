@@ -75,6 +75,24 @@ class InMemoryUserStore:
         user["updated_at"] = datetime.now(tz=timezone.utc)
         return dict(user)
 
+    def update_role(self, _database_url: str, user_id: int, role: str) -> dict[str, Any] | None:
+        user = self.users.get(user_id)
+        if user is None:
+            return None
+        user["role"] = role
+        user["updated_at"] = datetime.now(tz=timezone.utc)
+        return dict(user)
+
+    def list_users(self, _database_url: str, *, is_active: bool | None = None) -> list[dict[str, Any]]:
+        users = list(self.users.values())
+        if is_active is not None:
+            users = [user for user in users if user["is_active"] is is_active]
+        users.sort(key=lambda user: int(user["id"]))
+        return [dict(user) for user in users]
+
+    def count_by_role(self, _database_url: str, role: str) -> int:
+        return sum(1 for user in self.users.values() if user["role"] == role)
+
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch):
@@ -97,6 +115,9 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(backend_app_module, "find_user_by_identifier", store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", store.find_by_id)
     monkeypatch.setattr(backend_app_module, "activate_user", store.activate)
+    monkeypatch.setattr(backend_app_module, "update_user_role", store.update_role)
+    monkeypatch.setattr(backend_app_module, "list_users", store.list_users)
+    monkeypatch.setattr(backend_app_module, "count_users_by_role", store.count_by_role)
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -300,3 +321,121 @@ def test_activation_policy_for_admin_and_superadmin(client):
     )
     assert superadmin_can_activate_admin.status_code == 200
     assert superadmin_can_activate_admin.get_json()["user"]["is_active"] is True
+
+
+def test_list_pending_users_for_admin(client):
+    test_client, store = client
+    admin = store.create_user(
+        "ignored",
+        email="adminlist@example.com",
+        username="adminlist",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    store.create_user(
+        "ignored",
+        email="pending-list@example.com",
+        username="pendinglist",
+        password_hash=hash_password("pending-pass-123"),
+        role="user",
+        is_active=False,
+    )
+    store.create_user(
+        "ignored",
+        email="active-list@example.com",
+        username="activelist",
+        password_hash=hash_password("active-pass-123"),
+        role="user",
+        is_active=True,
+    )
+
+    admin_token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+    response = test_client.get("/auth/users?status=pending", headers=_auth_header(admin_token))
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["users"]) == 1
+    assert payload["users"][0]["username"] == "pendinglist"
+    assert payload["users"][0]["is_active"] is False
+
+
+def test_superadmin_can_promote_user_to_admin(client):
+    test_client, store = client
+    superadmin = store.create_user(
+        "ignored",
+        email="rootset@example.com",
+        username="rootset",
+        password_hash=hash_password("super-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    pending_user = store.create_user(
+        "ignored",
+        email="promote@example.com",
+        username="promote",
+        password_hash=hash_password("pending-pass-123"),
+        role="user",
+        is_active=False,
+    )
+
+    super_token = _login(test_client, superadmin["username"], "super-pass-123").get_json()["access_token"]
+    response = test_client.patch(
+        f"/auth/users/{pending_user['id']}/role",
+        headers=_auth_header(super_token),
+        json={"role": "admin"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["user"]["role"] == "admin"
+    assert response.get_json()["user"]["is_active"] is False
+
+
+def test_admin_cannot_update_roles(client):
+    test_client, store = client
+    admin = store.create_user(
+        "ignored",
+        email="noroleadmin@example.com",
+        username="noroleadmin",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    target = store.create_user(
+        "ignored",
+        email="target@example.com",
+        username="target",
+        password_hash=hash_password("target-pass-123"),
+        role="user",
+        is_active=True,
+    )
+
+    admin_token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+    response = test_client.patch(
+        f"/auth/users/{target['id']}/role",
+        headers=_auth_header(admin_token),
+        json={"role": "admin"},
+    )
+    assert response.status_code == 403
+
+
+def test_last_superadmin_cannot_demote_self(client):
+    test_client, store = client
+    superadmin = store.create_user(
+        "ignored",
+        email="lonely-root@example.com",
+        username="lonelyroot",
+        password_hash=hash_password("super-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+
+    super_token = _login(test_client, superadmin["username"], "super-pass-123").get_json()["access_token"]
+    response = test_client.patch(
+        f"/auth/users/{superadmin['id']}/role",
+        headers=_auth_header(super_token),
+        json={"role": "admin"},
+    )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "last_superadmin_demote_forbidden"

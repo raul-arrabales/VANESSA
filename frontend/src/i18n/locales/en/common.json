@@ -90,13 +90,21 @@
     "approvals": {
       "title": "Pending user approvals",
       "subtitle": "Activate pending users by ID.",
+      "subtitleWithList": "Review and process pending users below.",
       "note": "Listing pending users is not available yet in this backend version.",
       "userId": "User ID",
       "userIdPlaceholder": "42",
       "invalidId": "Provide a valid numeric user ID.",
       "submit": "Activate user",
       "submitting": "Activating...",
-      "success": "Activated {{username}} ({{role}})."
+      "success": "Activated {{username}} ({{role}}).",
+      "promote": "Promote to admin",
+      "promoteSuccess": "Promoted {{username}} to admin.",
+      "loading": "Loading pending users...",
+      "refresh": "Refresh list",
+      "empty": "No pending users.",
+      "tableAria": "Pending users list",
+      "roleLabel": "Role: {{role}}"
     },
     "welcome": {
       "availableItems": "Items available for this role:",
