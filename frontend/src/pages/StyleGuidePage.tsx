@@ -1,34 +1,81 @@
-const colorTokens = [
-  "--bg-canvas",
-  "--bg-surface",
-  "--bg-subtle",
-  "--text-primary",
-  "--text-secondary",
-  "--accent-primary",
-  "--accent-secondary",
-  "--border-muted",
-  "--status-success",
-  "--status-error",
-  "--lcars-rail",
-] as const;
+import { useEffect, useMemo, useState } from "react";
+import { EDITABLE_COLOR_TOKENS } from "../theme/theme";
+import { useTheme } from "../theme/ThemeProvider";
 
 const spacingTokens = ["--space-1", "--space-2", "--space-3", "--space-4", "--space-5", "--space-6"] as const;
 const radiusTokens = ["--radius-sm", "--radius-md", "--radius-lg"] as const;
 const shadowTokens = ["--shadow-1", "--shadow-2", "--shadow-3"] as const;
 
+function getComputedTokenValue(token: string): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+}
+
 export default function StyleGuidePage(): JSX.Element {
+  const { theme, colorOverrides, applyColorOverrides, resetColorOverrides } = useTheme();
+
+  const [draftColors, setDraftColors] = useState<Record<string, string>>(
+    Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)])),
+  );
+
+  useEffect(() => {
+    setDraftColors(Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)])));
+  }, [theme, colorOverrides]);
+
+  const isDirty = useMemo(
+    () => EDITABLE_COLOR_TOKENS.some((token) => draftColors[token] !== getComputedTokenValue(token)),
+    [draftColors],
+  );
+
+  const handleColorChange = (token: string, color: string): void => {
+    setDraftColors((current) => ({
+      ...current,
+      [token]: color,
+    }));
+  };
+
+  const applyThemeChanges = (): void => {
+    applyColorOverrides(Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, draftColors[token]])));
+  };
+
+  const resetThemeChanges = (): void => {
+    resetColorOverrides();
+    const nextDefaults = Object.fromEntries(EDITABLE_COLOR_TOKENS.map((token) => [token, getComputedTokenValue(token)]));
+    setDraftColors(nextDefaults);
+  };
+
   return (
     <section className="style-guide card-stack">
       <article className="panel card-stack">
-        <h2 className="section-title">Color Tokens</h2>
-        <p className="status-text">Semantic roles only. Components should never hardcode hex values.</p>
-        <div className="token-grid">
-          {colorTokens.map((token) => (
-            <div key={token} className="token-card">
-              <div className="token-swatch" style={{ backgroundColor: `var(${token})` }} aria-hidden="true" />
+        <h2 className="section-title">Theme color editor</h2>
+        <p className="status-text">Update design token colors for the active {theme} theme and apply them instantly.</p>
+        <div className="token-grid token-grid-editor">
+          {EDITABLE_COLOR_TOKENS.map((token) => (
+            <label key={token} className="token-card token-card-editor">
+              <div className="token-swatch" style={{ backgroundColor: draftColors[token] }} aria-hidden="true" />
               <code className="code-inline">{token}</code>
-            </div>
+              <input
+                className="field-input"
+                type="color"
+                value={draftColors[token]}
+                onChange={(event) => handleColorChange(token, event.target.value)}
+                aria-label={`${token} color`}
+              />
+              <input
+                className="field-input"
+                type="text"
+                value={draftColors[token]}
+                onChange={(event) => handleColorChange(token, event.target.value)}
+                aria-label={`${token} hex value`}
+              />
+            </label>
           ))}
+        </div>
+        <div className="button-row">
+          <button className="btn btn-primary" type="button" onClick={applyThemeChanges} disabled={!isDirty}>Apply theme changes</button>
+          <button className="btn btn-secondary" type="button" onClick={resetThemeChanges}>Reset current theme</button>
         </div>
       </article>
 
@@ -53,7 +100,7 @@ export default function StyleGuidePage(): JSX.Element {
       </article>
 
       <article className="panel card-stack">
-        <h2 className="section-title">Primitives</h2>
+        <h2 className="section-title">Primitives preview</h2>
         <div className="button-row">
           <button className="btn btn-primary" type="button">Primary</button>
           <button className="btn btn-secondary" type="button">Secondary</button>
