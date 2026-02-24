@@ -15,7 +15,6 @@ import RegisterPage from "./pages/RegisterPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
 import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
 import UserWelcomePage from "./pages/UserWelcomePage";
-import WelcomePage from "./pages/WelcomePage";
 
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
@@ -115,7 +114,7 @@ export default function App(): JSX.Element {
           path="/welcome/superadmin"
           element={(
             <RequireRole role="superadmin">
-              <SuperadminWelcomePage />
+              <SuperAdminWelcomePage />
             </RequireRole>
           )}
         />
@@ -133,39 +132,6 @@ export default function App(): JSX.Element {
             <RequireRole role="admin">
               <AdminApprovalsPage />
             </RequireRole>
-          )}
-        />
-        <Route
-          path="/welcome/user"
-          element={(
-            <RequireRole role="user">
-              <UserWelcomePage />
-            </RequireRole>
-            <RequireAuth>
-              <WelcomePage role="user" />
-            </RequireAuth>
-          )}
-        />
-        <Route
-          path="/welcome/admin"
-          element={(
-            <RequireRole role="admin">
-              <AdminWelcomePage />
-            </RequireRole>
-            <RequireAuth>
-              <WelcomePage role="admin" />
-            </RequireAuth>
-          )}
-        />
-        <Route
-          path="/welcome/superadmin"
-          element={(
-            <RequireRole role="superadmin">
-              <SuperAdminWelcomePage />
-            </RequireRole>
-            <RequireAuth>
-              <WelcomePage role="superadmin" />
-            </RequireAuth>
           )}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
