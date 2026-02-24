@@ -12,9 +12,11 @@
     "login": "Login",
     "register": "Register",
     "me": "Profile",
+    "guest": "Guest",
     "approvals": "Approvals",
     "backendHealth": "Backend health",
-    "settings": "Settings"
+    "settings": "Settings",
+    "settingsMenuLabel": "Identity and settings menu"
   },
   "theme": {
     "toggle": {

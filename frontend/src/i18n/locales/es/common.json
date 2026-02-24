@@ -12,9 +12,11 @@
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
+    "guest": "Invitado",
     "approvals": "Aprobaciones",
     "backendHealth": "Salud del backend",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "settingsMenuLabel": "Menú de identidad y configuración"
   },
   "theme": {
     "toggle": {
