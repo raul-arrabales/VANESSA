@@ -166,6 +166,56 @@ a {
   flex-wrap: wrap;
 }
 
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.user-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 10rem;
+  background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+  z-index: 20;
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+}
+
+.user-menu-item:hover {
+  background: color-mix(in oklab, var(--bg-subtle) 90%, transparent);
+}
+
+.user-menu-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .link-chip {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-muted);
@@ -389,7 +439,9 @@ a {
 
 .field-input:focus-visible,
 .btn:focus-visible,
-.link-chip:focus-visible {
+.link-chip:focus-visible,
+.user-menu-trigger:focus-visible,
+.user-menu-item:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent-primary) 80%, white);
   outline-offset: 2px;
 }

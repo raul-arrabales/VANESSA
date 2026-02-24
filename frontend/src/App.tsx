@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import LanguageSwitcher from "./components/LanguageSwitcher";
@@ -19,10 +20,36 @@ import UserWelcomePage from "./pages/UserWelcomePage";
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
 
   const canAccessApprovals = user?.role === "admin" || user?.role === "superadmin";
   const welcomeLabelKey = user?.role ? `nav.welcome.${user.role}` : "nav.welcome.user";
   const welcomeRoute = user?.role ? getDefaultRouteForRole(user.role) : "/welcome/user";
+  const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
+
+  useEffect(() => {
+    const handleDocumentClick = (event: MouseEvent): void => {
+      if (!menuContainerRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleEscapePress = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    document.addEventListener("keydown", handleEscapePress);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+      document.removeEventListener("keydown", handleEscapePress);
+    };
+  }, []);
 
   return (
     <header className="app-header panel">
@@ -40,14 +67,35 @@ function AppHeader(): JSX.Element {
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
           )}
         </nav>
-        <div className="nav-links" role="group" aria-label={t("nav.settingsMenuLabel")}>
-          <span className="link-chip">{isAuthenticated ? user?.username : t("nav.guest")}</span>
-          {!isAuthenticated && <Link to="/login" className="link-chip">{t("nav.login")}</Link>}
-          {isAuthenticated && <Link to="/settings" className="link-chip">{t("nav.settings")}</Link>}
-          {isAuthenticated && (
-            <button type="button" className="btn btn-ghost nav-logout" onClick={() => void logout()}>
-              {t("auth.logout")}
-            </button>
+        <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
+          <button
+            type="button"
+            className="user-menu-trigger"
+            aria-expanded={isMenuOpen}
+            aria-controls={menuId}
+            onClick={() => setIsMenuOpen((currentState) => !currentState)}
+          >
+            {displayName}
+          </button>
+          {isMenuOpen && (
+            <div id={menuId} className="user-menu-panel">
+              {!isAuthenticated && <Link to="/login" className="user-menu-item" onClick={() => setIsMenuOpen(false)}>{t("nav.login")}</Link>}
+              {isAuthenticated && (
+                <>
+                  <Link to="/settings" className="user-menu-item" onClick={() => setIsMenuOpen(false)}>{t("nav.settings")}</Link>
+                  <button
+                    type="button"
+                    className="user-menu-item user-menu-button"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      void logout();
+                    }}
+                  >
+                    {t("auth.logout")}
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
         <ThemeToggle />
