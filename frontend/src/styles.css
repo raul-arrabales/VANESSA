@@ -389,6 +389,14 @@ a {
   gap: var(--space-2);
 }
 
+.token-grid-editor {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.token-card-editor {
+  align-content: start;
+}
+
 .token-swatch {
   height: 48px;
   border-radius: var(--radius-sm);
