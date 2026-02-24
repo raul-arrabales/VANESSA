@@ -8,7 +8,6 @@
   "nav": {
     "aria": "Primary navigation",
     "home": "Home",
-    "styleGuide": "Style guide",
     "login": "Login",
     "register": "Register",
     "me": "Profile",
@@ -16,7 +15,9 @@
     "approvals": "Approvals",
     "backendHealth": "Backend health",
     "settings": "Settings",
-    "settingsMenuLabel": "Identity and settings menu"
+    "settingsMenuLabel": "Identity and settings menu",
+    "settingsHome": "Settings",
+    "settingsDesign": "Design resources"
   },
   "theme": {
     "toggle": {
@@ -162,6 +163,15 @@
       "title": "Superadmin settings",
       "description": "Access platform-level controls and design resources.",
       "styleGuide": "Open style guide"
+    },
+    "user": {
+      "title": "User settings",
+      "description": "Manage your account preferences and personal workspace access."
+    },
+    "navigation": {
+      "title": "Settings navigation",
+      "overview": "Overview",
+      "design": "Design"
     }
   }
 }

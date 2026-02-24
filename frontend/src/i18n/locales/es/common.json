@@ -8,7 +8,6 @@
   "nav": {
     "aria": "Navegacion principal",
     "home": "Inicio",
-    "styleGuide": "Guia de estilo",
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
@@ -16,7 +15,9 @@
     "approvals": "Aprobaciones",
     "backendHealth": "Salud del backend",
     "settings": "Configuración",
-    "settingsMenuLabel": "Menú de identidad y configuración"
+    "settingsMenuLabel": "Menú de identidad y configuración",
+    "settingsHome": "Configuración",
+    "settingsDesign": "Recursos de diseño"
   },
   "theme": {
     "toggle": {
@@ -162,6 +163,15 @@
       "title": "Configuración de superadministrador",
       "description": "Accede a controles de plataforma y recursos de diseño.",
       "styleGuide": "Abrir guía de estilo"
+    },
+    "user": {
+      "title": "Configuración de usuario",
+      "description": "Gestiona las preferencias de tu cuenta y el acceso a tu espacio personal."
+    },
+    "navigation": {
+      "title": "Navegación de configuración",
+      "overview": "Resumen",
+      "design": "Diseño"
     }
   }
 }

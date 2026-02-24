@@ -125,14 +125,6 @@ export default function App(): JSX.Element {
       <AppHeader />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route
-          path="/style-guide"
-          element={(
-            <RequireRole role="superadmin">
-              <StyleGuidePage />
-            </RequireRole>
-          )}
-        />
         <Route path="/backend-health" element={<BackendHealthPage />} />
         <Route
           path="/login"
@@ -181,7 +173,16 @@ export default function App(): JSX.Element {
               <SettingsPage />
             </RequireAuth>
           )}
-        />
+        >
+          <Route
+            path="design"
+            element={(
+              <RequireRole role="superadmin">
+                <StyleGuidePage />
+              </RequireRole>
+            )}
+          />
+        </Route>
         <Route
           path="/admin/approvals"
           element={(
