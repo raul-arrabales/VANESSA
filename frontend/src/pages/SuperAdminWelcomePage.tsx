@@ -47,13 +47,6 @@ const availableItems: AvailableItem[] = [
     to: "/welcome/admin",
     minimumRole: "admin",
   },
-  {
-    title: "Superadmin Control Panel",
-    description: "Return to this page to access full role-level capability overview.",
-    actionLabel: "Open control panel",
-    to: "/welcome/superadmin",
-    minimumRole: "superadmin",
-  },
 ];
 
 export default function SuperAdminWelcomePage(): JSX.Element {

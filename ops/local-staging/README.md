@@ -113,16 +113,17 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 2. Validate readiness: `./ops/local-staging/health.sh`
 3. Use app in browser: `http://localhost:3000`
 4. Login as `sample-superadmin` and validate approvals/promotion flows.
-5. In the UI, use "Check backend" and expect success. The frontend calls `/api/health` and Vite proxies to backend.
+5. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
 6. Check API health directly (host-to-container): `http://localhost:5000/health`
-7. Check wake-word service health: `http://localhost:10400/health`
-8. Simulate wake detection event:
+7. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
+8. Check wake-word service health: `http://localhost:10400/health`
+9. Simulate wake detection event:
    `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
-9. Validate backend voice endpoints:
+10. Validate backend voice endpoints:
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
-10. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-11. Stop while keeping state: `./ops/local-staging/stop.sh`
+11. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+12. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 ## LLM API Quick Reference (local)
 

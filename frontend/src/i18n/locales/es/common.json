@@ -45,7 +45,7 @@
     "es": "Espanol"
   },
   "backend": {
-    "sectionTitle": "Salud del backend",
+    "sectionTitle": "Salud del sistema",
     "url": {
       "label": "URL del backend"
     },
@@ -60,10 +60,24 @@
     },
     "check": {
       "cta": "Comprobar backend",
-      "loading": "Comprobando..."
+      "loading": "Comprobando...",
+      "ctaAll": "Comprobar todos los servicios",
+      "loadingAll": "Comprobando todos los servicios..."
     },
     "error": {
-      "prefix": "La solicitud fallo:"
+      "prefix": "La solicitud fallo:",
+      "legacyFallback": "Esta versión del backend aún no expone la salud completa del sistema. Se muestran solo las comprobaciones disponibles."
+    },
+    "table": {
+      "service": "Servicio",
+      "container": "Contenedor",
+      "target": "Objetivo de salud",
+      "status": "Estado"
+    },
+    "serviceStatus": {
+      "up": "Activo",
+      "down": "Fallando",
+      "unknown": "Desconocido"
     }
   },
   "auth": {

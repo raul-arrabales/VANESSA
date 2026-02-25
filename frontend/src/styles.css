@@ -459,6 +459,56 @@ a {
   color: var(--text-secondary);
 }
 
+.health-table-wrap {
+  overflow-x: auto;
+}
+
+.health-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 44rem;
+}
+
+.health-table th,
+.health-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-muted);
+  vertical-align: middle;
+}
+
+.health-table th {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.health-icon {
+  display: inline-block;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+
+.health-icon-up {
+  background: var(--status-success);
+}
+
+.health-icon-down {
+  background: #f79009;
+}
+
+.health-icon-unknown {
+  background: var(--border-muted);
+}
+
+.health-label {
+  vertical-align: middle;
+}
+
 .success-text {
   color: var(--status-success);
   font-weight: 600;

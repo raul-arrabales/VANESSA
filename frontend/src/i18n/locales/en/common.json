@@ -45,7 +45,7 @@
     "es": "Spanish"
   },
   "backend": {
-    "sectionTitle": "Backend health",
+    "sectionTitle": "System Health",
     "url": {
       "label": "Backend URL"
     },
@@ -60,10 +60,24 @@
     },
     "check": {
       "cta": "Check backend",
-      "loading": "Checking..."
+      "loading": "Checking...",
+      "ctaAll": "Check all services",
+      "loadingAll": "Checking all services..."
     },
     "error": {
-      "prefix": "Request failed:"
+      "prefix": "Request failed:",
+      "legacyFallback": "This backend version does not expose full system health yet. Showing available checks only."
+    },
+    "table": {
+      "service": "Service",
+      "container": "Container",
+      "target": "Health target",
+      "status": "Status"
+    },
+    "serviceStatus": {
+      "up": "Up",
+      "down": "Down",
+      "unknown": "Unknown"
     }
   },
   "auth": {

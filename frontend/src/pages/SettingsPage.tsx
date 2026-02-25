@@ -114,19 +114,6 @@ export default function SettingsPage(): JSX.Element {
         <>
           <ProfileSection titleKey="settings.profile.title" />
 
-          <article className="panel card-stack">
-            <h2 className="section-title">Model access</h2>
-            <p className="status-text">Enabled models for your account.</p>
-            <ul className="card-stack" aria-label="Enabled models list">
-              {enabledModels.length > 0 ? (
-                enabledModels.map((model) => (
-                  <li key={model.id}>{model.name}</li>
-                ))
-              ) : (
-                <li>No models are currently enabled.</li>
-              )}
-            </ul>
-          </article>
 
           <article className="panel card-stack">
             <h2 className="section-title">{t("settings.personalization.title")}</h2>
@@ -148,6 +135,21 @@ export default function SettingsPage(): JSX.Element {
                 )}
               </div>
             </section>
+          </article>
+
+
+          <article className="panel card-stack">
+            <h2 className="section-title">Model access</h2>
+            <p className="status-text">Enabled models for your account.</p>
+            <ul className="card-stack" aria-label="Enabled models list">
+              {enabledModels.length > 0 ? (
+                enabledModels.map((model) => (
+                  <li key={model.id}>{model.name}</li>
+                ))
+              ) : (
+                <li>No models are currently enabled.</li>
+              )}
+            </ul>
           </article>
 
           {isAdmin && (

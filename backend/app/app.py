@@ -13,7 +13,7 @@ from flask import Flask, g, jsonify, request
 from .auth_tokens import TOKEN_PREFIX, decode_access_token, issue_access_token
 from .authz import AUTH_ROLES, require_auth, require_role
 from .config import AuthConfig, get_auth_config
-from .db import run_auth_schema_migration
+from .db import get_connection, run_auth_schema_migration
 from .repositories.model_access import (
     assign_model_access,
     find_model_definition,
@@ -87,6 +87,15 @@ def _http_json_ok(url: str) -> bool:
         with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
             return 200 <= response.status < 300
     except URLError:
+        return False
+
+
+def _postgres_ok(database_url: str) -> bool:
+    try:
+        with get_connection(database_url) as connection:
+            connection.execute("SELECT 1")
+        return True
+    except Exception:
         return False
 
 
@@ -333,6 +342,78 @@ def load_current_user_from_token() -> None:
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "service": "backend"}), 200
+
+
+@app.get("/system/health")
+def system_health():
+    services = [
+        {
+            "service": "Frontend",
+            "container": "frontend",
+            "target": os.getenv("FRONTEND_URL", "http://frontend:3000"),
+            "reachable": _http_json_ok(os.getenv("FRONTEND_URL", "http://frontend:3000").rstrip("/") + "/"),
+        },
+        {
+            "service": "Backend",
+            "container": "backend",
+            "target": os.getenv("BACKEND_URL", "http://backend:5000"),
+            "reachable": _http_json_ok(os.getenv("BACKEND_URL", "http://backend:5000").rstrip("/") + "/health"),
+        },
+        {
+            "service": "LLM API",
+            "container": "llm",
+            "target": os.getenv("LLM_URL", "http://llm:8000"),
+            "reachable": _http_json_ok(os.getenv("LLM_URL", "http://llm:8000").rstrip("/") + "/health"),
+        },
+        {
+            "service": "LLM Runtime",
+            "container": "llm_runtime",
+            "target": os.getenv("LLM_RUNTIME_URL", "http://llm_runtime:8000"),
+            "reachable": _http_json_ok(os.getenv("LLM_RUNTIME_URL", "http://llm_runtime:8000").rstrip("/") + "/health"),
+        },
+        {
+            "service": "Agent Engine",
+            "container": "agent_engine",
+            "target": os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000"),
+            "reachable": _http_json_ok(os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").rstrip("/") + "/health"),
+        },
+        {
+            "service": "Sandbox",
+            "container": "sandbox",
+            "target": os.getenv("SANDBOX_URL", "http://sandbox:6000"),
+            "reachable": _http_json_ok(os.getenv("SANDBOX_URL", "http://sandbox:6000").rstrip("/") + "/health"),
+        },
+        {
+            "service": "KWS",
+            "container": "kws",
+            "target": os.getenv("KWS_URL", "http://kws:10400"),
+            "reachable": _http_json_ok(os.getenv("KWS_URL", "http://kws:10400").rstrip("/") + "/health"),
+        },
+        {
+            "service": "Weaviate",
+            "container": "weaviate",
+            "target": os.getenv("WEAVIATE_URL", "http://weaviate:8080"),
+            "reachable": _http_json_ok(
+                os.getenv("WEAVIATE_URL", "http://weaviate:8080").rstrip("/") + "/v1/.well-known/ready"
+            ),
+        },
+        {
+            "service": "PostgreSQL",
+            "container": "postgres",
+            "target": "postgresql",
+            "reachable": _postgres_ok(_get_config().database_url),
+        },
+    ]
+
+    return (
+        jsonify(
+            {
+                "status": "ok" if all(service["reachable"] for service in services) else "degraded",
+                "services": services,
+            }
+        ),
+        200,
+    )
 
 
 @app.post("/auth/register")
