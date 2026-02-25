@@ -4,7 +4,7 @@ import os
 import time
 from json import dumps, loads
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
@@ -104,8 +104,83 @@ def _http_json_request(
             status_code = int(response.status)
             body = response.read().decode("utf-8")
             return (loads(body) if body else {}), status_code
+    except HTTPError as error:
+        body = error.read().decode("utf-8")
+        parsed = loads(body) if body else {"error": "upstream_error"}
+        return parsed, int(error.code)
     except URLError:
         return None, 502
+
+
+def _coerce_chat_messages(messages: Any) -> list[dict[str, Any]]:
+    if not isinstance(messages, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for item in messages:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if role not in {"system", "user", "assistant", "tool"}:
+            continue
+        if not content:
+            continue
+        normalized.append(
+            {
+                "role": role,
+                "content": [{"type": "text", "text": content}],
+            }
+        )
+    return normalized
+
+
+def _extract_output_text(llm_response: dict[str, Any]) -> str:
+    output = llm_response.get("output")
+    if not isinstance(output, list) or len(output) == 0:
+        return ""
+
+    first = output[0]
+    if not isinstance(first, dict):
+        return ""
+    content = first.get("content")
+    if not isinstance(content, list) or len(content) == 0:
+        return ""
+
+    text_parts: list[str] = []
+    for part in content:
+        if isinstance(part, dict) and str(part.get("type", "")).lower() == "text":
+            text = str(part.get("text", "")).strip()
+            if text:
+                text_parts.append(text)
+    return "\n".join(text_parts)
+
+
+def _chat_completion_with_allowed_model(
+    *,
+    requested_model_id: str,
+    org_id: str | None,
+    group_id: str | None,
+    messages: list[dict[str, Any]],
+    max_tokens: int | None,
+    temperature: float | None,
+) -> tuple[dict[str, Any] | None, int]:
+    effective_models = _effective_models_for_current_user(org_id=org_id, group_id=group_id)
+    allowed_model_ids = {str(model.get("model_id", "")) for model in effective_models}
+    if requested_model_id not in allowed_model_ids:
+        return {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
+
+    llm_url = os.getenv("LLM_URL", "http://llm:11400").rstrip("/")
+    upstream_payload: dict[str, Any] = {
+        "model": requested_model_id,
+        "input": messages,
+    }
+    if max_tokens is not None:
+        upstream_payload["max_tokens"] = max_tokens
+    if temperature is not None:
+        upstream_payload["temperature"] = temperature
+
+    return _http_json_request(f"{llm_url}/v1/chat/completions", upstream_payload)
 
 
 def _get_config() -> AuthConfig:
@@ -593,6 +668,24 @@ def get_allowed_models():
     )
 
 
+@app.get("/models/enabled")
+@require_role("user")
+def get_enabled_models():
+    org_id = str(request.args.get("org_id", "")).strip() or None
+    group_id = str(request.args.get("group_id", "")).strip() or None
+    models = _effective_models_for_current_user(org_id=org_id, group_id=group_id)
+    normalized = [
+        {
+            "id": str(model.get("model_id", "")),
+            "name": str((model.get("metadata") or {}).get("name") or model.get("model_id", "")),
+            "provider": model.get("provider"),
+            "description": str((model.get("metadata") or {}).get("description", "")) or None,
+        }
+        for model in models
+    ]
+    return jsonify({"models": normalized}), 200
+
+
 @app.post("/llm/generate")
 @require_role("user")
 def generate_with_allowed_model():
@@ -606,25 +699,71 @@ def generate_with_allowed_model():
 
     org_id = str(payload.get("org_id", "")).strip() or None
     group_id = str(payload.get("group_id", "")).strip() or None
-    effective_models = _effective_models_for_current_user(
-        org_id=org_id, group_id=group_id
-    )
-    allowed_model_ids = {str(model.get("model_id", "")) for model in effective_models}
-    if requested_model_id not in allowed_model_ids:
-        return _json_error(403, "model_forbidden", "Requested model is not allowed")
+    prompt = str(payload.get("prompt", "")).strip()
+    history = _coerce_chat_messages(payload.get("history", []))
+    if prompt:
+        history.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
 
-    llm_url = os.getenv("LLM_URL", "http://llm:11400").rstrip("/")
-    upstream_payload = {
-        **payload,
-        "model_id": requested_model_id,
-        "allowed_model_ids": sorted(allowed_model_ids),
-    }
-    llm_response, status_code = _http_json_request(
-        f"{llm_url}/generate", upstream_payload
+    if not history:
+        return _json_error(400, "invalid_input", "history or prompt is required")
+
+    max_tokens_raw = payload.get("max_tokens")
+    max_tokens = int(max_tokens_raw) if isinstance(max_tokens_raw, int) and max_tokens_raw > 0 else None
+    temperature_raw = payload.get("temperature")
+    temperature = float(temperature_raw) if isinstance(temperature_raw, (int, float)) else None
+
+    llm_response, status_code = _chat_completion_with_allowed_model(
+        requested_model_id=requested_model_id,
+        org_id=org_id,
+        group_id=group_id,
+        messages=history,
+        max_tokens=max_tokens,
+        temperature=temperature,
     )
     if llm_response is None:
         return _json_error(502, "llm_unreachable", "LLM service unavailable")
     return jsonify(llm_response), status_code
+
+
+@app.post("/inference")
+@require_role("user")
+def inference_endpoint():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    requested_model_id = str(payload.get("model", "")).strip()
+    prompt = str(payload.get("prompt", "")).strip()
+    if not requested_model_id:
+        return _json_error(400, "invalid_model", "model is required")
+    if not prompt:
+        return _json_error(400, "invalid_prompt", "prompt is required")
+
+    history = _coerce_chat_messages(payload.get("history", []))
+    history.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
+
+    llm_response, status_code = _chat_completion_with_allowed_model(
+        requested_model_id=requested_model_id,
+        org_id=str(payload.get("org_id", "")).strip() or None,
+        group_id=str(payload.get("group_id", "")).strip() or None,
+        messages=history,
+        max_tokens=None,
+        temperature=None,
+    )
+    if llm_response is None:
+        return _json_error(502, "llm_unreachable", "LLM service unavailable")
+    if status_code >= 400:
+        return jsonify(llm_response), status_code
+
+    return (
+        jsonify(
+            {
+                "output": _extract_output_text(llm_response),
+                "response": llm_response,
+            }
+        ),
+        200,
+    )
 
 
 @app.post("/voice/wake-events")

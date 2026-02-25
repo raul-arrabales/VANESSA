@@ -22,6 +22,12 @@ export type ModelScopeAssignment = {
 
 export type InferenceResult = {
   output: string;
+  response?: Record<string, unknown>;
+};
+
+export type ChatHistoryItem = {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
 };
 
 function buildUrl(path: string): string {
@@ -97,14 +103,39 @@ export async function updateModelAssignment(
 }
 
 export async function listEnabledModels(token: string): Promise<ModelCatalogItem[]> {
-  const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/enabled", { token });
-  return result.models;
+  const result = await requestJson<{
+    models: Array<{
+      id?: string;
+      name?: string;
+      provider?: string | null;
+      description?: string | null;
+      model_id?: string;
+      metadata?: { name?: string; description?: string };
+    }>;
+  }>("/models/enabled", { token });
+
+  return result.models.map((model) => {
+    const fallbackId = model.model_id ?? "";
+    const id = model.id ?? fallbackId;
+    const metadata = model.metadata ?? {};
+    return {
+      id,
+      name: model.name ?? metadata.name ?? id,
+      provider: model.provider,
+      description: model.description ?? metadata.description ?? null,
+    };
+  }).filter((model) => model.id);
 }
 
-export async function runInference(prompt: string, model: string, token: string): Promise<InferenceResult> {
+export async function runInference(
+  prompt: string,
+  model: string,
+  token: string,
+  history: ChatHistoryItem[] = [],
+): Promise<InferenceResult> {
   return requestJson<InferenceResult>("/inference", {
     method: "POST",
     token,
-    body: { prompt, model },
+    body: { prompt, model, history },
   });
 }

@@ -385,7 +385,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
 
     def fake_llm_request(_url: str, payload: dict[str, Any]):
         seen_payload.update(payload)
-        return {"ok": True, "model_id": payload["model_id"]}, 200
+        return {"ok": True, "model": payload["model"]}, 200
 
     monkeypatch.setattr(backend_app_module, "_http_json_request", fake_llm_request)
 
@@ -395,7 +395,8 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
         json={"model_id": "allowed-model", "prompt": "hello"},
     )
     assert permitted.status_code == 200
-    assert seen_payload["allowed_model_ids"] == ["allowed-model"]
+    assert seen_payload["model"] == "allowed-model"
+    assert seen_payload["input"][0]["role"] == "user"
 
     forbidden = test_client.post(
         "/llm/generate",
