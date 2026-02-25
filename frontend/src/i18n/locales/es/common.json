@@ -15,9 +15,22 @@
     "approvals": "Aprobaciones",
     "backendHealth": "Salud del backend",
     "settings": "Configuración",
+    "welcome": {
+      "user": "Inicio de usuario",
+      "admin": "Inicio de admin",
+      "superadmin": "Panel de control de superadministrador"
+    },
     "settingsMenuLabel": "Menú de identidad y configuración",
     "settingsHome": "Configuración",
-    "settingsDesign": "Recursos de diseño"
+    "settingsDesign": "Recursos de diseño",
+    "breadcrumbs": {
+      "aria": "Navegación de migas",
+      "approvals": "Aprobaciones",
+      "backendHealth": "Salud del backend",
+      "chat": "Chatbot",
+      "design": "Diseño",
+      "welcome": "Bienvenida"
+    }
   },
   "theme": {
     "toggle": {
@@ -184,8 +197,9 @@
         "description": "Elige tu idioma preferido para la interfaz."
       },
       "theme": {
-        "title": "Modo de tema",
-        "description": "Alterna entre modo de día y de noche."
+        "title": "Personalización del interfaz",
+        "description": "Alterna entre modo de día y de noche y editar los colores del tema",
+        "styleEditor": "Editor de estilo del tema"
       }
     },
     "navigation": {

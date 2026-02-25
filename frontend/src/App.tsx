@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
 import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
@@ -16,6 +16,24 @@ import StyleGuidePage from "./pages/StyleGuidePage";
 import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
 import UserWelcomePage from "./pages/UserWelcomePage";
 
+type BreadcrumbSegmentConfig = {
+  labelKey?: string;
+  dynamicLabelKey?: (segment: string) => string;
+  includeInCrumbs?: boolean;
+};
+
+const breadcrumbSegmentConfig: Record<string, BreadcrumbSegmentConfig> = {
+  admin: { includeInCrumbs: false },
+  approvals: { labelKey: "nav.breadcrumbs.approvals" },
+  "backend-health": { labelKey: "nav.breadcrumbs.backendHealth" },
+  chat: { labelKey: "nav.breadcrumbs.chat" },
+  design: { labelKey: "nav.breadcrumbs.design" },
+  login: { labelKey: "nav.login" },
+  register: { labelKey: "nav.register" },
+  settings: { labelKey: "nav.settings" },
+  welcome: { labelKey: "nav.breadcrumbs.welcome" },
+};
+
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
@@ -23,7 +41,6 @@ function AppHeader(): JSX.Element {
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
-  const canAccessApprovals = user?.role === "admin" || user?.role === "superadmin";
   const welcomeLabelKey = user?.role ? `nav.welcome.${user.role}` : "nav.welcome.user";
   const welcomeRoute = user?.role ? getDefaultRouteForRole(user.role) : "/welcome/user";
   const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
@@ -60,11 +77,9 @@ function AppHeader(): JSX.Element {
       <div className="toolbar" role="group" aria-label={t("app.controls") }>
         <nav className="nav-links" aria-label={t("nav.aria")}>
           {!isAuthenticated && <Link to="/" className="link-chip">{t("nav.home")}</Link>}
-          {isAuthenticated && <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>}
-          {isAuthenticated && <Link to="/chat" className="link-chip">Chatbot</Link>}
-          {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
-          {isAuthenticated && canAccessApprovals && (
-            <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
+          {isAuthenticated && <Link to="/chat" className="link-chip">Chat</Link>}
+          {isAuthenticated && user?.role !== "superadmin" && (
+            <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>
           )}
         </nav>
         <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
@@ -123,10 +138,72 @@ function AuthRedirect({ children }: { children: JSX.Element }): JSX.Element {
   return children;
 }
 
+function BreadcrumbsBar(): JSX.Element {
+  const { t } = useTranslation("common");
+  const location = useLocation();
+  const pathSegments = location.pathname.split("/").filter(Boolean);
+
+  const crumbs: Array<{ href: string; label: string; isCurrent: boolean }> = [
+    {
+      href: "/",
+      label: t("nav.home"),
+      isCurrent: pathSegments.length === 0,
+    },
+  ];
+
+  let activePath = "";
+  for (let index = 0; index < pathSegments.length; index += 1) {
+    const segment = pathSegments[index];
+    const segmentConfig = breadcrumbSegmentConfig[segment];
+    activePath = `${activePath}/${segment}`;
+
+    if (segmentConfig?.includeInCrumbs === false) {
+      continue;
+    }
+
+    const label = segmentConfig?.dynamicLabelKey
+      ? t(segmentConfig.dynamicLabelKey(segment))
+      : segmentConfig?.labelKey
+        ? t(segmentConfig.labelKey)
+        : segment;
+
+    crumbs.push({
+      href: activePath,
+      label,
+      isCurrent: index === pathSegments.length - 1,
+    });
+  }
+
+  if (pathSegments[0] === "welcome" && pathSegments[1]) {
+    const roleCrumb = crumbs[crumbs.length - 1];
+    if (roleCrumb) {
+      roleCrumb.label = t(`nav.welcome.${pathSegments[1]}`);
+    }
+  }
+
+  return (
+    <nav className="breadcrumb-bar panel" aria-label={t("nav.breadcrumbs.aria")}>
+      <ol className="breadcrumb-list">
+        {crumbs.map((crumb, index) => (
+          <li key={crumb.href} className="breadcrumb-item">
+            {crumb.isCurrent ? (
+              <span className="breadcrumb-current" aria-current="page">{crumb.label}</span>
+            ) : (
+              <Link to={crumb.href} className="breadcrumb-link">{crumb.label}</Link>
+            )}
+            {index < crumbs.length - 1 && <span className="breadcrumb-separator" aria-hidden="true">/</span>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export default function App(): JSX.Element {
   return (
     <main className="page-shell">
       <AppHeader />
+      <BreadcrumbsBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/backend-health" element={<BackendHealthPage />} />

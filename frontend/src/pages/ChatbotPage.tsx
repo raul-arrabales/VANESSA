@@ -247,10 +247,10 @@ export default function ChatbotPage(): JSX.Element {
   };
 
   return (
-    <section className="panel chatbot-shell" aria-label="Chatbot panel">
+    <section className="panel chatbot-shell" aria-label="Chat panel">
       <aside className="chatbot-sidebar" aria-label="Conversation history">
         <div className="chatbot-sidebar-header">
-          <h2 className="section-title">Chatbot</h2>
+          <h2 className="section-title">Chat</h2>
           <button
             type="button"
             className="btn btn-secondary"

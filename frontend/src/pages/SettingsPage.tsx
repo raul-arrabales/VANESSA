@@ -129,11 +129,6 @@ export default function SettingsPage(): JSX.Element {
           </article>
 
           <article className="panel card-stack">
-            <h2 className="section-title">{t("settings.user.title")}</h2>
-            <p className="status-text">{t("settings.user.description")}</p>
-          </article>
-
-          <article className="panel card-stack">
             <h2 className="section-title">{t("settings.personalization.title")}</h2>
             <p className="status-text">{t("settings.personalization.description")}</p>
             <section className="card-stack" aria-label={t("settings.personalization.language.title")}>
@@ -146,6 +141,11 @@ export default function SettingsPage(): JSX.Element {
               <p className="status-text">{t("settings.personalization.theme.description")}</p>
               <div className="button-row">
                 <ThemeToggle />
+                {isSuperadmin && (
+                  <Link to="/settings/design" className="btn btn-secondary">
+                    {t("settings.personalization.theme.styleEditor")}
+                  </Link>
+                )}
               </div>
             </section>
           </article>
@@ -204,7 +204,6 @@ export default function SettingsPage(): JSX.Element {
                 <button type="button" className="btn btn-primary" onClick={() => void createModel()}>
                   Add model to catalog
                 </button>
-                <Link to="/settings/design" className="btn btn-secondary">{t("settings.superadmin.styleGuide")}</Link>
               </div>
             </article>
           )}

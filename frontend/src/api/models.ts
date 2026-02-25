@@ -53,8 +53,22 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
-  const maybeJson = await response.text();
-  const payload = maybeJson ? JSON.parse(maybeJson) as Record<string, unknown> : {};
+  const rawBody = await response.text();
+  let payload: Record<string, unknown> = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      if (!response.ok) {
+        throw new ApiError(`HTTP ${response.status}`, response.status);
+      }
+      throw new ApiError(
+        "Backend returned a non-JSON response",
+        response.status,
+        "invalid_response_format",
+      );
+    }
+  }
 
   if (!response.ok) {
     const message = String(payload.message ?? payload.error ?? `HTTP ${response.status}`);
@@ -66,8 +80,15 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
 }
 
 export async function listModelCatalog(token: string): Promise<ModelCatalogItem[]> {
-  const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/catalog", { token });
-  return result.models;
+  try {
+    const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/catalog", { token });
+    return result.models;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return listEnabledModels(token);
+    }
+    throw error;
+  }
 }
 
 export async function createModelCatalogItem(
@@ -84,8 +105,15 @@ export async function createModelCatalogItem(
 }
 
 export async function listModelAssignments(token: string): Promise<ModelScopeAssignment[]> {
-  const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/models/assignments", { token });
-  return result.assignments;
+  try {
+    const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/models/assignments", { token });
+    return result.assignments;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function updateModelAssignment(
