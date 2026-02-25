@@ -44,6 +44,7 @@ function renderChatbot(): void {
 describe("ChatbotPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -68,20 +69,45 @@ describe("ChatbotPage", () => {
     expect(screen.queryByRole("option", { name: "Admin Internal" })).toBeNull();
   });
 
-  it("includes selected model in inference requests", async () => {
+  it("includes selected model and conversation context in inference requests", async () => {
     modelApiMocks.listEnabledModels.mockResolvedValueOnce([
       { id: "safe-small", name: "Safe Small" },
       { id: "safe-large", name: "Safe Large" },
     ]);
-    modelApiMocks.runInference.mockResolvedValueOnce({ output: "hello" });
+    modelApiMocks.runInference.mockResolvedValue({ output: "hello" });
 
     renderChatbot();
 
     await screen.findByRole("option", { name: "Safe Large" });
     await userEvent.selectOptions(screen.getByLabelText("Model"), "safe-large");
-    await userEvent.type(screen.getByLabelText("Prompt"), "Test prompt");
-    await userEvent.click(screen.getByRole("button", { name: "Send prompt" }));
+    await userEvent.type(screen.getByLabelText("Message"), "Test prompt");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(modelApiMocks.runInference).toHaveBeenCalledWith("Test prompt", "safe-large", "token");
+    expect(modelApiMocks.runInference).toHaveBeenCalledWith(
+      "Test prompt",
+      "safe-large",
+      "token",
+      [{ role: "user", content: "Test prompt" }],
+    );
+  });
+
+  it("supports multiple conversations", async () => {
+    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
+      { id: "safe-small", name: "Safe Small" },
+    ]);
+    modelApiMocks.runInference.mockResolvedValue({ output: "response" });
+
+    renderChatbot();
+
+    await screen.findByLabelText("Model");
+    await userEvent.type(screen.getByLabelText("Message"), "First thread message");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+    await userEvent.type(screen.getByLabelText("Message"), "Second thread");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(screen.getByRole("button", { name: /First thread message/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /Second thread/ })).toBeVisible();
   });
 });
