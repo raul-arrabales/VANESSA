@@ -36,6 +36,7 @@ From repository root:
   - Flag: `--json`
 - `health.sh`
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
+  - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
 - `logs.sh`
@@ -120,6 +121,53 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - `http://localhost:5000/health`
 10. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
 11. Stop while keeping state: `./ops/local-staging/stop.sh`
+
+## LLM API Quick Reference (local)
+
+Base URL: `http://localhost:8000`
+
+- `GET /health`
+  - Purpose: liveness/readiness check for the LLM container.
+  - Example:
+    ```bash
+    curl -sS -i http://localhost:8000/health
+    ```
+  - Expected success: `200 OK` with a small health JSON payload.
+  - Typical failures:
+    - `404` if route is unavailable in the running server image.
+    - `5xx` if model/server startup is incomplete.
+
+- `GET /v1/models`
+  - Purpose: lightweight contract check that OpenAI-compatible model listing is available.
+  - Example:
+    ```bash
+    curl -sS -i http://localhost:8000/v1/models
+    ```
+  - Expected success: `200 OK` with JSON containing a top-level `data` array.
+  - Typical failures:
+    - `401` when auth is enabled and key/header is missing.
+    - `404` if OpenAI-compatible routes are disabled.
+    - `5xx` if backend model registry failed.
+
+- `POST /v1/responses`
+  - Purpose: generate a text response through the OpenAI Responses-compatible API.
+  - Example (dummy model):
+    ```bash
+    curl -sS -i http://localhost:8000/v1/responses \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "model": "dummy-model",
+        "input": "Reply with the single word: pong"
+      }'
+    ```
+  - Expected success: `200 OK` with a response object containing generated output text.
+  - Typical failures:
+    - `400` invalid JSON/body schema.
+    - `401` missing/invalid auth (if enabled).
+    - `404` unknown model ID.
+    - `422` validation error for malformed parameters.
+    - `429` rate limit/concurrency cap reached.
+    - `5xx` model runtime/server failure.
 
 ## Fast Rebuild/Restart (Single Service)
 

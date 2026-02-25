@@ -21,6 +21,11 @@ http_ok() {
   curl --silent --show-error --max-time 2 --fail "$url" >/dev/null
 }
 
+llm_contract_ok() {
+  # Lightweight contract check: endpoint exists and returns a models payload.
+  curl --silent --show-error --max-time 3 --fail "http://localhost:8000/v1/models" | grep -q '"data"'
+}
+
 tcp_ok() {
   local host="$1"
   local port="$2"
@@ -71,8 +76,8 @@ run_checks() {
     failures=$((failures + 1))
   fi
 
-  if http_ok "http://localhost:8000/health"; then
-    printf 'llm: OK\n'
+  if http_ok "http://localhost:8000/health" && llm_contract_ok; then
+    printf 'llm: OK (health + models)\n'
   else
     printf 'llm: FAIL\n'
     failures=$((failures + 1))
