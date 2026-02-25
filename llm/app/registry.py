@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.schemas import ResponseRequest
+
 
 @dataclass(frozen=True)
 class ModelCapabilities:
@@ -19,22 +21,30 @@ class ModelInfo:
     provider_type: str
 
 
+@dataclass(frozen=True)
+class ProviderResult:
+    output_text: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
 class ModelProvider(Protocol):
     @property
     def info(self) -> ModelInfo:
         """Metadata describing the provider's model."""
 
-
-@dataclass(frozen=True)
-class DummyModelProvider:
-    info: ModelInfo
+    def generate(self, request: ResponseRequest) -> ProviderResult:
+        """Generates a response from the incoming request."""
 
 
 class ModelRegistry:
     def __init__(self, providers: list[ModelProvider] | None = None) -> None:
         self._providers: dict[str, ModelProvider] = {}
         for provider in providers or []:
-            self._providers[provider.info.id] = provider
+            self.register_provider(provider)
+
+    def register_provider(self, provider: ModelProvider) -> None:
+        self._providers[provider.info.id] = provider
 
     def list_models(self) -> list[ModelInfo]:
         return [provider.info for provider in self._providers.values()]
@@ -46,16 +56,4 @@ class ModelRegistry:
             raise KeyError(f"Unknown model: {model_id}") from exc
 
 
-registry = ModelRegistry(
-    providers=[
-        DummyModelProvider(
-            info=ModelInfo(
-                id="dummy",
-                display_name="Dummy Test Model",
-                capabilities=ModelCapabilities(text=True, image_input=False),
-                status="available",
-                provider_type="dummy",
-            )
-        )
-    ]
-)
+registry = ModelRegistry()
