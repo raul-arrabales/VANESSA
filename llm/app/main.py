@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 
-from app.providers.dummy import DummyModelProvider
+from app.config import load_llm_config
+from app.providers.base import ProviderError
 from app.registry import ModelInfo, registry
 from app.schemas import (
     ErrorEnvelope,
@@ -17,8 +18,7 @@ SERVICE_VERSION = "0.1.0"
 
 app = FastAPI(title="VANESSA LLM Service", version=SERVICE_VERSION)
 
-if not registry.list_models():
-    registry.register_provider(DummyModelProvider())
+registry.configure(load_llm_config())
 
 
 @app.get("/health")
@@ -31,21 +31,27 @@ def health() -> dict[str, str]:
 
 
 @app.get("/v1/models")
-def list_models() -> list[dict[str, object]]:
+def list_models() -> dict[str, object]:
     models: list[ModelInfo] = registry.list_models()
-    return [
-        {
-            "id": model.id,
-            "display_name": model.display_name,
-            "capabilities": {
-                "text": model.capabilities.text,
-                "image_input": model.capabilities.image_input,
-            },
-            "status": model.status,
-            "provider_type": model.provider_type,
-        }
-        for model in models
-    ]
+    data: list[dict[str, object]] = []
+    for model in models:
+        data.append(
+            {
+                "id": model.id,
+                "object": "model",
+                "owned_by": model.provider_type,
+                "display_name": model.display_name,
+                "capabilities": {
+                    "text": model.capabilities.text,
+                    "image_input": model.capabilities.image_input,
+                },
+                "status": model.status,
+                "provider_type": model.provider_type,
+                "provider_config_ref": model.provider_config_ref,
+                "metadata": model.metadata,
+            }
+        )
+    return {"object": "list", "data": data}
 
 
 def _contains_image_parts(request: ResponseRequest) -> bool:
@@ -58,14 +64,14 @@ def _contains_image_parts(request: ResponseRequest) -> bool:
 
 def _build_response(request: ResponseRequest) -> ResponseEnvelope:
     try:
-        provider = registry.get_model(request.model)
+        resolved_model = registry.resolve_model(request.model)
     except KeyError as exc:
         raise HTTPException(
             status_code=404,
             detail=ErrorEnvelope(code="model_not_found", message=str(exc)).model_dump(),
         ) from exc
 
-    if _contains_image_parts(request) and not provider.info.capabilities.image_input:
+    if _contains_image_parts(request) and not resolved_model.model.capabilities.image_input:
         raise HTTPException(
             status_code=422,
             detail=ErrorEnvelope(
@@ -74,7 +80,29 @@ def _build_response(request: ResponseRequest) -> ResponseEnvelope:
             ).model_dump(),
         )
 
-    result = provider.generate(request)
+    result = None
+    last_provider_error: ProviderError | None = None
+    candidates = [resolved_model, *registry.failover_models(request.model)]
+    for candidate in candidates:
+        try:
+            result = candidate.provider.generate(
+                request, upstream_model=candidate.model.upstream_model or candidate.model.id
+            )
+            last_provider_error = None
+            break
+        except ProviderError as exc:
+            last_provider_error = exc
+
+    if result is None:
+        assert last_provider_error is not None
+        raise HTTPException(
+            status_code=last_provider_error.status_code,
+            detail=ErrorEnvelope(
+                code=last_provider_error.code,
+                message=last_provider_error.message,
+            ).model_dump(),
+        )
+
     usage = Usage(
         prompt_tokens=result.prompt_tokens,
         completion_tokens=result.completion_tokens,

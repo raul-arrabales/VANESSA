@@ -36,6 +36,7 @@ From repository root:
   - Flag: `--json`
 - `health.sh`
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
+  - Also checks `llm_runtime` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
@@ -75,6 +76,7 @@ Supported launcher variables:
 - `SAMPLE_USER_USERNAME` (default: `sample-user`)
 - `SAMPLE_USER_EMAIL` (default: `sample-user@local.test`)
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
+- `LLM_ROUTING_MODE` (default: `local_only`)
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 
@@ -156,8 +158,13 @@ Base URL: `http://localhost:8000`
     curl -sS -i http://localhost:8000/v1/responses \
       -H 'Content-Type: application/json' \
       -d '{
-        "model": "dummy-model",
-        "input": "Reply with the single word: pong"
+        "model": "dummy",
+        "input": [
+          {
+            "role": "user",
+            "content": [{"type": "text", "text": "Reply with the single word: pong"}]
+          }
+        ]
       }'
     ```
   - Expected success: `200 OK` with a response object containing generated output text.
@@ -192,6 +199,9 @@ Use the targeted restart script when only one service changed:
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`
+- `llm_runtime` fails to start:
+  - Ensure local model files exist under `models/llm/`.
+  - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.
 - `kws` fails at startup:
   - Confirm `/dev/snd` exists and Docker can map audio devices.
   - Confirm `models/kws/` and `models/kws/custom/` exist.

@@ -44,7 +44,8 @@ check_service_ready() {
     agent_engine) http_ok "http://localhost:7000/health" ;;
     sandbox) http_ok "http://localhost:6000/health" ;;
     kws) http_ok "http://localhost:10400/health" ;;
-    llm) http_ok "http://localhost:8000/" ;;
+    llm) http_ok "http://localhost:8000/health" ;;
+    llm_runtime) compose ps --status running llm_runtime | grep -q 'llm_runtime' ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
     *) return 1 ;;

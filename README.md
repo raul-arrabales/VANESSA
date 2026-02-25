@@ -7,7 +7,8 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Flask backend API
 - Agent orchestration service
 - Sandbox service for controlled code execution
-- Private LLM service
+- Private LLM gateway service (local-first routing)
+- Local vLLM runtime service
 - Wake-word (KWS) service
 - Weaviate vector store
 - PostgreSQL database
@@ -46,14 +47,19 @@ When running local staging (`./ops/local-staging/start.sh`), the LLM service is 
   - Failure codes you may see: `401` (if auth enabled), `404`, `5xx`.
 
 - `POST /v1/responses`
-  - Generates model output (OpenAI Responses-style endpoint).
+  - Generates model output through the VANESSA normalized envelope.
   - Example (dummy model):
     ```bash
     curl -sS -i http://localhost:8000/v1/responses \
       -H 'Content-Type: application/json' \
       -d '{
-        "model": "dummy-model",
-        "input": "Reply with the single word: pong"
+        "model": "dummy",
+        "input": [
+          {
+            "role": "user",
+            "content": [{"type": "text", "text": "Reply with the single word: pong"}]
+          }
+        ]
       }'
     ```
   - Expected: `200 OK` with generated response content.
@@ -95,6 +101,7 @@ Expected containers:
 - `vanessa-backend`
 - `vanessa-agent-engine`
 - `vanessa-llm`
+- `vanessa-llm-runtime`
 - `vanessa-sandbox`
 - `vanessa-kws`
 - `vanessa-weaviate`
@@ -110,7 +117,7 @@ docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 Service-specific logs:
 
 ```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm kws weaviate postgres frontend
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm llm_runtime kws weaviate postgres frontend
 ```
 
 ### 6. Stop And Clean Up Test Run

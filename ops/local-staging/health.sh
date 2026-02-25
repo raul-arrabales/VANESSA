@@ -40,6 +40,7 @@ tcp_ok() {
 
 run_checks() {
   local failures=0
+  local llm_routing_mode="${LLM_ROUTING_MODE:-local_only}"
 
   if http_ok "http://localhost:5000/health"; then
     printf 'backend: OK\n'
@@ -81,6 +82,17 @@ run_checks() {
   else
     printf 'llm: FAIL\n'
     failures=$((failures + 1))
+  fi
+
+  if [[ "${llm_routing_mode}" == "local_only" ]]; then
+    if compose ps --status running llm_runtime | grep -q 'llm_runtime'; then
+      printf 'llm_runtime: OK\n'
+    else
+      printf 'llm_runtime: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
   fi
 
   if http_ok "http://localhost:8080/v1/.well-known/live"; then

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -109,5 +109,29 @@ describe("ChatbotPage", () => {
 
     expect(screen.getByRole("button", { name: /First thread message/ })).toBeVisible();
     expect(screen.getByRole("button", { name: /Second thread/ })).toBeVisible();
+  });
+
+  it("disables new chat while an empty conversation exists and re-enables after sending", async () => {
+    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
+      { id: "safe-small", name: "Safe Small" },
+    ]);
+    modelApiMocks.runInference.mockResolvedValue({ output: "response" });
+
+    renderChatbot();
+
+    const newChatButton = await screen.findByRole("button", { name: "New chat" });
+    await waitFor(() => expect(newChatButton).toBeDisabled());
+
+    await userEvent.click(newChatButton);
+    expect(screen.queryAllByRole("button", { name: /New conversation/ })).toHaveLength(1);
+
+    await userEvent.type(screen.getByLabelText("Message"), "First message");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(newChatButton).toBeEnabled();
+
+    await userEvent.click(newChatButton);
+    expect(newChatButton).toBeDisabled();
+    expect(screen.queryAllByRole("button", { name: /New conversation/ })).toHaveLength(1);
   });
 });

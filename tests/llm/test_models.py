@@ -14,28 +14,44 @@ from app.main import list_models  # noqa: E402
 def test_models_catalog_output_shape() -> None:
     payload = list_models()
 
-    assert isinstance(payload, list)
-    assert payload, "Expected at least one model entry"
+    assert payload["object"] == "list"
+    assert isinstance(payload["data"], list)
+    assert payload["data"], "Expected at least one model entry"
 
-    for model in payload:
+    for model in payload["data"]:
         assert set(model.keys()) == {
             "id",
+            "object",
+            "owned_by",
             "display_name",
             "capabilities",
             "status",
             "provider_type",
+            "provider_config_ref",
+            "metadata",
         }
+        assert model["object"] == "model"
         assert set(model["capabilities"].keys()) == {"text", "image_input"}
         assert isinstance(model["capabilities"]["text"], bool)
         assert isinstance(model["capabilities"]["image_input"], bool)
+        assert isinstance(model["metadata"], dict)
 
 
 def test_models_catalog_includes_dummy_model() -> None:
     payload = list_models()
 
-    dummy = next((model for model in payload if model["id"] == "dummy"), None)
+    dummy = next((model for model in payload["data"] if model["id"] == "dummy"), None)
     assert dummy is not None
     assert dummy["display_name"] == "Dummy Test Model"
     assert dummy["provider_type"] == "dummy"
     assert dummy["status"] == "available"
     assert dummy["capabilities"] == {"text": True, "image_input": False}
+
+
+def test_models_catalog_includes_local_vllm_model() -> None:
+    payload = list_models()
+    local_default = next(
+        (model for model in payload["data"] if model["id"] == "local-vllm-default"), None
+    )
+    assert local_default is not None
+    assert local_default["provider_type"] == "local_vllm"

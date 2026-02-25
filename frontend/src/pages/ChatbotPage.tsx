@@ -154,7 +154,15 @@ export default function ChatbotPage(): JSX.Element {
     [activeConversationId, conversations],
   );
 
+  const canCreateConversation = useMemo(
+    () => models.length > 0 && conversations.every((conversation) => conversation.messages.length > 0),
+    [conversations, models.length],
+  );
+
   const createConversation = (): void => {
+    if (!canCreateConversation) {
+      return;
+    }
     const modelId = activeConversation?.modelId || models[0]?.id || "";
     const created = newConversation(modelId);
     setConversations((existing) => [created, ...existing]);
@@ -243,7 +251,14 @@ export default function ChatbotPage(): JSX.Element {
       <aside className="chatbot-sidebar" aria-label="Conversation history">
         <div className="chatbot-sidebar-header">
           <h2 className="section-title">Chatbot</h2>
-          <button type="button" className="btn btn-secondary" onClick={createConversation}>New chat</button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={createConversation}
+            disabled={!canCreateConversation}
+          >
+            New chat
+          </button>
         </div>
         <p className="status-text">Choose a model and continue any prior conversation.</p>
         <div className="chatbot-conversation-list" role="list">

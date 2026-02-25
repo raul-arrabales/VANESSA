@@ -382,8 +382,11 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     assert [m["model_id"] for m in allowed.get_json()["models"]] == ["allowed-model"]
 
     seen_payload: dict[str, Any] = {}
+    seen_url = ""
 
     def fake_llm_request(_url: str, payload: dict[str, Any]):
+        nonlocal seen_url
+        seen_url = _url
         seen_payload.update(payload)
         return {"ok": True, "model": payload["model"]}, 200
 
@@ -397,6 +400,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     assert permitted.status_code == 200
     assert seen_payload["model"] == "allowed-model"
     assert seen_payload["input"][0]["role"] == "user"
+    assert seen_url.endswith(":8000/v1/chat/completions")
 
     forbidden = test_client.post(
         "/llm/generate",

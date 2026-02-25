@@ -170,7 +170,7 @@ def _chat_completion_with_allowed_model(
     if requested_model_id not in allowed_model_ids:
         return {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
 
-    llm_url = os.getenv("LLM_URL", "http://llm:11400").rstrip("/")
+    llm_url = os.getenv("LLM_URL", "http://llm:8000").rstrip("/")
     upstream_payload: dict[str, Any] = {
         "model": requested_model_id,
         "input": messages,

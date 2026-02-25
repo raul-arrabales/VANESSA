@@ -14,10 +14,18 @@ class DummyModelProvider:
         capabilities=ModelCapabilities(text=True, image_input=False),
         status="available",
         provider_type="dummy",
+        provider_config_ref="dummy/default",
+        upstream_model="dummy",
+        metadata={
+            "upstream_model": "dummy",
+            "supports_image_input": False,
+            "max_tokens_default": 128,
+        },
     )
 
-    def generate(self, request: ResponseRequest) -> ProviderResult:
+    def generate(self, request: ResponseRequest, *, upstream_model: str) -> ProviderResult:
         _ = request
+        _ = upstream_model
         return ProviderResult(
             output_text="Hello, this is the test dummy model.",
             prompt_tokens=8,

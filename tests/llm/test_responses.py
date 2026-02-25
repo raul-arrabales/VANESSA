@@ -13,6 +13,8 @@ if str(LLM_PATH) not in sys.path:
     sys.path.insert(0, str(LLM_PATH))
 
 from app.main import create_chat_completion, create_response  # noqa: E402
+from app.providers.base import ProviderError  # noqa: E402
+from app.registry import registry  # noqa: E402
 from app.schemas import ResponseRequest  # noqa: E402
 
 
@@ -84,3 +86,26 @@ def test_multimodal_payload_validation_rejects_invalid_image_part() -> None:
                 }
             ],
         )
+
+
+def test_provider_error_maps_to_http_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = ResponseRequest(
+        model="dummy",
+        input=[{"role": "user", "content": [{"type": "text", "text": "Hi"}]}],
+    )
+    resolved = registry.resolve_model("dummy")
+
+    def fail_generate(_request: ResponseRequest, *, upstream_model: str):
+        _ = (_request, upstream_model)
+        raise ProviderError(
+            status_code=429,
+            code="dummy_rate_limited",
+            message="rate limited",
+        )
+
+    monkeypatch.setattr(type(resolved.provider), "generate", fail_generate)
+
+    with pytest.raises(HTTPException) as exc:
+        create_chat_completion(request)
+    assert exc.value.status_code == 429
+    assert exc.value.detail["code"] == "dummy_rate_limited"
