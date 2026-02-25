@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from json import dumps, loads
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -13,6 +14,12 @@ from .auth_tokens import TOKEN_PREFIX, decode_access_token, issue_access_token
 from .authz import AUTH_ROLES, require_auth, require_role
 from .config import AuthConfig, get_auth_config
 from .db import run_auth_schema_migration
+from .repositories.model_access import (
+    assign_model_access,
+    find_model_definition,
+    list_effective_allowed_models,
+    register_model_definition,
+)
 from .repositories.users import (
     activate_user,
     count_users_by_role,
@@ -67,7 +74,9 @@ def _get_int_env(name: str, default: int) -> int:
 
 def _trim_seen_event_ids(max_age_seconds: float) -> None:
     cutoff = time.time() - max_age_seconds
-    stale_ids = [event_id for event_id, seen_ts in _seen_event_ids.items() if seen_ts < cutoff]
+    stale_ids = [
+        event_id for event_id, seen_ts in _seen_event_ids.items() if seen_ts < cutoff
+    ]
     for event_id in stale_ids:
         _seen_event_ids.pop(event_id, None)
 
@@ -79,6 +88,24 @@ def _http_json_ok(url: str) -> bool:
             return 200 <= response.status < 300
     except URLError:
         return False
+
+
+def _http_json_request(
+    url: str, payload: dict[str, Any]
+) -> tuple[dict[str, Any] | None, int]:
+    req = Request(
+        url,
+        data=dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+            status_code = int(response.status)
+            body = response.read().decode("utf-8")
+            return (loads(body) if body else {}), status_code
+    except URLError:
+        return None, 502
 
 
 def _get_config() -> AuthConfig:
@@ -101,7 +128,9 @@ def _bootstrap_superadmin(config: AuthConfig) -> None:
     has_all_bootstrap_fields = bool(email and username and password)
 
     if has_any_bootstrap_field and not has_all_bootstrap_fields:
-        print("[WARN] Incomplete superadmin bootstrap env vars; skipping bootstrap user creation.")
+        print(
+            "[WARN] Incomplete superadmin bootstrap env vars; skipping bootstrap user creation."
+        )
         return
 
     if not has_all_bootstrap_fields:
@@ -161,6 +190,26 @@ def _validate_password_strength(password: str):
     return None
 
 
+def _serialize_model_definition(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "model_id": row.get("model_id"),
+        "provider": row.get("provider"),
+        "metadata": row.get("metadata") or {},
+        "provider_config_ref": row.get("provider_config_ref"),
+    }
+
+
+def _effective_models_for_current_user(
+    org_id: str | None, group_id: str | None
+) -> list[dict[str, Any]]:
+    return list_effective_allowed_models(
+        _get_config().database_url,
+        user_id=int(g.current_user["id"]),
+        org_id=org_id,
+        group_id=group_id,
+    )
+
+
 @app.before_request
 def load_current_user_from_token() -> None:
     g.current_user = None
@@ -175,7 +224,7 @@ def load_current_user_from_token() -> None:
         g.auth_error = "invalid_authorization_header"
         return
 
-    token = auth_header[len(prefix):].strip()
+    token = auth_header[len(prefix) :].strip()
     if not token:
         g.auth_error = "missing_token"
         return
@@ -224,7 +273,11 @@ def register_user():
     username = str(payload.get("username", "")).strip().lower()
     password = str(payload.get("password", ""))
     requested_role_raw = payload.get("role")
-    requested_role = str(requested_role_raw).strip().lower() if requested_role_raw is not None else ""
+    requested_role = (
+        str(requested_role_raw).strip().lower()
+        if requested_role_raw is not None
+        else ""
+    )
     requested_is_active = payload.get("is_active")
 
     if not email or "@" not in email:
@@ -243,9 +296,13 @@ def register_user():
 
     if actor is None:
         if not _get_config().allow_self_register:
-            return _json_error(403, "self_registration_disabled", "Self registration is disabled")
+            return _json_error(
+                403, "self_registration_disabled", "Self registration is disabled"
+            )
         if requested_role and requested_role != "user":
-            return _json_error(403, "role_assignment_forbidden", "Only superadmin can set custom role")
+            return _json_error(
+                403, "role_assignment_forbidden", "Only superadmin can set custom role"
+            )
         role = "user"
         is_active = False
     else:
@@ -260,11 +317,15 @@ def register_user():
                 is_active = bool(requested_is_active)
         elif actor_role == "admin":
             if requested_role and requested_role != "user":
-                return _json_error(403, "role_assignment_forbidden", "Admin can only create user role")
+                return _json_error(
+                    403, "role_assignment_forbidden", "Admin can only create user role"
+                )
             role = "user"
             is_active = False
         else:
-            return _json_error(403, "insufficient_role", "Only admin or superadmin can create users")
+            return _json_error(
+                403, "insufficient_role", "Only admin or superadmin can create users"
+            )
 
     try:
         created = create_user(
@@ -290,11 +351,18 @@ def login_user():
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
 
-    identifier = str(payload.get("identifier") or payload.get("email") or payload.get("username") or "").strip()
+    identifier = str(
+        payload.get("identifier")
+        or payload.get("email")
+        or payload.get("username")
+        or ""
+    ).strip()
     password = str(payload.get("password", ""))
 
     if not identifier or not password:
-        return _json_error(400, "missing_credentials", "Identifier and password are required")
+        return _json_error(
+            400, "missing_credentials", "Identifier and password are required"
+        )
 
     user = find_user_by_identifier(_get_config().database_url, identifier)
     if user is None:
@@ -307,14 +375,17 @@ def login_user():
         return _json_error(403, "account_inactive", "Account pending activation")
 
     token = issue_access_token(user, _get_config())
-    return jsonify(
-        {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": _get_config().access_token_ttl_seconds,
-            "user": sanitize_user_record(user),
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": _get_config().access_token_ttl_seconds,
+                "user": sanitize_user_record(user),
+            }
+        ),
+        200,
+    )
 
 
 @app.post("/auth/logout")
@@ -343,7 +414,9 @@ def activate_pending_user(user_id: int):
     target_role = str(target_user.get("role", "user"))
 
     if actor_role == "admin" and target_role != "user":
-        return _json_error(403, "insufficient_role", "Admin cannot activate elevated roles")
+        return _json_error(
+            403, "insufficient_role", "Admin cannot activate elevated roles"
+        )
 
     updated = activate_user(_get_config().database_url, user_id)
     if updated is None:
@@ -360,7 +433,9 @@ def auth_users_list():
 
     status = str(request.args.get("status", "")).strip().lower()
     if status and status not in {"pending", "active"}:
-        return _json_error(400, "invalid_status", "status must be one of: pending, active")
+        return _json_error(
+            400, "invalid_status", "status must be one of: pending, active"
+        )
 
     active_filter: bool | None
     if status == "pending":
@@ -424,12 +499,142 @@ def superadmin_ping():
     return jsonify({"status": "ok", "scope": "superadmin"}), 200
 
 
+@app.post("/models/registry")
+@require_role("superadmin")
+def register_model():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    model_id = str(payload.get("model_id", "")).strip()
+    provider = str(payload.get("provider", "")).strip()
+    metadata = payload.get("metadata")
+    provider_config_ref = payload.get("provider_config_ref")
+
+    if not model_id:
+        return _json_error(400, "invalid_model_id", "model_id is required")
+    if not provider:
+        return _json_error(400, "invalid_provider", "provider is required")
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        return _json_error(400, "invalid_metadata", "metadata must be an object")
+
+    try:
+        created = register_model_definition(
+            _get_config().database_url,
+            model_id=model_id,
+            provider=provider,
+            metadata=metadata,
+            provider_config_ref=(
+                str(provider_config_ref).strip()
+                if provider_config_ref is not None
+                else None
+            ),
+            created_by_user_id=int(g.current_user["id"]),
+        )
+    except ValueError:
+        return _json_error(409, "duplicate_model", "model_id already exists")
+    return jsonify({"model": _serialize_model_definition(created)}), 201
+
+
+@app.post("/models/access-assignments")
+@require_role("admin")
+def assign_model():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    model_id = str(payload.get("model_id", "")).strip()
+    scope_type = str(payload.get("scope_type", "")).strip().lower()
+    scope_id = str(payload.get("scope_id", "")).strip()
+    if not model_id:
+        return _json_error(400, "invalid_model_id", "model_id is required")
+    if scope_type not in {"org", "group", "user"}:
+        return _json_error(
+            400, "invalid_scope_type", "scope_type must be org, group, or user"
+        )
+    if not scope_id:
+        return _json_error(400, "invalid_scope_id", "scope_id is required")
+
+    if find_model_definition(_get_config().database_url, model_id) is None:
+        return _json_error(404, "model_not_found", "Model definition not found")
+
+    assigned = assign_model_access(
+        _get_config().database_url,
+        model_id=model_id,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        assigned_by_user_id=int(g.current_user["id"]),
+    )
+    return (
+        jsonify(
+            {
+                "assignment": {
+                    "model_id": assigned["model_id"],
+                    "scope_type": assigned["scope_type"],
+                    "scope_id": assigned["scope_id"],
+                }
+            }
+        ),
+        201,
+    )
+
+
+@app.get("/models/allowed")
+@require_role("user")
+def get_allowed_models():
+    org_id = str(request.args.get("org_id", "")).strip() or None
+    group_id = str(request.args.get("group_id", "")).strip() or None
+    models = _effective_models_for_current_user(org_id=org_id, group_id=group_id)
+    return (
+        jsonify({"models": [_serialize_model_definition(model) for model in models]}),
+        200,
+    )
+
+
+@app.post("/llm/generate")
+@require_role("user")
+def generate_with_allowed_model():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    requested_model_id = str(payload.get("model_id", "")).strip()
+    if not requested_model_id:
+        return _json_error(400, "invalid_model_id", "model_id is required")
+
+    org_id = str(payload.get("org_id", "")).strip() or None
+    group_id = str(payload.get("group_id", "")).strip() or None
+    effective_models = _effective_models_for_current_user(
+        org_id=org_id, group_id=group_id
+    )
+    allowed_model_ids = {str(model.get("model_id", "")) for model in effective_models}
+    if requested_model_id not in allowed_model_ids:
+        return _json_error(403, "model_forbidden", "Requested model is not allowed")
+
+    llm_url = os.getenv("LLM_URL", "http://llm:11400").rstrip("/")
+    upstream_payload = {
+        **payload,
+        "model_id": requested_model_id,
+        "allowed_model_ids": sorted(allowed_model_ids),
+    }
+    llm_response, status_code = _http_json_request(
+        f"{llm_url}/generate", upstream_payload
+    )
+    if llm_response is None:
+        return _json_error(502, "llm_unreachable", "LLM service unavailable")
+    return jsonify(llm_response), status_code
+
+
 @app.post("/voice/wake-events")
 def wake_events():
     payload = request.get_json(silent=True) or {}
 
     wake_word = str(payload.get("wake_word", "unknown")).strip() or "unknown"
-    source_device_id = str(payload.get("source_device_id", "default")).strip() or "default"
+    source_device_id = (
+        str(payload.get("source_device_id", "default")).strip() or "default"
+    )
     confidence = payload.get("confidence", 1.0)
     event_id = str(payload.get("event_id", "")).strip()
 
@@ -438,7 +643,9 @@ def wake_events():
     except (TypeError, ValueError):
         return jsonify({"accepted": False, "reason": "invalid_confidence"}), 400
 
-    detection_threshold = _get_float_env("KWS_DETECTION_THRESHOLD", _DEFAULT_DETECTION_THRESHOLD)
+    detection_threshold = _get_float_env(
+        "KWS_DETECTION_THRESHOLD", _DEFAULT_DETECTION_THRESHOLD
+    )
     if confidence_value < detection_threshold:
         return jsonify({"accepted": False, "reason": "below_threshold"}), 202
 
@@ -479,14 +686,17 @@ def voice_health():
     kws_url = os.getenv("KWS_URL", "http://kws:10400").rstrip("/")
     kws_health_url = f"{kws_url}/health"
 
-    return jsonify(
-        {
-            "status": "ok",
-            "service": "backend",
-            "voice": {
-                "kws": {"url": kws_url, "reachable": _http_json_ok(kws_health_url)},
-                "stt": {"configured": False},
-                "tts": {"configured": False},
-            },
-        }
-    ), 200
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "service": "backend",
+                "voice": {
+                    "kws": {"url": kws_url, "reachable": _http_json_ok(kws_health_url)},
+                    "stt": {"configured": False},
+                    "tts": {"configured": False},
+                },
+            }
+        ),
+        200,
+    )
