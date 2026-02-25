@@ -71,7 +71,7 @@ run_checks() {
     failures=$((failures + 1))
   fi
 
-  if http_ok "http://localhost:8000/"; then
+  if http_ok "http://localhost:8000/health"; then
     printf 'llm: OK\n'
   else
     printf 'llm: FAIL\n'
