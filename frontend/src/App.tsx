@@ -7,6 +7,7 @@ import { getDefaultRouteForRole } from "./auth/roles";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
 import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
+import ChatbotPage from "./pages/ChatbotPage";
 import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -60,6 +61,7 @@ function AppHeader(): JSX.Element {
         <nav className="nav-links" aria-label={t("nav.aria")}>
           {!isAuthenticated && <Link to="/" className="link-chip">{t("nav.home")}</Link>}
           {isAuthenticated && <Link to="/backend-health" className="link-chip">{t("nav.backendHealth")}</Link>}
+          {isAuthenticated && <Link to="/chat" className="link-chip">Chatbot</Link>}
           {isAuthenticated && <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>}
           {isAuthenticated && canAccessApprovals && (
             <Link to="/admin/approvals" className="link-chip">{t("nav.approvals")}</Link>
@@ -128,6 +130,14 @@ export default function App(): JSX.Element {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/backend-health" element={<BackendHealthPage />} />
+        <Route
+          path="/chat"
+          element={(
+            <RequireAuth>
+              <ChatbotPage />
+            </RequireAuth>
+          )}
+        />
         <Route
           path="/login"
           element={(
