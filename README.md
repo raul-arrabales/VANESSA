@@ -23,6 +23,42 @@ Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflo
 
 Full guide: `ops/local-staging/README.md`
 
+## LLM API Endpoints (Local)
+
+When running local staging (`./ops/local-staging/start.sh`), the LLM service is exposed at `http://localhost:8000`.
+
+- `GET /health`
+  - Quick liveness/readiness probe.
+  - Example:
+    ```bash
+    curl -sS -i http://localhost:8000/health
+    ```
+  - Expected: `200 OK` with a basic health payload.
+  - Failure codes you may see: `404`, `5xx`.
+
+- `GET /v1/models`
+  - Lists available models (OpenAI-compatible endpoint).
+  - Example:
+    ```bash
+    curl -sS -i http://localhost:8000/v1/models
+    ```
+  - Expected: `200 OK` and JSON with a `data` array.
+  - Failure codes you may see: `401` (if auth enabled), `404`, `5xx`.
+
+- `POST /v1/responses`
+  - Generates model output (OpenAI Responses-style endpoint).
+  - Example (dummy model):
+    ```bash
+    curl -sS -i http://localhost:8000/v1/responses \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "model": "dummy-model",
+        "input": "Reply with the single word: pong"
+      }'
+    ```
+  - Expected: `200 OK` with generated response content.
+  - Failure codes you may see: `400`, `401`, `404`, `422`, `429`, `5xx`.
+
 ## Run Containers For Testing
 
 These steps verify that Docker services are correctly defined and can start.
