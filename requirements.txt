@@ -3,3 +3,4 @@ psycopg[binary]>=3.2.0
 bcrypt>=4.1.0
 PyJWT>=2.9.0
 pytest>=8.0.0
+huggingface_hub>=0.34.0

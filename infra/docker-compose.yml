@@ -9,7 +9,10 @@ services:
     depends_on:
       - backend
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
 
   backend:
     build:
@@ -25,7 +28,12 @@ services:
       - llm
       - sandbox
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    volumes:
+      - ../models/llm:/models/llm
 
   llm:
     build:
@@ -37,7 +45,10 @@ services:
     depends_on:
       - llm_runtime
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
 
   llm_runtime:
     image: vllm/vllm-openai:latest
@@ -52,9 +63,12 @@ services:
     expose:
       - "8000"
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
     volumes:
-      - ../models/llm:/models/llm:ro
+      - ../models/llm:/models/llm
 
   agent_engine:
     build:
@@ -69,7 +83,10 @@ services:
       - postgres
       - sandbox
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
 
   sandbox:
     build:
@@ -89,7 +106,10 @@ services:
     depends_on:
       - backend
     env_file:
-      - .env.example
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
     volumes:
       - ../models/kws:/models/kws:ro
     devices:

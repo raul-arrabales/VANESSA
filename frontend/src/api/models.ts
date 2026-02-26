@@ -12,12 +12,49 @@ export type ModelCatalogItem = {
   id: string;
   name: string;
   provider?: string | null;
+  source_id?: string | null;
+  local_path?: string | null;
+  status?: string | null;
   description?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type ModelScopeAssignment = {
   scope: string;
   model_ids: string[];
+};
+
+export type HfDiscoveredModel = {
+  source_id: string;
+  name: string;
+  downloads?: number | null;
+  likes?: number | null;
+  tags: string[];
+  provider: string;
+};
+
+export type HfModelDetails = {
+  source_id: string;
+  name: string;
+  sha?: string | null;
+  downloads?: number | null;
+  likes?: number | null;
+  tags: string[];
+  files: Array<{ path: string; size?: number | null }>;
+};
+
+export type ModelDownloadJob = {
+  job_id: string;
+  provider: string;
+  source_id: string;
+  target_dir: string;
+  model_id?: string | null;
+  status: string;
+  error_message?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type InferenceResult = {
@@ -80,15 +117,8 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
 }
 
 export async function listModelCatalog(token: string): Promise<ModelCatalogItem[]> {
-  try {
-    const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/catalog", { token });
-    return result.models;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return listEnabledModels(token);
-    }
-    throw error;
-  }
+  const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/catalog", { token });
+  return result.models;
 }
 
 export async function createModelCatalogItem(
@@ -102,6 +132,49 @@ export async function createModelCatalogItem(
   });
 
   return result.model;
+}
+
+export async function discoverHfModels(
+  token: string,
+  options: { query?: string; task?: string; sort?: string; limit?: number } = {},
+): Promise<HfDiscoveredModel[]> {
+  const params = new URLSearchParams();
+  if (options.query) params.set("query", options.query);
+  if (options.task) params.set("task", options.task);
+  if (options.sort) params.set("sort", options.sort);
+  if (options.limit) params.set("limit", String(options.limit));
+  const query = params.toString();
+  const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/models/discovery/huggingface${query ? `?${query}` : ""}`, { token });
+  return result.models;
+}
+
+export async function getHfModelDetails(sourceId: string, token: string): Promise<HfModelDetails> {
+  const encoded = encodeURIComponent(sourceId);
+  const result = await requestJson<{ model: HfModelDetails }>(`/models/discovery/huggingface/${encoded}`, { token });
+  return result.model;
+}
+
+export async function startModelDownload(
+  payload: { source_id: string; name?: string; allow_patterns?: string[]; ignore_patterns?: string[] },
+  token: string,
+): Promise<ModelDownloadJob> {
+  const result = await requestJson<{ job: ModelDownloadJob }>("/models/catalog/downloads", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return result.job;
+}
+
+export async function getDownloadJob(jobId: string, token: string): Promise<ModelDownloadJob> {
+  const result = await requestJson<{ job: ModelDownloadJob }>(`/models/catalog/downloads/${encodeURIComponent(jobId)}`, { token });
+  return result.job;
+}
+
+export async function listDownloadJobs(token: string, status?: string): Promise<ModelDownloadJob[]> {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
+  const result = await requestJson<{ jobs: ModelDownloadJob[] }>(`/models/catalog/downloads${suffix}`, { token });
+  return result.jobs;
 }
 
 export async function listModelAssignments(token: string): Promise<ModelScopeAssignment[]> {

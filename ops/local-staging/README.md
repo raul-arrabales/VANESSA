@@ -79,6 +79,7 @@ Supported launcher variables:
 - `LLM_ROUTING_MODE` (default: `local_only`)
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
+For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
 
 ## Sample Auth Seeding
 
@@ -113,17 +114,19 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 2. Validate readiness: `./ops/local-staging/health.sh`
 3. Use app in browser: `http://localhost:3000`
 4. Login as `sample-superadmin` and validate approvals/promotion flows.
-5. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
-6. Check API health directly (host-to-container): `http://localhost:5000/health`
-7. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
-8. Check wake-word service health: `http://localhost:10400/health`
-9. Simulate wake detection event:
+5. In superadmin control panel, open "Model catalog management" and validate Hugging Face discovery/download flows.
+6. Confirm downloaded model files are written under host directory `models/llm/`.
+7. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
+8. Check API health directly (host-to-container): `http://localhost:5000/health`
+9. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
+10. Check wake-word service health: `http://localhost:10400/health`
+11. Simulate wake detection event:
    `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
-10. Validate backend voice endpoints:
+12. Validate backend voice endpoints:
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
-11. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-12. Stop while keeping state: `./ops/local-staging/stop.sh`
+13. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+14. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 ## LLM API Quick Reference (local)
 
@@ -203,6 +206,12 @@ Use the targeted restart script when only one service changed:
 - `llm_runtime` fails to start:
   - Ensure local model files exist under `models/llm/`.
   - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.
+- Model downloads fail from backend:
+  - Confirm `HF_TOKEN` is set in `infra/.env.local` (recommended) or your compose env override when accessing gated Hugging Face repos.
+  - Verify backend sees the token:
+    `docker compose -f infra/docker-compose.yml exec -T backend env | grep '^HF_TOKEN='`
+  - Confirm `MODEL_STORAGE_ROOT=/models/llm` and backend has write access to `models/llm/` on host.
+  - Check backend logs for `/models/catalog/downloads` job failure details.
 - `kws` fails at startup:
   - Confirm `/dev/snd` exists and Docker can map audio devices.
   - Confirm `models/kws/` and `models/kws/custom/` exist.

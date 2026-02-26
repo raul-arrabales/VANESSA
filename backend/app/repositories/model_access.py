@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from psycopg import errors
+from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 
@@ -40,7 +41,7 @@ def register_model_definition(
                 (
                     model_id.strip(),
                     provider.strip(),
-                    metadata,
+                    Jsonb(metadata),
                     provider_config_ref.strip() if provider_config_ref else None,
                     created_by_user_id,
                 ),

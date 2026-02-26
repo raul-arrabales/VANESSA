@@ -27,10 +27,14 @@ export function RequireAuth({ children }: GuardProps): JSX.Element {
 }
 
 export function RequireRole({ role, children }: RoleGuardProps): JSX.Element {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
-  if (!user) {
-    return <RequireAuth>{children}</RequireAuth>;
+  if (isLoading) {
+    return <p className="status-text">Loading...</p>;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
   }
 
   if (!hasRequiredRole(user.role, role)) {

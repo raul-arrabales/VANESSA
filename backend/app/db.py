@@ -108,6 +108,50 @@ def run_auth_schema_migration(database_url: str) -> None:
                 "ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
             )
             cursor.execute(
+                "ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS name TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS source_id TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS local_path TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS status TEXT"
+            )
+            cursor.execute(
+                """
+                UPDATE model_registry
+                SET
+                    name = COALESCE(name, NULLIF(metadata->>'name', ''), model_id),
+                    source_id = COALESCE(source_id, NULLIF(metadata->>'source_id', '')),
+                    local_path = COALESCE(local_path, NULLIF(metadata->>'local_path', '')),
+                    status = COALESCE(status, NULLIF(metadata->>'status', ''), 'available')
+                """
+            )
+            cursor.execute(
+                "ALTER TABLE model_registry ALTER COLUMN name SET NOT NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE model_registry ALTER COLUMN status SET DEFAULT 'available'"
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'model_registry_status_check'
+                    ) THEN
+                        ALTER TABLE model_registry
+                        ADD CONSTRAINT model_registry_status_check
+                        CHECK (status IN ('available', 'downloading', 'failed', 'archived'));
+                    END IF;
+                END
+                $$
+                """
+            )
+            cursor.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS model_registry_model_id_unique_idx ON model_registry (model_id)"
             )
 
@@ -161,4 +205,126 @@ def run_auth_schema_migration(database_url: str) -> None:
                 END
                 $$
                 """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS model_scope_assignments (
+                    id BIGSERIAL PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    model_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE(scope)
+                )
+                """
+            )
+            cursor.execute(
+                "ALTER TABLE model_scope_assignments ADD COLUMN IF NOT EXISTS scope TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_scope_assignments ADD COLUMN IF NOT EXISTS model_ids JSONB NOT NULL DEFAULT '[]'::jsonb"
+            )
+            cursor.execute(
+                "ALTER TABLE model_scope_assignments ADD COLUMN IF NOT EXISTS updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE model_scope_assignments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                "ALTER TABLE model_scope_assignments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'model_scope_assignments_scope_check'
+                    ) THEN
+                        ALTER TABLE model_scope_assignments
+                        ADD CONSTRAINT model_scope_assignments_scope_check
+                        CHECK (scope IN ('user', 'admin', 'superadmin'));
+                    END IF;
+                END
+                $$
+                """
+            )
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS model_scope_assignments_scope_unique_idx ON model_scope_assignments (scope)"
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS model_download_jobs (
+                    id UUID PRIMARY KEY,
+                    provider TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    target_dir TEXT NOT NULL,
+                    model_id TEXT REFERENCES model_registry(model_id) ON DELETE SET NULL,
+                    status TEXT NOT NULL,
+                    error_message TEXT,
+                    created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+                    started_at TIMESTAMPTZ,
+                    finished_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS provider TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS source_id TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS target_dir TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS model_id TEXT REFERENCES model_registry(model_id) ON DELETE SET NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS status TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS error_message TEXT"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                "ALTER TABLE model_download_jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'model_download_jobs_status_check'
+                    ) THEN
+                        ALTER TABLE model_download_jobs
+                        ADD CONSTRAINT model_download_jobs_status_check
+                        CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'));
+                    END IF;
+                END
+                $$
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS model_download_jobs_status_created_idx ON model_download_jobs (status, created_at DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS model_download_jobs_source_id_idx ON model_download_jobs (source_id)"
             )

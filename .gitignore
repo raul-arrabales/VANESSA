@@ -1,0 +1,14 @@
+# Local env files with secrets
+ops/local-staging/.env.local
+infra/.env.local
+*.env.local
+
+# python
+__pycache__/
+*.py[cod]
+
+# Models
+models/llm/
+*.safetensors
+*.bin
+*.pt

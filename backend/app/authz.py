@@ -18,7 +18,7 @@ def require_auth(view: Callable):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if getattr(g, "current_user", None) is None:
-            reason = getattr(g, "auth_error", "missing_auth")
+            reason = getattr(g, "auth_error", None) or "missing_auth"
             return _error(401, reason, "Authentication required")
         return view(*args, **kwargs)
 

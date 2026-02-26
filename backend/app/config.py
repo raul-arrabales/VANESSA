@@ -15,6 +15,12 @@ class AuthConfig:
     bootstrap_superadmin_username: str
     bootstrap_superadmin_password: str
     flask_env: str
+    model_storage_root: str = "/models/llm"
+    model_download_max_workers: int = 2
+    model_download_stale_seconds: int = 900
+    model_download_allow_patterns_default: str = ""
+    model_download_ignore_patterns_default: str = ""
+    hf_token: str = ""
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
@@ -65,4 +71,10 @@ def get_auth_config() -> AuthConfig:
         bootstrap_superadmin_username=os.getenv("AUTH_BOOTSTRAP_SUPERADMIN_USERNAME", "").strip(),
         bootstrap_superadmin_password=os.getenv("AUTH_BOOTSTRAP_SUPERADMIN_PASSWORD", ""),
         flask_env=flask_env,
+        model_storage_root=os.getenv("MODEL_STORAGE_ROOT", "/models/llm").strip() or "/models/llm",
+        model_download_max_workers=_get_int_env("MODEL_DOWNLOAD_MAX_WORKERS", 2),
+        model_download_stale_seconds=_get_int_env("MODEL_DOWNLOAD_STALE_SECONDS", 900),
+        model_download_allow_patterns_default=os.getenv("MODEL_DOWNLOAD_ALLOW_PATTERNS_DEFAULT", "").strip(),
+        model_download_ignore_patterns_default=os.getenv("MODEL_DOWNLOAD_IGNORE_PATTERNS_DEFAULT", "").strip(),
+        hf_token=os.getenv("HF_TOKEN", "").strip(),
     )

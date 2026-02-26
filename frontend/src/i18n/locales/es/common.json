@@ -29,6 +29,7 @@
       "backendHealth": "Salud del backend",
       "chat": "Chatbot",
       "design": "Diseño",
+      "models": "Modelos",
       "welcome": "Bienvenida"
     }
   },
@@ -220,6 +221,53 @@
       "title": "Navegación de configuración",
       "overview": "Resumen",
       "design": "Diseño"
+    }
+  },
+  "models": {
+    "title": "Gestion del catalogo de modelos",
+    "subtitle": "Gestiona las entradas del catalogo y las asignaciones de modelos por rol.",
+    "catalog": {
+      "title": "Operaciones de catalogo",
+      "description": "Agrega modelos al catalogo de la plataforma.",
+      "nameLabel": "Nombre del modelo",
+      "providerLabel": "Proveedor",
+      "addButton": "Agregar modelo al catalogo",
+      "listAria": "Entradas del catalogo de modelos"
+    },
+    "discovery": {
+      "title": "Descubrimiento en Hugging Face",
+      "description": "Busca e inspecciona modelos abiertos antes de descargarlos al almacenamiento local.",
+      "queryLabel": "Busqueda de descubrimiento",
+      "queryPlaceholder": "ej. llama instruct",
+      "searchButton": "Buscar modelos",
+      "inspectButton": "Inspeccionar",
+      "downloadButton": "Descargar y registrar",
+      "downloadCount": "Descargas: {{count}}",
+      "listAria": "Resultados de descubrimiento de modelos en Hugging Face",
+      "empty": "No se encontraron modelos para esta busqueda."
+    },
+    "jobs": {
+      "title": "Trabajos de descarga",
+      "description": "Supervisa el progreso de descargas asincronas y errores.",
+      "listAria": "Trabajos de descarga de modelos",
+      "pollingActive": "Consultando descargas activas.",
+      "noActive": "No hay descargas activas."
+    },
+    "assignments": {
+      "title": "Asignaciones de modelos",
+      "description": "Asigna modelos disponibles a cada alcance de rol.",
+      "scopeTitle": "Alcance {{scope}}",
+      "emptyCatalog": "No hay modelos en el catalogo."
+    },
+    "feedback": {
+      "loadFailed": "No se pudo cargar la configuracion de modelos.",
+      "discoveryFailed": "No se pudo consultar modelos en Hugging Face.",
+      "downloadStarted": "Descarga iniciada para {{source}}.",
+      "downloadStartFailed": "No se pudo iniciar el trabajo de descarga.",
+      "created": "Modelo agregado al catalogo.",
+      "createFailed": "No se pudo crear el modelo.",
+      "assignmentSaved": "Asignacion de modelos guardada para {{scope}}.",
+      "assignmentFailed": "No se pudieron actualizar las asignaciones de modelos."
     }
   }
 }

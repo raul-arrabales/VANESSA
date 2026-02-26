@@ -29,6 +29,7 @@
       "backendHealth": "Backend health",
       "chat": "Chatbot",
       "design": "Design",
+      "models": "Models",
       "welcome": "Welcome"
     }
   },
@@ -220,6 +221,53 @@
       "title": "Settings navigation",
       "overview": "Overview",
       "design": "Design"
+    }
+  },
+  "models": {
+    "title": "Model catalog management",
+    "subtitle": "Manage catalog entries and role-based model assignments.",
+    "catalog": {
+      "title": "Catalog operations",
+      "description": "Add models to the platform catalog.",
+      "nameLabel": "Model name",
+      "providerLabel": "Provider",
+      "addButton": "Add model to catalog",
+      "listAria": "Model catalog entries"
+    },
+    "discovery": {
+      "title": "Hugging Face discovery",
+      "description": "Search and inspect open models before downloading them to local storage.",
+      "queryLabel": "Discovery query",
+      "queryPlaceholder": "e.g. llama instruct",
+      "searchButton": "Search models",
+      "inspectButton": "Inspect",
+      "downloadButton": "Download and register",
+      "downloadCount": "Downloads: {{count}}",
+      "listAria": "Hugging Face model discovery results",
+      "empty": "No models found for this query."
+    },
+    "jobs": {
+      "title": "Download jobs",
+      "description": "Track asynchronous download progress and failures.",
+      "listAria": "Model download jobs",
+      "pollingActive": "Polling active downloads.",
+      "noActive": "No active downloads."
+    },
+    "assignments": {
+      "title": "Model assignments",
+      "description": "Assign available models to each role scope.",
+      "scopeTitle": "{{scope}} scope",
+      "emptyCatalog": "No models in catalog."
+    },
+    "feedback": {
+      "loadFailed": "Failed to load model settings.",
+      "discoveryFailed": "Failed to query Hugging Face models.",
+      "downloadStarted": "Started download for {{source}}.",
+      "downloadStartFailed": "Unable to start download job.",
+      "created": "Model added to catalog.",
+      "createFailed": "Unable to create model.",
+      "assignmentSaved": "Saved {{scope}} model assignment.",
+      "assignmentFailed": "Failed to update model assignments."
     }
   }
 }

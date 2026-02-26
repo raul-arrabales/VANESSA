@@ -13,6 +13,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import SettingsPage from "./pages/SettingsPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
+import SuperAdminModelsPage from "./pages/SuperAdminModelsPage";
 import SuperAdminWelcomePage from "./pages/SuperAdminWelcomePage";
 import UserWelcomePage from "./pages/UserWelcomePage";
 
@@ -29,6 +30,7 @@ const breadcrumbSegmentConfig: Record<string, BreadcrumbSegmentConfig> = {
   chat: { labelKey: "nav.breadcrumbs.chat" },
   design: { labelKey: "nav.breadcrumbs.design" },
   login: { labelKey: "nav.login" },
+  models: { labelKey: "nav.breadcrumbs.models" },
   register: { labelKey: "nav.register" },
   settings: { labelKey: "nav.settings" },
   welcome: { labelKey: "nav.breadcrumbs.welcome" },
@@ -175,7 +177,8 @@ function BreadcrumbsBar(): JSX.Element {
   }
 
   if (pathSegments[0] === "welcome" && pathSegments[1]) {
-    const roleCrumb = crumbs[crumbs.length - 1];
+    const rolePath = `/welcome/${pathSegments[1]}`;
+    const roleCrumb = crumbs.find((crumb) => crumb.href === rolePath);
     if (roleCrumb) {
       roleCrumb.label = t(`nav.welcome.${pathSegments[1]}`);
     }
@@ -252,6 +255,14 @@ export default function App(): JSX.Element {
           element={(
             <RequireRole role="superadmin">
               <SuperAdminWelcomePage />
+            </RequireRole>
+          )}
+        />
+        <Route
+          path="/welcome/superadmin/models"
+          element={(
+            <RequireRole role="superadmin">
+              <SuperAdminModelsPage />
             </RequireRole>
           )}
         />

@@ -104,35 +104,87 @@ a {
   gap: var(--space-4);
 }
 
-.welcome-tile-grid {
+.option-card-grid {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
-.welcome-tile {
+.option-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.option-card-link {
+  height: 100%;
   display: grid;
   gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
   padding: var(--space-4);
+  transition:
+    box-shadow var(--duration-fast) var(--easing-standard),
+    transform var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    background-color var(--duration-fast) var(--easing-standard);
 }
 
-.welcome-tile::before {
-  width: 0.35rem;
-}
-
-.welcome-tile .section-title {
+.option-card .section-title {
   font-size: 1.03rem;
 }
 
-.welcome-tile .status-text {
+.option-card-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.option-card-heading .section-title {
+  margin: 0;
+  font-size: 1.03rem;
+}
+
+.option-card .status-text {
   margin: 0;
 }
 
-.welcome-tile .btn {
-  justify-self: start;
+.option-card-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in oklab, var(--border-muted) 82%, transparent);
+  background: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+}
+
+.option-card-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.option-card-link:hover {
+  transform: translateY(-2px);
+  background: color-mix(in oklab, var(--bg-surface) 90%, var(--bg-subtle));
+}
+
+.option-card-link:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 84%, white);
+  outline-offset: -2px;
+}
+
+.option-card:hover {
+  border-color: color-mix(in oklab, var(--accent-secondary) 55%, var(--border-muted));
+  box-shadow: var(--shadow-2);
 }
 
 .panel {
