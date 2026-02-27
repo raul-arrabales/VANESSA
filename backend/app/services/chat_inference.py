@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from json import dumps, loads
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -97,7 +96,7 @@ def chat_completion_with_allowed_model(
     if requested_model_id not in allowed_model_ids:
         return {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
 
-    llm_url = os.getenv("LLM_URL", "http://llm:8000").rstrip("/")
+    llm_url = get_auth_config().llm_url.rstrip("/")
     upstream_payload: dict[str, Any] = {
         "model": requested_model_id,
         "input": messages,

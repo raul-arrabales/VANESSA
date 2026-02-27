@@ -63,4 +63,12 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 Canonical service notes: [`backend/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/backend/README.md).
 Execution contract details: [`docs/services/agent_execution_contract.md`](./agent_execution_contract.md).
 
+## Config Source of Truth
+
+- Backend config module: `backend/app/config.py`
+  - `get_auth_config()` for auth + DB + service integration settings.
+  - `get_backend_runtime_config()` for runtime-only settings used by health/voice/runtime checks.
+- Agent engine config module: `agent_engine/app/config.py`
+  - `get_config()` for engine DB/runtime/service-token settings.
+
 > Owner: Backend maintainers. Update cadence: whenever API routes, contracts, or service integrations change.

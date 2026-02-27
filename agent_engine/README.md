@@ -15,3 +15,7 @@ Notes:
 - Backend should call only `/v1/internal/agent-executions*`.
 - Public `/v1/agent-executions*` remains as compatibility alias.
 - Configure service token with `AGENT_ENGINE_SERVICE_TOKEN`.
+
+Config Source of Truth:
+
+- Engine runtime/config loader: `agent_engine/app/config.py` (`get_config`).

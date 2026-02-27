@@ -3,6 +3,35 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
+DEFAULT_RUNTIME_PROFILE = "offline"
+
+DEFAULT_FRONTEND_URL = "http://frontend:3000"
+DEFAULT_BACKEND_URL = "http://backend:5000"
+DEFAULT_LLM_URL = "http://llm:8000"
+DEFAULT_LLM_RUNTIME_URL = "http://llm_runtime:8000"
+DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
+DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
+DEFAULT_SANDBOX_URL = "http://sandbox:6000"
+DEFAULT_KWS_URL = "http://kws:10400"
+DEFAULT_WEAVIATE_URL = "http://weaviate:8080"
+
+
+@dataclass(frozen=True)
+class BackendRuntimeConfig:
+    frontend_url: str = DEFAULT_FRONTEND_URL
+    backend_url: str = DEFAULT_BACKEND_URL
+    llm_url: str = DEFAULT_LLM_URL
+    llm_runtime_url: str = DEFAULT_LLM_RUNTIME_URL
+    agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
+    agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+    sandbox_url: str = DEFAULT_SANDBOX_URL
+    kws_url: str = DEFAULT_KWS_URL
+    weaviate_url: str = DEFAULT_WEAVIATE_URL
+    runtime_profile_override: str = DEFAULT_RUNTIME_PROFILE
+    kws_detection_threshold: float = 0.5
+    kws_cooldown_ms: int = 2_000
+
 
 @dataclass(frozen=True)
 class AuthConfig:
@@ -21,10 +50,20 @@ class AuthConfig:
     model_download_allow_patterns_default: str = ""
     model_download_ignore_patterns_default: str = ""
     hf_token: str = ""
-    agent_engine_url: str = "http://agent_engine:7000"
-    agent_engine_service_token: str = "dev-agent-engine-token"
+    agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
+    agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
     agent_execution_via_engine: bool = True
     agent_execution_fallback: bool = False
+    frontend_url: str = DEFAULT_FRONTEND_URL
+    backend_url: str = DEFAULT_BACKEND_URL
+    llm_url: str = DEFAULT_LLM_URL
+    llm_runtime_url: str = DEFAULT_LLM_RUNTIME_URL
+    sandbox_url: str = DEFAULT_SANDBOX_URL
+    kws_url: str = DEFAULT_KWS_URL
+    weaviate_url: str = DEFAULT_WEAVIATE_URL
+    runtime_profile_override: str = DEFAULT_RUNTIME_PROFILE
+    kws_detection_threshold: float = 0.5
+    kws_cooldown_ms: int = 2_000
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
@@ -48,6 +87,27 @@ def _get_int_env(name: str, default: int) -> int:
     except ValueError:
         return default
     return parsed if parsed > 0 else default
+
+
+def _get_nonnegative_int_env(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError:
+        return default
+    return parsed if parsed >= 0 else default
+
+
+def _get_float_env(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
 
 
 def get_auth_config() -> AuthConfig:
@@ -81,9 +141,41 @@ def get_auth_config() -> AuthConfig:
         model_download_allow_patterns_default=os.getenv("MODEL_DOWNLOAD_ALLOW_PATTERNS_DEFAULT", "").strip(),
         model_download_ignore_patterns_default=os.getenv("MODEL_DOWNLOAD_IGNORE_PATTERNS_DEFAULT", "").strip(),
         hf_token=os.getenv("HF_TOKEN", "").strip(),
-        agent_engine_url=os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").strip() or "http://agent_engine:7000",
-        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", "dev-agent-engine-token").strip()
-        or "dev-agent-engine-token",
+        agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
+        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
+        or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
         agent_execution_via_engine=_get_bool_env("AGENT_EXECUTION_VIA_ENGINE", True),
         agent_execution_fallback=_get_bool_env("AGENT_EXECUTION_FALLBACK", False),
+        frontend_url=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,
+        backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
+        llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
+        llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
+        sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
+        kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
+        weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
+        runtime_profile_override=(
+            os.getenv("VANESSA_RUNTIME_PROFILE", DEFAULT_RUNTIME_PROFILE).strip().lower() or DEFAULT_RUNTIME_PROFILE
+        ),
+        kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
+        kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
+    )
+
+
+def get_backend_runtime_config() -> BackendRuntimeConfig:
+    return BackendRuntimeConfig(
+        frontend_url=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,
+        backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
+        llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
+        llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
+        agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
+        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
+        or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
+        sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
+        kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
+        weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
+        runtime_profile_override=(
+            os.getenv("VANESSA_RUNTIME_PROFILE", DEFAULT_RUNTIME_PROFILE).strip().lower() or DEFAULT_RUNTIME_PROFILE
+        ),
+        kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
+        kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
     )

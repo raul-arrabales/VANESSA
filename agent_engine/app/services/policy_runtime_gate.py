@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 try:
@@ -10,7 +9,10 @@ except Exception:  # pragma: no cover
     psycopg = None
     dict_row = None
 
-RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
+try:  # pragma: no cover - import path varies by invocation style
+    from ..config import DEFAULT_RUNTIME_PROFILE, RUNTIME_PROFILES, get_config
+except ImportError:  # pragma: no cover
+    from agent_engine.app.config import DEFAULT_RUNTIME_PROFILE, RUNTIME_PROFILES, get_config
 
 
 class ExecutionBlockedError(RuntimeError):
@@ -23,7 +25,7 @@ class ExecutionBlockedError(RuntimeError):
 
 
 def _database_url() -> str:
-    return os.getenv("DATABASE_URL", "").strip()
+    return get_config().database_url
 
 
 def _db_available() -> bool:
@@ -35,7 +37,7 @@ def _connect():
 
 
 def _runtime_profile_from_env() -> str | None:
-    env_value = os.getenv("VANESSA_RUNTIME_PROFILE", "").strip().lower()
+    env_value = get_config().runtime_profile_override
     return env_value if env_value in RUNTIME_PROFILES else None
 
 
@@ -60,7 +62,7 @@ def resolve_runtime_profile(requested_profile: str | None) -> str:
         except Exception:
             pass
 
-    return "offline"
+    return DEFAULT_RUNTIME_PROFILE
 
 
 def _get_entity(*, entity_type: str, entity_id: str) -> dict[str, Any] | None:
@@ -246,4 +248,3 @@ def validate_runtime_and_dependencies(*, agent_entity: dict[str, Any], runtime_p
                 )
 
     return str(agent_entity.get("current_version", "v1") or "v1"), model_ref
-

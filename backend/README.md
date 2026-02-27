@@ -65,3 +65,9 @@ Policy governance endpoints:
 
 - `POST /v1/policy/rules` (superadmin)
 - `GET /v1/policy/rules` (superadmin)
+
+Config Source of Truth:
+
+- Backend auth + service integration config: `backend/app/config.py` (`get_auth_config`).
+- Backend runtime-only (non-DB-strict) config for health/voice/runtime envs:
+  `backend/app/config.py` (`get_backend_runtime_config`).

@@ -83,6 +83,11 @@ Supported launcher variables:
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
 - `AGENT_EXECUTION_FALLBACK` (default: `false`)
 
+Config source of truth in code:
+
+- Backend: `backend/app/config.py`
+- Agent engine: `agent_engine/app/config.py`
+
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
 

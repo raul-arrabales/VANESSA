@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import os
-
+from ..config import DEFAULT_RUNTIME_PROFILE, RUNTIME_PROFILES, get_backend_runtime_config
 from ..repositories.registry import get_runtime_profile, upsert_runtime_profile
-
-RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
-_DEFAULT_PROFILE = "offline"
 
 
 def resolve_runtime_profile(database_url: str) -> str:
     # Explicit env override wins to support ops and deterministic staging behavior.
-    env_value = os.getenv("VANESSA_RUNTIME_PROFILE", "").strip().lower()
+    env_value = get_backend_runtime_config().runtime_profile_override
     if env_value in RUNTIME_PROFILES:
         return env_value
 
@@ -22,7 +18,7 @@ def resolve_runtime_profile(database_url: str) -> str:
         # During tests and bootstrap phases the runtime config table may be unavailable.
         pass
 
-    return _DEFAULT_PROFILE
+    return DEFAULT_RUNTIME_PROFILE
 
 
 def update_runtime_profile(database_url: str, *, profile: str, updated_by_user_id: int) -> str:

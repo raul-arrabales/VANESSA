@@ -1,39 +1,21 @@
 from __future__ import annotations
 
-import os
 import time
 from typing import Any
 from uuid import uuid4
 
 from flask import jsonify, request
 
+from ..config import get_backend_runtime_config
 from ..services.system_health import http_json_ok
 
-_DEFAULT_COOLDOWN_MS = 2_000
-_DEFAULT_DETECTION_THRESHOLD = 0.5
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 1.5
 _last_wake_by_key: dict[str, float] = {}
 _seen_event_ids: dict[str, float] = {}
 
 
-def _get_float_env(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except ValueError:
-        return default
-
-
-def _get_int_env(name: str, default: int) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except ValueError:
-        return default
+def _config():
+    return get_backend_runtime_config()
 
 
 def _trim_seen_event_ids(max_age_seconds: float) -> None:
@@ -58,12 +40,12 @@ def wake_events():
     except (TypeError, ValueError):
         return jsonify({"accepted": False, "reason": "invalid_confidence"}), 400
 
-    detection_threshold = _get_float_env("KWS_DETECTION_THRESHOLD", _DEFAULT_DETECTION_THRESHOLD)
+    detection_threshold = _config().kws_detection_threshold
     if confidence_value < detection_threshold:
         return jsonify({"accepted": False, "reason": "below_threshold"}), 202
 
     now = time.time()
-    cooldown_ms = _get_int_env("KWS_COOLDOWN_MS", _DEFAULT_COOLDOWN_MS)
+    cooldown_ms = _config().kws_cooldown_ms
     cooldown_seconds = max(cooldown_ms, 0) / 1000.0
 
     if event_id:
@@ -95,7 +77,7 @@ def wake_events():
 
 
 def voice_health():
-    kws_url = os.getenv("KWS_URL", "http://kws:10400").rstrip("/")
+    kws_url = _config().kws_url.rstrip("/")
     kws_health_url = f"{kws_url}/health"
 
     return (

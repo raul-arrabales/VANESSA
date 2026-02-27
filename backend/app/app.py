@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import os
 from pathlib import Path
 from typing import Any
 
@@ -67,62 +65,70 @@ def health():
 
 @app.get("/system/health")
 def system_health_route():
+    config = _get_config()
+    frontend_url = config.frontend_url.rstrip("/")
+    backend_url = config.backend_url.rstrip("/")
+    llm_url = config.llm_url.rstrip("/")
+    llm_runtime_url = config.llm_runtime_url.rstrip("/")
+    agent_engine_url = config.agent_engine_url.rstrip("/")
+    sandbox_url = config.sandbox_url.rstrip("/")
+    kws_url = config.kws_url.rstrip("/")
+    weaviate_url = config.weaviate_url.rstrip("/")
+
     services = [
         {
             "service": "Frontend",
             "container": "frontend",
-            "target": os.getenv("FRONTEND_URL", "http://frontend:3000"),
-            "reachable": _http_json_ok(os.getenv("FRONTEND_URL", "http://frontend:3000").rstrip("/") + "/"),
+            "target": config.frontend_url,
+            "reachable": _http_json_ok(frontend_url + "/"),
         },
         {
             "service": "Backend",
             "container": "backend",
-            "target": os.getenv("BACKEND_URL", "http://backend:5000"),
-            "reachable": _http_json_ok(os.getenv("BACKEND_URL", "http://backend:5000").rstrip("/") + "/health"),
+            "target": config.backend_url,
+            "reachable": _http_json_ok(backend_url + "/health"),
         },
         {
             "service": "LLM API",
             "container": "llm",
-            "target": os.getenv("LLM_URL", "http://llm:8000"),
-            "reachable": _http_json_ok(os.getenv("LLM_URL", "http://llm:8000").rstrip("/") + "/health"),
+            "target": config.llm_url,
+            "reachable": _http_json_ok(llm_url + "/health"),
         },
         {
             "service": "LLM Runtime",
             "container": "llm_runtime",
-            "target": os.getenv("LLM_RUNTIME_URL", "http://llm_runtime:8000"),
-            "reachable": _http_json_ok(os.getenv("LLM_RUNTIME_URL", "http://llm_runtime:8000").rstrip("/") + "/health"),
+            "target": config.llm_runtime_url,
+            "reachable": _http_json_ok(llm_runtime_url + "/health"),
         },
         {
             "service": "Agent Engine",
             "container": "agent_engine",
-            "target": os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000"),
-            "reachable": _http_json_ok(os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").rstrip("/") + "/health"),
+            "target": config.agent_engine_url,
+            "reachable": _http_json_ok(agent_engine_url + "/health"),
         },
         {
             "service": "Sandbox",
             "container": "sandbox",
-            "target": os.getenv("SANDBOX_URL", "http://sandbox:6000"),
-            "reachable": _http_json_ok(os.getenv("SANDBOX_URL", "http://sandbox:6000").rstrip("/") + "/health"),
+            "target": config.sandbox_url,
+            "reachable": _http_json_ok(sandbox_url + "/health"),
         },
         {
             "service": "KWS",
             "container": "kws",
-            "target": os.getenv("KWS_URL", "http://kws:10400"),
-            "reachable": _http_json_ok(os.getenv("KWS_URL", "http://kws:10400").rstrip("/") + "/health"),
+            "target": config.kws_url,
+            "reachable": _http_json_ok(kws_url + "/health"),
         },
         {
             "service": "Weaviate",
             "container": "weaviate",
-            "target": os.getenv("WEAVIATE_URL", "http://weaviate:8080"),
-            "reachable": _http_json_ok(
-                os.getenv("WEAVIATE_URL", "http://weaviate:8080").rstrip("/") + "/v1/.well-known/ready"
-            ),
+            "target": config.weaviate_url,
+            "reachable": _http_json_ok(weaviate_url + "/v1/.well-known/ready"),
         },
         {
             "service": "PostgreSQL",
             "container": "postgres",
             "target": "postgresql",
-            "reachable": _postgres_ok(_get_config().database_url),
+            "reachable": _postgres_ok(config.database_url),
         },
     ]
 

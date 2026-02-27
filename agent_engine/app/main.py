@@ -1,23 +1,24 @@
 from __future__ import annotations
 
 import json
-import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import urlparse
 
 try:  # pragma: no cover - import path varies by invocation style
+    from .config import get_config
     from .repositories.executions import ensure_schema
     from .services.execution_service import create_execution, get_execution
     from .services.policy_runtime_gate import ExecutionBlockedError
 except ImportError:  # pragma: no cover
+    from agent_engine.app.config import get_config
     from agent_engine.app.repositories.executions import ensure_schema
     from agent_engine.app.services.execution_service import create_execution, get_execution
     from agent_engine.app.services.policy_runtime_gate import ExecutionBlockedError
 
 
 def _service_token() -> str:
-    return os.getenv("AGENT_ENGINE_SERVICE_TOKEN", "dev-agent-engine-token").strip()
+    return get_config().agent_engine_service_token
 
 
 class Handler(BaseHTTPRequestHandler):

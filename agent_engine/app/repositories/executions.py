@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import threading
 from typing import Any
 
@@ -13,6 +12,10 @@ except Exception:  # pragma: no cover
     dict_row = None
 
 from ..schemas.agent_executions import AgentExecutionRecord
+try:  # pragma: no cover - import path varies by invocation style
+    from ..config import get_config
+except ImportError:  # pragma: no cover
+    from agent_engine.app.config import get_config
 
 _LOCK = threading.Lock()
 _DB_READY = False
@@ -20,7 +23,7 @@ _MEMORY_EXECUTIONS: dict[str, dict[str, Any]] = {}
 
 
 def _database_url() -> str:
-    return os.getenv("DATABASE_URL", "").strip()
+    return get_config().database_url
 
 
 def _db_available() -> bool:
@@ -176,4 +179,3 @@ def get_execution(execution_id: str) -> AgentExecutionRecord | None:
             return _row_to_execution(dict(row))
     except Exception:
         return None
-
