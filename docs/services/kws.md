@@ -14,6 +14,6 @@ The wake-word service handles offline wake detection and emits wake events to ba
 - `GET /health`
 - `POST /simulate-detect`
 
-Canonical service notes: [`kws/README.md`](https://github.com/<org-or-user>/VANESSA/blob/main/kws/README.md).
+Canonical service notes: [`kws/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/kws/README.md).
 
 > Owner: KWS maintainers. Update cadence: whenever wake-event schema, model loading rules, or webhook behavior changes.

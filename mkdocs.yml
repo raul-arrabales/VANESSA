@@ -1,7 +1,7 @@
 site_name: VANESSA Documentation
-site_url: https://<org-or-user>.github.io/VANESSA/
-repo_url: https://github.com/<org-or-user>/VANESSA
-repo_name: <org-or-user>/VANESSA
+site_url: https://raul-arrabales.github.io/VANESSA/
+repo_url: https://github.com/raul-arrabales/VANESSA
+repo_name: raul-arrabales/VANESSA
 
 theme:
   name: material

@@ -14,6 +14,6 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /voice/wake-events`
 - `GET /voice/health`
 
-Canonical service notes: [`backend/README.md`](https://github.com/<org-or-user>/VANESSA/blob/main/backend/README.md).
+Canonical service notes: [`backend/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/backend/README.md).
 
 > Owner: Backend maintainers. Update cadence: whenever API routes, contracts, or service integrations change.

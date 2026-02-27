@@ -22,6 +22,6 @@ VANESSA is designed as a multi-container system with clear boundaries.
 
 ## Source of Truth
 
-Container responsibilities are defined in [`AGENTS.md`](https://github.com/<org-or-user>/VANESSA/blob/main/AGENTS.md).
+Container responsibilities are defined in [`AGENTS.md`](https://github.com/raul-arrabales/VANESSA/blob/main/AGENTS.md).
 
 > Owner: Core platform maintainers. Update cadence: whenever service responsibilities or interfaces change.

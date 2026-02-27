@@ -17,7 +17,7 @@ VANESSA is a modular, containerized AI assistant stack with:
 
 Project documentation is published to GitHub Pages:
 
-- URL: `https://<org-or-user>.github.io/VANESSA/`
+- URL: `https://raul-arrabales.github.io/VANESSA/`
 - Deployment: automatic on `main` pushes for docs-related changes and manual via Actions `workflow_dispatch`
 
 Local docs authoring:

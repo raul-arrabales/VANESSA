@@ -30,6 +30,6 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 - Logs:
   - `./ops/local-staging/logs.sh --tail 200`
 
-For complete script flags, environment variables, and troubleshooting details, see the canonical guide in [`ops/local-staging/README.md`](https://github.com/<org-or-user>/VANESSA/blob/main/ops/local-staging/README.md).
+For complete script flags, environment variables, and troubleshooting details, see the canonical guide in [`ops/local-staging/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/ops/local-staging/README.md).
 
 > Owner: Ops/local-staging maintainers. Update cadence: with every local runtime behavior, script, port, or service health contract change.
