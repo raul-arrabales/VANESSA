@@ -1,103 +1,34 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_PATH = PROJECT_ROOT / "backend"
-if str(BACKEND_PATH) not in sys.path:
-    sys.path.insert(0, str(BACKEND_PATH))
-
-import app.app as backend_app_module  # noqa: E402
-from app.app import app  # noqa: E402
-from app.config import AuthConfig  # noqa: E402
-from app.handlers import auth_handlers as auth_handler  # noqa: E402
 from app.routes import model_catalog_v1 as model_catalog_routes  # noqa: E402
 from app.routes import model_governance as model_governance_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
-
-
-@dataclass
-class InMemoryUserStore:
-    users: dict[int, dict[str, Any]]
-    next_id: int = 1
-
-    def create_user(
-        self,
-        _database_url: str,
-        *,
-        email: str,
-        username: str,
-        password_hash: str,
-        role: str,
-        is_active: bool,
-    ) -> dict[str, Any]:
-        now = datetime.now(tz=timezone.utc)
-        user = {
-            "id": self.next_id,
-            "email": email.strip().lower(),
-            "username": username.strip().lower(),
-            "password_hash": password_hash,
-            "role": role,
-            "is_active": is_active,
-            "created_at": now,
-            "updated_at": now,
-        }
-        self.users[self.next_id] = user
-        self.next_id += 1
-        return dict(user)
-
-    def find_by_identifier(self, _database_url: str, identifier: str) -> dict[str, Any] | None:
-        needle = identifier.strip().lower()
-        for user in self.users.values():
-            if user["email"] == needle or user["username"] == needle:
-                return dict(user)
-        return None
-
-    def find_by_id(self, _database_url: str, user_id: int) -> dict[str, Any] | None:
-        user = self.users.get(user_id)
-        return dict(user) if user else None
+from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
 @pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch):
+def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "online")
-    user_store = InMemoryUserStore(users={})
+    test_client, user_store, config = backend_test_client_factory(
+        config_overrides={
+            "model_storage_root": "/models/llm",
+            "model_download_max_workers": 1,
+            "model_download_stale_seconds": 900,
+            "model_download_allow_patterns_default": "",
+            "model_download_ignore_patterns_default": "",
+            "hf_token": "",
+        }
+    )
     catalog: dict[str, dict[str, Any]] = {}
     assignments: dict[str, list[str]] = {"user": [], "admin": [], "superadmin": []}
     jobs: dict[str, dict[str, Any]] = {}
-
-    config = AuthConfig(
-        database_url="postgresql://ignored",
-        jwt_secret="test-secret-key-with-at-least-32-bytes",
-        jwt_algorithm="HS256",
-        access_token_ttl_seconds=28_800,
-        allow_self_register=True,
-        bootstrap_superadmin_email="",
-        bootstrap_superadmin_username="",
-        bootstrap_superadmin_password="",
-        flask_env="development",
-        model_storage_root="/models/llm",
-        model_download_max_workers=1,
-        model_download_stale_seconds=900,
-        model_download_allow_patterns_default="",
-        model_download_ignore_patterns_default="",
-        hf_token="",
-    )
-
-    monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
-    monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
-    monkeypatch.setattr(auth_handler, "get_config", lambda: config)
-    monkeypatch.setattr(auth_handler, "auth_ready_or_503", lambda _json_error: None)
-    monkeypatch.setattr(auth_handler, "create_user", user_store.create_user)
-    monkeypatch.setattr(auth_handler, "find_user_by_identifier", user_store.find_by_identifier)
-    monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
 
     def _list_catalog(_database_url: str):
         return list(catalog.values())
@@ -218,17 +149,15 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(model_catalog_routes, "list_download_jobs", lambda _db, status=None, limit=50: list(jobs.values()))
     monkeypatch.setattr(model_catalog_routes, "ensure_download_worker_started", lambda: None)
 
-    app.config.update(TESTING=True)
-    with app.test_client() as test_client:
-        yield test_client, user_store
+    yield test_client, user_store
 
 
 def _login(client, identifier: str, password: str):
-    return client.post("/auth/login", json={"identifier": identifier, "password": password})
+    return login(client, identifier, password)
 
 
 def _auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
+    return auth_header(token)
 
 
 def test_superadmin_catalog_discovery_and_download_apis(client):
