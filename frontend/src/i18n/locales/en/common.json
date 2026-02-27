@@ -47,6 +47,12 @@
   },
   "backend": {
     "sectionTitle": "System Health",
+    "architecture": {
+      "title": "Architecture Diagram",
+      "aria": "System architecture diagram",
+      "meta": "Nodes: {{nodes}} | Edges: {{edges}} | Generated: {{generatedAt}}",
+      "unavailable": "Architecture diagram is unavailable in this backend environment."
+    },
     "url": {
       "label": "Backend URL"
     },
@@ -67,7 +73,8 @@
     },
     "error": {
       "prefix": "Request failed:",
-      "legacyFallback": "This backend version does not expose full system health yet. Showing available checks only."
+      "legacyFallback": "This backend version does not expose full system health yet. Showing available checks only.",
+      "architectureUnavailable": "Architecture artifacts could not be loaded."
     },
     "table": {
       "service": "Service",

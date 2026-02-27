@@ -515,6 +515,47 @@ a {
   overflow-x: auto;
 }
 
+.architecture-panel {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.architecture-panel .section-title {
+  margin: 0;
+}
+
+.architecture-diagram {
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklab, var(--border-muted) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-subtle) 78%, transparent);
+  padding: var(--space-3);
+}
+
+.architecture-diagram svg {
+  width: 100%;
+  min-width: 820px;
+  height: auto;
+  display: block;
+}
+
+.architecture-diagram [data-container][data-status="up"] rect {
+  stroke: var(--status-success);
+  stroke-width: 2.8;
+}
+
+.architecture-diagram [data-container][data-status="down"] rect {
+  stroke: #f79009;
+  stroke-width: 2.8;
+}
+
+.architecture-diagram [data-container][data-status="unknown"] rect {
+  stroke: var(--border-muted);
+  stroke-width: 2.2;
+}
+
 .health-table {
   width: 100%;
   border-collapse: collapse;

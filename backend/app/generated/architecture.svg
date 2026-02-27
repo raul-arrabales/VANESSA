@@ -1,0 +1,101 @@
+<svg class="architecture-svg" xmlns="http://www.w3.org/2000/svg" width="1372" height="480" viewBox="0 0 1372 480" role="img" aria-labelledby="architecture-title architecture-desc">
+<title id="architecture-title">VANESSA Service Architecture</title>
+<desc id="architecture-desc">Container communication diagram generated from docker-compose metadata.</desc>
+<defs>
+<marker id="architecture-arrow" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
+<path d="M0,0 L10,4 L0,8 z" fill="#48617a" />
+</marker>
+</defs>
+<style>
+.group-label { font: 700 13px 'IBM Plex Sans', sans-serif; fill: #23425f; letter-spacing: 0.06em; text-anchor: middle; }
+.architecture-node rect { fill: #f7fbff; stroke: #95adc4; stroke-width: 1.6; }
+.architecture-node .node-title { font: 700 14px 'IBM Plex Sans', sans-serif; fill: #11314e; }
+.architecture-node .node-subtitle { font: 500 12px 'IBM Plex Mono', monospace; fill: #385e7f; }
+.architecture-edge { stroke-width: 2; stroke: #48617a; }
+.architecture-edge-http { stroke: #2162c8; }
+.architecture-edge-db { stroke: #8751c7; }
+.architecture-edge-event { stroke: #c76e2a; stroke-dasharray: 7 4; }
+.architecture-edge-internal { stroke: #58708a; stroke-dasharray: 5 3; }
+.edge-label { font: 500 11px 'IBM Plex Sans', sans-serif; fill: #274360; text-anchor: middle; }
+</style>
+<text class="group-label" x="146" y="36">CLIENT</text>
+<text class="group-label" x="416" y="36">API</text>
+<text class="group-label" x="686" y="36">ORCHESTRATION</text>
+<text class="group-label" x="956" y="36">RUNTIME</text>
+<text class="group-label" x="1226" y="36">DATA</text>
+<g id="architecture-edges">
+<line id="edge-agent_engine-llm" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-postgres" class="architecture-edge architecture-edge-db" x1="796" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-sandbox" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="364" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-weaviate" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-agent_engine" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="576" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-llm" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-postgres" class="architecture-edge architecture-edge-db" x1="526" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-sandbox" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="364" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-weaviate" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-frontend-backend" class="architecture-edge architecture-edge-http" x1="256" y1="116" x2="306" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-kws-backend" class="architecture-edge architecture-edge-event" x1="416" y1="282" x2="416" y2="74" marker-end="url(#architecture-arrow)" />
+<line id="edge-llm-llm_runtime" class="architecture-edge architecture-edge-internal" x1="956" y1="158" x2="956" y2="198" marker-end="url(#architecture-arrow)" />
+</g>
+<g id="architecture-edge-labels">
+<text class="edge-label" x="821" y="110">HTTP - Agent LLM requests</text>
+<text class="edge-label" x="956" y="172">SQL - Agent structured persistence</text>
+<text class="edge-label" x="821" y="234">HTTP - Agent sandbox execution</text>
+<text class="edge-label" x="956" y="110">HTTP - Vector search and retrieval</text>
+<text class="edge-label" x="551" y="110">HTTP - Agent orchestration calls</text>
+<text class="edge-label" x="686" y="110">HTTP - Model inference and discovery</text>
+<text class="edge-label" x="821" y="172">SQL - Structured data access</text>
+<text class="edge-label" x="686" y="234">HTTP - Controlled code execution</text>
+<text class="edge-label" x="821" y="110">HTTP - Semantic retrieval operations</text>
+<text class="edge-label" x="281" y="110">HTTP - UI API requests</text>
+<text class="edge-label" x="416" y="172">HTTP webhook - Wake event emission</text>
+<text class="edge-label" x="956" y="172">Internal HTTP - Runtime model execution path</text>
+</g>
+<g id="architecture-nodes">
+<g id="node-frontend" class="architecture-node architecture-node-frontend architecture-group-client" data-container="frontend">
+<rect x="36" y="74" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="50" y="104">Frontend</text>
+<text class="node-subtitle" x="50" y="126">frontend</text>
+</g>
+<g id="node-backend" class="architecture-node architecture-node-backend architecture-group-api" data-container="backend">
+<rect x="306" y="74" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="320" y="104">Backend API</text>
+<text class="node-subtitle" x="320" y="126">backend</text>
+</g>
+<g id="node-kws" class="architecture-node architecture-node-kws architecture-group-api" data-container="kws">
+<rect x="306" y="198" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="320" y="228">KWS</text>
+<text class="node-subtitle" x="320" y="250">kws</text>
+</g>
+<g id="node-agent_engine" class="architecture-node architecture-node-agent_engine architecture-group-orchestration" data-container="agent_engine">
+<rect x="576" y="74" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="590" y="104">Agent Engine</text>
+<text class="node-subtitle" x="590" y="126">agent_engine</text>
+</g>
+<g id="node-llm" class="architecture-node architecture-node-llm architecture-group-runtime" data-container="llm">
+<rect x="846" y="74" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="860" y="104">LLM API</text>
+<text class="node-subtitle" x="860" y="126">llm</text>
+</g>
+<g id="node-llm_runtime" class="architecture-node architecture-node-llm_runtime architecture-group-runtime" data-container="llm_runtime">
+<rect x="846" y="198" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="860" y="228">LLM Runtime</text>
+<text class="node-subtitle" x="860" y="250">llm_runtime</text>
+</g>
+<g id="node-sandbox" class="architecture-node architecture-node-sandbox architecture-group-runtime" data-container="sandbox">
+<rect x="846" y="322" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="860" y="352">Sandbox</text>
+<text class="node-subtitle" x="860" y="374">sandbox</text>
+</g>
+<g id="node-weaviate" class="architecture-node architecture-node-weaviate architecture-group-data" data-container="weaviate">
+<rect x="1116" y="74" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="1130" y="104">Weaviate</text>
+<text class="node-subtitle" x="1130" y="126">weaviate</text>
+</g>
+<g id="node-postgres" class="architecture-node architecture-node-postgres architecture-group-data" data-container="postgres">
+<rect x="1116" y="198" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="1130" y="228">PostgreSQL</text>
+<text class="node-subtitle" x="1130" y="250">postgres</text>
+</g>
+</g>
+</svg>

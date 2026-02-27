@@ -1,0 +1,263 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-02-27T08:13:08+00:00",
+  "nodes": [
+    {
+      "id": "frontend",
+      "container": "frontend",
+      "label": "Frontend",
+      "group": "client",
+      "description": "Browser UI and superadmin control panel.",
+      "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
+      "id": "backend",
+      "container": "backend",
+      "label": "Backend API",
+      "group": "api",
+      "description": "Flask API gateway and orchestration entrypoint.",
+      "public_exposed": true,
+      "criticality": "high"
+    },
+    {
+      "id": "kws",
+      "container": "kws",
+      "label": "KWS",
+      "group": "api",
+      "description": "Wake-word service emitting voice events.",
+      "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
+      "id": "agent_engine",
+      "container": "agent_engine",
+      "label": "Agent Engine",
+      "group": "orchestration",
+      "description": "Multi-step agent workflows and tool orchestration.",
+      "public_exposed": false,
+      "criticality": "high"
+    },
+    {
+      "id": "llm",
+      "container": "llm",
+      "label": "LLM API",
+      "group": "runtime",
+      "description": "Private model-serving HTTP gateway.",
+      "public_exposed": true,
+      "criticality": "high"
+    },
+    {
+      "id": "llm_runtime",
+      "container": "llm_runtime",
+      "label": "LLM Runtime",
+      "group": "runtime",
+      "description": "Local vLLM runtime backing LLM API service.",
+      "public_exposed": false,
+      "criticality": "high"
+    },
+    {
+      "id": "sandbox",
+      "container": "sandbox",
+      "label": "Sandbox",
+      "group": "runtime",
+      "description": "Isolated Python execution environment for agents.",
+      "public_exposed": true,
+      "criticality": "high"
+    },
+    {
+      "id": "weaviate",
+      "container": "weaviate",
+      "label": "Weaviate",
+      "group": "data",
+      "description": "Persistent vector index for RAG retrieval.",
+      "public_exposed": true,
+      "criticality": "high"
+    },
+    {
+      "id": "postgres",
+      "container": "postgres",
+      "label": "PostgreSQL",
+      "group": "data",
+      "description": "Persistent relational storage for auth and metadata.",
+      "public_exposed": true,
+      "criticality": "high"
+    }
+  ],
+  "edges": [
+    {
+      "id": "agent_engine-llm",
+      "from": "agent_engine",
+      "to": "llm",
+      "protocol": "HTTP",
+      "purpose": "Agent LLM requests",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "agent_engine-postgres",
+      "from": "agent_engine",
+      "to": "postgres",
+      "protocol": "SQL",
+      "purpose": "Agent structured persistence",
+      "kind": "db",
+      "direction": "outbound"
+    },
+    {
+      "id": "agent_engine-sandbox",
+      "from": "agent_engine",
+      "to": "sandbox",
+      "protocol": "HTTP",
+      "purpose": "Agent sandbox execution",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "agent_engine-weaviate",
+      "from": "agent_engine",
+      "to": "weaviate",
+      "protocol": "HTTP",
+      "purpose": "Vector search and retrieval",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-agent_engine",
+      "from": "backend",
+      "to": "agent_engine",
+      "protocol": "HTTP",
+      "purpose": "Agent orchestration calls",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-llm",
+      "from": "backend",
+      "to": "llm",
+      "protocol": "HTTP",
+      "purpose": "Model inference and discovery",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-postgres",
+      "from": "backend",
+      "to": "postgres",
+      "protocol": "SQL",
+      "purpose": "Structured data access",
+      "kind": "db",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-sandbox",
+      "from": "backend",
+      "to": "sandbox",
+      "protocol": "HTTP",
+      "purpose": "Controlled code execution",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-weaviate",
+      "from": "backend",
+      "to": "weaviate",
+      "protocol": "HTTP",
+      "purpose": "Semantic retrieval operations",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "frontend-backend",
+      "from": "frontend",
+      "to": "backend",
+      "protocol": "HTTP",
+      "purpose": "UI API requests",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "kws-backend",
+      "from": "kws",
+      "to": "backend",
+      "protocol": "HTTP webhook",
+      "purpose": "Wake event emission",
+      "kind": "event",
+      "direction": "outbound"
+    },
+    {
+      "id": "llm-llm_runtime",
+      "from": "llm",
+      "to": "llm_runtime",
+      "protocol": "Internal HTTP",
+      "purpose": "Runtime model execution path",
+      "kind": "internal",
+      "direction": "outbound"
+    }
+  ],
+  "rendering": {
+    "group_order": [
+      "client",
+      "api",
+      "orchestration",
+      "runtime",
+      "data"
+    ],
+    "node_positions": {
+      "frontend": {
+        "x": 36,
+        "y": 74,
+        "width": 220,
+        "height": 84
+      },
+      "backend": {
+        "x": 306,
+        "y": 74,
+        "width": 220,
+        "height": 84
+      },
+      "kws": {
+        "x": 306,
+        "y": 198,
+        "width": 220,
+        "height": 84
+      },
+      "agent_engine": {
+        "x": 576,
+        "y": 74,
+        "width": 220,
+        "height": 84
+      },
+      "llm": {
+        "x": 846,
+        "y": 74,
+        "width": 220,
+        "height": 84
+      },
+      "llm_runtime": {
+        "x": 846,
+        "y": 198,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 322,
+        "width": 220,
+        "height": 84
+      },
+      "weaviate": {
+        "x": 1116,
+        "y": 74,
+        "width": 220,
+        "height": 84
+      },
+      "postgres": {
+        "x": 1116,
+        "y": 198,
+        "width": 220,
+        "height": 84
+      }
+    }
+  },
+  "source_hash": "f39bc06ba977fadc527df577a31da5190f520eb13f06dcec797cc197d44a3339"
+}

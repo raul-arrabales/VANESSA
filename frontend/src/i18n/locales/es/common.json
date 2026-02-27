@@ -47,6 +47,12 @@
   },
   "backend": {
     "sectionTitle": "Salud del sistema",
+    "architecture": {
+      "title": "Diagrama de arquitectura",
+      "aria": "Diagrama de arquitectura del sistema",
+      "meta": "Nodos: {{nodes}} | Aristas: {{edges}} | Generado: {{generatedAt}}",
+      "unavailable": "El diagrama de arquitectura no está disponible en este entorno backend."
+    },
     "url": {
       "label": "URL del backend"
     },
@@ -67,7 +73,8 @@
     },
     "error": {
       "prefix": "La solicitud fallo:",
-      "legacyFallback": "Esta versión del backend aún no expone la salud completa del sistema. Se muestran solo las comprobaciones disponibles."
+      "legacyFallback": "Esta versión del backend aún no expone la salud completa del sistema. Se muestran solo las comprobaciones disponibles.",
+      "architectureUnavailable": "No se pudieron cargar los artefactos de arquitectura."
     },
     "table": {
       "service": "Servicio",

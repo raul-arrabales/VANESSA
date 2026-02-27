@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from flask import Flask, g, jsonify, request
+from flask import Flask, Response, g, jsonify, request
 
 from .auth_tokens import TOKEN_PREFIX, decode_access_token, issue_access_token
 from .authz import AUTH_ROLES, require_auth, require_role
@@ -72,6 +72,9 @@ _download_worker_lock = threading.Lock()
 _DOWNLOAD_POLL_SECONDS = 1.0
 _DISCOVERY_LIMIT_MIN = 1
 _DISCOVERY_LIMIT_MAX = 50
+_GENERATED_DIR = Path(__file__).resolve().parent / "generated"
+_ARCHITECTURE_JSON_PATH = _GENERATED_DIR / "architecture.json"
+_ARCHITECTURE_SVG_PATH = _GENERATED_DIR / "architecture.svg"
 
 
 def _json_error(status: int, code: str, message: str):
@@ -114,6 +117,16 @@ def _http_json_ok(url: str) -> bool:
             return 200 <= response.status < 300
     except URLError:
         return False
+
+
+def _load_architecture_payload() -> dict[str, Any]:
+    if not _ARCHITECTURE_JSON_PATH.exists():
+        raise FileNotFoundError(str(_ARCHITECTURE_JSON_PATH))
+    raw_payload = _ARCHITECTURE_JSON_PATH.read_text(encoding="utf-8")
+    parsed = loads(raw_payload)
+    if not isinstance(parsed, dict):
+        raise ValueError("Architecture payload must be a JSON object")
+    return parsed
 
 
 def _postgres_ok(database_url: str) -> bool:
@@ -586,6 +599,32 @@ def system_health():
         ),
         200,
     )
+
+
+@app.get("/system/architecture")
+def system_architecture():
+    try:
+        payload = _load_architecture_payload()
+    except (FileNotFoundError, ValueError):
+        return _json_error(
+            503,
+            "architecture_unavailable",
+            "Architecture graph artifact not available. Run: python scripts/generate_architecture.py --write",
+        )
+
+    return jsonify(payload), 200
+
+
+@app.get("/system/architecture.svg")
+def system_architecture_svg():
+    if not _ARCHITECTURE_SVG_PATH.exists():
+        return _json_error(
+            503,
+            "architecture_unavailable",
+            "Architecture SVG artifact not available. Run: python scripts/generate_architecture.py --write",
+        )
+
+    return Response(_ARCHITECTURE_SVG_PATH.read_text(encoding="utf-8"), mimetype="image/svg+xml")
 
 
 @app.post("/auth/register")

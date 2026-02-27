@@ -1,0 +1,146 @@
+version: 1
+rendering:
+  group_order:
+    - client
+    - api
+    - orchestration
+    - runtime
+    - data
+  node_order:
+    - frontend
+    - backend
+    - kws
+    - agent_engine
+    - llm
+    - llm_runtime
+    - sandbox
+    - weaviate
+    - postgres
+services:
+  frontend:
+    label: Frontend
+    group: client
+    description: Browser UI and superadmin control panel.
+    public_exposed: true
+    criticality: medium
+  backend:
+    label: Backend API
+    group: api
+    description: Flask API gateway and orchestration entrypoint.
+    public_exposed: true
+    criticality: high
+  kws:
+    label: KWS
+    group: api
+    description: Wake-word service emitting voice events.
+    public_exposed: true
+    criticality: medium
+  agent_engine:
+    label: Agent Engine
+    group: orchestration
+    description: Multi-step agent workflows and tool orchestration.
+    public_exposed: false
+    criticality: high
+  llm:
+    label: LLM API
+    group: runtime
+    description: Private model-serving HTTP gateway.
+    public_exposed: true
+    criticality: high
+  llm_runtime:
+    label: LLM Runtime
+    group: runtime
+    description: Local vLLM runtime backing LLM API service.
+    public_exposed: false
+    criticality: high
+  sandbox:
+    label: Sandbox
+    group: runtime
+    description: Isolated Python execution environment for agents.
+    public_exposed: true
+    criticality: high
+  weaviate:
+    label: Weaviate
+    group: data
+    description: Persistent vector index for RAG retrieval.
+    public_exposed: true
+    criticality: high
+  postgres:
+    label: PostgreSQL
+    group: data
+    description: Persistent relational storage for auth and metadata.
+    public_exposed: true
+    criticality: high
+edges:
+  - from: frontend
+    to: backend
+    protocol: HTTP
+    purpose: UI API requests
+    kind: http
+    direction: outbound
+  - from: backend
+    to: agent_engine
+    protocol: HTTP
+    purpose: Agent orchestration calls
+    kind: http
+    direction: outbound
+  - from: backend
+    to: llm
+    protocol: HTTP
+    purpose: Model inference and discovery
+    kind: http
+    direction: outbound
+  - from: backend
+    to: sandbox
+    protocol: HTTP
+    purpose: Controlled code execution
+    kind: http
+    direction: outbound
+  - from: backend
+    to: weaviate
+    protocol: HTTP
+    purpose: Semantic retrieval operations
+    kind: http
+    direction: outbound
+  - from: backend
+    to: postgres
+    protocol: SQL
+    purpose: Structured data access
+    kind: db
+    direction: outbound
+  - from: agent_engine
+    to: llm
+    protocol: HTTP
+    purpose: Agent LLM requests
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: sandbox
+    protocol: HTTP
+    purpose: Agent sandbox execution
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: weaviate
+    protocol: HTTP
+    purpose: Vector search and retrieval
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: postgres
+    protocol: SQL
+    purpose: Agent structured persistence
+    kind: db
+    direction: outbound
+  - from: llm
+    to: llm_runtime
+    protocol: Internal HTTP
+    purpose: Runtime model execution path
+    kind: internal
+    direction: outbound
+  - from: kws
+    to: backend
+    protocol: HTTP webhook
+    purpose: Wake event emission
+    kind: event
+    direction: outbound

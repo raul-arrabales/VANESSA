@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type LoadState = "idle" | "loading" | "success" | "error";
@@ -21,6 +21,27 @@ type SystemHealthResponse = {
   }>;
 };
 
+type ArchitectureGraphResponse = {
+  version: string;
+  generated_at: string;
+  nodes: Array<{
+    id: string;
+    container: string;
+    label: string;
+    group: string;
+    description: string;
+  }>;
+  edges: Array<{
+    id: string;
+    from: string;
+    to: string;
+    protocol: string;
+    purpose: string;
+    kind: string;
+    direction: string;
+  }>;
+};
+
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 const initialServices: ServiceRow[] = [
   { service: "Frontend", container: "frontend", target: "http://frontend:3000", status: "unknown" },
@@ -34,33 +55,95 @@ const initialServices: ServiceRow[] = [
   { service: "PostgreSQL", container: "postgres", target: "postgresql", status: "unknown" },
 ];
 
+function mapServicesFromHealth(payload: SystemHealthResponse): ServiceRow[] {
+  return payload.services.map((service) => ({
+    service: service.service,
+    container: service.container,
+    target: service.target,
+    status: service.reachable ? "up" : "down",
+  }));
+}
+
 export default function BackendHealthPage(): JSX.Element {
   const { t } = useTranslation("common");
   const [state, setState] = useState<LoadState>("idle");
   const [services, setServices] = useState<ServiceRow[]>(initialServices);
+  const [architectureGraph, setArchitectureGraph] = useState<ArchitectureGraphResponse | null>(null);
+  const [architectureSvg, setArchitectureSvg] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [warningMessage, setWarningMessage] = useState("");
+  const architectureContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!architectureContainerRef.current || !architectureSvg) {
+      return;
+    }
+
+    const statusByContainer = new Map<string, ServiceStatus>(
+      services.map((service) => [service.container, service.status]),
+    );
+
+    const nodes = architectureContainerRef.current.querySelectorAll<SVGGElement>("[data-container]");
+    nodes.forEach((node) => {
+      const container = node.getAttribute("data-container");
+      if (!container) {
+        return;
+      }
+      node.setAttribute("data-status", statusByContainer.get(container) ?? "unknown");
+    });
+  }, [architectureSvg, services]);
 
   const checkAllServices = async (): Promise<void> => {
     setState("loading");
     setErrorMessage("");
     setWarningMessage("");
 
-    try {
-      const response = await fetch(`${backendBaseUrl.replace(/\/$/, "")}/system/health`, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      });
+    const warnings: string[] = [];
 
-      if (response.status === 404) {
+    try {
+      const apiBase = backendBaseUrl.replace(/\/$/, "");
+      const [healthResponse, architectureJsonResponse, architectureSvgResponse] = await Promise.all([
+        fetch(`${apiBase}/system/health`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        }),
+        fetch(`${apiBase}/system/architecture`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        }).catch(() => null),
+        fetch(`${apiBase}/system/architecture.svg`, {
+          method: "GET",
+          headers: {
+            Accept: "image/svg+xml",
+          },
+        }).catch(() => null),
+      ]);
+
+      if (architectureJsonResponse?.ok) {
+        const architectureJson = (await architectureJsonResponse.json()) as ArchitectureGraphResponse;
+        setArchitectureGraph(architectureJson);
+      } else {
+        setArchitectureGraph(null);
+        warnings.push(t("backend.error.architectureUnavailable"));
+      }
+
+      if (architectureSvgResponse?.ok) {
+        setArchitectureSvg(await architectureSvgResponse.text());
+      } else {
+        setArchitectureSvg("");
+      }
+
+      if (healthResponse.status === 404) {
         const [backendResponse, voiceResponse] = await Promise.all([
-          fetch(`${backendBaseUrl.replace(/\/$/, "")}/health`, {
+          fetch(`${apiBase}/health`, {
             method: "GET",
             headers: { Accept: "application/json" },
           }),
-          fetch(`${backendBaseUrl.replace(/\/$/, "")}/voice/health`, {
+          fetch(`${apiBase}/voice/health`, {
             method: "GET",
             headers: { Accept: "application/json" },
           }).catch(() => null),
@@ -85,22 +168,21 @@ export default function BackendHealthPage(): JSX.Element {
           return { ...service, status: "unknown" };
         }));
 
-        setWarningMessage(t("backend.error.legacyFallback"));
+        warnings.push(t("backend.error.legacyFallback"));
+        setWarningMessage(warnings.join(" "));
         setState("success");
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      if (!healthResponse.ok) {
+        throw new Error(`HTTP ${healthResponse.status}`);
       }
 
-      const payload = (await response.json()) as SystemHealthResponse;
-      setServices(payload.services.map((service) => ({
-        service: service.service,
-        container: service.container,
-        target: service.target,
-        status: service.reachable ? "up" : "down",
-      })));
+      const payload = (await healthResponse.json()) as SystemHealthResponse;
+      setServices(mapServicesFromHealth(payload));
+      if (warnings.length > 0) {
+        setWarningMessage(warnings.join(" "));
+      }
       setState("success");
     } catch (error) {
       setServices((currentServices) => currentServices.map((service) => ({ ...service, status: "unknown" })));
@@ -121,6 +203,32 @@ export default function BackendHealthPage(): JSX.Element {
       <button type="button" className="btn btn-primary" onClick={checkAllServices} disabled={state === "loading"}>
         {state === "loading" ? t("backend.check.loadingAll") : t("backend.check.ctaAll")}
       </button>
+
+      <article className="architecture-panel card-stack">
+        <div className="status-row">
+          <h3 className="section-title">{t("backend.architecture.title")}</h3>
+          {architectureGraph && (
+            <span className="status-text">
+              {t("backend.architecture.meta", {
+                nodes: architectureGraph.nodes.length,
+                edges: architectureGraph.edges.length,
+                generatedAt: architectureGraph.generated_at,
+              })}
+            </span>
+          )}
+        </div>
+
+        {architectureSvg ? (
+          <div
+            ref={architectureContainerRef}
+            className="architecture-diagram"
+            aria-label={t("backend.architecture.aria")}
+            dangerouslySetInnerHTML={{ __html: architectureSvg }}
+          />
+        ) : (
+          <p className="status-text">{t("backend.architecture.unavailable")}</p>
+        )}
+      </article>
 
       <div className="health-table-wrap">
         <table className="health-table">

@@ -15,6 +15,7 @@ Manual scripts to run VANESSA locally in a staging-like mode for human feature c
 From repository root:
 
 ```bash
+python scripts/generate_architecture.py --write
 ./ops/local-staging/start.sh
 ./ops/local-staging/health.sh
 ./ops/local-staging/logs.sh --follow
@@ -119,14 +120,22 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 7. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
 8. Check API health directly (host-to-container): `http://localhost:5000/health`
 9. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
-10. Check wake-word service health: `http://localhost:10400/health`
-11. Simulate wake detection event:
+10. Check generated architecture JSON: `http://localhost:5000/system/architecture`
+11. Check generated architecture SVG: `http://localhost:5000/system/architecture.svg`
+12. Check wake-word service health: `http://localhost:10400/health`
+13. Simulate wake detection event:
    `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
-12. Validate backend voice endpoints:
+14. Validate backend voice endpoints:
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
-13. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-14. Stop while keeping state: `./ops/local-staging/stop.sh`
+15. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+16. Stop while keeping state: `./ops/local-staging/stop.sh`
+
+If compose or architecture metadata changes, verify artifacts are fresh:
+
+```bash
+python scripts/generate_architecture.py --check
+```
 
 ## LLM API Quick Reference (local)
 

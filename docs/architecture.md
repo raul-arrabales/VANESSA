@@ -2,6 +2,28 @@
 
 VANESSA is designed as a multi-container system with clear boundaries.
 
+## System Diagram
+
+![VANESSA container architecture](assets/architecture.svg)
+
+The diagram is generated from:
+
+- `infra/docker-compose.yml` (service inventory and dependencies)
+- `infra/architecture/metadata.yml` (labels, groups, communication semantics)
+
+To regenerate artifacts:
+
+```bash
+python scripts/generate_architecture.py --write
+```
+
+Legend:
+
+- Solid blue edges: HTTP calls
+- Purple edges: SQL/data access
+- Dashed orange edges: event/webhook flow
+- Dashed gray edges: internal runtime/dependency links
+
 ## Container Boundaries
 
 1. Frontend: browser UI, HTTP calls only to backend API.
