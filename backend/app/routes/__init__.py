@@ -1,8 +1,7 @@
 from . import (
     auth,
+    auth_legacy_routes,
     executions,
-    legacy_auth,
-    legacy_voice,
     model_catalog_v1,
     model_governance,
     model_inference_v1,
@@ -11,10 +10,12 @@ from . import (
     registry_models,
     runtime,
     system,
+    voice_legacy_routes,
 )
 
 __all__ = [
     "auth",
+    "auth_legacy_routes",
     "system",
     "runtime",
     "registry",
@@ -24,6 +25,5 @@ __all__ = [
     "model_catalog_v1",
     "model_inference_v1",
     "registry_models",
-    "legacy_auth",
-    "legacy_voice",
+    "voice_legacy_routes",
 ]

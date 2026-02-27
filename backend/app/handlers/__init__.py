@@ -1,1 +1,1 @@
-__all__ = ["legacy_auth", "legacy_voice"]
+__all__ = ["auth_handlers", "voice_handlers"]

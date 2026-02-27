@@ -14,7 +14,7 @@ from ..repositories.model_catalog import (
 )
 from ..repositories.model_download_jobs import create_download_job, get_download_job, list_download_jobs
 from ..services.hf_discovery import discover_hf_models, get_hf_model_details
-from ..services.legacy_models_support import model_id_from_source, parse_patterns, serialize_catalog_item, serialize_download_job
+from ..services.model_support import model_id_from_source, parse_patterns, serialize_catalog_item, serialize_download_job
 from ..services.model_downloader import resolve_target_dir
 from ..services.model_download_worker import ensure_download_worker_started
 from ..services.runtime_profile_service import internet_allowed, resolve_runtime_profile

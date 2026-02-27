@@ -12,7 +12,7 @@ from ..repositories.model_download_jobs import (
     mark_job_succeeded,
     reconcile_stale_running_jobs,
 )
-from ..services.legacy_models_support import model_id_from_source, parse_patterns
+from ..services.model_support import model_id_from_source, parse_patterns
 from ..services.model_downloader import download_from_huggingface
 
 _DOWNLOAD_POLL_SECONDS = 1.0

@@ -171,9 +171,8 @@ def system_architecture_svg():
 
 # Register modular v1 blueprints.
 from .routes import auth as auth_routes
+from .routes import auth_legacy_routes
 from .routes import executions as executions_routes
-from .routes import legacy_auth as legacy_auth_routes
-from .routes import legacy_voice as legacy_voice_routes
 from .routes import model_catalog_v1 as model_catalog_v1_routes
 from .routes import model_governance as model_governance_routes
 from .routes import model_inference_v1 as model_inference_v1_routes
@@ -182,6 +181,7 @@ from .routes import registry as registry_routes
 from .routes import registry_models as registry_models_routes
 from .routes import runtime as runtime_routes
 from .routes import system as system_routes
+from .routes import voice_legacy_routes
 
 app.register_blueprint(auth_routes.bp)
 app.register_blueprint(system_routes.bp)
@@ -193,5 +193,5 @@ app.register_blueprint(executions_routes.bp)
 app.register_blueprint(model_governance_routes.bp)
 app.register_blueprint(model_catalog_v1_routes.bp)
 app.register_blueprint(model_inference_v1_routes.bp)
-app.register_blueprint(legacy_auth_routes.bp)
-app.register_blueprint(legacy_voice_routes.bp)
+app.register_blueprint(auth_legacy_routes.bp)
+app.register_blueprint(voice_legacy_routes.bp)

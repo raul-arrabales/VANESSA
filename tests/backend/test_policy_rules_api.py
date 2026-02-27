@@ -16,7 +16,7 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
-from app.handlers import legacy_auth as legacy_auth_handler  # noqa: E402
+from app.handlers import auth_handlers as auth_handler  # noqa: E402
 from app.routes import policy as policy_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
@@ -82,10 +82,10 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
     monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
-    monkeypatch.setattr(legacy_auth_handler, "get_config", lambda: config)
-    monkeypatch.setattr(legacy_auth_handler, "auth_ready_or_503", lambda _json_error: None)
-    monkeypatch.setattr(legacy_auth_handler, "create_user", user_store.create_user)
-    monkeypatch.setattr(legacy_auth_handler, "find_user_by_identifier", user_store.find_by_identifier)
+    monkeypatch.setattr(auth_handler, "get_config", lambda: config)
+    monkeypatch.setattr(auth_handler, "auth_ready_or_503", lambda _json_error: None)
+    monkeypatch.setattr(auth_handler, "create_user", user_store.create_user)
+    monkeypatch.setattr(auth_handler, "find_user_by_identifier", user_store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
 
     monkeypatch.setattr(

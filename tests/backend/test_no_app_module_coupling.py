@@ -11,10 +11,10 @@ if str(BACKEND_PATH) not in sys.path:
 
 def test_routes_and_handlers_do_not_import_app_module_directly() -> None:
     target_files = [
-        PROJECT_ROOT / "backend" / "app" / "routes" / "legacy_auth.py",
-        PROJECT_ROOT / "backend" / "app" / "routes" / "legacy_voice.py",
-        PROJECT_ROOT / "backend" / "app" / "handlers" / "legacy_auth.py",
-        PROJECT_ROOT / "backend" / "app" / "handlers" / "legacy_voice.py",
+        PROJECT_ROOT / "backend" / "app" / "routes" / "auth_legacy_routes.py",
+        PROJECT_ROOT / "backend" / "app" / "routes" / "voice_legacy_routes.py",
+        PROJECT_ROOT / "backend" / "app" / "handlers" / "auth_handlers.py",
+        PROJECT_ROOT / "backend" / "app" / "handlers" / "voice_handlers.py",
         PROJECT_ROOT / "backend" / "app" / "services" / "chat_inference.py",
         PROJECT_ROOT / "backend" / "app" / "services" / "model_download_worker.py",
     ]
