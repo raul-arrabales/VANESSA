@@ -43,12 +43,6 @@ Model governance and runtime endpoints (canonical in Release N):
 - `POST /v1/models/inference`
 - `POST /v1/models/generate`
 
-Legacy model endpoints remain available in Release N with deprecation headers:
-
-- `/models/*`
-- `/inference`
-- `/llm/generate`
-
 Agent execution proxy endpoints:
 
 - `POST /v1/agent-executions`

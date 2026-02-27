@@ -16,8 +16,10 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
+from app.handlers import legacy_auth as legacy_auth_handler  # noqa: E402
+from app.routes import registry_models as registry_models_routes  # noqa: E402
 from app.routes import model_governance as model_governance_routes  # noqa: E402
-from app.routes import registry as registry_routes  # noqa: E402
+from app.services import chat_inference  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -171,27 +173,21 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
     monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
-    monkeypatch.setattr(backend_app_module, "create_user", user_store.create_user)
+    monkeypatch.setattr(legacy_auth_handler, "get_config", lambda: config)
+    monkeypatch.setattr(legacy_auth_handler, "auth_ready_or_503", lambda _json_error: None)
+    monkeypatch.setattr(legacy_auth_handler, "create_user", user_store.create_user)
     monkeypatch.setattr(
-        backend_app_module, "find_user_by_identifier", user_store.find_by_identifier
+        legacy_auth_handler, "find_user_by_identifier", user_store.find_by_identifier
     )
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
 
-    monkeypatch.setattr(
-        backend_app_module, "register_model_definition", model_store.register_model
-    )
-    monkeypatch.setattr(
-        backend_app_module, "find_model_definition", model_store.find_model
-    )
-    monkeypatch.setattr(backend_app_module, "assign_model_access", model_store.assign)
-    monkeypatch.setattr(
-        backend_app_module, "list_effective_allowed_models", model_store.effective
-    )
     monkeypatch.setattr(model_governance_routes, "find_model_definition", model_store.find_model)
     monkeypatch.setattr(model_governance_routes, "assign_model_access", model_store.assign)
     monkeypatch.setattr(model_governance_routes, "list_effective_allowed_models", model_store.effective)
     monkeypatch.setattr(model_governance_routes, "_database_url", lambda: "ignored")
-    monkeypatch.setattr(registry_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(registry_models_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(chat_inference, "get_auth_config", lambda: config)
+    monkeypatch.setattr(chat_inference, "list_effective_allowed_models", model_store.effective)
 
     def _create_entity_with_version(
         _database_url: str,
@@ -231,7 +227,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
             "version": {"entity_id": entity_id, "version": version, "spec_json": created},
         }
 
-    monkeypatch.setattr(registry_routes, "create_entity_with_version", _create_entity_with_version)
+    monkeypatch.setattr(registry_models_routes, "create_entity_with_version", _create_entity_with_version)
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -442,7 +438,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
         seen_payload.update(payload)
         return {"ok": True, "model": payload["model"]}, 200
 
-    monkeypatch.setattr(backend_app_module, "_http_json_request", fake_llm_request)
+    monkeypatch.setattr(chat_inference, "http_json_request", fake_llm_request)
 
     permitted = test_client.post(
         "/v1/models/generate",

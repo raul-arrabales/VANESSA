@@ -19,8 +19,6 @@ def test_expected_routes_are_registered() -> None:
         "/auth/login",
         "/auth/logout",
         "/auth/me",
-        "/models/catalog",
-        "/models/discovery/huggingface",
         "/v1/models/catalog",
         "/v1/models/discovery/huggingface",
         "/v1/models/downloads",

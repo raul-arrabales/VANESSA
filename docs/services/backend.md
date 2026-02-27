@@ -39,8 +39,6 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/models/inference`
 - `POST /v1/models/generate`
 
-Legacy model endpoints (`/models/*`, `/inference`, `/llm/generate`) are deprecated in Release N and scheduled for removal in Release N+1.
-
 ## Agent Execution Proxy
 
 - `POST /v1/agent-executions`

@@ -25,23 +25,17 @@ def _database_url() -> str:
     return get_auth_config().database_url
 
 
-def _is_model_entity_type(entity_type: str) -> bool:
+def _validate_non_model_entity_type(entity_type: str):
     normalized = entity_type.strip().lower()
-    return normalized in {"model", "models"}
-
-
-def _deny_unless_superadmin_for_models(entity_type: str):
-    if _is_model_entity_type(entity_type) and str(g.current_user.get("role", "")) != "superadmin":
-        return _json_error(403, "insufficient_role", "Only superadmin can manage model registry")
-    return None
+    if normalized in {"model", "models"}:
+        raise ValueError("invalid_entity_type")
 
 
 @bp.get("/v1/registry/<entity_type>")
 @require_auth
 def list_entities_generic(entity_type: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
     try:
+        _validate_non_model_entity_type(entity_type)
         rows = list_entities(_database_url(), entity_type=entity_type)
     except ValueError as exc:
         return _json_error(400, "invalid_entity_type", str(exc))
@@ -51,9 +45,8 @@ def list_entities_generic(entity_type: str):
 @bp.get("/v1/registry/<entity_type>/<entity_id>")
 @require_auth
 def get_entity_generic(entity_type: str, entity_id: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
     try:
+        _validate_non_model_entity_type(entity_type)
         entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
     except ValueError as exc:
         return _json_error(400, "invalid_entity_type", str(exc))
@@ -66,8 +59,6 @@ def get_entity_generic(entity_type: str, entity_id: str):
 @bp.post("/v1/registry/<entity_type>/<entity_id>/versions")
 @require_auth
 def create_entity_version_generic(entity_type: str, entity_id: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
@@ -78,7 +69,12 @@ def create_entity_version_generic(entity_type: str, entity_id: str):
     if not version:
         return _json_error(400, "invalid_version", "version is required")
 
-    entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    try:
+        _validate_non_model_entity_type(entity_type)
+        entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    except ValueError as exc:
+        return _json_error(400, "invalid_entity_type", str(exc))
+
     if entity is None:
         return _json_error(404, "entity_not_found", "Entity not found")
 
@@ -105,13 +101,16 @@ def create_entity_version_generic(entity_type: str, entity_id: str):
 @bp.post("/v1/registry/<entity_type>/<entity_id>/share")
 @require_auth
 def share_entity_generic(entity_type: str, entity_id: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
 
-    entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    try:
+        _validate_non_model_entity_type(entity_type)
+        entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    except ValueError as exc:
+        return _json_error(400, "invalid_entity_type", str(exc))
+
     if entity is None:
         return _json_error(404, "entity_not_found", "Entity not found")
 
@@ -140,9 +139,12 @@ def share_entity_generic(entity_type: str, entity_id: str):
 @bp.get("/v1/registry/<entity_type>/<entity_id>/shares")
 @require_auth
 def list_shares_generic(entity_type: str, entity_id: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
-    entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    try:
+        _validate_non_model_entity_type(entity_type)
+        entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
+    except ValueError as exc:
+        return _json_error(400, "invalid_entity_type", str(exc))
+
     if entity is None:
         return _json_error(404, "entity_not_found", "Entity not found")
 
@@ -153,8 +155,6 @@ def list_shares_generic(entity_type: str, entity_id: str):
 @bp.post("/v1/registry/<entity_type>")
 @require_auth
 def create_entity_generic(entity_type: str):
-    if (denied := _deny_unless_superadmin_for_models(entity_type)) is not None:
-        return denied
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
@@ -169,6 +169,7 @@ def create_entity_generic(entity_type: str):
         return _json_error(400, "invalid_entity_id", "id is required")
 
     try:
+        _validate_non_model_entity_type(entity_type)
         created = create_entity_with_version(
             _database_url(),
             entity_type=entity_type,

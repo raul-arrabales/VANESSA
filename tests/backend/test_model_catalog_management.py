@@ -17,6 +17,7 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
+from app.handlers import legacy_auth as legacy_auth_handler  # noqa: E402
 from app.routes import model_catalog_v1 as model_catalog_routes  # noqa: E402
 from app.routes import model_governance as model_governance_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
@@ -92,11 +93,11 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
     monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
-    monkeypatch.setattr(backend_app_module, "create_user", user_store.create_user)
-    monkeypatch.setattr(backend_app_module, "find_user_by_identifier", user_store.find_by_identifier)
+    monkeypatch.setattr(legacy_auth_handler, "get_config", lambda: config)
+    monkeypatch.setattr(legacy_auth_handler, "auth_ready_or_503", lambda _json_error: None)
+    monkeypatch.setattr(legacy_auth_handler, "create_user", user_store.create_user)
+    monkeypatch.setattr(legacy_auth_handler, "find_user_by_identifier", user_store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
-    monkeypatch.setattr(backend_app_module, "_ensure_download_worker_started", lambda: None)
-    monkeypatch.setattr(backend_app_module, "resolve_target_dir", lambda root, source_id: f"{root}/{source_id.replace('/', '--')}")
 
     def _list_catalog(_database_url: str):
         return list(catalog.values())
@@ -162,21 +163,11 @@ def client(monkeypatch: pytest.MonkeyPatch):
         catalog[model_id] = row
         return row
 
-    monkeypatch.setattr(backend_app_module, "list_model_catalog", _list_catalog)
-    monkeypatch.setattr(backend_app_module, "create_model_catalog_item", _create_catalog)
-    monkeypatch.setattr(backend_app_module, "upsert_model_catalog_item", _upsert_catalog)
-    monkeypatch.setattr(backend_app_module, "get_model_catalog_item", lambda _db, model_id: catalog.get(model_id))
     monkeypatch.setattr(model_catalog_routes, "list_model_catalog", _list_catalog)
     monkeypatch.setattr(model_catalog_routes, "create_model_catalog_item", _create_catalog)
     monkeypatch.setattr(model_catalog_routes, "upsert_model_catalog_item", _upsert_catalog)
     monkeypatch.setattr(model_catalog_routes, "_config", lambda: config)
 
-    monkeypatch.setattr(backend_app_module, "list_scope_assignments", lambda _db: [{"scope": k, "model_ids": v} for k, v in assignments.items()])
-    monkeypatch.setattr(
-        backend_app_module,
-        "upsert_scope_assignment",
-        lambda _db, *, scope, model_ids, updated_by_user_id: {"scope": scope, "model_ids": model_ids},
-    )
     monkeypatch.setattr(model_governance_routes, "list_scope_assignments", lambda _db: [{"scope": k, "model_ids": v} for k, v in assignments.items()])
     monkeypatch.setattr(
         model_governance_routes,
@@ -186,28 +177,11 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(model_governance_routes, "_database_url", lambda: "ignored")
 
     monkeypatch.setattr(
-        backend_app_module,
-        "discover_hf_models",
-        lambda **kwargs: [
-            {"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama-3-8B-Instruct", "downloads": 10, "likes": 1, "tags": ["text-generation"], "provider": "huggingface"}
-        ],
-    )
-    monkeypatch.setattr(
         model_catalog_routes,
         "discover_hf_models",
         lambda **kwargs: [
             {"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama-3-8B-Instruct", "downloads": 10, "likes": 1, "tags": ["text-generation"], "provider": "huggingface"}
         ],
-    )
-    monkeypatch.setattr(
-        backend_app_module,
-        "get_hf_model_details",
-        lambda source_id, token=None: {
-            "source_id": source_id,
-            "name": source_id.split("/")[-1],
-            "tags": ["text-generation"],
-            "files": [{"path": "config.json", "size": 123}],
-        },
     )
     monkeypatch.setattr(
         model_catalog_routes,
@@ -239,9 +213,6 @@ def client(monkeypatch: pytest.MonkeyPatch):
         jobs[str(job_id)] = row
         return row
 
-    monkeypatch.setattr(backend_app_module, "create_download_job", _create_job)
-    monkeypatch.setattr(backend_app_module, "get_download_job", lambda _db, job_id: jobs.get(job_id))
-    monkeypatch.setattr(backend_app_module, "list_download_jobs", lambda _db, status=None, limit=50: list(jobs.values()))
     monkeypatch.setattr(model_catalog_routes, "create_download_job", _create_job)
     monkeypatch.setattr(model_catalog_routes, "get_download_job", lambda _db, job_id: jobs.get(job_id))
     monkeypatch.setattr(model_catalog_routes, "list_download_jobs", lambda _db, status=None, limit=50: list(jobs.values()))

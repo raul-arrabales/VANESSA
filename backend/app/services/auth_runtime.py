@@ -1,0 +1,40 @@
+from __future__ import annotations
+
+from flask import current_app
+
+from ..config import AuthConfig, get_auth_config
+from ..db import run_auth_schema_migration
+from ..repositories.users import count_users, create_user
+from ..security import hash_password
+from . import auth_lifecycle
+from .model_download_worker import ensure_download_worker_started
+
+
+def get_config() -> AuthConfig:
+    return auth_lifecycle.get_config(get_auth_config)
+
+
+def bootstrap_superadmin(config: AuthConfig) -> None:
+    auth_lifecycle.bootstrap_superadmin(
+        config,
+        count_users_fn=count_users,
+        create_user_fn=create_user,
+        hash_password_fn=hash_password,
+    )
+
+
+def ensure_auth_initialized() -> bool:
+    return auth_lifecycle.ensure_auth_initialized(
+        app_logger=current_app.logger,
+        get_config_fn=get_config,
+        run_auth_schema_migration_fn=run_auth_schema_migration,
+        bootstrap_superadmin_fn=bootstrap_superadmin,
+        ensure_download_worker_started_fn=ensure_download_worker_started,
+    )
+
+
+def auth_ready_or_503(json_error_fn):
+    return auth_lifecycle.auth_ready_or_503(
+        ensure_auth_initialized_fn=ensure_auth_initialized,
+        json_error_fn=json_error_fn,
+    )

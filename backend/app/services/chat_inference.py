@@ -1,12 +1,37 @@
 from __future__ import annotations
 
+import os
+from json import dumps, loads
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+from flask import g
+
+from ..config import get_auth_config
+from ..repositories.model_access import list_effective_allowed_models
+
+_DEFAULT_HTTP_TIMEOUT_SECONDS = 1.5
 
 
-def _m():
-    import app.app as backend_app_module
-
-    return backend_app_module
+def http_json_request(url: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+    req = Request(
+        url,
+        data=dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+            status_code = int(response.status)
+            body = response.read().decode("utf-8")
+            return (loads(body) if body else {}), status_code
+    except HTTPError as error:
+        body = error.read().decode("utf-8")
+        parsed = loads(body) if body else {"error": "upstream_error"}
+        return parsed, int(error.code)
+    except URLError:
+        return None, 502
 
 
 def coerce_chat_messages(messages: Any) -> list[dict[str, Any]]:
@@ -62,13 +87,17 @@ def chat_completion_with_allowed_model(
     max_tokens: int | None,
     temperature: float | None,
 ) -> tuple[dict[str, Any] | None, int]:
-    m = _m()
-    effective_models = m._effective_models_for_current_user(org_id=org_id, group_id=group_id)
+    effective_models = list_effective_allowed_models(
+        get_auth_config().database_url,
+        user_id=int(g.current_user["id"]),
+        org_id=org_id,
+        group_id=group_id,
+    )
     allowed_model_ids = {str(model.get("model_id", "")) for model in effective_models}
     if requested_model_id not in allowed_model_ids:
         return {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
 
-    llm_url = m.os.getenv("LLM_URL", "http://llm:8000").rstrip("/")
+    llm_url = os.getenv("LLM_URL", "http://llm:8000").rstrip("/")
     upstream_payload: dict[str, Any] = {
         "model": requested_model_id,
         "input": messages,
@@ -78,4 +107,4 @@ def chat_completion_with_allowed_model(
     if temperature is not None:
         upstream_payload["temperature"] = temperature
 
-    return m._http_json_request(f"{llm_url}/v1/chat/completions", upstream_payload)
+    return http_json_request(f"{llm_url}/v1/chat/completions", upstream_payload)

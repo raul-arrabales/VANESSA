@@ -16,6 +16,7 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
+from app.handlers import legacy_auth as legacy_auth_handler  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -111,13 +112,16 @@ def client(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
     monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
-    monkeypatch.setattr(backend_app_module, "create_user", store.create_user)
-    monkeypatch.setattr(backend_app_module, "find_user_by_identifier", store.find_by_identifier)
+    monkeypatch.setattr(legacy_auth_handler, "get_config", lambda: config)
+    monkeypatch.setattr(legacy_auth_handler, "auth_ready_or_503", lambda _json_error: None)
+    monkeypatch.setattr(legacy_auth_handler, "create_user", store.create_user)
+    monkeypatch.setattr(legacy_auth_handler, "find_user_by_identifier", store.find_by_identifier)
+    monkeypatch.setattr(legacy_auth_handler, "find_user_by_id", store.find_by_id)
+    monkeypatch.setattr(legacy_auth_handler, "activate_user", store.activate)
+    monkeypatch.setattr(legacy_auth_handler, "update_user_role", store.update_role)
+    monkeypatch.setattr(legacy_auth_handler, "list_users", store.list_users)
+    monkeypatch.setattr(legacy_auth_handler, "count_users_by_role", store.count_by_role)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", store.find_by_id)
-    monkeypatch.setattr(backend_app_module, "activate_user", store.activate)
-    monkeypatch.setattr(backend_app_module, "update_user_role", store.update_role)
-    monkeypatch.setattr(backend_app_module, "list_users", store.list_users)
-    monkeypatch.setattr(backend_app_module, "count_users_by_role", store.count_by_role)
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
