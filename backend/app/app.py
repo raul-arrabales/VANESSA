@@ -40,6 +40,7 @@ from .repositories.model_access import (
 )
 from .services.hf_discovery import discover_hf_models, get_hf_model_details
 from .services.model_downloader import download_from_huggingface, resolve_target_dir
+from .services.runtime_profile_service import internet_allowed, resolve_runtime_profile
 from .repositories.users import (
     activate_user,
     count_users_by_role,
@@ -79,6 +80,15 @@ _ARCHITECTURE_SVG_PATH = _GENERATED_DIR / "architecture.svg"
 
 def _json_error(status: int, code: str, message: str):
     return jsonify({"error": code, "message": message}), status
+
+
+def _legacy_models_response(payload: Any, status_code: int = 200):
+    response = jsonify(payload)
+    response.status_code = status_code
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-12-31T00:00:00Z"
+    response.headers["Link"] = '</v1/registry/models>; rel="successor-version"'
+    return response
 
 
 def _get_float_env(name: str, default: float) -> float:
@@ -147,6 +157,21 @@ def _http_json_request(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+    try:
+        with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+            status_code = int(response.status)
+            body = response.read().decode("utf-8")
+            return (loads(body) if body else {}), status_code
+    except HTTPError as error:
+        body = error.read().decode("utf-8")
+        parsed = loads(body) if body else {"error": "upstream_error"}
+        return parsed, int(error.code)
+    except URLError:
+        return None, 502
+
+
+def _http_get_json(url: str) -> tuple[dict[str, Any] | None, int]:
+    req = Request(url, method="GET")
     try:
         with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
             status_code = int(response.status)
@@ -870,7 +895,7 @@ def superadmin_ping():
 @require_role("superadmin")
 def get_models_catalog():
     rows = list_model_catalog(_get_config().database_url)
-    return jsonify({"models": [_serialize_catalog_item(row) for row in rows]}), 200
+    return _legacy_models_response({"models": [_serialize_catalog_item(row) for row in rows]}, 200)
 
 
 @app.post("/models/catalog")
@@ -930,14 +955,14 @@ def create_models_catalog_item():
             return _json_error(409, "duplicate_model", "model id already exists")
         return _json_error(400, code, "Invalid model catalog payload")
 
-    return jsonify({"model": _serialize_catalog_item(created)}), 201
+    return _legacy_models_response({"model": _serialize_catalog_item(created)}, 201)
 
 
 @app.get("/models/assignments")
 @require_role("admin")
 def get_models_assignments():
     rows = list_scope_assignments(_get_config().database_url)
-    return jsonify({"assignments": [_serialize_assignment(row) for row in rows]}), 200
+    return _legacy_models_response({"assignments": [_serialize_assignment(row) for row in rows]}, 200)
 
 
 @app.put("/models/assignments")
@@ -962,12 +987,20 @@ def put_models_assignment():
     except ValueError:
         return _json_error(400, "invalid_scope", "scope must be user, admin, or superadmin")
 
-    return jsonify({"assignment": _serialize_assignment(saved)}), 200
+    return _legacy_models_response({"assignment": _serialize_assignment(saved)}, 200)
 
 
 @app.get("/models/discovery/huggingface")
 @require_role("superadmin")
 def discover_models_huggingface():
+    runtime_profile = resolve_runtime_profile(_get_config().database_url)
+    if not internet_allowed(runtime_profile):
+        return _json_error(
+            403,
+            "runtime_profile_blocks_internet",
+            f"Model discovery disabled for runtime profile '{runtime_profile}'",
+        )
+
     query = str(request.args.get("query", "")).strip()
     task = str(request.args.get("task", "text-generation")).strip() or "text-generation"
     sort = str(request.args.get("sort", "downloads")).strip() or "downloads"
@@ -989,24 +1022,40 @@ def discover_models_huggingface():
     except Exception as exc:  # noqa: BLE001
         return _json_error(502, "hf_discovery_failed", str(exc))
 
-    return jsonify({"models": models}), 200
+    return _legacy_models_response({"models": models}, 200)
 
 
 @app.get("/models/discovery/huggingface/<path:source_id>")
 @require_role("superadmin")
 def get_discovered_model_huggingface(source_id: str):
+    runtime_profile = resolve_runtime_profile(_get_config().database_url)
+    if not internet_allowed(runtime_profile):
+        return _json_error(
+            403,
+            "runtime_profile_blocks_internet",
+            f"Model discovery disabled for runtime profile '{runtime_profile}'",
+        )
+
     if not source_id.strip():
         return _json_error(400, "invalid_source_id", "source_id is required")
     try:
         model = get_hf_model_details(source_id.strip(), token=_get_config().hf_token)
     except Exception as exc:  # noqa: BLE001
         return _json_error(502, "hf_model_info_failed", str(exc))
-    return jsonify({"model": model}), 200
+    return _legacy_models_response({"model": model}, 200)
 
 
 @app.post("/models/catalog/downloads")
 @require_role("superadmin")
 def start_model_download():
+    runtime_profile = resolve_runtime_profile(_get_config().database_url)
+    if not internet_allowed(runtime_profile):
+        return _json_error(
+            403,
+            "runtime_profile_blocks_internet",
+            f"Model download disabled for runtime profile '{runtime_profile}'",
+        )
+
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
@@ -1053,7 +1102,7 @@ def start_model_download():
         created_by_user_id=int(g.current_user["id"]),
     )
     _ensure_download_worker_started()
-    return jsonify({"job": _serialize_download_job(created)}), 202
+    return _legacy_models_response({"job": _serialize_download_job(created)}, 202)
 
 
 @app.get("/models/catalog/downloads")
@@ -1061,7 +1110,7 @@ def start_model_download():
 def get_model_download_jobs():
     status = str(request.args.get("status", "")).strip().lower() or None
     rows = list_download_jobs(_get_config().database_url, status=status, limit=50)
-    return jsonify({"jobs": [_serialize_download_job(row) for row in rows]}), 200
+    return _legacy_models_response({"jobs": [_serialize_download_job(row) for row in rows]}, 200)
 
 
 @app.get("/models/catalog/downloads/<job_id>")
@@ -1070,7 +1119,7 @@ def get_model_download_job(job_id: str):
     row = get_download_job(_get_config().database_url, job_id)
     if row is None:
         return _json_error(404, "download_job_not_found", "Download job not found")
-    return jsonify({"job": _serialize_download_job(row)}), 200
+    return _legacy_models_response({"job": _serialize_download_job(row)}, 200)
 
 
 @app.post("/models/registry")
@@ -1265,6 +1314,54 @@ def inference_endpoint():
     )
 
 
+@app.post("/v1/agent-executions")
+@require_role("user")
+def create_agent_execution():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    agent_id = str(payload.get("agent_id", "")).strip()
+    execution_input = payload.get("input")
+    if not agent_id:
+        return _json_error(400, "invalid_agent_id", "agent_id is required")
+
+    upstream_payload: dict[str, Any] = {
+        "agent_id": agent_id,
+        "input": execution_input if isinstance(execution_input, dict) else {},
+        "requested_by_user_id": int(g.current_user["id"]),
+        "runtime_profile": resolve_runtime_profile(_get_config().database_url),
+    }
+    for key in ("org_id", "group_id"):
+        value = str(payload.get(key, "")).strip()
+        if value:
+            upstream_payload[key] = value
+
+    agent_engine_url = os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").rstrip("/")
+    response_payload, status_code = _http_json_request(
+        f"{agent_engine_url}/v1/agent-executions",
+        upstream_payload,
+    )
+    if response_payload is None:
+        return _json_error(502, "agent_engine_unreachable", "Agent engine unavailable")
+    return jsonify(response_payload), status_code
+
+
+@app.get("/v1/agent-executions/<execution_id>")
+@require_role("user")
+def get_agent_execution(execution_id: str):
+    if not execution_id.strip():
+        return _json_error(400, "invalid_execution_id", "execution_id is required")
+
+    agent_engine_url = os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").rstrip("/")
+    response_payload, status_code = _http_get_json(
+        f"{agent_engine_url}/v1/agent-executions/{execution_id.strip()}",
+    )
+    if response_payload is None:
+        return _json_error(502, "agent_engine_unreachable", "Agent engine unavailable")
+    return jsonify(response_payload), status_code
+
+
 @app.post("/voice/wake-events")
 def wake_events():
     payload = request.get_json(silent=True) or {}
@@ -1338,3 +1435,21 @@ def voice_health():
         ),
         200,
     )
+
+
+# Register modular v1 blueprints.
+from .routes import agents as agents_routes
+from .routes import auth as auth_routes
+from .routes import models as models_routes
+from .routes import registry as registry_routes
+from .routes import runtime as runtime_routes
+from .routes import system as system_routes
+from .routes import tools as tools_routes
+
+app.register_blueprint(auth_routes.bp)
+app.register_blueprint(system_routes.bp)
+app.register_blueprint(models_routes.bp)
+app.register_blueprint(registry_routes.bp)
+app.register_blueprint(agents_routes.bp)
+app.register_blueprint(tools_routes.bp)
+app.register_blueprint(runtime_routes.bp)

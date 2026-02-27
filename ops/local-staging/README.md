@@ -78,6 +78,7 @@ Supported launcher variables:
 - `SAMPLE_USER_EMAIL` (default: `sample-user@local.test`)
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
+- `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
@@ -119,6 +120,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 6. Confirm downloaded model files are written under host directory `models/llm/`.
 7. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
 8. Check API health directly (host-to-container): `http://localhost:5000/health`
+8.1. Check runtime profile directly: `http://localhost:5000/v1/runtime/profile`
 9. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
 10. Check generated architecture JSON: `http://localhost:5000/system/architecture`
 11. Check generated architecture SVG: `http://localhost:5000/system/architecture.svg`

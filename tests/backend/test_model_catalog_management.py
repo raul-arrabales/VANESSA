@@ -64,6 +64,7 @@ class InMemoryUserStore:
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "online")
     user_store = InMemoryUserStore(users={})
     catalog: dict[str, dict[str, Any]] = {}
     assignments: dict[str, list[str]] = {"user": [], "admin": [], "superadmin": []}

@@ -41,6 +41,7 @@ tcp_ok() {
 run_checks() {
   local failures=0
   local llm_routing_mode="${LLM_ROUTING_MODE:-local_only}"
+  local runtime_profile="${VANESSA_RUNTIME_PROFILE:-offline}"
 
   if http_ok "http://localhost:5000/health"; then
     printf 'backend: OK\n'
@@ -106,6 +107,13 @@ run_checks() {
     printf 'postgres: OK\n'
   else
     printf 'postgres: FAIL\n'
+    failures=$((failures + 1))
+  fi
+
+  if curl --silent --show-error --max-time 2 --fail "http://localhost:5000/v1/runtime/profile" | grep -q "\"profile\""; then
+    printf 'runtime_profile: OK (env=%s)\n' "${runtime_profile}"
+  else
+    printf 'runtime_profile: FAIL\n'
     failures=$((failures + 1))
   fi
 

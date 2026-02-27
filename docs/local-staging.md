@@ -25,6 +25,8 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 
 - Health check:
   - `./ops/local-staging/health.sh --wait --timeout 240`
+- Runtime profile check:
+  - `curl -sS http://localhost:5000/v1/runtime/profile`
 - Status:
   - `./ops/local-staging/status.sh`
 - Logs:
