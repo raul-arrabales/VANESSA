@@ -19,6 +19,7 @@ from app.config import AuthConfig  # noqa: E402
 from app.handlers import legacy_auth as legacy_auth_handler  # noqa: E402
 from app.routes import executions as executions_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services.agent_engine_client import AgentEngineClientError  # noqa: E402
 
 
 @dataclass
@@ -86,6 +87,8 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(legacy_auth_handler, "find_user_by_identifier", user_store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
     monkeypatch.setattr(executions_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(executions_routes, "_config", lambda: config)
+    monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -100,74 +103,6 @@ def _login(client, identifier: str, password: str):
     return client.post("/auth/login", json={"identifier": identifier, "password": password})
 
 
-def test_agent_execution_requires_registered_agent(client, monkeypatch: pytest.MonkeyPatch):
-    test_client, users = client
-    user = users.create_user(
-        "ignored",
-        email="u@example.com",
-        username="u",
-        password_hash=hash_password("u-pass-123"),
-        role="user",
-        is_active=True,
-    )
-    token = _login(test_client, user["username"], "u-pass-123").get_json()["access_token"]
-
-    monkeypatch.setattr(executions_routes, "get_entity", lambda *_args, **_kwargs: None)
-
-    response = test_client.post(
-        "/v1/agent-executions",
-        headers=_auth(token),
-        json={"agent_id": "agent.unknown", "input": {"prompt": "x"}},
-    )
-    assert response.status_code == 404
-    assert response.get_json()["error"] == "agent_not_found"
-
-
-def test_agent_execution_permission_and_runtime_checks(client, monkeypatch: pytest.MonkeyPatch):
-    test_client, users = client
-    user = users.create_user(
-        "ignored",
-        email="u2@example.com",
-        username="u2",
-        password_hash=hash_password("u2-pass-123"),
-        role="user",
-        is_active=True,
-    )
-    token = _login(test_client, user["username"], "u2-pass-123").get_json()["access_token"]
-
-    agent = {
-        "entity_id": "agent.internet",
-        "owner_user_id": 999,
-        "current_spec": {
-            "runtime_constraints": {"internet_required": True}
-        },
-    }
-    monkeypatch.setattr(executions_routes, "get_entity", lambda *_args, **_kwargs: agent)
-    monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
-
-    def _deny(*, database_url: str, current_user: dict[str, Any], entity_id: str, required_permission: str):
-        raise executions_routes.PolicyDeniedError("no execute")
-
-    monkeypatch.setattr(executions_routes, "require_entity_permission", _deny)
-
-    denied = test_client.post(
-        "/v1/agent-executions",
-        headers=_auth(token),
-        json={"agent_id": "agent.internet", "input": {}},
-    )
-    assert denied.status_code == 403
-    assert denied.get_json()["error"] == "policy_denied"
-
-    monkeypatch.setattr(executions_routes, "require_entity_permission", lambda **kwargs: None)
-    blocked = test_client.post(
-        "/v1/agent-executions",
-        headers=_auth(token),
-        json={"agent_id": "agent.internet", "input": {}},
-    )
-    assert blocked.status_code == 403
-    assert blocked.get_json()["error"] == "runtime_profile_blocks_internet"
-
-
 def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     user = users.create_user(
@@ -180,18 +115,30 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
     )
     token = _login(test_client, user["username"], "u3-pass-123").get_json()["access_token"]
 
-    monkeypatch.setattr(
-        executions_routes,
-        "get_entity",
-        lambda *_args, **_kwargs: {"entity_id": "agent.local", "owner_user_id": user["id"], "current_spec": {"runtime_constraints": {"internet_required": False}}},
-    )
-    monkeypatch.setattr(executions_routes, "require_entity_permission", lambda **kwargs: None)
-    monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
-    monkeypatch.setattr(
-        executions_routes,
-        "_http_json_request",
-        lambda url, payload: ({"execution": {"id": "exec-1", "agent_id": payload["agent_id"], "runtime_profile": payload["runtime_profile"]}}, 201),
-    )
+    def _create_execution(**kwargs):
+        assert kwargs["agent_id"] == "agent.local"
+        assert kwargs["runtime_profile"] == "offline"
+        assert kwargs["requested_by_user_id"] == user["id"]
+        return (
+            {
+                "execution": {
+                    "id": "exec-1",
+                    "status": "succeeded",
+                    "agent_ref": "agent.local",
+                    "agent_version": "v1",
+                    "model_ref": None,
+                    "runtime_profile": "offline",
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "finished_at": "2026-01-01T00:00:01+00:00",
+                    "result": {"output_text": "ok"},
+                    "error": None,
+                }
+            },
+            201,
+        )
+
+    monkeypatch.setattr(executions_routes, "create_execution", _create_execution)
 
     response = test_client.post(
         "/v1/agent-executions",
@@ -204,7 +151,37 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
     assert payload["runtime_profile"] == "offline"
 
 
-def test_agent_execution_blocks_non_offline_tool(client, monkeypatch: pytest.MonkeyPatch):
+def test_agent_execution_passes_engine_errors(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u2@example.com",
+        username="u2",
+        password_hash=hash_password("u2-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u2-pass-123").get_json()["access_token"]
+
+    def _create_execution(**_kwargs):
+        raise AgentEngineClientError(
+            code="EXEC_RUNTIME_PROFILE_BLOCKED",
+            message="Blocked in offline profile",
+            status_code=403,
+        )
+
+    monkeypatch.setattr(executions_routes, "create_execution", _create_execution)
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.internet", "input": {}},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "EXEC_RUNTIME_PROFILE_BLOCKED"
+
+
+def test_agent_execution_invalid_input(client):
     test_client, users = client
     user = users.create_user(
         "ignored",
@@ -216,31 +193,49 @@ def test_agent_execution_blocks_non_offline_tool(client, monkeypatch: pytest.Mon
     )
     token = _login(test_client, user["username"], "u4-pass-123").get_json()["access_token"]
 
-    def _get_entity(_db: str, *, entity_type: str, entity_id: str):
-        if entity_type == "agent":
-            return {
-                "entity_id": entity_id,
-                "owner_user_id": user["id"],
-                "current_spec": {
-                    "runtime_constraints": {"internet_required": False},
-                    "tool_refs": ["tool.remote"],
-                },
-            }
-        if entity_type == "tool":
-            return {
-                "entity_id": entity_id,
-                "current_spec": {"offline_compatible": False},
-            }
-        return None
-
-    monkeypatch.setattr(executions_routes, "get_entity", _get_entity)
-    monkeypatch.setattr(executions_routes, "require_entity_permission", lambda **kwargs: None)
-    monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
-
     response = test_client.post(
         "/v1/agent-executions",
         headers=_auth(token),
-        json={"agent_id": "agent.local", "input": {"prompt": "hello"}},
+        json={"agent_id": "agent.local", "input": "bad"},
     )
-    assert response.status_code == 403
-    assert response.get_json()["error"] == "runtime_profile_blocks_tool"
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid_input"
+
+
+def test_get_agent_execution_proxy(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u5@example.com",
+        username="u5",
+        password_hash=hash_password("u5-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u5-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        executions_routes,
+        "get_execution",
+        lambda **_kwargs: (
+            {
+                "execution": {
+                    "id": "exec-5",
+                    "status": "succeeded",
+                    "agent_ref": "agent.local",
+                    "agent_version": "v1",
+                    "model_ref": None,
+                    "runtime_profile": "offline",
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "finished_at": "2026-01-01T00:00:01+00:00",
+                    "result": {"output_text": "ok"},
+                    "error": None,
+                }
+            },
+            200,
+        ),
+    )
+    response = test_client.get("/v1/agent-executions/exec-5", headers=_auth(token))
+    assert response.status_code == 200
+    assert response.get_json()["execution"]["id"] == "exec-5"

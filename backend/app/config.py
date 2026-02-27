@@ -21,6 +21,10 @@ class AuthConfig:
     model_download_allow_patterns_default: str = ""
     model_download_ignore_patterns_default: str = ""
     hf_token: str = ""
+    agent_engine_url: str = "http://agent_engine:7000"
+    agent_engine_service_token: str = "dev-agent-engine-token"
+    agent_execution_via_engine: bool = True
+    agent_execution_fallback: bool = False
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
@@ -77,4 +81,9 @@ def get_auth_config() -> AuthConfig:
         model_download_allow_patterns_default=os.getenv("MODEL_DOWNLOAD_ALLOW_PATTERNS_DEFAULT", "").strip(),
         model_download_ignore_patterns_default=os.getenv("MODEL_DOWNLOAD_IGNORE_PATTERNS_DEFAULT", "").strip(),
         hf_token=os.getenv("HF_TOKEN", "").strip(),
+        agent_engine_url=os.getenv("AGENT_ENGINE_URL", "http://agent_engine:7000").strip() or "http://agent_engine:7000",
+        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", "dev-agent-engine-token").strip()
+        or "dev-agent-engine-token",
+        agent_execution_via_engine=_get_bool_env("AGENT_EXECUTION_VIA_ENGINE", True),
+        agent_execution_fallback=_get_bool_env("AGENT_EXECUTION_FALLBACK", False),
     )

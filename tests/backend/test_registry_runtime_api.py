@@ -96,6 +96,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(registry_models_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(runtime_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(executions_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(executions_routes, "_config", lambda: config)
 
     def _create_entity_with_version(
         _database_url: str,
@@ -273,24 +274,48 @@ def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(
         executions_routes,
-        "_http_json_request",
-        lambda url, payload: ({"execution": {"id": "exec-1", "agent_id": payload["agent_id"]}}, 201),
+        "create_execution",
+        lambda **kwargs: (
+            {
+                "execution": {
+                    "id": "exec-1",
+                    "status": "succeeded",
+                    "agent_ref": kwargs["agent_id"],
+                    "agent_version": "v1",
+                    "model_ref": None,
+                    "runtime_profile": kwargs["runtime_profile"],
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "finished_at": "2026-01-01T00:00:01+00:00",
+                    "result": {"output_text": "ok"},
+                    "error": None,
+                }
+            },
+            201,
+        ),
     )
     monkeypatch.setattr(
         executions_routes,
-        "_http_get_json",
-        lambda url: ({"execution": {"id": "exec-1", "status": "succeeded"}}, 200),
+        "get_execution",
+        lambda **_kwargs: (
+            {
+                "execution": {
+                    "id": "exec-1",
+                    "status": "succeeded",
+                    "agent_ref": "agent.alpha",
+                    "agent_version": "v1",
+                    "model_ref": None,
+                    "runtime_profile": "offline",
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "finished_at": "2026-01-01T00:00:01+00:00",
+                    "result": {"output_text": "ok"},
+                    "error": None,
+                }
+            },
+            200,
+        ),
     )
-    monkeypatch.setattr(
-        executions_routes,
-        "get_entity",
-        lambda _db, **kwargs: {
-            "entity_id": kwargs.get("entity_id", "agent.alpha"),
-            "owner_user_id": user["id"],
-            "current_spec": {"runtime_constraints": {"internet_required": False}, "tool_refs": []},
-        },
-    )
-    monkeypatch.setattr(executions_routes, "require_entity_permission", lambda **kwargs: None)
     monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
 
     create_response = test_client.post(

@@ -48,6 +48,16 @@ Agent execution proxy endpoints:
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
 
+Execution routing notes:
+
+- Backend is gateway-only for agent executions.
+- Backend forwards to agent engine internal endpoints:
+  - `POST /v1/internal/agent-executions`
+  - `GET /v1/internal/agent-executions/{id}`
+- Internal calls include `X-Service-Token` and `X-Request-Id`.
+- Use `AGENT_ENGINE_SERVICE_TOKEN` to configure shared service auth.
+- Use `AGENT_EXECUTION_VIA_ENGINE` to enable/disable execution forwarding.
+
 Policy governance endpoints:
 
 - `POST /v1/policy/rules` (superadmin)

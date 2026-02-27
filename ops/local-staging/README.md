@@ -79,6 +79,9 @@ Supported launcher variables:
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
+- `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
+- `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
+- `AGENT_EXECUTION_FALLBACK` (default: `false`)
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
@@ -214,6 +217,9 @@ Use the targeted restart script when only one service changed:
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`
+- Agent execution returns `agent_engine_unreachable` or `invalid_service_token`:
+  - Ensure backend and agent engine share the same `AGENT_ENGINE_SERVICE_TOKEN`.
+  - Confirm backend can reach `AGENT_ENGINE_URL` and agent engine exposes `/v1/internal/agent-executions`.
 - `llm_runtime` fails to start:
   - Ensure local model files exist under `models/llm/`.
   - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.

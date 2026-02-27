@@ -43,6 +43,15 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
+- Backend forwards to agent engine internal contract:
+  - `POST /v1/internal/agent-executions`
+  - `GET /v1/internal/agent-executions/{id}`
+- Internal calls include `X-Service-Token` and `X-Request-Id`.
+- Config:
+  - `AGENT_ENGINE_URL`
+  - `AGENT_ENGINE_SERVICE_TOKEN`
+  - `AGENT_EXECUTION_VIA_ENGINE`
+  - `AGENT_EXECUTION_FALLBACK`
 
 ## Policy Rule Management
 
@@ -50,5 +59,6 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `GET /v1/policy/rules` (superadmin)
 
 Canonical service notes: [`backend/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/backend/README.md).
+Execution contract details: [`docs/services/agent_execution_contract.md`](./agent_execution_contract.md).
 
 > Owner: Backend maintainers. Update cadence: whenever API routes, contracts, or service integrations change.
