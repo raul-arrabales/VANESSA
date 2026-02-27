@@ -7,33 +7,25 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_PATH = PROJECT_ROOT / "backend"
+TESTS_PATH = PROJECT_ROOT / "tests"
 if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
+if str(TESTS_PATH) not in sys.path:
+    sys.path.insert(0, str(TESTS_PATH))
 
 from app.services import agent_engine_client  # noqa: E402
+from contract_fixtures import load_contract_fixture  # noqa: E402
 
 
-def _sample_execution() -> dict[str, object]:
-    return {
-        "id": "exec-1",
-        "status": "succeeded",
-        "agent_ref": "agent.alpha",
-        "agent_version": "v1",
-        "model_ref": None,
-        "runtime_profile": "offline",
-        "created_at": "2026-01-01T00:00:00+00:00",
-        "started_at": "2026-01-01T00:00:00+00:00",
-        "finished_at": "2026-01-01T00:00:01+00:00",
-        "result": {"output_text": "ok"},
-        "error": None,
-    }
+def _golden_success_payload() -> dict[str, object]:
+    return load_contract_fixture("agent_execution", "succeeded_execution.json")
 
 
 def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_engine_client,
         "_request_json",
-        lambda **_kwargs: ({"execution": _sample_execution()}, 201),
+        lambda **_kwargs: (_golden_success_payload(), 201),
     )
 
     payload, status = agent_engine_client.create_execution(
@@ -54,7 +46,7 @@ def test_get_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_engine_client,
         "_request_json",
-        lambda **_kwargs: ({"execution": _sample_execution()}, 200),
+        lambda **_kwargs: (_golden_success_payload(), 200),
     )
     payload, status = agent_engine_client.get_execution(
         base_url="http://agent_engine:7000",
@@ -80,3 +72,19 @@ def test_invalid_engine_payload_returns_error(monkeypatch: pytest.MonkeyPatch):
             runtime_profile="offline",
         )
     assert exc.value.code == "invalid_engine_response"
+
+
+def test_error_taxonomy_fixture_is_complete():
+    fixture = load_contract_fixture("agent_execution", "error_taxonomy.json")
+    expected_codes = {
+        "EXEC_POLICY_DENIED",
+        "EXEC_RUNTIME_PROFILE_BLOCKED",
+        "EXEC_AGENT_NOT_FOUND",
+        "EXEC_AGENT_VERSION_NOT_FOUND",
+        "EXEC_MODEL_NOT_ALLOWED",
+        "EXEC_TOOL_NOT_ALLOWED",
+        "EXEC_TIMEOUT",
+        "EXEC_UPSTREAM_UNAVAILABLE",
+        "EXEC_INTERNAL_ERROR",
+    }
+    assert set(fixture["codes"]) == expected_codes
