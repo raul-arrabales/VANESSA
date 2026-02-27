@@ -16,7 +16,8 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
-from app.routes import _registry_common as registry_common  # noqa: E402
+from app.routes import executions as executions_routes  # noqa: E402
+from app.routes import registry as registry_routes  # noqa: E402
 from app.routes import runtime as runtime_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
@@ -87,8 +88,9 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(backend_app_module, "find_user_by_identifier", user_store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
 
-    monkeypatch.setattr(registry_common, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(registry_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(runtime_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(executions_routes, "_database_url", lambda: "ignored")
 
     def _create_entity_with_version(
         _database_url: str,
@@ -165,13 +167,13 @@ def client(monkeypatch: pytest.MonkeyPatch):
         shares_by_entity.setdefault(entity["entity_id"], []).append(share)
         return share
 
-    monkeypatch.setattr(registry_common, "create_entity_with_version", _create_entity_with_version)
-    monkeypatch.setattr(registry_common, "list_entities", _list_entities)
-    monkeypatch.setattr(registry_common, "get_entity", _get_entity)
-    monkeypatch.setattr(registry_common, "get_entity_versions", _get_entity_versions)
-    monkeypatch.setattr(registry_common, "create_entity_version", _create_entity_version)
-    monkeypatch.setattr(registry_common, "grant_share", _grant_share)
-    monkeypatch.setattr(registry_common, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
+    monkeypatch.setattr(registry_routes, "create_entity_with_version", _create_entity_with_version)
+    monkeypatch.setattr(registry_routes, "list_entities", _list_entities)
+    monkeypatch.setattr(registry_routes, "get_entity", _get_entity)
+    monkeypatch.setattr(registry_routes, "get_entity_versions", _get_entity_versions)
+    monkeypatch.setattr(registry_routes, "create_entity_version", _create_entity_version)
+    monkeypatch.setattr(registry_routes, "grant_share", _grant_share)
+    monkeypatch.setattr(registry_routes, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
 
     monkeypatch.setattr(runtime_routes, "resolve_runtime_profile", lambda _db: "offline")
     monkeypatch.setattr(runtime_routes, "update_runtime_profile", lambda _db, *, profile, updated_by_user_id: profile)
@@ -258,15 +260,26 @@ def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch
     token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
 
     monkeypatch.setattr(
-        backend_app_module,
+        executions_routes,
         "_http_json_request",
         lambda url, payload: ({"execution": {"id": "exec-1", "agent_id": payload["agent_id"]}}, 201),
     )
     monkeypatch.setattr(
-        backend_app_module,
+        executions_routes,
         "_http_get_json",
         lambda url: ({"execution": {"id": "exec-1", "status": "succeeded"}}, 200),
     )
+    monkeypatch.setattr(
+        executions_routes,
+        "get_entity",
+        lambda _db, **kwargs: {
+            "entity_id": kwargs.get("entity_id", "agent.alpha"),
+            "owner_user_id": user["id"],
+            "current_spec": {"runtime_constraints": {"internet_required": False}, "tool_refs": []},
+        },
+    )
+    monkeypatch.setattr(executions_routes, "require_entity_permission", lambda **kwargs: None)
+    monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
 
     create_response = test_client.post(
         "/v1/agent-executions",

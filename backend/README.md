@@ -30,3 +30,8 @@ Agent execution proxy endpoints:
 
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
+
+Policy governance endpoints:
+
+- `POST /v1/policy/rules` (superadmin)
+- `GET /v1/policy/rules` (superadmin)

@@ -25,7 +25,7 @@ def _database_url() -> str:
     return get_auth_config().database_url
 
 
-@bp.get("/v1/registry/<any(model,agent,tool):entity_type>")
+@bp.get("/v1/registry/<entity_type>")
 @require_auth
 def list_entities_generic(entity_type: str):
     try:
@@ -35,7 +35,7 @@ def list_entities_generic(entity_type: str):
     return jsonify({"items": rows}), 200
 
 
-@bp.get("/v1/registry/<any(model,agent,tool):entity_type>/<entity_id>")
+@bp.get("/v1/registry/<entity_type>/<entity_id>")
 @require_auth
 def get_entity_generic(entity_type: str, entity_id: str):
     try:
@@ -48,7 +48,7 @@ def get_entity_generic(entity_type: str, entity_id: str):
     return jsonify({"entity": entity, "versions": get_entity_versions(_database_url(), entity_id=entity_id)}), 200
 
 
-@bp.post("/v1/registry/<any(model,agent,tool):entity_type>/<entity_id>/versions")
+@bp.post("/v1/registry/<entity_type>/<entity_id>/versions")
 @require_auth
 def create_entity_version_generic(entity_type: str, entity_id: str):
     payload = request.get_json(silent=True)
@@ -85,7 +85,7 @@ def create_entity_version_generic(entity_type: str, entity_id: str):
     return jsonify(created), 201
 
 
-@bp.post("/v1/registry/<any(model,agent,tool):entity_type>/<entity_id>/share")
+@bp.post("/v1/registry/<entity_type>/<entity_id>/share")
 @require_auth
 def share_entity_generic(entity_type: str, entity_id: str):
     payload = request.get_json(silent=True)
@@ -118,7 +118,7 @@ def share_entity_generic(entity_type: str, entity_id: str):
     return jsonify({"share": share}), 201
 
 
-@bp.get("/v1/registry/<any(model,agent,tool):entity_type>/<entity_id>/shares")
+@bp.get("/v1/registry/<entity_type>/<entity_id>/shares")
 @require_auth
 def list_shares_generic(entity_type: str, entity_id: str):
     entity = get_entity(_database_url(), entity_type=entity_type, entity_id=entity_id)
@@ -129,7 +129,7 @@ def list_shares_generic(entity_type: str, entity_id: str):
     return jsonify({"shares": rows}), 200
 
 
-@bp.post("/v1/registry/<any(model,agent,tool):entity_type>")
+@bp.post("/v1/registry/<entity_type>")
 @require_auth
 def create_entity_generic(entity_type: str):
     payload = request.get_json(silent=True)

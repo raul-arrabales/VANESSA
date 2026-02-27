@@ -27,6 +27,11 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
 
+## Policy Rule Management
+
+- `POST /v1/policy/rules` (superadmin)
+- `GET /v1/policy/rules` (superadmin)
+
 Canonical service notes: [`backend/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/backend/README.md).
 
 > Owner: Backend maintainers. Update cadence: whenever API routes, contracts, or service integrations change.
