@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Blueprint
+from flask import Blueprint, Response
 
 from ..authz import require_role
 
@@ -11,6 +11,14 @@ def _m():
     import app.app as backend_app_module
 
     return backend_app_module
+
+
+@bp.after_request
+def add_deprecation_headers(response: Response):
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-12-31T00:00:00Z"
+    response.headers["Link"] = '</v1/models/catalog>; rel="successor-version"'
+    return response
 
 
 @bp.get("/models/catalog")

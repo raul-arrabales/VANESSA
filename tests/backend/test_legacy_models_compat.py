@@ -16,7 +16,6 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
-from app.routes import model_catalog_v1 as model_catalog_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -64,8 +63,6 @@ class InMemoryUserStore:
 
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
-
     user_store = InMemoryUserStore(users={})
     config = AuthConfig(
         database_url="postgresql://ignored",
@@ -84,9 +81,33 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(backend_app_module, "create_user", user_store.create_user)
     monkeypatch.setattr(backend_app_module, "find_user_by_identifier", user_store.find_by_identifier)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
-    monkeypatch.setattr(backend_app_module, "discover_hf_models", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
-    monkeypatch.setattr(model_catalog_routes, "_config", lambda: config)
-    monkeypatch.setattr(model_catalog_routes, "discover_hf_models", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
+    monkeypatch.setattr(
+        backend_app_module,
+        "list_model_catalog",
+        lambda _db: [
+            {
+                "model_id": "compat-model",
+                "name": "Compat Model",
+                "provider": "huggingface",
+                "source_id": "org/model",
+                "local_path": "/models/llm/org--model",
+                "status": "available",
+                "metadata": {},
+                "created_at": None,
+                "updated_at": None,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        backend_app_module,
+        "_http_json_request",
+        lambda _url, _payload: ({"output": [{"content": [{"type": "text", "text": "hello"}]}]}, 200),
+    )
+    monkeypatch.setattr(
+        backend_app_module,
+        "list_effective_allowed_models",
+        lambda _db, *, user_id, org_id, group_id: [{"model_id": "compat-model", "provider": "local", "metadata": {}}],
+    )
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -101,7 +122,7 @@ def _login(client, identifier: str, password: str):
     return client.post("/auth/login", json={"identifier": identifier, "password": password})
 
 
-def test_discovery_blocked_in_offline_profile(client):
+def test_legacy_model_routes_still_work_with_deprecation_headers(client):
     test_client, user_store = client
     root = user_store.create_user(
         "ignored",
@@ -113,6 +134,26 @@ def test_discovery_blocked_in_offline_profile(client):
     )
     token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
 
-    response = test_client.get("/v1/models/discovery/huggingface?query=llama", headers=_auth(token))
-    assert response.status_code == 403
-    assert response.get_json()["error"] == "runtime_profile_blocks_internet"
+    catalog = test_client.get("/models/catalog", headers=_auth(token))
+    assert catalog.status_code == 200
+    assert catalog.headers.get("Deprecation") == "true"
+    assert catalog.headers.get("Sunset") == "2026-12-31T00:00:00Z"
+    assert catalog.get_json()["models"][0]["id"] == "compat-model"
+
+    # inference requires user role
+    user = user_store.create_user(
+        "ignored",
+        email="user@example.com",
+        username="user",
+        password_hash=hash_password("user-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    user_token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
+    inference = test_client.post(
+        "/inference",
+        headers=_auth(user_token),
+        json={"model": "compat-model", "prompt": "say hi"},
+    )
+    assert inference.status_code == 200
+    assert inference.headers.get("Deprecation") == "true"

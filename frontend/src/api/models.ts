@@ -117,7 +117,7 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
 }
 
 export async function listModelCatalog(token: string): Promise<ModelCatalogItem[]> {
-  const result = await requestJson<{ models: ModelCatalogItem[] }>("/models/catalog", { token });
+  const result = await requestJson<{ models: ModelCatalogItem[] }>("/v1/models/catalog", { token });
   return result.models;
 }
 
@@ -125,7 +125,7 @@ export async function createModelCatalogItem(
   payload: Omit<ModelCatalogItem, "id"> & { id?: string },
   token: string,
 ): Promise<ModelCatalogItem> {
-  const result = await requestJson<{ model: ModelCatalogItem }>("/models/catalog", {
+  const result = await requestJson<{ model: ModelCatalogItem }>("/v1/models/catalog", {
     method: "POST",
     token,
     body: payload,
@@ -144,13 +144,13 @@ export async function discoverHfModels(
   if (options.sort) params.set("sort", options.sort);
   if (options.limit) params.set("limit", String(options.limit));
   const query = params.toString();
-  const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/models/discovery/huggingface${query ? `?${query}` : ""}`, { token });
+  const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/v1/models/discovery/huggingface${query ? `?${query}` : ""}`, { token });
   return result.models;
 }
 
 export async function getHfModelDetails(sourceId: string, token: string): Promise<HfModelDetails> {
   const encoded = encodeURIComponent(sourceId);
-  const result = await requestJson<{ model: HfModelDetails }>(`/models/discovery/huggingface/${encoded}`, { token });
+  const result = await requestJson<{ model: HfModelDetails }>(`/v1/models/discovery/huggingface/${encoded}`, { token });
   return result.model;
 }
 
@@ -158,7 +158,7 @@ export async function startModelDownload(
   payload: { source_id: string; name?: string; allow_patterns?: string[]; ignore_patterns?: string[] },
   token: string,
 ): Promise<ModelDownloadJob> {
-  const result = await requestJson<{ job: ModelDownloadJob }>("/models/catalog/downloads", {
+  const result = await requestJson<{ job: ModelDownloadJob }>("/v1/models/downloads", {
     method: "POST",
     token,
     body: payload,
@@ -167,19 +167,19 @@ export async function startModelDownload(
 }
 
 export async function getDownloadJob(jobId: string, token: string): Promise<ModelDownloadJob> {
-  const result = await requestJson<{ job: ModelDownloadJob }>(`/models/catalog/downloads/${encodeURIComponent(jobId)}`, { token });
+  const result = await requestJson<{ job: ModelDownloadJob }>(`/v1/models/downloads/${encodeURIComponent(jobId)}`, { token });
   return result.job;
 }
 
 export async function listDownloadJobs(token: string, status?: string): Promise<ModelDownloadJob[]> {
   const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
-  const result = await requestJson<{ jobs: ModelDownloadJob[] }>(`/models/catalog/downloads${suffix}`, { token });
+  const result = await requestJson<{ jobs: ModelDownloadJob[] }>(`/v1/models/downloads${suffix}`, { token });
   return result.jobs;
 }
 
 export async function listModelAssignments(token: string): Promise<ModelScopeAssignment[]> {
   try {
-    const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/models/assignments", { token });
+    const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/v1/model-governance/assignments", { token });
     return result.assignments;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
@@ -194,7 +194,7 @@ export async function updateModelAssignment(
   modelIds: string[],
   token: string,
 ): Promise<ModelScopeAssignment> {
-  const result = await requestJson<{ assignment: ModelScopeAssignment }>("/models/assignments", {
+  const result = await requestJson<{ assignment: ModelScopeAssignment }>("/v1/model-governance/assignments", {
     method: "PUT",
     token,
     body: { scope, model_ids: modelIds },
@@ -213,7 +213,7 @@ export async function listEnabledModels(token: string): Promise<ModelCatalogItem
       model_id?: string;
       metadata?: { name?: string; description?: string };
     }>;
-  }>("/models/enabled", { token });
+  }>("/v1/model-governance/enabled", { token });
 
   return result.models.map((model) => {
     const fallbackId = model.model_id ?? "";
@@ -234,7 +234,7 @@ export async function runInference(
   token: string,
   history: ChatHistoryItem[] = [],
 ): Promise<InferenceResult> {
-  return requestJson<InferenceResult>("/inference", {
+  return requestJson<InferenceResult>("/v1/models/inference", {
     method: "POST",
     token,
     body: { prompt, model, history },

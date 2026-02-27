@@ -17,6 +17,8 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
+from app.routes import model_catalog_v1 as model_catalog_routes  # noqa: E402
+from app.routes import model_governance as model_governance_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -164,6 +166,10 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(backend_app_module, "create_model_catalog_item", _create_catalog)
     monkeypatch.setattr(backend_app_module, "upsert_model_catalog_item", _upsert_catalog)
     monkeypatch.setattr(backend_app_module, "get_model_catalog_item", lambda _db, model_id: catalog.get(model_id))
+    monkeypatch.setattr(model_catalog_routes, "list_model_catalog", _list_catalog)
+    monkeypatch.setattr(model_catalog_routes, "create_model_catalog_item", _create_catalog)
+    monkeypatch.setattr(model_catalog_routes, "upsert_model_catalog_item", _upsert_catalog)
+    monkeypatch.setattr(model_catalog_routes, "_config", lambda: config)
 
     monkeypatch.setattr(backend_app_module, "list_scope_assignments", lambda _db: [{"scope": k, "model_ids": v} for k, v in assignments.items()])
     monkeypatch.setattr(
@@ -171,6 +177,13 @@ def client(monkeypatch: pytest.MonkeyPatch):
         "upsert_scope_assignment",
         lambda _db, *, scope, model_ids, updated_by_user_id: {"scope": scope, "model_ids": model_ids},
     )
+    monkeypatch.setattr(model_governance_routes, "list_scope_assignments", lambda _db: [{"scope": k, "model_ids": v} for k, v in assignments.items()])
+    monkeypatch.setattr(
+        model_governance_routes,
+        "upsert_scope_assignment",
+        lambda _db, *, scope, model_ids, updated_by_user_id: {"scope": scope, "model_ids": model_ids},
+    )
+    monkeypatch.setattr(model_governance_routes, "_database_url", lambda: "ignored")
 
     monkeypatch.setattr(
         backend_app_module,
@@ -180,7 +193,24 @@ def client(monkeypatch: pytest.MonkeyPatch):
         ],
     )
     monkeypatch.setattr(
+        model_catalog_routes,
+        "discover_hf_models",
+        lambda **kwargs: [
+            {"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama-3-8B-Instruct", "downloads": 10, "likes": 1, "tags": ["text-generation"], "provider": "huggingface"}
+        ],
+    )
+    monkeypatch.setattr(
         backend_app_module,
+        "get_hf_model_details",
+        lambda source_id, token=None: {
+            "source_id": source_id,
+            "name": source_id.split("/")[-1],
+            "tags": ["text-generation"],
+            "files": [{"path": "config.json", "size": 123}],
+        },
+    )
+    monkeypatch.setattr(
+        model_catalog_routes,
         "get_hf_model_details",
         lambda source_id, token=None: {
             "source_id": source_id,
@@ -212,6 +242,10 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(backend_app_module, "create_download_job", _create_job)
     monkeypatch.setattr(backend_app_module, "get_download_job", lambda _db, job_id: jobs.get(job_id))
     monkeypatch.setattr(backend_app_module, "list_download_jobs", lambda _db, status=None, limit=50: list(jobs.values()))
+    monkeypatch.setattr(model_catalog_routes, "create_download_job", _create_job)
+    monkeypatch.setattr(model_catalog_routes, "get_download_job", lambda _db, job_id: jobs.get(job_id))
+    monkeypatch.setattr(model_catalog_routes, "list_download_jobs", lambda _db, status=None, limit=50: list(jobs.values()))
+    monkeypatch.setattr(model_catalog_routes, "ensure_download_worker_started", lambda: None)
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -239,34 +273,34 @@ def test_superadmin_catalog_discovery_and_download_apis(client):
     token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
 
     created = test_client.post(
-        "/models/catalog",
+        "/v1/models/catalog",
         headers=_auth(token),
         json={"id": "llama-3-8b", "name": "Llama 3 8B", "provider": "huggingface", "source_id": "meta-llama/Llama-3-8B-Instruct"},
     )
     assert created.status_code == 201
     assert created.get_json()["model"]["id"] == "llama-3-8b"
 
-    listed = test_client.get("/models/catalog", headers=_auth(token))
+    listed = test_client.get("/v1/models/catalog", headers=_auth(token))
     assert listed.status_code == 200
     assert listed.get_json()["models"][0]["id"] == "llama-3-8b"
 
-    discovered = test_client.get("/models/discovery/huggingface?query=llama", headers=_auth(token))
+    discovered = test_client.get("/v1/models/discovery/huggingface?query=llama", headers=_auth(token))
     assert discovered.status_code == 200
     assert discovered.get_json()["models"][0]["source_id"] == "meta-llama/Llama-3-8B-Instruct"
 
-    details = test_client.get("/models/discovery/huggingface/meta-llama/Llama-3-8B-Instruct", headers=_auth(token))
+    details = test_client.get("/v1/models/discovery/huggingface/meta-llama/Llama-3-8B-Instruct", headers=_auth(token))
     assert details.status_code == 200
     assert details.get_json()["model"]["source_id"] == "meta-llama/Llama-3-8B-Instruct"
 
     download = test_client.post(
-        "/models/catalog/downloads",
+        "/v1/models/downloads",
         headers=_auth(token),
         json={"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama 3 8B"},
     )
     assert download.status_code == 202
     job_id = download.get_json()["job"]["job_id"]
 
-    fetched = test_client.get(f"/models/catalog/downloads/{job_id}", headers=_auth(token))
+    fetched = test_client.get(f"/v1/models/downloads/{job_id}", headers=_auth(token))
     assert fetched.status_code == 200
     assert fetched.get_json()["job"]["source_id"] == "meta-llama/Llama-3-8B-Instruct"
 
@@ -293,7 +327,7 @@ def test_admin_can_manage_assignments_but_user_cannot(client):
     user_token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
 
     updated = test_client.put(
-        "/models/assignments",
+        "/v1/model-governance/assignments",
         headers=_auth(admin_token),
         json={"scope": "user", "model_ids": ["model-a", "model-b"]},
     )
@@ -301,7 +335,7 @@ def test_admin_can_manage_assignments_but_user_cannot(client):
     assert updated.get_json()["assignment"]["scope"] == "user"
 
     forbidden = test_client.put(
-        "/models/assignments",
+        "/v1/model-governance/assignments",
         headers=_auth(user_token),
         json={"scope": "user", "model_ids": ["model-a"]},
     )

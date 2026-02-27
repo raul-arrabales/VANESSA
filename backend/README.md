@@ -26,6 +26,29 @@ Unified registry and runtime governance endpoints:
 - `GET /v1/runtime/profile`
 - `PUT /v1/runtime/profile` (superadmin)
 
+Model governance and runtime endpoints (canonical in Release N):
+
+- `GET /v1/models/catalog`
+- `POST /v1/models/catalog`
+- `GET /v1/models/discovery/huggingface`
+- `GET /v1/models/discovery/huggingface/{source_id}`
+- `POST /v1/models/downloads`
+- `GET /v1/models/downloads`
+- `GET /v1/models/downloads/{id}`
+- `GET /v1/model-governance/assignments`
+- `PUT /v1/model-governance/assignments`
+- `POST /v1/model-governance/access-assignments`
+- `GET /v1/model-governance/allowed`
+- `GET /v1/model-governance/enabled`
+- `POST /v1/models/inference`
+- `POST /v1/models/generate`
+
+Legacy model endpoints remain available in Release N with deprecation headers:
+
+- `/models/*`
+- `/inference`
+- `/llm/generate`
+
 Agent execution proxy endpoints:
 
 - `POST /v1/agent-executions`

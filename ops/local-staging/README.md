@@ -222,7 +222,11 @@ Use the targeted restart script when only one service changed:
   - Verify backend sees the token:
     `docker compose -f infra/docker-compose.yml exec -T backend env | grep '^HF_TOKEN='`
   - Confirm `MODEL_STORAGE_ROOT=/models/llm` and backend has write access to `models/llm/` on host.
-  - Check backend logs for `/models/catalog/downloads` job failure details.
+  - Check backend logs for `/v1/models/downloads` job failure details.
+
+Release N API note:
+- Canonical model endpoints are under `/v1/models/*` and `/v1/model-governance/*`.
+- Legacy `/models/*`, `/inference`, and `/llm/generate` remain temporarily as deprecated compatibility endpoints and are planned for removal in the next release.
 - `kws` fails at startup:
   - Confirm `/dev/snd` exists and Docker can map audio devices.
   - Confirm `models/kws/` and `models/kws/custom/` exist.

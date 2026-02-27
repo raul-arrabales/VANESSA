@@ -16,6 +16,8 @@ if str(BACKEND_PATH) not in sys.path:
 import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
+from app.routes import model_governance as model_governance_routes  # noqa: E402
+from app.routes import registry as registry_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 
@@ -185,6 +187,51 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         backend_app_module, "list_effective_allowed_models", model_store.effective
     )
+    monkeypatch.setattr(model_governance_routes, "find_model_definition", model_store.find_model)
+    monkeypatch.setattr(model_governance_routes, "assign_model_access", model_store.assign)
+    monkeypatch.setattr(model_governance_routes, "list_effective_allowed_models", model_store.effective)
+    monkeypatch.setattr(model_governance_routes, "_database_url", lambda: "ignored")
+    monkeypatch.setattr(registry_routes, "_database_url", lambda: "ignored")
+
+    def _create_entity_with_version(
+        _database_url: str,
+        *,
+        entity_type: str,
+        entity_id: str,
+        owner_user_id: int,
+        visibility: str,
+        spec: dict[str, Any],
+        version: str,
+        publish: bool,
+    ) -> dict[str, Any]:
+        if entity_type not in {"model", "models"}:
+            raise ValueError("invalid_entity_type")
+        created = model_store.register_model(
+            "ignored",
+            model_id=entity_id,
+            provider=str(spec.get("provider", "hf-local")),
+            metadata=spec.get("metadata") if isinstance(spec.get("metadata"), dict) else {},
+            provider_config_ref=(
+                str(spec.get("provider_config_ref")).strip()
+                if spec.get("provider_config_ref") is not None
+                else None
+            ),
+            created_by_user_id=owner_user_id,
+        )
+        return {
+            "entity": {
+                "entity_id": entity_id,
+                "entity_type": "model",
+                "owner_user_id": owner_user_id,
+                "visibility": visibility,
+                "status": "published" if publish else "draft",
+                "current_version": version,
+                "current_spec": spec,
+            },
+            "version": {"entity_id": entity_id, "version": version, "spec_json": created},
+        }
+
+    monkeypatch.setattr(registry_routes, "create_entity_with_version", _create_entity_with_version)
 
     app.config.update(TESTING=True)
     with app.test_client() as test_client:
@@ -228,22 +275,27 @@ def test_superadmin_can_register_model_and_admin_cannot(client):
     ]
 
     created = test_client.post(
-        "/models/registry",
+        "/v1/registry/models",
         headers=_auth(super_token),
         json={
-            "model_id": "gpt-private-1",
-            "provider": "hf-local",
-            "metadata": {"family": "gpt"},
-            "provider_config_ref": "providers/hf-local/main",
+            "id": "gpt-private-1",
+            "version": "v1",
+            "visibility": "private",
+            "publish": True,
+            "spec": {
+                "provider": "hf-local",
+                "metadata": {"family": "gpt"},
+                "provider_config_ref": "providers/hf-local/main",
+            },
         },
     )
     assert created.status_code == 201
-    assert created.get_json()["model"]["model_id"] == "gpt-private-1"
+    assert created.get_json()["entity"]["entity_id"] == "gpt-private-1"
 
     forbidden = test_client.post(
-        "/models/registry",
+        "/v1/registry/models",
         headers=_auth(admin_token),
-        json={"model_id": "gpt-private-2", "provider": "hf-local"},
+        json={"id": "gpt-private-2", "spec": {"provider": "hf-local"}},
     )
     assert forbidden.status_code == 403
 
@@ -292,7 +344,7 @@ def test_admin_can_assign_model_access_but_user_cannot_manage(client):
     ]
 
     assigned = test_client.post(
-        "/models/access-assignments",
+        "/v1/model-governance/access-assignments",
         headers=_auth(admin_token),
         json={
             "model_id": "gpt-private-allowed",
@@ -303,7 +355,7 @@ def test_admin_can_assign_model_access_but_user_cannot_manage(client):
     assert assigned.status_code == 201
 
     forbidden_manage = test_client.post(
-        "/models/access-assignments",
+        "/v1/model-governance/access-assignments",
         headers=_auth(user_token),
         json={
             "model_id": "gpt-private-allowed",
@@ -368,7 +420,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     ]
 
     test_client.post(
-        "/models/access-assignments",
+        "/v1/model-governance/access-assignments",
         headers=_auth(admin_token),
         json={
             "model_id": "allowed-model",
@@ -377,7 +429,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
         },
     )
 
-    allowed = test_client.get("/models/allowed", headers=_auth(user_token))
+    allowed = test_client.get("/v1/model-governance/allowed", headers=_auth(user_token))
     assert allowed.status_code == 200
     assert [m["model_id"] for m in allowed.get_json()["models"]] == ["allowed-model"]
 
@@ -393,7 +445,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     monkeypatch.setattr(backend_app_module, "_http_json_request", fake_llm_request)
 
     permitted = test_client.post(
-        "/llm/generate",
+        "/v1/models/generate",
         headers=_auth(user_token),
         json={"model_id": "allowed-model", "prompt": "hello"},
     )
@@ -403,7 +455,7 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     assert seen_url.endswith(":8000/v1/chat/completions")
 
     forbidden = test_client.post(
-        "/llm/generate",
+        "/v1/models/generate",
         headers=_auth(user_token),
         json={"model_id": "blocked-model", "prompt": "hello"},
     )
