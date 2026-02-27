@@ -1,0 +1,31 @@
+site_name: VANESSA Documentation
+site_url: https://<org-or-user>.github.io/VANESSA/
+repo_url: https://github.com/<org-or-user>/VANESSA
+repo_name: <org-or-user>/VANESSA
+
+theme:
+  name: material
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - tables
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Setup: setup.md
+  - Local Staging: local-staging.md
+  - Services:
+      - Backend (Flask API): services/backend.md
+      - Agent Engine: services/agent-engine.md
+      - Sandbox: services/sandbox.md
+      - KWS: services/kws.md
+      - Infrastructure: services/infra.md
+      - Models: services/models.md
+  - Testing: testing.md
+  - Security/Secrets: security-secrets.md
+  - Contributing: contributing.md

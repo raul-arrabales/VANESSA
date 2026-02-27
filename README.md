@@ -13,6 +13,21 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Weaviate vector store
 - PostgreSQL database
 
+## Documentation Site
+
+Project documentation is published to GitHub Pages:
+
+- URL: `https://<org-or-user>.github.io/VANESSA/`
+- Deployment: automatic on `main` pushes for docs-related changes and manual via Actions `workflow_dispatch`
+
+Local docs authoring:
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve
+mkdocs build --strict
+```
+
 ## Local Staging-Like Manual Testing
 
 Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflow:

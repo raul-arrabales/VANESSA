@@ -12,3 +12,6 @@ models/llm/
 *.safetensors
 *.bin
 *.pt
+
+# MkDocs build output
+site/
