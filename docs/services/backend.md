@@ -52,6 +52,8 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
   - `AGENT_ENGINE_SERVICE_TOKEN`
   - `AGENT_EXECUTION_VIA_ENGINE`
   - `AGENT_EXECUTION_FALLBACK`
+- `AGENT_EXECUTION_FALLBACK=true` applies only to engine transport failures and returns
+  deterministic `503 EXEC_UPSTREAM_UNAVAILABLE`; backend does not run local execution.
 
 ## Policy Rule Management
 

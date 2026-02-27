@@ -220,6 +220,9 @@ Use the targeted restart script when only one service changed:
 - Agent execution returns `agent_engine_unreachable` or `invalid_service_token`:
   - Ensure backend and agent engine share the same `AGENT_ENGINE_SERVICE_TOKEN`.
   - Confirm backend can reach `AGENT_ENGINE_URL` and agent engine exposes `/v1/internal/agent-executions`.
+  - With `AGENT_EXECUTION_FALLBACK=false`, transport failures are returned directly (for example `502 agent_engine_unreachable`).
+  - With `AGENT_EXECUTION_FALLBACK=true`, backend returns deterministic
+    `503 EXEC_UPSTREAM_UNAVAILABLE` with `details.fallback_applied=true`.
 - `llm_runtime` fails to start:
   - Ensure local model files exist under `models/llm/`.
   - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.

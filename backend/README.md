@@ -57,6 +57,9 @@ Execution routing notes:
 - Internal calls include `X-Service-Token` and `X-Request-Id`.
 - Use `AGENT_ENGINE_SERVICE_TOKEN` to configure shared service auth.
 - Use `AGENT_EXECUTION_VIA_ENGINE` to enable/disable execution forwarding.
+- `AGENT_EXECUTION_FALLBACK=true` enables deterministic `503 EXEC_UPSTREAM_UNAVAILABLE`
+  only for engine transport failures (unreachable/timeout). Backend still does not execute
+  agents locally.
 
 Policy governance endpoints:
 

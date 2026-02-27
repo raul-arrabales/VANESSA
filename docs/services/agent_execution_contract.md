@@ -62,3 +62,26 @@
 - `EXEC_UPSTREAM_UNAVAILABLE`
 - `EXEC_INTERNAL_ERROR`
 
+## Fallback Behavior (`AGENT_EXECUTION_FALLBACK`)
+
+When backend execution fallback is enabled (`AGENT_EXECUTION_FALLBACK=true`), backend still does not execute agents locally.
+Fallback applies only to engine transport failures (for example unreachable service or timeout).
+
+Response:
+
+- Status: `503`
+- Payload:
+
+```json
+{
+  "error": "EXEC_UPSTREAM_UNAVAILABLE",
+  "message": "Agent execution service is temporarily unavailable",
+  "details": {
+    "operation": "create_execution",
+    "fallback_applied": true,
+    "request_id": "request-id"
+  }
+}
+```
+
+`operation` is `create_execution` for `POST /v1/agent-executions` and `get_execution` for `GET /v1/agent-executions/{id}`.

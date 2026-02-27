@@ -239,3 +239,144 @@ def test_get_agent_execution_proxy(client, monkeypatch: pytest.MonkeyPatch):
     response = test_client.get("/v1/agent-executions/exec-5", headers=_auth(token))
     assert response.status_code == 200
     assert response.get_json()["execution"]["id"] == "exec-5"
+
+
+def test_fallback_enabled_create_unreachable_returns_deterministic_503(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u6@example.com",
+        username="u6",
+        password_hash=hash_password("u6-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u6-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: True)
+    monkeypatch.setattr(executions_routes, "_request_id", lambda: "req-create-fallback")
+
+    def _create_execution(**_kwargs):
+        raise AgentEngineClientError(
+            code="agent_engine_unreachable",
+            message="Agent engine unavailable",
+            status_code=502,
+        )
+
+    monkeypatch.setattr(executions_routes, "create_execution", _create_execution)
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.local", "input": {"prompt": "hello"}},
+    )
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "EXEC_UPSTREAM_UNAVAILABLE"
+    assert payload["details"]["fallback_applied"] is True
+    assert payload["details"]["operation"] == "create_execution"
+    assert payload["details"]["request_id"] == "req-create-fallback"
+
+
+def test_fallback_enabled_get_timeout_returns_deterministic_503(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u7@example.com",
+        username="u7",
+        password_hash=hash_password("u7-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u7-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: True)
+    monkeypatch.setattr(executions_routes, "_request_id", lambda: "req-get-fallback")
+    monkeypatch.setattr(
+        executions_routes,
+        "get_execution",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AgentEngineClientError(
+                code="EXEC_TIMEOUT",
+                message="timeout",
+                status_code=504,
+            )
+        ),
+    )
+
+    response = test_client.get("/v1/agent-executions/exec-timeout", headers=_auth(token))
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error"] == "EXEC_UPSTREAM_UNAVAILABLE"
+    assert payload["details"]["fallback_applied"] is True
+    assert payload["details"]["operation"] == "get_execution"
+    assert payload["details"]["request_id"] == "req-get-fallback"
+
+
+def test_fallback_enabled_does_not_mask_403_policy_denial(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u8@example.com",
+        username="u8",
+        password_hash=hash_password("u8-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u8-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: True)
+    monkeypatch.setattr(
+        executions_routes,
+        "create_execution",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AgentEngineClientError(
+                code="EXEC_POLICY_DENIED",
+                message="Denied",
+                status_code=403,
+            )
+        ),
+    )
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.local", "input": {}},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "EXEC_POLICY_DENIED"
+
+
+def test_fallback_disabled_preserves_upstream_unreachable_mapping(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u9@example.com",
+        username="u9",
+        password_hash=hash_password("u9-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u9-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: False)
+    monkeypatch.setattr(
+        executions_routes,
+        "create_execution",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AgentEngineClientError(
+                code="agent_engine_unreachable",
+                message="Agent engine unavailable",
+                status_code=502,
+            )
+        ),
+    )
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.local", "input": {}},
+    )
+    assert response.status_code == 502
+    payload = response.get_json()
+    assert payload["error"] == "agent_engine_unreachable"

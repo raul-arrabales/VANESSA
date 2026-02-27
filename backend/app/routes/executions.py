@@ -41,6 +41,33 @@ def _request_id() -> str:
     return header_value or str(uuid4())
 
 
+def _fallback_enabled() -> bool:
+    return bool(_config().agent_execution_fallback)
+
+
+def _is_transport_failure(exc: AgentEngineClientError) -> bool:
+    if exc.code in {"agent_engine_unreachable", "EXEC_TIMEOUT"}:
+        return True
+    return int(exc.status_code) in {502, 503, 504}
+
+
+def _fallback_unavailable_response(*, request_id: str, operation: str):
+    return (
+        jsonify(
+            {
+                "error": "EXEC_UPSTREAM_UNAVAILABLE",
+                "message": "Agent execution service is temporarily unavailable",
+                "details": {
+                    "operation": operation,
+                    "fallback_applied": True,
+                    "request_id": request_id,
+                },
+            }
+        ),
+        503,
+    )
+
+
 @bp.post("/v1/agent-executions")
 @require_role("user")
 def create_agent_execution():
@@ -61,11 +88,12 @@ def create_agent_execution():
     org_id = str(payload.get("org_id", "")).strip() or None
     group_id = str(payload.get("group_id", "")).strip() or None
 
+    request_id = _request_id()
     try:
         response_payload, status_code = create_execution(
             base_url=_agent_engine_url(),
             service_token=_agent_engine_service_token(),
-            request_id=_request_id(),
+            request_id=request_id,
             agent_id=agent_id,
             execution_input=execution_input if isinstance(execution_input, dict) else {},
             requested_by_user_id=int(g.current_user["id"]),
@@ -75,6 +103,11 @@ def create_agent_execution():
             group_id=group_id,
         )
     except AgentEngineClientError as exc:
+        if _fallback_enabled() and _is_transport_failure(exc):
+            return _fallback_unavailable_response(
+                request_id=request_id,
+                operation="create_execution",
+            )
         if exc.status_code >= 500:
             return _json_error(exc.status_code, exc.code, exc.message)
         return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
@@ -88,14 +121,20 @@ def get_agent_execution(execution_id: str):
     if not execution_id.strip():
         return _json_error(400, "invalid_execution_id", "execution_id is required")
 
+    request_id = _request_id()
     try:
         response_payload, status_code = get_execution(
             base_url=_agent_engine_url(),
             service_token=_agent_engine_service_token(),
-            request_id=_request_id(),
+            request_id=request_id,
             execution_id=execution_id.strip(),
         )
     except AgentEngineClientError as exc:
+        if _fallback_enabled() and _is_transport_failure(exc):
+            return _fallback_unavailable_response(
+                request_id=request_id,
+                operation="get_execution",
+            )
         if exc.status_code >= 500:
             return _json_error(exc.status_code, exc.code, exc.message)
         return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
