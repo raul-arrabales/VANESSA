@@ -204,12 +204,3 @@ def append_audit_event(
             """,
             (actor_user_id, event_type.strip(), target_type.strip(), target_id.strip(), Jsonb(payload)),
         )
-
-
-def get_model_by_id(database_url: str, model_id: str) -> dict[str, Any] | None:
-    with get_connection(database_url) as connection:
-        row = connection.execute(
-            "SELECT * FROM model_registry WHERE model_id = %s",
-            (model_id.strip(),),
-        ).fetchone()
-    return dict(row) if row else None

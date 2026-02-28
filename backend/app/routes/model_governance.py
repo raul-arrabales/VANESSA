@@ -5,7 +5,7 @@ from flask import Blueprint, g, jsonify, request
 from ..authz import require_role
 from ..config import get_auth_config
 from ..repositories.model_assignments import list_scope_assignments, upsert_scope_assignment
-from ..repositories.model_access import assign_model_access, find_model_definition
+from ..repositories.model_access import assign_model_access, find_model_definition, list_effective_allowed_models
 from ..services.model_resolution import list_models_for_user
 
 bp = Blueprint("model_governance_v1", __name__)

@@ -40,13 +40,11 @@ export default function SettingsPage(): JSX.Element {
                 )}
               </div>
             </section>
-            <section className="card-stack" aria-label={t("settings.modelAccess.navigation.ariaLabel")}>
-              <h3 className="section-title">{t("settings.modelAccess.navigation.title")}</h3>
-              <p className="status-text">{t("settings.modelAccess.navigation.description")}</p>
+            <section className="card-stack" aria-label="Model access settings">
+              <h3 className="section-title">Model access</h3>
+              <p className="status-text">Manage your provider credentials and register models available to your account.</p>
               <div className="button-row">
-                <Link to="/settings/model-access" className="btn btn-secondary">
-                  {t("settings.modelAccess.navigation.openButton")}
-                </Link>
+                <Link to="/settings/model-access" className="btn btn-secondary">Open model access</Link>
               </div>
             </section>
           </article>

@@ -81,15 +81,15 @@ describe("ModelAccessPage", () => {
 
     await screen.findByText("My key · openai_compatible · ****1234");
 
-    await user.type(screen.getByLabelText("settings.modelAccess.credentials.apiKeyLabel"), "sk-test-key");
-    await user.click(screen.getByRole("button", { name: "settings.modelAccess.credentials.saveButton" }));
+    await user.type(screen.getByLabelText("API key"), "sk-test-key");
+    await user.click(screen.getByRole("button", { name: "Save credential" }));
     expect(modelApiMocks.createModelCredential).toHaveBeenCalled();
 
-    await user.type(screen.getByLabelText("settings.modelAccess.models.modelIdLabel"), "gpt-private");
-    await user.type(screen.getByLabelText("settings.modelAccess.models.modelNameLabel"), "GPT Private");
-    await user.type(screen.getByLabelText("settings.modelAccess.models.providerModelIdLabel"), "gpt-4.1");
-    await user.selectOptions(screen.getByLabelText("settings.modelAccess.models.credentialLabel"), "cred-1");
-    await user.click(screen.getByRole("button", { name: "settings.modelAccess.models.registerButton" }));
+    await user.type(screen.getByLabelText("Model id"), "gpt-private");
+    await user.type(screen.getByLabelText("Model name"), "GPT Private");
+    await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
+    await user.selectOptions(screen.getByLabelText("Credential"), "cred-1");
+    await user.click(screen.getByRole("button", { name: "Register model" }));
 
     expect(modelApiMocks.registerManagedModel).toHaveBeenCalled();
   });
