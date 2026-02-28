@@ -22,6 +22,16 @@ vi.mock("./auth/AuthProvider", () => ({
   }),
 }));
 
+
+vi.mock("./runtime/RuntimeModeProvider", () => ({
+  useRuntimeMode: () => ({
+    mode: "offline",
+    isLoading: false,
+    isSaving: false,
+    error: "",
+    setMode: vi.fn(),
+  }),
+}));
 vi.mock("./api/models", () => ({
   listModelCatalog: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4" }]),
   listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),

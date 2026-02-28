@@ -4,6 +4,7 @@ import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
 import { RequireAuth, RequireRole } from "./auth/RouteGuards";
 import { getDefaultRouteForRole } from "./auth/roles";
+import { useRuntimeMode } from "./runtime/RuntimeModeProvider";
 import AdminApprovalsPage from "./pages/AdminApprovalsPage";
 import AdminWelcomePage from "./pages/AdminWelcomePage";
 import HomePage from "./pages/HomePage";
@@ -39,6 +40,7 @@ const breadcrumbSegmentConfig: Record<string, BreadcrumbSegmentConfig> = {
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
+  const { mode, isLoading: isRuntimeLoading, isSaving: isRuntimeSaving, error: runtimeError, setMode } = useRuntimeMode();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
@@ -46,6 +48,9 @@ function AppHeader(): JSX.Element {
   const welcomeLabelKey = user?.role ? `nav.welcome.${user.role}` : "nav.welcome.user";
   const welcomeRoute = user?.role ? getDefaultRouteForRole(user.role) : "/welcome/user";
   const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
+  const runtimeModeLabel = mode ? t(`runtimeMode.${mode === "air_gapped" ? "airGapped" : mode}`) : "--";
+  const canUpdateRuntimeMode = user?.role === "superadmin";
+  const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLoading || isRuntimeSaving || !mode;
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent): void => {
@@ -84,6 +89,23 @@ function AppHeader(): JSX.Element {
             <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>
           )}
         </nav>
+        <button
+          type="button"
+          className="link-chip"
+          disabled={isRuntimeToggleDisabled}
+          title={canUpdateRuntimeMode ? t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel }) : t("runtimeMode.permissionDenied")}
+          aria-label={t("runtimeMode.toggleLabel")}
+          onClick={() => {
+            if (!mode || isRuntimeToggleDisabled) {
+              return;
+            }
+
+            const nextMode = mode === "offline" ? "air_gapped" : mode === "air_gapped" ? "online" : "offline";
+            void setMode(nextMode);
+          }}
+        >
+          {t("runtimeMode.toggleLabel")}: {runtimeModeLabel}
+        </button>
         <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
           <button
             type="button"
@@ -121,6 +143,7 @@ function AppHeader(): JSX.Element {
             </div>
           )}
         </div>
+        {runtimeError && <p className="status-text">{runtimeError === "runtimeMode.updateFailed" ? t("runtimeMode.updateFailed") : runtimeError}</p>}
       </div>
     </header>
   );

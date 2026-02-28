@@ -293,5 +293,14 @@
       "assignmentSaved": "Asignacion de modelos guardada para {{scope}}.",
       "assignmentFailed": "No se pudieron actualizar las asignaciones de modelos."
     }
+  },
+  "runtimeMode": {
+    "toggleLabel": "Modo de ejecución",
+    "toggleTooltip": "Modo de ejecución actual: {{mode}}",
+    "online": "En línea",
+    "offline": "Sin conexión",
+    "airGapped": "Aislado",
+    "permissionDenied": "Solo los superadministradores pueden cambiar el modo de ejecución.",
+    "updateFailed": "No se pudo actualizar el modo de ejecución."
   }
 }

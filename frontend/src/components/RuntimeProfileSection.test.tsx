@@ -2,8 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RuntimeProfileSection from "./RuntimeProfileSection";
 
-const fetchRuntimeProfile = vi.fn();
-const updateRuntimeProfile = vi.fn();
+const setMode = vi.fn();
 
 let mockRole: "user" | "superadmin" = "user";
 
@@ -16,21 +15,23 @@ vi.mock("../auth/AuthProvider", () => ({
       role: mockRole,
       is_active: true,
     },
-    token: "token",
   }),
 }));
 
-vi.mock("../auth/authApi", () => ({
-  ApiError: class extends Error {},
-  fetchRuntimeProfile: (...args: unknown[]) => fetchRuntimeProfile(...args),
-  updateRuntimeProfile: (...args: unknown[]) => updateRuntimeProfile(...args),
+vi.mock("../runtime/RuntimeModeProvider", () => ({
+  useRuntimeMode: () => ({
+    mode: "offline",
+    isLoading: false,
+    isSaving: false,
+    error: "",
+    setMode,
+  }),
 }));
 
 describe("RuntimeProfileSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchRuntimeProfile.mockResolvedValue({ profile: "offline" });
-    updateRuntimeProfile.mockResolvedValue({ profile: "online" });
+    setMode.mockResolvedValue("online");
     mockRole = "user";
   });
 
@@ -45,9 +46,8 @@ describe("RuntimeProfileSection", () => {
     mockRole = "superadmin";
     render(<RuntimeProfileSection />);
 
-    await waitFor(() => expect(fetchRuntimeProfile).toHaveBeenCalledWith("token"));
     fireEvent.click(screen.getByRole("radio", { name: "settings.runtime.options.online" }));
 
-    await waitFor(() => expect(updateRuntimeProfile).toHaveBeenCalledWith("online", "token"));
+    await waitFor(() => expect(setMode).toHaveBeenCalledWith("online"));
   });
 });
