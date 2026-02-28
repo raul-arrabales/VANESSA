@@ -112,15 +112,23 @@ def assign_access_v1():
 @bp.get("/v1/model-governance/allowed")
 @require_role("user")
 def list_allowed_models_v1():
-    org_id = str(request.args.get("org_id", "")).strip() or None
-    group_id = str(request.args.get("group_id", "")).strip() or None
-    models = list_effective_allowed_models(
+    runtime_profile, models = list_models_for_user(
         _database_url(),
         user_id=int(g.current_user["id"]),
-        org_id=org_id,
-        group_id=group_id,
     )
-    return jsonify({"models": [_serialize_model_definition(model) for model in models]}), 200
+    normalized = [
+        {
+            "model_id": str(model.get("model_id", "")),
+            "provider": model.get("provider"),
+            "metadata": model.get("metadata") or {},
+            "provider_config_ref": model.get("provider_config_ref"),
+            "backend_kind": model.get("backend_kind"),
+            "availability": model.get("availability"),
+            "origin_scope": model.get("origin_scope"),
+        }
+        for model in models
+    ]
+    return jsonify({"models": normalized, "runtime_profile": runtime_profile}), 200
 
 
 @bp.get("/v1/model-governance/enabled")
