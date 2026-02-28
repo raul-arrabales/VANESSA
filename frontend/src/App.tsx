@@ -11,6 +11,7 @@ import HomePage from "./pages/HomePage";
 import ChatbotPage from "./pages/ChatbotPage";
 import BackendHealthPage from "./pages/BackendHealthPage";
 import LoginPage from "./pages/LoginPage";
+import ModelAccessPage from "./pages/ModelAccessPage";
 import RegisterPage from "./pages/RegisterPage";
 import SettingsPage from "./pages/SettingsPage";
 import StyleGuidePage from "./pages/StyleGuidePage";
@@ -34,6 +35,7 @@ const breadcrumbSegmentConfig: Record<string, BreadcrumbSegmentConfig> = {
   models: { labelKey: "nav.breadcrumbs.models" },
   register: { labelKey: "nav.register" },
   settings: { labelKey: "nav.settings" },
+  "model-access": { labelKey: "Model access" },
   welcome: { labelKey: "nav.breadcrumbs.welcome" },
 };
 
@@ -316,6 +318,10 @@ export default function App(): JSX.Element {
                 <StyleGuidePage />
               </RequireRole>
             )}
+          />
+          <Route
+            path="model-access"
+            element={<ModelAccessPage />}
           />
         </Route>
         <Route

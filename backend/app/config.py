@@ -37,6 +37,7 @@ class BackendRuntimeConfig:
 class AuthConfig:
     database_url: str
     jwt_secret: str
+    model_credentials_encryption_key: str
     jwt_algorithm: str
     access_token_ttl_seconds: int
     allow_self_register: bool
@@ -139,6 +140,9 @@ def get_auth_config() -> AuthConfig:
     return AuthConfig(
         database_url=database_url,
         jwt_secret=jwt_secret,
+        model_credentials_encryption_key=(
+            os.getenv("MODEL_CREDENTIALS_ENCRYPTION_KEY", "").strip() or jwt_secret
+        ),
         jwt_algorithm=os.getenv("AUTH_JWT_ALGORITHM", "HS256").strip() or "HS256",
         access_token_ttl_seconds=_get_int_env("AUTH_ACCESS_TOKEN_TTL_SECONDS", 28_800),
         allow_self_register=_get_bool_env("AUTH_ALLOW_SELF_REGISTER", True),

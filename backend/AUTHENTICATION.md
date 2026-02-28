@@ -54,6 +54,7 @@ Role hierarchy: `superadmin > admin > user`.
 Required / important backend auth settings (see `infra/.env.example`):
 
 - `AUTH_JWT_SECRET`: JWT signing secret. Must be non-empty outside development.
+- `MODEL_CREDENTIALS_ENCRYPTION_KEY`: dedicated encryption key for model provider credentials at rest (defaults to `AUTH_JWT_SECRET` when unset for backward compatibility; set explicitly in production).
 - `AUTH_JWT_ALGORITHM`: default `HS256`.
 - `AUTH_ACCESS_TOKEN_TTL_SECONDS`: default `28800` (8 hours).
 - `AUTH_ALLOW_SELF_REGISTER`: default `true`.
