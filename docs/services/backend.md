@@ -19,8 +19,8 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/registry/models`
 - `POST /v1/registry/agents`
 - `POST /v1/registry/tools`
-- `GET /v1/runtime/profile`
-- `PUT /v1/runtime/profile`
+- `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
+- `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
 
 ## Model Governance Endpoints (Release N Canonical)
 

@@ -9,10 +9,17 @@ import type {
   UsersResult,
 } from "./types";
 
+
+
+type RuntimeProfile = "offline" | "air_gapped" | "online";
+
+type RuntimeProfileResult = {
+  profile: RuntimeProfile;
+};
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
   token?: string;
 };
@@ -96,5 +103,18 @@ export function updateUserRole(userId: number, role: Role, token: string): Promi
     method: "PATCH",
     token,
     body: { role },
+  });
+}
+
+
+export function fetchRuntimeProfile(token: string): Promise<RuntimeProfileResult> {
+  return requestJson<RuntimeProfileResult>("/v1/runtime/profile", { token });
+}
+
+export function updateRuntimeProfile(profile: RuntimeProfile, token: string): Promise<RuntimeProfileResult> {
+  return requestJson<RuntimeProfileResult>("/v1/runtime/profile", {
+    method: "PUT",
+    token,
+    body: { profile },
   });
 }

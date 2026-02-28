@@ -23,8 +23,8 @@ Unified registry and runtime governance endpoints:
 - `POST /v1/registry/{type}/{id}/versions`
 - `POST /v1/registry/{type}/{id}/share`
 - `GET /v1/registry/{type}/{id}/shares`
-- `GET /v1/runtime/profile`
-- `PUT /v1/runtime/profile` (superadmin)
+- `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
+- `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
 
 Model governance and runtime endpoints (canonical in Release N):
 

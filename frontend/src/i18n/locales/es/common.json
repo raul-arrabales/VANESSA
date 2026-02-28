@@ -224,6 +224,23 @@
         "styleEditor": "Editor de estilo del tema"
       }
     },
+    "runtime": {
+      "title": "Perfil de ejecucion",
+      "description": "Controla el modo de ejecucion global que se usa para las compuertas de seguridad y acceso a herramientas.",
+      "restrictionMessage": "Solo los superadministradores pueden cambiar el perfil de ejecucion.",
+      "options": {
+        "offline": "Sin conexion",
+        "air_gapped": "Aislado",
+        "online": "En linea"
+      },
+      "feedback": {
+        "saved": "Perfil de ejecucion guardado: {{profile}}."
+      },
+      "error": {
+        "load": "No se pudo cargar el perfil de ejecucion.",
+        "save": "No se pudo guardar el perfil de ejecucion."
+      }
+    },
     "navigation": {
       "title": "Navegación de configuración",
       "overview": "Resumen",

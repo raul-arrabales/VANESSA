@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, g, request
 
-from ..authz import require_role
+from ..authz import require_auth, require_role
 from ..config import get_auth_config
 from ..services.runtime_profile_service import resolve_runtime_profile, update_runtime_profile
 
@@ -18,6 +18,7 @@ def _database_url() -> str:
 
 
 @bp.get("/v1/runtime/profile")
+@require_auth
 def get_runtime_profile_route():
     profile = resolve_runtime_profile(_database_url())
     return jsonify({"profile": profile}), 200
