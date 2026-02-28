@@ -3,7 +3,7 @@ import { ApiError } from "../auth/authApi";
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PUT";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   token?: string;
 };
@@ -55,6 +55,37 @@ export type ModelDownloadJob = {
   finished_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+
+
+export type ModelCredential = {
+  id: string;
+  owner_user_id: number;
+  credential_scope: "platform" | "personal";
+  provider: string;
+  display_name: string;
+  api_base_url?: string | null;
+  api_key_last4: string;
+  is_active: boolean;
+  revoked_at?: string | null;
+};
+
+export type ManagedModel = {
+  id: string;
+  name: string;
+  provider: string;
+  provider_model_id?: string | null;
+  origin: "platform" | "personal";
+  backend: "local" | "external_api";
+  source: string;
+  availability: "online_only" | "offline_ready";
+  access_scope: "private" | "assigned" | "global";
+  credential_owner: "platform" | "you";
+  model_size_billion?: number | null;
+  model_type?: string | null;
+  comment?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type InferenceResult = {
@@ -239,4 +270,71 @@ export async function runInference(
     token,
     body: { prompt, model, history },
   });
+}
+
+
+export async function listModelCredentials(token: string): Promise<ModelCredential[]> {
+  const result = await requestJson<{ credentials: ModelCredential[] }>("/v1/models/credentials", { token });
+  return result.credentials;
+}
+
+export async function createModelCredential(
+  payload: {
+    provider: string;
+    display_name?: string;
+    api_base_url?: string;
+    api_key: string;
+    credential_scope?: "platform" | "personal";
+    owner_user_id?: number;
+  },
+  token: string,
+): Promise<ModelCredential> {
+  const result = await requestJson<{ credential: ModelCredential }>("/v1/models/credentials", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return result.credential;
+}
+
+export async function revokeModelCredential(credentialId: string, token: string): Promise<ModelCredential> {
+  const result = await requestJson<{ credential: ModelCredential }>(`/v1/models/credentials/${encodeURIComponent(credentialId)}`, {
+    method: "DELETE",
+    token,
+  });
+  return result.credential;
+}
+
+export async function registerManagedModel(
+  payload: {
+    id: string;
+    name: string;
+    provider: string;
+    backend: "local" | "external_api";
+    origin: "platform" | "personal";
+    source?: string;
+    availability?: "online_only" | "offline_ready";
+    access_scope?: "private" | "assigned" | "global";
+    provider_model_id?: string;
+    credential_id?: string;
+    source_id?: string;
+    local_path?: string;
+    model_size_billion?: number;
+    model_type?: string;
+    comment?: string;
+    metadata?: Record<string, unknown>;
+  },
+  token: string,
+): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>("/v1/models/register", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return result.model;
+}
+
+export async function listAvailableManagedModels(token: string): Promise<ManagedModel[]> {
+  const result = await requestJson<{ models: ManagedModel[] }>("/v1/models/available", { token });
+  return result.models;
 }
