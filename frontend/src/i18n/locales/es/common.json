@@ -301,6 +301,9 @@
     "offline": "Sin conexión",
     "airGapped": "Aislado",
     "permissionDenied": "Solo los superadministradores pueden cambiar el modo de ejecución.",
-    "updateFailed": "No se pudo actualizar el modo de ejecución."
+    "updateFailed": "No se pudo actualizar el modo de ejecución.",
+    "localOnlyLabel": "Solo local",
+    "confirmEnableLocalOnly": "¿Activar el modo solo local para todos los usuarios? Las acciones que dependen de internet se bloquearan en todo el sistema.",
+    "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?"
   }
 }
