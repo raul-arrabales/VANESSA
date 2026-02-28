@@ -175,6 +175,7 @@ from .routes import auth_legacy_routes
 from .routes import executions as executions_routes
 from .routes import model_catalog_v1 as model_catalog_v1_routes
 from .routes import model_governance as model_governance_routes
+from .routes import model_management_v1 as model_management_v1_routes
 from .routes import model_inference_v1 as model_inference_v1_routes
 from .routes import policy as policy_routes
 from .routes import registry as registry_routes
@@ -192,6 +193,7 @@ app.register_blueprint(runtime_routes.bp)
 app.register_blueprint(executions_routes.bp)
 app.register_blueprint(model_governance_routes.bp)
 app.register_blueprint(model_catalog_v1_routes.bp)
+app.register_blueprint(model_management_v1_routes.bp)
 app.register_blueprint(model_inference_v1_routes.bp)
 app.register_blueprint(auth_legacy_routes.bp)
 app.register_blueprint(voice_legacy_routes.bp)
