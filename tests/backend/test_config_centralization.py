@@ -59,3 +59,21 @@ def test_backend_runtime_profile_override_ignores_invalid_values(monkeypatch: py
 
     runtime = backend_config.get_backend_runtime_config()
     assert runtime.runtime_profile_override is None
+
+
+def test_model_credentials_encryption_key_prefers_dedicated_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://ignored")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "jwt-signing-secret")
+    monkeypatch.setenv("MODEL_CREDENTIALS_ENCRYPTION_KEY", "model-credential-secret")
+
+    config = backend_config.get_auth_config()
+    assert config.model_credentials_encryption_key == "model-credential-secret"
+
+
+def test_model_credentials_encryption_key_falls_back_to_jwt_secret(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://ignored")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "jwt-signing-secret")
+    monkeypatch.delenv("MODEL_CREDENTIALS_ENCRYPTION_KEY", raising=False)
+
+    config = backend_config.get_auth_config()
+    assert config.model_credentials_encryption_key == "jwt-signing-secret"
