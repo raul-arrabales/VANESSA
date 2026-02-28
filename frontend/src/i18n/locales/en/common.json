@@ -245,6 +245,64 @@
       "title": "Settings navigation",
       "overview": "Overview",
       "design": "Design"
+    },
+    "modelAccess": {
+      "navigation": {
+        "ariaLabel": "Model access settings",
+        "title": "Model access",
+        "description": "Manage your provider credentials and register models available to your account.",
+        "openButton": "Open model access"
+      },
+      "providers": {
+        "openaiCompatible": "OpenAI compatible",
+        "openai": "OpenAI",
+        "anthropic": "Anthropic"
+      },
+      "scopes": {
+        "personal": "Personal",
+        "platform": "Platform"
+      },
+      "backends": {
+        "externalApi": "External API",
+        "local": "Local"
+      },
+      "credentials": {
+        "title": "Provider credentials",
+        "description": "Register API credentials for external model providers. API keys are masked after save.",
+        "providerLabel": "Provider",
+        "scopeLabel": "Credential scope",
+        "displayNameLabel": "Display name",
+        "apiBaseUrlLabel": "API base URL",
+        "apiKeyLabel": "API key",
+        "saveButton": "Save credential",
+        "listAria": "Registered credentials",
+        "revokeButton": "Revoke"
+      },
+      "models": {
+        "title": "Register managed model",
+        "modelIdLabel": "Model id",
+        "modelNameLabel": "Model name",
+        "originLabel": "Origin",
+        "backendLabel": "Backend",
+        "providerModelIdLabel": "Provider model id",
+        "credentialLabel": "Credential",
+        "selectCredential": "Select credential",
+        "localPathLabel": "Local path",
+        "commentLabel": "Comment",
+        "registerButton": "Register model"
+      },
+      "available": {
+        "title": "Available models",
+        "listAria": "Available model list"
+      },
+      "feedback": {
+        "loadFailed": "Unable to load model access data.",
+        "credentialSaved": "Credential saved.",
+        "credentialSaveFailed": "Failed to save credential.",
+        "credentialRevokeFailed": "Failed to revoke credential.",
+        "modelRegistered": "Model registered.",
+        "modelRegisterFailed": "Failed to register model."
+      }
     }
   },
   "models": {
