@@ -33,56 +33,63 @@ The system is meant to be:
 Please respect these boundaries when generating or modifying code or configuration.
 
 1. **Container #1 — Responsive Web Frontend**
-   - Tech: TBD (likely React/Vue/Svelte or simple HTML/JS).
+   - Tech: React + Vite + TypeScript.
    - Talks only to the **Flask Backend API** over HTTP.
    - No direct DB, Weaviate or LLM access.
 
 2. **Container #2 — Backend (Flask API)**
    - Entry point for all external HTTP calls.
    - Responsibilities:
-     - Authentication/authorization (later).
+     - Authentication/authorization surfaces (implemented, and designed to stay extensible).
      - REST/JSON endpoints for the frontend.
      - Orchestration calls to:
-       - Agent engine (Container #4).
-       - Vector store (Container #6).
-       - Database (Container #7).
+       - Agent engine (Container #5).
+       - LLM API gateway (Container #3).
+       - Sandbox (Container #6).
+       - Vector store (Container #8).
+       - Database (Container #9).
      - Input validation, error handling, logging.
 
-3. **Container #3 — Private LLM server (Hugging Face)**
-   - Runs a self-hosted LLM.
-   - Provides an HTTP API for text generation/embeddings.
-   - Backend and/or agent engine call this service; no direct access from frontend.
+3. **Container #3 — LLM API/Gateway (`llm`)**
+   - Provides the private model-serving HTTP API used by backend and agent engine.
+   - Handles API/gateway concerns in front of the runtime service.
+   - Forwards model execution requests to Container #4 (`llm_runtime`); no direct frontend access.
 
-4. **Container #4 — Custom Agent Orchestration Engine**
+4. **Container #4 — LLM Runtime (`llm_runtime`)**
+   - Runs local vLLM model execution for inference.
+   - Backing runtime for Container #3 (`llm`), exposed internally to the stack.
+   - Not called directly by the frontend.
+
+5. **Container #5 — Custom Agent Orchestration Engine**
    - Implements multi-step workflows and tools for agents.
    - Coordinates:
-     - Calls to the LLM server.
+     - Calls to the LLM API gateway.
      - RAG queries against Weaviate.
      - Database operations (via a clean abstraction).
    - This is where “agent logic” lives (tools, planners, etc.).
 
-5. **Container #5 — Python env sandbox for agents**
+6. **Container #6 — Python env sandbox for agents**
    - Isolated Python environment where agents can run controlled code.
    - No direct network access unless explicitly allowed.
    - Only exposed via safe APIs from the agent engine.
    - Do **not** bypass the sandbox from backend or frontend.
 
-6. **Container #6 — Persistent semantic index for RAG (Weaviate)**
+7. **Container #7 — Wake-word (KWS) service**
+   - Runs offline wake-word detection and emits wake events.
+   - Integrates with backend through a webhook/event API.
+   - Model files must be downloadable and runnable in air-gapped environments.
+   - No direct frontend dependency on this container.
+
+8. **Container #8 — Persistent semantic index for RAG (Weaviate)**
    - Stores embeddings and metadata.
    - Used for semantic search / context retrieval.
    - Accessed from backend and/or agent engine through a client library.
    - Persistence must be enabled (data should survive container restarts).
 
-7. **Container #7 — Database (PostgreSQL)**
+9. **Container #9 — Database (PostgreSQL)**
   - Stores structured data (users, sessions, logs, configs, etc.).
   - Access restricted to backend and agent engine through a data access layer.
   - No direct SQL from the frontend.
-
-8. **Container #8 — Wake-word (KWS) service**
-   - Runs offline wake-word detection and emits wake events.
-   - Integrates with backend through a webhook/event API.
-   - Model files must be downloadable and runnable in air-gapped environments.
-   - No direct frontend dependency on this container.
 
 ---
 
