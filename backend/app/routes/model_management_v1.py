@@ -13,10 +13,11 @@ from ..repositories.model_credentials import (
 from ..repositories.model_management import (
     append_audit_event,
     assign_model_to_user,
+    list_models_visible_to_user,
     register_model,
 )
 from ..services.provider_validation import ProviderValidationError, validate_openai_compatible_model
-from ..services.model_resolution import list_models_for_user
+from ..services.runtime_profile_service import resolve_runtime_profile
 
 bp = Blueprint("model_management_v1", __name__)
 
@@ -33,7 +34,7 @@ def _database_url() -> str:
 
 
 def _encryption_key() -> str:
-    return get_auth_config().model_credentials_encryption_key
+    return get_auth_config().jwt_secret
 
 
 def _serialize_credential(row: dict[str, object]) -> dict[str, object]:
@@ -271,5 +272,6 @@ def assign_model_user_v1():
 @require_role("user")
 def list_available_models_v1():
     user_id = int(g.current_user["id"])
-    profile, rows = list_models_for_user(_database_url(), user_id=user_id)
+    profile = resolve_runtime_profile(_database_url())
+    rows = list_models_visible_to_user(_database_url(), user_id=user_id, runtime_profile=profile)
     return jsonify({"models": [_serialize_managed_model(row) for row in rows], "runtime_profile": profile}), 200
