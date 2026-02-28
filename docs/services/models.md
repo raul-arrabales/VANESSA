@@ -38,3 +38,22 @@ This adds database support for:
 Backend startup migration path also applies this SQL via `run_model_management_schema_migration()`.
 
 > Owner: LLM and KWS maintainers. Update cadence: whenever model directory conventions or runtime path contracts change.
+
+
+## Model management APIs (workstream 2)
+
+Backend now exposes model-management endpoints for credential and model lifecycle operations:
+
+- `GET /v1/models/credentials`
+- `POST /v1/models/credentials`
+- `DELETE /v1/models/credentials/<credential_id>`
+- `POST /v1/models/register`
+- `POST /v1/models/assignments/user`
+- `GET /v1/models/available`
+
+Key behavior:
+
+- Credentials are write-only from API responses (last4 only) and can only be revoked by owner.
+- External model registration requires fixed `provider_model_id` and live provider validation through OpenAI-compatible `/models` discovery.
+- Platform model registration remains superadmin-only; personal model registration is available to regular users.
+- Available-model listing respects runtime profile (offline filtering) and assignment visibility.
