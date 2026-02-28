@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 from flask import g
 
 from ..config import get_auth_config
-from ..repositories.model_access import list_effective_allowed_models
+from .model_resolution import resolve_model_for_inference
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 1.5
 
@@ -86,19 +86,19 @@ def chat_completion_with_allowed_model(
     max_tokens: int | None,
     temperature: float | None,
 ) -> tuple[dict[str, Any] | None, int]:
-    effective_models = list_effective_allowed_models(
+    _ = org_id
+    _ = group_id
+    resolved_model_id, error_payload, status_code = resolve_model_for_inference(
         get_auth_config().database_url,
         user_id=int(g.current_user["id"]),
-        org_id=org_id,
-        group_id=group_id,
+        requested_model_id=requested_model_id,
     )
-    allowed_model_ids = {str(model.get("model_id", "")) for model in effective_models}
-    if requested_model_id not in allowed_model_ids:
-        return {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
+    if error_payload is not None:
+        return error_payload, status_code
 
     llm_url = get_auth_config().llm_url.rstrip("/")
     upstream_payload: dict[str, Any] = {
-        "model": requested_model_id,
+        "model": resolved_model_id or requested_model_id,
         "input": messages,
     }
     if max_tokens is not None:
