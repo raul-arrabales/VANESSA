@@ -293,5 +293,14 @@
       "assignmentSaved": "Saved {{scope}} model assignment.",
       "assignmentFailed": "Failed to update model assignments."
     }
+  },
+  "runtimeMode": {
+    "toggleLabel": "Runtime mode",
+    "toggleTooltip": "Current runtime mode: {{mode}}",
+    "online": "Online",
+    "offline": "Offline",
+    "airGapped": "Air-gapped",
+    "permissionDenied": "Only superadmins can change runtime mode.",
+    "updateFailed": "Unable to update runtime mode."
   }
 }

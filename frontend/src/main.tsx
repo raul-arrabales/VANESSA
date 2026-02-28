@@ -5,6 +5,7 @@ import App from "./App";
 import "./i18n";
 import "./styles.css";
 import { AuthProvider } from "./auth/AuthProvider";
+import { RuntimeModeProvider } from "./runtime/RuntimeModeProvider";
 import { ThemeProvider } from "./theme/ThemeProvider";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -12,7 +13,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <RuntimeModeProvider>
+            <App />
+          </RuntimeModeProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
