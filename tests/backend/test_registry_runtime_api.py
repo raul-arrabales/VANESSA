@@ -9,6 +9,7 @@ from app.routes import registry as registry_routes  # noqa: E402
 from app.routes import registry_models as registry_models_routes  # noqa: E402
 from app.routes import runtime as runtime_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services import runtime_profile_service  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
@@ -254,3 +255,25 @@ def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch
     get_response = test_client.get("/v1/agent-executions/exec-1", headers=_auth(token))
     assert get_response.status_code == 200
     assert get_response.get_json()["execution"]["status"] == "succeeded"
+
+
+def test_runtime_profile_resolution_prefers_db_when_no_env_override(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_override": None})(),
+    )
+    monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "air_gapped")
+
+    assert runtime_profile_service.resolve_runtime_profile("ignored") == "air_gapped"
+
+
+def test_runtime_profile_resolution_uses_default_when_db_invalid_and_no_env(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_override": None})(),
+    )
+    monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "invalid")
+
+    assert runtime_profile_service.resolve_runtime_profile("ignored") == "offline"

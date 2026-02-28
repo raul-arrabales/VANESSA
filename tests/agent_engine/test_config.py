@@ -11,7 +11,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from agent_engine.app.config import (  # noqa: E402
     DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
-    DEFAULT_RUNTIME_PROFILE,
     get_config,
 )
 
@@ -23,7 +22,7 @@ def test_engine_config_defaults(monkeypatch: pytest.MonkeyPatch):
 
     config = get_config()
     assert config.database_url == ""
-    assert config.runtime_profile_override == DEFAULT_RUNTIME_PROFILE
+    assert config.runtime_profile_override is None
     assert config.agent_engine_service_token == DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
 
 
@@ -37,3 +36,10 @@ def test_engine_config_env_overrides(monkeypatch: pytest.MonkeyPatch):
     assert config.runtime_profile_override == "air_gapped"
     assert config.agent_engine_service_token == "custom-token"
 
+
+
+def test_engine_config_invalid_runtime_profile_is_ignored(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "invalid")
+
+    config = get_config()
+    assert config.runtime_profile_override is None
