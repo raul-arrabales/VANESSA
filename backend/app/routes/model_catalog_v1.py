@@ -13,11 +13,11 @@ from ..repositories.model_catalog import (
     upsert_model_catalog_item,
 )
 from ..repositories.model_download_jobs import create_download_job, get_download_job, list_download_jobs
+from ..services.connectivity_policy import ConnectivityPolicyError, assert_internet_allowed
 from ..services.hf_discovery import discover_hf_models, get_hf_model_details
 from ..services.model_support import model_id_from_source, parse_patterns, serialize_catalog_item, serialize_download_job
 from ..services.model_downloader import resolve_target_dir
 from ..services.model_download_worker import ensure_download_worker_started
-from ..services.runtime_profile_service import internet_allowed, resolve_runtime_profile
 
 bp = Blueprint("model_catalog_v1", __name__)
 
@@ -103,13 +103,10 @@ def create_catalog_item_v1():
 @bp.get("/v1/models/discovery/huggingface")
 @require_role("superadmin")
 def discover_models_huggingface_v1():
-    runtime_profile = resolve_runtime_profile(_config().database_url)
-    if not internet_allowed(runtime_profile):
-        return _json_error(
-            403,
-            "runtime_profile_blocks_internet",
-            f"Model discovery disabled for runtime profile '{runtime_profile}'",
-        )
+    try:
+        assert_internet_allowed(_config().database_url, "Model discovery")
+    except ConnectivityPolicyError as exc:
+        return _json_error(exc.status_code, exc.code, str(exc))
 
     query = str(request.args.get("query", "")).strip()
     task = str(request.args.get("task", "text-generation")).strip() or "text-generation"
@@ -123,6 +120,7 @@ def discover_models_huggingface_v1():
 
     try:
         models = discover_hf_models(
+            database_url=_config().database_url,
             query=query,
             task=task,
             sort=sort,
@@ -138,18 +136,19 @@ def discover_models_huggingface_v1():
 @bp.get("/v1/models/discovery/huggingface/<path:source_id>")
 @require_role("superadmin")
 def get_discovered_model_huggingface_v1(source_id: str):
-    runtime_profile = resolve_runtime_profile(_config().database_url)
-    if not internet_allowed(runtime_profile):
-        return _json_error(
-            403,
-            "runtime_profile_blocks_internet",
-            f"Model discovery disabled for runtime profile '{runtime_profile}'",
-        )
+    try:
+        assert_internet_allowed(_config().database_url, "Model discovery")
+    except ConnectivityPolicyError as exc:
+        return _json_error(exc.status_code, exc.code, str(exc))
 
     if not source_id.strip():
         return _json_error(400, "invalid_source_id", "source_id is required")
     try:
-        model = get_hf_model_details(source_id.strip(), token=_config().hf_token)
+        model = get_hf_model_details(
+            source_id.strip(),
+            database_url=_config().database_url,
+            token=_config().hf_token,
+        )
     except Exception as exc:  # noqa: BLE001
         return _json_error(502, "hf_model_info_failed", str(exc))
     return jsonify({"model": model}), 200
@@ -158,13 +157,10 @@ def get_discovered_model_huggingface_v1(source_id: str):
 @bp.post("/v1/models/downloads")
 @require_role("superadmin")
 def start_model_download_v1():
-    runtime_profile = resolve_runtime_profile(_config().database_url)
-    if not internet_allowed(runtime_profile):
-        return _json_error(
-            403,
-            "runtime_profile_blocks_internet",
-            f"Model download disabled for runtime profile '{runtime_profile}'",
-        )
+    try:
+        assert_internet_allowed(_config().database_url, "Model download")
+    except ConnectivityPolicyError as exc:
+        return _json_error(exc.status_code, exc.code, str(exc))
 
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
