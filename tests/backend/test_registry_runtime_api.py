@@ -173,7 +173,7 @@ def test_registry_and_runtime_endpoints(client):
     )
     assert share_response.status_code == 201
 
-    runtime_get = test_client.get("/v1/runtime/profile")
+    runtime_get = test_client.get("/v1/runtime/profile", headers=_auth(token))
     assert runtime_get.status_code == 200
     assert runtime_get.get_json()["profile"] == "offline"
 
@@ -184,6 +184,35 @@ def test_registry_and_runtime_endpoints(client):
     )
     assert runtime_set.status_code == 200
     assert runtime_set.get_json()["profile"] == "air_gapped"
+
+
+def test_runtime_profile_read_requires_auth(client):
+    test_client, _ = client
+
+    response = test_client.get("/v1/runtime/profile")
+
+    assert response.status_code == 401
+
+
+def test_runtime_profile_write_rejects_non_superadmin(client):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="user@example.com",
+        username="user",
+        password_hash=hash_password("user-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
+
+    response = test_client.put(
+        "/v1/runtime/profile",
+        headers=_auth(token),
+        json={"profile": "air_gapped"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch):

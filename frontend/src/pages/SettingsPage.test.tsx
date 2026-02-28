@@ -23,6 +23,10 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
+vi.mock("../components/RuntimeProfileSection", () => ({
+  default: () => <div>runtime-profile-section</div>,
+}));
+
 function renderSettings(initialPath = "/settings"): void {
   render(
     <ThemeProvider>
@@ -54,6 +58,7 @@ describe("SettingsPage", () => {
     renderSettings("/settings");
 
     expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
+    expect(screen.getByText("runtime-profile-section")).toBeVisible();
     expect(screen.queryByRole("heading", { name: "settings.admin.title" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Model access" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Add model to catalog" })).toBeNull();

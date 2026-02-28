@@ -224,6 +224,23 @@
         "styleEditor": "Theme style editor"
       }
     },
+    "runtime": {
+      "title": "Runtime profile",
+      "description": "Controls the platform-wide runtime mode used for safety gates and tool access.",
+      "restrictionMessage": "Only superadmins can change the runtime profile.",
+      "options": {
+        "offline": "Offline",
+        "air_gapped": "Air-gapped",
+        "online": "Online"
+      },
+      "feedback": {
+        "saved": "Saved runtime profile: {{profile}}."
+      },
+      "error": {
+        "load": "Unable to load runtime profile.",
+        "save": "Unable to save runtime profile."
+      }
+    },
     "navigation": {
       "title": "Settings navigation",
       "overview": "Overview",

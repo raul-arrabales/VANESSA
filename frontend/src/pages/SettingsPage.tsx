@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthProvider";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProfileSection from "../components/ProfileSection";
 import ThemeToggle from "../components/ThemeToggle";
+import RuntimeProfileSection from "../components/RuntimeProfileSection";
 
 export default function SettingsPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -26,6 +27,7 @@ export default function SettingsPage(): JSX.Element {
               <p className="status-text">{t("settings.personalization.language.description")}</p>
               <LanguageSwitcher />
             </section>
+            <RuntimeProfileSection />
             <section className="card-stack" aria-label={t("settings.personalization.theme.title")}>
               <h3 className="section-title">{t("settings.personalization.theme.title")}</h3>
               <p className="status-text">{t("settings.personalization.theme.description")}</p>

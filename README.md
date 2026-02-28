@@ -147,6 +147,17 @@ To also remove named volumes (will delete local Weaviate/Postgres data):
 docker compose -f infra/docker-compose.yml down -v
 ```
 
+
+## Runtime Profile Semantics
+
+VANESSA currently uses **global runtime profile semantics** for safety gates and tool access.
+
+- `GET /v1/runtime/profile` is available to authenticated users for visibility.
+- `PUT /v1/runtime/profile` is restricted to `superadmin` users.
+- Frontend settings show the runtime profile toggle to all authenticated users, but only superadmins can modify it.
+
+When adding new safety/tool gates, use this same global runtime profile contract instead of creating per-user overrides unless the platform semantics are explicitly revised.
+
 ## Architecture
 
 - Container #1: Responsive Web Frontend
