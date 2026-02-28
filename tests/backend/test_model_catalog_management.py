@@ -117,7 +117,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         model_catalog_routes,
         "get_hf_model_details",
-        lambda source_id, token=None: {
+        lambda source_id, database_url, token=None: {
             "source_id": source_id,
             "name": source_id.split("/")[-1],
             "tags": ["text-generation"],

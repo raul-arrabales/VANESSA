@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from .connectivity_policy import assert_internet_allowed
+
 def discover_hf_models(
     *,
+    database_url: str,
     query: str,
     task: str = "text-generation",
     sort: str = "downloads",
     limit: int = 10,
     token: str | None = None,
 ) -> list[dict[str, Any]]:
+    assert_internet_allowed(database_url, "Model discovery")
+
     from huggingface_hub import HfApi
 
     api = HfApi(token=token or None)
@@ -35,7 +40,9 @@ def discover_hf_models(
     return results
 
 
-def get_hf_model_details(source_id: str, *, token: str | None = None) -> dict[str, Any]:
+def get_hf_model_details(source_id: str, *, database_url: str, token: str | None = None) -> dict[str, Any]:
+    assert_internet_allowed(database_url, "Model discovery")
+
     from huggingface_hub import HfApi
 
     api = HfApi(token=token or None)

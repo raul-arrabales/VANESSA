@@ -50,6 +50,7 @@ def download_worker_loop() -> None:
 
             try:
                 local_path = download_from_huggingface(
+                    database_url=config.database_url,
                     source_id=source_id,
                     storage_root=config.model_storage_root,
                     token=config.hf_token,

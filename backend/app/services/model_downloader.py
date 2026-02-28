@@ -4,6 +4,8 @@ import os
 import re
 from pathlib import Path
 
+from .connectivity_policy import assert_internet_allowed
+
 _SAFE_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9._-]+")
 
 
@@ -28,12 +30,15 @@ def resolve_target_dir(storage_root: str, source_id: str) -> str:
 
 def download_from_huggingface(
     *,
+    database_url: str,
     source_id: str,
     storage_root: str,
     token: str | None,
     allow_patterns: list[str] | None = None,
     ignore_patterns: list[str] | None = None,
 ) -> str:
+    assert_internet_allowed(database_url, "Model download")
+
     from huggingface_hub import snapshot_download
 
     target_dir = resolve_target_dir(storage_root, source_id)
