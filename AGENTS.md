@@ -71,8 +71,8 @@ Please respect these boundaries when generating or modifying code or configurati
 6. **Container #6 — Python env sandbox for agents**
    - Isolated Python environment where agents can run controlled code.
    - No direct network access unless explicitly allowed.
-   - Only exposed via safe APIs from the agent engine.
-   - Do **not** bypass the sandbox from backend or frontend.
+   - Access is allowed from backend and agent_engine via approved service abstractions and policy-governed APIs.
+   - Frontend must never call sandbox directly, and backend/agent_engine integrations must not bypass governance checks.
 
 7. **Container #7 — Wake-word (KWS) service**
    - Runs offline wake-word detection and emits wake events.
@@ -256,7 +256,8 @@ When making changes or adding features:
 - Data access layer for PostgreSQL instead of inline SQL.
 
 5. Be safe with the sandbox.
-- Any new capabilities involving code execution should integrate with the sandbox container, not bypass it.
+- Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.
+- Frontend paths must never call sandbox directly, and no backend/agent_engine flow may bypass governance checks.
 - Assume sandbox must be isolated and constrained.
 
 6. When in doubt, document.
