@@ -107,11 +107,23 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(model_governance_routes, "find_model_definition", model_store.find_model)
     monkeypatch.setattr(model_governance_routes, "assign_model_access", model_store.assign)
-    monkeypatch.setattr(model_governance_routes, "list_effective_allowed_models", model_store.effective)
+
+    def _list_models_for_user(_db: str, *, user_id: int):
+        return "online", model_store.effective("ignored", user_id=user_id, org_id=None, group_id=None)
+
+    monkeypatch.setattr(model_governance_routes, "list_models_for_user", _list_models_for_user)
     monkeypatch.setattr(model_governance_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(registry_models_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(chat_inference, "get_auth_config", lambda: config)
-    monkeypatch.setattr(chat_inference, "list_effective_allowed_models", model_store.effective)
+
+    def _resolve_model_for_inference(_db: str, *, user_id: int, requested_model_id: str):
+        allowed = model_store.effective("ignored", user_id=user_id, org_id=None, group_id=None)
+        ids = {model["model_id"] for model in allowed}
+        if requested_model_id in ids:
+            return requested_model_id, None, 200
+        return None, {"error": "model_forbidden", "message": "Requested model is not allowed"}, 403
+
+    monkeypatch.setattr(chat_inference, "resolve_model_for_inference", _resolve_model_for_inference)
 
     def _create_entity_with_version(
         _database_url: str,

@@ -77,6 +77,7 @@ def build_test_auth_config(auth_config_cls, **overrides):
     defaults = dict(
         database_url="postgresql://ignored",
         jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
         jwt_algorithm="HS256",
         access_token_ttl_seconds=28_800,
         allow_self_register=True,
@@ -128,4 +129,3 @@ def auth_header(token: str) -> dict[str, str]:
 
 def login(client, identifier: str, password: str):
     return client.post("/auth/login", json={"identifier": identifier, "password": password})
-

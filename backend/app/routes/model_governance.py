@@ -5,11 +5,8 @@ from flask import Blueprint, g, jsonify, request
 from ..authz import require_role
 from ..config import get_auth_config
 from ..repositories.model_assignments import list_scope_assignments, upsert_scope_assignment
-from ..repositories.model_access import (
-    assign_model_access,
-    find_model_definition,
-    list_effective_allowed_models,
-)
+from ..repositories.model_access import assign_model_access, find_model_definition
+from ..services.model_resolution import list_models_for_user
 
 bp = Blueprint("model_governance_v1", __name__)
 
@@ -115,35 +112,42 @@ def assign_access_v1():
 @bp.get("/v1/model-governance/allowed")
 @require_role("user")
 def list_allowed_models_v1():
-    org_id = str(request.args.get("org_id", "")).strip() or None
-    group_id = str(request.args.get("group_id", "")).strip() or None
-    models = list_effective_allowed_models(
+    runtime_profile, models = list_models_for_user(
         _database_url(),
         user_id=int(g.current_user["id"]),
-        org_id=org_id,
-        group_id=group_id,
     )
-    return jsonify({"models": [_serialize_model_definition(model) for model in models]}), 200
+    normalized = [
+        {
+            "model_id": str(model.get("model_id", "")),
+            "provider": model.get("provider"),
+            "metadata": model.get("metadata") or {},
+            "provider_config_ref": model.get("provider_config_ref"),
+            "backend_kind": model.get("backend_kind"),
+            "availability": model.get("availability"),
+            "origin_scope": model.get("origin_scope"),
+        }
+        for model in models
+    ]
+    return jsonify({"models": normalized, "runtime_profile": runtime_profile}), 200
 
 
 @bp.get("/v1/model-governance/enabled")
 @require_role("user")
 def list_enabled_models_v1():
-    org_id = str(request.args.get("org_id", "")).strip() or None
-    group_id = str(request.args.get("group_id", "")).strip() or None
-    models = list_effective_allowed_models(
+    runtime_profile, models = list_models_for_user(
         _database_url(),
         user_id=int(g.current_user["id"]),
-        org_id=org_id,
-        group_id=group_id,
     )
     normalized = [
         {
             "id": str(model.get("model_id", "")),
-            "name": str((model.get("metadata") or {}).get("name") or model.get("model_id", "")),
+            "name": str(model.get("name") or (model.get("metadata") or {}).get("name") or model.get("model_id", "")),
             "provider": model.get("provider"),
             "description": str((model.get("metadata") or {}).get("description", "")) or None,
+            "backend": model.get("backend_kind"),
+            "availability": model.get("availability"),
+            "origin": model.get("origin_scope"),
         }
         for model in models
     ]
-    return jsonify({"models": normalized}), 200
+    return jsonify({"models": normalized, "runtime_profile": runtime_profile}), 200
