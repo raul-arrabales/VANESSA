@@ -268,7 +268,22 @@ When making changes or adding features:
 - If a code/config change impacts local manual runtime behavior (service names, ports, health endpoints, compose files, env vars, startup order, or required dependencies), update `ops/local-staging/` scripts and `ops/local-staging/README.md` in the same change.
 - Treat `ops/local-staging/` as a maintained interface for human staging-like validation on Ubuntu, not as optional docs.
 
-8. Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+8. Follow the topology/interface maintenance workflow for architecture-affecting changes.
+- For any topology/interface change, update both `infra/docker-compose.yml` and `infra/architecture/metadata.yml`.
+- Regenerate artifacts with `python scripts/generate_architecture.py --write`.
+- Update narrative docs in the same change: `README.md`, `docs/architecture.md`, relevant `docs/services/*.md`, and `AGENTS.md`.
+- Verify generated artifacts are current with `python scripts/generate_architecture.py --check` before considering the change done.
+- Use this concise checklist:
+  - [ ] `infra/docker-compose.yml`
+  - [ ] `infra/architecture/metadata.yml`
+  - [ ] `python scripts/generate_architecture.py --write`
+  - [ ] `README.md`
+  - [ ] `docs/architecture.md`
+  - [ ] Relevant `docs/services/*.md`
+  - [ ] `AGENTS.md`
+  - [ ] `python scripts/generate_architecture.py --check`
+
+9. Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
 
 ## 8. Future directions (for agents to keep in mind)
 

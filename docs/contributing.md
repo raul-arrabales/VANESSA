@@ -28,6 +28,37 @@
 - Run strict docs build when docs or navigation changes:
   - `mkdocs build --strict`
 
+
+## Topology and Interface Change Workflow
+
+When a change alters service topology, container interfaces, ports, health endpoints, or cross-service contracts, keep machine-derived artifacts and narrative docs in sync in the **same PR**.
+
+### Required sequence
+
+1. Update topology metadata sources:
+   - `infra/docker-compose.yml`
+   - `infra/architecture/metadata.yml`
+2. Regenerate architecture artifacts:
+   - `python scripts/generate_architecture.py --write`
+3. Update narrative documentation:
+   - `README.md`
+   - `docs/architecture.md`
+   - Relevant `docs/services/*.md` pages
+   - `AGENTS.md`
+4. Verify generated artifacts are current:
+   - `python scripts/generate_architecture.py --check`
+
+### Files to touch when topology changes (checklist)
+
+- [ ] `infra/docker-compose.yml`
+- [ ] `infra/architecture/metadata.yml`
+- [ ] Generated architecture artifacts refreshed via `python scripts/generate_architecture.py --write`
+- [ ] `README.md`
+- [ ] `docs/architecture.md`
+- [ ] Relevant `docs/services/*.md`
+- [ ] `AGENTS.md`
+- [ ] Validation run: `python scripts/generate_architecture.py --check`
+
 ## Maintained Interfaces
 
 - Keep `ops/local-staging/` scripts and README in sync with runtime-affecting changes.
