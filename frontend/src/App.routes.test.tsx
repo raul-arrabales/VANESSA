@@ -39,6 +39,11 @@ vi.mock("./api/models", () => ({
   updateModelAssignment: vi.fn(),
   listEnabledModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4" }]),
   runInference: vi.fn(),
+  listModelCredentials: vi.fn(async () => []),
+  createModelCredential: vi.fn(),
+  revokeModelCredential: vi.fn(),
+  registerManagedModel: vi.fn(),
+  listAvailableManagedModels: vi.fn(async () => []),
 }));
 
 describe("App superadmin models route", () => {

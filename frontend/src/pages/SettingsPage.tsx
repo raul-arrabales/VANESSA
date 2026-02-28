@@ -40,6 +40,15 @@ export default function SettingsPage(): JSX.Element {
                 )}
               </div>
             </section>
+            <section className="card-stack" aria-label={t("settings.modelAccess.navigation.ariaLabel")}>
+              <h3 className="section-title">{t("settings.modelAccess.navigation.title")}</h3>
+              <p className="status-text">{t("settings.modelAccess.navigation.description")}</p>
+              <div className="button-row">
+                <Link to="/settings/model-access" className="btn btn-secondary">
+                  {t("settings.modelAccess.navigation.openButton")}
+                </Link>
+              </div>
+            </section>
           </article>
         </>
       )}

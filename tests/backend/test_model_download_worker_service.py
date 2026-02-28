@@ -16,6 +16,7 @@ def _config() -> AuthConfig:
     return AuthConfig(
         database_url="postgresql://ignored",
         jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
         jwt_algorithm="HS256",
         access_token_ttl_seconds=28_800,
         allow_self_register=True,

@@ -60,8 +60,8 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
     expect(screen.getByText("runtime-profile-section")).toBeVisible();
     expect(screen.queryByRole("heading", { name: "settings.admin.title" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Model access" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add model to catalog" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "settings.modelAccess.navigation.title" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "settings.modelAccess.navigation.openButton" })).toHaveAttribute("href", "/settings/model-access");
     expect(screen.queryByLabelText("Enabled models list")).toBeNull();
   });
 
@@ -79,7 +79,7 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "settings.admin.approvals" })).toBeNull();
     expect(screen.queryByLabelText("user model scope")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Add model to catalog" })).toBeNull();
+    expect(screen.getByRole("link", { name: "settings.modelAccess.navigation.openButton" })).toHaveAttribute("href", "/settings/model-access");
   });
 
   it("keeps style editor and removes model catalog management from superadmin settings", async () => {
@@ -94,7 +94,7 @@ describe("SettingsPage", () => {
     renderSettings("/settings");
 
     expect(await screen.findByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
-    expect(screen.queryByRole("button", { name: "Add model to catalog" })).toBeNull();
+    expect(screen.getByRole("link", { name: "settings.modelAccess.navigation.openButton" })).toHaveAttribute("href", "/settings/model-access");
     expect(screen.queryByRole("heading", { name: "settings.superadmin.title" })).toBeNull();
   });
 
