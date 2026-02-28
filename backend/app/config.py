@@ -28,7 +28,7 @@ class BackendRuntimeConfig:
     sandbox_url: str = DEFAULT_SANDBOX_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
-    runtime_profile_override: str = DEFAULT_RUNTIME_PROFILE
+    runtime_profile_override: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
 
@@ -61,7 +61,7 @@ class AuthConfig:
     sandbox_url: str = DEFAULT_SANDBOX_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
-    runtime_profile_override: str = DEFAULT_RUNTIME_PROFILE
+    runtime_profile_override: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
 
@@ -110,6 +110,17 @@ def _get_float_env(name: str, default: float) -> float:
         return default
 
 
+def _get_runtime_profile_override_env() -> str | None:
+    value = os.getenv("VANESSA_RUNTIME_PROFILE")
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if normalized in RUNTIME_PROFILES:
+        return normalized
+    return None
+
+
 def get_auth_config() -> AuthConfig:
     database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
@@ -153,9 +164,7 @@ def get_auth_config() -> AuthConfig:
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
-        runtime_profile_override=(
-            os.getenv("VANESSA_RUNTIME_PROFILE", DEFAULT_RUNTIME_PROFILE).strip().lower() or DEFAULT_RUNTIME_PROFILE
-        ),
+        runtime_profile_override=_get_runtime_profile_override_env(),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
     )
@@ -173,9 +182,7 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
-        runtime_profile_override=(
-            os.getenv("VANESSA_RUNTIME_PROFILE", DEFAULT_RUNTIME_PROFILE).strip().lower() or DEFAULT_RUNTIME_PROFILE
-        ),
+        runtime_profile_override=_get_runtime_profile_override_env(),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
     )

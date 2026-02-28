@@ -7,7 +7,7 @@ from ..repositories.registry import get_runtime_profile, upsert_runtime_profile
 def resolve_runtime_profile(database_url: str) -> str:
     # Explicit env override wins to support ops and deterministic staging behavior.
     env_value = get_backend_runtime_config().runtime_profile_override
-    if env_value in RUNTIME_PROFILES:
+    if env_value is not None:
         return env_value
 
     try:

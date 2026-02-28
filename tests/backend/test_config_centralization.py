@@ -38,7 +38,7 @@ def test_backend_runtime_config_defaults(monkeypatch: pytest.MonkeyPatch):
     assert runtime.backend_url == backend_config.DEFAULT_BACKEND_URL
     assert runtime.llm_url == backend_config.DEFAULT_LLM_URL
     assert runtime.agent_engine_service_token == backend_config.DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
-    assert runtime.runtime_profile_override == backend_config.DEFAULT_RUNTIME_PROFILE
+    assert runtime.runtime_profile_override is None
 
 
 def test_backend_and_engine_token_defaults_are_aligned():
@@ -52,3 +52,10 @@ def test_backend_and_engine_runtime_profiles_are_aligned():
     assert backend_config.RUNTIME_PROFILES == engine_config.RUNTIME_PROFILES
     assert backend_config.DEFAULT_RUNTIME_PROFILE == engine_config.DEFAULT_RUNTIME_PROFILE
 
+
+
+def test_backend_runtime_profile_override_ignores_invalid_values(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "invalid")
+
+    runtime = backend_config.get_backend_runtime_config()
+    assert runtime.runtime_profile_override is None

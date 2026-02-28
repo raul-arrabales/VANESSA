@@ -37,8 +37,7 @@ def _connect():
 
 
 def _runtime_profile_from_env() -> str | None:
-    env_value = get_config().runtime_profile_override
-    return env_value if env_value in RUNTIME_PROFILES else None
+    return get_config().runtime_profile_override
 
 
 def resolve_runtime_profile(requested_profile: str | None) -> str:
@@ -47,7 +46,7 @@ def resolve_runtime_profile(requested_profile: str | None) -> str:
         return normalized_requested
 
     env_value = _runtime_profile_from_env()
-    if env_value:
+    if env_value is not None:
         return env_value
 
     if _db_available():
