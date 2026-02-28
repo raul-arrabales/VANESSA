@@ -28,12 +28,21 @@ Legend:
 
 1. Frontend: browser UI, HTTP calls only to backend API.
 2. Backend (Flask API): public API entrypoint, validation, orchestration.
-3. Private LLM Server: self-hosted inference and embeddings API.
-4. Agent Engine: multi-step agent logic and tool workflows.
-5. Sandbox: isolated Python code execution environment.
-6. Weaviate: semantic index for RAG context retrieval.
-7. PostgreSQL: structured relational data.
-8. KWS: offline wake-word detection and wake-event emission.
+3. LLM API: private model-serving HTTP gateway for inference/discovery requests.
+4. LLM Runtime: local vLLM runtime engine backing LLM API execution.
+5. Agent Engine: multi-step agent logic and tool workflows.
+6. Sandbox: isolated Python code execution environment.
+7. KWS: offline wake-word detection and wake-event emission.
+8. Weaviate: persistent semantic index for RAG context retrieval.
+9. PostgreSQL: persistent relational data for auth and metadata.
+
+Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
+
+- Frontend -> Backend API
+- Backend API -> Agent Engine, LLM API, Sandbox, Weaviate, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
+- LLM API -> LLM Runtime
+- KWS -> Backend API
 
 ## Design Principles
 

@@ -162,12 +162,21 @@ When adding new safety/tool gates, use this same global runtime profile contract
 
 - Container #1: Responsive Web Frontend
 - Container #2: Backend (Flask API)
-- Container #3: Private LLM Server
-- Container #4: Custom Agent Orchestration Engine
-- Container #5: Python Sandbox
-- Container #6: Weaviate (RAG index)
-- Container #7: PostgreSQL
-- Container #8: Wake-word service (KWS)
+- Container #3: LLM API (private model-serving HTTP gateway)
+- Container #4: LLM Runtime (local vLLM inference engine used by LLM API)
+- Container #5: Custom Agent Orchestration Engine
+- Container #6: Python Sandbox
+- Container #7: Wake-word service (KWS)
+- Container #8: Weaviate (persistent semantic index for RAG)
+- Container #9: PostgreSQL
+
+Communication semantics (from generated architecture metadata) are directional service interactions, not container startup order:
+
+- Frontend -> Backend API (UI API requests)
+- Backend API -> Agent Engine, LLM API, Sandbox, Weaviate, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
+- LLM API -> LLM Runtime (internal runtime execution path)
+- KWS -> Backend API (wake event webhook)
 
 ## License
 
