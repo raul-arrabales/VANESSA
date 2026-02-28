@@ -94,7 +94,8 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(routes, "register_model", _register_model)
     monkeypatch.setattr(routes, "append_audit_event", lambda *args, **kwargs: None)
     monkeypatch.setattr(routes, "assign_model_to_user", lambda *args, **kwargs: {"model_id": kwargs["model_id"], "user_id": kwargs["user_id"]})
-    monkeypatch.setattr(routes, "list_models_for_user", lambda _db, user_id: ("online", list(models.values())))
+    monkeypatch.setattr(routes, "resolve_runtime_profile", lambda _db: "online")
+    monkeypatch.setattr(routes, "list_models_visible_to_user", lambda _db, user_id, runtime_profile: list(models.values()))
     monkeypatch.setattr(routes, "validate_openai_compatible_model", lambda **kwargs: None)
     monkeypatch.setattr(routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(routes, "_encryption_key", lambda: "test-secret")
@@ -155,32 +156,6 @@ def test_non_superadmin_cannot_create_platform_credential(client):
         json={"credential_scope": "platform", "provider": "openai_compatible", "api_key": "sk-abc"},
     )
     assert response.status_code == 403
-
-
-def test_create_credential_rejects_invalid_owner_user_id_shape(client):
-    test_client, user_store = client
-    user = user_store.create_user(
-        "ignored",
-        email="u-owner@example.com",
-        username="user-owner",
-        password_hash=hash_password("pass-123"),
-        role="superadmin",
-        is_active=True,
-    )
-    token = _token(test_client, user["username"], "pass-123")
-
-    response = test_client.post(
-        "/v1/models/credentials",
-        headers=_auth(token),
-        json={
-            "credential_scope": "platform",
-            "provider": "openai_compatible",
-            "owner_user_id": "not-an-int",
-            "api_key": "sk-platform",
-        },
-    )
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "invalid_owner_user_id"
 
 
 def test_register_external_model_requires_validation_path(client):

@@ -13,11 +13,11 @@ from ..repositories.model_credentials import (
 from ..repositories.model_management import (
     append_audit_event,
     assign_model_to_user,
+    list_models_visible_to_user,
     register_model,
 )
-from ..schemas.model_management import CredentialCreateRequest, ModelRegisterRequest, UserModelAssignmentRequest
 from ..services.provider_validation import ProviderValidationError, validate_openai_compatible_model
-from ..services.model_resolution import list_models_for_user
+from ..services.runtime_profile_service import resolve_runtime_profile
 
 bp = Blueprint("model_management_v1", __name__)
 
@@ -34,7 +34,7 @@ def _database_url() -> str:
 
 
 def _encryption_key() -> str:
-    return get_auth_config().model_credentials_encryption_key
+    return get_auth_config().jwt_secret
 
 
 def _serialize_credential(row: dict[str, object]) -> dict[str, object]:
@@ -88,31 +88,31 @@ def create_credential_v1():
 
     role = str(g.current_user.get("role", "user"))
     current_user_id = int(g.current_user["id"])
+    requested_scope = str(payload.get("credential_scope", "personal")).strip().lower() or "personal"
 
-    try:
-        request_body = CredentialCreateRequest.from_payload(
-            payload,
-            current_user_id=current_user_id,
-            current_role=role,
-            allowed_providers=_ALLOWED_PROVIDERS,
-        )
-    except ValueError as exc:
-        code = str(exc)
-        if code == "forbidden_scope":
-            return _json_error(403, code, "Only superadmin can create platform credentials")
-        if code == "invalid_provider":
-            return _json_error(400, code, "Unsupported provider")
-        return _json_error(400, code, "Invalid credential payload")
+    if requested_scope == "platform" and role != "superadmin":
+        return _json_error(403, "forbidden_scope", "Only superadmin can create platform credentials")
+
+    owner_user_id = int(payload.get("owner_user_id", current_user_id))
+    if requested_scope == "personal":
+        owner_user_id = current_user_id
+
+    provider = str(payload.get("provider", "openai_compatible")).strip().lower()
+    if provider not in _ALLOWED_PROVIDERS:
+        return _json_error(400, "invalid_provider", "Unsupported provider")
+
+    api_key = str(payload.get("api_key", ""))
+    display_name = str(payload.get("display_name", "")).strip() or f"{provider}-key"
 
     try:
         created = create_credential(
             _database_url(),
-            owner_user_id=request_body.owner_user_id,
-            credential_scope=request_body.credential_scope,
-            provider_slug=request_body.provider,
-            display_name=request_body.display_name,
-            api_base_url=request_body.api_base_url,
-            api_key=request_body.api_key,
+            owner_user_id=owner_user_id,
+            credential_scope=requested_scope,
+            provider_slug=provider,
+            display_name=display_name,
+            api_base_url=str(payload.get("api_base_url", "")).strip() or None,
+            api_key=api_key,
             encryption_key=_encryption_key(),
             created_by_user_id=current_user_id,
         )
@@ -125,7 +125,7 @@ def create_credential_v1():
         event_type="credential.created",
         target_type="credential",
         target_id=str(created["id"]),
-        payload={"scope": request_body.credential_scope, "provider": request_body.provider, "owner_user_id": request_body.owner_user_id},
+        payload={"scope": requested_scope, "provider": provider, "owner_user_id": owner_user_id},
     )
 
     return jsonify({"credential": _serialize_credential(created)}), 201
@@ -164,30 +164,33 @@ def register_model_v1():
     user_id = int(g.current_user["id"])
     role = str(g.current_user.get("role", "user"))
 
-    try:
-        request_body = ModelRegisterRequest.from_payload(
-            payload,
-            current_role=role,
-            allowed_providers=_ALLOWED_PROVIDERS,
-        )
-    except ValueError as exc:
-        code = str(exc)
-        if code == "forbidden_origin":
-            return _json_error(403, code, "Only superadmin can register platform models")
-        if code == "invalid_model":
-            return _json_error(400, code, "id and name are required")
-        if code == "invalid_provider":
-            return _json_error(400, code, "Unsupported provider")
-        if code == "provider_model_id_required":
-            return _json_error(400, code, "provider_model_id is required for external_api models")
-        if code == "credential_id_required":
-            return _json_error(400, code, "credential_id is required for external_api models")
-        return _json_error(400, code, "Invalid model payload")
+    model_id = str(payload.get("id", "")).strip()
+    name = str(payload.get("name", "")).strip()
+    provider = str(payload.get("provider", "openai_compatible")).strip().lower()
+    backend_kind = str(payload.get("backend", "external_api")).strip().lower()
+    origin_scope = str(payload.get("origin", "personal")).strip().lower()
 
-    if request_body.backend_kind == "external_api":
+    if not model_id or not name:
+        return _json_error(400, "invalid_model", "id and name are required")
+    if provider not in _ALLOWED_PROVIDERS:
+        return _json_error(400, "invalid_provider", "Unsupported provider")
+    if origin_scope == "platform" and role != "superadmin":
+        return _json_error(403, "forbidden_origin", "Only superadmin can register platform models")
+
+    source_kind = str(payload.get("source", "external_provider" if backend_kind == "external_api" else "local_folder")).strip().lower()
+    availability = str(payload.get("availability", "online_only" if backend_kind == "external_api" else "offline_ready")).strip().lower()
+    access_scope = str(payload.get("access_scope", "private" if origin_scope == "personal" else "assigned")).strip().lower()
+    provider_model_id = str(payload.get("provider_model_id", "")).strip() or None
+    credential_id = str(payload.get("credential_id", "")).strip() or None
+
+    if backend_kind == "external_api":
+        if not provider_model_id:
+            return _json_error(400, "provider_model_id_required", "provider_model_id is required for external_api models")
+        if not credential_id:
+            return _json_error(400, "credential_id_required", "credential_id is required for external_api models")
         credential = get_active_credential_secret(
             _database_url(),
-            credential_id=request_body.credential_id or "",
+            credential_id=credential_id,
             requester_user_id=user_id,
             requester_role=role,
             encryption_key=_encryption_key(),
@@ -199,7 +202,7 @@ def register_model_v1():
             validate_openai_compatible_model(
                 api_base_url=str(credential.get("api_base_url") or ""),
                 api_key=str(credential.get("api_key") or ""),
-                model_id=request_body.provider_model_id or "",
+                model_id=provider_model_id,
             )
         except ProviderValidationError as exc:
             return _json_error(400, str(exc), "Provider validation failed")
@@ -207,22 +210,22 @@ def register_model_v1():
     try:
         model = register_model(
             _database_url(),
-            model_id=request_body.model_id,
-            name=request_body.name,
-            provider=request_body.provider,
-            provider_model_id=request_body.provider_model_id,
-            source_id=request_body.source_id,
-            local_path=request_body.local_path,
-            origin_scope=request_body.origin_scope,
-            backend_kind=request_body.backend_kind,
-            source_kind=request_body.source_kind,
-            availability=request_body.availability,
-            access_scope=request_body.access_scope,
-            credential_id=request_body.credential_id,
-            model_size_billion=request_body.model_size_billion,
-            model_type=request_body.model_type,
-            comment=request_body.comment,
-            metadata=request_body.metadata,
+            model_id=model_id,
+            name=name,
+            provider=provider,
+            provider_model_id=provider_model_id,
+            source_id=str(payload.get("source_id", "")).strip() or None,
+            local_path=str(payload.get("local_path", "")).strip() or None,
+            origin_scope=origin_scope,
+            backend_kind=backend_kind,
+            source_kind=source_kind,
+            availability=availability,
+            access_scope=access_scope,
+            credential_id=credential_id,
+            model_size_billion=float(payload.get("model_size_billion")) if payload.get("model_size_billion") is not None else None,
+            model_type=str(payload.get("model_type", "")).strip() or None,
+            comment=str(payload.get("comment", "")).strip() or None,
+            metadata=payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {},
             registered_by_user_id=user_id,
         )
     except ValueError as exc:
@@ -234,7 +237,7 @@ def register_model_v1():
         event_type="model.registered",
         target_type="model",
         target_id=str(model["model_id"]),
-        payload={"origin": request_body.origin_scope, "backend": request_body.backend_kind, "provider": request_body.provider},
+        payload={"origin": origin_scope, "backend": backend_kind, "provider": provider},
     )
 
     return jsonify({"model": _serialize_managed_model(model)}), 201
@@ -247,25 +250,20 @@ def assign_model_user_v1():
     if not isinstance(payload, dict):
         return _json_error(400, "invalid_payload", "Expected JSON object")
 
-    try:
-        request_body = UserModelAssignmentRequest.from_payload(payload)
-    except ValueError:
+    model_id = str(payload.get("model_id", "")).strip()
+    user_id_raw = payload.get("user_id")
+    if not model_id or not isinstance(user_id_raw, int):
         return _json_error(400, "invalid_assignment", "model_id and integer user_id are required")
 
     actor = int(g.current_user["id"])
-    assignment = assign_model_to_user(
-        _database_url(),
-        model_id=request_body.model_id,
-        user_id=request_body.user_id,
-        actor_user_id=actor,
-    )
+    assignment = assign_model_to_user(_database_url(), model_id=model_id, user_id=user_id_raw, actor_user_id=actor)
     append_audit_event(
         _database_url(),
         actor_user_id=actor,
         event_type="model.assignment.user",
         target_type="model",
-        target_id=request_body.model_id,
-        payload={"user_id": request_body.user_id},
+        target_id=model_id,
+        payload={"user_id": user_id_raw},
     )
     return jsonify({"assignment": assignment}), 201
 
@@ -274,5 +272,6 @@ def assign_model_user_v1():
 @require_role("user")
 def list_available_models_v1():
     user_id = int(g.current_user["id"])
-    profile, rows = list_models_for_user(_database_url(), user_id=user_id)
+    profile = resolve_runtime_profile(_database_url())
+    rows = list_models_visible_to_user(_database_url(), user_id=user_id, runtime_profile=profile)
     return jsonify({"models": [_serialize_managed_model(row) for row in rows], "runtime_profile": profile}), 200
