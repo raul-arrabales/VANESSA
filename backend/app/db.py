@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Iterator
 
 import psycopg
@@ -328,3 +329,20 @@ def run_auth_schema_migration(database_url: str) -> None:
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS model_download_jobs_source_id_idx ON model_download_jobs (source_id)"
             )
+
+    run_model_management_schema_migration(database_url)
+
+
+def run_model_management_schema_migration(database_url: str) -> None:
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "004_model_management.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(migration_sql)
