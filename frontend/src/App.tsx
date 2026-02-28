@@ -51,6 +51,7 @@ function AppHeader(): JSX.Element {
   const runtimeModeLabel = mode ? t(`runtimeMode.${mode === "air_gapped" ? "airGapped" : mode}`) : "--";
   const canUpdateRuntimeMode = user?.role === "superadmin";
   const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLoading || isRuntimeSaving || !mode;
+  const isLocalOnlyMode = mode ? mode !== "online" : false;
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent): void => {
@@ -89,24 +90,35 @@ function AppHeader(): JSX.Element {
             <Link to={welcomeRoute} className="link-chip">{t(welcomeLabelKey)}</Link>
           )}
         </nav>
-        <button
-          type="button"
-          className="link-chip"
-          disabled={isRuntimeToggleDisabled}
-          title={canUpdateRuntimeMode ? t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel }) : t("runtimeMode.permissionDenied")}
-          aria-label={t("runtimeMode.toggleLabel")}
-          onClick={() => {
-            if (!mode || isRuntimeToggleDisabled) {
-              return;
-            }
-
-            const nextMode = mode === "offline" ? "air_gapped" : mode === "air_gapped" ? "online" : "offline";
-            void setMode(nextMode);
-          }}
-        >
-          {t("runtimeMode.toggleLabel")}: {runtimeModeLabel}
-        </button>
         <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
+          <label className="runtime-toggle" title={canUpdateRuntimeMode ? t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel }) : t("runtimeMode.permissionDenied")}>
+            <span className="runtime-toggle-text">{t("runtimeMode.localOnlyLabel")}</span>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={t("runtimeMode.toggleLabel")}
+              disabled={isRuntimeToggleDisabled}
+              checked={isLocalOnlyMode}
+              onChange={(event) => {
+                if (!mode || isRuntimeToggleDisabled) {
+                  return;
+                }
+
+                const nextMode = event.currentTarget.checked ? "air_gapped" : "online";
+                const confirmationMessage = nextMode === "air_gapped"
+                  ? t("runtimeMode.confirmEnableLocalOnly")
+                  : t("runtimeMode.confirmEnableOnline");
+                if (!window.confirm(confirmationMessage)) {
+                  return;
+                }
+
+                void setMode(nextMode);
+              }}
+            />
+            <span className="runtime-toggle-track" aria-hidden="true">
+              <span className="runtime-toggle-thumb" />
+            </span>
+          </label>
           <button
             type="button"
             className="user-menu-trigger"

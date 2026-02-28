@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
 import App from "./App";
 
 let mockUser: AuthUser | null = null;
+const mockSetMode = vi.fn();
 
 vi.mock("./auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -28,13 +30,15 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
     isLoading: false,
     isSaving: false,
     error: "",
-    setMode: vi.fn(),
+    setMode: mockSetMode,
   }),
 }));
 
 describe("App header", () => {
   beforeEach(() => {
     mockUser = null;
+    mockSetMode.mockReset();
+    vi.restoreAllMocks();
   });
 
   it("renders user icon and label in the menu trigger", () => {
@@ -66,7 +70,7 @@ describe("App header", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("button", { name: "runtimeMode.toggleLabel" })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "runtimeMode.toggleLabel" })).toBeDisabled();
   });
 
   it("enables runtime toggle for superadmin users", () => {
@@ -84,6 +88,29 @@ describe("App header", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("button", { name: "runtimeMode.toggleLabel" })).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "runtimeMode.toggleLabel" })).toBeEnabled();
+  });
+
+  it("requires confirmation before changing runtime mode", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("switch", { name: "runtimeMode.toggleLabel" }));
+
+    expect(mockSetMode).not.toHaveBeenCalled();
   });
 });

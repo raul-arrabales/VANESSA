@@ -301,6 +301,9 @@
     "offline": "Offline",
     "airGapped": "Air-gapped",
     "permissionDenied": "Only superadmins can change runtime mode.",
-    "updateFailed": "Unable to update runtime mode."
+    "updateFailed": "Unable to update runtime mode.",
+    "localOnlyLabel": "Local only",
+    "confirmEnableLocalOnly": "Enable Local-only mode for all users? Internet-dependent actions will be blocked system-wide.",
+    "confirmEnableOnline": "Switch to Online mode for all users?"
   }
 }

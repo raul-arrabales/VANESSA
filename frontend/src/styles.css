@@ -292,6 +292,63 @@ a {
   color: var(--text-secondary);
 }
 
+
+.runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.runtime-toggle-text {
+  white-space: nowrap;
+}
+
+.runtime-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.runtime-toggle-track {
+  width: 2.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.runtime-toggle-thumb {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--text-secondary);
+  transition: transform var(--duration-fast) var(--easing-standard), background-color var(--duration-fast) var(--easing-standard);
+}
+
+.runtime-toggle input:checked + .runtime-toggle-track {
+  background: color-mix(in oklab, var(--accent-secondary) 35%, var(--bg-subtle));
+}
+
+.runtime-toggle input:checked + .runtime-toggle-track .runtime-toggle-thumb {
+  transform: translateX(0.95rem);
+  background: var(--accent-primary);
+}
+
+.runtime-toggle input:disabled + .runtime-toggle-track {
+  opacity: 0.65;
+}
 .user-menu {
   position: relative;
 }
@@ -694,6 +751,7 @@ a {
 .field-input:focus-visible,
 .btn:focus-visible,
 .link-chip:focus-visible,
+.runtime-toggle:focus-within,
 .user-menu-trigger:focus-visible,
 .user-menu-item:focus-visible {
   outline: 2px solid color-mix(in oklab, var(--accent-primary) 80%, white);
