@@ -164,6 +164,15 @@ def list_models_visible_to_user(
     return [dict(row) for row in rows]
 
 
+def get_model_by_id(database_url: str, model_id: str) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            "SELECT * FROM model_registry WHERE model_id = %s",
+            (model_id.strip(),),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def assign_model_to_user(
     database_url: str,
     *,
