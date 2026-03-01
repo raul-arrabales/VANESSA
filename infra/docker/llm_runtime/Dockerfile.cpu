@@ -2,6 +2,7 @@ FROM python:3.11-slim AS builder
 
 ARG VLLM_VERSION=v0.8.5
 ARG LLM_RUNTIME_CPU_TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+ARG LLM_RUNTIME_CPU_TRANSFORMERS_VERSION=4.51.3
 ARG VLLM_CPU_DISABLE_AVX512=false
 ARG VLLM_CPU_AVX2=true
 ARG VLLM_CPU_AVX512=false
@@ -32,6 +33,7 @@ WORKDIR /src/vllm
 RUN pip install --upgrade pip setuptools wheel packaging
 RUN pip install -v --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" -r requirements/build.txt
 RUN pip install -v --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" -r requirements/cpu.txt
+RUN pip install -v --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" "transformers==${LLM_RUNTIME_CPU_TRANSFORMERS_VERSION}"
 RUN VLLM_TARGET_DEVICE=cpu python setup.py bdist_wheel
 RUN pip install --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" dist/*.whl
 

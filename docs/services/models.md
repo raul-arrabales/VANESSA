@@ -11,6 +11,7 @@ Model assets are organized for local-first runtime and offline operation where r
   - `LLM_RUNTIME_CPU_VARIANT=auto|avx2|avx512`
 - CPU runtime uses `infra/docker-compose.cpu.override.yml` and builds locally from source, pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - CPU builds resolve PyTorch CPU wheels from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
+- CPU builds pin `transformers` via `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to keep the tokenizer/runtime stack compatible with the chosen vLLM release.
 - GPU runtime uses `infra/docker-compose.gpu.override.yml` and the NVIDIA-targeted vLLM image.
 
 ## KWS Models

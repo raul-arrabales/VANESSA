@@ -103,6 +103,7 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - `cpu` adds `infra/docker-compose.cpu.override.yml` and resolves the CPU ISA automatically unless `LLM_RUNTIME_CPU_VARIANT` forces `avx2` or `avx512`.
 - CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - CPU builds install PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
+- CPU builds pin `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to avoid tokenizer/runtime incompatibilities as upstream releases move forward.
 - `VLLM_CPU_OMP_THREADS_BIND` is optional; leave it empty unless you want to pin inference to a specific core range.
 
 ## Sample Auth Seeding
