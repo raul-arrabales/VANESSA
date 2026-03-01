@@ -45,7 +45,7 @@ check_service_ready() {
     sandbox) http_ok "http://localhost:6000/health" ;;
     kws) http_ok "http://localhost:10400/health" ;;
     llm) http_ok "http://localhost:8000/health" ;;
-    llm_runtime) compose ps --status running llm_runtime | grep -q 'llm_runtime' ;;
+    llm_runtime) llm_runtime_internal_http_ok "/health" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
     *) return 1 ;;
@@ -124,6 +124,7 @@ validate_llm_runtime_support || true
 log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
 if [[ "${resolved_accelerator}" == "cpu" ]]; then
   log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
+  log_info "Resolved llm_runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
 fi
 
 if [[ "${target_service}" == "llm_runtime" ]] && [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" ]]; then
@@ -136,6 +137,7 @@ fi
 if [[ "${target_service}" == "llm_runtime" || "${target_service}" == "llm" ]]; then
   validate_llm_local_model_path
 fi
+validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"
 compose config >/dev/null || die "Compose configuration is invalid"
@@ -152,6 +154,7 @@ log_info "Restarting service '${target_service}'"
 if ! compose up "${compose_args[@]}" "${target_service}"; then
   if [[ "${target_service}" == "llm_runtime" && "${resolved_accelerator}" == "cpu" ]]; then
     log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+    log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
   fi
   die "Failed to restart service: ${target_service}"
 fi

@@ -61,9 +61,11 @@ validate_llm_runtime_support || true
 log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
 if [[ "${resolved_accelerator}" == "cpu" ]]; then
   log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
+  log_info "Resolved llm_runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
 fi
 
 validate_llm_local_model_path
+validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"
 if ! compose config >/dev/null; then
@@ -76,6 +78,7 @@ if [[ -n "${build_flag}" ]]; then
   if ! compose up -d --build "${selected_services[@]}"; then
     if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
       log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+      log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
     fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
@@ -84,6 +87,7 @@ else
   if ! compose up -d "${selected_services[@]}"; then
     if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
       log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+      log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
     fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"

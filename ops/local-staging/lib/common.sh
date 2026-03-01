@@ -21,6 +21,7 @@ LLM_RUNTIME_ACCELERATOR="${LLM_RUNTIME_ACCELERATOR:-auto}"
 LLM_RUNTIME_CPU_VARIANT="${LLM_RUNTIME_CPU_VARIANT:-auto}"
 LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
 LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
 readonly SERVICES=(frontend backend llm llm_runtime agent_engine sandbox kws weaviate postgres)
 
@@ -145,6 +146,80 @@ validate_llm_runtime_support() {
 
   export LLM_RUNTIME_CPU_SUPPORTED=true
   return 0
+}
+
+max_host_cpu_index() {
+  lscpu -p=cpu 2>/dev/null | grep -v '^#' | awk 'max < $1 { max = $1 } END { if (NR == 0) { print "-1" } else { print max } }'
+}
+
+resolve_llm_cpu_thread_binding() {
+  if [[ "${VLLM_CPU_OMP_THREADS_BIND+x}" == "x" && -z "${VLLM_CPU_OMP_THREADS_BIND}" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  printf '%s\n' "${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
+}
+
+validate_llm_cpu_thread_binding() {
+  local accelerator="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
+  [[ "${accelerator}" == "cpu" ]] || return 0
+
+  local binding
+  binding="$(resolve_llm_cpu_thread_binding)"
+
+  if [[ -z "${binding}" ]]; then
+    die "Invalid VLLM_CPU_OMP_THREADS_BIND='' for CPU runtime. Use 0-7, auto, or nobind."
+  fi
+
+  case "${binding}" in
+    auto|nobind)
+      return 0
+      ;;
+  esac
+
+  if ! [[ "${binding}" =~ ^[0-9,\|-]+$ ]]; then
+    die "Invalid VLLM_CPU_OMP_THREADS_BIND='${binding}' for CPU runtime. Use 0-7, auto, nobind, or a CPU set like 0-3|4-7."
+  fi
+
+  local max_cpu
+  max_cpu="$(max_host_cpu_index)"
+  [[ "${max_cpu}" =~ ^[0-9]+$ ]] || die "Unable to determine host CPU topology for VLLM_CPU_OMP_THREADS_BIND validation."
+
+  local rank_set part start end
+  local old_ifs="${IFS}"
+  IFS='|'
+  for rank_set in ${binding}; do
+    IFS=','
+    for part in ${rank_set}; do
+      if [[ "${part}" =~ ^[0-9]+-[0-9]+$ ]]; then
+        start="${part%-*}"
+        end="${part#*-}"
+        if (( start > end )); then
+          IFS="${old_ifs}"
+          die "Invalid VLLM_CPU_OMP_THREADS_BIND='${binding}': range '${part}' is reversed."
+        fi
+        if (( end > max_cpu )); then
+          IFS="${old_ifs}"
+          die "Invalid VLLM_CPU_OMP_THREADS_BIND='${binding}': CPU '${end}' exceeds host max CPU index ${max_cpu}."
+        fi
+      elif [[ "${part}" =~ ^[0-9]+$ ]]; then
+        if (( part > max_cpu )); then
+          IFS="${old_ifs}"
+          die "Invalid VLLM_CPU_OMP_THREADS_BIND='${binding}': CPU '${part}' exceeds host max CPU index ${max_cpu}."
+        fi
+      else
+        IFS="${old_ifs}"
+        die "Invalid VLLM_CPU_OMP_THREADS_BIND='${binding}'. Use 0-7, auto, nobind, or a CPU set like 0-3|4-7."
+      fi
+    done
+  done
+  IFS="${old_ifs}"
+}
+
+llm_runtime_internal_http_ok() {
+  local path="$1"
+  compose exec -T llm_runtime python -c "import sys, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3); sys.exit(0)"
 }
 
 resolve_llm_local_model_host_path() {

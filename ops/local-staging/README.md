@@ -104,7 +104,8 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - CPU builds install PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
 - CPU builds pin `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to avoid tokenizer/runtime incompatibilities as upstream releases move forward.
-- `VLLM_CPU_OMP_THREADS_BIND` is optional; leave it empty unless you want to pin inference to a specific core range.
+- CPU local staging defaults `VLLM_CPU_OMP_THREADS_BIND=0-7` on this single-NUMA-node 8-logical-core host.
+- `VLLM_CPU_OMP_THREADS_BIND` may also be set to `auto`, `nobind`, or a custom CPU set such as `0-3|4-7`.
 
 ## Sample Auth Seeding
 
@@ -256,6 +257,7 @@ Use the targeted restart script when only one service changed:
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
   - On CPU hosts, tune `VLLM_CPU_KVCACHE_SPACE` downward if the model does not fit in available RAM.
+  - If CPU startup fails around NUMA or thread binding, try `VLLM_CPU_OMP_THREADS_BIND` in this order: `0-7`, `auto`, `nobind`.
   - If the CPU image build fails while resolving `torch==...+cpu`, verify `LLM_RUNTIME_CPU_TORCH_INDEX_URL` points at a reachable PyTorch CPU wheel index.
   - If startup fails with exit code `132`, the host likely needs a different CPU build variant or does not meet the minimum supported ISA.
   - If you intentionally want to run without local vLLM on an unsupported CPU host:

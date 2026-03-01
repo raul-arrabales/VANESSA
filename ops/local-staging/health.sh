@@ -26,6 +26,10 @@ llm_contract_ok() {
   curl --silent --show-error --max-time 3 --fail "http://localhost:8000/v1/models" | grep -q '"data"'
 }
 
+llm_runtime_ready_ok() {
+  llm_runtime_internal_http_ok "/health"
+}
+
 runtime_profile_endpoint_ok() {
   local status
   status="$(curl --silent --show-error --max-time 2 -o /dev/null -w '%{http_code}' "http://localhost:5000/v1/runtime/profile")"
@@ -52,6 +56,8 @@ run_checks() {
   runtime_accelerator="$(resolve_llm_runtime_accelerator)"
   local runtime_cpu_variant
   runtime_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
+  local runtime_cpu_bind
+  runtime_cpu_bind="$(resolve_llm_cpu_thread_binding)"
   validate_llm_runtime_support >/dev/null 2>&1 || true
 
   if http_ok "http://localhost:5000/health"; then
@@ -100,15 +106,15 @@ run_checks() {
     if [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" && "${runtime_accelerator}" == "cpu" ]]; then
       printf 'llm_runtime: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
       failures=$((failures + 1))
-    elif compose ps --status running llm_runtime | grep -q 'llm_runtime'; then
+    elif llm_runtime_ready_ok; then
       if [[ "${runtime_accelerator}" == "cpu" ]]; then
-        printf 'llm_runtime: OK (accelerator=%s, variant=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+        printf 'llm_runtime: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
       else
         printf 'llm_runtime: OK (accelerator=%s)\n' "${runtime_accelerator}"
       fi
     else
       if [[ "${runtime_accelerator}" == "cpu" ]]; then
-        printf 'llm_runtime: FAIL (accelerator=%s, variant=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+        printf 'llm_runtime: FAIL (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
       else
         printf 'llm_runtime: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
       fi

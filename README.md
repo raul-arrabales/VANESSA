@@ -106,6 +106,7 @@ Optional fallback control:
 The CPU runtime build is pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 The CPU builder installs PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
 The CPU builder also pins `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` for compatibility with the selected vLLM release.
+On this single-NUMA-node desktop staging host, the default CPU binding is `VLLM_CPU_OMP_THREADS_BIND=0-7`. You can override it with `auto`, `nobind`, or a custom CPU set if needed.
 
 ## Run Containers For Testing
 
