@@ -11,14 +11,13 @@ services:
         VLLM_CPU_AVX512: ${LLM_RUNTIME_CPU_BUILD_AVX512:-false}
     image: ${LLM_RUNTIME_CPU_IMAGE:-vanessa-llm-runtime-cpu:local}
     command:
+      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}
       - --device
       - ${LLM_RUNTIME_DEVICE:-cpu}
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      - --model
-      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/tinyllama}
       - --dtype
       - ${LLM_RUNTIME_DTYPE:-float}
     shm_size: ${LLM_RUNTIME_SHM_SIZE:-4g}

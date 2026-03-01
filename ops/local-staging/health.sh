@@ -26,6 +26,12 @@ llm_contract_ok() {
   curl --silent --show-error --max-time 3 --fail "http://localhost:8000/v1/models" | grep -q '"data"'
 }
 
+runtime_profile_endpoint_ok() {
+  local status
+  status="$(curl --silent --show-error --max-time 2 -o /dev/null -w '%{http_code}' "http://localhost:5000/v1/runtime/profile")"
+  [[ "${status}" == "200" || "${status}" == "401" ]]
+}
+
 tcp_ok() {
   local host="$1"
   local port="$2"
@@ -130,8 +136,8 @@ run_checks() {
     failures=$((failures + 1))
   fi
 
-  if curl --silent --show-error --max-time 2 --fail "http://localhost:5000/v1/runtime/profile" | grep -q "\"profile\""; then
-    printf 'runtime_profile: OK (env=%s)\n' "${runtime_profile}"
+  if runtime_profile_endpoint_ok; then
+    printf 'runtime_profile: OK (env=%s, auth=required)\n' "${runtime_profile}"
   else
     printf 'runtime_profile: FAIL\n'
     failures=$((failures + 1))

@@ -52,12 +52,11 @@ services:
     image: ${LLM_RUNTIME_GPU_IMAGE:-vllm/vllm-openai:latest}
     container_name: vanessa-llm-runtime
     command:
+      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}
       - --host
       - 0.0.0.0
       - --port
       - "8000"
-      - --model
-      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/tinyllama}
       - --dtype
       - ${LLM_RUNTIME_GPU_DTYPE:-auto}
     expose:

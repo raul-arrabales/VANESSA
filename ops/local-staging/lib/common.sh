@@ -20,6 +20,7 @@ COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}"
 LLM_RUNTIME_ACCELERATOR="${LLM_RUNTIME_ACCELERATOR:-auto}"
 LLM_RUNTIME_CPU_VARIANT="${LLM_RUNTIME_CPU_VARIANT:-auto}"
 LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
+LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
 
 readonly SERVICES=(frontend backend llm llm_runtime agent_engine sandbox kws weaviate postgres)
 
@@ -144,6 +145,29 @@ validate_llm_runtime_support() {
 
   export LLM_RUNTIME_CPU_SUPPORTED=true
   return 0
+}
+
+resolve_llm_local_model_host_path() {
+  local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+  if [[ "${model_path}" == /models/llm/* ]]; then
+    printf '%s\n' "${REPO_ROOT}/models/llm/${model_path#/models/llm/}"
+    return 0
+  fi
+  printf '%s\n' "${model_path}"
+}
+
+validate_llm_local_model_path() {
+  local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+  local host_model_path
+  host_model_path="$(resolve_llm_local_model_host_path)"
+
+  if [[ ! -d "${host_model_path}" ]]; then
+    die "Configured LLM_LOCAL_MODEL_PATH=${model_path} does not exist on host at ${host_model_path}."
+  fi
+
+  if [[ ! -f "${host_model_path}/config.json" && ! -f "${host_model_path}/params.json" ]]; then
+    die "Configured LLM_LOCAL_MODEL_PATH=${model_path} is missing config.json or params.json at ${host_model_path}."
+  fi
 }
 
 compose_file_args() {

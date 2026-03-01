@@ -63,6 +63,8 @@ if [[ "${resolved_accelerator}" == "cpu" ]]; then
   log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
 fi
 
+validate_llm_local_model_path
+
 log_info "Validating compose configuration"
 if ! compose config >/dev/null; then
   die "Compose configuration is invalid"

@@ -245,6 +245,7 @@ Use the targeted restart script when only one service changed:
 - `llm_runtime` fails to start:
   - Ensure local model files exist under `models/llm/`.
   - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.
+  - The path must exist under `models/llm/` on the host and include `config.json` or `params.json`.
   - Confirm the resolved accelerator matches the host:
     - CPU host: `LLM_RUNTIME_ACCELERATOR=cpu` or `auto`
     - NVIDIA GPU host: `LLM_RUNTIME_ACCELERATOR=gpu` or `auto`

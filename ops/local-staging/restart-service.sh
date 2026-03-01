@@ -133,6 +133,10 @@ if [[ "${target_service}" == "llm_runtime" ]] && [[ "${LLM_RUNTIME_CPU_SUPPORTED
   die "llm_runtime is unsupported on this CPU host. Use a compatible AVX2/AVX512 CPU or an NVIDIA GPU host."
 fi
 
+if [[ "${target_service}" == "llm_runtime" || "${target_service}" == "llm" ]]; then
+  validate_llm_local_model_path
+fi
+
 log_info "Validating compose configuration"
 compose config >/dev/null || die "Compose configuration is invalid"
 
