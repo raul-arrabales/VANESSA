@@ -72,11 +72,17 @@ log_info "Starting VANESSA stack"
 mapfile -t selected_services < <(stack_services_for_start)
 if [[ -n "${build_flag}" ]]; then
   if ! compose up -d --build "${selected_services[@]}"; then
+    if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+      log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+    fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
   fi
 else
   if ! compose up -d "${selected_services[@]}"; then
+    if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+      log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+    fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
   fi

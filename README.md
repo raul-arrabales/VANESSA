@@ -104,6 +104,7 @@ Optional fallback control:
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true` allows launcher scripts to omit `llm_runtime` only when routing does not require local runtime
 
 The CPU runtime build is pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
+The CPU builder installs PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
 
 ## Run Containers For Testing
 

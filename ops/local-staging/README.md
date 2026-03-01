@@ -102,6 +102,7 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - `gpu` adds `infra/docker-compose.gpu.override.yml`, which switches `llm_runtime` to the NVIDIA-targeted `vllm/vllm-openai:latest` image and requests `gpus: all`.
 - `cpu` adds `infra/docker-compose.cpu.override.yml` and resolves the CPU ISA automatically unless `LLM_RUNTIME_CPU_VARIANT` forces `avx2` or `avx512`.
 - CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
+- CPU builds install PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
 - `VLLM_CPU_OMP_THREADS_BIND` is optional; leave it empty unless you want to pin inference to a specific core range.
 
 ## Sample Auth Seeding
@@ -253,6 +254,7 @@ Use the targeted restart script when only one service changed:
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
   - On CPU hosts, tune `VLLM_CPU_KVCACHE_SPACE` downward if the model does not fit in available RAM.
+  - If the CPU image build fails while resolving `torch==...+cpu`, verify `LLM_RUNTIME_CPU_TORCH_INDEX_URL` points at a reachable PyTorch CPU wheel index.
   - If startup fails with exit code `132`, the host likely needs a different CPU build variant or does not meet the minimum supported ISA.
   - If you intentionally want to run without local vLLM on an unsupported CPU host:
     - set `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true`

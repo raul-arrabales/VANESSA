@@ -145,7 +145,12 @@ if [[ "${with_deps}" == false ]]; then
 fi
 
 log_info "Restarting service '${target_service}'"
-compose up "${compose_args[@]}" "${target_service}" || die "Failed to restart service: ${target_service}"
+if ! compose up "${compose_args[@]}" "${target_service}"; then
+  if [[ "${target_service}" == "llm_runtime" && "${resolved_accelerator}" == "cpu" ]]; then
+    log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+  fi
+  die "Failed to restart service: ${target_service}"
+fi
 
 if [[ "${wait_mode}" == true ]]; then
   wait_for_service || exit 2

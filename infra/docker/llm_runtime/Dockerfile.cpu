@@ -1,12 +1,15 @@
 FROM python:3.11-slim AS builder
 
 ARG VLLM_VERSION=v0.8.5
+ARG LLM_RUNTIME_CPU_TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
 ARG VLLM_CPU_DISABLE_AVX512=false
 ARG VLLM_CPU_AVX2=true
 ARG VLLM_CPU_AVX512=false
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
+    PIP_EXTRA_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL} \
+    CMAKE_DISABLE_FIND_PACKAGE_CUDA=ON \
     VLLM_TARGET_DEVICE=cpu \
     VLLM_CPU_DISABLE_AVX512=${VLLM_CPU_DISABLE_AVX512} \
     VLLM_CPU_AVX2=${VLLM_CPU_AVX2} \
@@ -27,7 +30,10 @@ RUN git clone --depth 1 --branch "${VLLM_VERSION}" https://github.com/vllm-proje
 WORKDIR /src/vllm
 
 RUN pip install --upgrade pip setuptools wheel packaging
-RUN pip install .
+RUN pip install -v --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" -r requirements/build.txt
+RUN pip install -v --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" -r requirements/cpu.txt
+RUN VLLM_TARGET_DEVICE=cpu python setup.py bdist_wheel
+RUN pip install --extra-index-url "${LLM_RUNTIME_CPU_TORCH_INDEX_URL}" dist/*.whl
 
 FROM python:3.11-slim
 

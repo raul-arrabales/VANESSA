@@ -5,6 +5,7 @@ services:
       dockerfile: infra/docker/llm_runtime/Dockerfile.cpu
       args:
         VLLM_VERSION: ${LLM_RUNTIME_CPU_VLLM_VERSION:-v0.8.5}
+        LLM_RUNTIME_CPU_TORCH_INDEX_URL: ${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
         VLLM_CPU_DISABLE_AVX512: ${LLM_RUNTIME_CPU_BUILD_DISABLE_AVX512:-true}
         VLLM_CPU_AVX2: ${LLM_RUNTIME_CPU_BUILD_AVX2:-true}
         VLLM_CPU_AVX512: ${LLM_RUNTIME_CPU_BUILD_AVX512:-false}
