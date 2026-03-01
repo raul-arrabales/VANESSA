@@ -79,6 +79,8 @@ Supported launcher variables:
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
+- `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
+- `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
@@ -94,11 +96,12 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 
 `llm_runtime` selection:
 
-- Base compose now uses a CPU-safe vLLM image and flags.
+- Base compose defines the common `llm_runtime` service and launcher scripts add a CPU or GPU override compose file.
 - Local-staging scripts resolve `LLM_RUNTIME_ACCELERATOR` before every compose action.
 - `auto` picks `gpu` only when `nvidia-smi -L` succeeds; otherwise it falls back to `cpu`.
 - `gpu` adds `infra/docker-compose.gpu.override.yml`, which switches `llm_runtime` to the NVIDIA-targeted `vllm/vllm-openai:latest` image and requests `gpus: all`.
-- `cpu` keeps the CPU image and exports CPU-oriented vLLM settings such as `VLLM_CPU_KVCACHE_SPACE`.
+- `cpu` adds `infra/docker-compose.cpu.override.yml` and resolves the CPU ISA automatically unless `LLM_RUNTIME_CPU_VARIANT` forces `avx2` or `avx512`.
+- CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - `VLLM_CPU_OMP_THREADS_BIND` is optional; leave it empty unless you want to pin inference to a specific core range.
 
 ## Sample Auth Seeding
@@ -244,9 +247,16 @@ Use the targeted restart script when only one service changed:
   - Confirm the resolved accelerator matches the host:
     - CPU host: `LLM_RUNTIME_ACCELERATOR=cpu` or `auto`
     - NVIDIA GPU host: `LLM_RUNTIME_ACCELERATOR=gpu` or `auto`
+  - Confirm the resolved CPU variant matches the host capabilities:
+    - `avx512` host: `LLM_RUNTIME_CPU_VARIANT=auto` or `avx512`
+    - `avx2` host: `LLM_RUNTIME_CPU_VARIANT=auto` or `avx2`
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
   - On CPU hosts, tune `VLLM_CPU_KVCACHE_SPACE` downward if the model does not fit in available RAM.
+  - If startup fails with exit code `132`, the host likely needs a different CPU build variant or does not meet the minimum supported ISA.
+  - If you intentionally want to run without local vLLM on an unsupported CPU host:
+    - set `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true`
+    - choose a routing mode that does not require local runtime
 - Model downloads fail from backend:
   - Confirm `HF_TOKEN` is set in `infra/.env.local` (recommended) or your compose env override when accessing gated Hugging Face repos.
   - Verify backend sees the token:

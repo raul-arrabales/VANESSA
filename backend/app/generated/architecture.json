@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-02-28T08:35:50+00:00",
+  "generated_at": "2026-03-01T17:04:06+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -52,7 +52,7 @@
       "container": "llm_runtime",
       "label": "LLM Runtime",
       "group": "runtime",
-      "description": "Local vLLM runtime backing LLM API service.",
+      "description": "Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.",
       "public_exposed": false,
       "criticality": "high"
     },
@@ -259,5 +259,5 @@
       }
     }
   },
-  "source_hash": "f39bc06ba977fadc527df577a31da5190f520eb13f06dcec797cc197d44a3339"
+  "source_hash": "e787566e3cb50c3a72b04588c25ec31f53dac3a17e1c4f05d44a769e1e033b84"
 }

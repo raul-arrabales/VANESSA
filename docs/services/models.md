@@ -6,6 +6,11 @@ Model assets are organized for local-first runtime and offline operation where r
 
 - Host path pattern: `models/llm/<model-name>/...`
 - Runtime mapping is controlled via compose environment configuration.
+- Local-staging resolves `llm_runtime` hardware automatically with:
+  - `LLM_RUNTIME_ACCELERATOR=auto|cpu|gpu`
+  - `LLM_RUNTIME_CPU_VARIANT=auto|avx2|avx512`
+- CPU runtime uses `infra/docker-compose.cpu.override.yml` and builds locally from source, pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
+- GPU runtime uses `infra/docker-compose.gpu.override.yml` and the NVIDIA-targeted vLLM image.
 
 ## KWS Models
 

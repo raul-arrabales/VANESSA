@@ -44,6 +44,9 @@ run_checks() {
   local runtime_profile="${VANESSA_RUNTIME_PROFILE:-offline}"
   local runtime_accelerator
   runtime_accelerator="$(resolve_llm_runtime_accelerator)"
+  local runtime_cpu_variant
+  runtime_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
+  validate_llm_runtime_support >/dev/null 2>&1 || true
 
   if http_ok "http://localhost:5000/health"; then
     printf 'backend: OK\n'
@@ -88,14 +91,29 @@ run_checks() {
   fi
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then
-    if compose ps --status running llm_runtime | grep -q 'llm_runtime'; then
-      printf 'llm_runtime: OK (accelerator=%s)\n' "${runtime_accelerator}"
+    if [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" && "${runtime_accelerator}" == "cpu" ]]; then
+      printf 'llm_runtime: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+      failures=$((failures + 1))
+    elif compose ps --status running llm_runtime | grep -q 'llm_runtime'; then
+      if [[ "${runtime_accelerator}" == "cpu" ]]; then
+        printf 'llm_runtime: OK (accelerator=%s, variant=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+      else
+        printf 'llm_runtime: OK (accelerator=%s)\n' "${runtime_accelerator}"
+      fi
     else
-      printf 'llm_runtime: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
+      if [[ "${runtime_accelerator}" == "cpu" ]]; then
+        printf 'llm_runtime: FAIL (accelerator=%s, variant=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+      else
+        printf 'llm_runtime: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
+      fi
       failures=$((failures + 1))
     fi
   else
-    printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
+    if [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" && "${runtime_accelerator}" == "cpu" ]]; then
+      printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s, accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${llm_routing_mode}" "${runtime_accelerator}" "${runtime_cpu_variant}"
+    else
+      printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
+    fi
   fi
 
   if http_ok "http://localhost:8080/v1/.well-known/live"; then

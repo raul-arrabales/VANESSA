@@ -29,7 +29,7 @@ Legend:
 1. Frontend: browser UI, HTTP calls only to backend API.
 2. Backend (Flask API): public API entrypoint, validation, orchestration.
 3. LLM API: private model-serving HTTP gateway for inference/discovery requests.
-4. LLM Runtime: local vLLM runtime engine backing LLM API execution.
+4. LLM Runtime: hardware-adaptive local vLLM runtime engine backing LLM API execution on CPU or GPU hosts.
 5. Agent Engine: multi-step agent logic and tool workflows.
 6. Sandbox: isolated Python code execution environment.
 7. KWS: offline wake-word detection and wake-event emission.

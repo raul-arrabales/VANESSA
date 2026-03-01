@@ -42,8 +42,6 @@ services:
     container_name: vanessa-llm
     ports:
       - "8000:8000"
-    depends_on:
-      - llm_runtime
     env_file:
       - path: .env.example
         required: true
@@ -51,11 +49,9 @@ services:
         required: false
 
   llm_runtime:
-    image: ${LLM_RUNTIME_CPU_IMAGE:-public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest}
+    image: ${LLM_RUNTIME_GPU_IMAGE:-vllm/vllm-openai:latest}
     container_name: vanessa-llm-runtime
     command:
-      - --device
-      - ${LLM_RUNTIME_DEVICE:-cpu}
       - --host
       - 0.0.0.0
       - --port
@@ -63,17 +59,9 @@ services:
       - --model
       - ${LLM_LOCAL_MODEL_PATH:-/models/llm/tinyllama}
       - --dtype
-      - ${LLM_RUNTIME_DTYPE:-float}
+      - ${LLM_RUNTIME_GPU_DTYPE:-auto}
     expose:
       - "8000"
-    shm_size: ${LLM_RUNTIME_SHM_SIZE:-4g}
-    cap_add:
-      - SYS_NICE
-    security_opt:
-      - seccomp=unconfined
-    environment:
-      VLLM_CPU_KVCACHE_SPACE: ${VLLM_CPU_KVCACHE_SPACE:-8}
-      VLLM_CPU_OMP_THREADS_BIND: ${VLLM_CPU_OMP_THREADS_BIND:-}
     env_file:
       - path: .env.example
         required: true

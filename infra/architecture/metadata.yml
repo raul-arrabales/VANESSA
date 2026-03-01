@@ -50,7 +50,7 @@ services:
   llm_runtime:
     label: LLM Runtime
     group: runtime
-    description: Local vLLM runtime backing LLM API service.
+    description: Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.
     public_exposed: false
     criticality: high
   sandbox:

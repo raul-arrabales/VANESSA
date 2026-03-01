@@ -55,7 +55,13 @@ fi
 
 require_prerequisites
 
-log_info "Resolved llm_runtime accelerator: $(resolve_llm_runtime_accelerator)"
+resolved_accelerator="$(resolve_llm_runtime_accelerator)"
+resolved_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
+validate_llm_runtime_support || true
+log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
+if [[ "${resolved_accelerator}" == "cpu" ]]; then
+  log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
+fi
 
 log_info "Validating compose configuration"
 if ! compose config >/dev/null; then
@@ -63,13 +69,14 @@ if ! compose config >/dev/null; then
 fi
 
 log_info "Starting VANESSA stack"
+mapfile -t selected_services < <(stack_services_for_start)
 if [[ -n "${build_flag}" ]]; then
-  if ! compose up -d --build; then
+  if ! compose up -d --build "${selected_services[@]}"; then
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
   fi
 else
-  if ! compose up -d; then
+  if ! compose up -d "${selected_services[@]}"; then
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
   fi

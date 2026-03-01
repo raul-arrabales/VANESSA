@@ -18,6 +18,8 @@ START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-180}"
 LOG_TAIL_LINES="${LOG_TAIL_LINES:-200}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}"
 LLM_RUNTIME_ACCELERATOR="${LLM_RUNTIME_ACCELERATOR:-auto}"
+LLM_RUNTIME_CPU_VARIANT="${LLM_RUNTIME_CPU_VARIANT:-auto}"
+LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
 
 readonly SERVICES=(frontend backend llm llm_runtime agent_engine sandbox kws weaviate postgres)
 
@@ -59,6 +61,11 @@ detect_llm_runtime_accelerator() {
   printf 'cpu\n'
 }
 
+cpu_has_flag() {
+  local flag="$1"
+  lscpu 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr ' ' '\n' | grep -qx "${flag}"
+}
+
 resolve_llm_runtime_accelerator() {
   local requested="${LLM_RUNTIME_ACCELERATOR:-auto}"
   requested="$(printf '%s' "${requested}" | tr '[:upper:]' '[:lower:]')"
@@ -75,12 +82,78 @@ resolve_llm_runtime_accelerator() {
   esac
 }
 
+detect_llm_runtime_cpu_variant() {
+  if cpu_has_flag avx512f; then
+    printf 'avx512\n'
+    return 0
+  fi
+  if cpu_has_flag avx2; then
+    printf 'avx2\n'
+    return 0
+  fi
+  printf 'unsupported\n'
+}
+
+resolve_llm_runtime_cpu_variant() {
+  local requested="${LLM_RUNTIME_CPU_VARIANT:-auto}"
+  requested="$(printf '%s' "${requested}" | tr '[:upper:]' '[:lower:]')"
+  case "${requested}" in
+    avx2|avx512)
+      printf '%s\n' "${requested}"
+      ;;
+    auto|"")
+      detect_llm_runtime_cpu_variant
+      ;;
+    *)
+      die "Invalid LLM_RUNTIME_CPU_VARIANT: ${LLM_RUNTIME_CPU_VARIANT}. Valid values: auto, avx2, avx512"
+      ;;
+  esac
+}
+
+llm_runtime_disable_local_requested() {
+  local value="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
+  value="$(printf '%s' "${value}" | tr '[:upper:]' '[:lower:]')"
+  [[ "${value}" == "1" || "${value}" == "true" || "${value}" == "yes" || "${value}" == "on" ]]
+}
+
+llm_routing_requires_local_runtime() {
+  local routing_mode="${LLM_ROUTING_MODE:-local_only}"
+  routing_mode="$(printf '%s' "${routing_mode}" | tr '[:upper:]' '[:lower:]')"
+  [[ "${routing_mode}" == "local_only" ]]
+}
+
+validate_llm_runtime_support() {
+  local accelerator="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
+
+  if [[ "${accelerator}" == "gpu" ]]; then
+    if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+      die "LLM runtime accelerator is set to gpu, but NVIDIA runtime was not detected."
+    fi
+    export LLM_RUNTIME_CPU_SUPPORTED=true
+    return 0
+  fi
+
+  local variant="${RESOLVED_LLM_RUNTIME_CPU_VARIANT:-$(resolve_llm_runtime_cpu_variant)}"
+  if [[ "${variant}" == "unsupported" ]]; then
+    export LLM_RUNTIME_CPU_SUPPORTED=false
+    if llm_routing_requires_local_runtime && ! llm_runtime_disable_local_requested; then
+      die "CPU host does not advertise avx2 or avx512f; local llm_runtime is unsupported on this machine."
+    fi
+    return 1
+  fi
+
+  export LLM_RUNTIME_CPU_SUPPORTED=true
+  return 0
+}
+
 compose_file_args() {
   local resolved_accelerator="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
   local compose_files="${COMPOSE_FILE}"
 
   if [[ "${resolved_accelerator}" == "gpu" ]]; then
     compose_files="${compose_files}:infra/docker-compose.gpu.override.yml"
+  else
+    compose_files="${compose_files}:infra/docker-compose.cpu.override.yml"
   fi
 
   local compose_file
@@ -95,8 +168,32 @@ compose_file_args() {
 
 compose() {
   RESOLVED_LLM_RUNTIME_ACCELERATOR="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
+  RESOLVED_LLM_RUNTIME_CPU_VARIANT="${RESOLVED_LLM_RUNTIME_CPU_VARIANT:-$(resolve_llm_runtime_cpu_variant)}"
   export RESOLVED_LLM_RUNTIME_ACCELERATOR
+  export RESOLVED_LLM_RUNTIME_CPU_VARIANT
   export LLM_RUNTIME_ACCELERATOR="${RESOLVED_LLM_RUNTIME_ACCELERATOR}"
+  export LLM_RUNTIME_CPU_VARIANT="${RESOLVED_LLM_RUNTIME_CPU_VARIANT}"
+
+  if [[ "${RESOLVED_LLM_RUNTIME_CPU_VARIANT}" == "avx512" ]]; then
+    export LLM_RUNTIME_CPU_BUILD_DISABLE_AVX512=false
+    export LLM_RUNTIME_CPU_BUILD_AVX2=false
+    export LLM_RUNTIME_CPU_BUILD_AVX512=true
+  elif [[ "${RESOLVED_LLM_RUNTIME_CPU_VARIANT}" == "avx2" ]]; then
+    export LLM_RUNTIME_CPU_BUILD_DISABLE_AVX512=true
+    export LLM_RUNTIME_CPU_BUILD_AVX2=true
+    export LLM_RUNTIME_CPU_BUILD_AVX512=false
+  else
+    export LLM_RUNTIME_CPU_BUILD_DISABLE_AVX512=true
+    export LLM_RUNTIME_CPU_BUILD_AVX2=false
+    export LLM_RUNTIME_CPU_BUILD_AVX512=false
+  fi
+
+  if ! validate_llm_runtime_support; then
+    log_warn "Local llm_runtime CPU support is unavailable on this host."
+    if llm_runtime_disable_local_requested; then
+      log_warn "LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU is enabled; local-only routing must be disabled to run without llm_runtime."
+    fi
+  fi
 
   local -a cmd=(docker compose)
   local compose_path
@@ -108,6 +205,21 @@ compose() {
   fi
 
   "${cmd[@]}" "$@"
+}
+
+stack_services_for_start() {
+  local cpu_supported="${LLM_RUNTIME_CPU_SUPPORTED:-true}"
+  if [[ "${cpu_supported}" == "false" ]] && llm_runtime_disable_local_requested && ! llm_routing_requires_local_runtime; then
+    local service
+    for service in "${SERVICES[@]}"; do
+      if [[ "${service}" != "llm_runtime" ]]; then
+        printf '%s\n' "${service}"
+      fi
+    done
+    return 0
+  fi
+
+  printf '%s\n' "${SERVICES[@]}"
 }
 
 require_cmd() {

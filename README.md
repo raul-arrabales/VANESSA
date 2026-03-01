@@ -39,6 +39,12 @@ Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflo
 
 Full guide: `ops/local-staging/README.md`
 
+`llm_runtime` adapts to host hardware in local staging:
+
+- NVIDIA GPU hosts use the GPU runtime override image
+- CPU-only hosts add the CPU override compose file and build a local CPU vLLM image matched to the detected ISA (`avx512` or `avx2`)
+- Unsupported CPU hosts fail early with a clear launcher diagnostic instead of crashing with `SIGILL`
+
 ## LLM API Endpoints (Local)
 
 When running local staging (`./ops/local-staging/start.sh`), the LLM service is exposed at `http://localhost:8000`.
@@ -79,6 +85,25 @@ When running local staging (`./ops/local-staging/start.sh`), the LLM service is 
     ```
   - Expected: `200 OK` with generated response content.
   - Failure codes you may see: `400`, `401`, `404`, `422`, `429`, `5xx`.
+
+## Local LLM Runtime Selection
+
+Local staging resolves `llm_runtime` automatically:
+
+- `LLM_RUNTIME_ACCELERATOR=auto|cpu|gpu`
+- `LLM_RUNTIME_CPU_VARIANT=auto|avx2|avx512`
+
+Default behavior:
+
+- Prefer GPU when `nvidia-smi -L` succeeds
+- Otherwise use CPU mode
+- In CPU mode prefer `avx512`, then `avx2`, otherwise fail early as unsupported
+
+Optional fallback control:
+
+- `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true` allows launcher scripts to omit `llm_runtime` only when routing does not require local runtime
+
+The CPU runtime build is pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 
 ## Run Containers For Testing
 

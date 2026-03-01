@@ -118,7 +118,20 @@ fi
 
 require_prerequisites
 
-log_info "Resolved llm_runtime accelerator: $(resolve_llm_runtime_accelerator)"
+resolved_accelerator="$(resolve_llm_runtime_accelerator)"
+resolved_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
+validate_llm_runtime_support || true
+log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
+if [[ "${resolved_accelerator}" == "cpu" ]]; then
+  log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
+fi
+
+if [[ "${target_service}" == "llm_runtime" ]] && [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" ]]; then
+  if llm_runtime_disable_local_requested && ! llm_routing_requires_local_runtime; then
+    die "llm_runtime is unsupported on this CPU host and has been disabled for non-local routing."
+  fi
+  die "llm_runtime is unsupported on this CPU host. Use a compatible AVX2/AVX512 CPU or an NVIDIA GPU host."
+fi
 
 log_info "Validating compose configuration"
 compose config >/dev/null || die "Compose configuration is invalid"

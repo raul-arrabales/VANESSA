@@ -1,0 +1,45 @@
+FROM python:3.11-slim AS builder
+
+ARG VLLM_VERSION=v0.8.5
+ARG VLLM_CPU_DISABLE_AVX512=false
+ARG VLLM_CPU_AVX2=true
+ARG VLLM_CPU_AVX512=false
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    VLLM_TARGET_DEVICE=cpu \
+    VLLM_CPU_DISABLE_AVX512=${VLLM_CPU_DISABLE_AVX512} \
+    VLLM_CPU_AVX2=${VLLM_CPU_AVX2} \
+    VLLM_CPU_AVX512=${VLLM_CPU_AVX512}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    libnuma-dev \
+    ninja-build \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${VLLM_VERSION}" https://github.com/vllm-project/vllm.git /src/vllm
+
+WORKDIR /src/vllm
+
+RUN pip install --upgrade pip setuptools wheel packaging
+RUN pip install .
+
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    libnuma1 \
+    numactl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local /usr/local
+
+WORKDIR /app
+EXPOSE 8000
+
+ENTRYPOINT ["vllm", "serve"]
