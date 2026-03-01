@@ -219,7 +219,7 @@ validate_llm_cpu_thread_binding() {
 
 llm_runtime_internal_http_ok() {
   local path="$1"
-  compose exec -T llm_runtime python -c "import sys, urllib.request; urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3); sys.exit(0)"
+  compose exec -T llm_runtime python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
 resolve_llm_local_model_host_path() {
