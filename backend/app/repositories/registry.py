@@ -13,6 +13,20 @@ _GRANTEE_TYPES = {"user", "group", "org", "public"}
 _RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
 
 
+def _ensure_system_runtime_config_table(connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS system_runtime_config (
+            config_key TEXT PRIMARY KEY,
+            config_value TEXT NOT NULL,
+            updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
+
 def create_registry_entity(
     database_url: str,
     *,
@@ -205,6 +219,7 @@ def upsert_runtime_profile(database_url: str, *, profile: str, updated_by_user_i
         raise ValueError("invalid_runtime_profile")
 
     with get_connection(database_url) as connection:
+        _ensure_system_runtime_config_table(connection)
         connection.execute(
             """
             INSERT INTO system_runtime_config (config_key, config_value, updated_by_user_id)
@@ -222,6 +237,7 @@ def upsert_runtime_profile(database_url: str, *, profile: str, updated_by_user_i
 
 def get_runtime_profile(database_url: str) -> str | None:
     with get_connection(database_url) as connection:
+        _ensure_system_runtime_config_table(connection)
         row = connection.execute(
             "SELECT config_value FROM system_runtime_config WHERE config_key = 'runtime_profile'"
         ).fetchone()
