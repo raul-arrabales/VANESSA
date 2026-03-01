@@ -39,11 +39,95 @@ const breadcrumbSegmentConfig: Record<string, BreadcrumbSegmentConfig> = {
   welcome: { labelKey: "nav.breadcrumbs.welcome" },
 };
 
+type RuntimeModeConfirmationDialogProps = {
+  nextMode: "air_gapped" | "online";
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+function RuntimeModeConfirmationDialog({
+  nextMode,
+  isPending,
+  onCancel,
+  onConfirm,
+}: RuntimeModeConfirmationDialogProps): JSX.Element {
+  const { t } = useTranslation("common");
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    confirmButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleEscapePress = (event: KeyboardEvent): void => {
+      if (event.key === "Escape" && !isPending) {
+        onCancel();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscapePress);
+    return () => {
+      document.removeEventListener("keydown", handleEscapePress);
+    };
+  }, [isPending, onCancel]);
+
+  const titleKey = nextMode === "air_gapped"
+    ? "runtimeMode.dialog.titleLocalOnly"
+    : "runtimeMode.dialog.titleOnline";
+  const messageKey = nextMode === "air_gapped"
+    ? "runtimeMode.confirmEnableLocalOnly"
+    : "runtimeMode.confirmEnableOnline";
+  const confirmLabelKey = nextMode === "air_gapped"
+    ? "runtimeMode.dialog.confirmLocalOnly"
+    : "runtimeMode.dialog.confirmOnline";
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="modal-card panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="runtime-mode-dialog-title"
+        aria-describedby="runtime-mode-dialog-message"
+      >
+        <p className="eyebrow">{t("runtimeMode.toggleLabel")}</p>
+        <h2 id="runtime-mode-dialog-title" className="section-title modal-title">
+          {t(titleKey)}
+        </h2>
+        <p id="runtime-mode-dialog-message" className="modal-message">
+          {t(messageKey)}
+        </p>
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onCancel}
+            disabled={isPending}
+          >
+            {t("runtimeMode.dialog.cancel")}
+          </button>
+          <button
+            ref={confirmButtonRef}
+            type="button"
+            className="primary-button"
+            onClick={onConfirm}
+            disabled={isPending}
+          >
+            {t(confirmLabelKey)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
   const { mode, isLoading: isRuntimeLoading, isSaving: isRuntimeSaving, error: runtimeError, setMode } = useRuntimeMode();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [pendingRuntimeMode, setPendingRuntimeMode] = useState<"air_gapped" | "online" | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
@@ -54,6 +138,24 @@ function AppHeader(): JSX.Element {
   const canUpdateRuntimeMode = user?.role === "superadmin";
   const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLoading || isRuntimeSaving || !mode;
   const isLocalOnlyMode = mode ? mode !== "online" : false;
+
+  const handleRuntimeModeRequest = (nextMode: "air_gapped" | "online"): void => {
+    setPendingRuntimeMode(nextMode);
+  };
+
+  const handleRuntimeModeCancel = (): void => {
+    setPendingRuntimeMode(null);
+  };
+
+  const handleRuntimeModeConfirm = (): void => {
+    if (!pendingRuntimeMode) {
+      return;
+    }
+
+    const nextMode = pendingRuntimeMode;
+    setPendingRuntimeMode(null);
+    void setMode(nextMode);
+  };
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent): void => {
@@ -107,14 +209,7 @@ function AppHeader(): JSX.Element {
                 }
 
                 const nextMode = event.currentTarget.checked ? "air_gapped" : "online";
-                const confirmationMessage = nextMode === "air_gapped"
-                  ? t("runtimeMode.confirmEnableLocalOnly")
-                  : t("runtimeMode.confirmEnableOnline");
-                if (!window.confirm(confirmationMessage)) {
-                  return;
-                }
-
-                void setMode(nextMode);
+                handleRuntimeModeRequest(nextMode);
               }}
             />
             <span className="runtime-toggle-track" aria-hidden="true">
@@ -159,6 +254,14 @@ function AppHeader(): JSX.Element {
         </div>
         {runtimeError && <p className="status-text">{runtimeError === "runtimeMode.updateFailed" ? t("runtimeMode.updateFailed") : runtimeError}</p>}
       </div>
+      {pendingRuntimeMode && (
+        <RuntimeModeConfirmationDialog
+          nextMode={pendingRuntimeMode}
+          isPending={isRuntimeSaving}
+          onCancel={handleRuntimeModeCancel}
+          onConfirm={handleRuntimeModeConfirm}
+        />
+      )}
     </header>
   );
 }

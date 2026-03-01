@@ -362,6 +362,13 @@
     "updateFailed": "No se pudo actualizar el modo de ejecución.",
     "localOnlyLabel": "Solo local",
     "confirmEnableLocalOnly": "¿Activar el modo solo local para todos los usuarios? Las acciones que dependen de internet se bloquearan en todo el sistema.",
-    "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?"
+    "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?",
+    "dialog": {
+      "titleLocalOnly": "Confirmar ejecución solo local",
+      "titleOnline": "Confirmar ejecución en línea",
+      "cancel": "Cancelar",
+      "confirmLocalOnly": "Activar solo local",
+      "confirmOnline": "Cambiar a en línea"
+    }
   }
 }

@@ -205,6 +205,52 @@ a {
   background: linear-gradient(180deg, var(--lcars-rail) 0%, var(--lcars-rail-soft) 100%);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-canvas) 36%, rgba(8, 17, 30, 0.68));
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  width: min(32rem, 100%);
+  padding-right: var(--space-6);
+  box-shadow: var(--shadow-3);
+  animation: modal-enter var(--duration-base) var(--easing-standard);
+}
+
+.modal-title {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.modal-message {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.modal-actions {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .app-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -240,6 +286,55 @@ a {
   gap: var(--space-3);
   justify-content: flex-end;
   align-items: flex-end;
+}
+
+.primary-button,
+.secondary-button {
+  appearance: none;
+  border-radius: var(--radius-md);
+  padding: 0.82rem 1.15rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--easing-standard),
+    background-color var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.primary-button {
+  border: 1px solid color-mix(in oklab, var(--accent-primary) 80%, black 8%);
+  color: white;
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent-primary) 84%, white 6%),
+    color-mix(in oklab, var(--accent-secondary) 72%, var(--accent-primary))
+  );
+}
+
+.secondary-button {
+  border: 1px solid var(--border-muted);
+  color: var(--text-primary);
+  background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 84%, white);
+  outline-offset: 2px;
 }
 
 .nav-links {

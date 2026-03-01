@@ -362,6 +362,13 @@
     "updateFailed": "Unable to update runtime mode.",
     "localOnlyLabel": "Local only",
     "confirmEnableLocalOnly": "Enable Local-only mode for all users? Internet-dependent actions will be blocked system-wide.",
-    "confirmEnableOnline": "Switch to Online mode for all users?"
+    "confirmEnableOnline": "Switch to Online mode for all users?",
+    "dialog": {
+      "titleLocalOnly": "Confirm local-only runtime",
+      "titleOnline": "Confirm online runtime",
+      "cancel": "Cancel",
+      "confirmLocalOnly": "Enable local-only",
+      "confirmOnline": "Switch online"
+    }
   }
 }

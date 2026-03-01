@@ -101,7 +101,6 @@ describe("App header", () => {
     };
 
     const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(
       <MemoryRouter initialEntries={["/"]}>
@@ -110,7 +109,32 @@ describe("App header", () => {
     );
 
     await user.click(screen.getByRole("switch", { name: "runtimeMode.toggleLabel" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "runtimeMode.dialog.cancel" }));
 
     expect(mockSetMode).not.toHaveBeenCalled();
+  });
+
+  it("changes runtime mode after confirming in the themed dialog", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("switch", { name: "runtimeMode.toggleLabel" }));
+    await user.click(screen.getByRole("button", { name: "runtimeMode.dialog.confirmOnline" }));
+
+    expect(mockSetMode).toHaveBeenCalledWith("online");
   });
 });
