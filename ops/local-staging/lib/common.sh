@@ -63,6 +63,52 @@ detect_llm_runtime_accelerator() {
   printf 'cpu\n'
 }
 
+docker_has_nvidia_runtime() {
+  local runtimes
+  runtimes="$(docker info --format '{{json .Runtimes}}' 2>/dev/null || true)"
+  [[ "${runtimes}" == *'"nvidia"'* ]]
+}
+
+detect_low_capability_nvidia_gpu() {
+  local query_output
+  query_output="$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>/dev/null || true)"
+  [[ -n "${query_output}" ]] || return 1
+
+  local line gpu_name compute_cap major_cap minor_cap
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] || continue
+    gpu_name="$(printf '%s' "${line}" | cut -d',' -f1 | xargs)"
+    compute_cap="$(printf '%s' "${line}" | cut -d',' -f2 | xargs)"
+    [[ "${compute_cap}" =~ ^[0-9]+\.[0-9]+$ ]] || continue
+    major_cap="${compute_cap%%.*}"
+    minor_cap="${compute_cap#*.}"
+    if (( major_cap < 6 )); then
+      printf '%s,%s\n' "${gpu_name}" "${major_cap}.${minor_cap}"
+      return 0
+    fi
+  done <<< "${query_output}"
+
+  return 1
+}
+
+validate_docker_gpu_runtime() {
+  if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
+    die "LLM runtime accelerator is set to gpu, but NVIDIA drivers are not available on the host."
+  fi
+
+  if ! docker_has_nvidia_runtime; then
+    die "LLM runtime accelerator resolved to gpu, but Docker does not advertise an NVIDIA runtime. Install/configure nvidia-container-toolkit and restart Docker."
+  fi
+
+  local low_capability_gpu
+  low_capability_gpu="$(detect_low_capability_nvidia_gpu || true)"
+  if [[ -n "${low_capability_gpu}" ]]; then
+    local gpu_name="${low_capability_gpu%%,*}"
+    local compute_cap="${low_capability_gpu#*,}"
+    die "LLM runtime accelerator resolved to gpu, but detected GPU '${gpu_name}' has compute capability ${compute_cap}. The shipped CUDA 12 vLLM image requires a newer NVIDIA GPU; use CPU mode or a newer GPU."
+  fi
+}
+
 cpu_has_flag() {
   local flag="$1"
   lscpu 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr ' ' '\n' | grep -qx "${flag}"
@@ -128,9 +174,7 @@ validate_llm_runtime_support() {
   local accelerator="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
 
   if [[ "${accelerator}" == "gpu" ]]; then
-    if ! command -v nvidia-smi >/dev/null 2>&1 || ! nvidia-smi -L >/dev/null 2>&1; then
-      die "LLM runtime accelerator is set to gpu, but NVIDIA runtime was not detected."
-    fi
+    validate_docker_gpu_runtime
     export LLM_RUNTIME_CPU_SUPPORTED=true
     return 0
   fi

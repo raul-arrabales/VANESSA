@@ -256,6 +256,14 @@ Use the targeted restart script when only one service changed:
     - `avx2` host: `LLM_RUNTIME_CPU_VARIANT=auto` or `avx2`
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
+  - The default GPU runtime image is CUDA 12 based. Older NVIDIA GPUs below compute capability `6.0` can be visible to Docker and still fail during vLLM startup.
+    - Example: GTX 960 (`compute capability 5.2`) is too old for the shipped GPU image.
+    - In that case, use CPU mode (`LLM_RUNTIME_ACCELERATOR=cpu`) or run on a newer NVIDIA GPU.
+  - If host `nvidia-smi` works but Docker fails with `could not select device driver "" with capabilities: [[gpu]]`:
+    - NVIDIA drivers alone are not enough; Docker also needs `nvidia-container-toolkit`.
+    - Verify Docker advertises the `nvidia` runtime:
+      `docker info --format '{{json .Runtimes}}'`
+    - If `nvidia` is missing, install/configure `nvidia-container-toolkit` for Docker and restart the Docker daemon before re-running local staging.
   - On CPU hosts, tune `VLLM_CPU_KVCACHE_SPACE` downward if the model does not fit in available RAM.
   - If CPU startup fails around NUMA or thread binding, try `VLLM_CPU_OMP_THREADS_BIND` in this order: `0-7`, `auto`, `nobind`.
   - If the CPU image build fails while resolving `torch==...+cpu`, verify `LLM_RUNTIME_CPU_TORCH_INDEX_URL` points at a reachable PyTorch CPU wheel index.

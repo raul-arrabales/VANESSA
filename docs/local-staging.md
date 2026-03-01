@@ -25,6 +25,9 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 
 - Health check:
   - `./ops/local-staging/health.sh --wait --timeout 240`
+- GPU runtime prerequisite:
+  - On NVIDIA hosts, Docker must advertise the `nvidia` runtime, not just the host driver. If `docker info --format '{{json .Runtimes}}'` does not include `nvidia`, install/configure `nvidia-container-toolkit` and restart Docker.
+  - The default CUDA 12 `llm_runtime` image also needs a sufficiently recent GPU. Older cards such as GTX 960-class hardware can pass Docker GPU smoke tests and still fail when vLLM initializes CUDA. Use `LLM_RUNTIME_ACCELERATOR=cpu` on those hosts.
 - Runtime profile check:
   - `curl -sS http://localhost:5000/v1/runtime/profile`
 - Status:
