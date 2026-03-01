@@ -55,6 +55,8 @@ fi
 
 require_prerequisites
 
+log_info "Resolved llm_runtime accelerator: $(resolve_llm_runtime_accelerator)"
+
 log_info "Validating compose configuration"
 if ! compose config >/dev/null; then
   die "Compose configuration is invalid"

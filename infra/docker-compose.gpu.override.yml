@@ -1,0 +1,17 @@
+services:
+  llm_runtime:
+    image: ${LLM_RUNTIME_GPU_IMAGE:-vllm/vllm-openai:latest}
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --model
+      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/tinyllama}
+      - --dtype
+      - ${LLM_RUNTIME_GPU_DTYPE:-auto}
+    gpus: ${LLM_RUNTIME_GPU_REQUEST:-all}
+    ipc: host
+    cap_add: []
+    security_opt: []
+    environment: {}

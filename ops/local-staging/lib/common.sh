@@ -17,6 +17,7 @@ COMPOSE_FILE="${COMPOSE_FILE:-infra/docker-compose.yml}"
 START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-180}"
 LOG_TAIL_LINES="${LOG_TAIL_LINES:-200}"
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}"
+LLM_RUNTIME_ACCELERATOR="${LLM_RUNTIME_ACCELERATOR:-auto}"
 
 readonly SERVICES=(frontend backend llm llm_runtime agent_engine sandbox kws weaviate postgres)
 
@@ -42,18 +43,66 @@ die() {
 }
 
 resolve_compose_file() {
-  if [[ "${COMPOSE_FILE}" = /* ]]; then
-    printf '%s\n' "${COMPOSE_FILE}"
+  local compose_file="$1"
+  if [[ "${compose_file}" = /* ]]; then
+    printf '%s\n' "${compose_file}"
   else
-    printf '%s\n' "${REPO_ROOT}/${COMPOSE_FILE}"
+    printf '%s\n' "${REPO_ROOT}/${compose_file}"
   fi
 }
 
-compose() {
-  local compose_path
-  compose_path="$(resolve_compose_file)"
+detect_llm_runtime_accelerator() {
+  if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+    printf 'gpu\n'
+    return 0
+  fi
+  printf 'cpu\n'
+}
 
-  local -a cmd=(docker compose -f "${compose_path}")
+resolve_llm_runtime_accelerator() {
+  local requested="${LLM_RUNTIME_ACCELERATOR:-auto}"
+  requested="$(printf '%s' "${requested}" | tr '[:upper:]' '[:lower:]')"
+  case "${requested}" in
+    cpu|gpu)
+      printf '%s\n' "${requested}"
+      ;;
+    auto|"")
+      detect_llm_runtime_accelerator
+      ;;
+    *)
+      die "Invalid LLM_RUNTIME_ACCELERATOR: ${LLM_RUNTIME_ACCELERATOR}. Valid values: auto, cpu, gpu"
+      ;;
+  esac
+}
+
+compose_file_args() {
+  local resolved_accelerator="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
+  local compose_files="${COMPOSE_FILE}"
+
+  if [[ "${resolved_accelerator}" == "gpu" ]]; then
+    compose_files="${compose_files}:infra/docker-compose.gpu.override.yml"
+  fi
+
+  local compose_file
+  local old_ifs="${IFS}"
+  IFS=':'
+  for compose_file in ${compose_files}; do
+    [[ -n "${compose_file}" ]] || continue
+    printf '%s\0' "$(resolve_compose_file "${compose_file}")"
+  done
+  IFS="${old_ifs}"
+}
+
+compose() {
+  RESOLVED_LLM_RUNTIME_ACCELERATOR="${RESOLVED_LLM_RUNTIME_ACCELERATOR:-$(resolve_llm_runtime_accelerator)}"
+  export RESOLVED_LLM_RUNTIME_ACCELERATOR
+  export LLM_RUNTIME_ACCELERATOR="${RESOLVED_LLM_RUNTIME_ACCELERATOR}"
+
+  local -a cmd=(docker compose)
+  local compose_path
+  while IFS= read -r -d '' compose_path; do
+    cmd+=(-f "${compose_path}")
+  done < <(compose_file_args)
   if [[ -n "${COMPOSE_ENV_FILE}" ]]; then
     cmd+=(--env-file "${COMPOSE_ENV_FILE}")
   fi

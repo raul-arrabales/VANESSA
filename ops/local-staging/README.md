@@ -78,6 +78,7 @@ Supported launcher variables:
 - `SAMPLE_USER_EMAIL` (default: `sample-user@local.test`)
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
+- `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
@@ -90,6 +91,15 @@ Config source of truth in code:
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
+
+`llm_runtime` selection:
+
+- Base compose now uses a CPU-safe vLLM image and flags.
+- Local-staging scripts resolve `LLM_RUNTIME_ACCELERATOR` before every compose action.
+- `auto` picks `gpu` only when `nvidia-smi -L` succeeds; otherwise it falls back to `cpu`.
+- `gpu` adds `infra/docker-compose.gpu.override.yml`, which switches `llm_runtime` to the NVIDIA-targeted `vllm/vllm-openai:latest` image and requests `gpus: all`.
+- `cpu` keeps the CPU image and exports CPU-oriented vLLM settings such as `VLLM_CPU_KVCACHE_SPACE`.
+- `VLLM_CPU_OMP_THREADS_BIND` is optional; leave it empty unless you want to pin inference to a specific core range.
 
 ## Sample Auth Seeding
 
@@ -231,6 +241,12 @@ Use the targeted restart script when only one service changed:
 - `llm_runtime` fails to start:
   - Ensure local model files exist under `models/llm/`.
   - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.
+  - Confirm the resolved accelerator matches the host:
+    - CPU host: `LLM_RUNTIME_ACCELERATOR=cpu` or `auto`
+    - NVIDIA GPU host: `LLM_RUNTIME_ACCELERATOR=gpu` or `auto`
+  - On GPU hosts, verify Docker GPU access works before starting VANESSA:
+    `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
+  - On CPU hosts, tune `VLLM_CPU_KVCACHE_SPACE` downward if the model does not fit in available RAM.
 - Model downloads fail from backend:
   - Confirm `HF_TOKEN` is set in `infra/.env.local` (recommended) or your compose env override when accessing gated Hugging Face repos.
   - Verify backend sees the token:

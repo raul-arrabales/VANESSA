@@ -42,6 +42,8 @@ run_checks() {
   local failures=0
   local llm_routing_mode="${LLM_ROUTING_MODE:-local_only}"
   local runtime_profile="${VANESSA_RUNTIME_PROFILE:-offline}"
+  local runtime_accelerator
+  runtime_accelerator="$(resolve_llm_runtime_accelerator)"
 
   if http_ok "http://localhost:5000/health"; then
     printf 'backend: OK\n'
@@ -87,9 +89,9 @@ run_checks() {
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then
     if compose ps --status running llm_runtime | grep -q 'llm_runtime'; then
-      printf 'llm_runtime: OK\n'
+      printf 'llm_runtime: OK (accelerator=%s)\n' "${runtime_accelerator}"
     else
-      printf 'llm_runtime: FAIL\n'
+      printf 'llm_runtime: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
       failures=$((failures + 1))
     fi
   else
