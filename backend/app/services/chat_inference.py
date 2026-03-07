@@ -8,9 +8,11 @@ from urllib.request import Request, urlopen
 from flask import g
 
 from ..config import get_auth_config
+from ..repositories.model_management import get_model_by_id
 from .model_resolution import resolve_model_for_inference
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 1.5
+_LOCAL_LLM_MODEL_ID = "local-vllm-default"
 
 
 def http_json_request(url: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
@@ -77,6 +79,24 @@ def extract_output_text(llm_response: dict[str, Any]) -> str:
     return "\n".join(text_parts)
 
 
+def _is_model_not_found_error(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        return str(detail.get("code", "")).strip().lower() == "model_not_found"
+    return str(payload.get("error", "")).strip().lower() == "model_not_found"
+
+
+def _can_use_local_llm_fallback(requested_model_id: str) -> bool:
+    model = get_model_by_id(get_auth_config().database_url, requested_model_id)
+    if model is None:
+        return False
+    backend_kind = str(model.get("backend_kind", "")).strip().lower()
+    availability = str(model.get("availability", "")).strip().lower()
+    return backend_kind == "local" or availability == "offline_ready"
+
+
 def chat_completion_with_allowed_model(
     *,
     requested_model_id: str,
@@ -106,4 +126,14 @@ def chat_completion_with_allowed_model(
     if temperature is not None:
         upstream_payload["temperature"] = temperature
 
-    return http_json_request(f"{llm_url}/v1/chat/completions", upstream_payload)
+    llm_response, status_code = http_json_request(f"{llm_url}/v1/chat/completions", upstream_payload)
+    if (
+        status_code == 404
+        and upstream_payload["model"] != _LOCAL_LLM_MODEL_ID
+        and _is_model_not_found_error(llm_response)
+        and _can_use_local_llm_fallback(str(upstream_payload["model"]))
+    ):
+        fallback_payload = dict(upstream_payload)
+        fallback_payload["model"] = _LOCAL_LLM_MODEL_ID
+        return http_json_request(f"{llm_url}/v1/chat/completions", fallback_payload)
+    return llm_response, status_code

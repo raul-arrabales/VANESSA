@@ -79,6 +79,7 @@ Supported launcher variables:
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
+- `LLM_LOCAL_UPSTREAM_MODEL` (default in `infra/.env.example`: same value as `LLM_LOCAL_MODEL_PATH`; must match a model id exposed by `llm_runtime /v1/models`)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)

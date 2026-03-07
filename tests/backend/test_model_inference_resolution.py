@@ -140,3 +140,58 @@ def test_resolve_model_for_inference_returns_forbidden_when_not_visible(monkeypa
         "error": "model_forbidden",
         "message": "Requested model is not allowed",
     }
+
+
+def test_inference_retries_local_llm_alias_when_upstream_model_not_found(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="local@example.com",
+        username="localuser",
+        password_hash=hash_password("pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        chat_inference,
+        "resolve_model_for_inference",
+        lambda _db, *, user_id, requested_model_id: (requested_model_id, None, 200),
+    )
+    monkeypatch.setattr(
+        chat_inference,
+        "get_model_by_id",
+        lambda _db, model_id: {
+            "model_id": model_id,
+            "backend_kind": "local",
+            "availability": "offline_ready",
+        },
+    )
+
+    calls: list[dict[str, object]] = []
+
+    def fake_llm_request(_url: str, payload: dict[str, object]):
+        calls.append(dict(payload))
+        if payload.get("model") == "Qwen--Qwen2.5-0.5B-Instruct":
+            return {"detail": {"code": "model_not_found", "message": "Unknown model"}}, 404
+        if payload.get("model") == "local-vllm-default":
+            return {
+                "output": [{"content": [{"type": "text", "text": "ok"}]}],
+            }, 200
+        return {"detail": {"code": "unexpected_model"}}, 400
+
+    monkeypatch.setattr(chat_inference, "http_json_request", fake_llm_request)
+
+    response = test_client.post(
+        "/v1/models/inference",
+        headers=_auth(token),
+        json={"model": "Qwen--Qwen2.5-0.5B-Instruct", "prompt": "hi"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["output"] == "ok"
+    assert [call.get("model") for call in calls] == [
+        "Qwen--Qwen2.5-0.5B-Instruct",
+        "local-vllm-default",
+    ]

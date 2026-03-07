@@ -46,12 +46,19 @@ class LLMConfig:
 
 
 def load_llm_config() -> LLMConfig:
+    local_model_path = (
+        os.getenv("LLM_LOCAL_MODEL_PATH", "/models/llm/Qwen--Qwen2.5-0.5B-Instruct").strip()
+        or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
+    )
+    local_upstream_model = (
+        os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
+        or local_model_path
+    )
     return LLMConfig(
         routing_mode=os.getenv("LLM_ROUTING_MODE", "local_only").strip().lower() or "local_only",
         local_base_url=os.getenv("LLM_LOCAL_BASE_URL", "http://llm_runtime:8000/v1").strip()
         or "http://llm_runtime:8000/v1",
-        local_upstream_model=os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "local-vllm-model").strip()
-        or "local-vllm-model",
+        local_upstream_model=local_upstream_model,
         enable_hf_router=_get_bool_env("LLM_ENABLE_HF_ROUTER", False),
         hf_base_url=os.getenv("LLM_HF_BASE_URL", "https://router.huggingface.co/v1").strip()
         or "https://router.huggingface.co/v1",
