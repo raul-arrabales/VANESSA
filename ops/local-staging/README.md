@@ -288,6 +288,10 @@ API note:
   - Confirm frontend is loaded from `http://localhost:3000`.
   - Confirm backend health is reachable at `http://localhost:5000/health`.
   - The frontend should call `/api/health` (proxied by Vite), not `http://backend:5000/health` from browser context.
+- Chat shows `No enabled models`:
+  - Confirm role assignment exists in `/v1/model-governance/assignments` for your login role (`user|admin|superadmin`) or an explicit assignment exists in user/group/global assignment tables.
+  - Confirm model is enabled in `model_registry` (`is_enabled=true`), and if runtime profile is `offline`, model is local or `offline_ready`.
+  - Validate effective resolution via `GET /v1/model-governance/enabled` for the same logged-in user.
 - Rebuild needed after Dockerfile/dependency changes:
   - Run `./ops/local-staging/start.sh` (default includes `--build`)
 - Build fails with `parent snapshot ... does not exist`:

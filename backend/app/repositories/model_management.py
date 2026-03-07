@@ -125,7 +125,12 @@ def list_models_visible_to_user(
     with get_connection(database_url) as connection:
         rows = connection.execute(
             """
-            WITH user_groups_cte AS (
+            WITH user_role_cte AS (
+                SELECT role
+                FROM users
+                WHERE id = %s
+            ),
+            user_groups_cte AS (
                 SELECT group_id
                 FROM user_group_memberships
                 WHERE user_id = %s
@@ -138,6 +143,10 @@ def list_models_visible_to_user(
                 JOIN user_groups_cte ug ON ug.group_id = mga.group_id
                 UNION
                 SELECT model_id FROM model_global_assignments
+                UNION
+                SELECT jsonb_array_elements_text(msa.model_ids) AS model_id
+                FROM model_scope_assignments msa
+                JOIN user_role_cte ur ON ur.role = msa.scope
             )
             SELECT DISTINCT m.*
             FROM model_registry m
@@ -159,7 +168,7 @@ def list_models_visible_to_user(
                 )
             ORDER BY m.updated_at DESC, m.model_id ASC
             """,
-            (user_id, user_id, user_id, user_id, runtime_profile.strip().lower()),
+            (user_id, user_id, user_id, user_id, user_id, runtime_profile.strip().lower()),
         ).fetchall()
     return [dict(row) for row in rows]
 

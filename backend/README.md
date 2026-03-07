@@ -43,6 +43,14 @@ Model governance and runtime endpoints (canonical in Release N):
 - `POST /v1/models/inference`
 - `POST /v1/models/generate`
 
+Model visibility semantics:
+
+- `/v1/model-governance/allowed`, `/v1/model-governance/enabled`, and `/v1/models/available`
+  resolve effective visibility from the union of:
+  - role-scope assignments from `model_scope_assignments` (`/v1/model-governance/assignments`)
+  - explicit user/group/global assignments (`model_user_assignments`, `model_group_assignments`, `model_global_assignments`)
+- Runtime profile filtering (for example offline restrictions) still applies after assignment resolution.
+
 Agent execution proxy endpoints:
 
 - `POST /v1/agent-executions`

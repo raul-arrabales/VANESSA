@@ -240,3 +240,51 @@ def test_admin_can_manage_assignments_but_user_cannot(client):
         json={"scope": "user", "model_ids": ["model-a"]},
     )
     assert forbidden.status_code == 403
+
+
+def test_enabled_models_endpoint_includes_scope_assigned_models(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="viewer@example.com",
+        username="viewer",
+        password_hash=hash_password("viewer-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "viewer-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        model_governance_routes,
+        "list_models_for_user",
+        lambda _db, *, user_id: (
+            "offline",
+            [
+                {
+                    "model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+                    "name": "Qwen2.5-0.5B-Instruct",
+                    "provider": "huggingface",
+                    "metadata": {"description": "Offline local model"},
+                    "backend_kind": "local",
+                    "availability": "offline_ready",
+                    "origin_scope": "platform",
+                }
+            ],
+        ),
+    )
+
+    response = test_client.get("/v1/model-governance/enabled", headers=_auth(token))
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["runtime_profile"] == "offline"
+    assert payload["models"] == [
+        {
+            "id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "name": "Qwen2.5-0.5B-Instruct",
+            "provider": "huggingface",
+            "description": "Offline local model",
+            "backend": "local",
+            "availability": "offline_ready",
+            "origin": "platform",
+        }
+    ]

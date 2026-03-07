@@ -37,6 +37,7 @@ This adds database support for:
   - availability (`online_only`, `offline_ready`)
   - access scope (`private`, `assigned`, `global`)
 - Assignment targets:
+  - role scope (`model_scope_assignments`) used by `/v1/model-governance/assignments` (`user|admin|superadmin`)
   - user (`model_user_assignments`)
   - group/team (`user_groups`, `user_group_memberships`, `model_group_assignments`)
   - global (`model_global_assignments`)
@@ -64,4 +65,5 @@ Key behavior:
 - Credentials are write-only from API responses (last4 only) and can only be revoked by owner.
 - External model registration requires fixed `provider_model_id` and live provider validation through OpenAI-compatible `/models` discovery.
 - Platform model registration remains superadmin-only; personal model registration is available to regular users.
-- Available-model listing respects runtime profile (offline filtering) and assignment visibility.
+- Available/enabled model listing (`/v1/models/available`, `/v1/model-governance/allowed`, `/v1/model-governance/enabled`) respects runtime profile (offline filtering) and assignment visibility.
+- Effective visibility is the union of role scope assignments (`model_scope_assignments`) and explicit target assignments (`model_user_assignments`, `model_group_assignments`, `model_global_assignments`).
