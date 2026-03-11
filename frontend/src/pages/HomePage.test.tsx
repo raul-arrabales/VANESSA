@@ -44,35 +44,24 @@ describe("HomePage quote of the day", () => {
     });
   });
 
-  it("loads the quote for guests using the active UI language", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        quote: {
-          id: 1,
-          text: "Stars need skeptics too.",
-          author: "VANESSA Curated",
-          source_universe: "Original",
-          tone: "reflective",
-          language: "en",
-          date: "2026-03-11",
-          origin: "local",
-        },
-      }),
-    }));
+  it("does not load or show the quote for guests", async () => {
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     await renderHomePage();
 
-    expect(await screen.findByText("Stars need skeptics too.")).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/v1/content/quote-of-the-day?lang=en"),
-      expect.any(Object),
-    );
+    expect(screen.queryByRole("heading", { name: "Quote of the day" })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("refetches the quote after switching the UI language", async () => {
+    mockUser = {
+      id: 2,
+      email: "pilot@example.com",
+      username: "pilot",
+      role: "user",
+      is_active: true,
+    };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       const language = url.includes("lang=es") ? "es" : "en";
