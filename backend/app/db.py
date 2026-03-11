@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -12,6 +13,100 @@ from psycopg.rows import dict_row
 def get_connection(database_url: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         yield connection
+
+
+def _quote_seed_rows() -> list[dict[str, object]]:
+    now = datetime.now(tz=timezone.utc)
+    return [
+        {
+            "language": "en",
+            "text": "I asked the ship AI for meaning. It suggested a firmware update and a long walk among the stars.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "reflective",
+            "tags": ["ai", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "en",
+            "text": "A wise captain debugs the console before blaming the galaxy.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "funny",
+            "tags": ["ai", "funny", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "en",
+            "text": "Synthetic minds count possibilities. Sentient minds decide which ones deserve mercy.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "reflective",
+            "tags": ["ai", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "en",
+            "text": "On a starship, even existential dread sounds better with clean telemetry.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "funny",
+            "tags": ["funny", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "es",
+            "text": "Le pedi sentido a la IA de la nave. Me propuso una actualizacion de firmware y un paseo entre las estrellas.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "reflective",
+            "tags": ["ai", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "es",
+            "text": "Una capitana sabia depura la consola antes de culpar a la galaxia.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "funny",
+            "tags": ["ai", "funny", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "es",
+            "text": "Las mentes sinteticas cuentan posibilidades. Las conscientes eligen cuales merecen compasion.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "reflective",
+            "tags": ["ai", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "language": "es",
+            "text": "En una nave estelar, hasta la crisis existencial suena mejor con telemetria limpia.",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "funny",
+            "tags": ["funny", "philosophy", "scifi"],
+            "origin": "local",
+            "created_at": now,
+            "updated_at": now,
+        },
+    ]
 
 
 def run_auth_schema_migration(database_url: str) -> None:
@@ -331,6 +426,7 @@ def run_auth_schema_migration(database_url: str) -> None:
             )
 
     run_model_management_schema_migration(database_url)
+    run_quotes_schema_migration(database_url)
 
 
 def run_model_management_schema_migration(database_url: str) -> None:
@@ -346,3 +442,108 @@ def run_model_management_schema_migration(database_url: str) -> None:
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
             cursor.execute(migration_sql)
+
+
+def run_quotes_schema_migration(database_url: str) -> None:
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS quotes (
+                    id BIGSERIAL PRIMARY KEY,
+                    language TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    author TEXT NOT NULL,
+                    source_universe TEXT NOT NULL DEFAULT 'Original',
+                    tone TEXT NOT NULL,
+                    tags JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+                    origin TEXT NOT NULL DEFAULT 'local',
+                    external_ref TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cursor.execute("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS language TEXT")
+            cursor.execute("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS text TEXT")
+            cursor.execute("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS author TEXT")
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS source_universe TEXT NOT NULL DEFAULT 'Original'"
+            )
+            cursor.execute("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS tone TEXT")
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb"
+            )
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS is_approved BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'local'"
+            )
+            cursor.execute("ALTER TABLE quotes ADD COLUMN IF NOT EXISTS external_ref TEXT")
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                "ALTER TABLE quotes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()"
+            )
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'quotes_origin_check'
+                    ) THEN
+                        ALTER TABLE quotes
+                        ADD CONSTRAINT quotes_origin_check
+                        CHECK (origin IN ('local', 'cloud'));
+                    END IF;
+                END
+                $$
+                """
+            )
+            cursor.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS quotes_language_text_unique_idx ON quotes (language, text)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS quotes_lookup_idx ON quotes (language, is_active, is_approved)"
+            )
+
+            quote_rows = _quote_seed_rows()
+            for row in quote_rows:
+                cursor.execute(
+                    """
+                    INSERT INTO quotes (
+                        language,
+                        text,
+                        author,
+                        source_universe,
+                        tone,
+                        tags,
+                        is_active,
+                        is_approved,
+                        origin,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, TRUE, TRUE, %s, %s, %s)
+                    ON CONFLICT (language, text) DO NOTHING
+                    """,
+                    (
+                        row["language"],
+                        row["text"],
+                        row["author"],
+                        row["source_universe"],
+                        row["tone"],
+                        psycopg.types.json.Jsonb(row["tags"]),
+                        row["origin"],
+                        row["created_at"],
+                        row["updated_at"],
+                    ),
+                )

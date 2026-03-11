@@ -205,6 +205,66 @@ a {
   background: linear-gradient(180deg, var(--lcars-rail) 0%, var(--lcars-rail-soft) 100%);
 }
 
+.quote-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in oklab, var(--accent-secondary) 35%, var(--border-muted));
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--bg-surface) 92%, transparent), color-mix(in oklab, var(--bg-subtle) 84%, transparent)),
+    radial-gradient(circle at top right, color-mix(in oklab, var(--lcars-rail-soft) 44%, transparent), transparent 42%);
+}
+
+.quote-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--lcars-rail) 18%, transparent), transparent 30%);
+  opacity: 0.9;
+}
+
+.quote-card-header,
+.quote-card-body,
+.quote-card-meta,
+.quote-card > .status-text {
+  position: relative;
+  z-index: 1;
+}
+
+.quote-card-title {
+  margin: 0;
+}
+
+.quote-card-eyebrow {
+  margin: 0;
+}
+
+.quote-card-body {
+  margin: 0;
+  padding: 0;
+  border-left: 0.2rem solid color-mix(in oklab, var(--accent-primary) 60%, transparent);
+  padding-left: var(--space-4);
+  color: var(--text-primary);
+}
+
+.quote-card-body p {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.quote-card-meta {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

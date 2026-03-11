@@ -192,6 +192,16 @@
       "backendHealth": "Ejecutar diagnosticos del backend"
     }
   },
+  "quoteOfTheDay": {
+    "eyebrow": "Transmision diaria",
+    "title": "Cita del dia",
+    "loading": "Cargando la cita de hoy...",
+    "error": "No se pudo cargar la cita del dia ahora mismo.",
+    "tones": {
+      "funny": "Divertida",
+      "reflective": "Reflexiva"
+    }
+  },
   "settings": {
     "title": "Configuración",
     "profile": {

@@ -1,6 +1,7 @@
 from . import (
     auth,
     auth_legacy_routes,
+    content,
     executions,
     model_catalog_v1,
     model_governance,
@@ -17,6 +18,7 @@ from . import (
 __all__ = [
     "auth",
     "auth_legacy_routes",
+    "content",
     "system",
     "runtime",
     "registry",
