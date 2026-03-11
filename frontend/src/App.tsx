@@ -261,7 +261,9 @@ function BreadcrumbsBar(): JSX.Element {
   const { t } = useTranslation("common");
   const location = useLocation();
   const matchedRoutes = getBreadcrumbRoutes(location.pathname);
-  const crumbs = matchedRoutes.length > 0 ? matchedRoutes : appRoutes.filter((route) => route.path === "/");
+  const homeRoute = appRoutes.find((route) => route.path === "/");
+  const nonHomeRoutes = matchedRoutes.filter((route) => route.path !== "/");
+  const crumbs = homeRoute ? [homeRoute, ...nonHomeRoutes] : nonHomeRoutes;
 
   return (
     <nav className="breadcrumb-bar panel" aria-label={t("nav.breadcrumbs.aria")}>

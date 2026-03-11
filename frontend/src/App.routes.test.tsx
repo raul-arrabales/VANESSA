@@ -100,4 +100,23 @@ describe("App superadmin models route", () => {
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
   });
+
+  it("always shows Home as the first breadcrumb link", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/control/models"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const breadcrumbLinks = await screen.findAllByRole("link", { name: "nav.home" });
+    expect(breadcrumbLinks[0]).toHaveAttribute("href", "/");
+  });
 });
