@@ -30,7 +30,7 @@ export default function HomePage(): JSX.Element {
       </p>
       <QuoteOfTheDayCard />
       <div className="toolbar" role="group" aria-label={t("home.authenticated.actions") }>
-        <Link to="/settings" className="btn btn-primary">{t("home.authenticated.profile")}</Link>
+        <Link to="/settings" className="btn btn-secondary">{t("home.authenticated.profile")}</Link>
         <Link to="/control" className="btn btn-secondary">{t("home.authenticated.control")}</Link>
         <Link to="/ai/chat" className="btn btn-secondary">{t("home.authenticated.aiChat")}</Link>
       </div>
