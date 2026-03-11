@@ -318,6 +318,11 @@ a {
   align-items: start;
 }
 
+.app-header.panel {
+  overflow: visible;
+  z-index: 40;
+}
+
 .eyebrow {
   margin: 0;
   text-transform: uppercase;
@@ -559,7 +564,7 @@ a {
   padding: var(--space-2);
   display: grid;
   gap: var(--space-1);
-  z-index: 20;
+  z-index: 120;
 }
 
 .user-menu-item {
