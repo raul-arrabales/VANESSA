@@ -53,11 +53,13 @@ describe("SettingsPage", () => {
   it("renders profile and personalization only for standard users", async () => {
     renderSettings("/settings");
 
-    expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
-    expect(screen.getByText("runtime-profile-section")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "settings.profile.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "settings.admin.title" })).toBeNull();
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "settings.navigation.title" })).toBeNull();
     expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
-    expect(screen.getByRole("link", { name: "nav.models" })).toHaveAttribute("href", "/control/models");
   });
 
   it("hides model and approvals controls for admins", async () => {
@@ -71,9 +73,10 @@ describe("SettingsPage", () => {
 
     renderSettings("/settings");
 
-    expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
     expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
-    expect(screen.getByRole("link", { name: "nav.control" })).toHaveAttribute("href", "/control");
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
   });
 
   it("keeps canonical links for superadmin settings", async () => {
@@ -87,8 +90,10 @@ describe("SettingsPage", () => {
 
     renderSettings("/settings");
 
+    expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
     expect(await screen.findByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
-    expect(screen.getByRole("link", { name: "nav.models" })).toHaveAttribute("href", "/control/models");
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
     expect(screen.queryByRole("heading", { name: "settings.superadmin.title" })).toBeNull();
   });
 });
