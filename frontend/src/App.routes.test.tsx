@@ -119,4 +119,22 @@ describe("App superadmin models route", () => {
     const breadcrumbLinks = await screen.findAllByRole("link", { name: "nav.home" });
     expect(breadcrumbLinks[0]).toHaveAttribute("href", "/");
   });
+
+  it("renders the control breadcrumb with the control panel label", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/control/models"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("link", { name: "nav.controlPanel" })).toHaveAttribute("href", "/control");
+  });
 });

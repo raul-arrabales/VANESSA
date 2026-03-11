@@ -20,6 +20,7 @@ export type AppRouteDefinition = {
   id: string;
   path: string;
   titleKey: string;
+  breadcrumbTitleKey?: string;
   section: AppRouteSection;
   showInNav: boolean;
   showInBreadcrumbs: boolean;
@@ -107,12 +108,11 @@ export const appRoutes: AppRouteDefinition[] = [
     id: "control",
     path: "/control",
     titleKey: "nav.control",
+    breadcrumbTitleKey: "nav.controlPanel",
     section: "control",
-    showInNav: true,
+    showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
-    navGroup: "primary",
-    navAudience: "authenticated",
     element: <ControlPage />,
   },
   {

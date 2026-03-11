@@ -271,9 +271,9 @@ function BreadcrumbsBar(): JSX.Element {
         {crumbs.map((crumb, index) => (
           <li key={crumb.path} className="breadcrumb-item">
             {index === crumbs.length - 1 ? (
-              <span className="breadcrumb-current" aria-current="page">{t(crumb.titleKey)}</span>
+              <span className="breadcrumb-current" aria-current="page">{t(crumb.breadcrumbTitleKey ?? crumb.titleKey)}</span>
             ) : (
-              <Link to={crumb.path} className="breadcrumb-link">{t(crumb.titleKey)}</Link>
+              <Link to={crumb.path} className="breadcrumb-link">{t(crumb.breadcrumbTitleKey ?? crumb.titleKey)}</Link>
             )}
             {index < crumbs.length - 1 && <span className="breadcrumb-separator" aria-hidden="true">/</span>}
           </li>
