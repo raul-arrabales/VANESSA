@@ -8,25 +8,27 @@
   "nav": {
     "aria": "Primary navigation",
     "home": "Home",
+    "control": "Control",
+    "ai": "Vanessa AI",
+    "chat": "Chat",
     "login": "Login",
     "register": "Register",
     "me": "Profile",
     "guest": "Guest",
     "approvals": "Approvals",
-    "backendHealth": "Backend health",
+    "systemHealth": "System health",
+    "models": "Models",
     "settings": "Settings",
-    "welcome": {
-      "user": "User Home",
-      "admin": "Admin Home",
-      "superadmin": "Superadmin Control Panel"
-    },
+    "designEditor": "Design editor",
     "settingsMenuLabel": "Identity and settings menu",
     "settingsHome": "Settings",
     "settingsDesign": "Design resources",
     "breadcrumbs": {
       "aria": "Breadcrumb navigation",
       "approvals": "Approvals",
-      "backendHealth": "Backend health",
+      "control": "Control",
+      "systemHealth": "System health",
+      "ai": "Vanessa AI",
       "chat": "Chatbot",
       "design": "Design",
       "models": "Models",
@@ -186,10 +188,47 @@
     },
     "authenticated": {
       "title": "Welcome back",
-      "description": "You are signed in as {{username}}. Open your profile or run backend diagnostics.",
+      "description": "You are signed in as {{username}}. Open your profile, control panel, or Vanessa AI workspace.",
       "actions": "Signed-in quick actions",
       "profile": "View profile",
-      "backendHealth": "Run backend diagnostics"
+      "control": "Open control panel",
+      "aiChat": "Open AI chat"
+    }
+  },
+  "control": {
+    "title": "Control panel for {{username}}",
+    "description": "Use your role-based control surface to manage account tools, approvals, models, and operations.",
+    "aria": "Control panel destinations",
+    "items": {
+      "profile": {
+        "title": "Profile and settings",
+        "description": "Review your account details and personalize the interface."
+      },
+      "models": {
+        "title": "Models",
+        "description": "Manage model credentials, registered models, and allowed capabilities."
+      },
+      "ai": {
+        "title": "Vanessa AI",
+        "description": "Open the AI workspace and continue your conversations."
+      },
+      "approvals": {
+        "title": "User approvals",
+        "description": "Review and activate pending user accounts."
+      },
+      "systemHealth": {
+        "title": "System health",
+        "description": "Inspect the live status of VANESSA services and architecture."
+      }
+    }
+  },
+  "ai": {
+    "title": "Vanessa AI",
+    "description": "Open AI-powered workflows and keep your chat workspace organized under a dedicated section.",
+    "aria": "Vanessa AI destinations",
+    "chat": {
+      "title": "Chat workspace",
+      "description": "Start or continue a model-backed conversation in the Vanessa AI console."
     }
   },
   "quoteOfTheDay": {
@@ -253,6 +292,7 @@
     },
     "navigation": {
       "title": "Settings navigation",
+      "description": "Use canonical settings and control routes instead of hidden subpages.",
       "overview": "Overview",
       "design": "Design"
     },
@@ -314,6 +354,11 @@
         "modelRegisterFailed": "Failed to register model."
       }
     }
+  },
+  "modelsHub": {
+    "title": "Model management",
+    "description": "Manage your credentials, register accessible models, and review what is available to your account.",
+    "superadminDescription": "Manage personal model access plus platform catalog, assignments, discovery, and download workflows."
   },
   "models": {
     "title": "Model catalog management",

@@ -19,7 +19,7 @@ test("renders app shell and shows backend health success", async ({ page }) => {
   const identityTrigger = page.getByRole("button", { name: "Guest" });
   await expect(identityTrigger).toBeVisible();
   await expect(identityTrigger.locator("svg")).toBeVisible();
-  await page.goto("/backend-health");
+  await page.goto("/control/system-health");
   await expect(page.getByText("Backend status")).toBeVisible();
 
   await page.getByRole("button", { name: "Check backend" }).click();
@@ -134,7 +134,7 @@ test("toggles theme and persists mode after reload", async ({ page }) => {
 });
 
 test("renders style guide route with primitive examples", async ({ page }) => {
-  await page.goto("/style-guide");
+  await page.goto("/settings/design");
 
   await expect(page.getByRole("heading", { name: "VANESSA" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Color Tokens" })).toBeVisible();
@@ -211,8 +211,8 @@ test("logs in and redirects by role", async ({ page }) => {
   await page.getByLabel("Password").fill("password123");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/admin\/approvals$/);
-  await expect(page.getByRole("heading", { name: "Pending user approvals" })).toBeVisible();
+  await expect(page).toHaveURL(/\/control$/);
+  await expect(page.getByRole("heading", { name: /Control panel/i })).toBeVisible();
 });
 
 test("shows login error for invalid credentials", async ({ page }) => {
@@ -233,7 +233,7 @@ test("shows login error for invalid credentials", async ({ page }) => {
 });
 
 test("redirects protected route without auth", async ({ page }) => {
-  await page.goto("/me");
+  await page.goto("/control");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
 });
@@ -269,7 +269,7 @@ test("blocks standard user from admin approvals", async ({ page }) => {
     });
   });
 
-  await page.goto("/admin/approvals");
+  await page.goto("/control/approvals");
   await expect(page.getByText("You do not have permission to access this page.")).toBeVisible();
 });
 
@@ -320,7 +320,7 @@ test("admin activates pending user by id", async ({ page }) => {
     });
   });
 
-  await page.goto("/admin/approvals");
+  await page.goto("/control/approvals");
   await page.getByLabel("User ID").fill("42");
   await page.getByRole("button", { name: "Activate user" }).click();
 

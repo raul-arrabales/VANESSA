@@ -10,14 +10,6 @@ export function hasRequiredRole(current: Role, required: Role): boolean {
   return ROLE_WEIGHT[current] >= ROLE_WEIGHT[required];
 }
 
-export function getDefaultRouteForRole(role: Role): string {
-  if (role === "superadmin") {
-    return "/welcome/superadmin";
-  }
-
-  if (role === "admin") {
-    return "/welcome/admin";
-  }
-
-  return "/welcome/user";
+export function getDefaultRouteForRole(_role: Role): string {
+  return "/control";
 }

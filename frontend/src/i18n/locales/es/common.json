@@ -8,25 +8,27 @@
   "nav": {
     "aria": "Navegacion principal",
     "home": "Inicio",
+    "control": "Control",
+    "ai": "Vanessa AI",
+    "chat": "Chat",
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
     "guest": "Invitado",
     "approvals": "Aprobaciones",
-    "backendHealth": "Salud del backend",
+    "systemHealth": "Salud del sistema",
+    "models": "Modelos",
     "settings": "Configuración",
-    "welcome": {
-      "user": "Inicio de usuario",
-      "admin": "Inicio de admin",
-      "superadmin": "Panel de control de superadministrador"
-    },
+    "designEditor": "Editor de diseno",
     "settingsMenuLabel": "Menú de identidad y configuración",
     "settingsHome": "Configuración",
     "settingsDesign": "Recursos de diseño",
     "breadcrumbs": {
       "aria": "Navegación de migas",
       "approvals": "Aprobaciones",
-      "backendHealth": "Salud del backend",
+      "control": "Control",
+      "systemHealth": "Salud del sistema",
+      "ai": "Vanessa AI",
       "chat": "Chatbot",
       "design": "Diseño",
       "models": "Modelos",
@@ -186,10 +188,47 @@
     },
     "authenticated": {
       "title": "Bienvenido de nuevo",
-      "description": "Has iniciado sesion como {{username}}. Abre tu perfil o ejecuta diagnosticos del backend.",
+      "description": "Has iniciado sesion como {{username}}. Abre tu perfil, panel de control o espacio Vanessa AI.",
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
-      "backendHealth": "Ejecutar diagnosticos del backend"
+      "control": "Abrir panel de control",
+      "aiChat": "Abrir chat de IA"
+    }
+  },
+  "control": {
+    "title": "Panel de control de {{username}}",
+    "description": "Usa tu superficie de control por rol para gestionar herramientas de cuenta, aprobaciones, modelos y operaciones.",
+    "aria": "Destinos del panel de control",
+    "items": {
+      "profile": {
+        "title": "Perfil y configuracion",
+        "description": "Revisa los detalles de tu cuenta y personaliza la interfaz."
+      },
+      "models": {
+        "title": "Modelos",
+        "description": "Gestiona credenciales de modelos, modelos registrados y capacidades permitidas."
+      },
+      "ai": {
+        "title": "Vanessa AI",
+        "description": "Abre el espacio de IA y continua tus conversaciones."
+      },
+      "approvals": {
+        "title": "Aprobaciones de usuarios",
+        "description": "Revisa y activa cuentas de usuario pendientes."
+      },
+      "systemHealth": {
+        "title": "Salud del sistema",
+        "description": "Inspecciona el estado en vivo de los servicios y arquitectura de VANESSA."
+      }
+    }
+  },
+  "ai": {
+    "title": "Vanessa AI",
+    "description": "Abre flujos impulsados por IA y mantien tu espacio de chat organizado en una seccion dedicada.",
+    "aria": "Destinos de Vanessa AI",
+    "chat": {
+      "title": "Espacio de chat",
+      "description": "Inicia o continua una conversacion con modelos dentro de la consola Vanessa AI."
     }
   },
   "quoteOfTheDay": {
@@ -253,6 +292,7 @@
     },
     "navigation": {
       "title": "Navegación de configuración",
+      "description": "Usa rutas canonicas de configuracion y control en lugar de subpaginas ocultas.",
       "overview": "Resumen",
       "design": "Diseño"
     },
@@ -314,6 +354,11 @@
         "modelRegisterFailed": "No se pudo registrar el modelo."
       }
     }
+  },
+  "modelsHub": {
+    "title": "Gestion de modelos",
+    "description": "Gestiona tus credenciales, registra modelos accesibles y revisa lo disponible para tu cuenta.",
+    "superadminDescription": "Gestiona acceso personal a modelos ademas del catalogo de plataforma, asignaciones, descubrimiento y descargas."
   },
   "models": {
     "title": "Gestion del catalogo de modelos",

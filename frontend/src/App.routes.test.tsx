@@ -57,7 +57,7 @@ describe("App superadmin models route", () => {
     };
 
     render(
-      <MemoryRouter initialEntries={["/welcome/superadmin/models"]}>
+      <MemoryRouter initialEntries={["/control/models"]}>
         <App />
       </MemoryRouter>,
     );
@@ -75,11 +75,29 @@ describe("App superadmin models route", () => {
     };
 
     render(
-      <MemoryRouter initialEntries={["/welcome/superadmin/models"]}>
+      <MemoryRouter initialEntries={["/control/system-health"]}>
         <App />
       </MemoryRouter>,
     );
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("falls through removed legacy routes to not-found", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
   });
 });
