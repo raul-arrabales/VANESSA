@@ -659,6 +659,7 @@ a {
   padding: var(--space-2) var(--space-4);
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--easing-standard),
