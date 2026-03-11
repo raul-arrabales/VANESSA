@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { getDefaultRouteForRole, hasRequiredRole } from "./roles";
 
 describe("roles", () => {
-  it("returns the canonical control route for every role", () => {
-    expect(getDefaultRouteForRole("user")).toBe("/control");
-    expect(getDefaultRouteForRole("admin")).toBe("/control");
-    expect(getDefaultRouteForRole("superadmin")).toBe("/control");
+  it("returns the welcome home route for every role", () => {
+    expect(getDefaultRouteForRole("user")).toBe("/");
+    expect(getDefaultRouteForRole("admin")).toBe("/");
+    expect(getDefaultRouteForRole("superadmin")).toBe("/");
   });
 
   it("keeps hierarchy checks unchanged", () => {

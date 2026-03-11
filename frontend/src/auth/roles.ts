@@ -11,5 +11,5 @@ export function hasRequiredRole(current: Role, required: Role): boolean {
 }
 
 export function getDefaultRouteForRole(_role: Role): string {
-  return "/control";
+  return "/";
 }

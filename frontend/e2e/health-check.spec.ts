@@ -211,8 +211,8 @@ test("logs in and redirects by role", async ({ page }) => {
   await page.getByLabel("Password").fill("password123");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/control$/);
-  await expect(page.getByRole("heading", { name: /Control panel/i })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });
 
 test("shows login error for invalid credentials", async ({ page }) => {
