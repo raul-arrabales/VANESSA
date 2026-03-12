@@ -17,6 +17,7 @@
     "me": "Profile",
     "guest": "Guest",
     "approvals": "Approvals",
+    "quotes": "Quotes",
     "systemHealth": "System health",
     "models": "Models",
     "settings": "Settings",
@@ -27,6 +28,7 @@
     "breadcrumbs": {
       "aria": "Breadcrumb navigation",
       "approvals": "Approvals",
+      "quotes": "Quotes",
       "control": "Control",
       "systemHealth": "System health",
       "ai": "Vanessa AI",
@@ -217,6 +219,10 @@
         "title": "User approvals",
         "description": "Review and activate pending user accounts."
       },
+      "quotes": {
+        "title": "Quote management",
+        "description": "Search, review, edit, and add quote-of-the-day entries."
+      },
       "systemHealth": {
         "title": "System health",
         "description": "Inspect the live status of VANESSA services and architecture."
@@ -242,6 +248,80 @@
     "tones": {
       "funny": "Funny",
       "reflective": "Reflective"
+    }
+  },
+  "quoteAdmin": {
+    "title": "Quote management",
+    "description": "Review the quote catalog, filter entries, edit records, and add new ones.",
+    "actions": {
+      "new": "New quote",
+      "search": "Search quotes",
+      "edit": "Edit",
+      "save": "Save quote",
+      "saving": "Saving..."
+    },
+    "summary": {
+      "loading": "Loading quote summary...",
+      "total": "Total quotes",
+      "active": "Active quotes",
+      "approved": "Approved quotes",
+      "languages": "Languages",
+      "tones": "Tones",
+      "origins": "Origins"
+    },
+    "filters": {
+      "title": "Search filters",
+      "query": "Text, author, or source",
+      "language": "Language",
+      "source": "Source universe",
+      "tone": "Tone",
+      "origin": "Origin",
+      "createdFrom": "Created from",
+      "createdTo": "Created to"
+    },
+    "list": {
+      "title": "Quote list",
+      "loading": "Loading quotes...",
+      "empty": "No quotes match the current filters.",
+      "results": "{{total}} matching quotes",
+      "tableAria": "Quote management results",
+      "columns": {
+        "id": "ID",
+        "text": "Text",
+        "author": "Author",
+        "source": "Source",
+        "tone": "Tone",
+        "language": "Language",
+        "updated": "Updated",
+        "actions": "Actions"
+      }
+    },
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} of {{totalPages}}"
+    },
+    "editor": {
+      "createTitle": "Create quote",
+      "editTitle": "Edit quote",
+      "loading": "Loading quote details...",
+      "selectPrompt": "Select a quote from the list or create a new one.",
+      "fields": {
+        "language": "Language",
+        "author": "Author",
+        "sourceUniverse": "Source universe",
+        "tone": "Tone",
+        "origin": "Origin",
+        "externalRef": "External reference",
+        "text": "Quote text",
+        "tags": "Tags",
+        "isActive": "Active",
+        "isApproved": "Approved"
+      }
+    },
+    "feedback": {
+      "created": "Quote created.",
+      "updated": "Quote updated."
     }
   },
   "settings": {

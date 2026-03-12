@@ -8,6 +8,7 @@ import ControlModelsPage from "../pages/ControlModelsPage";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
+import QuoteManagementPage from "../pages/QuoteManagementPage";
 import RegisterPage from "../pages/RegisterPage";
 import SettingsPage from "../pages/SettingsPage";
 import StyleGuidePage from "../pages/StyleGuidePage";
@@ -125,6 +126,17 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "admin",
     element: <AdminApprovalsPage />,
+  },
+  {
+    id: "control-quotes",
+    path: "/control/quotes",
+    titleKey: "nav.quotes",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <QuoteManagementPage />,
   },
   {
     id: "control-system-health",

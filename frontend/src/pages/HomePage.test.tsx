@@ -167,7 +167,7 @@ describe("HomePage quote of the day", () => {
       is_active: true,
     };
 
-    let resolveRefreshFetch: ((value: {
+    let resolveRefreshFetch: (value: {
       ok: boolean;
       status: number;
       json: () => Promise<{ quote: {
@@ -180,7 +180,7 @@ describe("HomePage quote of the day", () => {
         date: string;
         origin: string;
       } }>;
-    }) => void) | null = null;
+    }) => void = () => {};
 
     const fetchMock = vi
       .fn()
@@ -216,7 +216,7 @@ describe("HomePage quote of the day", () => {
     const refreshButton = await screen.findByRole("button", { name: "Loading..." });
     expect(refreshButton).toBeDisabled();
 
-    resolveRefreshFetch?.({
+    resolveRefreshFetch({
       ok: true,
       status: 200,
       json: async () => ({

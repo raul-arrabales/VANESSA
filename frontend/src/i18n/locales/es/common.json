@@ -17,6 +17,7 @@
     "me": "Perfil",
     "guest": "Invitado",
     "approvals": "Aprobaciones",
+    "quotes": "Citas",
     "systemHealth": "Salud del sistema",
     "models": "Modelos",
     "settings": "Configuración",
@@ -27,6 +28,7 @@
     "breadcrumbs": {
       "aria": "Navegación de migas",
       "approvals": "Aprobaciones",
+      "quotes": "Citas",
       "control": "Control",
       "systemHealth": "Salud del sistema",
       "ai": "Vanessa AI",
@@ -217,6 +219,10 @@
         "title": "Aprobaciones de usuarios",
         "description": "Revisa y activa cuentas de usuario pendientes."
       },
+      "quotes": {
+        "title": "Gestion de citas",
+        "description": "Busca, revisa, edita y agrega entradas para la cita del dia."
+      },
       "systemHealth": {
         "title": "Salud del sistema",
         "description": "Inspecciona el estado en vivo de los servicios y arquitectura de VANESSA."
@@ -242,6 +248,80 @@
     "tones": {
       "funny": "Divertida",
       "reflective": "Reflexiva"
+    }
+  },
+  "quoteAdmin": {
+    "title": "Gestion de citas",
+    "description": "Revisa el catalogo de citas, filtra entradas, edita registros y agrega nuevas.",
+    "actions": {
+      "new": "Nueva cita",
+      "search": "Buscar citas",
+      "edit": "Editar",
+      "save": "Guardar cita",
+      "saving": "Guardando..."
+    },
+    "summary": {
+      "loading": "Cargando resumen de citas...",
+      "total": "Citas totales",
+      "active": "Citas activas",
+      "approved": "Citas aprobadas",
+      "languages": "Idiomas",
+      "tones": "Tonos",
+      "origins": "Origenes"
+    },
+    "filters": {
+      "title": "Filtros de busqueda",
+      "query": "Texto, autor o fuente",
+      "language": "Idioma",
+      "source": "Universo de origen",
+      "tone": "Tono",
+      "origin": "Origen",
+      "createdFrom": "Creado desde",
+      "createdTo": "Creado hasta"
+    },
+    "list": {
+      "title": "Lista de citas",
+      "loading": "Cargando citas...",
+      "empty": "No hay citas para los filtros actuales.",
+      "results": "{{total}} citas coincidentes",
+      "tableAria": "Resultados de gestion de citas",
+      "columns": {
+        "id": "ID",
+        "text": "Texto",
+        "author": "Autor",
+        "source": "Fuente",
+        "tone": "Tono",
+        "language": "Idioma",
+        "updated": "Actualizado",
+        "actions": "Acciones"
+      }
+    },
+    "pagination": {
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "page": "Pagina {{page}} de {{totalPages}}"
+    },
+    "editor": {
+      "createTitle": "Crear cita",
+      "editTitle": "Editar cita",
+      "loading": "Cargando detalles de la cita...",
+      "selectPrompt": "Selecciona una cita de la lista o crea una nueva.",
+      "fields": {
+        "language": "Idioma",
+        "author": "Autor",
+        "sourceUniverse": "Universo de origen",
+        "tone": "Tono",
+        "origin": "Origen",
+        "externalRef": "Referencia externa",
+        "text": "Texto de la cita",
+        "tags": "Etiquetas",
+        "isActive": "Activa",
+        "isApproved": "Aprobada"
+      }
+    },
+    "feedback": {
+      "created": "Cita creada.",
+      "updated": "Cita actualizada."
     }
   },
   "settings": {

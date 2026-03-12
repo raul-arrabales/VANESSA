@@ -45,6 +45,26 @@ vi.mock("./api/models", () => ({
   registerManagedModel: vi.fn(),
   listAvailableManagedModels: vi.fn(async () => []),
 }));
+vi.mock("./api/quoteAdmin", () => ({
+  fetchQuoteSummary: vi.fn(async () => ({
+    total: 2,
+    active: 2,
+    approved: 2,
+    by_language: [],
+    by_tone: [],
+    by_origin: [],
+  })),
+  fetchQuotes: vi.fn(async () => ({
+    items: [],
+    page: 1,
+    page_size: 10,
+    total: 0,
+    filters: {},
+  })),
+  fetchQuoteById: vi.fn(),
+  createQuote: vi.fn(),
+  updateQuote: vi.fn(),
+}));
 
 describe("App superadmin models route", () => {
   it("renders the page for superadmin", async () => {
@@ -76,6 +96,42 @@ describe("App superadmin models route", () => {
 
     render(
       <MemoryRouter initialEntries={["/control/system-health"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("renders the quote management page for admin users", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/control/quotes"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "quoteAdmin.title" })).toBeVisible();
+  });
+
+  it("blocks regular users from the quote management route", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    render(
+      <MemoryRouter initialEntries={["/control/quotes"]}>
         <App />
       </MemoryRouter>,
     );
