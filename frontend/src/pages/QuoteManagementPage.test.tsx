@@ -128,6 +128,7 @@ describe("QuoteManagementPage", () => {
     renderPage();
     await screen.findByText("Quote A");
     await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.edit" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
     expect(await screen.findByDisplayValue("Quote A")).toBeVisible();
     await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.text"));
     await user.type(screen.getByLabelText("quoteAdmin.editor.fields.text"), "Updated quote");
@@ -135,6 +136,9 @@ describe("QuoteManagementPage", () => {
 
     await waitFor(() => {
       expect(quoteApiMocks.updateQuote).toHaveBeenCalledWith(10, expect.objectContaining({ text: "Updated quote" }), "token");
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
   });
 
@@ -159,6 +163,7 @@ describe("QuoteManagementPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "quoteAdmin.title" });
     await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.new" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
     await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.author"));
     await user.type(screen.getByLabelText("quoteAdmin.editor.fields.author"), "Curator");
     await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.text"));
@@ -171,5 +176,22 @@ describe("QuoteManagementPage", () => {
         text: "Brand new quote",
       }), "token");
     });
+  });
+
+  it("closes the modal without saving when cancel is clicked", async () => {
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByRole("heading", { name: "quoteAdmin.title" });
+    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.new" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+    expect(quoteApiMocks.createQuote).not.toHaveBeenCalled();
+    expect(quoteApiMocks.updateQuote).not.toHaveBeenCalled();
   });
 });

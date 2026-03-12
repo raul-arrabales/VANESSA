@@ -309,12 +309,6 @@ a {
   letter-spacing: 0.06em;
 }
 
-.quote-admin-workspace {
-  display: grid;
-  gap: var(--space-4);
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-}
-
 .quote-admin-textarea {
   min-height: 9rem;
   resize: vertical;
@@ -324,6 +318,12 @@ a {
   display: flex;
   gap: var(--space-4);
   flex-wrap: wrap;
+}
+
+.quote-admin-modal {
+  width: min(56rem, 100%);
+  max-height: min(90vh, 52rem);
+  overflow: auto;
 }
 
 .modal-backdrop {
@@ -989,9 +989,6 @@ a {
     justify-content: flex-start;
   }
 
-  .quote-admin-workspace {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

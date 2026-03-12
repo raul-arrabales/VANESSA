@@ -90,6 +90,7 @@ export default function QuoteManagementPage(): JSX.Element {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -138,6 +139,7 @@ export default function QuoteManagementPage(): JSX.Element {
     setError("");
     setSuccess("");
     setIsCreating(false);
+    setIsEditorOpen(true);
     setIsLoadingDetail(true);
     try {
       const quote = await fetchQuoteById(quoteId, token);
@@ -163,10 +165,19 @@ export default function QuoteManagementPage(): JSX.Element {
 
   const beginCreate = (): void => {
     setIsCreating(true);
+    setIsEditorOpen(true);
     setSelectedQuote(null);
     setDraft(blankForm());
     setError("");
     setSuccess("");
+  };
+
+  const closeEditor = (): void => {
+    setIsEditorOpen(false);
+    setIsCreating(false);
+    setSelectedQuote(null);
+    setIsLoadingDetail(false);
+    setDraft(blankForm());
   };
 
   const saveQuote = async (): Promise<void> => {
@@ -176,21 +187,19 @@ export default function QuoteManagementPage(): JSX.Element {
 
     try {
       if (isCreating) {
-        const created = await createQuote(formToPayload(draft), token);
+        await createQuote(formToPayload(draft), token);
         setSuccess(t("quoteAdmin.feedback.created"));
         setIsCreating(false);
-        setSelectedQuote(created);
-        setDraft(formFromQuote(created));
         await loadSummary();
         await loadQuotes(1, filters);
         setPage(1);
+        closeEditor();
       } else if (selectedQuote) {
-        const updated = await updateQuote(selectedQuote.id, formToPayload(draft), token);
+        await updateQuote(selectedQuote.id, formToPayload(draft), token);
         setSuccess(t("quoteAdmin.feedback.updated"));
-        setSelectedQuote(updated);
-        setDraft(formFromQuote(updated));
         await loadSummary();
         await loadQuotes(page, filters);
+        closeEditor();
       }
     } catch (submitError) {
       if (submitError instanceof ApiError) {
@@ -322,150 +331,158 @@ export default function QuoteManagementPage(): JSX.Element {
         </div>
       </article>
 
-      <div className="quote-admin-workspace">
-        <article className="panel card-stack">
-          <div className="quote-admin-table-header">
-            <h3 className="section-title">{t("quoteAdmin.list.title")}</h3>
-            <p className="status-text">{t("quoteAdmin.list.results", { total })}</p>
-          </div>
+      <article className="panel card-stack">
+        <div className="quote-admin-table-header">
+          <h3 className="section-title">{t("quoteAdmin.list.title")}</h3>
+          <p className="status-text">{t("quoteAdmin.list.results", { total })}</p>
+        </div>
 
-          {isLoadingList ? (
-            <p className="status-text">{t("quoteAdmin.list.loading")}</p>
-          ) : items.length === 0 ? (
-            <p className="status-text">{t("quoteAdmin.list.empty")}</p>
-          ) : (
-            <div className="health-table-wrap">
-              <table className="health-table" aria-label={t("quoteAdmin.list.tableAria")}>
-                <thead>
-                  <tr>
-                    <th>{t("quoteAdmin.list.columns.id")}</th>
-                    <th>{t("quoteAdmin.list.columns.text")}</th>
-                    <th>{t("quoteAdmin.list.columns.author")}</th>
-                    <th>{t("quoteAdmin.list.columns.source")}</th>
-                    <th>{t("quoteAdmin.list.columns.tone")}</th>
-                    <th>{t("quoteAdmin.list.columns.language")}</th>
-                    <th>{t("quoteAdmin.list.columns.updated")}</th>
-                    <th>{t("quoteAdmin.list.columns.actions")}</th>
+        {isLoadingList ? (
+          <p className="status-text">{t("quoteAdmin.list.loading")}</p>
+        ) : items.length === 0 ? (
+          <p className="status-text">{t("quoteAdmin.list.empty")}</p>
+        ) : (
+          <div className="health-table-wrap">
+            <table className="health-table" aria-label={t("quoteAdmin.list.tableAria")}>
+              <thead>
+                <tr>
+                  <th>{t("quoteAdmin.list.columns.id")}</th>
+                  <th>{t("quoteAdmin.list.columns.text")}</th>
+                  <th>{t("quoteAdmin.list.columns.author")}</th>
+                  <th>{t("quoteAdmin.list.columns.source")}</th>
+                  <th>{t("quoteAdmin.list.columns.tone")}</th>
+                  <th>{t("quoteAdmin.list.columns.language")}</th>
+                  <th>{t("quoteAdmin.list.columns.updated")}</th>
+                  <th>{t("quoteAdmin.list.columns.actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.id}</td>
+                    <td>{item.text}</td>
+                    <td>{item.author}</td>
+                    <td>{item.source_universe}</td>
+                    <td>{item.tone}</td>
+                    <td>{item.language}</td>
+                    <td>{item.updated_at ?? "--"}</td>
+                    <td>
+                      <button className="btn btn-ghost" type="button" onClick={() => void selectQuote(item.id)}>
+                        {t("quoteAdmin.actions.edit")}
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.id}</td>
-                      <td>{item.text}</td>
-                      <td>{item.author}</td>
-                      <td>{item.source_universe}</td>
-                      <td>{item.tone}</td>
-                      <td>{item.language}</td>
-                      <td>{item.updated_at ?? "--"}</td>
-                      <td>
-                        <button className="btn btn-ghost" type="button" onClick={() => void selectQuote(item.id)}>
-                          {t("quoteAdmin.actions.edit")}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={page <= 1}
+          >
+            {t("quoteAdmin.pagination.previous")}
+          </button>
+          <p className="status-text">{t("quoteAdmin.pagination.page", { page, totalPages })}</p>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={page >= totalPages}
+          >
+            {t("quoteAdmin.pagination.next")}
+          </button>
+        </div>
+      </article>
+
+      {isEditorOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card panel quote-admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quote-admin-editor-title"
+          >
+            <div className="quote-admin-table-header">
+              <h3 id="quote-admin-editor-title" className="section-title">
+                {isCreating ? t("quoteAdmin.editor.createTitle") : t("quoteAdmin.editor.editTitle")}
+              </h3>
+              {!isCreating && selectedQuote && <p className="status-text">#{selectedQuote.id}</p>}
             </div>
-          )}
 
-          <div className="form-actions">
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={page <= 1}
-            >
-              {t("quoteAdmin.pagination.previous")}
-            </button>
-            <p className="status-text">{t("quoteAdmin.pagination.page", { page, totalPages })}</p>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-              disabled={page >= totalPages}
-            >
-              {t("quoteAdmin.pagination.next")}
-            </button>
+            {isLoadingDetail ? (
+              <p className="status-text">{t("quoteAdmin.editor.loading")}</p>
+            ) : (
+              <>
+                <div className="quote-admin-filter-grid">
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.language")}</span>
+                    <input className="field-input" value={draft.language} onChange={(event) => setDraft((current) => ({ ...current, language: event.target.value }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.author")}</span>
+                    <input className="field-input" value={draft.author} onChange={(event) => setDraft((current) => ({ ...current, author: event.target.value }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.sourceUniverse")}</span>
+                    <input className="field-input" value={draft.source_universe} onChange={(event) => setDraft((current) => ({ ...current, source_universe: event.target.value }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.tone")}</span>
+                    <input className="field-input" value={draft.tone} onChange={(event) => setDraft((current) => ({ ...current, tone: event.target.value }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.origin")}</span>
+                    <input className="field-input" value={draft.origin} onChange={(event) => setDraft((current) => ({ ...current, origin: event.target.value }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.externalRef")}</span>
+                    <input className="field-input" value={draft.external_ref} onChange={(event) => setDraft((current) => ({ ...current, external_ref: event.target.value }))} />
+                  </label>
+                </div>
+
+                <label className="control-group">
+                  <span className="field-label">{t("quoteAdmin.editor.fields.text")}</span>
+                  <textarea
+                    className="field-input quote-admin-textarea"
+                    value={draft.text}
+                    onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
+                  />
+                </label>
+
+                <label className="control-group">
+                  <span className="field-label">{t("quoteAdmin.editor.fields.tags")}</span>
+                  <input className="field-input" value={draft.tags} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value }))} />
+                </label>
+
+                <div className="quote-admin-checkbox-row">
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.isActive")}</span>
+                    <input type="checkbox" checked={draft.is_active} onChange={(event) => setDraft((current) => ({ ...current, is_active: event.target.checked }))} />
+                  </label>
+                  <label className="control-group">
+                    <span className="field-label">{t("quoteAdmin.editor.fields.isApproved")}</span>
+                    <input type="checkbox" checked={draft.is_approved} onChange={(event) => setDraft((current) => ({ ...current, is_approved: event.target.checked }))} />
+                  </label>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn btn-secondary" type="button" onClick={closeEditor} disabled={isSaving}>
+                    {t("quoteAdmin.actions.cancel")}
+                  </button>
+                  <button className="btn btn-primary" type="button" onClick={() => void saveQuote()} disabled={isSaving}>
+                    {isSaving ? t("quoteAdmin.actions.saving") : t("quoteAdmin.actions.save")}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
-        </article>
-
-        <article className="panel card-stack">
-          <div className="quote-admin-table-header">
-            <h3 className="section-title">
-              {isCreating ? t("quoteAdmin.editor.createTitle") : t("quoteAdmin.editor.editTitle")}
-            </h3>
-            {!isCreating && selectedQuote && <p className="status-text">#{selectedQuote.id}</p>}
-          </div>
-
-          {isLoadingDetail ? (
-            <p className="status-text">{t("quoteAdmin.editor.loading")}</p>
-          ) : !isCreating && !selectedQuote ? (
-            <p className="status-text">{t("quoteAdmin.editor.selectPrompt")}</p>
-          ) : (
-            <>
-              <div className="quote-admin-filter-grid">
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.language")}</span>
-                  <input className="field-input" value={draft.language} onChange={(event) => setDraft((current) => ({ ...current, language: event.target.value }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.author")}</span>
-                  <input className="field-input" value={draft.author} onChange={(event) => setDraft((current) => ({ ...current, author: event.target.value }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.sourceUniverse")}</span>
-                  <input className="field-input" value={draft.source_universe} onChange={(event) => setDraft((current) => ({ ...current, source_universe: event.target.value }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.tone")}</span>
-                  <input className="field-input" value={draft.tone} onChange={(event) => setDraft((current) => ({ ...current, tone: event.target.value }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.origin")}</span>
-                  <input className="field-input" value={draft.origin} onChange={(event) => setDraft((current) => ({ ...current, origin: event.target.value }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.externalRef")}</span>
-                  <input className="field-input" value={draft.external_ref} onChange={(event) => setDraft((current) => ({ ...current, external_ref: event.target.value }))} />
-                </label>
-              </div>
-
-              <label className="control-group">
-                <span className="field-label">{t("quoteAdmin.editor.fields.text")}</span>
-                <textarea
-                  className="field-input quote-admin-textarea"
-                  value={draft.text}
-                  onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
-                />
-              </label>
-
-              <label className="control-group">
-                <span className="field-label">{t("quoteAdmin.editor.fields.tags")}</span>
-                <input className="field-input" value={draft.tags} onChange={(event) => setDraft((current) => ({ ...current, tags: event.target.value }))} />
-              </label>
-
-              <div className="quote-admin-checkbox-row">
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.isActive")}</span>
-                  <input type="checkbox" checked={draft.is_active} onChange={(event) => setDraft((current) => ({ ...current, is_active: event.target.checked }))} />
-                </label>
-                <label className="control-group">
-                  <span className="field-label">{t("quoteAdmin.editor.fields.isApproved")}</span>
-                  <input type="checkbox" checked={draft.is_approved} onChange={(event) => setDraft((current) => ({ ...current, is_approved: event.target.checked }))} />
-                </label>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn btn-primary" type="button" onClick={() => void saveQuote()} disabled={isSaving}>
-                  {isSaving ? t("quoteAdmin.actions.saving") : t("quoteAdmin.actions.save")}
-                </button>
-              </div>
-            </>
-          )}
-        </article>
-      </div>
+        </div>
+      )}
     </section>
   );
 }
