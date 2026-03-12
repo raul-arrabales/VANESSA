@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
 import App from "./App";
+import { renderWithAppProviders } from "./test/renderWithAppProviders";
+import { t } from "./test/translation";
 
 let mockUser: AuthUser | null = null;
 
@@ -76,13 +77,9 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/models"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("heading", { name: "models.title" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("models.title") })).toBeVisible();
   });
 
   it("blocks non-superadmin users", async () => {
@@ -94,11 +91,7 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/system-health"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/system-health" });
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
   });
@@ -112,13 +105,9 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/quotes"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/quotes" });
 
-    expect(await screen.findByRole("heading", { name: "quoteAdmin.title" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("quoteAdmin.title") })).toBeVisible();
   });
 
   it("blocks regular users from the quote management route", async () => {
@@ -130,11 +119,7 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/quotes"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/quotes" });
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
   });
@@ -148,11 +133,7 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/chat"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/chat" });
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
   });
@@ -166,13 +147,9 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/models"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    const breadcrumbLinks = await screen.findAllByRole("link", { name: "nav.home" });
+    const breadcrumbLinks = await screen.findAllByRole("link", { name: await t("nav.home") });
     expect(breadcrumbLinks[0]).toHaveAttribute("href", "/");
   });
 
@@ -185,12 +162,8 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/control/models"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("link", { name: "nav.controlPanel" })).toHaveAttribute("href", "/control");
+    expect(await screen.findByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
   });
 });

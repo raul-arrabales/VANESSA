@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithAppProviders } from "../test/renderWithAppProviders";
+import { t } from "../test/translation";
 import QuoteManagementPage from "./QuoteManagementPage";
 
 const quoteApiMocks = vi.hoisted(() => ({
@@ -75,18 +76,14 @@ describe("QuoteManagementPage", () => {
     });
   });
 
-  function renderPage(): void {
-    render(
-      <MemoryRouter>
-        <QuoteManagementPage />
-      </MemoryRouter>,
-    );
+  async function renderPage(): Promise<void> {
+    await renderWithAppProviders(<QuoteManagementPage />);
   }
 
   it("loads summary and quote list", async () => {
-    renderPage();
+    await renderPage();
 
-    expect(await screen.findByRole("heading", { name: "quoteAdmin.title" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("quoteAdmin.title") })).toBeVisible();
     await waitFor(() => {
       expect(quoteApiMocks.fetchQuoteSummary).toHaveBeenCalledWith("token");
       expect(quoteApiMocks.fetchQuotes).toHaveBeenCalledWith("token", 1, 10, {});
@@ -96,11 +93,11 @@ describe("QuoteManagementPage", () => {
 
   it("searches and paginates results", async () => {
     const user = userEvent.setup();
-    renderPage();
+    await renderPage();
 
-    await screen.findByRole("heading", { name: "quoteAdmin.title" });
-    await user.type(screen.getByLabelText("quoteAdmin.filters.source"), "Original");
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.search" }));
+    await screen.findByRole("heading", { name: await t("quoteAdmin.title") });
+    await user.type(screen.getByLabelText(await t("quoteAdmin.filters.source")), "Original");
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.search") }));
 
     await waitFor(() => {
       expect(quoteApiMocks.fetchQuotes).toHaveBeenLastCalledWith("token", 1, 10, { source_universe: "Original" });
@@ -125,14 +122,14 @@ describe("QuoteManagementPage", () => {
       updated_at: "2026-03-12T11:00:00+00:00",
     });
 
-    renderPage();
+    await renderPage();
     await screen.findByText("Quote A");
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.edit" }));
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.edit") }));
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(await screen.findByDisplayValue("Quote A")).toBeVisible();
-    await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.text"));
-    await user.type(screen.getByLabelText("quoteAdmin.editor.fields.text"), "Updated quote");
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.save" }));
+    await user.clear(screen.getByLabelText(await t("quoteAdmin.editor.fields.text")));
+    await user.type(screen.getByLabelText(await t("quoteAdmin.editor.fields.text")), "Updated quote");
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.save") }));
 
     await waitFor(() => {
       expect(quoteApiMocks.updateQuote).toHaveBeenCalledWith(10, expect.objectContaining({ text: "Updated quote" }), "token");
@@ -160,15 +157,15 @@ describe("QuoteManagementPage", () => {
       updated_at: "2026-03-12T11:00:00+00:00",
     });
 
-    renderPage();
-    await screen.findByRole("heading", { name: "quoteAdmin.title" });
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.new" }));
+    await renderPage();
+    await screen.findByRole("heading", { name: await t("quoteAdmin.title") });
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.new") }));
     expect(await screen.findByRole("dialog")).toBeVisible();
-    await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.author"));
-    await user.type(screen.getByLabelText("quoteAdmin.editor.fields.author"), "Curator");
-    await user.clear(screen.getByLabelText("quoteAdmin.editor.fields.text"));
-    await user.type(screen.getByLabelText("quoteAdmin.editor.fields.text"), "Brand new quote");
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.save" }));
+    await user.clear(screen.getByLabelText(await t("quoteAdmin.editor.fields.author")));
+    await user.type(screen.getByLabelText(await t("quoteAdmin.editor.fields.author")), "Curator");
+    await user.clear(screen.getByLabelText(await t("quoteAdmin.editor.fields.text")));
+    await user.type(screen.getByLabelText(await t("quoteAdmin.editor.fields.text")), "Brand new quote");
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.save") }));
 
     await waitFor(() => {
       expect(quoteApiMocks.createQuote).toHaveBeenCalledWith(expect.objectContaining({
@@ -181,12 +178,12 @@ describe("QuoteManagementPage", () => {
   it("closes the modal without saving when cancel is clicked", async () => {
     const user = userEvent.setup();
 
-    renderPage();
-    await screen.findByRole("heading", { name: "quoteAdmin.title" });
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.new" }));
+    await renderPage();
+    await screen.findByRole("heading", { name: await t("quoteAdmin.title") });
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.new") }));
     expect(await screen.findByRole("dialog")).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "quoteAdmin.actions.cancel" }));
+    await user.click(screen.getByRole("button", { name: await t("quoteAdmin.actions.cancel") }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();

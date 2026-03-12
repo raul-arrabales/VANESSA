@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithAppProviders } from "../test/renderWithAppProviders";
+import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import ControlPage from "./ControlPage";
 
@@ -12,12 +13,8 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
-function renderPage(): void {
-  render(
-    <MemoryRouter>
-      <ControlPage />
-    </MemoryRouter>,
-  );
+async function renderPage(): Promise<void> {
+  await renderWithAppProviders(<ControlPage />);
 }
 
 describe("ControlPage", () => {
@@ -25,7 +22,7 @@ describe("ControlPage", () => {
     vi.clearAllMocks();
   });
 
-  it("hides the quotes control from regular users", () => {
+  it("hides the quotes control from regular users", async () => {
     mockUser = {
       id: 1,
       email: "user@example.com",
@@ -34,12 +31,12 @@ describe("ControlPage", () => {
       is_active: true,
     };
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.queryByRole("link", { name: "control.items.quotes.title" })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.quotes.title") })).toBeNull();
   });
 
-  it("shows the quotes control for admin users", () => {
+  it("shows the quotes control for admin users", async () => {
     mockUser = {
       id: 2,
       email: "admin@example.com",
@@ -48,8 +45,8 @@ describe("ControlPage", () => {
       is_active: true,
     };
 
-    renderPage();
+    await renderPage();
 
-    expect(screen.getByRole("link", { name: "control.items.quotes.title" })).toHaveAttribute("href", "/control/quotes");
+    expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
   });
 });
