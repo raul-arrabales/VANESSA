@@ -18,7 +18,7 @@ type RuntimeProfileResult = {
 };
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
-type RequestOptions = {
+export type RequestOptions = {
   method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
   token?: string;
@@ -35,11 +35,11 @@ export class ApiError extends Error {
   }
 }
 
-function buildUrl(path: string): string {
+export function buildUrl(path: string): string {
   return `${backendBaseUrl.replace(/\/$/, "")}${path}`;
 }
 
-async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: HeadersInit = {
     Accept: "application/json",
   };

@@ -1,37 +1,4 @@
-import { ApiError } from "../auth/authApi";
-
-const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
-
-function buildUrl(path: string): string {
-  return `${backendBaseUrl.replace(/\/$/, "")}${path}`;
-}
-
-async function requestJson<T>(path: string, token: string, options: {
-  method?: "GET" | "POST" | "PUT";
-  body?: unknown;
-} = {}): Promise<T> {
-  const headers: HeadersInit = {
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-
-  if (options.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  const response = await fetch(buildUrl(path), {
-    method: options.method ?? "GET",
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
-
-  const maybeJson = await response.text();
-  const payload = maybeJson ? JSON.parse(maybeJson) as Record<string, unknown> : {};
-  if (!response.ok) {
-    throw new ApiError(String(payload.message ?? payload.error ?? `HTTP ${response.status}`), response.status);
-  }
-  return payload as T;
-}
+import { requestJson } from "../auth/authApi";
 
 export type QuoteAdminItem = {
   id: number;
@@ -92,7 +59,7 @@ export type QuotePayload = {
 };
 
 export async function fetchQuoteSummary(token: string): Promise<QuoteSummary> {
-  const response = await requestJson<{ summary: QuoteSummary }>("/v1/quotes/summary", token);
+  const response = await requestJson<{ summary: QuoteSummary }>("/v1/quotes/summary", { token });
   return response.summary;
 }
 
@@ -113,26 +80,28 @@ export async function fetchQuotes(
     }
   });
 
-  return requestJson<QuoteListResult>(`/v1/quotes?${params.toString()}`, token);
+  return requestJson<QuoteListResult>(`/v1/quotes?${params.toString()}`, { token });
 }
 
 export async function fetchQuoteById(quoteId: number, token: string): Promise<QuoteAdminItem> {
-  const response = await requestJson<{ quote: QuoteAdminItem }>(`/v1/quotes/${quoteId}`, token);
+  const response = await requestJson<{ quote: QuoteAdminItem }>(`/v1/quotes/${quoteId}`, { token });
   return response.quote;
 }
 
 export async function createQuote(payload: QuotePayload, token: string): Promise<QuoteAdminItem> {
-  const response = await requestJson<{ quote: QuoteAdminItem }>("/v1/quotes", token, {
+  const response = await requestJson<{ quote: QuoteAdminItem }>("/v1/quotes", {
     method: "POST",
     body: payload,
+    token,
   });
   return response.quote;
 }
 
 export async function updateQuote(quoteId: number, payload: QuotePayload, token: string): Promise<QuoteAdminItem> {
-  const response = await requestJson<{ quote: QuoteAdminItem }>(`/v1/quotes/${quoteId}`, token, {
+  const response = await requestJson<{ quote: QuoteAdminItem }>(`/v1/quotes/${quoteId}`, {
     method: "PUT",
     body: payload,
+    token,
   });
   return response.quote;
 }

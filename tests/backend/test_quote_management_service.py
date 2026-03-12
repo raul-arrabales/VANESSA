@@ -28,18 +28,16 @@ def test_normalize_quote_payload_normalizes_values() -> None:
         "external_ref": " ref-1 ",
     })
 
-    assert payload == {
-        "language": "en",
-        "text": "Keep steady.",
-        "author": "Vanessa",
-        "source_universe": "Original",
-        "tone": "reflective",
-        "tags": ["ai", "ops"],
-        "is_active": True,
-        "is_approved": False,
-        "origin": "local",
-        "external_ref": "ref-1",
-    }
+    assert payload.language == "en"
+    assert payload.text == "Keep steady."
+    assert payload.author == "Vanessa"
+    assert payload.source_universe == "Original"
+    assert payload.tone == "reflective"
+    assert payload.tags == ["ai", "ops"]
+    assert payload.is_active is True
+    assert payload.is_approved is False
+    assert payload.origin == "local"
+    assert payload.external_ref == "ref-1"
 
 
 def test_normalize_quote_filters_parses_query_values() -> None:
@@ -55,14 +53,14 @@ def test_normalize_quote_filters_parses_query_values() -> None:
         "query": "galaxy",
     })
 
-    assert filters["language"] == "es"
-    assert filters["tone"] == "funny"
-    assert filters["origin"] == "local"
-    assert filters["is_active"] is True
-    assert filters["is_approved"] is False
-    assert filters["created_from"] == date(2026, 3, 1)
-    assert filters["created_to"] == date(2026, 3, 31)
-    assert filters["query"] == "galaxy"
+    assert filters.language == "es"
+    assert filters.tone == "funny"
+    assert filters.origin == "local"
+    assert filters.is_active is True
+    assert filters.is_approved is False
+    assert filters.created_from == date(2026, 3, 1)
+    assert filters.created_to == date(2026, 3, 31)
+    assert filters.query == "galaxy"
 
 
 def test_normalize_pagination_rejects_invalid_values() -> None:

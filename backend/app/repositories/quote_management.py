@@ -1,63 +1,59 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timezone
-from typing import Any
+from datetime import datetime, time, timezone
 
 import psycopg
 
 from ..db import get_connection
+from ..services.quote_management_types import (
+    QuoteCountBucket,
+    QuoteFilters,
+    QuoteListResult,
+    QuotePayload,
+    QuoteRecord,
+    QuoteSummary,
+)
 
-QuoteRecord = dict[str, Any]
 
-
-def _build_where_clause(filters: dict[str, Any]) -> tuple[str, list[Any]]:
+def _build_where_clause(filters: QuoteFilters) -> tuple[str, list[object]]:
     clauses: list[str] = []
-    params: list[Any] = []
+    params: list[object] = []
 
-    language = filters.get("language")
-    if language:
+    if filters.language:
         clauses.append("language = %s")
-        params.append(language)
+        params.append(filters.language)
 
-    source_universe = filters.get("source_universe")
-    if source_universe:
+    if filters.source_universe:
         clauses.append("source_universe ILIKE %s")
-        params.append(f"%{source_universe}%")
+        params.append(f"%{filters.source_universe}%")
 
-    tone = filters.get("tone")
-    if tone:
+    if filters.tone:
         clauses.append("tone = %s")
-        params.append(tone)
+        params.append(filters.tone)
 
-    origin = filters.get("origin")
-    if origin:
+    if filters.origin:
         clauses.append("origin = %s")
-        params.append(origin)
+        params.append(filters.origin)
 
-    is_active = filters.get("is_active")
-    if is_active is not None:
+    if filters.is_active is not None:
         clauses.append("is_active = %s")
-        params.append(is_active)
+        params.append(filters.is_active)
 
-    is_approved = filters.get("is_approved")
-    if is_approved is not None:
+    if filters.is_approved is not None:
         clauses.append("is_approved = %s")
-        params.append(is_approved)
+        params.append(filters.is_approved)
 
-    created_from = filters.get("created_from")
-    if created_from:
+    if filters.created_from:
         clauses.append("created_at >= %s")
-        params.append(datetime.combine(created_from, time.min, tzinfo=timezone.utc))
+        params.append(datetime.combine(filters.created_from, time.min, tzinfo=timezone.utc))
 
-    created_to = filters.get("created_to")
-    if created_to:
+    if filters.created_to:
         clauses.append("created_at <= %s")
-        params.append(datetime.combine(created_to, time.max, tzinfo=timezone.utc))
+        params.append(datetime.combine(filters.created_to, time.max, tzinfo=timezone.utc))
 
-    query = filters.get("query")
-    if query:
+    if filters.query:
         clauses.append("(text ILIKE %s OR author ILIKE %s OR source_universe ILIKE %s)")
-        params.extend([f"%{query}%", f"%{query}%", f"%{query}%"])
+        params.extend([f"%{filters.query}%", f"%{filters.query}%", f"%{filters.query}%"])
 
     if not clauses:
         return "", params
@@ -65,7 +61,7 @@ def _build_where_clause(filters: dict[str, Any]) -> tuple[str, list[Any]]:
     return f"WHERE {' AND '.join(clauses)}", params
 
 
-def get_quote_summary(database_url: str) -> dict[str, Any]:
+def get_quote_summary(database_url: str) -> QuoteSummary:
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -79,7 +75,7 @@ def get_quote_summary(database_url: str) -> dict[str, Any]:
             )
             totals = cursor.fetchone() or {"total": 0, "active": 0, "approved": 0}
 
-            grouped_counts: dict[str, list[dict[str, Any]]] = {}
+            grouped_counts: dict[str, list[QuoteCountBucket]] = {}
             for group_name, column in [
                 ("by_language", "language"),
                 ("by_tone", "tone"),
@@ -93,32 +89,34 @@ def get_quote_summary(database_url: str) -> dict[str, Any]:
                     ORDER BY COUNT(*) DESC, {column} ASC
                     """
                 )
-                grouped_counts[group_name] = [dict(row) for row in cursor.fetchall()]
+                grouped_counts[group_name] = [
+                    QuoteCountBucket(value=str(row["value"]), count=int(row["count"]))
+                    for row in cursor.fetchall()
+                ]
 
-    return {
-        "total": int(totals["total"]),
-        "active": int(totals["active"]),
-        "approved": int(totals["approved"]),
-        **grouped_counts,
-    }
+    return QuoteSummary(
+        total=int(totals["total"]),
+        active=int(totals["active"]),
+        approved=int(totals["approved"]),
+        by_language=grouped_counts["by_language"],
+        by_tone=grouped_counts["by_tone"],
+        by_origin=grouped_counts["by_origin"],
+    )
 
 
 def list_quotes(
     database_url: str,
     *,
-    filters: dict[str, Any],
+    filters: QuoteFilters,
     page: int,
     page_size: int,
-) -> dict[str, Any]:
+) -> QuoteListResult:
     where_clause, params = _build_where_clause(filters)
     offset = (page - 1) * page_size
 
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(
-                f"SELECT COUNT(*) AS total FROM quotes {where_clause}",
-                params,
-            )
+            cursor.execute(f"SELECT COUNT(*) AS total FROM quotes {where_clause}", params)
             total = int((cursor.fetchone() or {"total": 0})["total"])
 
             cursor.execute(
@@ -144,9 +142,9 @@ def list_quotes(
                 """,
                 [*params, page_size, offset],
             )
-            items = [dict(row) for row in cursor.fetchall()]
+            items = [_row_to_record(row) for row in cursor.fetchall()]
 
-    return {"items": items, "total": total}
+    return QuoteListResult(items=items, total=total)
 
 
 def get_quote_by_id(database_url: str, quote_id: int) -> QuoteRecord | None:
@@ -172,10 +170,10 @@ def get_quote_by_id(database_url: str, quote_id: int) -> QuoteRecord | None:
             """,
             (quote_id,),
         ).fetchone()
-    return dict(row) if row else None
+    return _row_to_record(row) if row else None
 
 
-def create_quote(database_url: str, *, payload: dict[str, Any]) -> QuoteRecord:
+def create_quote(database_url: str, *, payload: QuotePayload) -> QuoteRecord:
     now = datetime.now(tz=timezone.utc)
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
@@ -212,16 +210,16 @@ def create_quote(database_url: str, *, payload: dict[str, Any]) -> QuoteRecord:
                     updated_at
                 """,
                 (
-                    payload["language"],
-                    payload["text"],
-                    payload["author"],
-                    payload["source_universe"],
-                    payload["tone"],
-                    psycopg.types.json.Jsonb(payload["tags"]),
-                    payload["is_active"],
-                    payload["is_approved"],
-                    payload["origin"],
-                    payload["external_ref"],
+                    payload.language,
+                    payload.text,
+                    payload.author,
+                    payload.source_universe,
+                    payload.tone,
+                    psycopg.types.json.Jsonb(payload.tags),
+                    payload.is_active,
+                    payload.is_approved,
+                    payload.origin,
+                    payload.external_ref,
                     now,
                     now,
                 ),
@@ -229,10 +227,10 @@ def create_quote(database_url: str, *, payload: dict[str, Any]) -> QuoteRecord:
             row = cursor.fetchone()
     if row is None:
         raise ValueError("quote_create_failed")
-    return dict(row)
+    return _row_to_record(row)
 
 
-def update_quote(database_url: str, *, quote_id: int, payload: dict[str, Any]) -> QuoteRecord | None:
+def update_quote(database_url: str, *, quote_id: int, payload: QuotePayload) -> QuoteRecord | None:
     now = datetime.now(tz=timezone.utc)
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
@@ -268,19 +266,37 @@ def update_quote(database_url: str, *, quote_id: int, payload: dict[str, Any]) -
                     updated_at
                 """,
                 (
-                    payload["language"],
-                    payload["text"],
-                    payload["author"],
-                    payload["source_universe"],
-                    payload["tone"],
-                    psycopg.types.json.Jsonb(payload["tags"]),
-                    payload["is_active"],
-                    payload["is_approved"],
-                    payload["origin"],
-                    payload["external_ref"],
+                    payload.language,
+                    payload.text,
+                    payload.author,
+                    payload.source_universe,
+                    payload.tone,
+                    psycopg.types.json.Jsonb(payload.tags),
+                    payload.is_active,
+                    payload.is_approved,
+                    payload.origin,
+                    payload.external_ref,
                     now,
                     quote_id,
                 ),
             )
             row = cursor.fetchone()
-    return dict(row) if row else None
+    return _row_to_record(row) if row else None
+
+
+def _row_to_record(row: dict[str, object]) -> QuoteRecord:
+    return QuoteRecord(
+        id=int(row["id"]),
+        language=str(row["language"]),
+        text=str(row["text"]),
+        author=str(row["author"]),
+        source_universe=str(row["source_universe"]),
+        tone=str(row["tone"]),
+        tags=list(row.get("tags", [])),
+        is_active=bool(row["is_active"]),
+        is_approved=bool(row["is_approved"]),
+        origin=str(row["origin"]),
+        external_ref=row.get("external_ref") if isinstance(row.get("external_ref"), str) or row.get("external_ref") is None else str(row.get("external_ref")),
+        created_at=row.get("created_at") if isinstance(row.get("created_at"), datetime) or row.get("created_at") is None else None,
+        updated_at=row.get("updated_at") if isinstance(row.get("updated_at"), datetime) or row.get("updated_at") is None else None,
+    )

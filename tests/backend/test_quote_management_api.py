@@ -6,6 +6,7 @@ import pytest
 
 from app.routes import quotes_v1 as quotes_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services.quote_management import QuoteListResult, QuoteRecord, QuoteSummary  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
@@ -46,7 +47,7 @@ def test_quote_management_routes_require_admin_role(client, monkeypatch: pytest.
     monkeypatch.setattr(
         quotes_routes,
         "get_quote_summary",
-        lambda _db: {"total": 3, "active": 2, "approved": 1, "by_language": [], "by_tone": [], "by_origin": []},
+        lambda _db: QuoteSummary(total=3, active=2, approved=1, by_language=[], by_tone=[], by_origin=[]),
     )
 
     forbidden = test_client.get("/v1/quotes/summary", headers=_auth(user_token))
@@ -66,24 +67,24 @@ def test_quote_management_list_returns_filters_and_pagination(client, monkeypatc
     monkeypatch.setattr(
         quotes_routes,
         "list_quotes",
-        lambda _db, *, filters, page, page_size: {
-            "items": [{
-                "id": 11,
-                "language": "en",
-                "text": "Quote A",
-                "author": "VANESSA",
-                "source_universe": "Original",
-                "tone": "reflective",
-                "tags": ["ops"],
-                "is_active": True,
-                "is_approved": True,
-                "origin": "local",
-                "external_ref": None,
-                "created_at": now,
-                "updated_at": now,
-            }],
-            "total": 1,
-        },
+        lambda _db, *, filters, page, page_size: QuoteListResult(
+            items=[QuoteRecord(
+                id=11,
+                language="en",
+                text="Quote A",
+                author="VANESSA",
+                source_universe="Original",
+                tone="reflective",
+                tags=["ops"],
+                is_active=True,
+                is_approved=True,
+                origin="local",
+                external_ref=None,
+                created_at=now,
+                updated_at=now,
+            )],
+            total=1,
+        ),
     )
 
     response = test_client.get(
@@ -124,22 +125,36 @@ def test_quote_management_can_create_and_update_quotes(client, monkeypatch: pyte
     token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
 
     now = datetime(2026, 3, 12, tzinfo=timezone.utc)
-    created_row = {
-        "id": 17,
-        "language": "en",
-        "text": "Fresh quote",
-        "author": "Curator",
-        "source_universe": "Original",
-        "tone": "funny",
-        "tags": ["funny"],
-        "is_active": True,
-        "is_approved": True,
-        "origin": "local",
-        "external_ref": None,
-        "created_at": now,
-        "updated_at": now,
-    }
-    updated_row = {**created_row, "text": "Updated quote"}
+    created_row = QuoteRecord(
+        id=17,
+        language="en",
+        text="Fresh quote",
+        author="Curator",
+        source_universe="Original",
+        tone="funny",
+        tags=["funny"],
+        is_active=True,
+        is_approved=True,
+        origin="local",
+        external_ref=None,
+        created_at=now,
+        updated_at=now,
+    )
+    updated_row = QuoteRecord(
+        id=17,
+        language="en",
+        text="Updated quote",
+        author="Curator",
+        source_universe="Original",
+        tone="funny",
+        tags=["funny"],
+        is_active=True,
+        is_approved=True,
+        origin="local",
+        external_ref=None,
+        created_at=now,
+        updated_at=now,
+    )
     monkeypatch.setattr(quotes_routes, "create_quote", lambda _db, *, payload: created_row)
     monkeypatch.setattr(quotes_routes, "update_quote", lambda _db, *, quote_id, payload: updated_row)
 
