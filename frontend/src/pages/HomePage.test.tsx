@@ -95,7 +95,7 @@ describe("HomePage quote of the day", () => {
     expect(await screen.findByText("La consola tambien piensa.")).toBeVisible();
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining("/v1/content/quote-of-the-day?lang=es"),
+        expect.stringContaining("/v1/content/quote-of-the-day?lang=es&selection=daily"),
         expect.any(Object),
       );
     });
@@ -153,7 +153,7 @@ describe("HomePage quote of the day", () => {
     expect(await screen.findByText("A second signal arrives.")).toBeVisible();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining("/v1/content/quote-of-the-day?lang=en"),
+      expect.stringContaining("/v1/content/quote-of-the-day?lang=en&selection=random"),
       expect.any(Object),
     );
   });

@@ -15,5 +15,8 @@ def _database_url() -> str:
 @bp.get("/v1/content/quote-of-the-day")
 def quote_of_the_day_route():
     language = request.args.get("lang", default="en", type=str)
-    quote = resolve_quote_of_the_day(_database_url(), language=language)
+    selection_mode = request.args.get("selection", default="daily", type=str)
+    if selection_mode not in {"daily", "random"}:
+        selection_mode = "daily"
+    quote = resolve_quote_of_the_day(_database_url(), language=language, selection_mode=selection_mode)
     return jsonify({"quote": quote}), 200

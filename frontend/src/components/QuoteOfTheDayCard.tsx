@@ -18,7 +18,10 @@ export default function QuoteOfTheDayCard(): JSX.Element {
       setState("loading");
     }
 
-    const nextQuote = await fetchQuoteOfTheDay(activeLanguage);
+    const nextQuote = await fetchQuoteOfTheDay(
+      activeLanguage,
+      options?.preserveCurrentQuote ? "random" : "daily",
+    );
     setQuote(nextQuote);
     setState("ready");
     setIsRefreshing(false);
@@ -29,7 +32,7 @@ export default function QuoteOfTheDayCard(): JSX.Element {
 
     async function syncQuote(): Promise<void> {
       try {
-        const nextQuote = await fetchQuoteOfTheDay(activeLanguage);
+        const nextQuote = await fetchQuoteOfTheDay(activeLanguage, "daily");
         if (cancelled) {
           return;
         }
