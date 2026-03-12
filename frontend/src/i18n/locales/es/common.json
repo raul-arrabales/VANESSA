@@ -182,7 +182,7 @@
   "home": {
     "guest": {
       "title": "Bienvenido a VANESSA",
-      "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola local de IA.",
+      "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola de IA.",
       "actions": "Acciones rapidas para invitados",
       "login": "Ir a inicio de sesion",
       "register": "Crear una cuenta"

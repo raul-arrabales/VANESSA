@@ -182,7 +182,7 @@
   "home": {
     "guest": {
       "title": "Welcome to VANESSA",
-      "description": "Sign in or create an account to start using your local AI mission console.",
+      "description": "Sign in or create an account to start using your AI mission console.",
       "actions": "Guest quick actions",
       "login": "Go to login",
       "register": "Create an account"
