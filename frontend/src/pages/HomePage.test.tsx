@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nextProvider } from "react-i18next";
@@ -98,6 +99,141 @@ describe("HomePage quote of the day", () => {
         expect.any(Object),
       );
     });
+  });
+
+  it("loads a new random quote when the refresh button is clicked", async () => {
+    mockUser = {
+      id: 2,
+      email: "pilot@example.com",
+      username: "pilot",
+      role: "user",
+      is_active: true,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          quote: {
+            id: 1,
+            text: "The console thinks too.",
+            author: "VANESSA Curated",
+            source_universe: "Original",
+            tone: "funny",
+            language: "en",
+            date: "2026-03-11",
+            origin: "local",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          quote: {
+            id: 2,
+            text: "A second signal arrives.",
+            author: "VANESSA Curated",
+            source_universe: "Original",
+            tone: "reflective",
+            language: "en",
+            date: "2026-03-12",
+            origin: "local",
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await renderHomePage();
+    expect(await screen.findByText("The console thinks too.")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "New quote" }));
+
+    expect(await screen.findByText("A second signal arrives.")).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining("/v1/content/quote-of-the-day?lang=en"),
+      expect.any(Object),
+    );
+  });
+
+  it("disables the refresh button while a quote request is in flight", async () => {
+    mockUser = {
+      id: 2,
+      email: "pilot@example.com",
+      username: "pilot",
+      role: "user",
+      is_active: true,
+    };
+
+    let resolveRefreshFetch: ((value: {
+      ok: boolean;
+      status: number;
+      json: () => Promise<{ quote: {
+        id: number;
+        text: string;
+        author: string;
+        source_universe: string;
+        tone: string;
+        language: string;
+        date: string;
+        origin: string;
+      } }>;
+    }) => void) | null = null;
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          quote: {
+            id: 1,
+            text: "The console thinks too.",
+            author: "VANESSA Curated",
+            source_universe: "Original",
+            tone: "funny",
+            language: "en",
+            date: "2026-03-11",
+            origin: "local",
+          },
+        }),
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefreshFetch = resolve;
+          }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await renderHomePage();
+
+    const readyButton = await screen.findByRole("button", { name: "New quote" });
+    await userEvent.click(readyButton);
+
+    const refreshButton = await screen.findByRole("button", { name: "Loading..." });
+    expect(refreshButton).toBeDisabled();
+
+    resolveRefreshFetch?.({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        quote: {
+          id: 2,
+          text: "A second signal arrives.",
+          author: "VANESSA Curated",
+          source_universe: "Original",
+          tone: "reflective",
+          language: "en",
+          date: "2026-03-12",
+          origin: "local",
+        },
+      }),
+    });
+
+    expect(await screen.findByRole("button", { name: "New quote" })).toBeEnabled();
   });
 
   it("shows the quote card for authenticated users and keeps actions available when quote loading fails", async () => {

@@ -261,8 +261,15 @@ a {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+  align-items: center;
   color: var(--text-secondary);
   font-size: 0.92rem;
+}
+
+.quote-card-refresh {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.84rem;
 }
 
 .modal-backdrop {

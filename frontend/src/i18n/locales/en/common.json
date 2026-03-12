@@ -237,6 +237,8 @@
     "title": "Quote of the day",
     "loading": "Loading today's quote...",
     "error": "Unable to load the quote of the day right now.",
+    "refresh": "New quote",
+    "refreshing": "Loading...",
     "tones": {
       "funny": "Funny",
       "reflective": "Reflective"

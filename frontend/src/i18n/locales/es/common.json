@@ -237,6 +237,8 @@
     "title": "Cita del dia",
     "loading": "Cargando la cita de hoy...",
     "error": "No se pudo cargar la cita del dia ahora mismo.",
+    "refresh": "Nueva cita",
+    "refreshing": "Cargando...",
     "tones": {
       "funny": "Divertida",
       "reflective": "Reflexiva"
