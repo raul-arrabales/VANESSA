@@ -49,8 +49,7 @@ type DeploymentFormState = {
   slug: string;
   displayName: string;
   description: string;
-  llmProviderId: string;
-  vectorProviderId: string;
+  providerIdsByCapability: Record<string, string>;
 };
 
 const DEFAULT_PROVIDER_FORM: ProviderFormState = {
@@ -74,8 +73,7 @@ const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
   slug: "",
   displayName: "",
   description: "",
-  llmProviderId: "",
-  vectorProviderId: "",
+  providerIdsByCapability: {},
 };
 
 function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
@@ -123,8 +121,6 @@ function buildDeploymentForm(
   options: { mode: DeploymentFormMode },
 ): DeploymentFormState {
   const { mode } = options;
-  const llmBinding = deployment.bindings.find((binding) => binding.capability === "llm_inference");
-  const vectorBinding = deployment.bindings.find((binding) => binding.capability === "vector_store");
   const suffix = mode === "clone" ? "-copy" : "";
   const nameSuffix = mode === "clone" ? " Copy" : "";
 
@@ -135,8 +131,9 @@ function buildDeploymentForm(
     slug: mode === "clone" ? `${deployment.slug}${suffix}` : deployment.slug,
     displayName: mode === "clone" ? `${deployment.display_name}${nameSuffix}` : deployment.display_name,
     description: deployment.description,
-    llmProviderId: llmBinding?.provider.id ?? "",
-    vectorProviderId: vectorBinding?.provider.id ?? "",
+    providerIdsByCapability: Object.fromEntries(
+      deployment.bindings.map((binding) => [binding.capability, binding.provider.id]),
+    ),
   };
 }
 
@@ -203,8 +200,11 @@ export default function PlatformControlPage(): JSX.Element {
   const latestActivation = activationAudit[0] ?? null;
   const requiredCapabilities = capabilities.filter((capability) => capability.required);
   const coveredRequiredCapabilities = requiredCapabilities.filter((capability) => capability.active_provider !== null);
-  const llmProviders = providers.filter((provider) => provider.capability === "llm_inference");
-  const vectorProviders = providers.filter((provider) => provider.capability === "vector_store");
+  const capabilityLabelByKey = new Map(capabilities.map((capability) => [capability.capability, capability.display_name]));
+  const providersByCapability = requiredCapabilities.reduce<Record<string, PlatformProvider[]>>((accumulator, capability) => {
+    accumulator[capability.capability] = providers.filter((provider) => provider.capability === capability.capability);
+    return accumulator;
+  }, {});
 
   async function handleValidateProvider(providerId: string): Promise<void> {
     if (!token) {
@@ -313,7 +313,10 @@ export default function PlatformControlPage(): JSX.Element {
     if (!token) {
       return;
     }
-    if (!deploymentForm.llmProviderId || !deploymentForm.vectorProviderId) {
+    const missingBinding = requiredCapabilities.find(
+      (capability) => !deploymentForm.providerIdsByCapability[capability.capability],
+    );
+    if (missingBinding) {
       setErrorMessage(t("platformControl.feedback.bindingRequired"));
       return;
     }
@@ -338,10 +341,11 @@ export default function PlatformControlPage(): JSX.Element {
           slug: deploymentForm.slug,
           display_name: deploymentForm.displayName,
           description: deploymentForm.description,
-          bindings: [
-            { capability: "llm_inference", provider_id: deploymentForm.llmProviderId, config: {} },
-            { capability: "vector_store", provider_id: deploymentForm.vectorProviderId, config: {} },
-          ],
+          bindings: requiredCapabilities.map((capability) => ({
+            capability: capability.capability,
+            provider_id: deploymentForm.providerIdsByCapability[capability.capability],
+            config: {},
+          })),
         };
         if (deploymentForm.mode === "create") {
           await createDeploymentProfile(payload, token);
@@ -652,6 +656,15 @@ export default function PlatformControlPage(): JSX.Element {
                                   : t("platformControl.providers.modelsUnavailable")}
                               </span>
                             )}
+                            {typeof validation.validation.embeddings_reachable === "boolean" && (
+                              <span className="status-text">
+                                {validation.validation.embeddings_reachable
+                                  ? t("platformControl.providers.embeddingsReachable", {
+                                      dimension: validation.validation.embedding_dimension ?? 0,
+                                    })
+                                  : t("platformControl.providers.embeddingsUnavailable")}
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <span className="status-text">{t("platformControl.providers.notValidated")}</span>
@@ -741,38 +754,36 @@ export default function PlatformControlPage(): JSX.Element {
                 onChange={(event) => setDeploymentForm((current) => ({ ...current, displayName: event.target.value }))}
               />
             </label>
-            <label className="card-stack">
-              <span className="field-label">{t("platformControl.forms.deployment.llmProvider")}</span>
-              <select
-                className="field-input"
-                value={deploymentForm.llmProviderId}
-                disabled={deploymentForm.mode === "clone"}
-                onChange={(event) => setDeploymentForm((current) => ({ ...current, llmProviderId: event.target.value }))}
-              >
-                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                {llmProviders.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="card-stack">
-              <span className="field-label">{t("platformControl.forms.deployment.vectorProvider")}</span>
-              <select
-                className="field-input"
-                value={deploymentForm.vectorProviderId}
-                disabled={deploymentForm.mode === "clone"}
-                onChange={(event) => setDeploymentForm((current) => ({ ...current, vectorProviderId: event.target.value }))}
-              >
-                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                {vectorProviders.map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {requiredCapabilities.map((capability) => (
+              <label key={capability.capability} className="card-stack">
+                <span className="field-label">
+                  {t("platformControl.forms.deployment.providerForCapability", {
+                    capability: capability.display_name,
+                  })}
+                </span>
+                <select
+                  className="field-input"
+                  value={deploymentForm.providerIdsByCapability[capability.capability] ?? ""}
+                  disabled={deploymentForm.mode === "clone"}
+                  onChange={(event) =>
+                    setDeploymentForm((current) => ({
+                      ...current,
+                      providerIdsByCapability: {
+                        ...current.providerIdsByCapability,
+                        [capability.capability]: event.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                  {(providersByCapability[capability.capability] ?? []).map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
           </div>
           <label className="card-stack">
             <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
@@ -840,7 +851,7 @@ export default function PlatformControlPage(): JSX.Element {
                     <tbody>
                       {deployment.bindings.map((binding) => (
                         <tr key={`${deployment.id}-${binding.capability}`}>
-                          <td>{binding.capability}</td>
+                          <td>{capabilityLabelByKey.get(binding.capability) ?? binding.capability}</td>
                           <td>
                             <strong>{binding.provider.display_name}</strong>
                             <div className="platform-inline-meta">

@@ -67,6 +67,7 @@ def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
                 "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
             },
@@ -79,6 +80,7 @@ def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
     assert payload["execution"]["result"] == {
         "output_text": "model output",
         "tool_calls": [],
+        "embedding_calls": [],
         "retrieval_calls": [],
         "model_calls": [
             {
@@ -201,6 +203,7 @@ def test_execution_without_prompt_or_messages_keeps_deterministic_success(monkey
     assert payload["execution"]["result"] == {
         "output_text": "Agent 'agent.alpha' executed in offline profile",
         "tool_calls": [],
+        "embedding_calls": [],
         "model_calls": [],
         "retrieval_calls": [],
     }
@@ -247,7 +250,10 @@ def test_execution_runtime_client_failures_map_to_existing_error_model(monkeypat
                 "input": {"prompt": "hello"},
                 "platform_runtime": {
                     "deployment_profile": {"slug": "local-default"},
-                    "capabilities": {"llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"}},
+                    "capabilities": {
+                        "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                        "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
+                    },
                 },
             }
         )
@@ -266,6 +272,22 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: {
+                    "embeddings": [[0.1, 0.2]],
+                    "dimension": 2,
+                    "status_code": 200,
+                    "requested_model": "local-vllm-embeddings-default",
+                }
+            },
+        )(),
+    )
     monkeypatch.setattr(
         execution_service,
         "build_vector_store_runtime_client",
@@ -324,6 +346,7 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
             },
@@ -334,6 +357,17 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     assert payload["execution"]["result"] == {
         "output_text": "rag answer",
         "tool_calls": [],
+        "embedding_calls": [
+            {
+                "provider_slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "deployment_profile_slug": "local-default",
+                "requested_model": "local-vllm-embeddings-default",
+                "input_count": 1,
+                "dimension": 2,
+                "status_code": 200,
+            }
+        ],
         "model_calls": [
             {
                 "provider_slug": "vllm-local-gateway",
@@ -377,6 +411,22 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: {
+                    "embeddings": [[0.1, 0.2]],
+                    "dimension": 2,
+                    "status_code": 200,
+                    "requested_model": "local-vllm-embeddings-default",
+                }
+            },
+        )(),
+    )
     monkeypatch.setattr(
         execution_service,
         "build_vector_store_runtime_client",
@@ -428,6 +478,7 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
                 "deployment_profile": {"id": "dep-2", "slug": "local-qdrant", "display_name": "Local Qdrant"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "qdrant-local", "provider_key": "qdrant_local"},
                 },
             },
@@ -435,6 +486,17 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
     )
 
     assert status == 201
+    assert payload["execution"]["result"]["embedding_calls"] == [
+        {
+            "provider_slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "deployment_profile_slug": "local-qdrant",
+            "requested_model": "local-vllm-embeddings-default",
+            "input_count": 1,
+            "dimension": 2,
+            "status_code": 200,
+        }
+    ]
     assert payload["execution"]["result"]["retrieval_calls"] == [
         {
             "provider_slug": "qdrant-local",
@@ -468,6 +530,22 @@ def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypat
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: {
+                    "embeddings": [[0.1, 0.2]],
+                    "dimension": 2,
+                    "status_code": 200,
+                    "requested_model": "local-vllm-embeddings-default",
+                }
+            },
+        )(),
+    )
     monkeypatch.setattr(
         execution_service,
         "build_vector_store_runtime_client",
@@ -519,6 +597,7 @@ def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypat
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
             },
@@ -541,6 +620,22 @@ def test_execution_with_explicit_retrieval_query_overrides_prompt(monkeypatch: p
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: {
+                    "embeddings": [[0.1, 0.2]],
+                    "dimension": 2,
+                    "status_code": 200,
+                    "requested_model": "local-vllm-embeddings-default",
+                }
+            },
+        )(),
+    )
     monkeypatch.setattr(
         execution_service,
         "build_vector_store_runtime_client",
@@ -587,6 +682,7 @@ def test_execution_with_explicit_retrieval_query_overrides_prompt(monkeypatch: p
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
             },
@@ -609,6 +705,22 @@ def test_execution_with_zero_hit_retrieval_keeps_original_messages(monkeypatch: 
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: {
+                    "embeddings": [[0.1, 0.2]],
+                    "dimension": 2,
+                    "status_code": 200,
+                    "requested_model": "local-vllm-embeddings-default",
+                }
+            },
+        )(),
+    )
     monkeypatch.setattr(
         execution_service,
         "build_vector_store_runtime_client",
@@ -655,6 +767,7 @@ def test_execution_with_zero_hit_retrieval_keeps_original_messages(monkeypatch: 
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
                     "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
             },

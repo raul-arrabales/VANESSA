@@ -4,6 +4,10 @@ from app.config import load_llm_config
 from app.providers.base import ProviderError
 from app.registry import ModelInfo, registry
 from app.schemas import (
+    EmbeddingData,
+    EmbeddingRequest,
+    EmbeddingResponseEnvelope,
+    EmbeddingUsage,
     ErrorEnvelope,
     ImageUrlPart,
     NormalizedOutputMessage,
@@ -44,6 +48,7 @@ def list_models() -> dict[str, object]:
                 "capabilities": {
                     "text": model.capabilities.text,
                     "image_input": model.capabilities.image_input,
+                    "embeddings": model.capabilities.embeddings,
                 },
                 "status": model.status,
                 "provider_type": model.provider_type,
@@ -120,6 +125,49 @@ def _build_response(request: ResponseRequest) -> ResponseEnvelope:
     )
 
 
+def _build_embeddings(request: EmbeddingRequest) -> EmbeddingResponseEnvelope:
+    try:
+        resolved_model = registry.resolve_model(request.model)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorEnvelope(code="model_not_found", message=str(exc)).model_dump(),
+        ) from exc
+
+    if not resolved_model.model.capabilities.embeddings:
+        raise HTTPException(
+            status_code=422,
+            detail=ErrorEnvelope(
+                code="unsupported_input",
+                message=f"Model '{request.model}' does not support embeddings.",
+            ).model_dump(),
+        )
+
+    try:
+        result = resolved_model.provider.embed(
+            request,
+            upstream_model=resolved_model.model.upstream_model or resolved_model.model.id,
+        )
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=ErrorEnvelope(code=exc.code, message=exc.message).model_dump(),
+        ) from exc
+
+    return EmbeddingResponseEnvelope(
+        object="list",
+        model=request.model,
+        data=[
+            EmbeddingData(object="embedding", index=index, embedding=embedding)
+            for index, embedding in enumerate(result.embeddings)
+        ],
+        usage=EmbeddingUsage(
+            prompt_tokens=result.prompt_tokens,
+            total_tokens=result.prompt_tokens,
+        ),
+    )
+
+
 @app.post("/v1/responses", response_model=ResponseEnvelope)
 def create_response(request: ResponseRequest) -> ResponseEnvelope:
     return _build_response(request)
@@ -128,3 +176,8 @@ def create_response(request: ResponseRequest) -> ResponseEnvelope:
 @app.post("/v1/chat/completions", response_model=ResponseEnvelope)
 def create_chat_completion(request: ResponseRequest) -> ResponseEnvelope:
     return _build_response(request)
+
+
+@app.post("/v1/embeddings", response_model=EmbeddingResponseEnvelope)
+def create_embeddings(request: EmbeddingRequest) -> EmbeddingResponseEnvelope:
+    return _build_embeddings(request)

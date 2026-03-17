@@ -45,6 +45,7 @@ Platform control plane endpoints:
 - `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
+- `POST /v1/platform/embeddings` (superadmin)
 - `POST /v1/platform/vector/indexes/ensure` (superadmin)
 - `POST /v1/platform/vector/documents/upsert` (superadmin)
 - `POST /v1/platform/vector/query` (superadmin)
@@ -52,15 +53,15 @@ Platform control plane endpoints:
 
 Platform control plane semantics:
 
-- `capabilities` represent platform functions such as `llm_inference` and `vector_store`.
+- `capabilities` represent platform functions such as `llm_inference`, `embeddings`, and `vector_store`.
 - `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, and `qdrant_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
 - Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
-- The vector-store data plane now resolves through the active `vector_store` binding for normalized ensure, upsert, query, and delete operations.
+- The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
-- Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the same active `platform_runtime.capabilities.vector_store` snapshot.
+- Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
 

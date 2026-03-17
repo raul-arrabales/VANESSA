@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.registry import ProviderResult
-from app.schemas import ResponseRequest
+from app.registry import EmbeddingResult, ProviderResult
+from app.schemas import EmbeddingRequest, ResponseRequest
 
 from .base import ProviderError
 from .openai_compat import OpenAICompatibleProvider
@@ -25,3 +25,12 @@ class HuggingFaceRouterProvider:
                 message="HF_TOKEN is required for Hugging Face router inference.",
             )
         return self._provider.generate(request, upstream_model=upstream_model)
+
+    def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> EmbeddingResult:
+        if not self._token:
+            raise ProviderError(
+                status_code=401,
+                code="hf_router_auth_error",
+                message="HF_TOKEN is required for Hugging Face router inference.",
+            )
+        return self._provider.embed(request, upstream_model=upstream_model)

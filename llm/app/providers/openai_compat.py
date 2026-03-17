@@ -6,8 +6,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from app.registry import ProviderResult
-from app.schemas import ImageInputObject, ImageUrlPart, ResponseRequest, TextPart
+from app.registry import EmbeddingResult, ProviderResult
+from app.schemas import EmbeddingRequest, ImageInputObject, ImageUrlPart, ResponseRequest, TextPart
 
 from .base import ProviderError
 
@@ -66,6 +66,32 @@ def _extract_output_text(body: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_embeddings(body: dict[str, Any]) -> list[list[float]]:
+    data = body.get("data")
+    if not isinstance(data, list):
+        return []
+    embeddings: list[list[float]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw_embedding = item.get("embedding")
+        if not isinstance(raw_embedding, list):
+            continue
+        vector: list[float] = []
+        for value in raw_embedding:
+            if isinstance(value, bool):
+                vector = []
+                break
+            try:
+                vector.append(float(value))
+            except (TypeError, ValueError):
+                vector = []
+                break
+        if vector:
+            embeddings.append(vector)
+    return embeddings
+
+
 class OpenAICompatibleProvider:
     def __init__(
         self,
@@ -110,6 +136,73 @@ class OpenAICompatibleProvider:
                     output_text=_extract_output_text(parsed if isinstance(parsed, dict) else {}),
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
+                )
+        except HTTPError as error:
+            body = error.read().decode("utf-8")
+            message = "Upstream request failed"
+            try:
+                parsed_error = loads(body) if body else {}
+            except ValueError:
+                parsed_error = {}
+            if isinstance(parsed_error, dict):
+                err = parsed_error.get("error")
+                if isinstance(err, dict):
+                    message = str(err.get("message", "")).strip() or message
+                elif isinstance(err, str) and err.strip():
+                    message = err.strip()
+            status = int(error.code)
+            if status in {401, 403}:
+                raise ProviderError(
+                    status_code=status,
+                    code=f"{self._provider_code_prefix}_auth_error",
+                    message=message,
+                ) from error
+            if status == 429:
+                raise ProviderError(
+                    status_code=429,
+                    code=f"{self._provider_code_prefix}_rate_limited",
+                    message=message,
+                ) from error
+            if status >= 500:
+                raise ProviderError(
+                    status_code=502,
+                    code=f"{self._provider_code_prefix}_unavailable",
+                    message=message,
+                ) from error
+            raise ProviderError(
+                status_code=400,
+                code=f"{self._provider_code_prefix}_bad_request",
+                message=message,
+            ) from error
+        except (URLError, socket_timeout) as error:
+            raise ProviderError(
+                status_code=504,
+                code=f"{self._provider_code_prefix}_timeout",
+                message="Upstream request timed out or network was unreachable.",
+            ) from error
+
+    def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> EmbeddingResult:
+        payload: dict[str, Any] = {
+            "model": upstream_model,
+            "input": request.input,
+        }
+
+        headers = {"Content-Type": "application/json"}
+        if self._auth_header_value:
+            headers["Authorization"] = self._auth_header_value
+
+        url = f"{self._base_url}/embeddings"
+        req = Request(url, data=dumps(payload).encode("utf-8"), headers=headers, method="POST")
+
+        try:
+            with urlopen(req, timeout=float(self._timeout_seconds)) as response:
+                body = response.read().decode("utf-8")
+                parsed = loads(body) if body else {}
+                usage = parsed.get("usage") if isinstance(parsed, dict) else {}
+                prompt_tokens = int(usage.get("prompt_tokens", 0)) if isinstance(usage, dict) else 0
+                return EmbeddingResult(
+                    embeddings=_extract_embeddings(parsed if isinstance(parsed, dict) else {}),
+                    prompt_tokens=prompt_tokens,
                 )
         except HTTPError as error:
             body = error.read().decode("utf-8")

@@ -90,7 +90,7 @@ def test_activate_deployment_profile_requires_all_required_capabilities(monkeypa
         )
 
     assert exc_info.value.code == "deployment_profile_incomplete"
-    assert exc_info.value.details["missing_capabilities"] == ["vector_store"]
+    assert exc_info.value.details["missing_capabilities"] == ["embeddings", "vector_store"]
 
 
 def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeypatch: pytest.MonkeyPatch):
@@ -105,27 +105,34 @@ def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeyp
         "list_deployment_bindings",
         lambda _db, *, deployment_profile_id: [
             {"capability_key": "llm_inference", "provider_instance_id": "provider-1", "enabled": True},
+            {"capability_key": "embeddings", "provider_instance_id": "provider-embeddings", "enabled": True},
             {"capability_key": "vector_store", "provider_instance_id": "provider-2", "enabled": True},
         ],
     )
-    monkeypatch.setattr(
-        platform_service,
-        "validate_provider",
-        lambda _db, *, config, provider_instance_id: (
-            {
+    def _validate_provider(_db, *, config, provider_instance_id):
+        del config
+        if provider_instance_id == "provider-1":
+            return {
                 "provider": {"id": provider_instance_id, "slug": "provider-1"},
                 "validation": {
                     "health": {"reachable": False, "status_code": 503},
                     "models_reachable": False,
                 },
             }
-            if provider_instance_id == "provider-1"
-            else {
-                "provider": {"id": provider_instance_id, "slug": "provider-2"},
-                "validation": {"health": {"reachable": True, "status_code": 200}},
+        if provider_instance_id == "provider-embeddings":
+            return {
+                "provider": {"id": provider_instance_id, "slug": "provider-embeddings"},
+                "validation": {
+                    "health": {"reachable": True, "status_code": 200},
+                    "embeddings_reachable": True,
+                },
             }
-        ),
-    )
+        return {
+            "provider": {"id": provider_instance_id, "slug": "provider-2"},
+            "validation": {"health": {"reachable": True, "status_code": 200}},
+        }
+
+    monkeypatch.setattr(platform_service, "validate_provider", _validate_provider)
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         platform_service.activate_deployment_profile(
@@ -265,6 +272,68 @@ def test_openai_adapter_uses_models_endpoint_for_health_when_no_healthcheck(monk
     assert seen_urls == ["http://llama_cpp:8080/v1/models"]
 
 
+def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": "vLLM embeddings local",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config_json": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+        },
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_embeddings_adapter",
+        lambda _db, config, provider_instance_id=None: type(
+            "FakeEmbeddingsAdapter",
+            (),
+            {
+                "binding": platform_service.ProviderBinding(
+                    capability_key="embeddings",
+                    provider_instance_id="provider-embeddings",
+                    provider_slug="vllm-embeddings-local",
+                    provider_key="vllm_embeddings_local",
+                    provider_display_name="vLLM embeddings local",
+                    provider_description="desc",
+                    endpoint_url="http://llm:8000",
+                    healthcheck_url="http://llm:8000/health",
+                    enabled=True,
+                    adapter_kind="openai_compatible_embeddings",
+                    config={"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                    binding_config={},
+                    deployment_profile_id="deployment-1",
+                    deployment_profile_slug="local-default",
+                    deployment_profile_display_name="Local Default",
+                ),
+                "health": lambda self: {"reachable": True, "status_code": 200},
+                "embed_texts": lambda self, *, texts: (
+                    {"embeddings": [[0.1, 0.2, 0.3]], "embedding_dimension": 3},
+                    200,
+                ),
+            },
+        )(),
+    )
+
+    payload = platform_service.validate_provider("ignored", config=object(), provider_instance_id="provider-embeddings")  # type: ignore[arg-type]
+
+    assert payload["validation"] == {
+        "health": {"reachable": True, "status_code": 200},
+        "embeddings_reachable": True,
+        "embeddings_status_code": 200,
+        "embedding_dimension": 3,
+    }
+
+
 def test_openai_adapter_normalizes_openai_chat_payloads(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
 
@@ -367,6 +436,7 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
 
     assert created_profiles == ["local-default", "local-llama-cpp"]
     assert ("local-llama-cpp-id", "llm_inference", "llama-cpp-local-id") in binding_calls
+    assert ("local-llama-cpp-id", "embeddings", "vllm-embeddings-local-id") in binding_calls
     assert ("local-llama-cpp-id", "vector_store", "weaviate-local-id") in binding_calls
 
 
@@ -432,6 +502,7 @@ def test_ensure_platform_bootstrap_state_seeds_qdrant_profile_when_configured(mo
 
     assert created_profiles == ["local-default", "local-qdrant"]
     assert ("local-qdrant-id", "llm_inference", "vllm-local-gateway-id") in binding_calls
+    assert ("local-qdrant-id", "embeddings", "vllm-embeddings-local-id") in binding_calls
     assert ("local-qdrant-id", "vector_store", "qdrant-local-id") in binding_calls
 
 
@@ -502,6 +573,24 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "deployment_profile_slug": deployment_slug,
                 "deployment_profile_display_name": "Runtime Deployment",
             }
+        if capability_key == "embeddings":
+            return {
+                "capability_key": "embeddings",
+                "provider_instance_id": "provider-embeddings",
+                "provider_slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "provider_display_name": "vLLM embeddings local",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_embeddings",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": deployment_slug,
+                "deployment_profile_display_name": "Runtime Deployment",
+            }
         return {
             "capability_key": "vector_store",
             "provider_instance_id": "provider-2",
@@ -546,6 +635,19 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
                 "config": {"chat_completion_path": "/v1/chat/completions"},
+                "binding_config": {},
+            },
+            "embeddings": {
+                "id": "provider-embeddings",
+                "slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "display_name": "vLLM embeddings local",
+                "description": "desc",
+                "adapter_kind": "openai_compatible_embeddings",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
                 "binding_config": {},
             },
             "vector_store": {

@@ -43,6 +43,21 @@ class ResponseRequest(BaseModel):
     max_tokens: int | None = None
 
 
+class EmbeddingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str = Field(min_length=1)
+    input: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> "EmbeddingRequest":
+        normalized = [item.strip() for item in self.input]
+        if any(not item for item in normalized):
+            raise ValueError("embedding input items must be non-empty strings.")
+        self.input = normalized
+        return self
+
+
 class NormalizedOutputMessage(BaseModel):
     role: Literal["assistant"]
     content: list[TextPart]
@@ -51,6 +66,17 @@ class NormalizedOutputMessage(BaseModel):
 class Usage(BaseModel):
     prompt_tokens: int
     completion_tokens: int
+    total_tokens: int
+
+
+class EmbeddingData(BaseModel):
+    object: Literal["embedding"]
+    index: int
+    embedding: list[float]
+
+
+class EmbeddingUsage(BaseModel):
+    prompt_tokens: int
     total_tokens: int
 
 
@@ -63,4 +89,12 @@ class ResponseEnvelope(BaseModel):
     model: str
     output: list[NormalizedOutputMessage]
     usage: Usage
+    error: ErrorEnvelope | None = None
+
+
+class EmbeddingResponseEnvelope(BaseModel):
+    object: Literal["list"]
+    model: str
+    data: list[EmbeddingData]
+    usage: EmbeddingUsage
     error: ErrorEnvelope | None = None

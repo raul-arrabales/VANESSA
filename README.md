@@ -17,7 +17,7 @@ VANESSA is a modular, containerized AI assistant stack with:
 
 The backend also owns a GenAI control plane that distinguishes:
 
-- `capabilities` such as `llm_inference` and `vector_store`
+- `capabilities` such as `llm_inference`, `embeddings`, and `vector_store`
 - `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, and `qdrant_local`
 - `deployment profiles` that bind capabilities to active providers
 
@@ -248,6 +248,7 @@ Backend exposes platform control-plane endpoints for capability/provider managem
 - `DELETE /v1/platform/deployments/{id}`
 - `POST /v1/platform/deployments/{id}/activate`
 - `POST /v1/platform/providers/{id}/validate`
+- `POST /v1/platform/embeddings`
 - `POST /v1/platform/vector/indexes/ensure`
 - `POST /v1/platform/vector/documents/upsert`
 - `POST /v1/platform/vector/query`
@@ -256,6 +257,7 @@ Backend exposes platform control-plane endpoints for capability/provider managem
 Current first-wave capabilities:
 
 - `llm_inference`
+- `embeddings`
 - `vector_store`
 
 Current bootstrapped local providers:
@@ -265,7 +267,7 @@ Current bootstrapped local providers:
 - `weaviate_local`
 - `qdrant_local`
 
-The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve ensure, upsert, query, and delete through the active `vector_store` binding using provider-agnostic payloads.
+The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve embeddings, ensure, upsert, query, and delete through the active `embeddings` and `vector_store` bindings using provider-agnostic payloads.
 
 Bootstrapped deployment profiles:
 

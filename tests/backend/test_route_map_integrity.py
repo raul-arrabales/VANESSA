@@ -38,6 +38,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/platform/deployments/<deployment_profile_id>",
         "/v1/platform/deployments/<deployment_profile_id>/clone",
         "/v1/platform/deployments/<deployment_profile_id>/activate",
+        "/v1/platform/embeddings",
         "/v1/platform/vector/indexes/ensure",
         "/v1/platform/vector/documents/upsert",
         "/v1/platform/vector/query",

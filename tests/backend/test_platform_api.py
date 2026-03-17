@@ -94,6 +94,7 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     activate = test_client.post("/v1/platform/deployments/deployment-1/activate", headers=_auth(token))
     delete_deployment = test_client.delete("/v1/platform/deployments/deployment-1", headers=_auth(token))
     ensure_index = test_client.post("/v1/platform/vector/indexes/ensure", headers=_auth(token), json={"index": "kb"})
+    embeddings = test_client.post("/v1/platform/embeddings", headers=_auth(token), json={"inputs": ["hello"]})
     upsert_documents = test_client.post(
         "/v1/platform/vector/documents/upsert",
         headers=_auth(token),
@@ -121,6 +122,7 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     assert clone_deployment.status_code == 403
     assert activate.status_code == 403
     assert delete_deployment.status_code == 403
+    assert embeddings.status_code == 403
     assert ensure_index.status_code == 403
     assert upsert_documents.status_code == 403
     assert query_documents.status_code == 403
@@ -323,6 +325,16 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     )
     monkeypatch.setattr(
         platform_routes,
+        "embed_platform_inputs",
+        lambda _db, _config, payload: {
+            "provider": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
+            "count": len(payload["inputs"]),
+            "dimension": 2,
+            "embeddings": [[0.1, 0.2] for _ in payload["inputs"]],
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
         "delete_vector_documents",
         lambda _db, _config, payload: {
             "index": payload["index"],
@@ -396,6 +408,11 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
         "/v1/platform/providers/provider-1/validate",
         headers=_auth(token),
     )
+    embeddings_response = test_client.post(
+        "/v1/platform/embeddings",
+        headers=_auth(token),
+        json={"inputs": ["hello"]},
+    )
     ensure_response = test_client.post(
         "/v1/platform/vector/indexes/ensure",
         headers=_auth(token),
@@ -443,6 +460,9 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     assert delete_deployment_response.get_json()["deleted"] is True
     assert validate_response.status_code == 200
     assert validate_response.get_json()["validation"]["health"]["reachable"] is True
+    assert embeddings_response.status_code == 200
+    assert embeddings_response.get_json()["provider"]["slug"] == "vllm-embeddings-local"
+    assert embeddings_response.get_json()["dimension"] == 2
     assert ensure_response.status_code == 200
     assert ensure_response.get_json()["index"]["name"] == "knowledge_base"
     assert upsert_response.status_code == 200
@@ -483,6 +503,39 @@ def test_platform_vector_routes_return_control_plane_errors(client, monkeypatch:
     assert response.get_json() == {
         "error": "invalid_query_input",
         "message": "Provide exactly one of query_text or embedding",
+    }
+
+
+def test_platform_embeddings_route_returns_control_plane_errors(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        platform_routes,
+        "embed_platform_inputs",
+        lambda _db, _config, payload: (_ for _ in ()).throw(
+            PlatformControlPlaneError("invalid_inputs", "inputs must be a non-empty array", status_code=400)
+        ),
+    )
+
+    response = test_client.post(
+        "/v1/platform/embeddings",
+        headers=_auth(token),
+        json={"inputs": []},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "invalid_inputs",
+        "message": "inputs must be a non-empty array",
     }
 
 

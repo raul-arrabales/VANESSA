@@ -27,6 +27,15 @@ class VectorStoreRuntimeClientError(RuntimeError):
         self.details = details or {}
 
 
+class EmbeddingsRuntimeClientError(RuntimeError):
+    def __init__(self, *, code: str, message: str, status_code: int, details: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        self.details = details or {}
+
+
 class LlmRuntimeClient(ABC):
     def __init__(self, *, deployment_profile: dict[str, Any], llm_binding: dict[str, Any]):
         self.deployment_profile = deployment_profile
@@ -52,9 +61,24 @@ class VectorStoreRuntimeClient(ABC):
         self,
         *,
         index_name: str,
-        query_text: str,
+        embedding: list[float],
         top_k: int,
         filters: dict[str, Any],
+        query_text: str | None = None,
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class EmbeddingsRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], embeddings_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.embeddings_binding = embeddings_binding
+
+    @abstractmethod
+    def embed_texts(
+        self,
+        *,
+        texts: list[str],
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -117,14 +141,15 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         self,
         *,
         index_name: str,
-        query_text: str,
+        embedding: list[float],
         top_k: int,
         filters: dict[str, Any],
+        query_text: str | None = None,
     ) -> dict[str, Any]:
         class_name = _coerce_weaviate_class_name(index_name)
         operation = _build_weaviate_query_operation(
             class_name=class_name,
-            query_text=query_text,
+            embedding=embedding,
             top_k=top_k,
             filters=filters,
         )
@@ -192,22 +217,19 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         self,
         *,
         index_name: str,
-        query_text: str,
+        embedding: list[float],
         top_k: int,
         filters: dict[str, Any],
+        query_text: str | None = None,
     ) -> dict[str, Any]:
         collection_name = _coerce_qdrant_collection_name(index_name)
         payload, status_code = http_json_request(
-            self._scroll_url(collection_name),
+            self._search_url(collection_name),
             method="POST",
             payload={
+                "vector": embedding,
                 "limit": top_k,
-                "filter": {
-                    "must": [
-                        *_qdrant_filter_conditions(filters),
-                        {"key": "text", "match": {"text": query_text}},
-                    ]
-                },
+                "filter": {"must": _qdrant_filter_conditions(filters)},
                 "with_payload": True,
                 "with_vector": False,
             },
@@ -238,9 +260,7 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
                     "upstream": payload,
                 },
             )
-        points = (((payload.get("result") or {}).get("points")) if isinstance(payload.get("result"), dict) else [])
-        if not isinstance(points, list):
-            points = []
+        points = payload.get("result") if isinstance(payload.get("result"), list) else []
         return {
             "index": index_name,
             "query": query_text,
@@ -251,6 +271,77 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
     def _scroll_url(self, collection_name: str) -> str:
         endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
         return endpoint_url + f"/collections/{collection_name}/points/scroll"
+
+    def _search_url(self, collection_name: str) -> str:
+        endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + f"/collections/{collection_name}/points/search"
+
+
+class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
+    def embed_texts(
+        self,
+        *,
+        texts: list[str],
+    ) -> dict[str, Any]:
+        payload = {
+            "model": _resolve_effective_embedding_model(self.embeddings_binding),
+            "input": texts,
+        }
+        response_payload, status_code = http_json_request(
+            self._embeddings_url(),
+            method="POST",
+            payload=payload,
+        )
+        if response_payload is None:
+            raise EmbeddingsRuntimeClientError(
+                code="embeddings_runtime_unreachable",
+                message="Embeddings runtime unavailable",
+                status_code=status_code,
+                details={"provider_slug": self.embeddings_binding.get("slug"), "status_code": status_code},
+            )
+        if not 200 <= status_code < 300:
+            error_code = (
+                "embeddings_runtime_timeout"
+                if status_code == 504
+                else "embeddings_runtime_upstream_unavailable"
+                if status_code >= 502
+                else "embeddings_runtime_request_failed"
+            )
+            raise EmbeddingsRuntimeClientError(
+                code=error_code,
+                message="Embeddings runtime request failed",
+                status_code=status_code,
+                details={
+                    "provider_slug": self.embeddings_binding.get("slug"),
+                    "status_code": status_code,
+                    "upstream": response_payload,
+                },
+            )
+
+        embeddings = _extract_embeddings(response_payload)
+        if not embeddings:
+            raise EmbeddingsRuntimeClientError(
+                code="embeddings_runtime_request_failed",
+                message="Embeddings runtime returned no vectors",
+                status_code=502,
+                details={
+                    "provider_slug": self.embeddings_binding.get("slug"),
+                    "status_code": 502,
+                    "upstream": response_payload,
+                },
+            )
+        return {
+            "embeddings": embeddings,
+            "dimension": len(embeddings[0]) if embeddings else 0,
+            "status_code": status_code,
+            "requested_model": payload["model"],
+        }
+
+    def _embeddings_url(self) -> str:
+        config = self.embeddings_binding.get("config") if isinstance(self.embeddings_binding.get("config"), dict) else {}
+        embeddings_path = str(config.get("embeddings_path", "/v1/embeddings")).strip() or "/v1/embeddings"
+        endpoint_url = str(self.embeddings_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + embeddings_path
 
 
 def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClient:
@@ -274,6 +365,32 @@ def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClie
             details={"adapter_kind": adapter_kind},
         )
     return OpenAICompatibleLlmRuntimeClient(deployment_profile=deployment_profile, llm_binding=llm_binding)
+
+
+def build_embeddings_runtime_client(platform_runtime: dict[str, Any]) -> EmbeddingsRuntimeClient:
+    deployment_profile, capabilities = _coerce_platform_runtime(
+        platform_runtime,
+        error_cls=EmbeddingsRuntimeClientError,
+    )
+    embeddings_binding = capabilities.get("embeddings")
+    if not isinstance(embeddings_binding, dict):
+        raise EmbeddingsRuntimeClientError(
+            code="missing_embeddings_runtime",
+            message="platform_runtime is missing embeddings binding",
+            status_code=500,
+        )
+    adapter_kind = str(embeddings_binding.get("adapter_kind", "")).strip().lower()
+    if adapter_kind != "openai_compatible_embeddings":
+        raise EmbeddingsRuntimeClientError(
+            code="unsupported_adapter_kind",
+            message="Unsupported embeddings runtime adapter",
+            status_code=500,
+            details={"adapter_kind": adapter_kind},
+        )
+    return OpenAICompatibleEmbeddingsRuntimeClient(
+        deployment_profile=deployment_profile,
+        embeddings_binding=embeddings_binding,
+    )
 
 
 def build_vector_store_runtime_client(platform_runtime: dict[str, Any]) -> VectorStoreRuntimeClient:
@@ -338,7 +455,7 @@ def http_json_request(
 def _coerce_platform_runtime(
     platform_runtime: dict[str, Any],
     *,
-    error_cls: type[LlmRuntimeClientError] | type[VectorStoreRuntimeClientError],
+    error_cls: type[LlmRuntimeClientError] | type[VectorStoreRuntimeClientError] | type[EmbeddingsRuntimeClientError],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     deployment_profile = platform_runtime.get("deployment_profile")
     capabilities = platform_runtime.get("capabilities")
@@ -481,11 +598,11 @@ def _coerce_metadata_key(key: str) -> str:
 def _build_weaviate_query_operation(
     *,
     class_name: str,
-    query_text: str,
+    embedding: list[float],
     top_k: int,
     filters: dict[str, Any],
 ) -> dict[str, str]:
-    args: list[str] = [f"limit: {top_k}", f'bm25: {{ query: {_graphql_string(query_text)}, properties: ["text"] }}']
+    args: list[str] = [f"limit: {top_k}", f"nearVector: {{ vector: {_graphql_list(embedding)} }}"]
     if filters:
         args.append(f"where: {_graphql_where_filter(filters)}")
     args_text = ", ".join(args)
@@ -494,11 +611,15 @@ def _build_weaviate_query_operation(
         f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id score }} }} '
         "} } }"
     )
-    return {"query": query}
+    return {"query": query, "score_kind": "similarity"}
 
 
 def _graphql_string(value: str) -> str:
     return dumps(value)
+
+
+def _graphql_list(values: list[float]) -> str:
+    return "[" + ", ".join(format(float(value), ".12g") for value in values) + "]"
 
 
 def _graphql_where_filter(filters: dict[str, Any]) -> str:
@@ -533,7 +654,7 @@ def _normalize_weaviate_query_result(item: dict[str, Any]) -> dict[str, Any]:
         "text": str(item.get("text", "")).strip(),
         "metadata": metadata,
         "score": float(additional.get("score", 0.0) or 0.0),
-        "score_kind": "bm25",
+        "score_kind": "similarity",
     }
 
 
@@ -573,5 +694,47 @@ def _normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
         "text": str(payload.get("text", "")).strip(),
         "metadata": metadata,
         "score": score,
-        "score_kind": "text_match",
+        "score_kind": "similarity",
     }
+
+
+def _resolve_effective_embedding_model(embeddings_binding: dict[str, Any]) -> str:
+    config = embeddings_binding.get("config") if isinstance(embeddings_binding.get("config"), dict) else {}
+    forced_model = str(config.get("forced_model_id", "")).strip()
+    if forced_model:
+        return forced_model
+    fallback_model = str(config.get("local_fallback_model_id", "")).strip()
+    if fallback_model:
+        return fallback_model
+    raise EmbeddingsRuntimeClientError(
+        code="missing_model_ref",
+        message="No embedding model was resolved for execution",
+        status_code=500,
+        details={"provider_slug": embeddings_binding.get("slug")},
+    )
+
+
+def _extract_embeddings(payload: dict[str, Any]) -> list[list[float]]:
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return []
+    embeddings: list[list[float]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw_embedding = item.get("embedding")
+        if not isinstance(raw_embedding, list):
+            continue
+        vector: list[float] = []
+        for value in raw_embedding:
+            if isinstance(value, bool):
+                vector = []
+                break
+            try:
+                vector.append(float(value))
+            except (TypeError, ValueError):
+                vector = []
+                break
+        if vector:
+            embeddings.append(vector)
+    return embeddings

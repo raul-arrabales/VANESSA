@@ -12,6 +12,7 @@
     "result": {
       "output_text": "Agent 'agent.alpha' executed in offline profile",
       "tool_calls": [],
+      "embedding_calls": [],
       "retrieval_calls": [],
       "model_calls": [
         {

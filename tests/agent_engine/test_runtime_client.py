@@ -16,6 +16,11 @@ def _platform_runtime(
     *,
     provider_key: str = "vllm_local",
     request_format: str = "responses_api",
+    embeddings_provider_key: str = "vllm_embeddings_local",
+    embeddings_adapter_kind: str = "openai_compatible_embeddings",
+    embeddings_endpoint_url: str = "http://llm:8000",
+    embeddings_healthcheck_url: str | None = "http://llm:8000/health",
+    embeddings_config: dict[str, object] | None = None,
     vector_provider_key: str = "weaviate_local",
     vector_adapter_kind: str = "weaviate_http",
     vector_endpoint_url: str = "http://weaviate:8080",
@@ -39,6 +44,23 @@ def _platform_runtime(
                     "chat_completion_path": "/v1/chat/completions",
                     "request_format": request_format,
                     "forced_model_id": "local-default-model",
+                },
+                "binding_config": {},
+            },
+            "embeddings": {
+                "id": "provider-embeddings",
+                "slug": "vllm-embeddings-local",
+                "provider_key": embeddings_provider_key,
+                "display_name": "vLLM embeddings local",
+                "description": "desc",
+                "adapter_kind": embeddings_adapter_kind,
+                "endpoint_url": embeddings_endpoint_url,
+                "healthcheck_url": embeddings_healthcheck_url,
+                "enabled": True,
+                "config": {
+                    "embeddings_path": "/v1/embeddings",
+                    "forced_model_id": "local-vllm-embeddings-default",
+                    **(embeddings_config or {}),
                 },
                 "binding_config": {},
             },
@@ -158,9 +180,10 @@ def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results
 
     payload = client.query(
         index_name="knowledge_base",
-        query_text="hello",
+        embedding=[0.1, 0.2],
         top_k=4,
         filters={"tenant": "ops"},
+        query_text="hello",
     )
 
     assert payload == {
@@ -173,11 +196,11 @@ def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results
                 "text": "retrieved text",
                 "metadata": {"tenant": "ops"},
                 "score": 7.5,
-                "score_kind": "bm25",
+                "score_kind": "similarity",
             }
         ],
     }
-    assert 'bm25: { query: "hello", properties: ["text"] }' in str(seen_payloads[0])
+    assert "nearVector: { vector: [0.1, 0.2] }" in str(seen_payloads[0])
     assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in str(seen_payloads[0])
 
 
@@ -188,7 +211,7 @@ def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pyt
     with pytest.raises(runtime_client.VectorStoreRuntimeClientError) as exc_info:
         client.query(
             index_name="knowledge_base",
-            query_text="hello",
+            embedding=[0.1, 0.2],
             top_k=5,
             filters={},
         )
@@ -196,7 +219,7 @@ def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pyt
     assert exc_info.value.code == "vector_runtime_timeout"
 
 
-def test_qdrant_vector_runtime_client_builds_scroll_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+def test_qdrant_vector_runtime_client_builds_similarity_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
 
     def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
@@ -204,18 +227,17 @@ def test_qdrant_vector_runtime_client_builds_scroll_query_and_normalizes_results
         seen_payloads.append(dict(payload or {}))
         return {
             "status": "ok",
-            "result": {
-                "points": [
-                    {
-                        "id": "doc-1",
-                        "payload": {
-                            "document_id": "doc-1",
-                            "text": "retrieved text",
-                            "metadata": {"tenant": "ops"},
-                        },
-                    }
-                ]
-            },
+            "result": [
+                {
+                    "id": "doc-1",
+                    "payload": {
+                        "document_id": "doc-1",
+                        "text": "retrieved text",
+                        "metadata": {"tenant": "ops"},
+                    },
+                    "score": 0.88,
+                }
+            ],
         }, 200
 
     monkeypatch.setattr(runtime_client, "http_json_request", _request)
@@ -230,9 +252,10 @@ def test_qdrant_vector_runtime_client_builds_scroll_query_and_normalizes_results
 
     payload = client.query(
         index_name="knowledge_base",
-        query_text="hello",
+        embedding=[0.1, 0.2],
         top_k=4,
         filters={"tenant": "ops"},
+        query_text="hello",
     )
 
     assert payload == {
@@ -244,21 +267,39 @@ def test_qdrant_vector_runtime_client_builds_scroll_query_and_normalizes_results
                 "id": "doc-1",
                 "text": "retrieved text",
                 "metadata": {"tenant": "ops"},
-                "score": 1.0,
-                "score_kind": "text_match",
+                "score": 0.88,
+                "score_kind": "similarity",
             }
         ],
     }
     assert seen_payloads == [
         {
+            "vector": [0.1, 0.2],
             "limit": 4,
-            "filter": {
-                "must": [
-                    {"key": "tenant", "match": {"value": "ops"}},
-                    {"key": "text", "match": {"text": "hello"}},
-                ]
-            },
+            "filter": {"must": [{"key": "tenant", "match": {"value": "ops"}}]},
             "with_payload": True,
             "with_vector": False,
         }
     ]
+
+
+def test_openai_compatible_embeddings_runtime_client_returns_vectors(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_embeddings_runtime_client(_platform_runtime())
+
+    payload = client.embed_texts(texts=["hello"])
+
+    assert payload == {
+        "embeddings": [[0.1, 0.2, 0.3]],
+        "dimension": 3,
+        "status_code": 200,
+        "requested_model": "local-vllm-embeddings-default",
+    }
+    assert seen_payloads == [{"model": "local-vllm-embeddings-default", "input": ["hello"]}]

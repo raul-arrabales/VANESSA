@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.registry import ProviderResult
-from app.schemas import ResponseRequest
+from app.registry import EmbeddingResult, ProviderResult
+from app.schemas import EmbeddingRequest, ResponseRequest
 
 from .openai_compat import OpenAICompatibleProvider
 
@@ -17,3 +17,6 @@ class LocalVLLMProvider:
 
     def generate(self, request: ResponseRequest, *, upstream_model: str) -> ProviderResult:
         return self._provider.generate(request, upstream_model=upstream_model)
+
+    def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> EmbeddingResult:
+        return self._provider.embed(request, upstream_model=upstream_model)

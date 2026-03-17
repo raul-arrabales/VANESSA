@@ -50,7 +50,7 @@ Interaction semantics in the generated graph represent directional runtime commu
 
 The runtime architecture now distinguishes container topology from GenAI capability binding:
 
-- `capability`: a platform function such as `llm_inference` or `vector_store`
+- `capability`: a platform function such as `llm_inference`, `embeddings`, or `vector_store`
 - `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, or `qdrant_local`
 - `deployment profile`: the named set of active capability-to-provider bindings
 - `adapter`: the capability-specific backend client that talks to a provider
@@ -59,9 +59,9 @@ This control plane lives in backend + postgres. It complements the container top
 
 Current provider proof state:
 
-- `local-default` keeps `llm_inference -> vllm_local` through the `llm` gateway.
-- When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`.
-- When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `vector_store -> qdrant_local`.
+- `local-default` keeps `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
+- When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
+- When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
 - Switching deployment profiles changes the active inference and retrieval targets without changing frontend or model-governance APIs.
 
 ## Design Principles

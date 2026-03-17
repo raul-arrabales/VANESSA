@@ -5,13 +5,16 @@ from typing import Any
 from ..config import AuthConfig
 from ..repositories import platform_control_plane as platform_repo
 from .platform_adapters import (
+    EmbeddingsAdapter,
     LlmInferenceAdapter,
+    OpenAICompatibleEmbeddingsAdapter,
     OpenAICompatibleLlmAdapter,
     QdrantVectorStoreAdapter,
     VectorStoreAdapter,
     WeaviateVectorStoreAdapter,
 )
 from .platform_types import (
+    CAPABILITY_EMBEDDINGS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_VECTOR_STORE,
     REQUIRED_CAPABILITIES,
@@ -42,6 +45,13 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     )
     platform_repo.ensure_capability(
         database_url,
+        capability_key=CAPABILITY_EMBEDDINGS,
+        display_name="Embeddings",
+        description="Normalized text embeddings capability for retrieval and vector ingestion.",
+        is_required=True,
+    )
+    platform_repo.ensure_capability(
+        database_url,
         capability_key=CAPABILITY_VECTOR_STORE,
         display_name="Vector store",
         description="Semantic retrieval capability for embeddings and document search.",
@@ -63,6 +73,14 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         adapter_kind="openai_compatible_llm",
         display_name="llama.cpp local",
         description="OpenAI-compatible llama.cpp inference endpoint for local deployments.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="vllm_embeddings_local",
+        capability_key=CAPABILITY_EMBEDDINGS,
+        adapter_kind="openai_compatible_embeddings",
+        display_name="vLLM embeddings local",
+        description="Local embeddings provider exposed through the llm gateway.",
     )
     platform_repo.ensure_provider_family(
         database_url,
@@ -107,6 +125,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         healthcheck_url=config.weaviate_url.rstrip("/") + "/v1/.well-known/ready",
         enabled=True,
         config_json={},
+    )
+    embeddings_provider = platform_repo.ensure_provider_instance(
+        database_url,
+        slug="vllm-embeddings-local",
+        provider_key="vllm_embeddings_local",
+        display_name="vLLM embeddings local",
+        description="Primary llm gateway entrypoint for local embeddings generation.",
+        endpoint_url=config.llm_url,
+        healthcheck_url=config.llm_url.rstrip("/") + "/health",
+        enabled=True,
+        config_json={
+            "models_path": "/v1/models",
+            "embeddings_path": "/v1/embeddings",
+            "forced_model_id": "local-vllm-embeddings-default",
+            "input_type": "text",
+        },
     )
     llama_cpp_provider = platform_repo.ensure_provider_instance(
         database_url,
@@ -162,6 +196,13 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     platform_repo.upsert_deployment_binding(
         database_url,
         deployment_profile_id=str(profile["id"]),
+        capability_key=CAPABILITY_EMBEDDINGS,
+        provider_instance_id=str(embeddings_provider["id"]),
+        binding_config={},
+    )
+    platform_repo.upsert_deployment_binding(
+        database_url,
+        deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_VECTOR_STORE,
         provider_instance_id=str(weaviate_provider["id"]),
         binding_config={},
@@ -186,6 +227,13 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         platform_repo.upsert_deployment_binding(
             database_url,
             deployment_profile_id=str(llama_profile["id"]),
+            capability_key=CAPABILITY_EMBEDDINGS,
+            provider_instance_id=str(embeddings_provider["id"]),
+            binding_config={},
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(weaviate_provider["id"]),
             binding_config={},
@@ -205,6 +253,13 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=str(vllm_provider["id"]),
+            binding_config={},
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(qdrant_profile["id"]),
+            capability_key=CAPABILITY_EMBEDDINGS,
+            provider_instance_id=str(embeddings_provider["id"]),
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -619,6 +674,22 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
             },
         }
 
+    if binding.capability_key == CAPABILITY_EMBEDDINGS:
+        adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        health = adapter.health()
+        embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
+        embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
+        embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
+        return {
+            "provider": _serialize_provider_row(provider_row),
+            "validation": {
+                "health": health,
+                "embeddings_reachable": embeddings_payload is not None and 200 <= embeddings_status < 300,
+                "embeddings_status_code": embeddings_status,
+                "embedding_dimension": embedding_dimension,
+            },
+        }
+
     if binding.capability_key == CAPABILITY_VECTOR_STORE:
         adapter = resolve_vector_store_adapter(database_url, config, provider_instance_id=provider_instance_id)
         return {
@@ -648,6 +719,23 @@ def resolve_llm_inference_adapter(
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported LLM adapter kind", status_code=500)
 
 
+def resolve_embeddings_adapter(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    provider_instance_id: str | None = None,
+) -> EmbeddingsAdapter:
+    binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_EMBEDDINGS,
+        provider_instance_id=provider_instance_id,
+    )
+    if binding.adapter_kind == "openai_compatible_embeddings":
+        return OpenAICompatibleEmbeddingsAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported embeddings adapter kind", status_code=500)
+
+
 def resolve_vector_store_adapter(
     database_url: str,
     config: AuthConfig,
@@ -675,13 +763,19 @@ def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[s
         capability_key=CAPABILITY_LLM_INFERENCE,
         provider_instance_id=None,
     )
+    embeddings_binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_EMBEDDINGS,
+        provider_instance_id=None,
+    )
     vector_binding = _resolve_provider_binding(
         database_url,
         config,
         capability_key=CAPABILITY_VECTOR_STORE,
         provider_instance_id=None,
     )
-    if llm_binding.deployment_profile_id != vector_binding.deployment_profile_id:
+    if len({llm_binding.deployment_profile_id, embeddings_binding.deployment_profile_id, vector_binding.deployment_profile_id}) != 1:
         raise PlatformControlPlaneError(
             "active_deployment_profile_mismatch",
             "Active capability bindings do not point to the same deployment profile",
@@ -692,6 +786,7 @@ def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[s
         "deployment_profile": _serialize_runtime_deployment_profile(llm_binding),
         "capabilities": {
             CAPABILITY_LLM_INFERENCE: _serialize_runtime_binding(llm_binding),
+            CAPABILITY_EMBEDDINGS: _serialize_runtime_binding(embeddings_binding),
             CAPABILITY_VECTOR_STORE: _serialize_runtime_binding(vector_binding),
         },
     }
@@ -717,6 +812,25 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                 "display_name": llm_adapter.binding.deployment_profile_display_name,
             },
             "health": llm_adapter.health(),
+        }
+    )
+
+    embeddings_adapter = resolve_embeddings_adapter(database_url, config)
+    statuses.append(
+        {
+            "capability": CAPABILITY_EMBEDDINGS,
+            "provider": {
+                "id": embeddings_adapter.binding.provider_instance_id,
+                "slug": embeddings_adapter.binding.provider_slug,
+                "provider_key": embeddings_adapter.binding.provider_key,
+                "display_name": embeddings_adapter.binding.provider_display_name,
+            },
+            "deployment_profile": {
+                "id": embeddings_adapter.binding.deployment_profile_id,
+                "slug": embeddings_adapter.binding.deployment_profile_slug,
+                "display_name": embeddings_adapter.binding.deployment_profile_display_name,
+            },
+            "health": embeddings_adapter.health(),
         }
     )
 
@@ -944,8 +1058,13 @@ def _validate_deployment_profile_bindings(
         health = dict(validation.get("health") or {})
         reachable = bool(health.get("reachable"))
         models_reachable = validation.get("models_reachable")
+        embeddings_reachable = validation.get("embeddings_reachable")
         capability = str(binding.get("capability_key", "")).strip().lower()
-        failed = not reachable or (capability == CAPABILITY_LLM_INFERENCE and models_reachable is False)
+        failed = (
+            not reachable
+            or (capability == CAPABILITY_LLM_INFERENCE and models_reachable is False)
+            or (capability == CAPABILITY_EMBEDDINGS and embeddings_reachable is False)
+        )
         if failed:
             failures.append(
                 {

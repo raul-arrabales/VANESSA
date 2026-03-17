@@ -539,7 +539,8 @@
         "displayName": "Display name",
         "description": "Description",
         "llmProvider": "LLM provider",
-        "vectorProvider": "Vector provider"
+        "vectorProvider": "Vector provider",
+        "providerForCapability": "{{capability}} provider"
       }
     },
     "capabilities": {
@@ -555,6 +556,8 @@
       "validationStatus": "Health status: {{code}}",
       "modelsReachable": "Model discovery reachable",
       "modelsUnavailable": "Model discovery unavailable",
+      "embeddingsReachable": "Embeddings reachable ({{dimension}}d)",
+      "embeddingsUnavailable": "Embeddings unavailable",
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
       "editing": "Editing provider {{slug}}.",

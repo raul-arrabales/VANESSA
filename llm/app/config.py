@@ -32,6 +32,7 @@ class LLMConfig:
     routing_mode: str
     local_base_url: str
     local_upstream_model: str
+    local_embeddings_upstream_model: str
     enable_hf_router: bool
     hf_base_url: str
     hf_token: str
@@ -59,6 +60,8 @@ def load_llm_config() -> LLMConfig:
         local_base_url=os.getenv("LLM_LOCAL_BASE_URL", "http://llm_runtime:8000/v1").strip()
         or "http://llm_runtime:8000/v1",
         local_upstream_model=local_upstream_model,
+        local_embeddings_upstream_model=os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
+        or local_upstream_model,
         enable_hf_router=_get_bool_env("LLM_ENABLE_HF_ROUTER", False),
         hf_base_url=os.getenv("LLM_HF_BASE_URL", "https://router.huggingface.co/v1").strip()
         or "https://router.huggingface.co/v1",

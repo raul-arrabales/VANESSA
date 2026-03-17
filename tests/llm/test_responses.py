@@ -12,10 +12,10 @@ LLM_PATH = PROJECT_ROOT / "llm"
 if str(LLM_PATH) not in sys.path:
     sys.path.insert(0, str(LLM_PATH))
 
-from app.main import create_chat_completion, create_response  # noqa: E402
+from app.main import create_chat_completion, create_embeddings, create_response  # noqa: E402
 from app.providers.base import ProviderError  # noqa: E402
 from app.registry import registry  # noqa: E402
-from app.schemas import ResponseRequest  # noqa: E402
+from app.schemas import EmbeddingRequest, ResponseRequest  # noqa: E402
 
 
 def test_unknown_model_returns_not_found() -> None:
@@ -109,3 +109,33 @@ def test_provider_error_maps_to_http_exception(monkeypatch: pytest.MonkeyPatch) 
         create_chat_completion(request)
     assert exc.value.status_code == 429
     assert exc.value.detail["code"] == "dummy_rate_limited"
+
+
+def test_local_embeddings_model_returns_embedding_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = EmbeddingRequest(model="local-vllm-embeddings-default", input=["hello"])
+    resolved = registry.resolve_model("local-vllm-embeddings-default")
+
+    def fake_embed(_request: EmbeddingRequest, *, upstream_model: str):
+        assert upstream_model
+        assert _request.input == ["hello"]
+        return type("EmbeddingResult", (), {"embeddings": [[0.1, 0.2]], "prompt_tokens": 3})()
+
+    monkeypatch.setattr(type(resolved.provider), "embed", fake_embed)
+
+    response = create_embeddings(request)
+
+    assert response.object == "list"
+    assert response.model == "local-vllm-embeddings-default"
+    assert response.data[0].embedding == [0.1, 0.2]
+    assert response.usage.prompt_tokens == 3
+    assert response.usage.total_tokens == 3
+
+
+def test_embeddings_reject_models_without_embedding_capability() -> None:
+    request = EmbeddingRequest(model="dummy", input=["hello"])
+
+    with pytest.raises(HTTPException) as exc:
+        create_embeddings(request)
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail["code"] == "unsupported_input"

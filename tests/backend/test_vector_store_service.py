@@ -151,6 +151,108 @@ def test_query_vector_documents_normalizes_payload_and_delegates(monkeypatch: py
     assert payload == {"index": "knowledge_base", "results": []}
 
 
+def test_query_vector_documents_embeds_query_text_before_delegate(monkeypatch: pytest.MonkeyPatch):
+    calls: list[dict[str, object]] = []
+
+    class _Adapter:
+        def query(
+            self,
+            *,
+            index_name: str,
+            query_text: str | None,
+            embedding: list[float] | None,
+            top_k: int,
+            filters: dict[str, object],
+        ) -> dict[str, object]:
+            calls.append(
+                {
+                    "index_name": index_name,
+                    "query_text": query_text,
+                    "embedding": embedding,
+                    "top_k": top_k,
+                    "filters": filters,
+                }
+            )
+            return {"index": index_name, "results": []}
+
+    monkeypatch.setattr(vector_store_service, "resolve_vector_store_adapter", lambda _db, _config: _Adapter())
+    monkeypatch.setattr(
+        vector_store_service,
+        "embed_text_inputs",
+        lambda _db, _config, texts: {
+            "provider": {"slug": "vllm-embeddings-local"},
+            "count": len(texts),
+            "dimension": 2,
+            "embeddings": [[0.1, 0.2]],
+        },
+    )
+
+    payload = vector_store_service.query_vector_documents(
+        "ignored",
+        object(),  # type: ignore[arg-type]
+        {
+            "index": "knowledge_base",
+            "query_text": "hello",
+            "top_k": 3,
+        },
+    )
+
+    assert payload == {"index": "knowledge_base", "results": []}
+    assert calls == [
+        {
+            "index_name": "knowledge_base",
+            "query_text": None,
+            "embedding": [0.1, 0.2],
+            "top_k": 3,
+            "filters": {},
+        }
+    ]
+
+
+def test_upsert_vector_documents_generates_embeddings_for_missing_documents(monkeypatch: pytest.MonkeyPatch):
+    calls: list[dict[str, object]] = []
+
+    class _Adapter:
+        def upsert(self, *, index_name: str, documents: list[dict[str, object]]) -> dict[str, object]:
+            calls.append({"index_name": index_name, "documents": documents})
+            return {"index": index_name, "count": len(documents), "documents": documents}
+
+    monkeypatch.setattr(vector_store_service, "resolve_vector_store_adapter", lambda _db, _config: _Adapter())
+    monkeypatch.setattr(
+        vector_store_service,
+        "embed_text_inputs",
+        lambda _db, _config, texts: {
+            "provider": {"slug": "vllm-embeddings-local"},
+            "count": len(texts),
+            "dimension": 2,
+            "embeddings": [[0.1, 0.2] for _ in texts],
+        },
+    )
+
+    payload = vector_store_service.upsert_vector_documents(
+        "ignored",
+        object(),  # type: ignore[arg-type]
+        {
+            "index": "knowledge_base",
+            "documents": [
+                {"id": "doc-1", "text": "hello"},
+                {"id": "doc-2", "text": "world", "embedding": [0.9, 1.1]},
+            ],
+        },
+    )
+
+    assert payload["count"] == 2
+    assert calls == [
+        {
+            "index_name": "knowledge_base",
+            "documents": [
+                {"id": "doc-1", "text": "hello", "metadata": {}, "embedding": [0.1, 0.2]},
+                {"id": "doc-2", "text": "world", "metadata": {}, "embedding": [0.9, 1.1]},
+            ],
+        }
+    ]
+
+
 def test_delete_vector_documents_requires_non_empty_ids(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(vector_store_service, "resolve_vector_store_adapter", lambda _db, _config: object())
 

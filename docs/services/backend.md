@@ -38,6 +38,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/platform/deployments/{id}/clone` (superadmin)
 - `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
+- `POST /v1/platform/embeddings` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
 - `POST /v1/platform/vector/indexes/ensure` (superadmin)
 - `POST /v1/platform/vector/documents/upsert` (superadmin)
@@ -46,7 +47,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 
 Key terms:
 
-- `capability`: platform function such as `llm_inference` or `vector_store`
+- `capability`: platform function such as `llm_inference`, `embeddings`, or `vector_store`
 - `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, or `qdrant_local`
 - `deployment profile`: named set of active capability bindings
 - `adapter`: capability-specific backend client used by runtime paths
@@ -59,9 +60,9 @@ Bootstrap defaults:
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
-- Superadmin-only vector proof routes exercise the real `vector_store` data plane through the active provider binding without exposing provider-specific payloads.
+- Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
-- Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `vector_store` binding for explicit retrieval requests before model execution.
+- Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
 

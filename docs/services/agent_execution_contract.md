@@ -51,6 +51,22 @@
         },
         "binding_config": {}
       },
+      "embeddings": {
+        "id": "provider-embeddings",
+        "slug": "vllm-embeddings-local",
+        "provider_key": "vllm_embeddings_local",
+        "display_name": "vLLM embeddings local",
+        "description": "Primary embeddings endpoint",
+        "adapter_kind": "openai_compatible_embeddings",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": true,
+        "config": {
+          "embeddings_path": "/v1/embeddings",
+          "forced_model_id": "local-vllm-embeddings-default"
+        },
+        "binding_config": {}
+      },
       "vector_store": {
         "id": "provider-2",
         "slug": "weaviate-local",
@@ -88,6 +104,7 @@
     "result": {
       "output_text": "Agent 'agent.alpha' executed in offline profile",
       "tool_calls": [],
+      "embedding_calls": [],
       "retrieval_calls": [],
       "model_calls": [
         {
@@ -106,7 +123,7 @@
 
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
-`input.retrieval` is optional and execution-scoped. In v1 it is text-query only, uses the active `vector_store` binding, and runs only when explicitly present in the input payload. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
+`input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
 
 ## Error Codes
 

@@ -539,7 +539,8 @@
         "displayName": "Nombre visible",
         "description": "Descripcion",
         "llmProvider": "Proveedor LLM",
-        "vectorProvider": "Proveedor vectorial"
+        "vectorProvider": "Proveedor vectorial",
+        "providerForCapability": "Proveedor de {{capability}}"
       }
     },
     "capabilities": {
@@ -555,6 +556,8 @@
       "validationStatus": "Estado de salud: {{code}}",
       "modelsReachable": "Descubrimiento de modelos accesible",
       "modelsUnavailable": "Descubrimiento de modelos no accesible",
+      "embeddingsReachable": "Embeddings accesibles ({{dimension}}d)",
+      "embeddingsUnavailable": "Embeddings no accesibles",
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
       "editing": "Editando proveedor {{slug}}.",

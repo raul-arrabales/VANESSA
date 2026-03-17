@@ -50,6 +50,20 @@ const capabilitiesFixture = [
     },
   },
   {
+    capability: "embeddings",
+    display_name: "Embeddings",
+    description: "Normalized text embeddings capability.",
+    required: true,
+    active_provider: {
+      id: "provider-embeddings",
+      slug: "vllm-embeddings-local",
+      provider_key: "vllm_embeddings_local",
+      display_name: "vLLM embeddings local",
+      deployment_profile_id: "deployment-1",
+      deployment_profile_slug: "local-default",
+    },
+  },
+  {
     capability: "vector_store",
     display_name: "Vector store",
     description: "Semantic retrieval capability.",
@@ -74,6 +88,13 @@ const providerFamiliesFixture = [
     description: "Local vLLM family.",
   },
   {
+    provider_key: "vllm_embeddings_local",
+    capability: "embeddings",
+    adapter_kind: "openai_compatible_embeddings",
+    display_name: "vLLM embeddings local",
+    description: "Local embeddings family.",
+  },
+  {
     provider_key: "weaviate_local",
     capability: "vector_store",
     adapter_kind: "weaviate_http",
@@ -91,6 +112,20 @@ const providersFixture = [
     adapter_kind: "openai_compatible_llm",
     display_name: "vLLM local gateway",
     description: "Primary llm endpoint.",
+    endpoint_url: "http://llm:8000",
+    healthcheck_url: "http://llm:8000/health",
+    enabled: true,
+    config: {},
+    secret_refs: {},
+  },
+  {
+    id: "provider-embeddings",
+    slug: "vllm-embeddings-local",
+    provider_key: "vllm_embeddings_local",
+    capability: "embeddings",
+    adapter_kind: "openai_compatible_embeddings",
+    display_name: "vLLM embeddings local",
+    description: "Primary embeddings endpoint.",
     endpoint_url: "http://llm:8000",
     healthcheck_url: "http://llm:8000/health",
     enabled: true,
@@ -135,6 +170,19 @@ const deploymentsFixture = [
         config: {},
       },
       {
+        capability: "embeddings",
+        provider: {
+          id: "provider-embeddings",
+          slug: "vllm-embeddings-local",
+          provider_key: "vllm_embeddings_local",
+          display_name: "vLLM embeddings local",
+          endpoint_url: "http://llm:8000",
+          enabled: true,
+          adapter_kind: "openai_compatible_embeddings",
+        },
+        config: {},
+      },
+      {
         capability: "vector_store",
         provider: {
           id: "provider-2",
@@ -166,6 +214,19 @@ const deploymentsFixture = [
           endpoint_url: "http://llm:8000",
           enabled: true,
           adapter_kind: "openai_compatible_llm",
+        },
+        config: {},
+      },
+      {
+        capability: "embeddings",
+        provider: {
+          id: "provider-embeddings",
+          slug: "vllm-embeddings-local",
+          provider_key: "vllm_embeddings_local",
+          display_name: "vLLM embeddings local",
+          endpoint_url: "http://llm:8000",
+          enabled: true,
+          adapter_kind: "openai_compatible_embeddings",
         },
         config: {},
       },
@@ -229,6 +290,7 @@ describe("PlatformControlPage", () => {
     expect(await screen.findByText(await t("platformControl.sections.providers"))).toBeVisible();
     expect(await screen.findByText(await t("platformControl.sections.deployments"))).toBeVisible();
     expect(await screen.findByText(await t("platformControl.sections.audit"))).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Embeddings" })).toBeVisible();
     expect((await screen.findAllByText("2026-01-01T00:00:00+00:00")).length).toBeGreaterThan(0);
     expect(await screen.findByRole("heading", { name: "Local Default" })).toBeVisible();
     expect((await screen.findAllByText("vLLM local gateway")).length).toBeGreaterThan(0);
@@ -315,6 +377,16 @@ describe("PlatformControlPage", () => {
         "token",
       );
     });
+  });
+
+  it("renders deployment bindings from the capability registry", async () => {
+    await renderPage();
+
+    expect(
+      await screen.findByLabelText(
+        await t("platformControl.forms.deployment.providerForCapability", { capability: "Embeddings" }),
+      ),
+    ).toBeVisible();
   });
 
   it("confirms activation, activates the deployment, and refreshes state", async () => {

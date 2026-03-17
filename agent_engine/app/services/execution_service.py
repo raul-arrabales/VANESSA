@@ -15,8 +15,10 @@ from .policy_runtime_gate import (
     validate_runtime_and_dependencies,
 )
 from .runtime_client import (
+    EmbeddingsRuntimeClientError,
     LlmRuntimeClientError,
     VectorStoreRuntimeClientError,
+    build_embeddings_runtime_client,
     build_llm_runtime_client,
     build_vector_store_runtime_client,
 )
@@ -52,6 +54,7 @@ def _deterministic_execution_result(*, agent_id: str, runtime_profile: str) -> d
     return {
         "output_text": output_text,
         "tool_calls": [],
+        "embedding_calls": [],
         "model_calls": [],
         "retrieval_calls": [],
     }
@@ -198,19 +201,43 @@ def _execute_retrieval_call(
     *,
     retrieval_request: dict[str, Any] | None,
     platform_runtime: dict[str, Any] | None,
-) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, list[dict[str, Any]]]:
     if retrieval_request is None:
-        return None, []
+        return None, None, []
 
     runtime_snapshot = platform_runtime if isinstance(platform_runtime, dict) else {}
     try:
+        embeddings_client = build_embeddings_runtime_client(runtime_snapshot)
+        embedding_payload = embeddings_client.embed_texts(texts=[str(retrieval_request["query"])])
         client = build_vector_store_runtime_client(runtime_snapshot)
         query_payload = client.query(
             index_name=str(retrieval_request["index"]),
-            query_text=str(retrieval_request["query"]),
+            embedding=list(embedding_payload["embeddings"][0]),
             top_k=int(retrieval_request["top_k"]),
             filters=dict(retrieval_request["filters"]),
+            query_text=str(retrieval_request["query"]),
         )
+    except EmbeddingsRuntimeClientError as exc:
+        if exc.code == "embeddings_runtime_timeout":
+            raise ExecutionBlockedError(
+                code="EXEC_TIMEOUT",
+                message="Execution timed out",
+                status_code=504,
+                details=exc.details,
+            ) from exc
+        if exc.code in {"embeddings_runtime_unreachable", "embeddings_runtime_upstream_unavailable"}:
+            raise ExecutionBlockedError(
+                code="EXEC_UPSTREAM_UNAVAILABLE",
+                message="Upstream LLM/tool dependency unavailable",
+                status_code=503,
+                details=exc.details,
+            ) from exc
+        raise ExecutionBlockedError(
+            code="EXEC_INTERNAL_ERROR",
+            message="Execution failed internally",
+            status_code=500,
+            details=exc.details,
+        ) from exc
     except VectorStoreRuntimeClientError as exc:
         if exc.code == "vector_runtime_timeout":
             raise ExecutionBlockedError(
@@ -233,9 +260,19 @@ def _execute_retrieval_call(
             details=exc.details,
         ) from exc
 
+    embeddings_binding = runtime_snapshot.get("capabilities", {}).get("embeddings", {})
     vector_binding = runtime_snapshot.get("capabilities", {}).get("vector_store", {})
     deployment_profile = runtime_snapshot.get("deployment_profile", {})
     results = query_payload.get("results") if isinstance(query_payload.get("results"), list) else []
+    embedding_call = {
+        "provider_slug": embeddings_binding.get("slug"),
+        "provider_key": embeddings_binding.get("provider_key"),
+        "deployment_profile_slug": deployment_profile.get("slug"),
+        "requested_model": embedding_payload.get("requested_model"),
+        "input_count": 1,
+        "dimension": int(embedding_payload.get("dimension", 0) or 0),
+        "status_code": int(embedding_payload.get("status_code", 200) or 200),
+    }
     retrieval_call = {
         "provider_slug": vector_binding.get("slug"),
         "provider_key": vector_binding.get("provider_key"),
@@ -246,7 +283,7 @@ def _execute_retrieval_call(
         "result_count": len(results),
         "results": results,
     }
-    return retrieval_call, results
+    return embedding_call, retrieval_call, results
 
 
 def _prepend_retrieval_context(
@@ -287,7 +324,7 @@ def _execute_model_call(
     if not messages and retrieval_request is None:
         return _deterministic_execution_result(agent_id=agent_id, runtime_profile=runtime_profile), model_ref
 
-    retrieval_call, retrieval_results = _execute_retrieval_call(
+    embedding_call, retrieval_call, retrieval_results = _execute_retrieval_call(
         retrieval_request=retrieval_request,
         platform_runtime=platform_runtime if isinstance(platform_runtime, dict) else None,
     )
@@ -329,6 +366,7 @@ def _execute_model_call(
         {
             "output_text": str(completion.get("output_text", "")),
             "tool_calls": [],
+            "embedding_calls": [embedding_call] if embedding_call is not None else [],
             "model_calls": [
                 {
                     "provider_slug": llm_binding.get("slug"),

@@ -71,6 +71,23 @@ class LlmInferenceAdapter(ABC):
         raise NotImplementedError
 
 
+class EmbeddingsAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def embed_texts(
+        self,
+        *,
+        texts: list[str],
+    ) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
 class VectorStoreAdapter(ABC):
     def __init__(self, binding: ProviderBinding):
         self.binding = binding
@@ -176,6 +193,40 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             "model": model,
             "input": messages,
         }
+
+
+class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
+    def _embeddings_url(self) -> str:
+        path = str(self.binding.config.get("embeddings_path", "/v1/embeddings")).strip() or "/v1/embeddings"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        return self._embeddings_url()
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(self._health_url(), method="GET")
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def embed_texts(
+        self,
+        *,
+        texts: list[str],
+    ) -> tuple[dict[str, Any] | None, int]:
+        effective_model = str(self.binding.config.get("forced_model_id", "")).strip()
+        payload = {
+            "model": effective_model,
+            "input": texts,
+        }
+        response_payload, status_code = http_json_request(self._embeddings_url(), method="POST", payload=payload)
+        return _normalize_embeddings_response_payload(response_payload), status_code
 
 
 class WeaviateVectorStoreAdapter(VectorStoreAdapter):
@@ -651,6 +702,39 @@ def _normalize_chat_response_payload(payload: dict[str, Any] | None) -> dict[str
                 "content": normalized_parts,
             }
         ]
+    return normalized_payload
+
+
+def _normalize_embeddings_response_payload(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return payload
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return payload
+
+    normalized_vectors: list[list[float]] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw_embedding = item.get("embedding")
+        if not isinstance(raw_embedding, list):
+            continue
+        vector: list[float] = []
+        for value in raw_embedding:
+            if isinstance(value, bool):
+                vector = []
+                break
+            try:
+                vector.append(float(value))
+            except (TypeError, ValueError):
+                vector = []
+                break
+        if vector:
+            normalized_vectors.append(vector)
+
+    normalized_payload = dict(payload)
+    normalized_payload["embeddings"] = normalized_vectors
+    normalized_payload["embedding_dimension"] = len(normalized_vectors[0]) if normalized_vectors else 0
     return normalized_payload
 
 

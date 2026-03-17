@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
+from .embeddings_service import embed_text_inputs
 from .platform_service import resolve_vector_store_adapter
 from .platform_types import PlatformControlPlaneError
 
@@ -23,6 +24,7 @@ def upsert_vector_documents(database_url: str, config: AuthConfig, payload: dict
         raise PlatformControlPlaneError("invalid_documents", "documents must be a non-empty array", status_code=400)
 
     normalized_documents = [_normalize_document(document, position=index) for index, document in enumerate(documents)]
+    _populate_missing_embeddings(database_url, config, normalized_documents)
     adapter = resolve_vector_store_adapter(database_url, config)
     return adapter.upsert(index_name=index_name, documents=normalized_documents)
 
@@ -42,6 +44,11 @@ def query_vector_documents(database_url: str, config: AuthConfig, payload: dict[
     embedding = _normalize_embedding(payload.get("embedding"), field_name="embedding") if has_embedding else None
     top_k = _normalize_top_k(payload.get("top_k"))
     filters = _normalize_metadata(payload.get("filters"), field_name="filters")
+
+    if query_text is not None:
+        embedding_payload = embed_text_inputs(database_url, config, [query_text])
+        embedding = embedding_payload["embeddings"][0]
+        query_text = None
 
     adapter = resolve_vector_store_adapter(database_url, config)
     return adapter.query(
@@ -156,6 +163,20 @@ def _normalize_document(document: Any, *, position: int) -> dict[str, Any]:
     if embedding is not None:
         normalized["embedding"] = embedding
     return normalized
+
+
+def _populate_missing_embeddings(database_url: str, config: AuthConfig, documents: list[dict[str, Any]]) -> None:
+    missing_positions = [index for index, document in enumerate(documents) if document.get("embedding") is None]
+    if not missing_positions:
+        return
+    embedding_payload = embed_text_inputs(
+        database_url,
+        config,
+        [str(documents[index]["text"]) for index in missing_positions],
+    )
+    embeddings = embedding_payload["embeddings"]
+    for offset, document_index in enumerate(missing_positions):
+        documents[document_index]["embedding"] = embeddings[offset]
 
 
 def _normalize_query_text(value: Any) -> str:

@@ -20,6 +20,7 @@ from ..services.platform_service import (
     update_provider,
     validate_provider,
 )
+from ..services.embeddings_service import embed_platform_inputs
 from ..services.platform_types import PlatformControlPlaneError
 from ..services.vector_store_service import (
     delete_vector_documents,
@@ -237,6 +238,20 @@ def ensure_platform_vector_index_route():
 
     try:
         result = ensure_vector_index(_database_url(), _config(), payload)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200
+
+
+@bp.post("/v1/platform/embeddings")
+@require_role("superadmin")
+def platform_embeddings_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        result = embed_platform_inputs(_database_url(), _config(), payload)
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(result), 200

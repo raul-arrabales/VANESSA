@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from app.schemas import ResponseRequest
+from app.schemas import EmbeddingRequest, ResponseRequest
 
 if TYPE_CHECKING:
-    from app.registry import ProviderResult
+    from app.registry import EmbeddingResult, ProviderResult
 
 
 class ProviderError(Exception):
@@ -19,3 +19,6 @@ class ProviderError(Exception):
 class RoutedModelProvider(Protocol):
     def generate(self, request: ResponseRequest, *, upstream_model: str) -> "ProviderResult":
         """Generates a response from the incoming request."""
+
+    def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> "EmbeddingResult":
+        """Generates embeddings from the incoming request."""

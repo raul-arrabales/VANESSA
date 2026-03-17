@@ -94,6 +94,9 @@ export type PlatformProviderValidation = {
     };
     models_reachable?: boolean;
     models_status_code?: number;
+    embeddings_reachable?: boolean;
+    embeddings_status_code?: number;
+    embedding_dimension?: number;
   };
 };
 

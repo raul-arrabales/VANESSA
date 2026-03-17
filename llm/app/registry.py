@@ -11,6 +11,7 @@ from app.providers.base import RoutedModelProvider
 class ModelCapabilities:
     text: bool
     image_input: bool
+    embeddings: bool
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,12 @@ class ProviderResult:
     output_text: str
     prompt_tokens: int = 0
     completion_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class EmbeddingResult:
+    embeddings: list[list[float]]
+    prompt_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -72,7 +79,7 @@ class ModelRegistry:
             ModelInfo(
                 id="local-vllm-default",
                 display_name="Local vLLM Default",
-                capabilities=ModelCapabilities(text=True, image_input=False),
+                capabilities=ModelCapabilities(text=True, image_input=False, embeddings=False),
                 status="available",
                 provider_type="local_vllm",
                 provider_config_ref="local/default",
@@ -81,6 +88,21 @@ class ModelRegistry:
                     "upstream_model": config.local_upstream_model,
                     "supports_image_input": False,
                     "max_tokens_default": 512,
+                },
+            )
+        )
+        self.register_model(
+            ModelInfo(
+                id="local-vllm-embeddings-default",
+                display_name="Local vLLM Embeddings Default",
+                capabilities=ModelCapabilities(text=False, image_input=False, embeddings=True),
+                status="available",
+                provider_type="local_vllm",
+                provider_config_ref="local/embeddings",
+                upstream_model=config.local_embeddings_upstream_model,
+                metadata={
+                    "upstream_model": config.local_embeddings_upstream_model,
+                    "supports_embeddings": True,
                 },
             )
         )
@@ -98,7 +120,7 @@ class ModelRegistry:
                 ModelInfo(
                     id="hf-router-default",
                     display_name="Hugging Face Router Default",
-                    capabilities=ModelCapabilities(text=True, image_input=False),
+                    capabilities=ModelCapabilities(text=True, image_input=False, embeddings=False),
                     status="available",
                     provider_type="hf_router",
                     provider_config_ref="hf_router/default",
@@ -124,7 +146,7 @@ class ModelRegistry:
                 ModelInfo(
                     id="openai-default",
                     display_name="OpenAI Default",
-                    capabilities=ModelCapabilities(text=True, image_input=False),
+                    capabilities=ModelCapabilities(text=True, image_input=False, embeddings=False),
                     status="available",
                     provider_type="openai",
                     provider_config_ref="openai/default",

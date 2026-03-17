@@ -56,6 +56,19 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
                     "config": {"chat_completion_path": "/v1/chat/completions"},
                     "binding_config": {},
                 },
+                "embeddings": {
+                    "id": "provider-embeddings",
+                    "slug": "vllm-embeddings-local",
+                    "provider_key": "vllm_embeddings_local",
+                    "display_name": "vLLM embeddings local",
+                    "description": "desc",
+                    "adapter_kind": "openai_compatible_embeddings",
+                    "endpoint_url": "http://llm:8000",
+                    "healthcheck_url": "http://llm:8000/health",
+                    "enabled": True,
+                    "config": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                    "binding_config": {},
+                },
                 "vector_store": {
                     "id": "provider-2",
                     "slug": "weaviate-local",
@@ -84,6 +97,7 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
         }
         assert kwargs["platform_runtime"]["deployment_profile"]["slug"] == "local-default"
         assert kwargs["platform_runtime"]["capabilities"]["llm_inference"]["provider_key"] == "vllm_local"
+        assert kwargs["platform_runtime"]["capabilities"]["embeddings"]["provider_key"] == "vllm_embeddings_local"
         assert kwargs["platform_runtime"]["capabilities"]["vector_store"]["provider_key"] == "weaviate_local"
         return (
             {
@@ -157,6 +171,19 @@ def test_agent_execution_proxy_forwards_qdrant_runtime_snapshot(client, monkeypa
                     "config": {"chat_completion_path": "/v1/chat/completions"},
                     "binding_config": {},
                 },
+                "embeddings": {
+                    "id": "provider-embeddings",
+                    "slug": "vllm-embeddings-local",
+                    "provider_key": "vllm_embeddings_local",
+                    "display_name": "vLLM embeddings local",
+                    "description": "desc",
+                    "adapter_kind": "openai_compatible_embeddings",
+                    "endpoint_url": "http://llm:8000",
+                    "healthcheck_url": "http://llm:8000/health",
+                    "enabled": True,
+                    "config": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                    "binding_config": {},
+                },
                 "vector_store": {
                     "id": "provider-3",
                     "slug": "qdrant-local",
@@ -176,6 +203,7 @@ def test_agent_execution_proxy_forwards_qdrant_runtime_snapshot(client, monkeypa
 
     def _create_execution(**kwargs):
         assert kwargs["platform_runtime"]["deployment_profile"]["slug"] == "local-qdrant"
+        assert kwargs["platform_runtime"]["capabilities"]["embeddings"]["provider_key"] == "vllm_embeddings_local"
         assert kwargs["platform_runtime"]["capabilities"]["vector_store"]["provider_key"] == "qdrant_local"
         assert kwargs["execution_input"]["retrieval"] == {"index": "knowledge_base"}
         return (
