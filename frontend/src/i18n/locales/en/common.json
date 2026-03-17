@@ -19,6 +19,7 @@
     "approvals": "Approvals",
     "quotes": "Quotes",
     "systemHealth": "System health",
+    "platform": "Platform control",
     "models": "Models",
     "settings": "Settings",
     "designEditor": "Design editor",
@@ -31,6 +32,7 @@
       "quotes": "Quotes",
       "control": "Control",
       "systemHealth": "System health",
+      "platform": "Platform control",
       "ai": "Vanessa AI",
       "chat": "Chatbot",
       "design": "Design",
@@ -226,6 +228,10 @@
       "systemHealth": {
         "title": "System health",
         "description": "Inspect the live status of VANESSA services and architecture."
+      },
+      "platform": {
+        "title": "Platform control",
+        "description": "Inspect capability bindings, validate providers, and activate deployment profiles."
       }
     }
   },
@@ -489,6 +495,92 @@
       "createFailed": "Unable to create model.",
       "assignmentSaved": "Saved {{scope}} model assignment.",
       "assignmentFailed": "Failed to update model assignments."
+    }
+  },
+  "platformControl": {
+    "eyebrow": "GenAI control plane",
+    "title": "Platform control",
+    "description": "Inspect active capability bindings, validate providers, and activate deployment profiles.",
+    "state": {
+      "idle": "IDLE",
+      "loading": "LOADING",
+      "success": "SUCCESS",
+      "error": "ERROR"
+    },
+    "sections": {
+      "capabilities": "Capabilities",
+      "providers": "Providers",
+      "deployments": "Deployment profiles"
+    },
+    "summary": {
+      "activeDeployment": "Active deployment profile",
+      "requiredCoverage": "Required capability coverage",
+      "requiredCoverageDescription": "Bound required capabilities",
+      "loadState": "Page state",
+      "none": "None"
+    },
+    "capabilities": {
+      "description": "Each required platform capability should resolve to an active provider binding.",
+      "activeProvider": "Active provider",
+      "unbound": "No active provider is bound to this capability.",
+      "empty": "No platform capabilities are registered."
+    },
+    "providers": {
+      "description": "Validate provider instances individually and inspect their current health.",
+      "tableAria": "Platform providers",
+      "notValidated": "Not validated yet.",
+      "validationStatus": "Health status: {{code}}",
+      "modelsReachable": "Model discovery reachable",
+      "modelsUnavailable": "Model discovery unavailable",
+      "empty": "No providers are registered.",
+      "columns": {
+        "provider": "Provider",
+        "capability": "Capability",
+        "endpoint": "Endpoint",
+        "status": "Status",
+        "validation": "Validation",
+        "actions": "Actions"
+      }
+    },
+    "deployments": {
+      "description": "Activate a deployment profile to switch the current capability-to-provider bindings.",
+      "tableAria": "Bindings for {{name}}",
+      "empty": "No deployment profiles are available.",
+      "noDescription": "No description provided.",
+      "confirmActivation": "Confirm activation for this deployment profile.",
+      "columns": {
+        "capability": "Capability",
+        "provider": "Provider",
+        "adapter": "Adapter",
+        "status": "Status"
+      }
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "refreshing": "Refreshing...",
+      "validate": "Validate",
+      "validating": "Validating...",
+      "activate": "Activate",
+      "confirmActivate": "Confirm activation",
+      "activating": "Activating...",
+      "active": "Active",
+      "cancel": "Cancel"
+    },
+    "badges": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "required": "Required",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "feedback": {
+      "prefix": "Request failed:",
+      "authRequired": "Authentication is required to load platform control data.",
+      "loadFailed": "Unable to load platform control data.",
+      "validationSuccess": "Validated provider {{slug}}.",
+      "validationFailed": "Unable to validate provider.",
+      "activationSuccess": "Activated deployment profile {{name}}.",
+      "activationFailed": "Unable to activate deployment profile."
     }
   },
   "runtimeMode": {

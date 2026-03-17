@@ -13,6 +13,7 @@ describe("app route registry", () => {
       "/control/approvals",
       "/control/quotes",
       "/control/system-health",
+      "/control/platform",
       "/control/models",
       "/ai",
       "/ai/chat",

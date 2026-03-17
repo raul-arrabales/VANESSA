@@ -48,5 +48,20 @@ describe("ControlPage", () => {
     await renderPage();
 
     expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
+    expect(screen.queryByRole("link", { name: await t("control.items.platform.title") })).toBeNull();
+  });
+
+  it("shows the platform control only for superadmin users", async () => {
+    mockUser = {
+      id: 3,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderPage();
+
+    expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
   });
 });

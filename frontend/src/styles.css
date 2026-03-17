@@ -302,6 +302,80 @@ a {
   background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
 }
 
+.platform-summary-grid,
+.platform-capability-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.platform-summary-card,
+.platform-capability-card,
+.platform-deployment-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.platform-section-header,
+.platform-card-header,
+.platform-action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.platform-inline-meta {
+  margin-top: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.platform-badge[data-tone="active"],
+.platform-badge[data-tone="enabled"] {
+  color: var(--status-success);
+  border-color: color-mix(in oklab, var(--status-success) 44%, var(--border-muted));
+  background: color-mix(in oklab, var(--status-success) 12%, var(--bg-surface));
+}
+
+.platform-badge[data-tone="inactive"],
+.platform-badge[data-tone="disabled"] {
+  color: var(--status-error);
+  border-color: color-mix(in oklab, var(--status-error) 44%, var(--border-muted));
+  background: color-mix(in oklab, var(--status-error) 10%, var(--bg-surface));
+}
+
+.platform-badge[data-tone="required"] {
+  color: var(--accent-secondary);
+  border-color: color-mix(in oklab, var(--accent-secondary) 42%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-secondary) 12%, var(--bg-surface));
+}
+
+.platform-deployment-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .quote-admin-summary-value {
   margin: 0;
   font-family: var(--font-heading);

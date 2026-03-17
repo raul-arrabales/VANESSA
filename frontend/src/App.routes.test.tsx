@@ -46,6 +46,51 @@ vi.mock("./api/models", () => ({
   registerManagedModel: vi.fn(),
   listAvailableManagedModels: vi.fn(async () => []),
 }));
+vi.mock("./api/platform", () => ({
+  listPlatformCapabilities: vi.fn(async () => [
+    {
+      capability: "llm_inference",
+      display_name: "LLM inference",
+      description: "desc",
+      required: true,
+      active_provider: {
+        id: "provider-1",
+        slug: "vllm-local-gateway",
+        provider_key: "vllm_local",
+        display_name: "vLLM local gateway",
+        deployment_profile_id: "deployment-1",
+        deployment_profile_slug: "local-default",
+      },
+    },
+  ]),
+  listPlatformProviders: vi.fn(async () => [
+    {
+      id: "provider-1",
+      slug: "vllm-local-gateway",
+      provider_key: "vllm_local",
+      capability: "llm_inference",
+      adapter_kind: "openai_compatible_llm",
+      display_name: "vLLM local gateway",
+      description: "desc",
+      endpoint_url: "http://llm:8000",
+      healthcheck_url: "http://llm:8000/health",
+      enabled: true,
+      config: {},
+    },
+  ]),
+  listPlatformDeployments: vi.fn(async () => [
+    {
+      id: "deployment-1",
+      slug: "local-default",
+      display_name: "Local Default",
+      description: "desc",
+      is_active: true,
+      bindings: [],
+    },
+  ]),
+  validatePlatformProvider: vi.fn(),
+  activateDeploymentProfile: vi.fn(),
+}));
 vi.mock("./api/quoteAdmin", () => ({
   fetchQuoteSummary: vi.fn(async () => ({
     total: 2,
@@ -92,6 +137,34 @@ describe("App superadmin models route", () => {
     };
 
     await renderWithAppProviders(<App />, { route: "/control/system-health" });
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("renders the platform control page for superadmin", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/platform" });
+
+    expect(await screen.findByRole("heading", { name: await t("platformControl.title") })).toBeVisible();
+  });
+
+  it("blocks admin users from the platform control route", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/platform" });
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
   });

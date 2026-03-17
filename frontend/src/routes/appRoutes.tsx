@@ -8,6 +8,7 @@ import ControlModelsPage from "../pages/ControlModelsPage";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
+import PlatformControlPage from "../pages/PlatformControlPage";
 import QuoteManagementPage from "../pages/QuoteManagementPage";
 import RegisterPage from "../pages/RegisterPage";
 import SettingsPage from "../pages/SettingsPage";
@@ -148,6 +149,17 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "superadmin",
     element: <BackendHealthPage />,
+  },
+  {
+    id: "control-platform",
+    path: "/control/platform",
+    titleKey: "nav.platform",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformControlPage />,
   },
   {
     id: "control-models",

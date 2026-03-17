@@ -63,6 +63,14 @@ export default function ControlPage(): JSX.Element {
       icon: "health",
       minimumRole: "superadmin",
     },
+    {
+      id: "platform",
+      title: t("control.items.platform.title"),
+      description: t("control.items.platform.description"),
+      to: "/control/platform",
+      icon: "adminPage",
+      minimumRole: "superadmin",
+    },
   ];
 
   const visibleItems = items.filter((item) => hasRequiredRole(currentRole, item.minimumRole));
