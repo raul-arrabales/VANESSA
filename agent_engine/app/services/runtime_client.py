@@ -187,6 +187,72 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         return endpoint_url + "/v1/graphql"
 
 
+class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str,
+        top_k: int,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        payload, status_code = http_json_request(
+            self._scroll_url(collection_name),
+            method="POST",
+            payload={
+                "limit": top_k,
+                "filter": {
+                    "must": [
+                        *_qdrant_filter_conditions(filters),
+                        {"key": "text", "match": {"text": query_text}},
+                    ]
+                },
+                "with_payload": True,
+                "with_vector": False,
+            },
+        )
+        if payload is None:
+            error_code = "vector_runtime_timeout" if status_code == 504 else "vector_runtime_unreachable"
+            raise VectorStoreRuntimeClientError(
+                code=error_code,
+                message="Vector runtime unavailable",
+                status_code=status_code,
+                details={"provider_slug": self.vector_binding.get("slug"), "status_code": status_code},
+            )
+        if not 200 <= status_code < 300:
+            error_code = (
+                "vector_runtime_timeout"
+                if status_code == 504
+                else "vector_runtime_upstream_unavailable"
+                if status_code >= 502
+                else "vector_runtime_request_failed"
+            )
+            raise VectorStoreRuntimeClientError(
+                code=error_code,
+                message="Vector runtime request failed",
+                status_code=status_code,
+                details={
+                    "provider_slug": self.vector_binding.get("slug"),
+                    "status_code": status_code,
+                    "upstream": payload,
+                },
+            )
+        points = (((payload.get("result") or {}).get("points")) if isinstance(payload.get("result"), dict) else [])
+        if not isinstance(points, list):
+            points = []
+        return {
+            "index": index_name,
+            "query": query_text,
+            "top_k": top_k,
+            "results": [_normalize_qdrant_query_result(item) for item in points if isinstance(item, dict)],
+        }
+
+    def _scroll_url(self, collection_name: str) -> str:
+        endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + f"/collections/{collection_name}/points/scroll"
+
+
 def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClient:
     deployment_profile, capabilities = _coerce_platform_runtime(
         platform_runtime,
@@ -223,14 +289,16 @@ def build_vector_store_runtime_client(platform_runtime: dict[str, Any]) -> Vecto
             status_code=500,
         )
     adapter_kind = str(vector_binding.get("adapter_kind", "")).strip().lower()
-    if adapter_kind != "weaviate_http":
-        raise VectorStoreRuntimeClientError(
-            code="unsupported_adapter_kind",
-            message="Unsupported vector runtime adapter",
-            status_code=500,
-            details={"adapter_kind": adapter_kind},
-        )
-    return WeaviateVectorStoreRuntimeClient(deployment_profile=deployment_profile, vector_binding=vector_binding)
+    if adapter_kind == "weaviate_http":
+        return WeaviateVectorStoreRuntimeClient(deployment_profile=deployment_profile, vector_binding=vector_binding)
+    if adapter_kind == "qdrant_http":
+        return QdrantVectorStoreRuntimeClient(deployment_profile=deployment_profile, vector_binding=vector_binding)
+    raise VectorStoreRuntimeClientError(
+        code="unsupported_adapter_kind",
+        message="Unsupported vector runtime adapter",
+        status_code=500,
+        details={"adapter_kind": adapter_kind},
+    )
 
 
 def http_json_request(
@@ -466,4 +534,44 @@ def _normalize_weaviate_query_result(item: dict[str, Any]) -> dict[str, Any]:
         "metadata": metadata,
         "score": float(additional.get("score", 0.0) or 0.0),
         "score_kind": "bm25",
+    }
+
+
+def _coerce_qdrant_collection_name(index_name: str) -> str:
+    normalized = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in index_name.strip())
+    normalized = normalized.strip("_-")
+    if not normalized:
+        raise VectorStoreRuntimeClientError(
+            code="invalid_index_name",
+            message="index name must contain letters or numbers",
+            status_code=400,
+        )
+    return normalized.lower()
+
+
+def _qdrant_filter_conditions(filters: dict[str, Any]) -> list[dict[str, Any]]:
+    conditions: list[dict[str, Any]] = []
+    for key, value in filters.items():
+        conditions.append({"key": _coerce_metadata_key(str(key)), "match": {"value": value}})
+    return conditions
+
+
+def _normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
+    payload = item.get("payload")
+    payload = payload if isinstance(payload, dict) else {}
+    metadata = payload.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    if not metadata:
+        for key, value in payload.items():
+            if key in {"document_id", "text", "metadata"}:
+                continue
+            metadata[key] = value
+    raw_score = item.get("score")
+    score = float(raw_score if isinstance(raw_score, (int, float)) else 1.0)
+    return {
+        "id": str(payload.get("document_id") or item.get("id") or "").strip(),
+        "text": str(payload.get("text", "")).strip(),
+        "metadata": metadata,
+        "score": score,
+        "score_kind": "text_match",
     }

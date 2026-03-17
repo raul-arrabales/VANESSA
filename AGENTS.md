@@ -17,7 +17,7 @@ VANESSA is a multi-container AI assistant that:
   - A **custom agent orchestration engine**.
   - A **Python sandbox environment** where agents can execute code safely.
   - A **wake-word (KWS) service** for offline voice activation.
-  - A **persistent semantic index** (Weaviate) for RAG.
+  - A **persistent semantic index** (Weaviate by default, optional Qdrant alternate provider) for RAG.
   - A **relational database** (PostgreSQL) for structured data.
 
 The system is meant to be:
@@ -46,8 +46,8 @@ Please respect these boundaries when generating or modifying code or configurati
        - Agent engine (Container #6).
        - LLM API gateway (Container #3).
        - Sandbox (Container #7).
-       - Vector store (Container #9).
-       - Database (Container #10).
+       - Vector store (Container #9 or Container #10).
+       - Database (Container #11).
      - Input validation, error handling, logging.
 
 3. **Container #3 — LLM API/Gateway (`llm`)**
@@ -69,7 +69,7 @@ Please respect these boundaries when generating or modifying code or configurati
    - Implements multi-step workflows and tools for agents.
    - Coordinates:
      - Calls to the LLM API gateway.
-     - RAG queries against Weaviate.
+     - RAG queries against the active vector-store provider.
      - Database operations (via a clean abstraction).
    - This is where “agent logic” lives (tools, planners, etc.).
 
@@ -91,7 +91,12 @@ Please respect these boundaries when generating or modifying code or configurati
    - Accessed from backend and/or agent engine through a client library.
    - Persistence must be enabled (data should survive container restarts).
 
-10. **Container #10 — Database (PostgreSQL)**
+10. **Container #10 — Optional alternate vector store for RAG (`qdrant`)**
+   - Optional local vector database selected by the backend GenAI control plane as an alternate `vector_store` provider.
+   - Used to prove provider switching without changing frontend or public execution APIs.
+   - Not required for the default stack.
+
+11. **Container #11 — Database (PostgreSQL)**
   - Stores structured data (users, sessions, logs, configs, etc.).
   - Access restricted to backend and agent engine through a data access layer.
   - No direct SQL from the frontend.
@@ -112,7 +117,7 @@ Agents should keep to this structure or evolve it consistently.
   - Agent orchestration logic (tools, planners, workflows).
   - Integrations with:
     - LLM server.
-    - Weaviate.
+    - Active vector store provider.
     - DB (through an abstraction layer).
 - `sandbox/`
   - Code related to the Python sandbox container.
@@ -186,6 +191,8 @@ Agent engine
 Weaviate
 PostgreSQL
 Sandbox
+Optional llama.cpp
+Optional Qdrant
 
 ## 5. Code style and conventions
 
@@ -244,7 +251,7 @@ Agents should:
 When making changes or adding features:
 
 1. Respect the container boundaries.
-- Do not add direct DB or Weaviate calls in the frontend.
+- Do not add direct DB or vector-store calls in the frontend.
 - Keep agent logic out of the plain Flask route handlers; call into agent_engine/.
 
 2. Keep secrets out of the repo.
@@ -257,10 +264,10 @@ When making changes or adding features:
 
 4. Maintain clear abstractions.
 - LLM client wrapper (e.g. llm_client.py) instead of scattering HTTP calls.
-- Weaviate client wrapper (vector_store_client.py) instead of direct calls everywhere.
+- Vector-store client wrapper (for example Weaviate/Qdrant adapters) instead of direct calls everywhere.
 - Data access layer for PostgreSQL instead of inline SQL.
 - For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
-- Treat `LLAMA_CPP_URL` as the bootstrap flag for enabling the optional `llama_cpp` runtime and seeding the alternate `local-llama-cpp` deployment profile.
+- Treat `LLAMA_CPP_URL` and `QDRANT_URL` as bootstrap flags for enabling the optional local provider runtimes and seeding the alternate deployment profiles.
 
 5. Be safe with the sandbox.
 - Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.

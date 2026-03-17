@@ -16,6 +16,7 @@ DEFAULT_SANDBOX_URL = "http://sandbox:6000"
 DEFAULT_KWS_URL = "http://kws:10400"
 DEFAULT_WEAVIATE_URL = "http://weaviate:8080"
 DEFAULT_LLAMA_CPP_URL = ""
+DEFAULT_QDRANT_URL = ""
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,7 @@ class BackendRuntimeConfig:
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
+    qdrant_url: str = DEFAULT_QDRANT_URL
     runtime_profile_override: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
@@ -65,6 +67,7 @@ class AuthConfig:
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
+    qdrant_url: str = DEFAULT_QDRANT_URL
     runtime_profile_override: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
@@ -172,6 +175,7 @@ def get_auth_config() -> AuthConfig:
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
+        qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
         runtime_profile_override=_get_runtime_profile_override_env(),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
@@ -191,6 +195,7 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
+        qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
         runtime_profile_override=_get_runtime_profile_override_env(),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),

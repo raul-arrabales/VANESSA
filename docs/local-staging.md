@@ -34,6 +34,9 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
   - `./ops/local-staging/status.sh`
 - Logs:
   - `./ops/local-staging/logs.sh --tail 200`
+- Optional provider proofs:
+  - Set `LLAMA_CPP_URL` to enable the alternate local LLM provider.
+  - Set `QDRANT_URL` to enable the alternate local vector-store provider.
 
 For complete script flags, environment variables, and troubleshooting details, see the canonical guide in [`ops/local-staging/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/ops/local-staging/README.md).
 

@@ -35,13 +35,14 @@ Legend:
 7. Sandbox: isolated Python code execution environment.
 8. KWS: offline wake-word detection and wake-event emission.
 9. Weaviate: persistent semantic index for RAG context retrieval.
-10. PostgreSQL: persistent relational data for auth and metadata.
+10. Qdrant: optional vector database for alternate retrieval provider binding.
+11. PostgreSQL: persistent relational data for auth and metadata.
 
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, PostgreSQL
-- Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, optional Qdrant, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, Weaviate, optional Qdrant, PostgreSQL
 - LLM API -> LLM Runtime
 - KWS -> Backend API
 
@@ -50,7 +51,7 @@ Interaction semantics in the generated graph represent directional runtime commu
 The runtime architecture now distinguishes container topology from GenAI capability binding:
 
 - `capability`: a platform function such as `llm_inference` or `vector_store`
-- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, or `weaviate_local`
+- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, or `qdrant_local`
 - `deployment profile`: the named set of active capability-to-provider bindings
 - `adapter`: the capability-specific backend client that talks to a provider
 
@@ -60,7 +61,8 @@ Current provider proof state:
 
 - `local-default` keeps `llm_inference -> vllm_local` through the `llm` gateway.
 - When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`.
-- Switching deployment profiles changes the backend inference target without changing frontend or model-governance APIs.
+- When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `vector_store -> qdrant_local`.
+- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or model-governance APIs.
 
 ## Design Principles
 

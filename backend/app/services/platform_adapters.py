@@ -33,6 +33,8 @@ def http_json_request(
         with urlopen(req, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
             return (loads(raw) if raw else {}), int(response.status)
+    except TimeoutError:
+        return None, 504
     except HTTPError as exc:
         raw = exc.read().decode("utf-8")
         try:
@@ -353,6 +355,219 @@ class WeaviateVectorStoreAdapter(VectorStoreAdapter):
         return self.binding.endpoint_url.rstrip("/") + f"/v1/objects/{class_name}/{object_id}"
 
 
+class QdrantVectorStoreAdapter(VectorStoreAdapter):
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        path = str(self.binding.config.get("collections_path", "/collections")).strip() or "/collections"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(self._health_url(), method="GET")
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        existing_payload, existing_status = http_json_request(self._collection_url(collection_name), method="GET")
+        if existing_payload is not None and 200 <= existing_status < 300:
+            self._ensure_text_indexes(collection_name=collection_name, schema=schema)
+            return {
+                "index": {
+                    "name": index_name,
+                    "provider": self.binding.provider_slug,
+                    "status": "ready",
+                    "created": False,
+                }
+            }
+        if existing_status not in {404, 502, 504} and existing_payload is not None:
+            _raise_platform_provider_error(
+                code="vector_index_ensure_failed",
+                message="Unable to inspect vector index state",
+                status_code=existing_status,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": existing_payload},
+            )
+
+        vector_size = _qdrant_vector_size(schema, self.binding.config)
+        create_payload = {
+            "vectors": {
+                "size": vector_size,
+                "distance": _qdrant_distance(self.binding.config),
+            }
+        }
+        created_payload, created_status = http_json_request(
+            self._collection_url(collection_name),
+            method="PUT",
+            payload=create_payload,
+        )
+        if not _qdrant_operation_ok(created_payload, created_status):
+            _raise_platform_provider_error(
+                code="vector_index_ensure_failed",
+                message="Unable to ensure vector index",
+                status_code=created_status,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": created_payload},
+            )
+        self._ensure_text_indexes(collection_name=collection_name, schema=schema)
+        return {
+            "index": {
+                "name": index_name,
+                "provider": self.binding.provider_slug,
+                "status": "ready",
+                "created": True,
+            }
+        }
+
+    def upsert(self, *, index_name: str, documents: list[dict[str, Any]]) -> dict[str, Any]:
+        inferred_vector_size = _infer_qdrant_vector_size(documents)
+        self.ensure_index(index_name=index_name, schema={"vector_size": inferred_vector_size})
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        vector_size = inferred_vector_size or int(self.binding.config.get("default_vector_size", 1) or 1)
+        payload, status_code = http_json_request(
+            self._points_url(collection_name),
+            method="PUT",
+            payload={
+                "points": [
+                    {
+                        "id": str(document["id"]),
+                        "vector": _qdrant_document_vector(document, vector_size=vector_size),
+                        "payload": _build_qdrant_payload(document),
+                    }
+                    for document in documents
+                ]
+            },
+        )
+        if not _qdrant_operation_ok(payload, status_code):
+            _raise_platform_provider_error(
+                code="vector_upsert_failed",
+                message="Unable to upsert vector documents",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        return {
+            "index": index_name,
+            "count": len(documents),
+            "documents": [{"id": str(document["id"]), "status": "upserted"} for document in documents],
+        }
+
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str | None,
+        embedding: list[float] | None,
+        top_k: int,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        if embedding is not None:
+            payload, status_code = http_json_request(
+                self._search_url(collection_name),
+                method="POST",
+                payload={
+                    "vector": embedding,
+                    "limit": top_k,
+                    "filter": _qdrant_filter(filters),
+                    "with_payload": True,
+                    "with_vector": False,
+                },
+            )
+            if not _qdrant_result_ok(payload, status_code):
+                _raise_platform_provider_error(
+                    code="vector_query_failed",
+                    message="Unable to query vector index",
+                    status_code=status_code,
+                    details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+                )
+            rows = payload.get("result") if isinstance(payload.get("result"), list) else []
+            results = [_normalize_qdrant_query_result(item, score_kind="similarity") for item in rows if isinstance(item, dict)]
+            return {"index": index_name, "results": results}
+
+        must_filters = _qdrant_filter_conditions(filters)
+        must_filters.append({"key": "text", "match": {"text": str(query_text or "")}})
+        payload, status_code = http_json_request(
+            self._scroll_url(collection_name),
+            method="POST",
+            payload={
+                "limit": top_k,
+                "filter": {"must": must_filters},
+                "with_payload": True,
+                "with_vector": False,
+            },
+        )
+        if not _qdrant_result_ok(payload, status_code):
+            _raise_platform_provider_error(
+                code="vector_query_failed",
+                message="Unable to query vector index",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        points = (((payload.get("result") or {}).get("points")) if isinstance(payload.get("result"), dict) else [])
+        if not isinstance(points, list):
+            points = []
+        return {
+            "index": index_name,
+            "results": [_normalize_qdrant_query_result(item, score_kind="text_match") for item in points if isinstance(item, dict)],
+        }
+
+    def delete(self, *, index_name: str, ids: list[str]) -> dict[str, Any]:
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        payload, status_code = http_json_request(
+            self._delete_points_url(collection_name),
+            method="POST",
+            payload={"points": ids},
+        )
+        if not _qdrant_operation_ok(payload, status_code):
+            _raise_platform_provider_error(
+                code="vector_delete_failed",
+                message="Unable to delete vector documents",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        return {
+            "index": index_name,
+            "count": len(ids),
+            "deleted_ids": ids,
+        }
+
+    def _collection_url(self, collection_name: str) -> str:
+        return self.binding.endpoint_url.rstrip("/") + f"/collections/{collection_name}"
+
+    def _points_url(self, collection_name: str) -> str:
+        return self._collection_url(collection_name) + "/points"
+
+    def _delete_points_url(self, collection_name: str) -> str:
+        return self._collection_url(collection_name) + "/points/delete"
+
+    def _search_url(self, collection_name: str) -> str:
+        return self._collection_url(collection_name) + "/points/search"
+
+    def _scroll_url(self, collection_name: str) -> str:
+        return self._collection_url(collection_name) + "/points/scroll"
+
+    def _index_url(self, collection_name: str) -> str:
+        return self._collection_url(collection_name) + "/index"
+
+    def _ensure_text_indexes(self, *, collection_name: str, schema: dict[str, Any]) -> None:
+        for field_name, field_schema in _qdrant_field_indexes(schema).items():
+            payload, status_code = http_json_request(
+                self._index_url(collection_name),
+                method="PUT",
+                payload={"field_name": field_name, "field_schema": field_schema},
+            )
+            if not _qdrant_operation_ok(payload, status_code):
+                _raise_platform_provider_error(
+                    code="vector_index_ensure_failed",
+                    message="Unable to ensure vector index fields",
+                    status_code=status_code,
+                    details={"provider": self.binding.provider_slug, "upstream": payload, "field_name": field_name},
+                )
+
+
 def _is_model_not_found(payload: dict[str, Any] | None) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -602,6 +817,144 @@ def _normalize_weaviate_query_result(item: dict[str, Any], *, score_kind: str) -
         "text": str(item.get("text", "")).strip(),
         "metadata": metadata,
         "score": float(additional.get(score_field, 0.0) or 0.0),
+        "score_kind": score_kind,
+    }
+
+
+def _coerce_qdrant_collection_name(index_name: str) -> str:
+    normalized = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in index_name.strip())
+    normalized = normalized.strip("_-")
+    if not normalized:
+        raise PlatformControlPlaneError("invalid_index_name", "index name must contain letters or numbers", status_code=400)
+    return normalized.lower()
+
+
+def _qdrant_vector_size(schema: dict[str, Any], config: dict[str, Any]) -> int:
+    configured = schema.get("vector_size", config.get("default_vector_size", 1))
+    if isinstance(configured, bool):
+        raise PlatformControlPlaneError("invalid_vector_size", "vector size must be a positive integer", status_code=400)
+    try:
+        vector_size = int(configured)
+    except (TypeError, ValueError) as exc:
+        raise PlatformControlPlaneError("invalid_vector_size", "vector size must be a positive integer", status_code=400) from exc
+    if vector_size <= 0:
+        raise PlatformControlPlaneError("invalid_vector_size", "vector size must be a positive integer", status_code=400)
+    return vector_size
+
+
+def _qdrant_distance(config: dict[str, Any]) -> str:
+    distance = str(config.get("distance", "Cosine")).strip() or "Cosine"
+    return distance[:1].upper() + distance[1:].lower()
+
+
+def _infer_qdrant_vector_size(documents: list[dict[str, Any]]) -> int | None:
+    for document in documents:
+        embedding = document.get("embedding")
+        if isinstance(embedding, list) and embedding:
+            return len(embedding)
+    return None
+
+
+def _qdrant_document_vector(document: dict[str, Any], *, vector_size: int) -> list[float]:
+    embedding = document.get("embedding")
+    if isinstance(embedding, list) and embedding:
+        if len(embedding) != vector_size:
+            raise PlatformControlPlaneError(
+                "invalid_embedding",
+                "embedding size does not match vector index configuration",
+                status_code=400,
+            )
+        return [float(value) for value in embedding]
+    return [0.0] * vector_size
+
+
+def _build_qdrant_payload(document: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(document.get("metadata") or {})
+    payload: dict[str, Any] = {
+        "document_id": str(document["id"]),
+        "text": str(document["text"]),
+        "metadata": metadata,
+    }
+    for key, value in metadata.items():
+        payload[_coerce_metadata_key(str(key))] = value
+    return payload
+
+
+def _qdrant_filter(filters: dict[str, Any]) -> dict[str, Any] | None:
+    conditions = _qdrant_filter_conditions(filters)
+    if not conditions:
+        return None
+    return {"must": conditions}
+
+
+def _qdrant_filter_conditions(filters: dict[str, Any]) -> list[dict[str, Any]]:
+    conditions: list[dict[str, Any]] = []
+    for key, value in filters.items():
+        conditions.append(
+            {
+                "key": _coerce_metadata_key(str(key)),
+                "match": {"value": value},
+            }
+        )
+    return conditions
+
+
+def _qdrant_operation_ok(payload: dict[str, Any] | None, status_code: int) -> bool:
+    if payload is None or not 200 <= status_code < 300:
+        return False
+    return str(payload.get("status", "")).strip().lower() in {"ok", ""} or payload.get("result") is not None
+
+
+def _qdrant_result_ok(payload: dict[str, Any] | None, status_code: int) -> bool:
+    if payload is None or not 200 <= status_code < 300:
+        return False
+    return str(payload.get("status", "")).strip().lower() in {"ok", ""} and "result" in payload
+
+
+def _qdrant_field_indexes(schema: dict[str, Any]) -> dict[str, Any]:
+    field_indexes: dict[str, Any] = {
+        "text": {
+            "type": "text",
+            "tokenizer": "word",
+            "lowercase": True,
+            "phrase_matching": True,
+        }
+    }
+    for item in schema.get("properties", []):
+        if not isinstance(item, dict):
+            continue
+        field_name = _coerce_metadata_key(str(item.get("name", "")))
+        if field_name in {"document_id", "text", "metadata_json", "metadata"}:
+            continue
+        data_type = str(item.get("data_type", "text")).strip().lower() or "text"
+        if data_type == "boolean":
+            field_indexes[field_name] = "bool"
+        elif data_type == "int":
+            field_indexes[field_name] = "integer"
+        elif data_type == "number":
+            field_indexes[field_name] = "float"
+        else:
+            field_indexes[field_name] = "keyword"
+    return field_indexes
+
+
+def _normalize_qdrant_query_result(item: dict[str, Any], *, score_kind: str) -> dict[str, Any]:
+    payload = item.get("payload")
+    payload = payload if isinstance(payload, dict) else {}
+    metadata = payload.get("metadata")
+    metadata = metadata if isinstance(metadata, dict) else {}
+    if not metadata:
+        for key, value in payload.items():
+            if key in {"document_id", "text", "metadata"}:
+                continue
+            metadata[key] = value
+    raw_score = item.get("score")
+    score = float(raw_score if isinstance(raw_score, (int, float)) else 1.0)
+    return {
+        "id": str(payload.get("document_id") or item.get("id") or "").strip(),
+        "text": str(payload.get("text", "")).strip(),
+        "metadata": metadata,
+        "score": score,
         "score_kind": score_kind,
     }
 

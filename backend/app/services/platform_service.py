@@ -4,7 +4,13 @@ from typing import Any
 
 from ..config import AuthConfig
 from ..repositories import platform_control_plane as platform_repo
-from .platform_adapters import LlmInferenceAdapter, OpenAICompatibleLlmAdapter, VectorStoreAdapter, WeaviateVectorStoreAdapter
+from .platform_adapters import (
+    LlmInferenceAdapter,
+    OpenAICompatibleLlmAdapter,
+    QdrantVectorStoreAdapter,
+    VectorStoreAdapter,
+    WeaviateVectorStoreAdapter,
+)
 from .platform_types import (
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_VECTOR_STORE,
@@ -21,6 +27,9 @@ _BOOTSTRAP_DEPLOYMENT_DESCRIPTION = "Bootstrapped local profile using current pl
 _LLAMA_CPP_DEPLOYMENT_SLUG = "local-llama-cpp"
 _LLAMA_CPP_DEPLOYMENT_NAME = "Local llama.cpp"
 _LLAMA_CPP_DEPLOYMENT_DESCRIPTION = "Optional local profile using llama.cpp for LLM inference and Weaviate for vector storage."
+_QDRANT_DEPLOYMENT_SLUG = "local-qdrant"
+_QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
+_QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
 
 
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
@@ -62,6 +71,14 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         adapter_kind="weaviate_http",
         display_name="Weaviate local",
         description="Local Weaviate semantic index endpoint.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="qdrant_local",
+        capability_key=CAPABILITY_VECTOR_STORE,
+        adapter_kind="qdrant_http",
+        display_name="Qdrant local",
+        description="Optional local Qdrant semantic index endpoint.",
     )
 
     vllm_provider = platform_repo.ensure_provider_instance(
@@ -108,6 +125,24 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "local_fallback_model_id": "local-llama-cpp-default",
         },
     )
+    qdrant_provider = None
+    if getattr(config, "qdrant_url", "").strip():
+        qdrant_provider = platform_repo.ensure_provider_instance(
+            database_url,
+            slug="qdrant-local",
+            provider_key="qdrant_local",
+            display_name="Qdrant local",
+            description="Optional Qdrant endpoint for alternate local retrieval.",
+            endpoint_url=config.qdrant_url,
+            healthcheck_url=config.qdrant_url.rstrip("/") + "/healthz",
+            enabled=True,
+            config_json={
+                "collections_path": "/collections",
+                "health_path": "/healthz",
+                "default_vector_size": 1,
+                "distance": "Cosine",
+            },
+        )
 
     profile = platform_repo.ensure_deployment_profile(
         database_url,
@@ -153,6 +188,30 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(weaviate_provider["id"]),
+            binding_config={},
+        )
+
+    if qdrant_provider is not None:
+        qdrant_profile = platform_repo.ensure_deployment_profile(
+            database_url,
+            slug=_QDRANT_DEPLOYMENT_SLUG,
+            display_name=_QDRANT_DEPLOYMENT_NAME,
+            description=_QDRANT_DEPLOYMENT_DESCRIPTION,
+            created_by_user_id=None,
+            updated_by_user_id=None,
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(qdrant_profile["id"]),
+            capability_key=CAPABILITY_LLM_INFERENCE,
+            provider_instance_id=str(vllm_provider["id"]),
+            binding_config={},
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(qdrant_profile["id"]),
+            capability_key=CAPABILITY_VECTOR_STORE,
+            provider_instance_id=str(qdrant_provider["id"]),
             binding_config={},
         )
 
@@ -379,6 +438,8 @@ def resolve_vector_store_adapter(
     )
     if binding.adapter_kind == "weaviate_http":
         return WeaviateVectorStoreAdapter(binding)
+    if binding.adapter_kind == "qdrant_http":
+        return QdrantVectorStoreAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported vector adapter kind", status_code=500)
 
 

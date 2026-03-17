@@ -368,6 +368,95 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     assert "retrieved text" in seen_llm_messages[0][0]["content"][0]["text"]
 
 
+def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_vector_store_runtime_client",
+        lambda _runtime: type(
+            "FakeQdrantClient",
+            (),
+            {
+                "query": lambda self, **kwargs: {
+                    "index": kwargs["index_name"],
+                    "query": kwargs["query_text"],
+                    "top_k": kwargs["top_k"],
+                    "results": [
+                        {
+                            "id": "doc-1",
+                            "text": "qdrant text",
+                            "metadata": {"tenant": "ops"},
+                            "score": 1.0,
+                            "score_kind": "text_match",
+                        }
+                    ],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeLlmClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: {
+                    "output_text": "rag answer",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "hello", "retrieval": {"index": "knowledge_base"}},
+            "platform_runtime": {
+                "deployment_profile": {"id": "dep-2", "slug": "local-qdrant", "display_name": "Local Qdrant"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "vector_store": {"slug": "qdrant-local", "provider_key": "qdrant_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"]["retrieval_calls"] == [
+        {
+            "provider_slug": "qdrant-local",
+            "provider_key": "qdrant_local",
+            "deployment_profile_slug": "local-qdrant",
+            "index": "knowledge_base",
+            "query": "hello",
+            "top_k": 5,
+            "result_count": 1,
+            "results": [
+                {
+                    "id": "doc-1",
+                    "text": "qdrant text",
+                    "metadata": {"tenant": "ops"},
+                    "score": 1.0,
+                    "score_kind": "text_match",
+                }
+            ],
+        }
+    ]
+
+
 def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypatch: pytest.MonkeyPatch):
     seen_queries: list[str] = []
 

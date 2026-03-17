@@ -23,7 +23,7 @@ LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNS
 LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime llama_cpp agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime llama_cpp qdrant agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -275,6 +275,15 @@ llama_cpp_internal_http_ok() {
   compose exec -T llama_cpp python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8080${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
+qdrant_enabled_requested() {
+  [[ -n "${QDRANT_URL:-}" ]]
+}
+
+qdrant_internal_http_ok() {
+  local path="$1"
+  compose exec -T qdrant python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6333${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
 resolve_llm_local_model_host_path() {
   local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
   if [[ "${model_path}" == /models/llm/* ]]; then
@@ -371,6 +380,9 @@ compose() {
   if llama_cpp_enabled_requested; then
     cmd+=(--profile llama_cpp)
   fi
+  if qdrant_enabled_requested; then
+    cmd+=(--profile qdrant)
+  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -387,6 +399,9 @@ stack_services_for_start() {
   local service
   for service in "${SERVICES[@]}"; do
     if [[ "${service}" == "llama_cpp" ]] && ! llama_cpp_enabled_requested; then
+      continue
+    fi
+    if [[ "${service}" == "qdrant" ]] && ! qdrant_enabled_requested; then
       continue
     fi
     services_to_start+=("${service}")

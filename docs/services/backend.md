@@ -39,7 +39,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 Key terms:
 
 - `capability`: platform function such as `llm_inference` or `vector_store`
-- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, or `weaviate_local`
+- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, or `qdrant_local`
 - `deployment profile`: named set of active capability bindings
 - `adapter`: capability-specific backend client used by runtime paths
 
@@ -49,6 +49,7 @@ Bootstrap defaults:
 
 - `local-default` is always seeded from `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL`.
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
+- `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Superadmin-only vector proof routes exercise the real `vector_store` data plane through the active provider binding without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.

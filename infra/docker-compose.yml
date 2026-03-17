@@ -90,6 +90,21 @@ services:
     volumes:
       - ../models/llm:/models/llm
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: vanessa-qdrant
+    profiles:
+      - qdrant
+    ports:
+      - "6333:6333"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    volumes:
+      - qdrant_data:/qdrant/storage
+
   agent_engine:
     build:
       context: ..
@@ -164,4 +179,5 @@ services:
 
 volumes:
   weaviate_data:
+  qdrant_data:
   postgres_data:

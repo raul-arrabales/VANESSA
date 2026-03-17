@@ -77,6 +77,7 @@ def system_health_route():
     kws_url = config.kws_url.rstrip("/")
     weaviate_url = config.weaviate_url.rstrip("/")
     llama_cpp_url = config.llama_cpp_url.rstrip("/")
+    qdrant_url = config.qdrant_url.rstrip("/")
 
     services = [
         {
@@ -142,6 +143,16 @@ def system_health_route():
                 "container": "llama_cpp",
                 "target": config.llama_cpp_url,
                 "reachable": _http_json_ok(llama_cpp_url + "/v1/models"),
+            },
+        )
+    if config.qdrant_url.strip():
+        services.insert(
+            len(services) - 1,
+            {
+                "service": "Qdrant",
+                "container": "qdrant",
+                "target": config.qdrant_url,
+                "reachable": _http_json_ok(qdrant_url + "/healthz"),
             },
         )
 

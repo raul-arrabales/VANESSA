@@ -12,12 +12,13 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Optional local llama.cpp runtime service
 - Wake-word (KWS) service
 - Weaviate vector store
+- Optional Qdrant vector store
 - PostgreSQL database
 
 The backend also owns a GenAI control plane that distinguishes:
 
 - `capabilities` such as `llm_inference` and `vector_store`
-- `providers` such as `vllm_local`, `llama_cpp_local`, and `weaviate_local`
+- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, and `qdrant_local`
 - `deployment profiles` that bind capabilities to active providers
 
 ## Documentation Site
@@ -58,6 +59,11 @@ Full guide: `ops/local-staging/README.md`
 - Set `LLAMA_CPP_MODEL_PATH` to a GGUF file mounted from `models/llm/`
 - `LLAMA_CPP_CONTEXT_SIZE` controls the server context window
 - When enabled, backend seeds an inactive `local-llama-cpp` deployment profile for platform switching
+
+`qdrant` is optional in local staging:
+
+- Set `QDRANT_URL` to enable the optional `qdrant` compose profile
+- When enabled, backend seeds an inactive `local-qdrant` deployment profile for platform switching
 
 ## LLM API Endpoints (Local)
 
@@ -161,6 +167,7 @@ Expected containers:
 - `vanessa-llm`
 - `vanessa-llm-runtime`
 - `vanessa-llama-cpp` (only when `LLAMA_CPP_URL` enables the optional profile)
+- `vanessa-qdrant` (only when `QDRANT_URL` enables the optional profile)
 - `vanessa-sandbox`
 - `vanessa-kws`
 - `vanessa-weaviate`
@@ -212,13 +219,14 @@ When adding new safety/tool gates, use this same global runtime profile contract
 - Container #6: Python Sandbox
 - Container #7: Wake-word service (KWS)
 - Container #8: Weaviate (persistent semantic index for RAG)
-- Container #9: PostgreSQL
+- Container #9: Qdrant (optional alternate vector store for RAG)
+- Container #10: PostgreSQL
 
 Communication semantics (from generated architecture metadata) are directional service interactions, not container startup order:
 
 - Frontend -> Backend API (UI API requests)
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, PostgreSQL
-- Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, optional Qdrant, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, Weaviate, optional Qdrant, PostgreSQL
 - LLM API -> LLM Runtime (internal runtime execution path)
 - KWS -> Backend API (wake event webhook)
 
@@ -247,6 +255,7 @@ Current bootstrapped local providers:
 - `vllm_local`
 - `llama_cpp_local`
 - `weaviate_local`
+- `qdrant_local`
 
 The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve ensure, upsert, query, and delete through the active `vector_store` binding using provider-agnostic payloads.
 
@@ -254,6 +263,7 @@ Bootstrapped deployment profiles:
 
 - `local-default` is always seeded and remains the default active profile
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured
+- `local-qdrant` is seeded only when `QDRANT_URL` is configured
 
 The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values so current local staging behavior remains compatible.
 

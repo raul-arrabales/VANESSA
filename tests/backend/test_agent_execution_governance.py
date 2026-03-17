@@ -127,6 +127,88 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
     assert payload["runtime_profile"] == "offline"
 
 
+def test_agent_execution_proxy_forwards_qdrant_runtime_snapshot(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u11@example.com",
+        username="u11",
+        password_hash=hash_password("u11-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u11-pass-123").get_json()["access_token"]
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {
+            "deployment_profile": {"id": "dep-2", "slug": "local-qdrant", "display_name": "Local Qdrant"},
+            "capabilities": {
+                "llm_inference": {
+                    "id": "provider-1",
+                    "slug": "vllm-local-gateway",
+                    "provider_key": "vllm_local",
+                    "display_name": "vLLM local gateway",
+                    "description": "desc",
+                    "adapter_kind": "openai_compatible_llm",
+                    "endpoint_url": "http://llm:8000",
+                    "healthcheck_url": "http://llm:8000/health",
+                    "enabled": True,
+                    "config": {"chat_completion_path": "/v1/chat/completions"},
+                    "binding_config": {},
+                },
+                "vector_store": {
+                    "id": "provider-3",
+                    "slug": "qdrant-local",
+                    "provider_key": "qdrant_local",
+                    "display_name": "Qdrant local",
+                    "description": "desc",
+                    "adapter_kind": "qdrant_http",
+                    "endpoint_url": "http://qdrant:6333",
+                    "healthcheck_url": "http://qdrant:6333/healthz",
+                    "enabled": True,
+                    "config": {},
+                    "binding_config": {},
+                },
+            },
+        },
+    )
+
+    def _create_execution(**kwargs):
+        assert kwargs["platform_runtime"]["deployment_profile"]["slug"] == "local-qdrant"
+        assert kwargs["platform_runtime"]["capabilities"]["vector_store"]["provider_key"] == "qdrant_local"
+        assert kwargs["execution_input"]["retrieval"] == {"index": "knowledge_base"}
+        return (
+            {
+                "execution": {
+                    "id": "exec-qdrant",
+                    "status": "succeeded",
+                    "agent_ref": "agent.local",
+                    "agent_version": "v1",
+                    "model_ref": None,
+                    "runtime_profile": "offline",
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "finished_at": "2026-01-01T00:00:01+00:00",
+                    "result": {"output_text": "ok"},
+                    "error": None,
+                }
+            },
+            201,
+        )
+
+    monkeypatch.setattr(executions_routes, "create_execution", _create_execution)
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.local", "input": {"prompt": "hello", "retrieval": {"index": "knowledge_base"}}},
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()["execution"]["id"] == "exec-qdrant"
+
+
 def test_agent_execution_passes_engine_errors(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     user = users.create_user(

@@ -25,13 +25,15 @@
 <text class="group-label" x="1226" y="36">DATA</text>
 <g id="architecture-edges">
 <line id="edge-agent_engine-llm" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
-<line id="edge-agent_engine-postgres" class="architecture-edge architecture-edge-db" x1="796" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-postgres" class="architecture-edge architecture-edge-db" x1="796" y1="116" x2="1116" y2="364" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-qdrant" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
 <line id="edge-agent_engine-sandbox" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
 <line id="edge-agent_engine-weaviate" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-agent_engine" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="576" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-llama_cpp" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="364" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-llm" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
-<line id="edge-backend-postgres" class="architecture-edge architecture-edge-db" x1="526" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-postgres" class="architecture-edge architecture-edge-db" x1="526" y1="116" x2="1116" y2="364" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-qdrant" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-sandbox" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-weaviate" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-frontend-backend" class="architecture-edge architecture-edge-http" x1="256" y1="116" x2="306" y2="116" marker-end="url(#architecture-arrow)" />
@@ -40,13 +42,15 @@
 </g>
 <g id="architecture-edge-labels">
 <text class="edge-label" x="821" y="110">HTTP - Agent LLM requests</text>
-<text class="edge-label" x="956" y="172">SQL - Agent structured persistence</text>
+<text class="edge-label" x="956" y="234">SQL - Agent structured persistence</text>
+<text class="edge-label" x="956" y="172">HTTP - Optional vector search and retrieval via alternate provider binding</text>
 <text class="edge-label" x="821" y="296">HTTP - Agent sandbox execution</text>
 <text class="edge-label" x="956" y="110">HTTP - Vector search and retrieval</text>
 <text class="edge-label" x="551" y="110">HTTP - Agent orchestration calls</text>
 <text class="edge-label" x="686" y="234">HTTP - Optional direct llama.cpp inference via platform provider binding</text>
 <text class="edge-label" x="686" y="110">HTTP - Model inference and discovery</text>
-<text class="edge-label" x="821" y="172">SQL - Structured data access</text>
+<text class="edge-label" x="821" y="234">SQL - Structured data access</text>
+<text class="edge-label" x="821" y="172">HTTP - Optional semantic retrieval operations via alternate provider binding</text>
 <text class="edge-label" x="686" y="296">HTTP - Controlled code execution</text>
 <text class="edge-label" x="821" y="110">HTTP - Semantic retrieval operations</text>
 <text class="edge-label" x="281" y="110">HTTP - UI API requests</text>
@@ -99,10 +103,15 @@
 <text class="node-title" x="1130" y="104">Weaviate</text>
 <text class="node-subtitle" x="1130" y="126">weaviate</text>
 </g>
-<g id="node-postgres" class="architecture-node architecture-node-postgres architecture-group-data" data-container="postgres">
+<g id="node-qdrant" class="architecture-node architecture-node-qdrant architecture-group-data" data-container="qdrant">
 <rect x="1116" y="198" width="220" height="84" rx="14" ry="14" />
-<text class="node-title" x="1130" y="228">PostgreSQL</text>
-<text class="node-subtitle" x="1130" y="250">postgres</text>
+<text class="node-title" x="1130" y="228">Qdrant</text>
+<text class="node-subtitle" x="1130" y="250">qdrant</text>
+</g>
+<g id="node-postgres" class="architecture-node architecture-node-postgres architecture-group-data" data-container="postgres">
+<rect x="1116" y="322" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="1130" y="352">PostgreSQL</text>
+<text class="node-subtitle" x="1130" y="374">postgres</text>
 </g>
 </g>
 </svg>

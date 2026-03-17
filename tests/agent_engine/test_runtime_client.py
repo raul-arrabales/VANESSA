@@ -12,7 +12,16 @@ if str(PROJECT_ROOT) not in sys.path:
 from agent_engine.app.services import runtime_client  # noqa: E402
 
 
-def _platform_runtime(*, provider_key: str = "vllm_local", request_format: str = "responses_api") -> dict[str, object]:
+def _platform_runtime(
+    *,
+    provider_key: str = "vllm_local",
+    request_format: str = "responses_api",
+    vector_provider_key: str = "weaviate_local",
+    vector_adapter_kind: str = "weaviate_http",
+    vector_endpoint_url: str = "http://weaviate:8080",
+    vector_healthcheck_url: str | None = "http://weaviate:8080/v1/.well-known/ready",
+    vector_config: dict[str, object] | None = None,
+) -> dict[str, object]:
     return {
         "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
         "capabilities": {
@@ -35,15 +44,15 @@ def _platform_runtime(*, provider_key: str = "vllm_local", request_format: str =
             },
             "vector_store": {
                 "id": "provider-2",
-                "slug": "weaviate-local",
-                "provider_key": "weaviate_local",
-                "display_name": "Weaviate local",
+                "slug": "weaviate-local" if vector_provider_key == "weaviate_local" else "qdrant-local",
+                "provider_key": vector_provider_key,
+                "display_name": "Weaviate local" if vector_provider_key == "weaviate_local" else "Qdrant local",
                 "description": "desc",
-                "adapter_kind": "weaviate_http",
-                "endpoint_url": "http://weaviate:8080",
-                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "adapter_kind": vector_adapter_kind,
+                "endpoint_url": vector_endpoint_url,
+                "healthcheck_url": vector_healthcheck_url,
                 "enabled": True,
-                "config": {},
+                "config": vector_config or {},
                 "binding_config": {},
             }
         },
@@ -185,3 +194,71 @@ def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pyt
         )
 
     assert exc_info.value.code == "vector_runtime_timeout"
+
+
+def test_qdrant_vector_runtime_client_builds_scroll_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "status": "ok",
+            "result": {
+                "points": [
+                    {
+                        "id": "doc-1",
+                        "payload": {
+                            "document_id": "doc-1",
+                            "text": "retrieved text",
+                            "metadata": {"tenant": "ops"},
+                        },
+                    }
+                ]
+            },
+        }, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_vector_store_runtime_client(
+        _platform_runtime(
+            vector_provider_key="qdrant_local",
+            vector_adapter_kind="qdrant_http",
+            vector_endpoint_url="http://qdrant:6333",
+            vector_healthcheck_url="http://qdrant:6333/healthz",
+        )
+    )
+
+    payload = client.query(
+        index_name="knowledge_base",
+        query_text="hello",
+        top_k=4,
+        filters={"tenant": "ops"},
+    )
+
+    assert payload == {
+        "index": "knowledge_base",
+        "query": "hello",
+        "top_k": 4,
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "retrieved text",
+                "metadata": {"tenant": "ops"},
+                "score": 1.0,
+                "score_kind": "text_match",
+            }
+        ],
+    }
+    assert seen_payloads == [
+        {
+            "limit": 4,
+            "filter": {
+                "must": [
+                    {"key": "tenant", "match": {"value": "ops"}},
+                    {"key": "text", "match": {"text": "hello"}},
+                ]
+            },
+            "with_payload": True,
+            "with_vector": False,
+        }
+    ]

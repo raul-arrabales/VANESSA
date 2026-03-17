@@ -34,6 +34,10 @@ llama_cpp_ready_ok() {
   llama_cpp_internal_http_ok "/v1/models"
 }
 
+qdrant_ready_ok() {
+  qdrant_internal_http_ok "/healthz"
+}
+
 runtime_profile_endpoint_ok() {
   local status
   status="$(curl --silent --show-error --max-time 2 -o /dev/null -w '%{http_code}' "http://localhost:5000/v1/runtime/profile")"
@@ -115,6 +119,17 @@ run_checks() {
     fi
   else
     printf 'llama_cpp: SKIP (LLAMA_CPP_URL not set)\n'
+  fi
+
+  if qdrant_enabled_requested; then
+    if qdrant_ready_ok; then
+      printf 'qdrant: OK (/healthz)\n'
+    else
+      printf 'qdrant: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'qdrant: SKIP (QDRANT_URL not set)\n'
   fi
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then

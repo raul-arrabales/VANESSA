@@ -106,7 +106,7 @@
 
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
-`input.retrieval` is optional and execution-scoped. In v1 it is text-query only, uses the active `vector_store` binding, and runs only when explicitly present in the input payload.
+`input.retrieval` is optional and execution-scoped. In v1 it is text-query only, uses the active `vector_store` binding, and runs only when explicitly present in the input payload. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
 
 ## Error Codes
 

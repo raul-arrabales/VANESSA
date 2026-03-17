@@ -38,6 +38,7 @@ python scripts/generate_architecture.py --write
 - `health.sh`
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
+  - Checks optional `qdrant` when `QDRANT_URL` is configured.
   - Also checks `llm_runtime` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
@@ -86,6 +87,7 @@ Supported launcher variables:
 - `LLAMA_CPP_URL` (blank by default; when set, enables the optional `llama_cpp` compose profile and backend bootstrap profile)
 - `LLAMA_CPP_MODEL_PATH` (required when `LLAMA_CPP_URL` is set; must point to a GGUF file under `models/llm/` or an absolute host path)
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
+- `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
@@ -118,6 +120,12 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - Local-staging scripts automatically add the `llama_cpp` compose profile when enabled.
 - `LLAMA_CPP_MODEL_PATH` must point to a GGUF file that exists on the host.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /v1/models` inside the container.
+
+`qdrant` selection:
+
+- The optional `qdrant` service is enabled only when `QDRANT_URL` is non-empty.
+- Local-staging scripts automatically add the `qdrant` compose profile when enabled.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /healthz` inside the container.
 
 ## Sample Auth Seeding
 
@@ -172,7 +180,11 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - set `LLAMA_CPP_MODEL_PATH` to a valid GGUF file
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `llama.cpp local`, activate `Local llama.cpp`, and confirm inference still succeeds
-17. Stop while keeping state: `./ops/local-staging/stop.sh`
+17. Optional Qdrant provider proof:
+   - set `QDRANT_URL=http://qdrant:6333`
+   - run `./ops/local-staging/start.sh`
+   - login as `sample-superadmin`, open Platform control, validate `Qdrant local`, activate `Local Qdrant`, and confirm retrieval still succeeds
+18. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 If compose or architecture metadata changes, verify artifacts are fresh:
 
@@ -278,6 +290,10 @@ Use the targeted restart script when only one service changed:
   - Confirm `LLAMA_CPP_URL` is set and `LLAMA_CPP_MODEL_PATH` points to an existing GGUF file.
   - Run `./ops/local-staging/restart-service.sh --service llama_cpp`.
   - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/v1/models` inside the container.
+- `qdrant` fails to start:
+  - Confirm `QDRANT_URL` is set.
+  - Run `./ops/local-staging/restart-service.sh --service qdrant`.
+  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/healthz` inside the container.
     - Example: GTX 960 (`compute capability 5.2`) is too old for the shipped GPU image.
     - In that case, use CPU mode (`LLM_RUNTIME_ACCELERATOR=cpu`) or run on a newer NVIDIA GPU.
   - If host `nvidia-smi` works but Docker fails with `could not select device driver "" with capabilities: [[gpu]]`:

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-03-17T13:14:14+00:00",
+  "generated_at": "2026-03-17T17:50:40+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -84,6 +84,15 @@
       "criticality": "high"
     },
     {
+      "id": "qdrant",
+      "container": "qdrant",
+      "label": "Qdrant",
+      "group": "data",
+      "description": "Optional vector database for alternate retrieval provider binding.",
+      "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
       "id": "postgres",
       "container": "postgres",
       "label": "PostgreSQL",
@@ -110,6 +119,15 @@
       "protocol": "SQL",
       "purpose": "Agent structured persistence",
       "kind": "db",
+      "direction": "outbound"
+    },
+    {
+      "id": "agent_engine-qdrant",
+      "from": "agent_engine",
+      "to": "qdrant",
+      "protocol": "HTTP",
+      "purpose": "Optional vector search and retrieval via alternate provider binding",
+      "kind": "http",
       "direction": "outbound"
     },
     {
@@ -164,6 +182,15 @@
       "protocol": "SQL",
       "purpose": "Structured data access",
       "kind": "db",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-qdrant",
+      "from": "backend",
+      "to": "qdrant",
+      "protocol": "HTTP",
+      "purpose": "Optional semantic retrieval operations via alternate provider binding",
+      "kind": "http",
       "direction": "outbound"
     },
     {
@@ -275,13 +302,19 @@
         "width": 220,
         "height": 84
       },
-      "postgres": {
+      "qdrant": {
         "x": 1116,
         "y": 198,
+        "width": 220,
+        "height": 84
+      },
+      "postgres": {
+        "x": 1116,
+        "y": 322,
         "width": 220,
         "height": 84
       }
     }
   },
-  "source_hash": "7c88f14f197ca98d621fc99525c3772a71cb2fb4fe682da838139fff27ccb18d"
+  "source_hash": "cd85fe4fc8dcc48c3c03124256e68974144a11f41232cf05d35d2ca68f6cf4db"
 }

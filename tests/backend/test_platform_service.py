@@ -270,6 +270,7 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
         llm_runtime_url="http://llm_runtime:8000",
         weaviate_url="http://weaviate:8080",
         llama_cpp_url="http://llama_cpp:8080",
+        qdrant_url="",
     )
 
     platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
@@ -299,6 +300,7 @@ def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_config
         llm_runtime_url="http://llm_runtime:8000",
         weaviate_url="http://weaviate:8080",
         llama_cpp_url="",
+        qdrant_url="",
     )
 
     platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
@@ -306,17 +308,88 @@ def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_config
     assert created_profiles == ["local-default"]
 
 
+def test_ensure_platform_bootstrap_state_seeds_qdrant_profile_when_configured(monkeypatch: pytest.MonkeyPatch):
+    created_profiles: list[str] = []
+    binding_calls: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id"})
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "ensure_deployment_profile",
+        lambda _db, *, slug, **kwargs: created_profiles.append(slug) or {"id": f"{slug}-id"},
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "upsert_deployment_binding",
+        lambda _db, *, deployment_profile_id, capability_key, provider_instance_id, binding_config: (
+            binding_calls.append((deployment_profile_id, capability_key, provider_instance_id)) or {}
+        ),
+    )
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+        qdrant_url="http://qdrant:6333",
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert created_profiles == ["local-default", "local-qdrant"]
+    assert ("local-qdrant-id", "llm_inference", "vllm-local-gateway-id") in binding_calls
+    assert ("local-qdrant-id", "vector_store", "qdrant-local-id") in binding_calls
+
+
+def test_resolve_vector_store_adapter_supports_qdrant(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _db, *, capability_key: {
+            "capability_key": capability_key,
+            "provider_instance_id": "provider-2",
+            "provider_slug": "qdrant-local",
+            "provider_key": "qdrant_local",
+            "provider_display_name": "Qdrant local",
+            "provider_description": "desc",
+            "endpoint_url": "http://qdrant:6333",
+            "healthcheck_url": "http://qdrant:6333/healthz",
+            "enabled": True,
+            "config_json": {},
+            "binding_config": {},
+            "adapter_kind": "qdrant_http",
+            "deployment_profile_id": "deployment-2",
+            "deployment_profile_slug": "local-qdrant",
+            "deployment_profile_display_name": "Local Qdrant",
+        },
+    )
+
+    adapter = platform_service.resolve_vector_store_adapter("ignored", object())  # type: ignore[arg-type]
+
+    assert isinstance(adapter, platform_adapters.QdrantVectorStoreAdapter)
+    assert adapter.binding.provider_slug == "qdrant-local"
+
+
 @pytest.mark.parametrize(
-    ("llm_provider_key", "deployment_slug"),
+    ("llm_provider_key", "deployment_slug", "vector_provider_key", "vector_adapter_kind", "vector_endpoint_url"),
     [
-        ("vllm_local", "local-default"),
-        ("llama_cpp_local", "local-llama-cpp"),
+        ("vllm_local", "local-default", "weaviate_local", "weaviate_http", "http://weaviate:8080"),
+        ("llama_cpp_local", "local-llama-cpp", "weaviate_local", "weaviate_http", "http://weaviate:8080"),
+        ("vllm_local", "local-qdrant", "qdrant_local", "qdrant_http", "http://qdrant:6333"),
     ],
 )
 def test_get_active_platform_runtime_uses_current_active_bindings(
     monkeypatch: pytest.MonkeyPatch,
     llm_provider_key: str,
     deployment_slug: str,
+    vector_provider_key: str,
+    vector_adapter_kind: str,
+    vector_endpoint_url: str,
 ):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
 
@@ -342,16 +415,20 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
         return {
             "capability_key": "vector_store",
             "provider_instance_id": "provider-2",
-            "provider_slug": "weaviate-local",
-            "provider_key": "weaviate_local",
-            "provider_display_name": "Weaviate local",
+            "provider_slug": "weaviate-local" if vector_provider_key == "weaviate_local" else "qdrant-local",
+            "provider_key": vector_provider_key,
+            "provider_display_name": "Weaviate local" if vector_provider_key == "weaviate_local" else "Qdrant local",
             "provider_description": "desc",
-            "endpoint_url": "http://weaviate:8080",
-            "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+            "endpoint_url": vector_endpoint_url,
+            "healthcheck_url": (
+                "http://weaviate:8080/v1/.well-known/ready"
+                if vector_provider_key == "weaviate_local"
+                else "http://qdrant:6333/healthz"
+            ),
             "enabled": True,
             "config_json": {},
             "binding_config": {},
-            "adapter_kind": "weaviate_http",
+            "adapter_kind": vector_adapter_kind,
             "deployment_profile_id": "deployment-1",
             "deployment_profile_slug": deployment_slug,
             "deployment_profile_display_name": "Runtime Deployment",
@@ -383,13 +460,17 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
             },
             "vector_store": {
                 "id": "provider-2",
-                "slug": "weaviate-local",
-                "provider_key": "weaviate_local",
-                "display_name": "Weaviate local",
+                "slug": "weaviate-local" if vector_provider_key == "weaviate_local" else "qdrant-local",
+                "provider_key": vector_provider_key,
+                "display_name": "Weaviate local" if vector_provider_key == "weaviate_local" else "Qdrant local",
                 "description": "desc",
-                "adapter_kind": "weaviate_http",
-                "endpoint_url": "http://weaviate:8080",
-                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "adapter_kind": vector_adapter_kind,
+                "endpoint_url": vector_endpoint_url,
+                "healthcheck_url": (
+                    "http://weaviate:8080/v1/.well-known/ready"
+                    if vector_provider_key == "weaviate_local"
+                    else "http://qdrant:6333/healthz"
+                ),
                 "enabled": True,
                 "config": {},
                 "binding_config": {},

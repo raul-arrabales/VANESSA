@@ -16,6 +16,7 @@ rendering:
     - llama_cpp
     - sandbox
     - weaviate
+    - qdrant
     - postgres
 services:
   frontend:
@@ -72,6 +73,12 @@ services:
     description: Persistent vector index for RAG retrieval.
     public_exposed: true
     criticality: high
+  qdrant:
+    label: Qdrant
+    group: data
+    description: Optional vector database for alternate retrieval provider binding.
+    public_exposed: true
+    criticality: medium
   postgres:
     label: PostgreSQL
     group: data
@@ -116,6 +123,12 @@ edges:
     kind: http
     direction: outbound
   - from: backend
+    to: qdrant
+    protocol: HTTP
+    purpose: Optional semantic retrieval operations via alternate provider binding
+    kind: http
+    direction: outbound
+  - from: backend
     to: postgres
     protocol: SQL
     purpose: Structured data access
@@ -137,6 +150,12 @@ edges:
     to: weaviate
     protocol: HTTP
     purpose: Vector search and retrieval
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: qdrant
+    protocol: HTTP
+    purpose: Optional vector search and retrieval via alternate provider binding
     kind: http
     direction: outbound
   - from: agent_engine

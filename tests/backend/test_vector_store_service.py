@@ -26,6 +26,26 @@ def _binding() -> ProviderBinding:
     )
 
 
+def _qdrant_binding() -> ProviderBinding:
+    return ProviderBinding(
+        capability_key="vector_store",
+        provider_instance_id="provider-2",
+        provider_slug="qdrant-local",
+        provider_key="qdrant_local",
+        provider_display_name="Qdrant local",
+        provider_description="desc",
+        endpoint_url="http://qdrant:6333",
+        healthcheck_url="http://qdrant:6333/healthz",
+        enabled=True,
+        adapter_kind="qdrant_http",
+        config={"default_vector_size": 2, "distance": "Cosine"},
+        binding_config={},
+        deployment_profile_id="deployment-2",
+        deployment_profile_slug="local-qdrant",
+        deployment_profile_display_name="Local Qdrant",
+    )
+
+
 def test_ensure_vector_index_validates_and_delegates(monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, dict[str, object]]] = []
 
@@ -357,4 +377,220 @@ def test_weaviate_vector_store_adapter_delete_returns_deleted_ids(monkeypatch: p
             + platform_adapters._weaviate_object_uuid("knowledge_base", "doc-2"),
             "DELETE",
         ),
+    ]
+
+
+def test_qdrant_vector_store_adapter_ensure_index_creates_collection_and_text_index(monkeypatch: pytest.MonkeyPatch):
+    calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        calls.append((url, method, payload))
+        if url.endswith("/collections/knowledge_base"):
+            if method == "GET":
+                return {"status": "not_found"}, 404
+            return {"status": "ok", "result": True}, 200
+        if url.endswith("/collections/knowledge_base/index"):
+            return {"status": "ok", "result": True}, 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.QdrantVectorStoreAdapter(_qdrant_binding())
+
+    payload = adapter.ensure_index(index_name="knowledge_base", schema={"properties": [{"name": "tenant", "data_type": "text"}]})
+
+    assert payload == {
+        "index": {
+            "name": "knowledge_base",
+            "provider": "qdrant-local",
+            "status": "ready",
+            "created": True,
+        }
+    }
+    assert calls == [
+        ("http://qdrant:6333/collections/knowledge_base", "GET", None),
+        (
+            "http://qdrant:6333/collections/knowledge_base",
+            "PUT",
+            {"vectors": {"size": 2, "distance": "Cosine"}},
+        ),
+        (
+            "http://qdrant:6333/collections/knowledge_base/index",
+            "PUT",
+            {
+                "field_name": "text",
+                "field_schema": {
+                    "type": "text",
+                    "tokenizer": "word",
+                    "lowercase": True,
+                    "phrase_matching": True,
+                },
+            },
+        ),
+        (
+            "http://qdrant:6333/collections/knowledge_base/index",
+            "PUT",
+            {"field_name": "tenant", "field_schema": "keyword"},
+        ),
+    ]
+
+
+def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_documents(monkeypatch: pytest.MonkeyPatch):
+    calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        calls.append((url, method, payload))
+        if url.endswith("/collections/knowledge_base") and method == "GET":
+            return {"status": "ok", "result": {"status": "green"}}, 200
+        if url.endswith("/collections/knowledge_base/index"):
+            return {"status": "ok", "result": True}, 200
+        if url.endswith("/collections/knowledge_base/points") and method == "PUT":
+            return {"status": "ok", "result": {"status": "acknowledged"}}, 200
+        if url.endswith("/collections/knowledge_base/points/search"):
+            return {
+                "status": "ok",
+                "result": [
+                    {
+                        "id": "doc-1",
+                        "score": 0.87,
+                        "payload": {
+                            "document_id": "doc-1",
+                            "text": "hello",
+                            "metadata": {"tenant": "ops"},
+                        },
+                    }
+                ],
+            }, 200
+        if url.endswith("/collections/knowledge_base/points/scroll"):
+            return {
+                "status": "ok",
+                "result": {
+                    "points": [
+                        {
+                            "id": "doc-1",
+                            "payload": {
+                                "document_id": "doc-1",
+                                "text": "hello",
+                                "metadata": {"tenant": "ops"},
+                            },
+                        }
+                    ]
+                },
+            }, 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.QdrantVectorStoreAdapter(_qdrant_binding())
+
+    upsert_payload = adapter.upsert(
+        index_name="knowledge_base",
+        documents=[{"id": "doc-1", "text": "hello", "metadata": {"tenant": "ops"}, "embedding": [0.1, 0.2]}],
+    )
+    vector_query_payload = adapter.query(
+        index_name="knowledge_base",
+        query_text=None,
+        embedding=[0.1, 0.2],
+        top_k=3,
+        filters={"tenant": "ops"},
+    )
+    text_query_payload = adapter.query(
+        index_name="knowledge_base",
+        query_text="hello",
+        embedding=None,
+        top_k=2,
+        filters={"tenant": "ops"},
+    )
+
+    assert upsert_payload == {
+        "index": "knowledge_base",
+        "count": 1,
+        "documents": [{"id": "doc-1", "status": "upserted"}],
+    }
+    assert vector_query_payload == {
+        "index": "knowledge_base",
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "hello",
+                "metadata": {"tenant": "ops"},
+                "score": 0.87,
+                "score_kind": "similarity",
+            }
+        ],
+    }
+    assert text_query_payload == {
+        "index": "knowledge_base",
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "hello",
+                "metadata": {"tenant": "ops"},
+                "score": 1.0,
+                "score_kind": "text_match",
+            }
+        ],
+    }
+    assert calls[2] == (
+        "http://qdrant:6333/collections/knowledge_base/points",
+        "PUT",
+        {
+            "points": [
+                {
+                    "id": "doc-1",
+                    "vector": [0.1, 0.2],
+                    "payload": {
+                        "document_id": "doc-1",
+                        "text": "hello",
+                        "metadata": {"tenant": "ops"},
+                        "tenant": "ops",
+                    },
+                }
+            ]
+        },
+    )
+    assert calls[3][2] == {
+        "vector": [0.1, 0.2],
+        "limit": 3,
+        "filter": {"must": [{"key": "tenant", "match": {"value": "ops"}}]},
+        "with_payload": True,
+        "with_vector": False,
+    }
+    assert calls[4][2] == {
+        "limit": 2,
+        "filter": {
+            "must": [
+                {"key": "tenant", "match": {"value": "ops"}},
+                {"key": "text", "match": {"text": "hello"}},
+            ]
+        },
+        "with_payload": True,
+        "with_vector": False,
+    }
+
+
+def test_qdrant_vector_store_adapter_delete_returns_deleted_ids(monkeypatch: pytest.MonkeyPatch):
+    calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        calls.append((url, method, payload))
+        return {"status": "ok", "result": {"status": "acknowledged"}}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.QdrantVectorStoreAdapter(_qdrant_binding())
+
+    payload = adapter.delete(index_name="knowledge_base", ids=["doc-1", "doc-2"])
+
+    assert payload == {
+        "index": "knowledge_base",
+        "count": 2,
+        "deleted_ids": ["doc-1", "doc-2"],
+    }
+    assert calls == [
+        (
+            "http://qdrant:6333/collections/knowledge_base/points/delete",
+            "POST",
+            {"points": ["doc-1", "doc-2"]},
+        )
     ]
