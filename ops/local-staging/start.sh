@@ -65,6 +65,9 @@ if [[ "${resolved_accelerator}" == "cpu" ]]; then
 fi
 
 validate_llm_local_model_path
+if llama_cpp_enabled_requested; then
+  validate_llama_cpp_model_path
+fi
 validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"

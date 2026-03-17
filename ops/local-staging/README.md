@@ -37,6 +37,7 @@ python scripts/generate_architecture.py --write
   - Flag: `--json`
 - `health.sh`
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
+  - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Also checks `llm_runtime` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
@@ -82,6 +83,9 @@ Supported launcher variables:
 - `LLM_LOCAL_UPSTREAM_MODEL` (default in `infra/.env.example`: same value as `LLM_LOCAL_MODEL_PATH`; must match a model id exposed by `llm_runtime /v1/models`)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
+- `LLAMA_CPP_URL` (blank by default; when set, enables the optional `llama_cpp` compose profile and backend bootstrap profile)
+- `LLAMA_CPP_MODEL_PATH` (required when `LLAMA_CPP_URL` is set; must point to a GGUF file under `models/llm/` or an absolute host path)
+- `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
@@ -107,6 +111,13 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - CPU builds pin `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to avoid tokenizer/runtime incompatibilities as upstream releases move forward.
 - CPU local staging defaults `VLLM_CPU_OMP_THREADS_BIND=0-7` on this single-NUMA-node 8-logical-core host.
 - `VLLM_CPU_OMP_THREADS_BIND` may also be set to `auto`, `nobind`, or a custom CPU set such as `0-3|4-7`.
+
+`llama_cpp` selection:
+
+- The optional `llama_cpp` service is enabled only when `LLAMA_CPP_URL` is non-empty.
+- Local-staging scripts automatically add the `llama_cpp` compose profile when enabled.
+- `LLAMA_CPP_MODEL_PATH` must point to a GGUF file that exists on the host.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /v1/models` inside the container.
 
 ## Sample Auth Seeding
 
@@ -156,7 +167,12 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
 15. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-16. Stop while keeping state: `./ops/local-staging/stop.sh`
+16. Optional llama.cpp provider proof:
+   - set `LLAMA_CPP_URL=http://llama_cpp:8080`
+   - set `LLAMA_CPP_MODEL_PATH` to a valid GGUF file
+   - run `./ops/local-staging/start.sh`
+   - login as `sample-superadmin`, open Platform control, validate `llama.cpp local`, activate `Local llama.cpp`, and confirm inference still succeeds
+17. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 If compose or architecture metadata changes, verify artifacts are fresh:
 
@@ -235,7 +251,7 @@ Use the targeted restart script when only one service changed:
 
 - Port already in use:
   - Run `./ops/local-staging/status.sh`
-  - Free ports `3000, 5000, 6000, 7000, 8000, 8080, 10400, 5432` or adjust compose mapping.
+  - Free ports `3000, 5000, 6000, 7000, 8000, 8080, 8081, 10400, 5432` or adjust compose mapping.
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`
@@ -258,6 +274,10 @@ Use the targeted restart script when only one service changed:
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
   - The default GPU runtime image is CUDA 12 based. Older NVIDIA GPUs below compute capability `6.0` can be visible to Docker and still fail during vLLM startup.
+- `llama_cpp` fails to start:
+  - Confirm `LLAMA_CPP_URL` is set and `LLAMA_CPP_MODEL_PATH` points to an existing GGUF file.
+  - Run `./ops/local-staging/restart-service.sh --service llama_cpp`.
+  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/v1/models` inside the container.
     - Example: GTX 960 (`compute capability 5.2`) is too old for the shipped GPU image.
     - In that case, use CPU mode (`LLM_RUNTIME_ACCELERATOR=cpu`) or run on a newer NVIDIA GPU.
   - If host `nvidia-smi` works but Docker fails with `could not select device driver "" with capabilities: [[gpu]]`:

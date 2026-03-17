@@ -76,6 +76,7 @@ def system_health_route():
     sandbox_url = config.sandbox_url.rstrip("/")
     kws_url = config.kws_url.rstrip("/")
     weaviate_url = config.weaviate_url.rstrip("/")
+    llama_cpp_url = config.llama_cpp_url.rstrip("/")
 
     services = [
         {
@@ -133,6 +134,16 @@ def system_health_route():
             "reachable": _postgres_ok(config.database_url),
         },
     ]
+    if config.llama_cpp_url.strip():
+        services.insert(
+            4,
+            {
+                "service": "llama.cpp",
+                "container": "llama_cpp",
+                "target": config.llama_cpp_url,
+                "reachable": _http_json_ok(llama_cpp_url + "/v1/models"),
+            },
+        )
 
     response_payload: dict[str, Any] = {
         "status": "ok" if all(service["reachable"] for service in services) else "degraded",

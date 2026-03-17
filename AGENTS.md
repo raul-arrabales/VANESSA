@@ -43,11 +43,11 @@ Please respect these boundaries when generating or modifying code or configurati
      - Authentication/authorization surfaces (implemented, and designed to stay extensible).
      - REST/JSON endpoints for the frontend.
      - Orchestration calls to:
-       - Agent engine (Container #5).
+       - Agent engine (Container #6).
        - LLM API gateway (Container #3).
-       - Sandbox (Container #6).
-       - Vector store (Container #8).
-       - Database (Container #9).
+       - Sandbox (Container #7).
+       - Vector store (Container #9).
+       - Database (Container #10).
      - Input validation, error handling, logging.
 
 3. **Container #3 — LLM API/Gateway (`llm`)**
@@ -60,7 +60,12 @@ Please respect these boundaries when generating or modifying code or configurati
    - Backing runtime for Container #3 (`llm`), exposed internally to the stack.
    - Not called directly by the frontend.
 
-5. **Container #5 — Custom Agent Orchestration Engine**
+5. **Container #5 — Optional llama.cpp Runtime (`llama_cpp`)**
+   - Optional OpenAI-compatible local inference runtime.
+   - May be selected by the backend GenAI control plane as the active `llm_inference` provider.
+   - Does not replace the `llm` gateway by default; it is an alternate runtime path.
+
+6. **Container #6 — Custom Agent Orchestration Engine**
    - Implements multi-step workflows and tools for agents.
    - Coordinates:
      - Calls to the LLM API gateway.
@@ -68,25 +73,25 @@ Please respect these boundaries when generating or modifying code or configurati
      - Database operations (via a clean abstraction).
    - This is where “agent logic” lives (tools, planners, etc.).
 
-6. **Container #6 — Python env sandbox for agents**
+7. **Container #7 — Python env sandbox for agents**
    - Isolated Python environment where agents can run controlled code.
    - No direct network access unless explicitly allowed.
    - Access is allowed from backend and agent_engine via approved service abstractions and policy-governed APIs.
    - Frontend must never call sandbox directly, and backend/agent_engine integrations must not bypass governance checks.
 
-7. **Container #7 — Wake-word (KWS) service**
+8. **Container #8 — Wake-word (KWS) service**
    - Runs offline wake-word detection and emits wake events.
    - Integrates with backend through a webhook/event API.
    - Model files must be downloadable and runnable in air-gapped environments.
    - No direct frontend dependency on this container.
 
-8. **Container #8 — Persistent semantic index for RAG (Weaviate)**
+9. **Container #9 — Persistent semantic index for RAG (Weaviate)**
    - Stores embeddings and metadata.
    - Used for semantic search / context retrieval.
    - Accessed from backend and/or agent engine through a client library.
    - Persistence must be enabled (data should survive container restarts).
 
-9. **Container #9 — Database (PostgreSQL)**
+10. **Container #10 — Database (PostgreSQL)**
   - Stores structured data (users, sessions, logs, configs, etc.).
   - Access restricted to backend and agent engine through a data access layer.
   - No direct SQL from the frontend.
@@ -255,6 +260,7 @@ When making changes or adding features:
 - Weaviate client wrapper (vector_store_client.py) instead of direct calls everywhere.
 - Data access layer for PostgreSQL instead of inline SQL.
 - For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
+- Treat `LLAMA_CPP_URL` as the bootstrap flag for enabling the optional `llama_cpp` runtime and seeding the alternate `local-llama-cpp` deployment profile.
 
 5. Be safe with the sandbox.
 - Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.

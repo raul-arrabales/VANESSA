@@ -46,6 +46,7 @@ check_service_ready() {
     kws) http_ok "http://localhost:10400/health" ;;
     llm) http_ok "http://localhost:8000/health" ;;
     llm_runtime) llm_runtime_internal_http_ok "/health" ;;
+    llama_cpp) llama_cpp_internal_http_ok "/v1/models" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
     *) return 1 ;;
@@ -136,6 +137,10 @@ fi
 
 if [[ "${target_service}" == "llm_runtime" || "${target_service}" == "llm" ]]; then
   validate_llm_local_model_path
+fi
+if [[ "${target_service}" == "llama_cpp" ]]; then
+  llama_cpp_enabled_requested || die "llama_cpp is disabled. Set LLAMA_CPP_URL to enable the optional llama.cpp runtime."
+  validate_llama_cpp_model_path
 fi
 validate_llm_cpu_thread_binding
 

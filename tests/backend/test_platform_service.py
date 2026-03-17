@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.services import platform_adapters, platform_service  # noqa: E402
@@ -136,3 +138,169 @@ def test_openai_adapter_retries_local_fallback_on_model_not_found(monkeypatch: p
         "Qwen--Qwen2.5-0.5B-Instruct",
         "local-vllm-default",
     ]
+
+
+def test_openai_adapter_uses_models_endpoint_for_health_when_no_healthcheck(monkeypatch: pytest.MonkeyPatch):
+    seen_urls: list[str] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del payload, headers, timeout_seconds
+        seen_urls.append(url)
+        return {"data": [{"id": "local-llama-cpp-default"}]}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleLlmAdapter(
+        platform_service.ProviderBinding(
+            capability_key="llm_inference",
+            provider_instance_id="provider-2",
+            provider_slug="llama-cpp-local",
+            provider_key="llama_cpp_local",
+            provider_display_name="llama.cpp local",
+            provider_description="desc",
+            endpoint_url="http://llama_cpp:8080",
+            healthcheck_url=None,
+            enabled=True,
+            adapter_kind="openai_compatible_llm",
+            config={"models_path": "/v1/models"},
+            binding_config={},
+            deployment_profile_id="deployment-2",
+            deployment_profile_slug="local-llama-cpp",
+            deployment_profile_display_name="Local llama.cpp",
+        )
+    )
+
+    health = adapter.health()
+
+    assert health["reachable"] is True
+    assert seen_urls == ["http://llama_cpp:8080/v1/models"]
+
+
+def test_openai_adapter_normalizes_openai_chat_payloads(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "llama.cpp says hi",
+                    }
+                }
+            ]
+        }, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleLlmAdapter(
+        platform_service.ProviderBinding(
+            capability_key="llm_inference",
+            provider_instance_id="provider-2",
+            provider_slug="llama-cpp-local",
+            provider_key="llama_cpp_local",
+            provider_display_name="llama.cpp local",
+            provider_description="desc",
+            endpoint_url="http://llama_cpp:8080",
+            healthcheck_url=None,
+            enabled=True,
+            adapter_kind="openai_compatible_llm",
+            config={
+                "chat_completion_path": "/v1/chat/completions",
+                "request_format": "openai_chat",
+                "forced_model_id": "local-llama-cpp-default",
+            },
+            binding_config={},
+            deployment_profile_id="deployment-2",
+            deployment_profile_slug="local-llama-cpp",
+            deployment_profile_display_name="Local llama.cpp",
+        )
+    )
+
+    payload, status_code = adapter.chat_completion(
+        model="allowed-model",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+        max_tokens=64,
+        temperature=0.1,
+        allow_local_fallback=True,
+    )
+
+    assert status_code == 200
+    assert seen_payloads == [
+        {
+            "model": "local-llama-cpp-default",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 64,
+            "temperature": 0.1,
+        }
+    ]
+    assert payload == {
+        "choices": [{"message": {"role": "assistant", "content": "llama.cpp says hi"}}],
+        "output": [{"role": "assistant", "content": [{"type": "text", "text": "llama.cpp says hi"}]}],
+    }
+
+
+def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured(monkeypatch: pytest.MonkeyPatch):
+    created_profiles: list[str] = []
+    binding_calls: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+
+    def _ensure_provider_instance(_db, **kwargs):
+        return {"id": f"{kwargs['slug']}-id"}
+
+    def _ensure_deployment_profile(_db, *, slug, **kwargs):
+        created_profiles.append(slug)
+        return {"id": f"{slug}-id"}
+
+    def _upsert_deployment_binding(_db, *, deployment_profile_id, capability_key, provider_instance_id, binding_config):
+        del binding_config
+        binding_calls.append((deployment_profile_id, capability_key, provider_instance_id))
+        return {}
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", _ensure_provider_instance)
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_deployment_profile", _ensure_deployment_profile)
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", _upsert_deployment_binding)
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="http://llama_cpp:8080",
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert created_profiles == ["local-default", "local-llama-cpp"]
+    assert ("local-llama-cpp-id", "llm_inference", "llama-cpp-local-id") in binding_calls
+    assert ("local-llama-cpp-id", "vector_store", "weaviate-local-id") in binding_calls
+
+
+def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_configured(monkeypatch: pytest.MonkeyPatch):
+    created_profiles: list[str] = []
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id"})
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "ensure_deployment_profile",
+        lambda _db, *, slug, **kwargs: created_profiles.append(slug) or {"id": f"{slug}-id"},
+    )
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert created_profiles == ["local-default"]

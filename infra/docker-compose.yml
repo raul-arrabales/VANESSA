@@ -69,6 +69,27 @@ services:
     volumes:
       - ../models/llm:/models/llm
 
+  llama_cpp:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: vanessa-llama-cpp
+    profiles:
+      - llama_cpp
+    ports:
+      - "8081:8080"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      LLAMA_ARG_MODEL: ${LLAMA_CPP_MODEL_PATH}
+      LLAMA_ARG_ALIAS: local-llama-cpp-default
+      LLAMA_ARG_CTX_SIZE: ${LLAMA_CPP_CONTEXT_SIZE:-4096}
+      LLAMA_ARG_HOST: 0.0.0.0
+      LLAMA_ARG_PORT: 8080
+    volumes:
+      - ../models/llm:/models/llm
+
   agent_engine:
     build:
       context: ..

@@ -47,3 +47,24 @@ def test_system_health_includes_platform_capabilities(client, monkeypatch: pytes
     payload = response.get_json()
     assert payload["platform"]["capabilities"][0]["capability"] == "llm_inference"
     assert payload["platform"]["capabilities"][0]["provider"]["slug"] == "vllm-local-gateway"
+
+
+def test_system_health_includes_llama_cpp_service_when_configured(client, monkeypatch: pytest.MonkeyPatch):
+    config = build_test_auth_config(backend_app_module.AuthConfig, llama_cpp_url="http://llama_cpp:8080")
+    seen_urls: list[str] = []
+
+    def _http_ok(url: str) -> bool:
+        seen_urls.append(url)
+        return True
+
+    monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
+    monkeypatch.setattr(backend_app_module, "_http_json_ok", _http_ok)
+    monkeypatch.setattr(backend_app_module, "_postgres_ok", lambda _db: True)
+    monkeypatch.setattr(backend_app_module, "get_active_capability_statuses", lambda _db, _config: [])
+
+    response = client.get("/system/health")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert any(service["container"] == "llama_cpp" for service in payload["services"])
+    assert "http://llama_cpp:8080/v1/models" in seen_urls

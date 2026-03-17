@@ -13,6 +13,7 @@ rendering:
     - agent_engine
     - llm
     - llm_runtime
+    - llama_cpp
     - sandbox
     - weaviate
     - postgres
@@ -53,6 +54,12 @@ services:
     description: Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.
     public_exposed: false
     criticality: high
+  llama_cpp:
+    label: llama.cpp
+    group: runtime
+    description: Optional OpenAI-compatible llama.cpp runtime for alternate local inference.
+    public_exposed: true
+    criticality: medium
   sandbox:
     label: Sandbox
     group: runtime
@@ -88,6 +95,12 @@ edges:
     to: llm
     protocol: HTTP
     purpose: Model inference and discovery
+    kind: http
+    direction: outbound
+  - from: backend
+    to: llama_cpp
+    protocol: HTTP
+    purpose: Optional direct llama.cpp inference via platform provider binding
     kind: http
     direction: outbound
   - from: backend

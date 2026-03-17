@@ -23,7 +23,7 @@ LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNS
 LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime llama_cpp agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -266,6 +266,15 @@ llm_runtime_internal_http_ok() {
   compose exec -T llm_runtime python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
+llama_cpp_enabled_requested() {
+  [[ -n "${LLAMA_CPP_URL:-}" ]]
+}
+
+llama_cpp_internal_http_ok() {
+  local path="$1"
+  compose exec -T llama_cpp python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8080${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
 resolve_llm_local_model_host_path() {
   local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
   if [[ "${model_path}" == /models/llm/* ]]; then
@@ -286,6 +295,26 @@ validate_llm_local_model_path() {
 
   if [[ ! -f "${host_model_path}/config.json" && ! -f "${host_model_path}/params.json" ]]; then
     die "Configured LLM_LOCAL_MODEL_PATH=${model_path} is missing config.json or params.json at ${host_model_path}."
+  fi
+}
+
+resolve_llama_cpp_model_host_path() {
+  local model_path="${LLAMA_CPP_MODEL_PATH:-}"
+  if [[ "${model_path}" == /models/llm/* ]]; then
+    printf '%s\n' "${REPO_ROOT}/models/llm/${model_path#/models/llm/}"
+    return 0
+  fi
+  printf '%s\n' "${model_path}"
+}
+
+validate_llama_cpp_model_path() {
+  local model_path="${LLAMA_CPP_MODEL_PATH:-}"
+  [[ -n "${model_path}" ]] || die "LLAMA_CPP_MODEL_PATH must be set when LLAMA_CPP_URL enables the llama.cpp runtime."
+
+  local host_model_path
+  host_model_path="$(resolve_llama_cpp_model_host_path)"
+  if [[ ! -f "${host_model_path}" ]]; then
+    die "Configured LLAMA_CPP_MODEL_PATH=${model_path} does not exist on host at ${host_model_path}."
   fi
 }
 
@@ -339,6 +368,9 @@ compose() {
   fi
 
   local -a cmd=(docker compose)
+  if llama_cpp_enabled_requested; then
+    cmd+=(--profile llama_cpp)
+  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -351,10 +383,18 @@ compose() {
 }
 
 stack_services_for_start() {
+  local -a services_to_start=()
+  local service
+  for service in "${SERVICES[@]}"; do
+    if [[ "${service}" == "llama_cpp" ]] && ! llama_cpp_enabled_requested; then
+      continue
+    fi
+    services_to_start+=("${service}")
+  done
+
   local cpu_supported="${LLM_RUNTIME_CPU_SUPPORTED:-true}"
   if [[ "${cpu_supported}" == "false" ]] && llm_runtime_disable_local_requested && ! llm_routing_requires_local_runtime; then
-    local service
-    for service in "${SERVICES[@]}"; do
+    for service in "${services_to_start[@]}"; do
       if [[ "${service}" != "llm_runtime" ]]; then
         printf '%s\n' "${service}"
       fi
@@ -362,7 +402,7 @@ stack_services_for_start() {
     return 0
   fi
 
-  printf '%s\n' "${SERVICES[@]}"
+  printf '%s\n' "${services_to_start[@]}"
 }
 
 require_cmd() {

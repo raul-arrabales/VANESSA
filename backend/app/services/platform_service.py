@@ -18,6 +18,9 @@ from .platform_types import (
 _BOOTSTRAP_DEPLOYMENT_SLUG = "local-default"
 _BOOTSTRAP_DEPLOYMENT_NAME = "Local Default"
 _BOOTSTRAP_DEPLOYMENT_DESCRIPTION = "Bootstrapped local profile using current platform endpoint configuration."
+_LLAMA_CPP_DEPLOYMENT_SLUG = "local-llama-cpp"
+_LLAMA_CPP_DEPLOYMENT_NAME = "Local llama.cpp"
+_LLAMA_CPP_DEPLOYMENT_DESCRIPTION = "Optional local profile using llama.cpp for LLM inference and Weaviate for vector storage."
 
 
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
@@ -88,18 +91,21 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         enabled=True,
         config_json={},
     )
-    platform_repo.ensure_provider_instance(
+    llama_cpp_provider = platform_repo.ensure_provider_instance(
         database_url,
         slug="llama-cpp-local",
         provider_key="llama_cpp_local",
         display_name="llama.cpp local",
         description="Optional OpenAI-compatible llama.cpp endpoint for alternative local inference.",
         endpoint_url=(getattr(config, "llama_cpp_url", "") or "http://llama_cpp:8080"),
-        healthcheck_url=((getattr(config, "llama_cpp_url", "") or "http://llama_cpp:8080").rstrip("/") + "/health"),
+        healthcheck_url=None,
         enabled=bool(getattr(config, "llama_cpp_url", "").strip()),
         config_json={
             "models_path": "/v1/models",
             "chat_completion_path": "/v1/chat/completions",
+            "request_format": "openai_chat",
+            "forced_model_id": "local-llama-cpp-default",
+            "local_fallback_model_id": "local-llama-cpp-default",
         },
     )
 
@@ -125,6 +131,30 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         provider_instance_id=str(weaviate_provider["id"]),
         binding_config={},
     )
+
+    if getattr(config, "llama_cpp_url", "").strip():
+        llama_profile = platform_repo.ensure_deployment_profile(
+            database_url,
+            slug=_LLAMA_CPP_DEPLOYMENT_SLUG,
+            display_name=_LLAMA_CPP_DEPLOYMENT_NAME,
+            description=_LLAMA_CPP_DEPLOYMENT_DESCRIPTION,
+            created_by_user_id=None,
+            updated_by_user_id=None,
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(llama_profile["id"]),
+            capability_key=CAPABILITY_LLM_INFERENCE,
+            provider_instance_id=str(llama_cpp_provider["id"]),
+            binding_config={},
+        )
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(llama_profile["id"]),
+            capability_key=CAPABILITY_VECTOR_STORE,
+            provider_instance_id=str(weaviate_provider["id"]),
+            binding_config={},
+        )
 
     if platform_repo.get_active_deployment(database_url) is None:
         platform_repo.activate_deployment_profile(

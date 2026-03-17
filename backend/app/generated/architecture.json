@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-03-01T17:38:02+00:00",
+  "generated_at": "2026-03-17T13:14:14+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -55,6 +55,15 @@
       "description": "Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.",
       "public_exposed": false,
       "criticality": "high"
+    },
+    {
+      "id": "llama_cpp",
+      "container": "llama_cpp",
+      "label": "llama.cpp",
+      "group": "runtime",
+      "description": "Optional OpenAI-compatible llama.cpp runtime for alternate local inference.",
+      "public_exposed": true,
+      "criticality": "medium"
     },
     {
       "id": "sandbox",
@@ -127,6 +136,15 @@
       "to": "agent_engine",
       "protocol": "HTTP",
       "purpose": "Agent orchestration calls",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-llama_cpp",
+      "from": "backend",
+      "to": "llama_cpp",
+      "protocol": "HTTP",
+      "purpose": "Optional direct llama.cpp inference via platform provider binding",
       "kind": "http",
       "direction": "outbound"
     },
@@ -239,9 +257,15 @@
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "llama_cpp": {
         "x": 846,
         "y": 322,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 446,
         "width": 220,
         "height": 84
       },
@@ -259,5 +283,5 @@
       }
     }
   },
-  "source_hash": "142b45997d782484f34a4120e2794cf9213a79b3eb5b47cad54c9dc9d1e86f17"
+  "source_hash": "7c88f14f197ca98d621fc99525c3772a71cb2fb4fe682da838139fff27ccb18d"
 }

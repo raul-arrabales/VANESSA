@@ -9,6 +9,7 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Sandbox service for controlled code execution
 - Private LLM gateway service (local-first routing)
 - Local vLLM runtime service
+- Optional local llama.cpp runtime service
 - Wake-word (KWS) service
 - Weaviate vector store
 - PostgreSQL database
@@ -50,6 +51,13 @@ Full guide: `ops/local-staging/README.md`
 - NVIDIA GPU hosts use the GPU runtime override image
 - CPU-only hosts add the CPU override compose file and build a local CPU vLLM image matched to the detected ISA (`avx512` or `avx2`)
 - Unsupported CPU hosts fail early with a clear launcher diagnostic instead of crashing with `SIGILL`
+
+`llama_cpp` is optional in local staging:
+
+- Set `LLAMA_CPP_URL` to enable the optional `llama_cpp` compose profile
+- Set `LLAMA_CPP_MODEL_PATH` to a GGUF file mounted from `models/llm/`
+- `LLAMA_CPP_CONTEXT_SIZE` controls the server context window
+- When enabled, backend seeds an inactive `local-llama-cpp` deployment profile for platform switching
 
 ## LLM API Endpoints (Local)
 
@@ -152,6 +160,7 @@ Expected containers:
 - `vanessa-agent-engine`
 - `vanessa-llm`
 - `vanessa-llm-runtime`
+- `vanessa-llama-cpp` (only when `LLAMA_CPP_URL` enables the optional profile)
 - `vanessa-sandbox`
 - `vanessa-kws`
 - `vanessa-weaviate`
@@ -208,7 +217,7 @@ When adding new safety/tool gates, use this same global runtime profile contract
 Communication semantics (from generated architecture metadata) are directional service interactions, not container startup order:
 
 - Frontend -> Backend API (UI API requests)
-- Backend API -> Agent Engine, LLM API, Sandbox, Weaviate, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, PostgreSQL
 - Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
 - LLM API -> LLM Runtime (internal runtime execution path)
 - KWS -> Backend API (wake event webhook)
@@ -234,6 +243,11 @@ Current bootstrapped local providers:
 - `vllm_local`
 - `llama_cpp_local`
 - `weaviate_local`
+
+Bootstrapped deployment profiles:
+
+- `local-default` is always seeded and remains the default active profile
+- `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured
 
 The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values so current local staging behavior remains compatible.
 

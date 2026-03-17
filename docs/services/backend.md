@@ -41,6 +41,12 @@ Key terms:
 
 This layer stays separate from user-facing model/provider governance. Model governance decides which models users can access; the platform control plane decides which infrastructure implementation powers a capability.
 
+Bootstrap defaults:
+
+- `local-default` is always seeded from `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL`.
+- `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
+- The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
+
 ## Model Governance Endpoints (Release N Canonical)
 
 - `GET /v1/models/catalog`

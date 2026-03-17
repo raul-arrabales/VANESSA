@@ -30,16 +30,17 @@ Legend:
 2. Backend (Flask API): public API entrypoint, validation, orchestration.
 3. LLM API: private model-serving HTTP gateway for inference/discovery requests.
 4. LLM Runtime: hardware-adaptive local vLLM runtime engine backing LLM API execution on CPU or GPU hosts.
-5. Agent Engine: multi-step agent logic and tool workflows.
-6. Sandbox: isolated Python code execution environment.
-7. KWS: offline wake-word detection and wake-event emission.
-8. Weaviate: persistent semantic index for RAG context retrieval.
-9. PostgreSQL: persistent relational data for auth and metadata.
+5. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
+6. Agent Engine: multi-step agent logic and tool workflows.
+7. Sandbox: isolated Python code execution environment.
+8. KWS: offline wake-word detection and wake-event emission.
+9. Weaviate: persistent semantic index for RAG context retrieval.
+10. PostgreSQL: persistent relational data for auth and metadata.
 
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
-- Backend API -> Agent Engine, LLM API, Sandbox, Weaviate, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, PostgreSQL
 - Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
 - LLM API -> LLM Runtime
 - KWS -> Backend API
@@ -54,6 +55,12 @@ The runtime architecture now distinguishes container topology from GenAI capabil
 - `adapter`: the capability-specific backend client that talks to a provider
 
 This control plane lives in backend + postgres. It complements the container topology rather than replacing it.
+
+Current provider proof state:
+
+- `local-default` keeps `llm_inference -> vllm_local` through the `llm` gateway.
+- When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`.
+- Switching deployment profiles changes the backend inference target without changing frontend or model-governance APIs.
 
 ## Design Principles
 

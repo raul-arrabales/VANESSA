@@ -30,6 +30,10 @@ llm_runtime_ready_ok() {
   llm_runtime_internal_http_ok "/health"
 }
 
+llama_cpp_ready_ok() {
+  llama_cpp_internal_http_ok "/v1/models"
+}
+
 runtime_profile_endpoint_ok() {
   local status
   status="$(curl --silent --show-error --max-time 2 -o /dev/null -w '%{http_code}' "http://localhost:5000/v1/runtime/profile")"
@@ -100,6 +104,17 @@ run_checks() {
   else
     printf 'llm: FAIL\n'
     failures=$((failures + 1))
+  fi
+
+  if llama_cpp_enabled_requested; then
+    if llama_cpp_ready_ok; then
+      printf 'llama_cpp: OK (/v1/models)\n'
+    else
+      printf 'llama_cpp: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'llama_cpp: SKIP (LLAMA_CPP_URL not set)\n'
   fi
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then

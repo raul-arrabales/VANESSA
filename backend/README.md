@@ -11,6 +11,7 @@ System diagnostics endpoints:
 
 - `GET /system/health` returns aggregate reachability for core services.
   - Includes active capability/provider health from the platform control plane when available.
+  - Includes optional `llama_cpp` reachability when `LLAMA_CPP_URL` is configured.
 - `GET /system/architecture` returns generated architecture graph JSON.
 - `GET /system/architecture.svg` returns generated architecture diagram SVG.
 
@@ -42,6 +43,7 @@ Platform control plane semantics:
 - `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, and `weaviate_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
 - Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
+- `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 
 Model governance and runtime endpoints (canonical in Release N):
 
