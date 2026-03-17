@@ -169,19 +169,23 @@ def test_inference_retries_local_llm_alias_when_upstream_model_not_found(client,
         },
     )
 
-    calls: list[dict[str, object]] = []
+    class FakeAdapter:
+        def __init__(self):
+            self.calls: list[dict[str, object]] = []
 
-    def fake_llm_request(_url: str, payload: dict[str, object]):
-        calls.append(dict(payload))
-        if payload.get("model") == "Qwen--Qwen2.5-0.5B-Instruct":
-            return {"detail": {"code": "model_not_found", "message": "Unknown model"}}, 404
-        if payload.get("model") == "local-vllm-default":
+        def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
+            self.calls.append(
+                {
+                    "model": model,
+                    "allow_local_fallback": allow_local_fallback,
+                }
+            )
             return {
                 "output": [{"content": [{"type": "text", "text": "ok"}]}],
             }, 200
-        return {"detail": {"code": "unexpected_model"}}, 400
 
-    monkeypatch.setattr(chat_inference, "http_json_request", fake_llm_request)
+    adapter = FakeAdapter()
+    monkeypatch.setattr(chat_inference, "resolve_llm_inference_adapter", lambda _db, _config: adapter)
 
     response = test_client.post(
         "/v1/models/inference",
@@ -191,7 +195,9 @@ def test_inference_retries_local_llm_alias_when_upstream_model_not_found(client,
 
     assert response.status_code == 200
     assert response.get_json()["output"] == "ok"
-    assert [call.get("model") for call in calls] == [
-        "Qwen--Qwen2.5-0.5B-Instruct",
-        "local-vllm-default",
+    assert adapter.calls == [
+        {
+            "model": "Qwen--Qwen2.5-0.5B-Instruct",
+            "allow_local_fallback": True,
+        }
     ]

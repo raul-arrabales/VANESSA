@@ -254,6 +254,7 @@ When making changes or adding features:
 - LLM client wrapper (e.g. llm_client.py) instead of scattering HTTP calls.
 - Weaviate client wrapper (vector_store_client.py) instead of direct calls everywhere.
 - Data access layer for PostgreSQL instead of inline SQL.
+- For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
 
 5. Be safe with the sandbox.
 - Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.

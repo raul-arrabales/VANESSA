@@ -7,6 +7,7 @@ from . import (
     model_governance,
     model_management_v1,
     model_inference_v1,
+    platform,
     policy,
     quotes_v1,
     registry,
@@ -30,6 +31,7 @@ __all__ = [
     "model_management_v1",
     "model_catalog_v1",
     "model_inference_v1",
+    "platform",
     "registry_models",
     "voice_legacy_routes",
 ]

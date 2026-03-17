@@ -44,12 +44,24 @@ Interaction semantics in the generated graph represent directional runtime commu
 - LLM API -> LLM Runtime
 - KWS -> Backend API
 
+## GenAI Control Plane Terms
+
+The runtime architecture now distinguishes container topology from GenAI capability binding:
+
+- `capability`: a platform function such as `llm_inference` or `vector_store`
+- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, or `weaviate_local`
+- `deployment profile`: the named set of active capability-to-provider bindings
+- `adapter`: the capability-specific backend client that talks to a provider
+
+This control plane lives in backend + postgres. It complements the container topology rather than replacing it.
+
 ## Design Principles
 
 - Keep agent logic in `agent_engine/`, not in Flask route handlers.
 - Use service abstractions for LLM, vector store, and data access.
 - Preserve sandbox isolation. Do not bypass it from backend/frontend paths.
 - Keep services modular so they can evolve independently.
+- Keep infrastructure provider binding separate from user-facing model governance.
 
 ## Source of Truth
 

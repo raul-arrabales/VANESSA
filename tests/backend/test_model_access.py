@@ -364,13 +364,28 @@ def test_user_reads_effective_allowed_models_and_generate_enforces_rbac(
     seen_payload: dict[str, Any] = {}
     seen_url = ""
 
-    def fake_llm_request(_url: str, payload: dict[str, Any]):
-        nonlocal seen_url
-        seen_url = _url
-        seen_payload.update(payload)
-        return {"ok": True, "model": payload["model"]}, 200
+    class FakeAdapter:
+        def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
+            nonlocal seen_url
+            seen_url = "http://llm:8000/v1/chat/completions"
+            seen_payload.update(
+                {
+                    "model": model,
+                    "input": messages,
+                }
+            )
+            return {"ok": True, "model": model}, 200
 
-    monkeypatch.setattr(chat_inference, "http_json_request", fake_llm_request)
+    monkeypatch.setattr(
+        chat_inference,
+        "get_model_by_id",
+        lambda _db, model_id: {
+            "model_id": model_id,
+            "backend_kind": "local",
+            "availability": "offline_ready",
+        },
+    )
+    monkeypatch.setattr(chat_inference, "resolve_llm_inference_adapter", lambda _db, _config: FakeAdapter())
 
     permitted = test_client.post(
         "/v1/models/generate",
