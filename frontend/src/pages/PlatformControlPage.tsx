@@ -1,31 +1,166 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
 import {
   activateDeploymentProfile,
+  cloneDeploymentProfile,
+  createDeploymentProfile,
+  createPlatformProvider,
+  deleteDeploymentProfile,
+  deletePlatformProvider,
+  listPlatformActivationAudit,
   listPlatformCapabilities,
   listPlatformDeployments,
+  listPlatformProviderFamilies,
   listPlatformProviders,
+  type PlatformActivationAuditEntry,
   type PlatformCapability,
   type PlatformDeploymentProfile,
   type PlatformProvider,
+  type PlatformProviderFamily,
   type PlatformProviderValidation,
+  updateDeploymentProfile,
+  updatePlatformProvider,
   validatePlatformProvider,
 } from "../api/platform";
 
 type LoadState = "idle" | "loading" | "success" | "error";
+type ProviderFormMode = "create" | "edit";
+type DeploymentFormMode = "create" | "edit" | "clone";
+
+type ProviderFormState = {
+  mode: ProviderFormMode;
+  providerId: string;
+  providerKey: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  endpointUrl: string;
+  healthcheckUrl: string;
+  enabled: boolean;
+  configText: string;
+  secretRefsText: string;
+};
+
+type DeploymentFormState = {
+  mode: DeploymentFormMode;
+  deploymentId: string;
+  sourceDeploymentId: string;
+  slug: string;
+  displayName: string;
+  description: string;
+  llmProviderId: string;
+  vectorProviderId: string;
+};
+
+const DEFAULT_PROVIDER_FORM: ProviderFormState = {
+  mode: "create",
+  providerId: "",
+  providerKey: "",
+  slug: "",
+  displayName: "",
+  description: "",
+  endpointUrl: "",
+  healthcheckUrl: "",
+  enabled: true,
+  configText: "{}",
+  secretRefsText: "{}",
+};
+
+const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
+  mode: "create",
+  deploymentId: "",
+  sourceDeploymentId: "",
+  slug: "",
+  displayName: "",
+  description: "",
+  llmProviderId: "",
+  vectorProviderId: "",
+};
+
+function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
+  return JSON.stringify(value, null, 2);
+}
+
+function parseJsonObject(text: string, errorMessage: string): Record<string, unknown> {
+  const normalized = text.trim();
+  if (!normalized) {
+    return {};
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(normalized);
+  } catch {
+    throw new Error(errorMessage);
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(errorMessage);
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function buildProviderForm(provider: PlatformProvider): ProviderFormState {
+  return {
+    mode: "edit",
+    providerId: provider.id,
+    providerKey: provider.provider_key,
+    slug: provider.slug,
+    displayName: provider.display_name,
+    description: provider.description,
+    endpointUrl: provider.endpoint_url,
+    healthcheckUrl: provider.healthcheck_url ?? "",
+    enabled: provider.enabled,
+    configText: stringifyJson(provider.config),
+    secretRefsText: stringifyJson(provider.secret_refs),
+  };
+}
+
+function buildDeploymentForm(
+  deployment: PlatformDeploymentProfile,
+  options: { mode: DeploymentFormMode },
+): DeploymentFormState {
+  const { mode } = options;
+  const llmBinding = deployment.bindings.find((binding) => binding.capability === "llm_inference");
+  const vectorBinding = deployment.bindings.find((binding) => binding.capability === "vector_store");
+  const suffix = mode === "clone" ? "-copy" : "";
+  const nameSuffix = mode === "clone" ? " Copy" : "";
+
+  return {
+    mode,
+    deploymentId: mode === "edit" ? deployment.id : "",
+    sourceDeploymentId: mode === "clone" ? deployment.id : "",
+    slug: mode === "clone" ? `${deployment.slug}${suffix}` : deployment.slug,
+    displayName: mode === "clone" ? `${deployment.display_name}${nameSuffix}` : deployment.display_name,
+    description: deployment.description,
+    llmProviderId: llmBinding?.provider.id ?? "",
+    vectorProviderId: vectorBinding?.provider.id ?? "",
+  };
+}
 
 export default function PlatformControlPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
   const [state, setState] = useState<LoadState>("idle");
   const [capabilities, setCapabilities] = useState<PlatformCapability[]>([]);
+  const [providerFamilies, setProviderFamilies] = useState<PlatformProviderFamily[]>([]);
   const [providers, setProviders] = useState<PlatformProvider[]>([]);
   const [deployments, setDeployments] = useState<PlatformDeploymentProfile[]>([]);
+  const [activationAudit, setActivationAudit] = useState<PlatformActivationAuditEntry[]>([]);
   const [validatingProviderId, setValidatingProviderId] = useState("");
   const [validationResults, setValidationResults] = useState<Record<string, PlatformProviderValidation>>({});
+  const [providerForm, setProviderForm] = useState<ProviderFormState>(DEFAULT_PROVIDER_FORM);
+  const [deploymentForm, setDeploymentForm] = useState<DeploymentFormState>(DEFAULT_DEPLOYMENT_FORM);
   const [activationCandidateId, setActivationCandidateId] = useState("");
+  const [providerDeleteCandidateId, setProviderDeleteCandidateId] = useState("");
+  const [deploymentDeleteCandidateId, setDeploymentDeleteCandidateId] = useState("");
+  const [savingProvider, setSavingProvider] = useState(false);
+  const [savingDeployment, setSavingDeployment] = useState(false);
   const [activatingDeploymentId, setActivatingDeploymentId] = useState("");
+  const [deletingProviderId, setDeletingProviderId] = useState("");
+  const [deletingDeploymentId, setDeletingDeploymentId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
 
@@ -40,14 +175,19 @@ export default function PlatformControlPage(): JSX.Element {
     setErrorMessage("");
 
     try {
-      const [capabilitiesPayload, providersPayload, deploymentsPayload] = await Promise.all([
-        listPlatformCapabilities(token),
-        listPlatformProviders(token),
-        listPlatformDeployments(token),
-      ]);
+      const [capabilitiesPayload, providerFamiliesPayload, providersPayload, deploymentsPayload, activationAuditPayload] =
+        await Promise.all([
+          listPlatformCapabilities(token),
+          listPlatformProviderFamilies(token),
+          listPlatformProviders(token),
+          listPlatformDeployments(token),
+          listPlatformActivationAudit(token),
+        ]);
       setCapabilities(capabilitiesPayload);
+      setProviderFamilies(providerFamiliesPayload);
       setProviders(providersPayload);
       setDeployments(deploymentsPayload);
+      setActivationAudit(activationAuditPayload);
       setState("success");
     } catch (error) {
       setState("error");
@@ -60,8 +200,11 @@ export default function PlatformControlPage(): JSX.Element {
   }, [token]);
 
   const activeDeployment = deployments.find((deployment) => deployment.is_active) ?? null;
+  const latestActivation = activationAudit[0] ?? null;
   const requiredCapabilities = capabilities.filter((capability) => capability.required);
   const coveredRequiredCapabilities = requiredCapabilities.filter((capability) => capability.active_provider !== null);
+  const llmProviders = providers.filter((provider) => provider.capability === "llm_inference");
+  const vectorProviders = providers.filter((provider) => provider.capability === "vector_store");
 
   async function handleValidateProvider(providerId: string): Promise<void> {
     if (!token) {
@@ -79,6 +222,141 @@ export default function PlatformControlPage(): JSX.Element {
       setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.validationFailed"));
     } finally {
       setValidatingProviderId("");
+    }
+  }
+
+  async function handleProviderSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setSavingProvider(true);
+    setFeedbackMessage("");
+    setErrorMessage("");
+    try {
+      const config = parseJsonObject(
+        providerForm.configText,
+        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.config") }),
+      );
+      const secretRefs = parseJsonObject(
+        providerForm.secretRefsText,
+        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.secretRefs") }),
+      ) as Record<string, string>;
+      if (providerForm.mode === "create") {
+        await createPlatformProvider(
+          {
+            provider_key: providerForm.providerKey,
+            slug: providerForm.slug,
+            display_name: providerForm.displayName,
+            description: providerForm.description,
+            endpoint_url: providerForm.endpointUrl,
+            healthcheck_url: providerForm.healthcheckUrl || null,
+            enabled: providerForm.enabled,
+            config,
+            secret_refs: secretRefs,
+          },
+          token,
+        );
+        setFeedbackMessage(t("platformControl.feedback.providerCreated", { name: providerForm.displayName }));
+      } else {
+        await updatePlatformProvider(
+          providerForm.providerId,
+          {
+            slug: providerForm.slug,
+            display_name: providerForm.displayName,
+            description: providerForm.description,
+            endpoint_url: providerForm.endpointUrl,
+            healthcheck_url: providerForm.healthcheckUrl || null,
+            enabled: providerForm.enabled,
+            config,
+            secret_refs: secretRefs,
+          },
+          token,
+        );
+        setFeedbackMessage(t("platformControl.feedback.providerUpdated", { name: providerForm.displayName }));
+      }
+      setProviderForm(DEFAULT_PROVIDER_FORM);
+      await loadPlatformState();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerSaveFailed"));
+    } finally {
+      setSavingProvider(false);
+    }
+  }
+
+  async function handleDeleteProvider(providerId: string): Promise<void> {
+    if (!token) {
+      return;
+    }
+
+    setDeletingProviderId(providerId);
+    setFeedbackMessage("");
+    setErrorMessage("");
+    try {
+      await deletePlatformProvider(providerId, token);
+      setProviderDeleteCandidateId("");
+      if (providerForm.providerId === providerId) {
+        setProviderForm(DEFAULT_PROVIDER_FORM);
+      }
+      setFeedbackMessage(t("platformControl.feedback.providerDeleted"));
+      await loadPlatformState();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerDeleteFailed"));
+    } finally {
+      setDeletingProviderId("");
+    }
+  }
+
+  async function handleDeploymentSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+    if (!deploymentForm.llmProviderId || !deploymentForm.vectorProviderId) {
+      setErrorMessage(t("platformControl.feedback.bindingRequired"));
+      return;
+    }
+
+    setSavingDeployment(true);
+    setFeedbackMessage("");
+    setErrorMessage("");
+    try {
+      if (deploymentForm.mode === "clone") {
+        await cloneDeploymentProfile(
+          deploymentForm.sourceDeploymentId,
+          {
+            slug: deploymentForm.slug,
+            display_name: deploymentForm.displayName,
+            description: deploymentForm.description,
+          },
+          token,
+        );
+        setFeedbackMessage(t("platformControl.feedback.deploymentCloned", { name: deploymentForm.displayName }));
+      } else {
+        const payload = {
+          slug: deploymentForm.slug,
+          display_name: deploymentForm.displayName,
+          description: deploymentForm.description,
+          bindings: [
+            { capability: "llm_inference", provider_id: deploymentForm.llmProviderId, config: {} },
+            { capability: "vector_store", provider_id: deploymentForm.vectorProviderId, config: {} },
+          ],
+        };
+        if (deploymentForm.mode === "create") {
+          await createDeploymentProfile(payload, token);
+          setFeedbackMessage(t("platformControl.feedback.deploymentCreated", { name: deploymentForm.displayName }));
+        } else {
+          await updateDeploymentProfile(deploymentForm.deploymentId, payload, token);
+          setFeedbackMessage(t("platformControl.feedback.deploymentUpdated", { name: deploymentForm.displayName }));
+        }
+      }
+      setDeploymentForm(DEFAULT_DEPLOYMENT_FORM);
+      await loadPlatformState();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentSaveFailed"));
+    } finally {
+      setSavingDeployment(false);
     }
   }
 
@@ -102,6 +380,29 @@ export default function PlatformControlPage(): JSX.Element {
     }
   }
 
+  async function handleDeleteDeployment(deploymentId: string): Promise<void> {
+    if (!token) {
+      return;
+    }
+
+    setDeletingDeploymentId(deploymentId);
+    setFeedbackMessage("");
+    setErrorMessage("");
+    try {
+      await deleteDeploymentProfile(deploymentId, token);
+      setDeploymentDeleteCandidateId("");
+      if (deploymentForm.deploymentId === deploymentId || deploymentForm.sourceDeploymentId === deploymentId) {
+        setDeploymentForm(DEFAULT_DEPLOYMENT_FORM);
+      }
+      setFeedbackMessage(t("platformControl.feedback.deploymentDeleted"));
+      await loadPlatformState();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentDeleteFailed"));
+    } finally {
+      setDeletingDeploymentId("");
+    }
+  }
+
   return (
     <section className="card-stack">
       <article className="panel card-stack">
@@ -122,8 +423,13 @@ export default function PlatformControlPage(): JSX.Element {
             <span className="status-text">{t("platformControl.summary.requiredCoverageDescription")}</span>
           </div>
           <div className="platform-summary-card">
+            <span className="field-label">{t("platformControl.summary.lastActivation")}</span>
+            <strong>{latestActivation?.deployment_profile.display_name ?? t("platformControl.summary.none")}</strong>
+            <span className="status-text">{latestActivation?.activated_at ?? t("platformControl.summary.none")}</span>
+          </div>
+          <div className="platform-summary-card">
             <span className="field-label">{t("platformControl.summary.loadState")}</span>
-            <span className="status-pill" data-state={state}>
+            <span className="platform-badge" data-tone={state === "success" ? "active" : state === "error" ? "inactive" : "required"}>
               {t(`platformControl.state.${state}`)}
             </span>
           </div>
@@ -178,6 +484,120 @@ export default function PlatformControlPage(): JSX.Element {
           <h3 className="section-title">{t("platformControl.sections.providers")}</h3>
           <p className="status-text">{t("platformControl.providers.description")}</p>
         </div>
+
+        <form className="card-stack" onSubmit={(event) => void handleProviderSubmit(event)}>
+          <div className="form-grid">
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.family")}</span>
+              <select
+                className="field-input"
+                value={providerForm.providerKey}
+                disabled={providerForm.mode === "edit"}
+                onChange={(event) => setProviderForm((current) => ({ ...current, providerKey: event.target.value }))}
+              >
+                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                {providerFamilies.map((family) => (
+                  <option key={family.provider_key} value={family.provider_key}>
+                    {family.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.slug")}</span>
+              <input
+                className="field-input"
+                value={providerForm.slug}
+                onChange={(event) => setProviderForm((current) => ({ ...current, slug: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.displayName")}</span>
+              <input
+                className="field-input"
+                value={providerForm.displayName}
+                onChange={(event) => setProviderForm((current) => ({ ...current, displayName: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.endpoint")}</span>
+              <input
+                className="field-input"
+                value={providerForm.endpointUrl}
+                onChange={(event) => setProviderForm((current) => ({ ...current, endpointUrl: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.healthcheck")}</span>
+              <input
+                className="field-input"
+                value={providerForm.healthcheckUrl}
+                onChange={(event) => setProviderForm((current) => ({ ...current, healthcheckUrl: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.enabled")}</span>
+              <select
+                className="field-input"
+                value={providerForm.enabled ? "true" : "false"}
+                onChange={(event) =>
+                  setProviderForm((current) => ({ ...current, enabled: event.target.value === "true" }))
+                }
+              >
+                <option value="true">{t("platformControl.badges.enabled")}</option>
+                <option value="false">{t("platformControl.badges.disabled")}</option>
+              </select>
+            </label>
+          </div>
+          <label className="card-stack">
+            <span className="field-label">{t("platformControl.forms.provider.description")}</span>
+            <textarea
+              className="field-input quote-admin-textarea"
+              value={providerForm.description}
+              onChange={(event) => setProviderForm((current) => ({ ...current, description: event.target.value }))}
+            />
+          </label>
+          <div className="form-grid">
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.config")}</span>
+              <textarea
+                className="field-input quote-admin-textarea"
+                value={providerForm.configText}
+                onChange={(event) => setProviderForm((current) => ({ ...current, configText: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.provider.secretRefs")}</span>
+              <textarea
+                className="field-input quote-admin-textarea"
+                value={providerForm.secretRefsText}
+                onChange={(event) => setProviderForm((current) => ({ ...current, secretRefsText: event.target.value }))}
+              />
+            </label>
+          </div>
+          <div className="platform-action-row">
+            <span className="status-text">
+              {providerForm.mode === "create"
+                ? t("platformControl.providers.createHelp")
+                : t("platformControl.providers.editing", { slug: providerForm.slug })}
+            </span>
+            <div className="form-actions">
+              {providerForm.mode === "edit" && (
+                <button type="button" className="btn btn-secondary" onClick={() => setProviderForm(DEFAULT_PROVIDER_FORM)}>
+                  {t("platformControl.actions.reset")}
+                </button>
+              )}
+              <button type="submit" className="btn btn-primary" disabled={savingProvider}>
+                {savingProvider
+                  ? t("platformControl.actions.saving")
+                  : providerForm.mode === "create"
+                    ? t("platformControl.actions.createProvider")
+                    : t("platformControl.actions.saveProvider")}
+              </button>
+            </div>
+          </div>
+        </form>
+
         {providers.length === 0 ? (
           <p className="status-text">{t("platformControl.providers.empty")}</p>
         ) : (
@@ -206,7 +626,9 @@ export default function PlatformControlPage(): JSX.Element {
                         </div>
                       </td>
                       <td>{provider.capability}</td>
-                      <td><code className="code-inline">{provider.endpoint_url}</code></td>
+                      <td>
+                        <code className="code-inline">{provider.endpoint_url}</code>
+                      </td>
                       <td>
                         <span className="platform-badge" data-tone={provider.enabled ? "enabled" : "disabled"}>
                           {provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled")}
@@ -216,7 +638,9 @@ export default function PlatformControlPage(): JSX.Element {
                         {validation ? (
                           <div className="status-row">
                             <span className="platform-badge" data-tone={validation.validation.health.reachable ? "active" : "inactive"}>
-                              {validation.validation.health.reachable ? t("platformControl.badges.active") : t("platformControl.badges.inactive")}
+                              {validation.validation.health.reachable
+                                ? t("platformControl.badges.active")
+                                : t("platformControl.badges.inactive")}
                             </span>
                             <span className="status-text">
                               {t("platformControl.providers.validationStatus", { code: validation.validation.health.status_code })}
@@ -234,16 +658,55 @@ export default function PlatformControlPage(): JSX.Element {
                         )}
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => void handleValidateProvider(provider.id)}
-                          disabled={validatingProviderId === provider.id}
-                        >
-                          {validatingProviderId === provider.id
-                            ? t("platformControl.actions.validating")
-                            : t("platformControl.actions.validate")}
-                        </button>
+                        <div className="platform-inline-meta">
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => void handleValidateProvider(provider.id)}
+                            disabled={validatingProviderId === provider.id}
+                          >
+                            {validatingProviderId === provider.id
+                              ? t("platformControl.actions.validating")
+                              : t("platformControl.actions.validate")}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setProviderForm(buildProviderForm(provider))}
+                          >
+                            {t("platformControl.actions.edit")}
+                          </button>
+                          {providerDeleteCandidateId === provider.id ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => setProviderDeleteCandidateId("")}
+                                disabled={deletingProviderId === provider.id}
+                              >
+                                {t("platformControl.actions.cancel")}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => void handleDeleteProvider(provider.id)}
+                                disabled={deletingProviderId === provider.id}
+                              >
+                                {deletingProviderId === provider.id
+                                  ? t("platformControl.actions.deleting")
+                                  : t("platformControl.actions.confirmDelete")}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => setProviderDeleteCandidateId(provider.id)}
+                            >
+                              {t("platformControl.actions.delete")}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -259,6 +722,93 @@ export default function PlatformControlPage(): JSX.Element {
           <h3 className="section-title">{t("platformControl.sections.deployments")}</h3>
           <p className="status-text">{t("platformControl.deployments.description")}</p>
         </div>
+
+        <form className="card-stack" onSubmit={(event) => void handleDeploymentSubmit(event)}>
+          <div className="form-grid">
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
+              <input
+                className="field-input"
+                value={deploymentForm.slug}
+                onChange={(event) => setDeploymentForm((current) => ({ ...current, slug: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.deployment.displayName")}</span>
+              <input
+                className="field-input"
+                value={deploymentForm.displayName}
+                onChange={(event) => setDeploymentForm((current) => ({ ...current, displayName: event.target.value }))}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.deployment.llmProvider")}</span>
+              <select
+                className="field-input"
+                value={deploymentForm.llmProviderId}
+                disabled={deploymentForm.mode === "clone"}
+                onChange={(event) => setDeploymentForm((current) => ({ ...current, llmProviderId: event.target.value }))}
+              >
+                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                {llmProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("platformControl.forms.deployment.vectorProvider")}</span>
+              <select
+                className="field-input"
+                value={deploymentForm.vectorProviderId}
+                disabled={deploymentForm.mode === "clone"}
+                onChange={(event) => setDeploymentForm((current) => ({ ...current, vectorProviderId: event.target.value }))}
+              >
+                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                {vectorProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="card-stack">
+            <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
+            <textarea
+              className="field-input quote-admin-textarea"
+              value={deploymentForm.description}
+              onChange={(event) => setDeploymentForm((current) => ({ ...current, description: event.target.value }))}
+            />
+          </label>
+          <div className="platform-action-row">
+            <span className="status-text">
+              {deploymentForm.mode === "create"
+                ? t("platformControl.deployments.createHelp")
+                : deploymentForm.mode === "edit"
+                  ? t("platformControl.deployments.editing", { slug: deploymentForm.slug })
+                  : t("platformControl.deployments.cloning", { slug: deploymentForm.slug })}
+            </span>
+            <div className="form-actions">
+              {deploymentForm.mode !== "create" && (
+                <button type="button" className="btn btn-secondary" onClick={() => setDeploymentForm(DEFAULT_DEPLOYMENT_FORM)}>
+                  {t("platformControl.actions.reset")}
+                </button>
+              )}
+              <button type="submit" className="btn btn-primary" disabled={savingDeployment}>
+                {savingDeployment
+                  ? t("platformControl.actions.saving")
+                  : deploymentForm.mode === "create"
+                    ? t("platformControl.actions.createDeployment")
+                    : deploymentForm.mode === "edit"
+                      ? t("platformControl.actions.saveDeployment")
+                      : t("platformControl.actions.cloneDeployment")}
+              </button>
+            </div>
+          </div>
+        </form>
+
         {deployments.length === 0 ? (
           <p className="status-text">{t("platformControl.deployments.empty")}</p>
         ) : (
@@ -309,41 +859,124 @@ export default function PlatformControlPage(): JSX.Element {
                   </table>
                 </div>
                 <div className="platform-action-row">
-                  {activationCandidateId === deployment.id && !deployment.is_active ? (
-                    <>
-                      <span className="status-text">{t("platformControl.deployments.confirmActivation")}</span>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => setActivationCandidateId("")}
-                        disabled={activatingDeploymentId === deployment.id}
-                      >
-                        {t("platformControl.actions.cancel")}
-                      </button>
+                  <div className="platform-inline-meta">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setDeploymentForm(buildDeploymentForm(deployment, { mode: "edit" }))}
+                    >
+                      {t("platformControl.actions.edit")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setDeploymentForm(buildDeploymentForm(deployment, { mode: "clone" }))}
+                    >
+                      {t("platformControl.actions.clone")}
+                    </button>
+                  </div>
+                  <div className="platform-inline-meta">
+                    {activationCandidateId === deployment.id && !deployment.is_active ? (
+                      <>
+                        <span className="status-text">{t("platformControl.deployments.confirmActivation")}</span>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => setActivationCandidateId("")}
+                          disabled={activatingDeploymentId === deployment.id}
+                        >
+                          {t("platformControl.actions.cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={() => void handleActivateDeployment(deployment.id)}
+                          disabled={activatingDeploymentId === deployment.id}
+                        >
+                          {activatingDeploymentId === deployment.id
+                            ? t("platformControl.actions.activating")
+                            : t("platformControl.actions.confirmActivate")}
+                        </button>
+                      </>
+                    ) : (
                       <button
                         type="button"
                         className="btn btn-primary"
-                        onClick={() => void handleActivateDeployment(deployment.id)}
-                        disabled={activatingDeploymentId === deployment.id}
+                        onClick={() => setActivationCandidateId(deployment.id)}
+                        disabled={deployment.is_active}
                       >
-                        {activatingDeploymentId === deployment.id
-                          ? t("platformControl.actions.activating")
-                          : t("platformControl.actions.confirmActivate")}
+                        {deployment.is_active ? t("platformControl.actions.active") : t("platformControl.actions.activate")}
                       </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => setActivationCandidateId(deployment.id)}
-                      disabled={deployment.is_active}
-                    >
-                      {deployment.is_active ? t("platformControl.actions.active") : t("platformControl.actions.activate")}
-                    </button>
-                  )}
+                    )}
+
+                    {deploymentDeleteCandidateId === deployment.id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => setDeploymentDeleteCandidateId("")}
+                          disabled={deletingDeploymentId === deployment.id}
+                        >
+                          {t("platformControl.actions.cancel")}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => void handleDeleteDeployment(deployment.id)}
+                          disabled={deletingDeploymentId === deployment.id || deployment.is_active}
+                        >
+                          {deletingDeploymentId === deployment.id
+                            ? t("platformControl.actions.deleting")
+                            : t("platformControl.actions.confirmDelete")}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setDeploymentDeleteCandidateId(deployment.id)}
+                        disabled={deployment.is_active}
+                      >
+                        {t("platformControl.actions.delete")}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}
+          </div>
+        )}
+      </article>
+
+      <article className="panel card-stack">
+        <div className="status-row">
+          <h3 className="section-title">{t("platformControl.sections.audit")}</h3>
+          <p className="status-text">{t("platformControl.audit.description")}</p>
+        </div>
+        {activationAudit.length === 0 ? (
+          <p className="status-text">{t("platformControl.audit.empty")}</p>
+        ) : (
+          <div className="health-table-wrap">
+            <table className="health-table" aria-label={t("platformControl.audit.tableAria")}>
+              <thead>
+                <tr>
+                  <th>{t("platformControl.audit.columns.activatedAt")}</th>
+                  <th>{t("platformControl.audit.columns.deployment")}</th>
+                  <th>{t("platformControl.audit.columns.previousDeployment")}</th>
+                  <th>{t("platformControl.audit.columns.actor")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activationAudit.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{entry.activated_at}</td>
+                    <td>{entry.deployment_profile.display_name}</td>
+                    <td>{entry.previous_deployment_profile?.display_name ?? t("platformControl.summary.none")}</td>
+                    <td>{entry.activated_by_user_id ?? t("platformControl.summary.none")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </article>

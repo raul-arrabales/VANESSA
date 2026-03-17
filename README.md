@@ -235,9 +235,17 @@ Communication semantics (from generated architecture metadata) are directional s
 Backend exposes platform control-plane endpoints for capability/provider management:
 
 - `GET /v1/platform/capabilities`
+- `GET /v1/platform/provider-families`
 - `GET /v1/platform/providers`
+- `POST /v1/platform/providers`
+- `PUT /v1/platform/providers/{id}`
+- `DELETE /v1/platform/providers/{id}`
 - `GET /v1/platform/deployments`
+- `GET /v1/platform/activation-audit`
 - `POST /v1/platform/deployments`
+- `PUT /v1/platform/deployments/{id}`
+- `POST /v1/platform/deployments/{id}/clone`
+- `DELETE /v1/platform/deployments/{id}`
 - `POST /v1/platform/deployments/{id}/activate`
 - `POST /v1/platform/providers/{id}/validate`
 - `POST /v1/platform/vector/indexes/ensure`
@@ -266,6 +274,13 @@ Bootstrapped deployment profiles:
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured
 
 The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values so current local staging behavior remains compatible.
+
+The control plane now supports an operator-managed lifecycle on top of bootstrap seeding:
+
+- provider instances can be created, updated, validated, and deleted through the API/UI
+- deployment profiles can be created, updated, cloned, activated, and deleted through the API/UI
+- activation history is readable through `/v1/platform/activation-audit`
+- deployment activation now performs provider preflight validation before switching
 
 ## License
 

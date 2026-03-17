@@ -500,7 +500,7 @@
   "platformControl": {
     "eyebrow": "GenAI control plane",
     "title": "Platform control",
-    "description": "Inspect active capability bindings, validate providers, and activate deployment profiles.",
+    "description": "Manage provider instances, deployment profiles, and activation history for the GenAI control plane.",
     "state": {
       "idle": "IDLE",
       "loading": "LOADING",
@@ -510,14 +510,37 @@
     "sections": {
       "capabilities": "Capabilities",
       "providers": "Providers",
-      "deployments": "Deployment profiles"
+      "deployments": "Deployment profiles",
+      "audit": "Activation history"
     },
     "summary": {
       "activeDeployment": "Active deployment profile",
       "requiredCoverage": "Required capability coverage",
       "requiredCoverageDescription": "Bound required capabilities",
+      "lastActivation": "Latest activation",
       "loadState": "Page state",
       "none": "None"
+    },
+    "forms": {
+      "selectPlaceholder": "Select an option",
+      "provider": {
+        "family": "Provider family",
+        "slug": "Provider slug",
+        "displayName": "Display name",
+        "description": "Description",
+        "endpoint": "Endpoint URL",
+        "healthcheck": "Healthcheck URL",
+        "enabled": "Enabled state",
+        "config": "Config JSON",
+        "secretRefs": "Secret refs JSON"
+      },
+      "deployment": {
+        "slug": "Deployment slug",
+        "displayName": "Display name",
+        "description": "Description",
+        "llmProvider": "LLM provider",
+        "vectorProvider": "Vector provider"
+      }
     },
     "capabilities": {
       "description": "Each required platform capability should resolve to an active provider binding.",
@@ -526,13 +549,15 @@
       "empty": "No platform capabilities are registered."
     },
     "providers": {
-      "description": "Validate provider instances individually and inspect their current health.",
+      "description": "Create, update, validate, and remove provider instances without editing bootstrap code.",
       "tableAria": "Platform providers",
       "notValidated": "Not validated yet.",
       "validationStatus": "Health status: {{code}}",
       "modelsReachable": "Model discovery reachable",
       "modelsUnavailable": "Model discovery unavailable",
       "empty": "No providers are registered.",
+      "createHelp": "Create a new provider instance or edit an existing one.",
+      "editing": "Editing provider {{slug}}.",
       "columns": {
         "provider": "Provider",
         "capability": "Capability",
@@ -543,11 +568,14 @@
       }
     },
     "deployments": {
-      "description": "Activate a deployment profile to switch the current capability-to-provider bindings.",
+      "description": "Create, edit, clone, activate, and delete deployment profiles from the active provider inventory.",
       "tableAria": "Bindings for {{name}}",
       "empty": "No deployment profiles are available.",
       "noDescription": "No description provided.",
       "confirmActivation": "Confirm activation for this deployment profile.",
+      "createHelp": "Define the provider bindings for a deployment profile.",
+      "editing": "Editing deployment {{slug}}.",
+      "cloning": "Cloning deployment into {{slug}}.",
       "columns": {
         "capability": "Capability",
         "provider": "Provider",
@@ -555,15 +583,38 @@
         "status": "Status"
       }
     },
+    "audit": {
+      "description": "Review deployment switches and who triggered them.",
+      "tableAria": "Deployment activation history",
+      "empty": "No deployment activations have been recorded yet.",
+      "columns": {
+        "activatedAt": "Activated at",
+        "deployment": "Deployment",
+        "previousDeployment": "Previous deployment",
+        "actor": "Actor user id"
+      }
+    },
     "actions": {
       "refresh": "Refresh",
       "refreshing": "Refreshing...",
       "validate": "Validate",
       "validating": "Validating...",
+      "createProvider": "Create provider",
+      "saveProvider": "Save provider",
+      "createDeployment": "Create deployment",
+      "saveDeployment": "Save deployment",
+      "cloneDeployment": "Clone deployment",
       "activate": "Activate",
       "confirmActivate": "Confirm activation",
       "activating": "Activating...",
       "active": "Active",
+      "edit": "Edit",
+      "clone": "Clone",
+      "delete": "Delete",
+      "confirmDelete": "Confirm delete",
+      "deleting": "Deleting...",
+      "saving": "Saving...",
+      "reset": "Reset",
       "cancel": "Cancel"
     },
     "badges": {
@@ -577,8 +628,21 @@
       "prefix": "Request failed:",
       "authRequired": "Authentication is required to load platform control data.",
       "loadFailed": "Unable to load platform control data.",
+      "invalidJson": "{{field}} must be valid JSON object text.",
+      "bindingRequired": "Both required capability bindings must be selected.",
       "validationSuccess": "Validated provider {{slug}}.",
       "validationFailed": "Unable to validate provider.",
+      "providerCreated": "Created provider {{name}}.",
+      "providerUpdated": "Saved provider {{name}}.",
+      "providerDeleted": "Provider deleted.",
+      "providerSaveFailed": "Unable to save provider.",
+      "providerDeleteFailed": "Unable to delete provider.",
+      "deploymentCreated": "Created deployment profile {{name}}.",
+      "deploymentUpdated": "Saved deployment profile {{name}}.",
+      "deploymentCloned": "Cloned deployment profile {{name}}.",
+      "deploymentDeleted": "Deployment profile deleted.",
+      "deploymentSaveFailed": "Unable to save deployment profile.",
+      "deploymentDeleteFailed": "Unable to delete deployment profile.",
       "activationSuccess": "Activated deployment profile {{name}}.",
       "activationFailed": "Unable to activate deployment profile."
     }

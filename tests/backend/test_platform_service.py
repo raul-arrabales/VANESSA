@@ -93,6 +93,96 @@ def test_activate_deployment_profile_requires_all_required_capabilities(monkeypa
     assert exc_info.value.details["missing_capabilities"] == ["vector_store"]
 
 
+def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_deployment_profile",
+        lambda _db, deployment_profile_id: {"id": deployment_profile_id, "slug": "profile-a", "is_active": False},
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_bindings",
+        lambda _db, *, deployment_profile_id: [
+            {"capability_key": "llm_inference", "provider_instance_id": "provider-1", "enabled": True},
+            {"capability_key": "vector_store", "provider_instance_id": "provider-2", "enabled": True},
+        ],
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "validate_provider",
+        lambda _db, *, config, provider_instance_id: (
+            {
+                "provider": {"id": provider_instance_id, "slug": "provider-1"},
+                "validation": {
+                    "health": {"reachable": False, "status_code": 503},
+                    "models_reachable": False,
+                },
+            }
+            if provider_instance_id == "provider-1"
+            else {
+                "provider": {"id": provider_instance_id, "slug": "provider-2"},
+                "validation": {"health": {"reachable": True, "status_code": 200}},
+            }
+        ),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.activate_deployment_profile(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            deployment_profile_id="deployment-1",
+            activated_by_user_id=1,
+        )
+
+    assert exc_info.value.code == "deployment_profile_validation_failed"
+    assert exc_info.value.details["providers"][0]["provider"]["slug"] == "provider-1"
+
+
+def test_delete_provider_rejects_bound_instances(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {"id": provider_instance_id, "slug": "provider-a"},
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "count_deployment_bindings_for_provider",
+        lambda _db, *, provider_instance_id: 2,
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.delete_provider("ignored", config=object(), provider_instance_id="provider-1")  # type: ignore[arg-type]
+
+    assert exc_info.value.code == "provider_instance_in_use"
+    assert exc_info.value.details["binding_count"] == 2
+
+
+def test_serialize_provider_row_exposes_secret_refs_separately():
+    payload = platform_service._serialize_provider_row(  # type: ignore[attr-defined]
+        {
+            "id": "provider-1",
+            "slug": "provider-a",
+            "provider_key": "vllm_local",
+            "capability_key": "llm_inference",
+            "adapter_kind": "openai_compatible_llm",
+            "display_name": "Provider A",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config_json": {
+                "chat_completion_path": "/v1/chat/completions",
+                "secret_refs": {"api_key": "env://API_KEY"},
+            },
+        }
+    )
+
+    assert payload["config"] == {"chat_completion_path": "/v1/chat/completions"}
+    assert payload["secret_refs"] == {"api_key": "env://API_KEY"}
+
+
 def test_openai_adapter_retries_local_fallback_on_model_not_found(monkeypatch: pytest.MonkeyPatch):
     calls: list[dict[str, object]] = []
 

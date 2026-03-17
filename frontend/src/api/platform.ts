@@ -3,7 +3,7 @@ import { ApiError } from "../auth/authApi";
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   token?: string;
 };
@@ -35,6 +35,15 @@ export type PlatformProvider = {
   healthcheck_url?: string | null;
   enabled: boolean;
   config: Record<string, unknown>;
+  secret_refs: Record<string, string>;
+};
+
+export type PlatformProviderFamily = {
+  provider_key: string;
+  capability: string;
+  adapter_kind: string;
+  display_name: string;
+  description: string;
 };
 
 export type PlatformDeploymentBinding = {
@@ -60,6 +69,22 @@ export type PlatformDeploymentProfile = {
   bindings: PlatformDeploymentBinding[];
 };
 
+export type PlatformActivationAuditEntry = {
+  id: string;
+  deployment_profile: {
+    id: string;
+    slug: string;
+    display_name: string;
+  };
+  previous_deployment_profile: {
+    id: string;
+    slug: string;
+    display_name: string;
+  } | null;
+  activated_by_user_id: number | null;
+  activated_at: string;
+};
+
 export type PlatformProviderValidation = {
   provider: Pick<PlatformProvider, "id" | "slug">;
   validation: {
@@ -70,6 +95,29 @@ export type PlatformProviderValidation = {
     models_reachable?: boolean;
     models_status_code?: number;
   };
+};
+
+export type PlatformProviderMutationInput = {
+  provider_key: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  endpoint_url: string;
+  healthcheck_url?: string | null;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  secret_refs: Record<string, string>;
+};
+
+export type PlatformDeploymentMutationInput = {
+  slug: string;
+  display_name: string;
+  description: string;
+  bindings: Array<{
+    capability: string;
+    provider_id: string;
+    config?: Record<string, unknown>;
+  }>;
 };
 
 function buildUrl(path: string): string {
@@ -131,14 +179,56 @@ export async function listPlatformProviders(token: string): Promise<PlatformProv
   return result.providers;
 }
 
+export async function listPlatformProviderFamilies(token: string): Promise<PlatformProviderFamily[]> {
+  const result = await requestJson<{ provider_families: PlatformProviderFamily[] }>("/v1/platform/provider-families", { token });
+  return result.provider_families;
+}
+
 export async function listPlatformDeployments(token: string): Promise<PlatformDeploymentProfile[]> {
   const result = await requestJson<{ deployments: PlatformDeploymentProfile[] }>("/v1/platform/deployments", { token });
   return result.deployments;
 }
 
+export async function listPlatformActivationAudit(token: string): Promise<PlatformActivationAuditEntry[]> {
+  const result = await requestJson<{ activation_audit: PlatformActivationAuditEntry[] }>("/v1/platform/activation-audit", { token });
+  return result.activation_audit;
+}
+
 export async function validatePlatformProvider(providerId: string, token: string): Promise<PlatformProviderValidation> {
   return requestJson<PlatformProviderValidation>(`/v1/platform/providers/${encodeURIComponent(providerId)}/validate`, {
     method: "POST",
+    token,
+  });
+}
+
+export async function createPlatformProvider(
+  input: PlatformProviderMutationInput,
+  token: string,
+): Promise<PlatformProvider> {
+  const result = await requestJson<{ provider: PlatformProvider }>("/v1/platform/providers", {
+    method: "POST",
+    token,
+    body: input,
+  });
+  return result.provider;
+}
+
+export async function updatePlatformProvider(
+  providerId: string,
+  input: Omit<PlatformProviderMutationInput, "provider_key">,
+  token: string,
+): Promise<PlatformProvider> {
+  const result = await requestJson<{ provider: PlatformProvider }>(`/v1/platform/providers/${encodeURIComponent(providerId)}`, {
+    method: "PUT",
+    token,
+    body: input,
+  });
+  return result.provider;
+}
+
+export async function deletePlatformProvider(providerId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/platform/providers/${encodeURIComponent(providerId)}`, {
+    method: "DELETE",
     token,
   });
 }
@@ -152,4 +242,55 @@ export async function activateDeploymentProfile(deploymentId: string, token: str
     },
   );
   return result.deployment_profile;
+}
+
+export async function createDeploymentProfile(
+  input: PlatformDeploymentMutationInput,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>("/v1/platform/deployments", {
+    method: "POST",
+    token,
+    body: input,
+  });
+  return result.deployment_profile;
+}
+
+export async function updateDeploymentProfile(
+  deploymentId: string,
+  input: PlatformDeploymentMutationInput,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
+    `/v1/platform/deployments/${encodeURIComponent(deploymentId)}`,
+    {
+      method: "PUT",
+      token,
+      body: input,
+    },
+  );
+  return result.deployment_profile;
+}
+
+export async function cloneDeploymentProfile(
+  deploymentId: string,
+  input: Pick<PlatformDeploymentMutationInput, "slug" | "display_name" | "description">,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
+    `/v1/platform/deployments/${encodeURIComponent(deploymentId)}/clone`,
+    {
+      method: "POST",
+      token,
+      body: input,
+    },
+  );
+  return result.deployment_profile;
+}
+
+export async function deleteDeploymentProfile(deploymentId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/platform/deployments/${encodeURIComponent(deploymentId)}`, {
+    method: "DELETE",
+    token,
+  });
 }

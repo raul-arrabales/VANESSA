@@ -263,6 +263,103 @@ def list_providers(database_url: str, config: AuthConfig) -> list[dict[str, Any]
     return [_serialize_provider_row(row) for row in platform_repo.list_provider_instances(database_url)]
 
 
+def list_provider_families(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
+    ensure_platform_bootstrap_state(database_url, config)
+    return [_serialize_provider_family_row(row) for row in platform_repo.list_provider_families(database_url)]
+
+
+def create_provider(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    normalized = _coerce_provider_input(database_url, payload, is_update=False)
+    try:
+        created = platform_repo.create_provider_instance(
+            database_url,
+            slug=normalized["slug"],
+            provider_key=normalized["provider_key"],
+            display_name=normalized["display_name"],
+            description=normalized["description"],
+            endpoint_url=normalized["endpoint_url"],
+            healthcheck_url=normalized["healthcheck_url"],
+            enabled=normalized["enabled"],
+            config_json=_provider_storage_config(normalized["config"], normalized["secret_refs"]),
+        )
+    except Exception as exc:
+        message = str(exc).lower()
+        if "duplicate key value violates unique constraint" in message:
+            raise PlatformControlPlaneError(
+                "provider_instance_exists",
+                "Provider instance slug already exists",
+                status_code=409,
+            ) from exc
+        raise
+    return _serialize_provider_row({**created, **(platform_repo.get_provider_instance(database_url, str(created["id"])) or {})})
+
+
+def update_provider(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_instance_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    existing = platform_repo.get_provider_instance(database_url, provider_instance_id)
+    if existing is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    normalized = _coerce_provider_input(
+        database_url,
+        payload,
+        is_update=True,
+        existing_provider=existing,
+    )
+    try:
+        updated = platform_repo.update_provider_instance(
+            database_url,
+            provider_instance_id=provider_instance_id,
+            slug=normalized["slug"],
+            display_name=normalized["display_name"],
+            description=normalized["description"],
+            endpoint_url=normalized["endpoint_url"],
+            healthcheck_url=normalized["healthcheck_url"],
+            enabled=normalized["enabled"],
+            config_json=_provider_storage_config(normalized["config"], normalized["secret_refs"]),
+        )
+    except Exception as exc:
+        if "duplicate key value violates unique constraint" in str(exc).lower():
+            raise PlatformControlPlaneError(
+                "provider_instance_exists",
+                "Provider instance slug already exists",
+                status_code=409,
+            ) from exc
+        raise
+    if updated is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    return _serialize_provider_row({**updated, **(platform_repo.get_provider_instance(database_url, provider_instance_id) or {})})
+
+
+def delete_provider(database_url: str, *, config: AuthConfig, provider_instance_id: str) -> None:
+    ensure_platform_bootstrap_state(database_url, config)
+    existing = platform_repo.get_provider_instance(database_url, provider_instance_id)
+    if existing is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    binding_count = platform_repo.count_deployment_bindings_for_provider(database_url, provider_instance_id=provider_instance_id)
+    if binding_count > 0:
+        raise PlatformControlPlaneError(
+            "provider_instance_in_use",
+            "Provider instance is still referenced by deployment profiles",
+            status_code=409,
+            details={"binding_count": binding_count},
+        )
+    deleted = platform_repo.delete_provider_instance(database_url, provider_instance_id)
+    if not deleted:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+
+
 def list_deployment_profiles(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
     ensure_platform_bootstrap_state(database_url, config)
     items: list[dict[str, Any]] = []
@@ -270,6 +367,11 @@ def list_deployment_profiles(database_url: str, config: AuthConfig) -> list[dict
         bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=str(profile["id"]))
         items.append(_serialize_deployment_profile(profile, bindings))
     return items
+
+
+def list_deployment_activation_audit(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
+    ensure_platform_bootstrap_state(database_url, config)
+    return [_serialize_activation_audit_row(row) for row in platform_repo.list_deployment_activation_audit(database_url)]
 
 
 def create_deployment_profile(
@@ -331,6 +433,119 @@ def create_deployment_profile(
     return _serialize_deployment_profile(created, bindings)
 
 
+def update_deployment_profile(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    deployment_profile_id: str,
+    payload: dict[str, Any],
+    updated_by_user_id: int,
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    existing = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
+    if existing is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    normalized = _coerce_create_input(payload)
+    resolved_bindings = _resolve_deployment_bindings(database_url, normalized.bindings)
+    try:
+        updated = platform_repo.update_deployment_profile(
+            database_url,
+            deployment_profile_id=deployment_profile_id,
+            slug=normalized.slug,
+            display_name=normalized.display_name,
+            description=normalized.description,
+            bindings=resolved_bindings,
+            updated_by_user_id=updated_by_user_id,
+        )
+    except Exception as exc:
+        if "duplicate key value violates unique constraint" in str(exc).lower():
+            raise PlatformControlPlaneError(
+                "deployment_profile_exists",
+                "Deployment profile slug already exists",
+                status_code=409,
+            ) from exc
+        raise
+    if updated is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=deployment_profile_id)
+    return _serialize_deployment_profile(updated, bindings)
+
+
+def clone_deployment_profile(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    source_deployment_profile_id: str,
+    payload: dict[str, Any],
+    created_by_user_id: int,
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    source = platform_repo.get_deployment_profile(database_url, source_deployment_profile_id)
+    if source is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    source_bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=source_deployment_profile_id)
+    if not source_bindings:
+        raise PlatformControlPlaneError(
+            "deployment_profile_incomplete",
+            "Deployment profile is missing required capability bindings",
+            status_code=409,
+        )
+    slug = str(payload.get("slug", "")).strip().lower()
+    display_name = str(payload.get("display_name", "")).strip()
+    description = str(payload.get("description", source.get("description", ""))).strip()
+    if not slug:
+        raise PlatformControlPlaneError("invalid_slug", "slug is required", status_code=400)
+    if not display_name:
+        raise PlatformControlPlaneError("invalid_display_name", "display_name is required", status_code=400)
+    try:
+        created = platform_repo.create_deployment_profile(
+            database_url,
+            slug=slug,
+            display_name=display_name,
+            description=description,
+            bindings=[
+                {
+                    "capability_key": str(binding["capability_key"]).strip().lower(),
+                    "provider_instance_id": str(binding["provider_instance_id"]).strip(),
+                    "binding_config": dict(binding.get("binding_config") or {}),
+                }
+                for binding in source_bindings
+            ],
+            created_by_user_id=created_by_user_id,
+        )
+    except Exception as exc:
+        if "duplicate key value violates unique constraint" in str(exc).lower():
+            raise PlatformControlPlaneError(
+                "deployment_profile_exists",
+                "Deployment profile slug already exists",
+                status_code=409,
+            ) from exc
+        raise
+    bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=str(created["id"]))
+    return _serialize_deployment_profile(created, bindings)
+
+
+def delete_deployment_profile(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    deployment_profile_id: str,
+) -> None:
+    ensure_platform_bootstrap_state(database_url, config)
+    existing = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
+    if existing is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    if bool(existing.get("is_active")):
+        raise PlatformControlPlaneError(
+            "deployment_profile_active",
+            "Active deployment profile cannot be deleted",
+            status_code=409,
+        )
+    deleted = platform_repo.delete_deployment_profile(database_url, deployment_profile_id)
+    if not deleted:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+
+
 def activate_deployment_profile(
     database_url: str,
     *,
@@ -362,6 +577,15 @@ def activate_deployment_profile(
                 status_code=409,
                 details={"provider_instance_id": str(binding["provider_instance_id"])},
             )
+
+    validation_failures = _validate_deployment_profile_bindings(database_url, config, bindings)
+    if validation_failures:
+        raise PlatformControlPlaneError(
+            "deployment_profile_validation_failed",
+            "Deployment profile preflight validation failed",
+            status_code=409,
+            details={"providers": validation_failures},
+        )
 
     platform_repo.activate_deployment_profile(
         database_url,
@@ -595,7 +819,158 @@ def _coerce_create_input(payload: dict[str, Any]) -> DeploymentProfileCreateInpu
     )
 
 
+def _coerce_provider_input(
+    database_url: str,
+    payload: dict[str, Any],
+    *,
+    is_update: bool,
+    existing_provider: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    provider_key = (
+        str(existing_provider["provider_key"]).strip().lower()
+        if existing_provider is not None
+        else str(payload.get("provider_key", "")).strip().lower()
+    )
+    slug = str(payload.get("slug", existing_provider["slug"] if existing_provider else "")).strip().lower()
+    display_name = str(payload.get("display_name", existing_provider["display_name"] if existing_provider else "")).strip()
+    description = str(payload.get("description", existing_provider["description"] if existing_provider else "")).strip()
+    endpoint_url = str(payload.get("endpoint_url", existing_provider["endpoint_url"] if existing_provider else "")).strip()
+    healthcheck_url = str(payload.get("healthcheck_url", existing_provider.get("healthcheck_url", "") if existing_provider else "")).strip() or None
+    enabled = payload.get("enabled", existing_provider["enabled"] if existing_provider is not None else True)
+    raw_config = payload.get("config", _serialize_provider_row(existing_provider)["config"] if existing_provider is not None else {})
+    raw_secret_refs = payload.get("secret_refs", _serialize_provider_row(existing_provider)["secret_refs"] if existing_provider is not None else {})
+
+    if not provider_key:
+        raise PlatformControlPlaneError("invalid_provider_key", "provider_key is required", status_code=400)
+    if platform_repo.get_provider_family(database_url, provider_key) is None:
+        raise PlatformControlPlaneError("provider_family_not_found", "Provider family not found", status_code=404)
+    if not slug:
+        raise PlatformControlPlaneError("invalid_slug", "slug is required", status_code=400)
+    if not display_name:
+        raise PlatformControlPlaneError("invalid_display_name", "display_name is required", status_code=400)
+    if not endpoint_url:
+        raise PlatformControlPlaneError("invalid_endpoint_url", "endpoint_url is required", status_code=400)
+    if isinstance(enabled, bool):
+        normalized_enabled = enabled
+    else:
+        raise PlatformControlPlaneError("invalid_enabled", "enabled must be a boolean", status_code=400)
+    config = _coerce_json_object(raw_config, error_code="invalid_provider_config", message="config must be an object")
+    secret_refs = _coerce_secret_refs(raw_secret_refs)
+    return {
+        "provider_key": provider_key,
+        "slug": slug,
+        "display_name": display_name,
+        "description": description,
+        "endpoint_url": endpoint_url,
+        "healthcheck_url": healthcheck_url,
+        "enabled": normalized_enabled,
+        "config": config,
+        "secret_refs": secret_refs,
+    }
+
+
+def _coerce_json_object(raw: Any, *, error_code: str, message: str) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise PlatformControlPlaneError(error_code, message, status_code=400)
+    return dict(raw)
+
+
+def _coerce_secret_refs(raw: Any) -> dict[str, str]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise PlatformControlPlaneError("invalid_secret_refs", "secret_refs must be an object", status_code=400)
+    normalized: dict[str, str] = {}
+    for key, value in raw.items():
+        normalized_key = str(key).strip()
+        normalized_value = str(value).strip()
+        if not normalized_key or not normalized_value:
+            raise PlatformControlPlaneError("invalid_secret_refs", "secret_refs must contain non-empty string values", status_code=400)
+        normalized[normalized_key] = normalized_value
+    return normalized
+
+
+def _provider_storage_config(config: dict[str, Any], secret_refs: dict[str, str]) -> dict[str, Any]:
+    stored = dict(config)
+    if secret_refs:
+        stored["secret_refs"] = dict(secret_refs)
+    else:
+        stored.pop("secret_refs", None)
+    return stored
+
+
+def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBindingInput]) -> list[dict[str, Any]]:
+    seen_capabilities: set[str] = set()
+    resolved_bindings: list[dict[str, Any]] = []
+    for binding in bindings:
+        if binding.capability_key in seen_capabilities:
+            raise PlatformControlPlaneError(
+                "duplicate_capability_binding",
+                f"Capability '{binding.capability_key}' is bound more than once",
+                status_code=400,
+            )
+        provider = platform_repo.get_provider_instance(database_url, binding.provider_instance_id)
+        if provider is None:
+            raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+        if str(provider["capability_key"]).strip().lower() != binding.capability_key:
+            raise PlatformControlPlaneError(
+                "provider_capability_mismatch",
+                "Provider instance does not implement the requested capability",
+                status_code=400,
+            )
+        resolved_bindings.append(
+            {
+                "capability_key": binding.capability_key,
+                "provider_instance_id": binding.provider_instance_id,
+                "binding_config": binding.binding_config,
+            }
+        )
+        seen_capabilities.add(binding.capability_key)
+    return resolved_bindings
+
+
+def _validate_deployment_profile_bindings(
+    database_url: str,
+    config: AuthConfig,
+    bindings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    failures: list[dict[str, Any]] = []
+    for binding in bindings:
+        provider_instance_id = str(binding["provider_instance_id"])
+        result = validate_provider(database_url, config=config, provider_instance_id=provider_instance_id)
+        validation = dict(result.get("validation") or {})
+        health = dict(validation.get("health") or {})
+        reachable = bool(health.get("reachable"))
+        models_reachable = validation.get("models_reachable")
+        capability = str(binding.get("capability_key", "")).strip().lower()
+        failed = not reachable or (capability == CAPABILITY_LLM_INFERENCE and models_reachable is False)
+        if failed:
+            failures.append(
+                {
+                    "provider": result.get("provider"),
+                    "validation": validation,
+                }
+            )
+    return failures
+
+
+def _serialize_provider_family_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "provider_key": row["provider_key"],
+        "capability": row["capability_key"],
+        "adapter_kind": row["adapter_kind"],
+        "display_name": row["display_name"],
+        "description": row["description"],
+    }
+
+
 def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
+    config = dict(row.get("config_json") or {})
+    secret_refs = config.pop("secret_refs", {})
+    if not isinstance(secret_refs, dict):
+        secret_refs = {}
     return {
         "id": str(row["id"]),
         "slug": row["slug"],
@@ -607,7 +982,8 @@ def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
         "endpoint_url": row["endpoint_url"],
         "healthcheck_url": row.get("healthcheck_url"),
         "enabled": bool(row["enabled"]),
-        "config": dict(row.get("config_json") or {}),
+        "config": config,
+        "secret_refs": dict(secret_refs),
     }
 
 
@@ -658,4 +1034,26 @@ def _serialize_deployment_profile(profile: dict[str, Any], bindings: list[dict[s
             }
             for binding in bindings
         ],
+    }
+
+
+def _serialize_activation_audit_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "deployment_profile": {
+            "id": str(row["deployment_profile_id"]),
+            "slug": row["deployment_profile_slug"],
+            "display_name": row["deployment_profile_display_name"],
+        },
+        "previous_deployment_profile": (
+            {
+                "id": str(row["previous_deployment_profile_id"]),
+                "slug": row["previous_deployment_profile_slug"],
+                "display_name": row["previous_deployment_profile_display_name"],
+            }
+            if row.get("previous_deployment_profile_id")
+            else None
+        ),
+        "activated_by_user_id": row.get("activated_by_user_id"),
+        "activated_at": row["activated_at"].isoformat() if hasattr(row.get("activated_at"), "isoformat") else row["activated_at"],
     }

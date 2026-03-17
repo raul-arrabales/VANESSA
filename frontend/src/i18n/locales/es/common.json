@@ -500,7 +500,7 @@
   "platformControl": {
     "eyebrow": "Plano de control GenAI",
     "title": "Control de plataforma",
-    "description": "Inspecciona enlaces activos de capacidades, valida proveedores y activa perfiles de despliegue.",
+    "description": "Administra instancias de proveedor, perfiles de despliegue e historial de activacion del plano de control GenAI.",
     "state": {
       "idle": "INACTIVO",
       "loading": "CARGANDO",
@@ -510,14 +510,37 @@
     "sections": {
       "capabilities": "Capacidades",
       "providers": "Proveedores",
-      "deployments": "Perfiles de despliegue"
+      "deployments": "Perfiles de despliegue",
+      "audit": "Historial de activacion"
     },
     "summary": {
       "activeDeployment": "Perfil de despliegue activo",
       "requiredCoverage": "Cobertura de capacidades requeridas",
       "requiredCoverageDescription": "Capacidades requeridas enlazadas",
+      "lastActivation": "Ultima activacion",
       "loadState": "Estado de la pagina",
       "none": "Ninguno"
+    },
+    "forms": {
+      "selectPlaceholder": "Selecciona una opcion",
+      "provider": {
+        "family": "Familia de proveedor",
+        "slug": "Slug del proveedor",
+        "displayName": "Nombre visible",
+        "description": "Descripcion",
+        "endpoint": "URL del endpoint",
+        "healthcheck": "URL de healthcheck",
+        "enabled": "Estado habilitado",
+        "config": "JSON de configuracion",
+        "secretRefs": "JSON de referencias secretas"
+      },
+      "deployment": {
+        "slug": "Slug del despliegue",
+        "displayName": "Nombre visible",
+        "description": "Descripcion",
+        "llmProvider": "Proveedor LLM",
+        "vectorProvider": "Proveedor vectorial"
+      }
     },
     "capabilities": {
       "description": "Cada capacidad requerida de la plataforma debe resolver a un proveedor activo.",
@@ -526,13 +549,15 @@
       "empty": "No hay capacidades de plataforma registradas."
     },
     "providers": {
-      "description": "Valida instancias de proveedor de forma individual e inspecciona su estado actual.",
+      "description": "Crea, actualiza, valida y elimina instancias de proveedor sin editar codigo de bootstrap.",
       "tableAria": "Proveedores de plataforma",
       "notValidated": "Todavia no validado.",
       "validationStatus": "Estado de salud: {{code}}",
       "modelsReachable": "Descubrimiento de modelos accesible",
       "modelsUnavailable": "Descubrimiento de modelos no accesible",
       "empty": "No hay proveedores registrados.",
+      "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
+      "editing": "Editando proveedor {{slug}}.",
       "columns": {
         "provider": "Proveedor",
         "capability": "Capacidad",
@@ -543,11 +568,14 @@
       }
     },
     "deployments": {
-      "description": "Activa un perfil de despliegue para cambiar los enlaces actuales entre capacidades y proveedores.",
+      "description": "Crea, edita, clona, activa y elimina perfiles de despliegue desde el inventario activo de proveedores.",
       "tableAria": "Enlaces para {{name}}",
       "empty": "No hay perfiles de despliegue disponibles.",
       "noDescription": "No hay descripcion.",
       "confirmActivation": "Confirma la activacion de este perfil de despliegue.",
+      "createHelp": "Define los enlaces de proveedores para un perfil de despliegue.",
+      "editing": "Editando despliegue {{slug}}.",
+      "cloning": "Clonando despliegue en {{slug}}.",
       "columns": {
         "capability": "Capacidad",
         "provider": "Proveedor",
@@ -555,15 +583,38 @@
         "status": "Estado"
       }
     },
+    "audit": {
+      "description": "Revisa los cambios de despliegue y quien los activo.",
+      "tableAria": "Historial de activacion de despliegues",
+      "empty": "Todavia no se han registrado activaciones de despliegues.",
+      "columns": {
+        "activatedAt": "Activado en",
+        "deployment": "Despliegue",
+        "previousDeployment": "Despliegue anterior",
+        "actor": "Id de usuario actor"
+      }
+    },
     "actions": {
       "refresh": "Actualizar",
       "refreshing": "Actualizando...",
       "validate": "Validar",
       "validating": "Validando...",
+      "createProvider": "Crear proveedor",
+      "saveProvider": "Guardar proveedor",
+      "createDeployment": "Crear despliegue",
+      "saveDeployment": "Guardar despliegue",
+      "cloneDeployment": "Clonar despliegue",
       "activate": "Activar",
       "confirmActivate": "Confirmar activacion",
       "activating": "Activando...",
       "active": "Activo",
+      "edit": "Editar",
+      "clone": "Clonar",
+      "delete": "Eliminar",
+      "confirmDelete": "Confirmar eliminacion",
+      "deleting": "Eliminando...",
+      "saving": "Guardando...",
+      "reset": "Restablecer",
       "cancel": "Cancelar"
     },
     "badges": {
@@ -577,8 +628,21 @@
       "prefix": "Error de solicitud:",
       "authRequired": "Se requiere autenticacion para cargar el control de plataforma.",
       "loadFailed": "No se pudieron cargar los datos de control de plataforma.",
+      "invalidJson": "{{field}} debe ser texto JSON de objeto valido.",
+      "bindingRequired": "Deben seleccionarse ambos enlaces de capacidad requeridos.",
       "validationSuccess": "Proveedor {{slug}} validado.",
       "validationFailed": "No se pudo validar el proveedor.",
+      "providerCreated": "Proveedor {{name}} creado.",
+      "providerUpdated": "Proveedor {{name}} guardado.",
+      "providerDeleted": "Proveedor eliminado.",
+      "providerSaveFailed": "No se pudo guardar el proveedor.",
+      "providerDeleteFailed": "No se pudo eliminar el proveedor.",
+      "deploymentCreated": "Perfil de despliegue {{name}} creado.",
+      "deploymentUpdated": "Perfil de despliegue {{name}} guardado.",
+      "deploymentCloned": "Perfil de despliegue {{name}} clonado.",
+      "deploymentDeleted": "Perfil de despliegue eliminado.",
+      "deploymentSaveFailed": "No se pudo guardar el perfil de despliegue.",
+      "deploymentDeleteFailed": "No se pudo eliminar el perfil de despliegue.",
       "activationSuccess": "Perfil de despliegue {{name}} activado.",
       "activationFailed": "No se pudo activar el perfil de despliegue."
     }

@@ -102,6 +102,45 @@ def ensure_provider_family(
     return dict(row)
 
 
+def list_provider_families(database_url: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+              provider_key,
+              capability_key,
+              adapter_kind,
+              display_name,
+              description,
+              created_at,
+              updated_at
+            FROM platform_provider_families
+            ORDER BY capability_key ASC, provider_key ASC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_provider_family(database_url: str, provider_key: str) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT
+              provider_key,
+              capability_key,
+              adapter_kind,
+              display_name,
+              description,
+              created_at,
+              updated_at
+            FROM platform_provider_families
+            WHERE provider_key = %s
+            """,
+            (provider_key.strip().lower(),),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
 def ensure_provider_instance(
     database_url: str,
     *,
@@ -167,6 +206,107 @@ def ensure_provider_instance(
     return dict(row)
 
 
+def create_provider_instance(
+    database_url: str,
+    *,
+    slug: str,
+    provider_key: str,
+    display_name: str,
+    description: str,
+    endpoint_url: str,
+    healthcheck_url: str | None,
+    enabled: bool,
+    config_json: dict[str, Any],
+) -> dict[str, Any]:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            INSERT INTO platform_provider_instances (
+                id,
+                slug,
+                provider_key,
+                display_name,
+                description,
+                endpoint_url,
+                healthcheck_url,
+                enabled,
+                config_json
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+            RETURNING *
+            """,
+            (
+                str(uuid4()),
+                slug.strip().lower(),
+                provider_key.strip().lower(),
+                display_name.strip(),
+                description.strip(),
+                endpoint_url.strip(),
+                (healthcheck_url or "").strip() or None,
+                enabled,
+                Jsonb(config_json),
+            ),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("failed_to_create_provider_instance")
+    return dict(row)
+
+
+def update_provider_instance(
+    database_url: str,
+    *,
+    provider_instance_id: str,
+    slug: str,
+    display_name: str,
+    description: str,
+    endpoint_url: str,
+    healthcheck_url: str | None,
+    enabled: bool,
+    config_json: dict[str, Any],
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE platform_provider_instances
+            SET
+              slug = %s,
+              display_name = %s,
+              description = %s,
+              endpoint_url = %s,
+              healthcheck_url = %s,
+              enabled = %s,
+              config_json = %s::jsonb,
+              updated_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                slug.strip().lower(),
+                display_name.strip(),
+                description.strip(),
+                endpoint_url.strip(),
+                (healthcheck_url or "").strip() or None,
+                enabled,
+                Jsonb(config_json),
+                provider_instance_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def delete_provider_instance(database_url: str, provider_instance_id: str) -> bool:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            DELETE FROM platform_provider_instances
+            WHERE id = %s
+            RETURNING id
+            """,
+            (provider_instance_id.strip(),),
+        ).fetchone()
+    return row is not None
+
+
 def list_provider_instances(database_url: str) -> list[dict[str, Any]]:
     with get_connection(database_url) as connection:
         rows = connection.execute(
@@ -218,6 +358,19 @@ def get_provider_instance(database_url: str, provider_instance_id: str) -> dict[
             (provider_instance_id.strip(),),
         ).fetchone()
     return dict(row) if row is not None else None
+
+
+def count_deployment_bindings_for_provider(database_url: str, *, provider_instance_id: str) -> int:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS binding_count
+            FROM platform_deployment_bindings
+            WHERE provider_instance_id = %s
+            """,
+            (provider_instance_id.strip(),),
+        ).fetchone()
+    return int(row["binding_count"]) if row is not None else 0
 
 
 def ensure_deployment_profile(
@@ -328,6 +481,83 @@ def create_deployment_profile(
                 ),
             )
     return get_deployment_profile(database_url, str(profile_row["id"])) or {}
+
+
+def update_deployment_profile(
+    database_url: str,
+    *,
+    deployment_profile_id: str,
+    slug: str,
+    display_name: str,
+    description: str,
+    bindings: list[dict[str, Any]],
+    updated_by_user_id: int,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        profile_row = connection.execute(
+            """
+            UPDATE platform_deployment_profiles
+            SET
+              slug = %s,
+              display_name = %s,
+              description = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                slug.strip().lower(),
+                display_name.strip(),
+                description.strip(),
+                updated_by_user_id,
+                deployment_profile_id.strip(),
+            ),
+        ).fetchone()
+        if profile_row is None:
+            return None
+
+        connection.execute(
+            """
+            DELETE FROM platform_deployment_bindings
+            WHERE deployment_profile_id = %s
+            """,
+            (deployment_profile_id.strip(),),
+        )
+        for binding in bindings:
+            connection.execute(
+                """
+                INSERT INTO platform_deployment_bindings (
+                    id,
+                    deployment_profile_id,
+                    capability_key,
+                    provider_instance_id,
+                    binding_config
+                )
+                VALUES (%s, %s, %s, %s, %s::jsonb)
+                """,
+                (
+                    str(uuid4()),
+                    deployment_profile_id.strip(),
+                    str(binding["capability_key"]).strip().lower(),
+                    str(binding["provider_instance_id"]).strip(),
+                    Jsonb(binding.get("binding_config") or {}),
+                ),
+            )
+    return get_deployment_profile(database_url, deployment_profile_id.strip())
+
+
+def delete_deployment_profile(database_url: str, deployment_profile_id: str) -> bool:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            DELETE FROM platform_deployment_profiles
+            WHERE id = %s
+            RETURNING id
+            """,
+            (deployment_profile_id.strip(),),
+        ).fetchone()
+    return row is not None
 
 
 def upsert_deployment_binding(
@@ -565,3 +795,26 @@ def activate_deployment_profile(
     if row is None:
         raise RuntimeError("failed_to_activate_deployment_profile")
     return dict(row)
+
+
+def list_deployment_activation_audit(database_url: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+              a.id,
+              a.deployment_profile_id,
+              current_profile.slug AS deployment_profile_slug,
+              current_profile.display_name AS deployment_profile_display_name,
+              a.previous_deployment_profile_id,
+              previous_profile.slug AS previous_deployment_profile_slug,
+              previous_profile.display_name AS previous_deployment_profile_display_name,
+              a.activated_by_user_id,
+              a.activated_at
+            FROM platform_deployment_activation_audit a
+            JOIN platform_deployment_profiles current_profile ON current_profile.id = a.deployment_profile_id
+            LEFT JOIN platform_deployment_profiles previous_profile ON previous_profile.id = a.previous_deployment_profile_id
+            ORDER BY a.activated_at DESC, a.id DESC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]

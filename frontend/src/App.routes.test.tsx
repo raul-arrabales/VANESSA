@@ -63,6 +63,15 @@ vi.mock("./api/platform", () => ({
       },
     },
   ]),
+  listPlatformProviderFamilies: vi.fn(async () => [
+    {
+      provider_key: "vllm_local",
+      capability: "llm_inference",
+      adapter_kind: "openai_compatible_llm",
+      display_name: "vLLM local gateway",
+      description: "desc",
+    },
+  ]),
   listPlatformProviders: vi.fn(async () => [
     {
       id: "provider-1",
@@ -76,6 +85,7 @@ vi.mock("./api/platform", () => ({
       healthcheck_url: "http://llm:8000/health",
       enabled: true,
       config: {},
+      secret_refs: {},
     },
   ]),
   listPlatformDeployments: vi.fn(async () => [
@@ -88,7 +98,15 @@ vi.mock("./api/platform", () => ({
       bindings: [],
     },
   ]),
+  listPlatformActivationAudit: vi.fn(async () => []),
   validatePlatformProvider: vi.fn(),
+  createPlatformProvider: vi.fn(),
+  updatePlatformProvider: vi.fn(),
+  deletePlatformProvider: vi.fn(),
+  createDeploymentProfile: vi.fn(),
+  updateDeploymentProfile: vi.fn(),
+  cloneDeploymentProfile: vi.fn(),
+  deleteDeploymentProfile: vi.fn(),
   activateDeploymentProfile: vi.fn(),
 }));
 vi.mock("./api/quoteAdmin", () => ({

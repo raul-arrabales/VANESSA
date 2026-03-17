@@ -32,9 +32,17 @@ Unified registry and runtime governance endpoints:
 Platform control plane endpoints:
 
 - `GET /v1/platform/capabilities` (authenticated)
+- `GET /v1/platform/provider-families` (superadmin)
 - `GET /v1/platform/providers` (superadmin)
+- `POST /v1/platform/providers` (superadmin)
+- `PUT /v1/platform/providers/{id}` (superadmin)
+- `DELETE /v1/platform/providers/{id}` (superadmin)
 - `GET /v1/platform/deployments` (superadmin)
+- `GET /v1/platform/activation-audit` (superadmin)
 - `POST /v1/platform/deployments` (superadmin)
+- `PUT /v1/platform/deployments/{id}` (superadmin)
+- `POST /v1/platform/deployments/{id}/clone` (superadmin)
+- `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
 - `POST /v1/platform/vector/indexes/ensure` (superadmin)
@@ -53,6 +61,8 @@ Platform control plane semantics:
 - The vector-store data plane now resolves through the active `vector_store` binding for normalized ensure, upsert, query, and delete operations.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the same active `platform_runtime.capabilities.vector_store` snapshot.
+- Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
+- Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
 
 Model governance and runtime endpoints (canonical in Release N):
 

@@ -26,9 +26,17 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 ## Platform Control Plane
 
 - `GET /v1/platform/capabilities` (authenticated)
+- `GET /v1/platform/provider-families` (superadmin)
 - `GET /v1/platform/providers` (superadmin)
+- `POST /v1/platform/providers` (superadmin)
+- `PUT /v1/platform/providers/{id}` (superadmin)
+- `DELETE /v1/platform/providers/{id}` (superadmin)
 - `GET /v1/platform/deployments` (superadmin)
+- `GET /v1/platform/activation-audit` (superadmin)
 - `POST /v1/platform/deployments` (superadmin)
+- `PUT /v1/platform/deployments/{id}` (superadmin)
+- `POST /v1/platform/deployments/{id}/clone` (superadmin)
+- `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
 - `POST /v1/platform/vector/indexes/ensure` (superadmin)
@@ -54,6 +62,8 @@ Bootstrap defaults:
 - Superadmin-only vector proof routes exercise the real `vector_store` data plane through the active provider binding without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `vector_store` binding for explicit retrieval requests before model execution.
+- Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
+- Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
 
 ## Model Governance Endpoints (Release N Canonical)
 
