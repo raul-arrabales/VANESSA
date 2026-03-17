@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import type { AuthUser } from "../auth/types";
@@ -31,11 +31,7 @@ function renderSettings(initialPath = "/settings"): void {
   render(
     <ThemeProvider>
       <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/settings" element={<SettingsPage />}>
-            <Route path="design" element={<div>design-outlet</div>} />
-          </Route>
-        </Routes>
+        <SettingsPage />
       </MemoryRouter>
     </ThemeProvider>,
   );
@@ -57,12 +53,13 @@ describe("SettingsPage", () => {
   it("renders profile and personalization only for standard users", async () => {
     renderSettings("/settings");
 
-    expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
-    expect(screen.getByText("runtime-profile-section")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "settings.profile.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "settings.admin.title" })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Model access" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Open model access" })).toHaveAttribute("href", "/settings/model-access");
-    expect(screen.queryByLabelText("Enabled models list")).toBeNull();
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "settings.navigation.title" })).toBeNull();
+    expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
   });
 
   it("hides model and approvals controls for admins", async () => {
@@ -76,13 +73,13 @@ describe("SettingsPage", () => {
 
     renderSettings("/settings");
 
-    expect(await screen.findByRole("heading", { name: "settings.personalization.title" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "settings.admin.approvals" })).toBeNull();
-    expect(screen.queryByLabelText("user model scope")).toBeNull();
-    expect(screen.getByRole("link", { name: "Open model access" })).toHaveAttribute("href", "/settings/model-access");
+    expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
   });
 
-  it("keeps style editor and removes model catalog management from superadmin settings", async () => {
+  it("keeps canonical links for superadmin settings", async () => {
     mockUser = {
       id: 2,
       email: "root@example.com",
@@ -93,17 +90,10 @@ describe("SettingsPage", () => {
 
     renderSettings("/settings");
 
+    expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
     expect(await screen.findByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
-    expect(screen.getByRole("link", { name: "Open model access" })).toHaveAttribute("href", "/settings/model-access");
+    expect(screen.queryByText("runtime-profile-section")).toBeNull();
     expect(screen.queryByRole("heading", { name: "settings.superadmin.title" })).toBeNull();
-  });
-
-  it("renders nested outlet on /settings/design without overview cards", () => {
-    renderSettings("/settings/design");
-
-    expect(screen.getByText("design-outlet")).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "settings.personalization.title" })).toBeNull();
-    expect(screen.queryByLabelText("language.label")).toBeNull();
-    expect(screen.queryByTestId("theme-toggle")).toBeNull();
   });
 });

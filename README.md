@@ -13,6 +13,12 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Weaviate vector store
 - PostgreSQL database
 
+The backend also owns a GenAI control plane that distinguishes:
+
+- `capabilities` such as `llm_inference` and `vector_store`
+- `providers` such as `vllm_local`, `llama_cpp_local`, and `weaviate_local`
+- `deployment profiles` that bind capabilities to active providers
+
 ## Documentation Site
 
 Project documentation is published to GitHub Pages:
@@ -51,6 +57,7 @@ When running local staging (`./ops/local-staging/start.sh`), the LLM service is 
 
 - `GET /health`
   - Quick liveness/readiness probe.
+  - Backend `/system/health` also reports active capability/provider health for the platform control plane when initialized.
   - Example:
     ```bash
     curl -sS -i http://localhost:8000/health
@@ -205,6 +212,30 @@ Communication semantics (from generated architecture metadata) are directional s
 - Agent Engine -> LLM API, Sandbox, Weaviate, PostgreSQL
 - LLM API -> LLM Runtime (internal runtime execution path)
 - KWS -> Backend API (wake event webhook)
+
+## GenAI Control Plane
+
+Backend exposes platform control-plane endpoints for capability/provider management:
+
+- `GET /v1/platform/capabilities`
+- `GET /v1/platform/providers`
+- `GET /v1/platform/deployments`
+- `POST /v1/platform/deployments`
+- `POST /v1/platform/deployments/{id}/activate`
+- `POST /v1/platform/providers/{id}/validate`
+
+Current first-wave capabilities:
+
+- `llm_inference`
+- `vector_store`
+
+Current bootstrapped local providers:
+
+- `vllm_local`
+- `llama_cpp_local`
+- `weaviate_local`
+
+The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values so current local staging behavior remains compatible.
 
 ## License
 

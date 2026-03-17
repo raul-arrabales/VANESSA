@@ -9,14 +9,30 @@ export default function QuoteOfTheDayCard(): JSX.Element {
   const activeLanguage = i18n.resolvedLanguage?.split("-")[0] ?? "en";
   const [quote, setQuote] = useState<QuoteOfTheDay | null>(null);
   const [state, setState] = useState<QuoteLoadState>("loading");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  async function loadQuote(options?: { preserveCurrentQuote?: boolean }): Promise<void> {
+    if (options?.preserveCurrentQuote) {
+      setIsRefreshing(true);
+    } else {
+      setState("loading");
+    }
+
+    const nextQuote = await fetchQuoteOfTheDay(
+      activeLanguage,
+      options?.preserveCurrentQuote ? "random" : "daily",
+    );
+    setQuote(nextQuote);
+    setState("ready");
+    setIsRefreshing(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadQuote(): Promise<void> {
-      setState("loading");
+    async function syncQuote(): Promise<void> {
       try {
-        const nextQuote = await fetchQuoteOfTheDay(activeLanguage);
+        const nextQuote = await fetchQuoteOfTheDay(activeLanguage, "daily");
         if (cancelled) {
           return;
         }
@@ -26,16 +42,26 @@ export default function QuoteOfTheDayCard(): JSX.Element {
         if (cancelled) {
           return;
         }
+        setIsRefreshing(false);
         setState("error");
       }
     }
 
-    void loadQuote();
+    void syncQuote();
 
     return () => {
       cancelled = true;
     };
   }, [activeLanguage]);
+
+  const refreshQuote = async (): Promise<void> => {
+    try {
+      await loadQuote({ preserveCurrentQuote: true });
+    } catch {
+      setIsRefreshing(false);
+      setState("error");
+    }
+  };
 
   return (
     <aside className="quote-card" aria-live="polite">
@@ -60,6 +86,14 @@ export default function QuoteOfTheDayCard(): JSX.Element {
             <span>{quote.source_universe}</span>
             <span aria-hidden="true">/</span>
             <span>{t(`quoteOfTheDay.tones.${quote.tone}`, quote.tone)}</span>
+            <button
+              className="btn btn-secondary quote-card-refresh"
+              type="button"
+              onClick={() => void refreshQuote()}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? t("quoteOfTheDay.refreshing") : t("quoteOfTheDay.refresh")}
+            </button>
           </p>
         </div>
       )}

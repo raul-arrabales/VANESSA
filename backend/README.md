@@ -10,6 +10,7 @@ Current voice-related endpoints:
 System diagnostics endpoints:
 
 - `GET /system/health` returns aggregate reachability for core services.
+  - Includes active capability/provider health from the platform control plane when available.
 - `GET /system/architecture` returns generated architecture graph JSON.
 - `GET /system/architecture.svg` returns generated architecture diagram SVG.
 
@@ -25,6 +26,22 @@ Unified registry and runtime governance endpoints:
 - `GET /v1/registry/{type}/{id}/shares`
 - `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
 - `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
+
+Platform control plane endpoints:
+
+- `GET /v1/platform/capabilities` (authenticated)
+- `GET /v1/platform/providers` (superadmin)
+- `GET /v1/platform/deployments` (superadmin)
+- `POST /v1/platform/deployments` (superadmin)
+- `POST /v1/platform/deployments/{id}/activate` (superadmin)
+- `POST /v1/platform/providers/{id}/validate` (superadmin)
+
+Platform control plane semantics:
+
+- `capabilities` represent platform functions such as `llm_inference` and `vector_store`.
+- `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, and `weaviate_local`.
+- `deployment profiles` define the active capability-to-provider bindings.
+- Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 
 Model governance and runtime endpoints (canonical in Release N):
 
@@ -50,6 +67,7 @@ Model visibility semantics:
   - role-scope assignments from `model_scope_assignments` (`/v1/model-governance/assignments`)
   - explicit user/group/global assignments (`model_user_assignments`, `model_group_assignments`, `model_global_assignments`)
 - Runtime profile filtering (for example offline restrictions) still applies after assignment resolution.
+- This model governance layer remains separate from platform provider binding; it controls model access, not infra selection.
 
 Agent execution proxy endpoints:
 

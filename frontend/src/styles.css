@@ -261,8 +261,69 @@ a {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+  align-items: center;
   color: var(--text-secondary);
   font-size: 0.92rem;
+}
+
+.quote-card-refresh {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.84rem;
+}
+
+.quote-admin-page {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.quote-admin-header,
+.quote-admin-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.quote-admin-summary-grid,
+.quote-admin-filter-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.quote-admin-summary-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.quote-admin-summary-value {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  letter-spacing: 0.06em;
+}
+
+.quote-admin-textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.quote-admin-checkbox-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.quote-admin-modal {
+  width: min(56rem, 100%);
+  max-height: min(90vh, 52rem);
+  overflow: auto;
 }
 
 .modal-backdrop {
@@ -316,6 +377,11 @@ a {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-4);
   align-items: start;
+}
+
+.app-header.panel {
+  overflow: visible;
+  z-index: 40;
 }
 
 .eyebrow {
@@ -559,7 +625,7 @@ a {
   padding: var(--space-2);
   display: grid;
   gap: var(--space-1);
-  z-index: 20;
+  z-index: 120;
 }
 
 .user-menu-item {
@@ -654,6 +720,7 @@ a {
   padding: var(--space-2) var(--space-4);
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--easing-standard),
@@ -921,6 +988,7 @@ a {
   .toolbar {
     justify-content: flex-start;
   }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

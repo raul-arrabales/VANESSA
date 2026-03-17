@@ -8,6 +8,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - API endpoints for frontend clients
 - Orchestration with agent engine, vector store, and data layer
 - Authentication and authorization surface (present and future)
+- GenAI control plane for capability/provider/deployment-profile management
 
 ## Current Voice Endpoints
 
@@ -21,6 +22,24 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/registry/tools`
 - `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
 - `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
+
+## Platform Control Plane
+
+- `GET /v1/platform/capabilities` (authenticated)
+- `GET /v1/platform/providers` (superadmin)
+- `GET /v1/platform/deployments` (superadmin)
+- `POST /v1/platform/deployments` (superadmin)
+- `POST /v1/platform/deployments/{id}/activate` (superadmin)
+- `POST /v1/platform/providers/{id}/validate` (superadmin)
+
+Key terms:
+
+- `capability`: platform function such as `llm_inference` or `vector_store`
+- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, or `weaviate_local`
+- `deployment profile`: named set of active capability bindings
+- `adapter`: capability-specific backend client used by runtime paths
+
+This layer stays separate from user-facing model/provider governance. Model governance decides which models users can access; the platform control plane decides which infrastructure implementation powers a capability.
 
 ## Model Governance Endpoints (Release N Canonical)
 

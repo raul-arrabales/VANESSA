@@ -13,14 +13,19 @@ type QuoteOfTheDayResponse = {
   quote: QuoteOfTheDay;
 };
 
+type QuoteSelectionMode = "daily" | "random";
+
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 function buildUrl(path: string): string {
   return `${backendBaseUrl.replace(/\/$/, "")}${path}`;
 }
 
-export async function fetchQuoteOfTheDay(language: string): Promise<QuoteOfTheDay> {
-  const params = new URLSearchParams({ lang: language });
+export async function fetchQuoteOfTheDay(
+  language: string,
+  selection: QuoteSelectionMode = "daily",
+): Promise<QuoteOfTheDay> {
+  const params = new URLSearchParams({ lang: language, selection });
   const response = await fetch(buildUrl(`/v1/content/quote-of-the-day?${params.toString()}`), {
     headers: {
       Accept: "application/json",

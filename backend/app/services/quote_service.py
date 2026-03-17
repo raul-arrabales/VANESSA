@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import hashlib
+import random
 from typing import Any
 
 from ..repositories.quotes import list_active_quotes
@@ -51,6 +52,15 @@ def select_quote_for_day(quotes: list[dict[str, Any]], *, language: str, selecte
     return selected
 
 
+def select_random_quote(quotes: list[dict[str, Any]], *, selected_date: date) -> dict[str, Any]:
+    if not quotes:
+        raise ValueError("quotes are required")
+
+    selected = dict(random.choice(quotes))
+    selected["date"] = _date_key(selected_date)
+    return selected
+
+
 def fallback_quote(*, language: str, selected_date: date) -> dict[str, Any]:
     normalized = normalize_language(language)
     template = _FALLBACK_QUOTES.get(normalized, _FALLBACK_QUOTES[DEFAULT_LANGUAGE])
@@ -70,6 +80,7 @@ def resolve_quote_of_the_day(
     database_url: str,
     *,
     language: str | None,
+    selection_mode: str = "daily",
     now: datetime | None = None,
 ) -> dict[str, Any]:
     normalized = normalize_language(language)
@@ -77,11 +88,15 @@ def resolve_quote_of_the_day(
 
     requested_quotes = list_active_quotes(database_url, normalized)
     if requested_quotes:
+        if selection_mode == "random":
+            return select_random_quote(requested_quotes, selected_date=selected_date)
         return select_quote_for_day(requested_quotes, language=normalized, selected_date=selected_date)
 
     if normalized != DEFAULT_LANGUAGE:
         default_quotes = list_active_quotes(database_url, DEFAULT_LANGUAGE)
         if default_quotes:
+            if selection_mode == "random":
+                return select_random_quote(default_quotes, selected_date=selected_date)
             return select_quote_for_day(default_quotes, language=DEFAULT_LANGUAGE, selected_date=selected_date)
 
     return fallback_quote(language=normalized, selected_date=selected_date)

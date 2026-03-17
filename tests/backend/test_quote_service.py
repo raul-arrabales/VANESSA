@@ -45,6 +45,19 @@ def test_select_quote_for_day_changes_with_date_when_pool_allows() -> None:
     assert first["id"] != second["id"]
 
 
+def test_select_random_quote_uses_random_choice(monkeypatch) -> None:
+    quotes = [_quote_template(1), _quote_template(2), _quote_template(3)]
+    monkeypatch.setattr(quote_service.random, "choice", lambda rows: rows[-1])
+
+    selected = quote_service.select_random_quote(
+        quotes,
+        selected_date=datetime(2026, 3, 11, tzinfo=timezone.utc).date(),
+    )
+
+    assert selected["id"] == 3
+    assert selected["date"] == "2026-03-11"
+
+
 def test_resolve_quote_of_the_day_falls_back_to_default_language(monkeypatch) -> None:
     quote_rows = [_quote_template(9, language="en", text="English only")]
 
@@ -61,6 +74,27 @@ def test_resolve_quote_of_the_day_falls_back_to_default_language(monkeypatch) ->
 
     assert resolved["text"] == "English only"
     assert resolved["language"] == "en"
+
+
+def test_resolve_quote_of_the_day_supports_random_selection(monkeypatch) -> None:
+    quote_rows = [
+        _quote_template(1, language="en", text="First"),
+        _quote_template(2, language="en", text="Second"),
+    ]
+
+    monkeypatch.setattr(quote_service, "list_active_quotes", lambda *_args, **_kwargs: quote_rows)
+    monkeypatch.setattr(quote_service.random, "choice", lambda rows: rows[1])
+
+    resolved = quote_service.resolve_quote_of_the_day(
+        "postgresql://ignored",
+        language="en",
+        selection_mode="random",
+        now=datetime(2026, 3, 11, tzinfo=timezone.utc),
+    )
+
+    assert resolved["id"] == 2
+    assert resolved["text"] == "Second"
+    assert resolved["date"] == "2026-03-11"
 
 
 def test_resolve_quote_of_the_day_returns_code_fallback_when_store_is_empty(monkeypatch) -> None:

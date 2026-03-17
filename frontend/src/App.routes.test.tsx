@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
 import App from "./App";
+import { renderWithAppProviders } from "./test/renderWithAppProviders";
+import { t } from "./test/translation";
 
 let mockUser: AuthUser | null = null;
 
@@ -45,6 +46,26 @@ vi.mock("./api/models", () => ({
   registerManagedModel: vi.fn(),
   listAvailableManagedModels: vi.fn(async () => []),
 }));
+vi.mock("./api/quoteAdmin", () => ({
+  fetchQuoteSummary: vi.fn(async () => ({
+    total: 2,
+    active: 2,
+    approved: 2,
+    by_language: [],
+    by_tone: [],
+    by_origin: [],
+  })),
+  fetchQuotes: vi.fn(async () => ({
+    items: [],
+    page: 1,
+    page_size: 10,
+    total: 0,
+    filters: {},
+  })),
+  fetchQuoteById: vi.fn(),
+  createQuote: vi.fn(),
+  updateQuote: vi.fn(),
+}));
 
 describe("App superadmin models route", () => {
   it("renders the page for superadmin", async () => {
@@ -56,13 +77,9 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/welcome/superadmin/models"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("heading", { name: "models.title" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("models.title") })).toBeVisible();
   });
 
   it("blocks non-superadmin users", async () => {
@@ -74,12 +91,79 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    render(
-      <MemoryRouter initialEntries={["/welcome/superadmin/models"]}>
-        <App />
-      </MemoryRouter>,
-    );
+    await renderWithAppProviders(<App />, { route: "/control/system-health" });
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("renders the quote management page for admin users", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/quotes" });
+
+    expect(await screen.findByRole("heading", { name: await t("quoteAdmin.title") })).toBeVisible();
+  });
+
+  it("blocks regular users from the quote management route", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/quotes" });
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("falls through removed legacy routes to not-found", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/chat" });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
+  });
+
+  it("always shows Home as the first breadcrumb link", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models" });
+
+    const breadcrumbLinks = await screen.findAllByRole("link", { name: await t("nav.home") });
+    expect(breadcrumbLinks[0]).toHaveAttribute("href", "/");
+  });
+
+  it("renders the control breadcrumb with the control panel label", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models" });
+
+    expect(await screen.findByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
   });
 });

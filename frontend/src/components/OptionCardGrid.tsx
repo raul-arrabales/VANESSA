@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-export type OptionCardIconName = "profile" | "approvals" | "health" | "userPage" | "adminPage" | "models";
+export type OptionCardIconName = "profile" | "approvals" | "health" | "userPage" | "adminPage" | "models" | "ai";
 
 export type OptionCardItem = {
   id: string;
@@ -46,6 +46,11 @@ const iconByName: Record<OptionCardIconName, JSX.Element> = {
   models: (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <path d="M4 6c0-1.1.9-2 2-2h12a2 2 0 0 1 2 2v2H4V6Zm0 4h16v4H4v-4Zm0 6h16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2Z" />
+    </svg>
+  ),
+  ai: (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M12 2a3 3 0 0 1 3 3v1h1.5A2.5 2.5 0 0 1 19 8.5V10h1a2 2 0 1 1 0 4h-1v1.5A2.5 2.5 0 0 1 16.5 18H15v1a3 3 0 1 1-6 0v-1H7.5A2.5 2.5 0 0 1 5 15.5V14H4a2 2 0 1 1 0-4h1V8.5A2.5 2.5 0 0 1 7.5 6H9V5a3 3 0 0 1 3-3Zm-1 4H9v2h2V6Zm4 0h-2v2h2V6Zm-3 5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-5 1H8v3h3.5a3.97 3.97 0 0 1-.5-2c0-.36.05-.7.14-1H11Zm5.5 0c.09.3.14.64.14 1 0 .74-.2 1.41-.54 2H16v-3h-1.5Z" />
     </svg>
   ),
 };

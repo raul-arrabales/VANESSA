@@ -9,6 +9,8 @@ from .config import AuthConfig
 from .db import get_connection
 from .repositories.users import find_user_by_id
 from .services import auth_request_context, auth_runtime, system_health
+from .services.platform_service import get_active_capability_statuses
+from .services.platform_types import PlatformControlPlaneError
 
 app = Flask(__name__)
 
@@ -132,15 +134,26 @@ def system_health_route():
         },
     ]
 
-    return (
-        jsonify(
-            {
-                "status": "ok" if all(service["reachable"] for service in services) else "degraded",
-                "services": services,
-            }
-        ),
-        200,
-    )
+    response_payload: dict[str, Any] = {
+        "status": "ok" if all(service["reachable"] for service in services) else "degraded",
+        "services": services,
+    }
+    try:
+        response_payload["platform"] = {
+            "capabilities": get_active_capability_statuses(config.database_url, config),
+        }
+    except PlatformControlPlaneError as exc:
+        response_payload["platform"] = {
+            "error": exc.code,
+            "message": exc.message,
+        }
+    except Exception:
+        response_payload["platform"] = {
+            "error": "platform_health_unavailable",
+            "message": "Platform capability health is currently unavailable",
+        }
+
+    return jsonify(response_payload), 200
 
 
 @app.get("/system/architecture")
@@ -178,7 +191,9 @@ from .routes import model_catalog_v1 as model_catalog_v1_routes
 from .routes import model_governance as model_governance_routes
 from .routes import model_management_v1 as model_management_v1_routes
 from .routes import model_inference_v1 as model_inference_v1_routes
+from .routes import platform as platform_routes
 from .routes import policy as policy_routes
+from .routes import quotes_v1 as quotes_v1_routes
 from .routes import registry as registry_routes
 from .routes import registry_models as registry_models_routes
 from .routes import runtime as runtime_routes
@@ -191,11 +206,13 @@ app.register_blueprint(system_routes.bp)
 app.register_blueprint(registry_models_routes.bp)
 app.register_blueprint(registry_routes.bp)
 app.register_blueprint(policy_routes.bp)
+app.register_blueprint(quotes_v1_routes.bp)
 app.register_blueprint(runtime_routes.bp)
 app.register_blueprint(executions_routes.bp)
 app.register_blueprint(model_governance_routes.bp)
 app.register_blueprint(model_catalog_v1_routes.bp)
 app.register_blueprint(model_management_v1_routes.bp)
 app.register_blueprint(model_inference_v1_routes.bp)
+app.register_blueprint(platform_routes.bp)
 app.register_blueprint(auth_legacy_routes.bp)
 app.register_blueprint(voice_legacy_routes.bp)

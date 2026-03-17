@@ -16,7 +16,7 @@ const items: OptionCardItem[] = [
     id: "approvals",
     title: "Process user approvals",
     description: "Use admin approval workflow to activate pending accounts.",
-    to: "/admin/approvals",
+    to: "/control/approvals",
     icon: "approvals",
   },
 ];
@@ -31,7 +31,7 @@ describe("OptionCardGrid", () => {
 
     expect(screen.getByRole("list", { name: "Available actions" })).toBeVisible();
     expect(screen.getByRole("link", { name: "View your profile" })).toHaveAttribute("href", "/settings");
-    expect(screen.getByRole("link", { name: "Process user approvals" })).toHaveAttribute("href", "/admin/approvals");
+    expect(screen.getByRole("link", { name: "Process user approvals" })).toHaveAttribute("href", "/control/approvals");
     expect(container.querySelectorAll(".option-card-icon svg")).toHaveLength(items.length);
   });
 

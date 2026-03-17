@@ -8,25 +8,30 @@
   "nav": {
     "aria": "Navegacion principal",
     "home": "Inicio",
+    "control": "Control",
+    "controlPanel": "Panel de control",
+    "ai": "Vanessa AI",
+    "chat": "Chat",
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
     "guest": "Invitado",
     "approvals": "Aprobaciones",
-    "backendHealth": "Salud del backend",
+    "quotes": "Citas",
+    "systemHealth": "Salud del sistema",
+    "models": "Modelos",
     "settings": "Configuración",
-    "welcome": {
-      "user": "Inicio de usuario",
-      "admin": "Inicio de admin",
-      "superadmin": "Panel de control de superadministrador"
-    },
+    "designEditor": "Editor de diseno",
     "settingsMenuLabel": "Menú de identidad y configuración",
     "settingsHome": "Configuración",
     "settingsDesign": "Recursos de diseño",
     "breadcrumbs": {
       "aria": "Navegación de migas",
       "approvals": "Aprobaciones",
-      "backendHealth": "Salud del backend",
+      "quotes": "Citas",
+      "control": "Control",
+      "systemHealth": "Salud del sistema",
+      "ai": "Vanessa AI",
       "chat": "Chatbot",
       "design": "Diseño",
       "models": "Modelos",
@@ -179,17 +184,58 @@
   "home": {
     "guest": {
       "title": "Bienvenido a VANESSA",
-      "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola local de IA.",
+      "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola de IA.",
       "actions": "Acciones rapidas para invitados",
       "login": "Ir a inicio de sesion",
       "register": "Crear una cuenta"
     },
     "authenticated": {
       "title": "Bienvenido de nuevo",
-      "description": "Has iniciado sesion como {{username}}. Abre tu perfil o ejecuta diagnosticos del backend.",
+      "description": "Has iniciado sesion como {{username}}. Abre tu perfil, panel de control o espacio Vanessa AI.",
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
-      "backendHealth": "Ejecutar diagnosticos del backend"
+      "control": "Abrir panel de control",
+      "aiChat": "Abrir chat de IA"
+    }
+  },
+  "control": {
+    "title": "Panel de control de {{username}}",
+    "description": "Usa tu superficie de control por rol para gestionar herramientas de cuenta, aprobaciones, modelos y operaciones.",
+    "aria": "Destinos del panel de control",
+    "items": {
+      "profile": {
+        "title": "Perfil y configuracion",
+        "description": "Revisa los detalles de tu cuenta y personaliza la interfaz."
+      },
+      "models": {
+        "title": "Modelos",
+        "description": "Gestiona credenciales de modelos, modelos registrados y capacidades permitidas."
+      },
+      "ai": {
+        "title": "Vanessa AI",
+        "description": "Abre el espacio de IA y continua tus conversaciones."
+      },
+      "approvals": {
+        "title": "Aprobaciones de usuarios",
+        "description": "Revisa y activa cuentas de usuario pendientes."
+      },
+      "quotes": {
+        "title": "Gestion de citas",
+        "description": "Busca, revisa, edita y agrega entradas para la cita del dia."
+      },
+      "systemHealth": {
+        "title": "Salud del sistema",
+        "description": "Inspecciona el estado en vivo de los servicios y arquitectura de VANESSA."
+      }
+    }
+  },
+  "ai": {
+    "title": "Vanessa AI",
+    "description": "Abre flujos impulsados por IA y mantien tu espacio de chat organizado en una seccion dedicada.",
+    "aria": "Destinos de Vanessa AI",
+    "chat": {
+      "title": "Espacio de chat",
+      "description": "Inicia o continua una conversacion con modelos dentro de la consola Vanessa AI."
     }
   },
   "quoteOfTheDay": {
@@ -197,9 +243,86 @@
     "title": "Cita del dia",
     "loading": "Cargando la cita de hoy...",
     "error": "No se pudo cargar la cita del dia ahora mismo.",
+    "refresh": "Nueva cita",
+    "refreshing": "Cargando...",
     "tones": {
       "funny": "Divertida",
       "reflective": "Reflexiva"
+    }
+  },
+  "quoteAdmin": {
+    "title": "Gestion de citas",
+    "description": "Revisa el catalogo de citas, filtra entradas, edita registros y agrega nuevas.",
+    "actions": {
+      "new": "Nueva cita",
+      "search": "Buscar citas",
+      "edit": "Editar",
+      "cancel": "Cancelar",
+      "save": "Guardar cita",
+      "saving": "Guardando..."
+    },
+    "summary": {
+      "loading": "Cargando resumen de citas...",
+      "total": "Citas totales",
+      "active": "Citas activas",
+      "approved": "Citas aprobadas",
+      "languages": "Idiomas",
+      "tones": "Tonos",
+      "origins": "Origenes"
+    },
+    "filters": {
+      "title": "Filtros de busqueda",
+      "query": "Texto, autor o fuente",
+      "language": "Idioma",
+      "source": "Universo de origen",
+      "tone": "Tono",
+      "origin": "Origen",
+      "createdFrom": "Creado desde",
+      "createdTo": "Creado hasta"
+    },
+    "list": {
+      "title": "Lista de citas",
+      "loading": "Cargando citas...",
+      "empty": "No hay citas para los filtros actuales.",
+      "results": "{{total}} citas coincidentes",
+      "tableAria": "Resultados de gestion de citas",
+      "columns": {
+        "id": "ID",
+        "text": "Texto",
+        "author": "Autor",
+        "source": "Fuente",
+        "tone": "Tono",
+        "language": "Idioma",
+        "updated": "Actualizado",
+        "actions": "Acciones"
+      }
+    },
+    "pagination": {
+      "previous": "Anterior",
+      "next": "Siguiente",
+      "page": "Pagina {{page}} de {{totalPages}}"
+    },
+    "editor": {
+      "createTitle": "Crear cita",
+      "editTitle": "Editar cita",
+      "loading": "Cargando detalles de la cita...",
+      "selectPrompt": "Selecciona una cita de la lista o crea una nueva.",
+      "fields": {
+        "language": "Idioma",
+        "author": "Autor",
+        "sourceUniverse": "Universo de origen",
+        "tone": "Tono",
+        "origin": "Origen",
+        "externalRef": "Referencia externa",
+        "text": "Texto de la cita",
+        "tags": "Etiquetas",
+        "isActive": "Activa",
+        "isApproved": "Aprobada"
+      }
+    },
+    "feedback": {
+      "created": "Cita creada.",
+      "updated": "Cita actualizada."
     }
   },
   "settings": {
@@ -253,6 +376,7 @@
     },
     "navigation": {
       "title": "Navegación de configuración",
+      "description": "Usa rutas canonicas de configuracion y control en lugar de subpaginas ocultas.",
       "overview": "Resumen",
       "design": "Diseño"
     },
@@ -314,6 +438,11 @@
         "modelRegisterFailed": "No se pudo registrar el modelo."
       }
     }
+  },
+  "modelsHub": {
+    "title": "Gestion de modelos",
+    "description": "Gestiona tus credenciales, registra modelos accesibles y revisa lo disponible para tu cuenta.",
+    "superadminDescription": "Gestiona acceso personal a modelos ademas del catalogo de plataforma, asignaciones, descubrimiento y descargas."
   },
   "models": {
     "title": "Gestion del catalogo de modelos",

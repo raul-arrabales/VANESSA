@@ -14,7 +14,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         content_routes,
         "resolve_quote_of_the_day",
-        lambda _database_url, *, language: {
+        lambda _database_url, *, language, selection_mode: {
             "id": 7,
             "text": f"Quote in {language}",
             "author": "VANESSA Curated",
@@ -44,3 +44,33 @@ def test_quote_of_the_day_route_is_public_and_uses_requested_language(client) ->
             "origin": "local",
         }
     }
+
+
+def test_quote_of_the_day_route_supports_random_selection_mode(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(
+        content_routes,
+        "resolve_quote_of_the_day",
+        lambda _database_url, *, language, selection_mode: captured.update(
+            {"language": language, "selection_mode": selection_mode}
+        )
+        or {
+            "id": 8,
+            "text": "Random quote",
+            "author": "VANESSA Curated",
+            "source_universe": "Original",
+            "tone": "reflective",
+            "language": language,
+            "date": "2026-03-11",
+            "origin": "local",
+        },
+    )
+
+    response = client.get("/v1/content/quote-of-the-day?lang=en&selection=random")
+
+    assert response.status_code == 200
+    assert captured == {"language": "en", "selection_mode": "random"}
