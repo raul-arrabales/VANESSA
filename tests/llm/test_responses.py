@@ -95,8 +95,8 @@ def test_provider_error_maps_to_http_exception(monkeypatch: pytest.MonkeyPatch) 
     )
     resolved = registry.resolve_model("dummy")
 
-    def fail_generate(_request: ResponseRequest, *, upstream_model: str):
-        _ = (_request, upstream_model)
+    def fail_generate(self, _request: ResponseRequest, *, upstream_model: str):
+        _ = (self, _request, upstream_model)
         raise ProviderError(
             status_code=429,
             code="dummy_rate_limited",
@@ -115,7 +115,8 @@ def test_local_embeddings_model_returns_embedding_payload(monkeypatch: pytest.Mo
     request = EmbeddingRequest(model="local-vllm-embeddings-default", input=["hello"])
     resolved = registry.resolve_model("local-vllm-embeddings-default")
 
-    def fake_embed(_request: EmbeddingRequest, *, upstream_model: str):
+    def fake_embed(self, _request: EmbeddingRequest, *, upstream_model: str):
+        _ = self
         assert upstream_model
         assert _request.input == ["hello"]
         return type("EmbeddingResult", (), {"embeddings": [[0.1, 0.2]], "prompt_tokens": 3})()
