@@ -18,6 +18,13 @@ export default function AiPage(): JSX.Element {
             to: "/ai/chat",
             icon: "ai",
           },
+          {
+            id: "knowledge",
+            title: t("ai.knowledge.title"),
+            description: t("ai.knowledge.description"),
+            to: "/ai/knowledge",
+            icon: "ai",
+          },
         ]}
       />
     </section>

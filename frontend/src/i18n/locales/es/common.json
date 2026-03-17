@@ -12,6 +12,7 @@
     "controlPanel": "Panel de control",
     "ai": "Vanessa AI",
     "chat": "Chat",
+    "knowledge": "Chat de conocimiento",
     "login": "Iniciar sesion",
     "register": "Registro",
     "me": "Perfil",
@@ -35,6 +36,7 @@
       "platform": "Control de plataforma",
       "ai": "Vanessa AI",
       "chat": "Chatbot",
+      "knowledge": "Chat de conocimiento",
       "design": "Diseño",
       "models": "Modelos",
       "welcome": "Bienvenida"
@@ -242,6 +244,41 @@
     "chat": {
       "title": "Espacio de chat",
       "description": "Inicia o continua una conversacion con modelos dentro de la consola Vanessa AI."
+    },
+    "knowledge": {
+      "title": "Chat de conocimiento",
+      "description": "Haz preguntas sobre el corpus compartido y revisa citas con fragmentos de soporte."
+    }
+  },
+  "knowledgeChat": {
+    "title": "Chat de conocimiento",
+    "description": "Consulta el corpus compartido con una conversacion separada y respaldada por citas.",
+    "actions": {
+      "newChat": "Nuevo chat de conocimiento",
+      "send": "Consultar",
+      "sending": "Buscando..."
+    },
+    "fields": {
+      "model": "Modelo",
+      "message": "Mensaje",
+      "placeholder": "Haz una pregunta sobre la base de conocimiento compartida"
+    },
+    "labels": {
+      "you": "Tu",
+      "assistant": "Chat de conocimiento"
+    },
+    "sources": {
+      "title": "Fuentes"
+    },
+    "states": {
+      "empty": "Aun no hay mensajes. Haz una pregunta para recuperar contexto con conocimiento.",
+      "noModels": "No hay modelos habilitados",
+      "modelsError": "No se pudieron cargar los modelos.",
+      "requestError": "La solicitud de chat de conocimiento fallo."
+    },
+    "aria": {
+      "panel": "Panel de chat de conocimiento",
+      "history": "Historial de conversaciones del chat de conocimiento"
     }
   },
   "quoteOfTheDay": {

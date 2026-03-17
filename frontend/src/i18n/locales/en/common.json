@@ -12,6 +12,7 @@
     "controlPanel": "Control Panel",
     "ai": "Vanessa AI",
     "chat": "Chat",
+    "knowledge": "Knowledge Chat",
     "login": "Login",
     "register": "Register",
     "me": "Profile",
@@ -35,6 +36,7 @@
       "platform": "Platform control",
       "ai": "Vanessa AI",
       "chat": "Chatbot",
+      "knowledge": "Knowledge Chat",
       "design": "Design",
       "models": "Models",
       "welcome": "Welcome"
@@ -242,6 +244,41 @@
     "chat": {
       "title": "Chat workspace",
       "description": "Start or continue a model-backed conversation in the Vanessa AI console."
+    },
+    "knowledge": {
+      "title": "Knowledge chat",
+      "description": "Ask questions against the shared knowledge corpus and review cited source snippets."
+    }
+  },
+  "knowledgeChat": {
+    "title": "Knowledge Chat",
+    "description": "Search the shared knowledge corpus while keeping a separate citation-backed conversation history.",
+    "actions": {
+      "newChat": "New knowledge chat",
+      "send": "Ask knowledge chat",
+      "sending": "Searching..."
+    },
+    "fields": {
+      "model": "Model",
+      "message": "Message",
+      "placeholder": "Ask a question about the shared knowledge base"
+    },
+    "labels": {
+      "you": "You",
+      "assistant": "Knowledge Chat"
+    },
+    "sources": {
+      "title": "Sources"
+    },
+    "states": {
+      "empty": "No messages yet. Ask a question to retrieve knowledge-backed context.",
+      "noModels": "No enabled models",
+      "modelsError": "Unable to load models.",
+      "requestError": "Knowledge chat request failed."
+    },
+    "aria": {
+      "panel": "Knowledge chat panel",
+      "history": "Knowledge chat conversation history"
     }
   },
   "quoteOfTheDay": {

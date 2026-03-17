@@ -63,11 +63,13 @@ Bootstrap defaults:
 - Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
+- `POST /v1/chat/knowledge` is the first product-facing RAG surface. It keeps frontend chat state browser-local, resolves the selected model through model governance, executes the fixed `agent.knowledge_chat` agent through backend-owned orchestration, and returns normalized `sources` plus `retrieval` metadata for citation rendering.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
 
 ## Model Governance Endpoints (Release N Canonical)
 
+- `POST /v1/chat/knowledge`
 - `GET /v1/models/catalog`
 - `POST /v1/models/catalog`
 - `GET /v1/models/discovery/huggingface`

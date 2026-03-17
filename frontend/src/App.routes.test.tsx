@@ -46,6 +46,9 @@ vi.mock("./api/models", () => ({
   registerManagedModel: vi.fn(),
   listAvailableManagedModels: vi.fn(async () => []),
 }));
+vi.mock("./api/knowledge", () => ({
+  runKnowledgeChat: vi.fn(),
+}));
 vi.mock("./api/platform", () => ({
   listPlatformCapabilities: vi.fn(async () => [
     {
@@ -227,6 +230,20 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/chat" });
 
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeVisible();
+  });
+
+  it("renders the knowledge chat page for authenticated users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/ai/knowledge" });
+
+    expect(await screen.findByRole("heading", { name: await t("knowledgeChat.title") })).toBeVisible();
   });
 
   it("always shows Home as the first breadcrumb link", async () => {

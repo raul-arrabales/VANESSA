@@ -331,10 +331,12 @@ def _execute_model_call(
     effective_messages = _prepend_retrieval_context(messages, retrieval_results=retrieval_results)
 
     runtime_snapshot = platform_runtime if isinstance(platform_runtime, dict) else {}
+    requested_model_override = str(execution_input.get("model", "")).strip() or None
+    effective_requested_model = requested_model_override or model_ref
     try:
         client = build_llm_runtime_client(runtime_snapshot)
         completion = client.chat_completion(
-            requested_model=model_ref,
+            requested_model=effective_requested_model,
             messages=effective_messages,
         )
     except LlmRuntimeClientError as exc:
@@ -361,7 +363,7 @@ def _execute_model_call(
 
     llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
     deployment_profile = runtime_snapshot.get("deployment_profile", {})
-    effective_model = str(completion.get("requested_model", "")).strip() or model_ref
+    effective_model = str(completion.get("requested_model", "")).strip() or effective_requested_model
     return (
         {
             "output_text": str(completion.get("output_text", "")),
@@ -462,13 +464,15 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             agent_entity=agent_entity,
             runtime_profile=runtime_profile,
         )
+        requested_model_override = str(normalized_input.get("model", "")).strip() or None
+        running_model_ref = requested_model_override or model_ref
         running_started_at = _iso_now()
         running = _build_execution(
             execution_id=execution_id,
             status="running",
             agent_ref=agent_id,
             agent_version=agent_version,
-            model_ref=model_ref,
+            model_ref=running_model_ref,
             runtime_profile=runtime_profile,
             created_at=created_at,
             started_at=running_started_at,

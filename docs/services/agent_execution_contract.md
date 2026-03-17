@@ -17,6 +17,7 @@
   "agent_id": "agent.alpha",
   "input": {
     "prompt": "hello",
+    "model": "optional-model-override",
     "retrieval": {
       "index": "knowledge_base",
       "query": "optional explicit retrieval query",
@@ -124,6 +125,8 @@
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
 `input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
+
+`input.model` is optional and execution-scoped. When present, agent engine uses it as the requested LLM model instead of the agent spec default. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 
 ## Error Codes
 

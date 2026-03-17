@@ -207,6 +207,7 @@ def system_architecture_svg():
 # Register modular v1 blueprints.
 from .routes import auth as auth_routes
 from .routes import auth_legacy_routes
+from .routes import chat as chat_routes
 from .routes import content as content_routes
 from .routes import executions as executions_routes
 from .routes import model_catalog_v1 as model_catalog_v1_routes
@@ -223,6 +224,7 @@ from .routes import system as system_routes
 from .routes import voice_legacy_routes
 
 app.register_blueprint(auth_routes.bp)
+app.register_blueprint(chat_routes.bp)
 app.register_blueprint(content_routes.bp)
 app.register_blueprint(system_routes.bp)
 app.register_blueprint(registry_models_routes.bp)

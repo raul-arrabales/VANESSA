@@ -26,6 +26,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/models/catalog",
         "/v1/models/discovery/huggingface",
         "/v1/models/downloads",
+        "/v1/chat/knowledge",
         "/v1/models/inference",
         "/v1/models/generate",
         "/v1/platform/capabilities",

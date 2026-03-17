@@ -1,0 +1,214 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+from flask import g
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_PATH = PROJECT_ROOT / "backend"
+if str(BACKEND_PATH) not in sys.path:
+    sys.path.insert(0, str(BACKEND_PATH))
+
+from app.app import app  # noqa: E402
+from app.config import AuthConfig  # noqa: E402
+from app.services import knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
+
+
+def _config(**overrides) -> AuthConfig:
+    payload = {
+        "database_url": "postgresql://ignored",
+        "jwt_secret": "test-secret",
+        "model_credentials_encryption_key": "test-secret",
+        "jwt_algorithm": "HS256",
+        "access_token_ttl_seconds": 28_800,
+        "allow_self_register": True,
+        "bootstrap_superadmin_email": "",
+        "bootstrap_superadmin_username": "",
+        "bootstrap_superadmin_password": "",
+        "flask_env": "development",
+    }
+    payload.update(overrides)
+    return AuthConfig(**payload)
+
+
+def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        knowledge_chat_service,
+        "resolve_model_for_inference",
+        lambda _db, *, user_id, requested_model_id: (f"{requested_model_id}-resolved", None, 200),
+    )
+    monkeypatch.setattr(knowledge_chat_service, "ensure_knowledge_chat_agent", lambda _db: True)
+    monkeypatch.setattr(
+        knowledge_chat_service,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+    )
+    monkeypatch.setattr(knowledge_chat_service, "resolve_runtime_profile", lambda _db: "offline")
+
+    seen_calls: list[dict[str, object]] = []
+
+    def _create_execution(**kwargs):
+        seen_calls.append(kwargs)
+        return (
+            {
+                "execution": {
+                    "id": "exec-knowledge",
+                    "status": "succeeded",
+                    "result": {
+                        "output_text": "retrieval answer",
+                        "retrieval_calls": [
+                            {
+                                "index": "knowledge_base",
+                                "result_count": 1,
+                                "results": [
+                                    {
+                                        "id": "doc-1",
+                                        "text": "A long explanation about retrieval in VANESSA.",
+                                        "metadata": {
+                                            "title": "Architecture Overview",
+                                            "uri": "https://example.com/architecture",
+                                            "source_type": "doc",
+                                        },
+                                        "score": 0.92,
+                                        "score_kind": "similarity",
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                }
+            },
+            201,
+        )
+
+    with app.test_request_context("/v1/chat/knowledge"):
+        g.current_user = {"id": 7, "role": "user"}
+        payload, status_code = knowledge_chat_service.run_knowledge_chat(
+            database_url="ignored",
+            config=_config(),
+            request_id="req-1",
+            prompt="How does retrieval work?",
+            requested_model_id="safe-small",
+            history_payload=[{"role": "assistant", "content": "Previous answer"}],
+            create_execution_fn=_create_execution,
+        )
+
+    assert status_code == 200
+    assert payload["output"] == "retrieval answer"
+    assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 1}
+    assert payload["sources"] == [
+        {
+            "id": "doc-1",
+            "title": "Architecture Overview",
+            "snippet": "A long explanation about retrieval in VANESSA.",
+            "uri": "https://example.com/architecture",
+            "source_type": "doc",
+            "metadata": {
+                "title": "Architecture Overview",
+                "uri": "https://example.com/architecture",
+                "source_type": "doc",
+            },
+            "score": 0.92,
+            "score_kind": "similarity",
+        }
+    ]
+    assert seen_calls == [
+        {
+            "base_url": "http://agent_engine:7000",
+            "service_token": "dev-agent-engine-token",
+            "request_id": "req-1",
+            "agent_id": "agent.knowledge_chat",
+            "execution_input": {
+                "prompt": "How does retrieval work?",
+                "model": "safe-small-resolved",
+                "messages": [
+                    {"role": "assistant", "content": [{"type": "text", "text": "Previous answer"}]},
+                    {"role": "user", "content": [{"type": "text", "text": "How does retrieval work?"}]},
+                ],
+                "retrieval": {"index": "knowledge_base", "top_k": 5},
+            },
+            "requested_by_user_id": 7,
+            "requested_by_role": "user",
+            "runtime_profile": "offline",
+            "platform_runtime": {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+        }
+    ]
+
+
+def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        knowledge_chat_service,
+        "resolve_model_for_inference",
+        lambda _db, *, user_id, requested_model_id: (requested_model_id, None, 200),
+    )
+    monkeypatch.setattr(knowledge_chat_service, "ensure_knowledge_chat_agent", lambda _db: True)
+    monkeypatch.setattr(
+        knowledge_chat_service,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+    )
+    monkeypatch.setattr(knowledge_chat_service, "resolve_runtime_profile", lambda _db: "offline")
+
+    with app.test_request_context("/v1/chat/knowledge"):
+        g.current_user = {"id": 7, "role": "user"}
+        payload, status_code = knowledge_chat_service.run_knowledge_chat(
+            database_url="ignored",
+            config=_config(),
+            request_id="req-2",
+            prompt="hello",
+            requested_model_id="safe-small",
+            history_payload=[],
+            create_execution_fn=lambda **_kwargs: (
+                {
+                    "execution": {
+                        "id": "exec-knowledge",
+                        "status": "succeeded",
+                        "result": {
+                            "output_text": "answer",
+                            "retrieval_calls": [{"index": "knowledge_base", "result_count": 0, "results": []}],
+                        },
+                    }
+                },
+                201,
+            ),
+        )
+
+    assert status_code == 200
+    assert payload["sources"] == []
+    assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 0}
+
+
+def test_ensure_knowledge_chat_agent_seeds_entity_and_share(monkeypatch: pytest.MonkeyPatch):
+    created_entities: list[dict[str, object]] = []
+    created_versions: list[dict[str, object]] = []
+    created_shares: list[dict[str, object]] = []
+
+    monkeypatch.setattr(knowledge_chat_bootstrap, "find_registry_entity", lambda _db, *, entity_type, entity_id: None)
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "list_users",
+        lambda _db, *, is_active=None: [{"id": 3, "role": "superadmin"}] if is_active is not False else [],
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_registry_entity",
+        lambda _db, **kwargs: created_entities.append(kwargs) or {"entity_id": kwargs["entity_id"], "owner_user_id": kwargs["owner_user_id"]},
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_registry_version",
+        lambda _db, **kwargs: created_versions.append(kwargs) or {"entity_id": kwargs["entity_id"], "version": kwargs["version"]},
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_share_grant",
+        lambda _db, **kwargs: created_shares.append(kwargs) or kwargs,
+    )
+
+    assert knowledge_chat_bootstrap.ensure_knowledge_chat_agent("ignored") is True
+    assert created_entities[0]["entity_id"] == "agent.knowledge_chat"
+    assert created_versions[0]["entity_id"] == "agent.knowledge_chat"
+    assert created_shares[0]["permission"] == "execute"
+    assert created_shares[0]["grantee_type"] == "public"

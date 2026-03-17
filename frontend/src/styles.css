@@ -1165,6 +1165,44 @@ a {
   background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
 }
 
+.knowledge-chat-sources {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-muted);
+  padding-top: var(--space-3);
+}
+
+.knowledge-chat-sources-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.knowledge-chat-source-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.knowledge-chat-source {
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+}
+
+.knowledge-chat-source-title {
+  margin: 0 0 var(--space-1);
+  font-weight: 700;
+}
+
+.knowledge-chat-source-title a {
+  color: inherit;
+}
+
+.knowledge-chat-source-snippet {
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .chatbot-shell {
     grid-template-columns: 1fr;

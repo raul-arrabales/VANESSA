@@ -7,6 +7,7 @@ import ChatbotPage from "../pages/ChatbotPage";
 import ControlModelsPage from "../pages/ControlModelsPage";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
+import KnowledgeChatPage from "../pages/KnowledgeChatPage";
 import LoginPage from "../pages/LoginPage";
 import PlatformControlPage from "../pages/PlatformControlPage";
 import QuoteManagementPage from "../pages/QuoteManagementPage";
@@ -192,6 +193,16 @@ export const appRoutes: AppRouteDefinition[] = [
     showInBreadcrumbs: true,
     requiresAuth: true,
     element: <ChatbotPage />,
+  },
+  {
+    id: "ai-knowledge",
+    path: "/ai/knowledge",
+    titleKey: "nav.knowledge",
+    section: "ai",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <KnowledgeChatPage />,
   },
 ];
 

@@ -17,6 +17,7 @@ describe("app route registry", () => {
       "/control/models",
       "/ai",
       "/ai/chat",
+      "/ai/knowledge",
     ]);
   });
 

@@ -62,11 +62,13 @@ Platform control plane semantics:
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
+- Product-facing knowledge chat now lives on `POST /v1/chat/knowledge`; backend resolves the selected model through governance, injects the configured retrieval settings, and routes the request through the fixed `agent.knowledge_chat` agent before returning normalized citations and snippets.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
 
 Model governance and runtime endpoints (canonical in Release N):
 
+- `POST /v1/chat/knowledge`
 - `GET /v1/models/catalog`
 - `POST /v1/models/catalog`
 - `GET /v1/models/discovery/huggingface`

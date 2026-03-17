@@ -209,6 +209,56 @@ def test_execution_without_prompt_or_messages_keeps_deterministic_success(monkey
     }
 
 
+def test_execution_uses_input_model_override_for_runtime_request(monkeypatch: pytest.MonkeyPatch):
+    seen_models: list[str | None] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        execution_service,
+        "validate_runtime_and_dependencies",
+        lambda **_kwargs: ("v1", None),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: seen_models.append(kwargs["requested_model"]) or {
+                    "output_text": "override output",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "hello", "model": "safe-small"},
+            "platform_runtime": {
+                "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+                "capabilities": {"llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"}},
+            },
+        }
+    )
+
+    assert status == 201
+    assert seen_models == ["safe-small"]
+    assert payload["execution"]["model_ref"] == "safe-small"
+
+
 def test_execution_runtime_client_failures_map_to_existing_error_model(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
     monkeypatch.setattr(
