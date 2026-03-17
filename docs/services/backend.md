@@ -31,6 +31,10 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/platform/deployments` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
+- `POST /v1/platform/vector/indexes/ensure` (superadmin)
+- `POST /v1/platform/vector/documents/upsert` (superadmin)
+- `POST /v1/platform/vector/query` (superadmin)
+- `POST /v1/platform/vector/documents/delete` (superadmin)
 
 Key terms:
 
@@ -46,6 +50,7 @@ Bootstrap defaults:
 - `local-default` is always seeded from `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL`.
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
+- Superadmin-only vector proof routes exercise the real `vector_store` data plane through the active provider binding without exposing provider-specific payloads.
 
 ## Model Governance Endpoints (Release N Canonical)
 

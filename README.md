@@ -232,6 +232,10 @@ Backend exposes platform control-plane endpoints for capability/provider managem
 - `POST /v1/platform/deployments`
 - `POST /v1/platform/deployments/{id}/activate`
 - `POST /v1/platform/providers/{id}/validate`
+- `POST /v1/platform/vector/indexes/ensure`
+- `POST /v1/platform/vector/documents/upsert`
+- `POST /v1/platform/vector/query`
+- `POST /v1/platform/vector/documents/delete`
 
 Current first-wave capabilities:
 
@@ -243,6 +247,8 @@ Current bootstrapped local providers:
 - `vllm_local`
 - `llama_cpp_local`
 - `weaviate_local`
+
+The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve ensure, upsert, query, and delete through the active `vector_store` binding using provider-agnostic payloads.
 
 Bootstrapped deployment profiles:
 

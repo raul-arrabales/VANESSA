@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from json import dumps, loads
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -76,33 +77,29 @@ class VectorStoreAdapter(ABC):
     def health(self) -> dict[str, Any]:
         raise NotImplementedError
 
-    def query(self, *_args, **_kwargs) -> dict[str, Any]:
-        raise PlatformControlPlaneError(
-            "vector_query_not_implemented",
-            "Vector query is not implemented for this adapter yet",
-            status_code=501,
-        )
+    @abstractmethod
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str | None,
+        embedding: list[float] | None,
+        top_k: int,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
 
-    def upsert(self, *_args, **_kwargs) -> dict[str, Any]:
-        raise PlatformControlPlaneError(
-            "vector_upsert_not_implemented",
-            "Vector upsert is not implemented for this adapter yet",
-            status_code=501,
-        )
+    @abstractmethod
+    def upsert(self, *, index_name: str, documents: list[dict[str, Any]]) -> dict[str, Any]:
+        raise NotImplementedError
 
-    def delete(self, *_args, **_kwargs) -> dict[str, Any]:
-        raise PlatformControlPlaneError(
-            "vector_delete_not_implemented",
-            "Vector delete is not implemented for this adapter yet",
-            status_code=501,
-        )
+    @abstractmethod
+    def delete(self, *, index_name: str, ids: list[str]) -> dict[str, Any]:
+        raise NotImplementedError
 
-    def ensure_index(self, *_args, **_kwargs) -> dict[str, Any]:
-        raise PlatformControlPlaneError(
-            "vector_index_not_implemented",
-            "Vector index management is not implemented for this adapter yet",
-            status_code=501,
-        )
+    @abstractmethod
+    def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
 
 
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
@@ -195,6 +192,166 @@ class WeaviateVectorStoreAdapter(VectorStoreAdapter):
             "provider_slug": self.binding.provider_slug,
         }
 
+    def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
+        class_name = _coerce_weaviate_class_name(index_name)
+        existing, status_code = http_json_request(self._schema_class_url(class_name), method="GET")
+        if existing is not None and 200 <= status_code < 300:
+            return {
+                "index": {
+                    "name": index_name,
+                    "provider": self.binding.provider_slug,
+                    "status": "ready",
+                    "created": False,
+                }
+            }
+        if status_code not in {404, 422, 502} and existing is not None:
+            _raise_platform_provider_error(
+                code="vector_index_ensure_failed",
+                message="Unable to inspect vector index state",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": existing},
+            )
+
+        payload = {
+            "class": class_name,
+            "vectorizer": "none",
+            "properties": _build_weaviate_schema_properties(schema),
+        }
+        created_payload, created_status = http_json_request(self._schema_url(), method="POST", payload=payload)
+        if not (200 <= created_status < 300) and not _weaviate_already_exists(created_payload):
+            _raise_platform_provider_error(
+                code="vector_index_ensure_failed",
+                message="Unable to ensure vector index",
+                status_code=created_status,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": created_payload},
+            )
+        return {
+            "index": {
+                "name": index_name,
+                "provider": self.binding.provider_slug,
+                "status": "ready",
+                "created": 200 <= created_status < 300,
+            }
+        }
+
+    def upsert(self, *, index_name: str, documents: list[dict[str, Any]]) -> dict[str, Any]:
+        self.ensure_index(index_name=index_name, schema={})
+        class_name = _coerce_weaviate_class_name(index_name)
+        batch_payload = {
+            "objects": [
+                {
+                    "class": class_name,
+                    "id": _weaviate_object_uuid(index_name, str(document["id"])),
+                    "properties": _build_weaviate_properties(document),
+                    **({"vector": document["embedding"]} if document.get("embedding") is not None else {}),
+                }
+                for document in documents
+            ]
+        }
+        payload, status_code = http_json_request(self._batch_objects_url(), method="POST", payload=batch_payload)
+        if payload is None or not 200 <= status_code < 300:
+            _raise_platform_provider_error(
+                code="vector_upsert_failed",
+                message="Unable to upsert vector documents",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        if _weaviate_batch_has_errors(payload):
+            _raise_platform_provider_error(
+                code="vector_upsert_failed",
+                message="Vector document upsert returned provider errors",
+                status_code=502,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        return {
+            "index": index_name,
+            "count": len(documents),
+            "documents": [{"id": str(document["id"]), "status": "upserted"} for document in documents],
+        }
+
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str | None,
+        embedding: list[float] | None,
+        top_k: int,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        class_name = _coerce_weaviate_class_name(index_name)
+        operation = _build_weaviate_query_operation(
+            class_name=class_name,
+            query_text=query_text,
+            embedding=embedding,
+            top_k=top_k,
+            filters=filters,
+        )
+        payload, status_code = http_json_request(
+            self._graphql_url(),
+            method="POST",
+            payload={"query": operation["query"]},
+        )
+        if payload is None or not 200 <= status_code < 300:
+            _raise_platform_provider_error(
+                code="vector_query_failed",
+                message="Unable to query vector index",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        if isinstance(payload.get("errors"), list) and payload["errors"]:
+            _raise_platform_provider_error(
+                code="vector_query_failed",
+                message="Vector query returned provider errors",
+                status_code=502,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+
+        rows = (((payload.get("data") or {}).get("Get") or {}).get(class_name) or [])
+        if not isinstance(rows, list):
+            rows = []
+        return {
+            "index": index_name,
+            "results": [_normalize_weaviate_query_result(item, score_kind=operation["score_kind"]) for item in rows if isinstance(item, dict)],
+        }
+
+    def delete(self, *, index_name: str, ids: list[str]) -> dict[str, Any]:
+        class_name = _coerce_weaviate_class_name(index_name)
+        deleted_ids: list[str] = []
+        for raw_id in ids:
+            payload, status_code = http_json_request(
+                self._object_url(class_name, _weaviate_object_uuid(index_name, raw_id)),
+                method="DELETE",
+            )
+            if status_code not in {200, 204, 404}:
+                _raise_platform_provider_error(
+                    code="vector_delete_failed",
+                    message="Unable to delete vector documents",
+                    status_code=status_code,
+                    details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload, "document_id": raw_id},
+                )
+            if status_code != 404:
+                deleted_ids.append(raw_id)
+        return {
+            "index": index_name,
+            "count": len(deleted_ids),
+            "deleted_ids": deleted_ids,
+        }
+
+    def _schema_url(self) -> str:
+        return self.binding.endpoint_url.rstrip("/") + "/v1/schema"
+
+    def _schema_class_url(self, class_name: str) -> str:
+        return self._schema_url().rstrip("/") + f"/{class_name}"
+
+    def _batch_objects_url(self) -> str:
+        return self.binding.endpoint_url.rstrip("/") + "/v1/batch/objects"
+
+    def _graphql_url(self) -> str:
+        return self.binding.endpoint_url.rstrip("/") + "/v1/graphql"
+
+    def _object_url(self, class_name: str, object_id: str) -> str:
+        return self.binding.endpoint_url.rstrip("/") + f"/v1/objects/{class_name}/{object_id}"
+
 
 def _is_model_not_found(payload: dict[str, Any] | None) -> bool:
     if not isinstance(payload, dict):
@@ -280,3 +437,175 @@ def _normalize_chat_response_payload(payload: dict[str, Any] | None) -> dict[str
             }
         ]
     return normalized_payload
+
+
+def _coerce_weaviate_class_name(index_name: str) -> str:
+    parts = [segment for segment in "".join(ch if ch.isalnum() else " " for ch in index_name).split() if segment]
+    if not parts:
+        raise PlatformControlPlaneError("invalid_index_name", "index name must contain letters or numbers", status_code=400)
+    return "".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def _coerce_metadata_key(key: str) -> str:
+    normalized = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in key.strip())
+    if not normalized or not normalized[0].isalpha():
+        raise PlatformControlPlaneError("invalid_metadata_key", "metadata keys must start with a letter", status_code=400)
+    return normalized.lower()
+
+
+def _build_weaviate_schema_properties(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    properties = [
+        {"name": "document_id", "dataType": ["text"]},
+        {"name": "text", "dataType": ["text"]},
+        {"name": "metadata_json", "dataType": ["text"]},
+    ]
+    raw_properties = schema.get("properties")
+    if not isinstance(raw_properties, list):
+        return properties
+
+    for item in raw_properties:
+        if not isinstance(item, dict):
+            continue
+        name = _coerce_metadata_key(str(item.get("name", "")))
+        data_type = str(item.get("data_type", "text")).strip().lower() or "text"
+        if data_type not in {"text", "number", "int", "boolean"}:
+            raise PlatformControlPlaneError("invalid_schema_property_type", "Unsupported schema property type", status_code=400)
+        if name in {"document_id", "text", "metadata_json"}:
+            continue
+        properties.append({"name": name, "dataType": [_weaviate_data_type(data_type)]})
+    return properties
+
+
+def _build_weaviate_properties(document: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(document.get("metadata") or {})
+    properties: dict[str, Any] = {
+        "document_id": str(document["id"]),
+        "text": str(document["text"]),
+        "metadata_json": dumps(metadata, sort_keys=True),
+    }
+    for key, value in metadata.items():
+        normalized_key = _coerce_metadata_key(str(key))
+        if normalized_key in {"document_id", "text", "metadata_json"}:
+            continue
+        properties[normalized_key] = value
+    return properties
+
+
+def _weaviate_data_type(data_type: str) -> str:
+    if data_type == "number":
+        return "number"
+    if data_type == "int":
+        return "int"
+    if data_type == "boolean":
+        return "boolean"
+    return "text"
+
+
+def _weaviate_object_uuid(index_name: str, document_id: str) -> str:
+    return str(uuid5(NAMESPACE_URL, f"{index_name}:{document_id}"))
+
+
+def _weaviate_already_exists(payload: dict[str, Any] | None) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    error = payload.get("error")
+    if isinstance(error, list):
+        return any("already exists" in str(item.get("message", "")).lower() for item in error if isinstance(item, dict))
+    if isinstance(error, dict):
+        return "already exists" in str(error.get("message", "")).lower()
+    return "already exists" in dumps(payload).lower()
+
+
+def _weaviate_batch_has_errors(payload: dict[str, Any]) -> bool:
+    if payload.get("errors") is False:
+        return False
+    objects = payload.get("objects")
+    if not isinstance(objects, list):
+        return False
+    for item in objects:
+        if not isinstance(item, dict):
+            continue
+        result = item.get("result")
+        if isinstance(result, dict):
+            errors = result.get("errors")
+            if errors:
+                return True
+    return False
+
+
+def _build_weaviate_query_operation(
+    *,
+    class_name: str,
+    query_text: str | None,
+    embedding: list[float] | None,
+    top_k: int,
+    filters: dict[str, Any],
+) -> dict[str, str]:
+    args: list[str] = [f"limit: {top_k}"]
+    if embedding is not None:
+        args.append(f"nearVector: {{ vector: {_graphql_list(embedding)} }}")
+        score_field = "distance"
+        score_kind = "distance"
+    else:
+        args.append(f'bm25: {{ query: {_graphql_string(query_text or "")}, properties: ["text"] }}')
+        score_field = "score"
+        score_kind = "bm25"
+    if filters:
+        args.append(f"where: {_graphql_where_filter(filters)}")
+    args_text = ", ".join(args)
+    query = (
+        "{ Get { "
+        f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id {score_field} }} }} '
+        "} } }"
+    )
+    return {"query": query, "score_kind": score_kind}
+
+
+def _graphql_list(values: list[float]) -> str:
+    return "[" + ",".join(format(float(value), ".12g") for value in values) + "]"
+
+
+def _graphql_string(value: str) -> str:
+    return dumps(value)
+
+
+def _graphql_where_filter(filters: dict[str, Any]) -> str:
+    operands: list[str] = []
+    for key, value in filters.items():
+        property_name = _coerce_metadata_key(str(key))
+        if isinstance(value, bool):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueBoolean: {str(value).lower()} }}')
+        elif isinstance(value, int) and not isinstance(value, bool):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueInt: {value} }}')
+        elif isinstance(value, float):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueNumber: {format(value, ".12g")} }}')
+        else:
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueText: {_graphql_string(str(value))} }}')
+    if len(operands) == 1:
+        return operands[0]
+    return "{ operator: And, operands: [" + ", ".join(operands) + "] }"
+
+
+def _normalize_weaviate_query_result(item: dict[str, Any], *, score_kind: str) -> dict[str, Any]:
+    additional = item.get("_additional")
+    additional = additional if isinstance(additional, dict) else {}
+    score_field = "score" if score_kind == "bm25" else score_kind
+    metadata_json = str(item.get("metadata_json", "")).strip()
+    try:
+        metadata = loads(metadata_json) if metadata_json else {}
+    except ValueError:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    return {
+        "id": str(item.get("document_id") or additional.get("id") or "").strip(),
+        "text": str(item.get("text", "")).strip(),
+        "metadata": metadata,
+        "score": float(additional.get(score_field, 0.0) or 0.0),
+        "score_kind": score_kind,
+    }
+
+
+def _raise_platform_provider_error(*, code: str, message: str, status_code: int, details: dict[str, Any]) -> None:
+    normalized_status = status_code if 400 <= status_code < 600 else 502
+    raise PlatformControlPlaneError(code, message, status_code=normalized_status, details=details)

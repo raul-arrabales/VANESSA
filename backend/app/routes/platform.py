@@ -13,6 +13,12 @@ from ..services.platform_service import (
     validate_provider,
 )
 from ..services.platform_types import PlatformControlPlaneError
+from ..services.vector_store_service import (
+    delete_vector_documents,
+    ensure_vector_index,
+    query_vector_documents,
+    upsert_vector_documents,
+)
 
 bp = Blueprint("platform", __name__)
 
@@ -104,3 +110,59 @@ def activate_platform_deployment_route(deployment_profile_id: str):
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"deployment_profile": deployment}), 200
+
+
+@bp.post("/v1/platform/vector/indexes/ensure")
+@require_role("superadmin")
+def ensure_platform_vector_index_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        result = ensure_vector_index(_database_url(), _config(), payload)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200
+
+
+@bp.post("/v1/platform/vector/documents/upsert")
+@require_role("superadmin")
+def upsert_platform_vector_documents_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        result = upsert_vector_documents(_database_url(), _config(), payload)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200
+
+
+@bp.post("/v1/platform/vector/query")
+@require_role("superadmin")
+def query_platform_vector_documents_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        result = query_vector_documents(_database_url(), _config(), payload)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200
+
+
+@bp.post("/v1/platform/vector/documents/delete")
+@require_role("superadmin")
+def delete_platform_vector_documents_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        result = delete_vector_documents(_database_url(), _config(), payload)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200

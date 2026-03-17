@@ -4,6 +4,7 @@ import pytest
 
 from app.routes import platform as platform_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
@@ -84,10 +85,30 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     providers = test_client.get("/v1/platform/providers", headers=_auth(token))
     deployments = test_client.get("/v1/platform/deployments", headers=_auth(token))
     activate = test_client.post("/v1/platform/deployments/deployment-1/activate", headers=_auth(token))
+    ensure_index = test_client.post("/v1/platform/vector/indexes/ensure", headers=_auth(token), json={"index": "kb"})
+    upsert_documents = test_client.post(
+        "/v1/platform/vector/documents/upsert",
+        headers=_auth(token),
+        json={"index": "kb", "documents": [{"id": "doc-1", "text": "hello"}]},
+    )
+    query_documents = test_client.post(
+        "/v1/platform/vector/query",
+        headers=_auth(token),
+        json={"index": "kb", "query_text": "hello"},
+    )
+    delete_documents = test_client.post(
+        "/v1/platform/vector/documents/delete",
+        headers=_auth(token),
+        json={"index": "kb", "ids": ["doc-1"]},
+    )
 
     assert providers.status_code == 403
     assert deployments.status_code == 403
     assert activate.status_code == 403
+    assert ensure_index.status_code == 403
+    assert upsert_documents.status_code == 403
+    assert query_documents.status_code == 403
+    assert delete_documents.status_code == 403
 
 
 def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.MonkeyPatch):
@@ -167,6 +188,39 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "validation": {"health": {"reachable": True, "status_code": 200}},
         },
     )
+    monkeypatch.setattr(
+        platform_routes,
+        "ensure_vector_index",
+        lambda _db, _config, payload: {
+            "index": {"name": payload["index"], "provider": "weaviate-local", "status": "ready", "created": True}
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "upsert_vector_documents",
+        lambda _db, _config, payload: {
+            "index": payload["index"],
+            "count": len(payload["documents"]),
+            "documents": [{"id": payload["documents"][0]["id"], "status": "upserted"}],
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "query_vector_documents",
+        lambda _db, _config, payload: {
+            "index": payload["index"],
+            "results": [{"id": "doc-1", "text": "hello", "metadata": {}, "score": 0.1, "score_kind": "distance"}],
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "delete_vector_documents",
+        lambda _db, _config, payload: {
+            "index": payload["index"],
+            "count": len(payload["ids"]),
+            "deleted_ids": list(payload["ids"]),
+        },
+    )
 
     providers = test_client.get("/v1/platform/providers", headers=_auth(token))
     deployments = test_client.get("/v1/platform/deployments", headers=_auth(token))
@@ -187,6 +241,26 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
         "/v1/platform/providers/provider-1/validate",
         headers=_auth(token),
     )
+    ensure_response = test_client.post(
+        "/v1/platform/vector/indexes/ensure",
+        headers=_auth(token),
+        json={"index": "knowledge_base"},
+    )
+    upsert_response = test_client.post(
+        "/v1/platform/vector/documents/upsert",
+        headers=_auth(token),
+        json={"index": "knowledge_base", "documents": [{"id": "doc-1", "text": "hello"}]},
+    )
+    query_response = test_client.post(
+        "/v1/platform/vector/query",
+        headers=_auth(token),
+        json={"index": "knowledge_base", "query_text": "hello"},
+    )
+    delete_response = test_client.post(
+        "/v1/platform/vector/documents/delete",
+        headers=_auth(token),
+        json={"index": "knowledge_base", "ids": ["doc-1"]},
+    )
 
     assert providers.status_code == 200
     assert providers.get_json()["providers"][0]["slug"] == "vllm-local-gateway"
@@ -198,3 +272,44 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     assert activate_response.get_json()["deployment_profile"]["is_active"] is True
     assert validate_response.status_code == 200
     assert validate_response.get_json()["validation"]["health"]["reachable"] is True
+    assert ensure_response.status_code == 200
+    assert ensure_response.get_json()["index"]["name"] == "knowledge_base"
+    assert upsert_response.status_code == 200
+    assert upsert_response.get_json()["documents"][0]["status"] == "upserted"
+    assert query_response.status_code == 200
+    assert query_response.get_json()["results"][0]["id"] == "doc-1"
+    assert delete_response.status_code == 200
+    assert delete_response.get_json()["deleted_ids"] == ["doc-1"]
+
+
+def test_platform_vector_routes_return_control_plane_errors(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        platform_routes,
+        "query_vector_documents",
+        lambda _db, _config, payload: (_ for _ in ()).throw(
+            PlatformControlPlaneError("invalid_query_input", "Provide exactly one of query_text or embedding", status_code=400)
+        ),
+    )
+
+    response = test_client.post(
+        "/v1/platform/vector/query",
+        headers=_auth(token),
+        json={"index": "knowledge_base", "query_text": "hello", "embedding": [0.1]},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "invalid_query_input",
+        "message": "Provide exactly one of query_text or embedding",
+    }

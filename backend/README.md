@@ -36,6 +36,10 @@ Platform control plane endpoints:
 - `POST /v1/platform/deployments` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
 - `POST /v1/platform/providers/{id}/validate` (superadmin)
+- `POST /v1/platform/vector/indexes/ensure` (superadmin)
+- `POST /v1/platform/vector/documents/upsert` (superadmin)
+- `POST /v1/platform/vector/query` (superadmin)
+- `POST /v1/platform/vector/documents/delete` (superadmin)
 
 Platform control plane semantics:
 
@@ -44,6 +48,7 @@ Platform control plane semantics:
 - `deployment profiles` define the active capability-to-provider bindings.
 - Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
+- The vector-store data plane now resolves through the active `vector_store` binding for normalized ensure, upsert, query, and delete operations.
 
 Model governance and runtime endpoints (canonical in Release N):
 
