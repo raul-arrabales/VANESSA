@@ -49,6 +49,7 @@ Platform control plane semantics:
 - Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - The vector-store data plane now resolves through the active `vector_store` binding for normalized ensure, upsert, query, and delete operations.
+- Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 
 Model governance and runtime endpoints (canonical in Release N):
 

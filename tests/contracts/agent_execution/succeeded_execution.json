@@ -12,9 +12,16 @@
     "result": {
       "output_text": "Agent 'agent.alpha' executed in offline profile",
       "tool_calls": [],
-      "model_calls": []
+      "model_calls": [
+        {
+          "provider_slug": "vllm-local-gateway",
+          "provider_key": "vllm_local",
+          "deployment_profile_slug": "local-default",
+          "requested_model": "model.default",
+          "status_code": 200
+        }
+      ]
     },
     "error": null
   }
 }
-

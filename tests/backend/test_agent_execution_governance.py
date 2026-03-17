@@ -5,6 +5,7 @@ import pytest
 from app.routes import executions as executions_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.agent_engine_client import AgentEngineClientError  # noqa: E402
+from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
@@ -36,11 +37,49 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
         is_active=True,
     )
     token = _login(test_client, user["username"], "u3-pass-123").get_json()["access_token"]
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {
+            "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+            "capabilities": {
+                "llm_inference": {
+                    "id": "provider-1",
+                    "slug": "vllm-local-gateway",
+                    "provider_key": "vllm_local",
+                    "display_name": "vLLM local gateway",
+                    "description": "desc",
+                    "adapter_kind": "openai_compatible_llm",
+                    "endpoint_url": "http://llm:8000",
+                    "healthcheck_url": "http://llm:8000/health",
+                    "enabled": True,
+                    "config": {"chat_completion_path": "/v1/chat/completions"},
+                    "binding_config": {},
+                },
+                "vector_store": {
+                    "id": "provider-2",
+                    "slug": "weaviate-local",
+                    "provider_key": "weaviate_local",
+                    "display_name": "Weaviate local",
+                    "description": "desc",
+                    "adapter_kind": "weaviate_http",
+                    "endpoint_url": "http://weaviate:8080",
+                    "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                    "enabled": True,
+                    "config": {},
+                    "binding_config": {},
+                },
+            },
+        },
+    )
 
     def _create_execution(**kwargs):
         assert kwargs["agent_id"] == "agent.local"
         assert kwargs["runtime_profile"] == "offline"
         assert kwargs["requested_by_user_id"] == user["id"]
+        assert kwargs["platform_runtime"]["deployment_profile"]["slug"] == "local-default"
+        assert kwargs["platform_runtime"]["capabilities"]["llm_inference"]["provider_key"] == "vllm_local"
+        assert kwargs["platform_runtime"]["capabilities"]["vector_store"]["provider_key"] == "weaviate_local"
         return (
             {
                 "execution": {
@@ -84,6 +123,11 @@ def test_agent_execution_passes_engine_errors(client, monkeypatch: pytest.Monkey
         is_active=True,
     )
     token = _login(test_client, user["username"], "u2-pass-123").get_json()["access_token"]
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"}, "capabilities": {}},
+    )
 
     def _create_execution(**_kwargs):
         raise AgentEngineClientError(
@@ -177,6 +221,11 @@ def test_fallback_enabled_create_unreachable_returns_deterministic_503(client, m
 
     monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: True)
     monkeypatch.setattr(executions_routes, "_request_id", lambda: "req-create-fallback")
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"}, "capabilities": {}},
+    )
 
     def _create_execution(**_kwargs):
         raise AgentEngineClientError(
@@ -250,6 +299,11 @@ def test_fallback_enabled_does_not_mask_403_policy_denial(client, monkeypatch: p
     monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: True)
     monkeypatch.setattr(
         executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"}, "capabilities": {}},
+    )
+    monkeypatch.setattr(
+        executions_routes,
         "create_execution",
         lambda **_kwargs: (_ for _ in ()).throw(
             AgentEngineClientError(
@@ -284,6 +338,11 @@ def test_fallback_disabled_preserves_upstream_unreachable_mapping(client, monkey
     monkeypatch.setattr(executions_routes, "_fallback_enabled", lambda: False)
     monkeypatch.setattr(
         executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {"deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"}, "capabilities": {}},
+    )
+    monkeypatch.setattr(
+        executions_routes,
         "create_execution",
         lambda **_kwargs: (_ for _ in ()).throw(
             AgentEngineClientError(
@@ -302,3 +361,37 @@ def test_fallback_disabled_preserves_upstream_unreachable_mapping(client, monkey
     assert response.status_code == 502
     payload = response.get_json()
     assert payload["error"] == "agent_engine_unreachable"
+
+
+def test_agent_execution_returns_platform_control_plane_error(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u10@example.com",
+        username="u10",
+        password_hash=hash_password("u10-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u10-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: (_ for _ in ()).throw(
+            PlatformControlPlaneError(
+                "active_binding_not_found",
+                "No active provider binding for capability 'llm_inference'",
+                status_code=503,
+            )
+        ),
+    )
+
+    response = test_client.post(
+        "/v1/agent-executions",
+        headers=_auth(token),
+        json={"agent_id": "agent.local", "input": {"prompt": "hello"}},
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "active_binding_not_found"

@@ -71,6 +71,7 @@ def create_execution(
     requested_by_user_id: int,
     requested_by_role: str,
     runtime_profile: str,
+    platform_runtime: dict[str, Any],
     org_id: str | None = None,
     group_id: str | None = None,
 ) -> tuple[dict[str, Any], int]:
@@ -80,6 +81,7 @@ def create_execution(
         "requested_by_user_id": requested_by_user_id,
         "requested_by_role": requested_by_role,
         "runtime_profile": runtime_profile,
+        "platform_runtime": platform_runtime,
     }
     if org_id:
         payload["org_id"] = org_id

@@ -21,6 +21,43 @@
   "requested_by_user_id": 123,
   "requested_by_role": "user",
   "runtime_profile": "offline",
+  "platform_runtime": {
+    "deployment_profile": {
+      "id": "deployment-1",
+      "slug": "local-default",
+      "display_name": "Local Default"
+    },
+    "capabilities": {
+      "llm_inference": {
+        "id": "provider-1",
+        "slug": "vllm-local-gateway",
+        "provider_key": "vllm_local",
+        "display_name": "vLLM local gateway",
+        "description": "Current local-first LLM gateway",
+        "adapter_kind": "openai_compatible_llm",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": true,
+        "config": {
+          "chat_completion_path": "/v1/chat/completions"
+        },
+        "binding_config": {}
+      },
+      "vector_store": {
+        "id": "provider-2",
+        "slug": "weaviate-local",
+        "provider_key": "weaviate_local",
+        "display_name": "Weaviate local",
+        "description": "Primary Weaviate endpoint",
+        "adapter_kind": "weaviate_http",
+        "endpoint_url": "http://weaviate:8080",
+        "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+        "enabled": true,
+        "config": {},
+        "binding_config": {}
+      }
+    }
+  },
   "org_id": "optional-org",
   "group_id": "optional-group"
 }
@@ -43,12 +80,22 @@
     "result": {
       "output_text": "Agent 'agent.alpha' executed in offline profile",
       "tool_calls": [],
-      "model_calls": []
+      "model_calls": [
+        {
+          "provider_slug": "vllm-local-gateway",
+          "provider_key": "vllm_local",
+          "deployment_profile_slug": "local-default",
+          "requested_model": "model.default",
+          "status_code": 200
+        }
+      ]
     },
     "error": null
   }
 }
 ```
+
+`platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
 ## Error Codes
 

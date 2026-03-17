@@ -272,6 +272,41 @@ def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch
         ),
     )
     monkeypatch.setattr(executions_routes, "resolve_runtime_profile", lambda _db: "offline")
+    monkeypatch.setattr(
+        executions_routes,
+        "get_active_platform_runtime",
+        lambda _db, _config: {
+            "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+            "capabilities": {
+                "llm_inference": {
+                    "id": "provider-1",
+                    "slug": "vllm-local-gateway",
+                    "provider_key": "vllm_local",
+                    "display_name": "vLLM local gateway",
+                    "description": "desc",
+                    "adapter_kind": "openai_compatible_llm",
+                    "endpoint_url": "http://llm:8000",
+                    "healthcheck_url": "http://llm:8000/health",
+                    "enabled": True,
+                    "config": {"chat_completion_path": "/v1/chat/completions"},
+                    "binding_config": {},
+                },
+                "vector_store": {
+                    "id": "provider-2",
+                    "slug": "weaviate-local",
+                    "provider_key": "weaviate_local",
+                    "display_name": "Weaviate local",
+                    "description": "desc",
+                    "adapter_kind": "weaviate_http",
+                    "endpoint_url": "http://weaviate:8080",
+                    "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                    "enabled": True,
+                    "config": {},
+                    "binding_config": {},
+                },
+            },
+        },
+    )
 
     create_response = test_client.post(
         "/v1/agent-executions",

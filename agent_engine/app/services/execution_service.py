@@ -13,6 +13,7 @@ from .policy_runtime_gate import (
     resolve_runtime_profile,
     validate_runtime_and_dependencies,
 )
+from .runtime_client import LlmRuntimeClientError, build_llm_runtime_client
 
 
 def _iso_now() -> str:
@@ -26,7 +27,7 @@ def _error_payload(code: str, message: str, details: dict[str, Any] | None = Non
     return payload
 
 
-def _simulate_execution_result(*, agent_id: str, runtime_profile: str, execution_input: dict[str, Any]) -> dict[str, Any]:
+def _raise_simulated_error_if_requested(execution_input: dict[str, Any]) -> None:
     simulate_error = str(execution_input.get("simulate_error", "")).strip().lower()
     if simulate_error == "timeout":
         raise ExecutionBlockedError(code="EXEC_TIMEOUT", message="Execution timed out", status_code=504)
@@ -39,17 +40,120 @@ def _simulate_execution_result(*, agent_id: str, runtime_profile: str, execution
     if simulate_error == "internal":
         raise ExecutionBlockedError(code="EXEC_INTERNAL_ERROR", message="Execution failed internally", status_code=500)
 
-    prompt = str(execution_input.get("prompt", "")).strip()
-    output_text = (
-        f"Agent '{agent_id}' executed in {runtime_profile} profile"
-        if not prompt
-        else f"Agent '{agent_id}' executed in {runtime_profile} profile with prompt: {prompt}"
-    )
+
+def _deterministic_execution_result(*, agent_id: str, runtime_profile: str) -> dict[str, Any]:
+    output_text = f"Agent '{agent_id}' executed in {runtime_profile} profile"
     return {
         "output_text": output_text,
         "tool_calls": [],
         "model_calls": [],
     }
+
+
+def _coerce_execution_messages(execution_input: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_messages = execution_input.get("messages")
+    if isinstance(raw_messages, list):
+        normalized = _coerce_messages(raw_messages)
+        if normalized:
+            return normalized
+
+    prompt = str(execution_input.get("prompt", "")).strip()
+    if prompt:
+        return [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+    return []
+
+
+def _coerce_messages(messages: list[Any]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for item in messages:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).strip().lower()
+        if role not in {"system", "user", "assistant", "tool"}:
+            continue
+        content = item.get("content")
+        if isinstance(content, str):
+            text = content.strip()
+            if text:
+                normalized.append({"role": role, "content": [{"type": "text", "text": text}]})
+            continue
+        if not isinstance(content, list):
+            continue
+        parts: list[dict[str, str]] = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if str(part.get("type", "")).strip().lower() != "text":
+                continue
+            text = str(part.get("text", "")).strip()
+            if text:
+                parts.append({"type": "text", "text": text})
+        if parts:
+            normalized.append({"role": role, "content": parts})
+    return normalized
+
+
+def _execute_model_call(
+    *,
+    execution_input: dict[str, Any],
+    agent_id: str,
+    runtime_profile: str,
+    model_ref: str | None,
+    platform_runtime: dict[str, Any] | None,
+) -> tuple[dict[str, Any], str | None]:
+    _raise_simulated_error_if_requested(execution_input)
+    messages = _coerce_execution_messages(execution_input)
+    if not messages:
+        return _deterministic_execution_result(agent_id=agent_id, runtime_profile=runtime_profile), model_ref
+
+    runtime_snapshot = platform_runtime if isinstance(platform_runtime, dict) else {}
+    try:
+        client = build_llm_runtime_client(runtime_snapshot)
+        completion = client.chat_completion(
+            requested_model=model_ref,
+            messages=messages,
+        )
+    except LlmRuntimeClientError as exc:
+        if exc.code == "runtime_timeout":
+            raise ExecutionBlockedError(
+                code="EXEC_TIMEOUT",
+                message="Execution timed out",
+                status_code=504,
+                details=exc.details,
+            ) from exc
+        if exc.code in {"runtime_unreachable", "runtime_upstream_unavailable"}:
+            raise ExecutionBlockedError(
+                code="EXEC_UPSTREAM_UNAVAILABLE",
+                message="Upstream LLM/tool dependency unavailable",
+                status_code=503,
+                details=exc.details,
+            ) from exc
+        raise ExecutionBlockedError(
+            code="EXEC_INTERNAL_ERROR",
+            message="Execution failed internally",
+            status_code=500,
+            details=exc.details,
+        ) from exc
+
+    llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
+    deployment_profile = runtime_snapshot.get("deployment_profile", {})
+    effective_model = str(completion.get("requested_model", "")).strip() or model_ref
+    return (
+        {
+            "output_text": str(completion.get("output_text", "")),
+            "tool_calls": [],
+            "model_calls": [
+                {
+                    "provider_slug": llm_binding.get("slug"),
+                    "provider_key": llm_binding.get("provider_key"),
+                    "deployment_profile_slug": deployment_profile.get("slug"),
+                    "requested_model": effective_model,
+                    "status_code": int(completion.get("status_code", 200) or 200),
+                }
+            ],
+        },
+        effective_model,
+    )
 
 
 def _build_execution(
@@ -90,6 +194,7 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
     if execution_input is not None and not isinstance(execution_input, dict):
         raise ValueError("invalid_input")
     normalized_input = execution_input if isinstance(execution_input, dict) else {}
+    platform_runtime = payload.get("platform_runtime")
 
     requested_by_user_id = int(payload.get("requested_by_user_id", 0) or 0)
     requested_by_role = str(payload.get("requested_by_role", "user")).strip().lower() or "user"
@@ -146,17 +251,19 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             requested_by_user_id=requested_by_user_id if requested_by_user_id > 0 else None,
             input_payload=normalized_input,
         )
-        result = _simulate_execution_result(
+        result, effective_model_ref = _execute_model_call(
+            execution_input=normalized_input,
             agent_id=agent_id,
             runtime_profile=runtime_profile,
-            execution_input=normalized_input,
+            model_ref=model_ref,
+            platform_runtime=platform_runtime if isinstance(platform_runtime, dict) else None,
         )
         finished = _build_execution(
             execution_id=execution_id,
             status="succeeded",
             agent_ref=agent_id,
             agent_version=agent_version,
-            model_ref=model_ref,
+            model_ref=effective_model_ref,
             runtime_profile=runtime_profile,
             created_at=created_at,
             started_at=running_started_at,
@@ -229,4 +336,3 @@ def get_execution(execution_id: str) -> tuple[dict[str, Any], int]:
             status_code=404,
         )
     return {"execution": execution.to_payload()}, 200
-

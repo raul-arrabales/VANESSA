@@ -22,10 +22,12 @@ def _golden_success_payload() -> dict[str, object]:
 
 
 def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
     monkeypatch.setattr(
         agent_engine_client,
         "_request_json",
-        lambda **_kwargs: (_golden_success_payload(), 201),
+        lambda **kwargs: seen_payloads.append(kwargs["payload"]) or (_golden_success_payload(), 201),
     )
 
     payload, status = agent_engine_client.create_execution(
@@ -37,9 +39,26 @@ def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
         requested_by_user_id=42,
         requested_by_role="user",
         runtime_profile="offline",
+        platform_runtime={
+            "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+            "capabilities": {},
+        },
     )
     assert status == 201
     assert payload["execution"]["id"] == "exec-1"
+    assert seen_payloads == [
+        {
+            "agent_id": "agent.alpha",
+            "input": {"prompt": "hello"},
+            "requested_by_user_id": 42,
+            "requested_by_role": "user",
+            "runtime_profile": "offline",
+            "platform_runtime": {
+                "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+                "capabilities": {},
+            },
+        }
+    ]
 
 
 def test_get_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
@@ -70,6 +89,10 @@ def test_invalid_engine_payload_returns_error(monkeypatch: pytest.MonkeyPatch):
             requested_by_user_id=1,
             requested_by_role="user",
             runtime_profile="offline",
+            platform_runtime={
+                "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+                "capabilities": {},
+            },
         )
     assert exc.value.code == "invalid_engine_response"
 

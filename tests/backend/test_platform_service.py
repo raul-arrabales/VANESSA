@@ -304,3 +304,95 @@ def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_config
     platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
 
     assert created_profiles == ["local-default"]
+
+
+@pytest.mark.parametrize(
+    ("llm_provider_key", "deployment_slug"),
+    [
+        ("vllm_local", "local-default"),
+        ("llama_cpp_local", "local-llama-cpp"),
+    ],
+)
+def test_get_active_platform_runtime_uses_current_active_bindings(
+    monkeypatch: pytest.MonkeyPatch,
+    llm_provider_key: str,
+    deployment_slug: str,
+):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+
+    def _active_binding(_db, *, capability_key):
+        if capability_key == "llm_inference":
+            return {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-1",
+                "provider_slug": "llm-provider",
+                "provider_key": llm_provider_key,
+                "provider_display_name": "LLM Provider",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {"chat_completion_path": "/v1/chat/completions"},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_llm",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": deployment_slug,
+                "deployment_profile_display_name": "Runtime Deployment",
+            }
+        return {
+            "capability_key": "vector_store",
+            "provider_instance_id": "provider-2",
+            "provider_slug": "weaviate-local",
+            "provider_key": "weaviate_local",
+            "provider_display_name": "Weaviate local",
+            "provider_description": "desc",
+            "endpoint_url": "http://weaviate:8080",
+            "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+            "enabled": True,
+            "config_json": {},
+            "binding_config": {},
+            "adapter_kind": "weaviate_http",
+            "deployment_profile_id": "deployment-1",
+            "deployment_profile_slug": deployment_slug,
+            "deployment_profile_display_name": "Runtime Deployment",
+        }
+
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_binding_for_capability", _active_binding)
+
+    payload = platform_service.get_active_platform_runtime("ignored", object())  # type: ignore[arg-type]
+
+    assert payload == {
+        "deployment_profile": {
+            "id": "deployment-1",
+            "slug": deployment_slug,
+            "display_name": "Runtime Deployment",
+        },
+        "capabilities": {
+            "llm_inference": {
+                "id": "provider-1",
+                "slug": "llm-provider",
+                "provider_key": llm_provider_key,
+                "display_name": "LLM Provider",
+                "description": "desc",
+                "adapter_kind": "openai_compatible_llm",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config": {"chat_completion_path": "/v1/chat/completions"},
+                "binding_config": {},
+            },
+            "vector_store": {
+                "id": "provider-2",
+                "slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "display_name": "Weaviate local",
+                "description": "desc",
+                "adapter_kind": "weaviate_http",
+                "endpoint_url": "http://weaviate:8080",
+                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "enabled": True,
+                "config": {},
+                "binding_config": {},
+            },
+        },
+    }

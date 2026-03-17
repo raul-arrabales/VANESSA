@@ -382,6 +382,36 @@ def resolve_vector_store_adapter(
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported vector adapter kind", status_code=500)
 
 
+def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    llm_binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_LLM_INFERENCE,
+        provider_instance_id=None,
+    )
+    vector_binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_VECTOR_STORE,
+        provider_instance_id=None,
+    )
+    if llm_binding.deployment_profile_id != vector_binding.deployment_profile_id:
+        raise PlatformControlPlaneError(
+            "active_deployment_profile_mismatch",
+            "Active capability bindings do not point to the same deployment profile",
+            status_code=503,
+        )
+
+    return {
+        "deployment_profile": _serialize_runtime_deployment_profile(llm_binding),
+        "capabilities": {
+            CAPABILITY_LLM_INFERENCE: _serialize_runtime_binding(llm_binding),
+            CAPABILITY_VECTOR_STORE: _serialize_runtime_binding(vector_binding),
+        },
+    }
+
+
 def get_active_capability_statuses(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
     ensure_platform_bootstrap_state(database_url, config)
     statuses: list[dict[str, Any]] = []
@@ -517,6 +547,30 @@ def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
         "healthcheck_url": row.get("healthcheck_url"),
         "enabled": bool(row["enabled"]),
         "config": dict(row.get("config_json") or {}),
+    }
+
+
+def _serialize_runtime_binding(binding: ProviderBinding) -> dict[str, Any]:
+    return {
+        "id": binding.provider_instance_id,
+        "slug": binding.provider_slug,
+        "provider_key": binding.provider_key,
+        "display_name": binding.provider_display_name,
+        "description": binding.provider_description,
+        "adapter_kind": binding.adapter_kind,
+        "endpoint_url": binding.endpoint_url,
+        "healthcheck_url": binding.healthcheck_url,
+        "enabled": binding.enabled,
+        "config": dict(binding.config),
+        "binding_config": dict(binding.binding_config),
+    }
+
+
+def _serialize_runtime_deployment_profile(binding: ProviderBinding) -> dict[str, Any]:
+    return {
+        "id": binding.deployment_profile_id,
+        "slug": binding.deployment_profile_slug,
+        "display_name": binding.deployment_profile_display_name,
     }
 
 

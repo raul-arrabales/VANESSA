@@ -11,13 +11,18 @@ from ..services.agent_engine_client import (
     create_execution,
     get_execution,
 )
+from ..services.platform_service import get_active_platform_runtime
+from ..services.platform_types import PlatformControlPlaneError
 from ..services.runtime_profile_service import resolve_runtime_profile
 
 bp = Blueprint("executions", __name__)
 
 
-def _json_error(status: int, code: str, message: str):
-    return jsonify({"error": code, "message": message}), status
+def _json_error(status: int, code: str, message: str, *, details: dict | None = None):
+    payload = {"error": code, "message": message}
+    if details:
+        payload["details"] = details
+    return jsonify(payload), status
 
 
 def _database_url() -> str:
@@ -90,6 +95,10 @@ def create_agent_execution():
 
     request_id = _request_id()
     try:
+        platform_runtime = get_active_platform_runtime(_database_url(), _config())
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    try:
         response_payload, status_code = create_execution(
             base_url=_agent_engine_url(),
             service_token=_agent_engine_service_token(),
@@ -99,6 +108,7 @@ def create_agent_execution():
             requested_by_user_id=int(g.current_user["id"]),
             requested_by_role=str(g.current_user.get("role", "user")),
             runtime_profile=resolve_runtime_profile(_database_url()),
+            platform_runtime=platform_runtime,
             org_id=org_id,
             group_id=group_id,
         )
