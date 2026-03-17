@@ -17,7 +17,7 @@ The agent engine hosts multi-step orchestration workflows and tool logic.
 
 Execution records are persisted to PostgreSQL when `DATABASE_URL` is available; otherwise an in-memory fallback store is used.
 
-Backend resolves the active platform bindings and passes them to agent engine as an execution-scoped `platform_runtime` snapshot. Prompt- and message-based executions now perform a real LLM call through that snapshot using the active `llm_inference` provider; `vector_store` is included in the same snapshot for the next RAG convergence step.
+Backend resolves the active platform bindings and passes them to agent engine as an execution-scoped `platform_runtime` snapshot. Prompt- and message-based executions perform a real LLM call through the active `llm_inference` provider, and explicit `input.retrieval` requests perform a real vector query through the active `vector_store` provider before the LLM call.
 
 Canonical service notes: [`agent_engine/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/agent_engine/README.md).
 

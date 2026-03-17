@@ -127,3 +127,34 @@ def test_engine_success_payload_matches_golden_shape(monkeypatch: pytest.MonkeyP
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_invalid_retrieval_input_returns_400():
+    try:
+        server = HTTPServer(("127.0.0.1", 0), module.Handler)
+    except PermissionError:
+        pytest.skip("Socket binding is not permitted in this test environment")
+    host, port = server.server_address
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        status, payload = _request_json(
+            "POST",
+            host,
+            port,
+            "/v1/agent-executions",
+            {
+                "agent_id": "agent.alpha",
+                "runtime_profile": "offline",
+                "input": {
+                    "retrieval": {"index": "knowledge_base"},
+                },
+            },
+        )
+        assert status == 400
+        assert payload["error"] == "invalid_retrieval_input"
+    finally:
+        server.shutdown()
+        server.server_close()

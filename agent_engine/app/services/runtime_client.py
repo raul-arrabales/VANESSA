@@ -18,6 +18,15 @@ class LlmRuntimeClientError(RuntimeError):
         self.details = details or {}
 
 
+class VectorStoreRuntimeClientError(RuntimeError):
+    def __init__(self, *, code: str, message: str, status_code: int, details: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        self.details = details or {}
+
+
 class LlmRuntimeClient(ABC):
     def __init__(self, *, deployment_profile: dict[str, Any], llm_binding: dict[str, Any]):
         self.deployment_profile = deployment_profile
@@ -29,6 +38,23 @@ class LlmRuntimeClient(ABC):
         *,
         requested_model: str | None,
         messages: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class VectorStoreRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], vector_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.vector_binding = vector_binding
+
+    @abstractmethod
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str,
+        top_k: int,
+        filters: dict[str, Any],
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -55,7 +81,13 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
                 details={"provider_slug": self.llm_binding.get("slug"), "status_code": status_code},
             )
         if not 200 <= status_code < 300:
-            error_code = "runtime_timeout" if status_code == 504 else "runtime_upstream_unavailable" if status_code >= 502 else "runtime_request_failed"
+            error_code = (
+                "runtime_timeout"
+                if status_code == 504
+                else "runtime_upstream_unavailable"
+                if status_code >= 502
+                else "runtime_request_failed"
+            )
             raise LlmRuntimeClientError(
                 code=error_code,
                 message="LLM runtime request failed",
@@ -80,15 +112,86 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         return endpoint_url + chat_path
 
 
-def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClient:
-    deployment_profile = platform_runtime.get("deployment_profile")
-    capabilities = platform_runtime.get("capabilities")
-    if not isinstance(deployment_profile, dict) or not isinstance(capabilities, dict):
-        raise LlmRuntimeClientError(
-            code="invalid_platform_runtime",
-            message="platform_runtime is missing deployment profile or capabilities",
-            status_code=500,
+class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
+    def query(
+        self,
+        *,
+        index_name: str,
+        query_text: str,
+        top_k: int,
+        filters: dict[str, Any],
+    ) -> dict[str, Any]:
+        class_name = _coerce_weaviate_class_name(index_name)
+        operation = _build_weaviate_query_operation(
+            class_name=class_name,
+            query_text=query_text,
+            top_k=top_k,
+            filters=filters,
         )
+        payload, status_code = http_json_request(
+            self._graphql_url(),
+            method="POST",
+            payload={"query": operation["query"]},
+        )
+        if payload is None:
+            error_code = "vector_runtime_timeout" if status_code == 504 else "vector_runtime_unreachable"
+            raise VectorStoreRuntimeClientError(
+                code=error_code,
+                message="Vector runtime unavailable",
+                status_code=status_code,
+                details={"provider_slug": self.vector_binding.get("slug"), "status_code": status_code},
+            )
+        if not 200 <= status_code < 300:
+            error_code = (
+                "vector_runtime_timeout"
+                if status_code == 504
+                else "vector_runtime_upstream_unavailable"
+                if status_code >= 502
+                else "vector_runtime_request_failed"
+            )
+            raise VectorStoreRuntimeClientError(
+                code=error_code,
+                message="Vector runtime request failed",
+                status_code=status_code,
+                details={
+                    "provider_slug": self.vector_binding.get("slug"),
+                    "status_code": status_code,
+                    "upstream": payload,
+                },
+            )
+        if isinstance(payload.get("errors"), list) and payload["errors"]:
+            raise VectorStoreRuntimeClientError(
+                code="vector_runtime_request_failed",
+                message="Vector runtime query failed",
+                status_code=502,
+                details={
+                    "provider_slug": self.vector_binding.get("slug"),
+                    "status_code": 502,
+                    "upstream": payload,
+                },
+            )
+
+        rows = (((payload.get("data") or {}).get("Get") or {}).get(class_name) or [])
+        if not isinstance(rows, list):
+            rows = []
+        results = [_normalize_weaviate_query_result(item) for item in rows if isinstance(item, dict)]
+        return {
+            "index": index_name,
+            "query": query_text,
+            "top_k": top_k,
+            "results": results,
+        }
+
+    def _graphql_url(self) -> str:
+        endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + "/v1/graphql"
+
+
+def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClient:
+    deployment_profile, capabilities = _coerce_platform_runtime(
+        platform_runtime,
+        error_cls=LlmRuntimeClientError,
+    )
     llm_binding = capabilities.get("llm_inference")
     if not isinstance(llm_binding, dict):
         raise LlmRuntimeClientError(
@@ -104,10 +207,30 @@ def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClie
             status_code=500,
             details={"adapter_kind": adapter_kind},
         )
-    return OpenAICompatibleLlmRuntimeClient(
-        deployment_profile=deployment_profile,
-        llm_binding=llm_binding,
+    return OpenAICompatibleLlmRuntimeClient(deployment_profile=deployment_profile, llm_binding=llm_binding)
+
+
+def build_vector_store_runtime_client(platform_runtime: dict[str, Any]) -> VectorStoreRuntimeClient:
+    deployment_profile, capabilities = _coerce_platform_runtime(
+        platform_runtime,
+        error_cls=VectorStoreRuntimeClientError,
     )
+    vector_binding = capabilities.get("vector_store")
+    if not isinstance(vector_binding, dict):
+        raise VectorStoreRuntimeClientError(
+            code="missing_vector_runtime",
+            message="platform_runtime is missing vector_store binding",
+            status_code=500,
+        )
+    adapter_kind = str(vector_binding.get("adapter_kind", "")).strip().lower()
+    if adapter_kind != "weaviate_http":
+        raise VectorStoreRuntimeClientError(
+            code="unsupported_adapter_kind",
+            message="Unsupported vector runtime adapter",
+            status_code=500,
+            details={"adapter_kind": adapter_kind},
+        )
+    return WeaviateVectorStoreRuntimeClient(deployment_profile=deployment_profile, vector_binding=vector_binding)
 
 
 def http_json_request(
@@ -142,6 +265,22 @@ def http_json_request(
         return parsed, int(exc.code)
     except URLError:
         return None, 502
+
+
+def _coerce_platform_runtime(
+    platform_runtime: dict[str, Any],
+    *,
+    error_cls: type[LlmRuntimeClientError] | type[VectorStoreRuntimeClientError],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    deployment_profile = platform_runtime.get("deployment_profile")
+    capabilities = platform_runtime.get("capabilities")
+    if not isinstance(deployment_profile, dict) or not isinstance(capabilities, dict):
+        raise error_cls(
+            code="invalid_platform_runtime",
+            message="platform_runtime is missing deployment profile or capabilities",
+            status_code=500,
+        )
+    return deployment_profile, capabilities
 
 
 def _resolve_effective_model(requested_model: str | None, llm_binding: dict[str, Any]) -> str:
@@ -247,3 +386,84 @@ def _extract_output_text(payload: dict[str, Any]) -> str:
         if text:
             text_parts.append(text)
     return "\n".join(text_parts)
+
+
+def _coerce_weaviate_class_name(index_name: str) -> str:
+    parts = [segment for segment in "".join(ch if ch.isalnum() else " " for ch in index_name).split() if segment]
+    if not parts:
+        raise VectorStoreRuntimeClientError(
+            code="invalid_index_name",
+            message="index name must contain letters or numbers",
+            status_code=400,
+        )
+    return "".join(part[:1].upper() + part[1:] for part in parts)
+
+
+def _coerce_metadata_key(key: str) -> str:
+    normalized = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in key.strip())
+    if not normalized or not normalized[0].isalpha():
+        raise VectorStoreRuntimeClientError(
+            code="invalid_metadata_key",
+            message="metadata keys must start with a letter",
+            status_code=400,
+        )
+    return normalized.lower()
+
+
+def _build_weaviate_query_operation(
+    *,
+    class_name: str,
+    query_text: str,
+    top_k: int,
+    filters: dict[str, Any],
+) -> dict[str, str]:
+    args: list[str] = [f"limit: {top_k}", f'bm25: {{ query: {_graphql_string(query_text)}, properties: ["text"] }}']
+    if filters:
+        args.append(f"where: {_graphql_where_filter(filters)}")
+    args_text = ", ".join(args)
+    query = (
+        "{ Get { "
+        f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id score }} }} '
+        "} } }"
+    )
+    return {"query": query}
+
+
+def _graphql_string(value: str) -> str:
+    return dumps(value)
+
+
+def _graphql_where_filter(filters: dict[str, Any]) -> str:
+    operands: list[str] = []
+    for key, value in filters.items():
+        property_name = _coerce_metadata_key(str(key))
+        if isinstance(value, bool):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueBoolean: {str(value).lower()} }}')
+        elif isinstance(value, int) and not isinstance(value, bool):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueInt: {value} }}')
+        elif isinstance(value, float):
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueNumber: {format(value, ".12g")} }}')
+        else:
+            operands.append(f'{{ path: ["{property_name}"], operator: Equal, valueText: {_graphql_string(str(value))} }}')
+    if len(operands) == 1:
+        return operands[0]
+    return "{ operator: And, operands: [" + ", ".join(operands) + "] }"
+
+
+def _normalize_weaviate_query_result(item: dict[str, Any]) -> dict[str, Any]:
+    additional = item.get("_additional")
+    additional = additional if isinstance(additional, dict) else {}
+    metadata_json = str(item.get("metadata_json", "")).strip()
+    try:
+        metadata = loads(metadata_json) if metadata_json else {}
+    except ValueError:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    return {
+        "id": str(item.get("document_id") or additional.get("id") or "").strip(),
+        "text": str(item.get("text", "")).strip(),
+        "metadata": metadata,
+        "score": float(additional.get("score", 0.0) or 0.0),
+        "score_kind": "bm25",
+    }

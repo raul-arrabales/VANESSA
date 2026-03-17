@@ -32,6 +32,19 @@ def _platform_runtime(*, provider_key: str = "vllm_local", request_format: str =
                     "forced_model_id": "local-default-model",
                 },
                 "binding_config": {},
+            },
+            "vector_store": {
+                "id": "provider-2",
+                "slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "display_name": "Weaviate local",
+                "description": "desc",
+                "adapter_kind": "weaviate_http",
+                "endpoint_url": "http://weaviate:8080",
+                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "enabled": True,
+                "config": {},
+                "binding_config": {},
             }
         },
     }
@@ -108,3 +121,67 @@ def test_openai_compatible_runtime_client_maps_transport_failures(monkeypatch: p
         )
 
     assert exc_info.value.code == "runtime_unreachable"
+
+
+def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "data": {
+                "Get": {
+                    "KnowledgeBase": [
+                        {
+                            "document_id": "doc-1",
+                            "text": "retrieved text",
+                            "metadata_json": '{"tenant":"ops"}',
+                            "_additional": {"id": "uuid-1", "score": 7.5},
+                        }
+                    ]
+                }
+            }
+        }, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_vector_store_runtime_client(_platform_runtime())
+
+    payload = client.query(
+        index_name="knowledge_base",
+        query_text="hello",
+        top_k=4,
+        filters={"tenant": "ops"},
+    )
+
+    assert payload == {
+        "index": "knowledge_base",
+        "query": "hello",
+        "top_k": 4,
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "retrieved text",
+                "metadata": {"tenant": "ops"},
+                "score": 7.5,
+                "score_kind": "bm25",
+            }
+        ],
+    }
+    assert 'bm25: { query: "hello", properties: ["text"] }' in str(seen_payloads[0])
+    assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in str(seen_payloads[0])
+
+
+def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(runtime_client, "http_json_request", lambda *args, **kwargs: (None, 504))
+    client = runtime_client.build_vector_store_runtime_client(_platform_runtime())
+
+    with pytest.raises(runtime_client.VectorStoreRuntimeClientError) as exc_info:
+        client.query(
+            index_name="knowledge_base",
+            query_text="hello",
+            top_k=5,
+            filters={},
+        )
+
+    assert exc_info.value.code == "vector_runtime_timeout"

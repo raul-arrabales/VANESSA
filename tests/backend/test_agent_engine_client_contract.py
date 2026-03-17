@@ -35,7 +35,7 @@ def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
         service_token="token",
         request_id="req-1",
         agent_id="agent.alpha",
-        execution_input={"prompt": "hello"},
+        execution_input={"prompt": "hello", "retrieval": {"index": "knowledge_base", "top_k": 3}},
         requested_by_user_id=42,
         requested_by_role="user",
         runtime_profile="offline",
@@ -49,7 +49,7 @@ def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
     assert seen_payloads == [
         {
             "agent_id": "agent.alpha",
-            "input": {"prompt": "hello"},
+            "input": {"prompt": "hello", "retrieval": {"index": "knowledge_base", "top_k": 3}},
             "requested_by_user_id": 42,
             "requested_by_role": "user",
             "runtime_profile": "offline",

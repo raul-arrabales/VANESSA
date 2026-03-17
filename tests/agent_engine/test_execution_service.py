@@ -79,6 +79,7 @@ def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
     assert payload["execution"]["result"] == {
         "output_text": "model output",
         "tool_calls": [],
+        "retrieval_calls": [],
         "model_calls": [
             {
                 "provider_slug": "vllm-local-gateway",
@@ -201,6 +202,7 @@ def test_execution_without_prompt_or_messages_keeps_deterministic_success(monkey
         "output_text": "Agent 'agent.alpha' executed in offline profile",
         "tool_calls": [],
         "model_calls": [],
+        "retrieval_calls": [],
     }
 
 
@@ -251,3 +253,345 @@ def test_execution_runtime_client_failures_map_to_existing_error_model(monkeypat
         )
 
     assert exc_info.value.code == "EXEC_UPSTREAM_UNAVAILABLE"
+
+
+def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monkeypatch: pytest.MonkeyPatch):
+    seen_llm_messages: list[list[dict[str, Any]]] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_vector_store_runtime_client",
+        lambda _runtime: type(
+            "FakeVectorClient",
+            (),
+            {
+                "query": lambda self, **kwargs: {
+                    "index": kwargs["index_name"],
+                    "query": kwargs["query_text"],
+                    "top_k": kwargs["top_k"],
+                    "results": [
+                        {
+                            "id": "doc-1",
+                            "text": "retrieved text",
+                            "metadata": {"tenant": "ops"},
+                            "score": 7.5,
+                            "score_kind": "bm25",
+                        }
+                    ],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeLlmClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: seen_llm_messages.append(kwargs["messages"]) or {
+                    "output_text": "rag answer",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "hello",
+                "retrieval": {
+                    "index": "knowledge_base",
+                    "top_k": 3,
+                    "filters": {"tenant": "ops"},
+                },
+            },
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"] == {
+        "output_text": "rag answer",
+        "tool_calls": [],
+        "model_calls": [
+            {
+                "provider_slug": "vllm-local-gateway",
+                "provider_key": "vllm_local",
+                "deployment_profile_slug": "local-default",
+                "requested_model": "model.alpha",
+                "status_code": 200,
+            }
+        ],
+        "retrieval_calls": [
+            {
+                "provider_slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "deployment_profile_slug": "local-default",
+                "index": "knowledge_base",
+                "query": "hello",
+                "top_k": 3,
+                "result_count": 1,
+                "results": [
+                    {
+                        "id": "doc-1",
+                        "text": "retrieved text",
+                        "metadata": {"tenant": "ops"},
+                        "score": 7.5,
+                        "score_kind": "bm25",
+                    }
+                ],
+            }
+        ],
+    }
+    assert seen_llm_messages[0][0]["role"] == "system"
+    assert "retrieved text" in seen_llm_messages[0][0]["content"][0]["text"]
+
+
+def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypatch: pytest.MonkeyPatch):
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_vector_store_runtime_client",
+        lambda _runtime: type(
+            "FakeVectorClient",
+            (),
+            {
+                "query": lambda self, **kwargs: seen_queries.append(kwargs["query_text"]) or {
+                    "index": kwargs["index_name"],
+                    "query": kwargs["query_text"],
+                    "top_k": kwargs["top_k"],
+                    "results": [],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeLlmClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: {
+                    "output_text": "ok",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "messages": [
+                    {"role": "system", "content": "system"},
+                    {"role": "user", "content": "first"},
+                    {"role": "assistant", "content": "reply"},
+                    {"role": "user", "content": "last user question"},
+                ],
+                "retrieval": {"index": "knowledge_base"},
+            },
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert seen_queries == ["last user question"]
+    assert payload["execution"]["result"]["retrieval_calls"][0]["query"] == "last user question"
+
+
+def test_execution_with_explicit_retrieval_query_overrides_prompt(monkeypatch: pytest.MonkeyPatch):
+    seen_queries: list[str] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_vector_store_runtime_client",
+        lambda _runtime: type(
+            "FakeVectorClient",
+            (),
+            {
+                "query": lambda self, **kwargs: seen_queries.append(kwargs["query_text"]) or {
+                    "index": kwargs["index_name"],
+                    "query": kwargs["query_text"],
+                    "top_k": kwargs["top_k"],
+                    "results": [],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeLlmClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: {
+                    "output_text": "ok",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "hello",
+                "retrieval": {"index": "knowledge_base", "query": "explicit retrieval query"},
+            },
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert seen_queries == ["explicit retrieval query"]
+    assert payload["execution"]["result"]["retrieval_calls"][0]["query"] == "explicit retrieval query"
+
+
+def test_execution_with_zero_hit_retrieval_keeps_original_messages(monkeypatch: pytest.MonkeyPatch):
+    seen_llm_messages: list[list[dict[str, Any]]] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_vector_store_runtime_client",
+        lambda _runtime: type(
+            "FakeVectorClient",
+            (),
+            {
+                "query": lambda self, **kwargs: {
+                    "index": kwargs["index_name"],
+                    "query": kwargs["query_text"],
+                    "top_k": kwargs["top_k"],
+                    "results": [],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeLlmClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: seen_llm_messages.append(kwargs["messages"]) or {
+                    "output_text": "ok",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "hello",
+                "retrieval": {"index": "knowledge_base"},
+            },
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert seen_llm_messages == [[{"role": "user", "content": [{"type": "text", "text": "hello"}]}]]
+    assert payload["execution"]["result"]["retrieval_calls"][0]["result_count"] == 0
+
+
+def test_execution_rejects_invalid_retrieval_payload_before_persisting(monkeypatch: pytest.MonkeyPatch):
+    saved_statuses: list[str] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda execution, **_kwargs: saved_statuses.append(execution.status))
+
+    with pytest.raises(ValueError) as exc_info:
+        execution_service.create_execution(
+            {
+                "agent_id": "agent.alpha",
+                "requested_by_user_id": 123,
+                "runtime_profile": "offline",
+                "input": {"prompt": "hello", "retrieval": {"index": "knowledge_base", "top_k": 0}},
+            }
+        )
+
+    assert str(exc_info.value) == "invalid_retrieval_input"
+    assert saved_statuses == []

@@ -115,6 +115,15 @@ class Handler(BaseHTTPRequestHandler):
             if code == "invalid_input":
                 self._send_json(400, {"error": "invalid_input", "message": "input must be an object when provided"})
                 return
+            if code == "invalid_retrieval_input":
+                self._send_json(
+                    400,
+                    {
+                        "error": "invalid_retrieval_input",
+                        "message": "retrieval must include a valid index, query source, top_k, and scalar filters",
+                    },
+                )
+                return
             self._send_json(400, {"error": "invalid_payload", "message": "Expected valid payload"})
         except ExecutionBlockedError as exc:
             self._send_json(exc.status_code, {"error": exc.code, "message": exc.message, "details": exc.details})

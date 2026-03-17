@@ -16,7 +16,15 @@
 {
   "agent_id": "agent.alpha",
   "input": {
-    "prompt": "hello"
+    "prompt": "hello",
+    "retrieval": {
+      "index": "knowledge_base",
+      "query": "optional explicit retrieval query",
+      "top_k": 5,
+      "filters": {
+        "tenant": "ops"
+      }
+    }
   },
   "requested_by_user_id": 123,
   "requested_by_role": "user",
@@ -80,6 +88,7 @@
     "result": {
       "output_text": "Agent 'agent.alpha' executed in offline profile",
       "tool_calls": [],
+      "retrieval_calls": [],
       "model_calls": [
         {
           "provider_slug": "vllm-local-gateway",
@@ -96,6 +105,8 @@
 ```
 
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
+
+`input.retrieval` is optional and execution-scoped. In v1 it is text-query only, uses the active `vector_store` binding, and runs only when explicitly present in the input payload.
 
 ## Error Codes
 

@@ -77,6 +77,11 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
         assert kwargs["agent_id"] == "agent.local"
         assert kwargs["runtime_profile"] == "offline"
         assert kwargs["requested_by_user_id"] == user["id"]
+        assert kwargs["execution_input"]["retrieval"] == {
+            "index": "knowledge_base",
+            "top_k": 3,
+            "filters": {"tenant": "ops"},
+        }
         assert kwargs["platform_runtime"]["deployment_profile"]["slug"] == "local-default"
         assert kwargs["platform_runtime"]["capabilities"]["llm_inference"]["provider_key"] == "vllm_local"
         assert kwargs["platform_runtime"]["capabilities"]["vector_store"]["provider_key"] == "weaviate_local"
@@ -104,7 +109,17 @@ def test_agent_execution_success_proxy(client, monkeypatch: pytest.MonkeyPatch):
     response = test_client.post(
         "/v1/agent-executions",
         headers=_auth(token),
-        json={"agent_id": "agent.local", "input": {"prompt": "hello"}},
+        json={
+            "agent_id": "agent.local",
+            "input": {
+                "prompt": "hello",
+                "retrieval": {
+                    "index": "knowledge_base",
+                    "top_k": 3,
+                    "filters": {"tenant": "ops"},
+                },
+            },
+        },
     )
     assert response.status_code == 201
     payload = response.get_json()["execution"]

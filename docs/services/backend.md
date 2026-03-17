@@ -52,6 +52,7 @@ Bootstrap defaults:
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Superadmin-only vector proof routes exercise the real `vector_store` data plane through the active provider binding without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
+- Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `vector_store` binding for explicit retrieval requests before model execution.
 
 ## Model Governance Endpoints (Release N Canonical)
 
