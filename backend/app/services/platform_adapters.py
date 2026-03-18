@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from json import dumps, loads
 import logging
 from typing import Any
@@ -12,6 +13,13 @@ from .platform_types import PlatformControlPlaneError, ProviderBinding
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
 logger = logging.getLogger(__name__)
+
+
+class StreamRequestError(RuntimeError):
+    def __init__(self, message: str, *, status_code: int, payload: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.payload = payload
 
 
 def http_json_request(
@@ -48,6 +56,49 @@ def http_json_request(
         return None, 502
 
 
+def stream_sse_request(
+    url: str,
+    *,
+    method: str,
+    payload: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    request_headers = {"Accept": "text/event-stream"}
+    if headers:
+        request_headers.update(headers)
+    data = None
+    if payload is not None:
+        request_headers.setdefault("Content-Type", "application/json")
+        data = dumps(payload).encode("utf-8")
+
+    req = Request(url, data=data, headers=request_headers, method=method.upper())
+    try:
+        with urlopen(req, timeout=timeout_seconds) as response:
+            yield from _iter_sse_events(response)
+    except TimeoutError as exc:
+        raise StreamRequestError(
+            "Upstream stream request timed out",
+            status_code=504,
+        ) from exc
+    except HTTPError as exc:
+        raw = exc.read().decode("utf-8")
+        try:
+            parsed = loads(raw) if raw else {"error": "upstream_error"}
+        except ValueError:
+            parsed = {"error": "upstream_error", "body": raw}
+        raise StreamRequestError(
+            str(parsed.get("message") or parsed.get("error") or "Upstream stream request failed"),
+            status_code=int(exc.code),
+            payload=parsed,
+        ) from exc
+    except URLError as exc:
+        raise StreamRequestError(
+            "Upstream stream request failed",
+            status_code=502,
+        ) from exc
+
+
 def _binding_timeout_seconds(config: dict[str, Any]) -> float:
     raw_timeout = config.get("request_timeout_seconds", _DEFAULT_HTTP_TIMEOUT_SECONDS)
     try:
@@ -79,6 +130,18 @@ class LlmInferenceAdapter(ABC):
         temperature: float | None,
         allow_local_fallback: bool,
     ) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def chat_completion_stream(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int | None,
+        temperature: float | None,
+        allow_local_fallback: bool,
+    ) -> Iterator[dict[str, Any]]:
         raise NotImplementedError
 
 
@@ -267,6 +330,120 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             )
             return _normalize_chat_response_payload(fallback_response), fallback_status
         return _normalize_chat_response_payload(response_payload), status_code
+
+    def chat_completion_stream(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int | None,
+        temperature: float | None,
+        allow_local_fallback: bool,
+    ) -> Iterator[dict[str, Any]]:
+        effective_model = str(self.binding.config.get("forced_model_id", "")).strip() or model
+        payload: dict[str, Any] = self._build_chat_payload(model=effective_model, messages=messages)
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+        payload["stream"] = True
+
+        fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
+
+        def _stream_attempt(stream_payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+            for event_name, event_payload in stream_sse_request(
+                self._chat_url(),
+                method="POST",
+                payload=stream_payload,
+                timeout_seconds=self._request_timeout_seconds(),
+            ):
+                normalized_event_name = event_name.strip().lower()
+                if normalized_event_name == "delta":
+                    text = str(event_payload.get("text", ""))
+                    if text:
+                        yield {"type": "delta", "text": text}
+                    continue
+                if normalized_event_name == "complete":
+                    response_payload = event_payload.get("response")
+                    normalized_response = (
+                        _normalize_chat_response_payload(response_payload)
+                        if isinstance(response_payload, dict)
+                        else None
+                    )
+                    yield {
+                        "type": "complete",
+                        "response": normalized_response,
+                        "status_code": 200,
+                    }
+                    return
+                if normalized_event_name == "error":
+                    yield {
+                        "type": "error",
+                        "payload": event_payload,
+                        "status_code": int(event_payload.get("status_code", 502) or 502),
+                    }
+                    return
+
+        first_attempt_started = False
+        try:
+            for event in _stream_attempt(payload):
+                event_type = str(event.get("type", "")).strip().lower()
+                if event_type == "error":
+                    should_retry_fallback = (
+                        allow_local_fallback
+                        and fallback_model_id
+                        and effective_model != fallback_model_id
+                        and not first_attempt_started
+                        and _is_model_not_found(_stream_error_payload(event))
+                    )
+                    if should_retry_fallback:
+                        logger.warning(
+                            "LLM adapter falling back to local model alias '%s' after streamed request for '%s' reported model_not_found via provider '%s'.",
+                            fallback_model_id,
+                            effective_model,
+                            self.binding.provider_slug,
+                        )
+                        break
+                    yield event
+                    return
+                if event_type == "delta":
+                    first_attempt_started = True
+                yield event
+                if event_type == "complete":
+                    return
+        except StreamRequestError as exc:
+            if (
+                allow_local_fallback
+                and fallback_model_id
+                and effective_model != fallback_model_id
+                and _is_model_not_found(exc.payload)
+            ):
+                logger.warning(
+                    "LLM adapter falling back to local model alias '%s' after streamed request for '%s' returned model_not_found via provider '%s'.",
+                    fallback_model_id,
+                    effective_model,
+                    self.binding.provider_slug,
+                )
+            else:
+                yield {
+                    "type": "error",
+                    "payload": exc.payload or {"error": "llm_stream_unreachable", "message": str(exc)},
+                    "status_code": exc.status_code,
+                }
+                return
+        else:
+            return
+
+        fallback_payload = dict(payload)
+        fallback_payload["model"] = fallback_model_id
+        try:
+            yield from _stream_attempt(fallback_payload)
+        except StreamRequestError as exc:
+            yield {
+                "type": "error",
+                "payload": exc.payload or {"error": "llm_stream_unreachable", "message": str(exc)},
+                "status_code": exc.status_code,
+            }
 
     def _build_chat_payload(self, *, model: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
         request_format = self._request_format()
@@ -826,6 +1003,59 @@ def _is_model_not_found(payload: dict[str, Any] | None) -> bool:
         return error_code == "model_not_found" or ("model" in error_message and "not found" in error_message)
     error_text = str(error or "").strip().lower()
     return error_text == "model_not_found" or ("model" in error_text and "not found" in error_text)
+
+
+def _stream_error_payload(event: dict[str, Any]) -> dict[str, Any] | None:
+    payload = event.get("payload")
+    if isinstance(payload, dict):
+        return payload
+    error = event.get("error")
+    if isinstance(error, dict):
+        return error
+    return None
+
+
+def _iter_sse_events(response) -> Iterator[tuple[str, dict[str, Any]]]:
+    event_name = "message"
+    data_lines: list[str] = []
+
+    def _flush() -> tuple[str, dict[str, Any]] | None:
+        nonlocal event_name, data_lines
+        if not data_lines:
+            event_name = "message"
+            return None
+        raw_data = "\n".join(data_lines)
+        data_lines = []
+        current_event = event_name
+        event_name = "message"
+        try:
+            payload = loads(raw_data) if raw_data else {}
+        except ValueError:
+            payload = {"raw": raw_data}
+        if not isinstance(payload, dict):
+            payload = {"data": payload}
+        return current_event, payload
+
+    while True:
+        raw_line = response.readline()
+        if not raw_line:
+            flushed = _flush()
+            if flushed is not None:
+                yield flushed
+            break
+        line = raw_line.decode("utf-8").rstrip("\r\n")
+        if not line:
+            flushed = _flush()
+            if flushed is not None:
+                yield flushed
+            continue
+        if line.startswith(":"):
+            continue
+        if line.startswith("event:"):
+            event_name = line[6:].strip() or "message"
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line[5:].lstrip())
 
 
 def _coerce_openai_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:

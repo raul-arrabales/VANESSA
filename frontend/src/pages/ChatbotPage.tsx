@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createChatConversation,
   deleteChatConversation,
   getChatConversation,
   listChatConversations,
-  sendChatMessage,
+  streamChatMessage,
+  type ChatConversationMessage,
   updateChatConversation,
   type ChatConversationDetail,
   type ChatConversationSummary,
@@ -43,6 +44,13 @@ function formatTimestamp(value: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function createTransientMessageId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export default function ChatbotPage(): JSX.Element {
   const { token, isAuthenticated } = useAuth();
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
@@ -54,6 +62,11 @@ export default function ChatbotPage(): JSX.Element {
   const [isSending, setIsSending] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [isConversationBusy, setIsConversationBusy] = useState(false);
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    streamAbortRef.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -165,9 +178,10 @@ export default function ChatbotPage(): JSX.Element {
   );
 
   const activeConversationModelId = activeConversation?.modelId ?? "";
+  const isInteractionLocked = isConversationBusy || isSending;
 
   const createConversation = async (): Promise<void> => {
-    if (!token || !canCreateConversation) {
+    if (!token || !canCreateConversation || isSending) {
       return;
     }
 
@@ -188,7 +202,7 @@ export default function ChatbotPage(): JSX.Element {
   };
 
   const updateConversationModel = async (conversationId: string, modelId: string): Promise<void> => {
-    if (!token) {
+    if (!token || isSending) {
       return;
     }
 
@@ -205,7 +219,7 @@ export default function ChatbotPage(): JSX.Element {
   };
 
   const renameConversation = async (): Promise<void> => {
-    if (!token || !activeConversation) {
+    if (!token || !activeConversation || isSending) {
       return;
     }
 
@@ -230,7 +244,7 @@ export default function ChatbotPage(): JSX.Element {
   };
 
   const deleteConversation = async (): Promise<void> => {
-    if (!token || !activeConversation) {
+    if (!token || !activeConversation || isSending) {
       return;
     }
     if (!window.confirm("Delete this conversation?")) {
@@ -267,26 +281,83 @@ export default function ChatbotPage(): JSX.Element {
     }
 
     const prompt = draft.trim();
+    const previousMessages = [...activeConversation.messages];
+    const conversationId = activeConversation.id;
+    const userMessageId = createTransientMessageId("pending-user");
+    const assistantMessageId = createTransientMessageId("pending-assistant");
+    const optimisticMessages: ChatConversationMessage[] = [
+      ...previousMessages,
+      {
+        id: userMessageId,
+        role: "user",
+        content: prompt,
+        metadata: {},
+        createdAt: null,
+      },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        metadata: { transient: true },
+        createdAt: null,
+      },
+    ];
+
     setError("");
     setIsSending(true);
+    setDraft("");
+    setActiveConversation((current) => (
+      current && current.id === conversationId ? { ...current, messages: optimisticMessages } : current
+    ));
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
 
     try {
-      const result = await sendChatMessage(activeConversation.id, { prompt }, token);
+      const result = await streamChatMessage(
+        conversationId,
+        { prompt },
+        token,
+        {
+          signal: controller.signal,
+          onDelta: (text) => {
+            setActiveConversation((current) => {
+              if (!current || current.id !== conversationId) {
+                return current;
+              }
+              return {
+                ...current,
+                messages: current.messages.map((message) => (
+                  message.id === assistantMessageId
+                    ? { ...message, content: `${message.content}${text}` }
+                    : message
+                )),
+              };
+            });
+          },
+        },
+      );
       setConversations((existing) => upsertConversationSummary(existing, result.conversation));
       setActiveConversation((current) => {
-        if (!current || current.id !== activeConversation.id) {
+        if (!current || current.id !== conversationId) {
           return current;
         }
         return {
           ...current,
           ...result.conversation,
-          messages: [...current.messages, ...result.messages],
+          messages: [...previousMessages, ...result.messages],
         };
       });
-      setDraft("");
     } catch (requestError) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      setActiveConversation((current) => (
+        current && current.id === conversationId ? { ...current, messages: previousMessages } : current
+      ));
+      setDraft(prompt);
       setError(requestError instanceof Error ? requestError.message : "Message request failed.");
     } finally {
+      streamAbortRef.current = null;
       setIsSending(false);
     }
   };
@@ -300,7 +371,7 @@ export default function ChatbotPage(): JSX.Element {
             type="button"
             className="btn btn-secondary"
             onClick={() => void createConversation()}
-            disabled={!canCreateConversation || isConversationBusy}
+            disabled={!canCreateConversation || isInteractionLocked}
           >
             New chat
           </button>
@@ -316,6 +387,7 @@ export default function ChatbotPage(): JSX.Element {
                 setActiveConversationId(conversation.id);
                 setActiveConversation(null);
               }}
+              disabled={isInteractionLocked}
             >
               <strong>{conversation.title}</strong>
               <span>{formatTimestamp(conversation.updatedAt)}</span>
@@ -332,7 +404,7 @@ export default function ChatbotPage(): JSX.Element {
               type="button"
               className="btn btn-secondary"
               onClick={() => void renameConversation()}
-              disabled={!activeConversation || isConversationBusy}
+              disabled={!activeConversation || isInteractionLocked}
             >
               Rename
             </button>
@@ -340,7 +412,7 @@ export default function ChatbotPage(): JSX.Element {
               type="button"
               className="btn btn-secondary"
               onClick={() => void deleteConversation()}
-              disabled={!activeConversation || isConversationBusy}
+              disabled={!activeConversation || isInteractionLocked}
             >
               Delete
             </button>
@@ -357,7 +429,7 @@ export default function ChatbotPage(): JSX.Element {
               void updateConversationModel(activeConversation.id, event.currentTarget.value);
             }
           }}
-          disabled={models.length === 0 || !activeConversation}
+          disabled={models.length === 0 || !activeConversation || isSending}
         >
           {models.length === 0 && <option value="">No enabled models</option>}
           {models.map((model) => (
@@ -392,6 +464,7 @@ export default function ChatbotPage(): JSX.Element {
           onChange={(event) => setDraft(event.currentTarget.value)}
           rows={4}
           placeholder="Type your message"
+          disabled={isSending}
         />
 
         <button
@@ -400,7 +473,7 @@ export default function ChatbotPage(): JSX.Element {
           onClick={() => void sendPrompt()}
           disabled={!activeConversation?.modelId || !draft.trim() || isSending}
         >
-          {isSending ? "Sending..." : "Send"}
+          {isSending ? "Streaming..." : "Send"}
         </button>
 
         {error && <p className="status-text error-text">{error}</p>}

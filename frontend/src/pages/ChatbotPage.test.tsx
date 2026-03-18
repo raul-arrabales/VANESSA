@@ -16,7 +16,7 @@ const chatApiMocks = vi.hoisted(() => ({
   getChatConversation: vi.fn(),
   updateChatConversation: vi.fn(),
   deleteChatConversation: vi.fn(),
-  sendChatMessage: vi.fn(),
+  streamChatMessage: vi.fn(),
 }));
 
 let mockUser: AuthUser | null = null;
@@ -31,7 +31,7 @@ vi.mock("../api/chat", () => ({
   getChatConversation: chatApiMocks.getChatConversation,
   updateChatConversation: chatApiMocks.updateChatConversation,
   deleteChatConversation: chatApiMocks.deleteChatConversation,
-  sendChatMessage: chatApiMocks.sendChatMessage,
+  streamChatMessage: chatApiMocks.streamChatMessage,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -147,11 +147,11 @@ describe("ChatbotPage", () => {
     expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
   });
 
-  it("uses the conversation API for model changes and message sends", async () => {
+  it("uses the conversation API for model changes and streamed message sends", async () => {
     chatApiMocks.updateChatConversation.mockResolvedValueOnce(
       conversationSummary("conv-1", "Thread one", { modelId: "safe-large" }),
     );
-    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
       sendResult(
         conversationSummary("conv-1", "Test prompt", {
           modelId: "safe-large",
@@ -176,17 +176,18 @@ describe("ChatbotPage", () => {
       { model_id: "safe-large" },
       "token",
     ));
-    expect(chatApiMocks.sendChatMessage).toHaveBeenCalledWith(
+    expect(chatApiMocks.streamChatMessage).toHaveBeenCalledWith(
       "conv-1",
       { prompt: "Test prompt" },
       "token",
+      expect.any(Object),
     );
     expect(await screen.findByRole("heading", { name: "hello" })).toBeVisible();
     expect(screen.getByText("code", { selector: "code" })).toBeVisible();
   });
 
   it("keeps user messages as plain text while rendering assistant markdown", async () => {
-    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
       sendResult(
         conversationSummary("conv-1", "Literal user", {
           messageCount: 2,
@@ -243,7 +244,7 @@ describe("ChatbotPage", () => {
   });
 
   it("disables new chat while an empty conversation exists and re-enables after sending", async () => {
-    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
       sendResult(
         conversationSummary("conv-1", "First message", {
           messageCount: 2,
@@ -270,5 +271,90 @@ describe("ChatbotPage", () => {
     await userEvent.click(newChatButton);
     expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
     await waitFor(() => expect(newChatButton).toBeDisabled());
+  });
+
+  it("renders assistant text incrementally while the stream is active", async () => {
+    let resolveStream: (value: SendChatMessageResult) => void = () => {};
+    chatApiMocks.streamChatMessage.mockImplementationOnce(
+      async (_conversationId, _payload, _token, options) => {
+        options?.onDelta?.("## hello");
+        options?.onDelta?.("\n\n`code`");
+        return await new Promise<SendChatMessageResult>((resolve) => {
+          resolveStream = resolve;
+        });
+      },
+    );
+
+    renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    await userEvent.type(screen.getByLabelText("Message"), "Stream prompt");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByRole("heading", { name: "hello" })).toBeVisible();
+    expect(screen.getByText("code", { selector: "code" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Streaming..." })).toBeDisabled();
+
+    resolveStream(
+      sendResult(
+        conversationSummary("conv-1", "Stream prompt", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:02Z",
+        }),
+        "Stream prompt",
+        "## hello\n\n`code`",
+      ),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
+    expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
+  });
+
+  it("restores the draft and removes the transient assistant reply when streaming fails", async () => {
+    chatApiMocks.streamChatMessage.mockRejectedValueOnce(new Error("Stream failed"));
+
+    renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    await userEvent.type(screen.getByLabelText("Message"), "Broken prompt");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue("Broken prompt"));
+    expect(screen.queryByRole("heading", { name: "hello" })).toBeNull();
+    expect(screen.getByText("Stream failed")).toBeVisible();
+  });
+
+  it("disables conversation controls while a stream is active", async () => {
+    let resolveStream: (value: SendChatMessageResult) => void = () => {};
+    chatApiMocks.streamChatMessage.mockImplementationOnce(
+      async () => await new Promise<SendChatMessageResult>((resolve) => {
+        resolveStream = resolve;
+      }),
+    );
+
+    renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    await userEvent.type(screen.getByLabelText("Message"), "Lock controls");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Thread one/ })).toBeDisabled();
+
+    resolveStream(
+      sendResult(
+        conversationSummary("conv-1", "Lock controls", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:02Z",
+        }),
+        "Lock controls",
+        "done",
+      ),
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled());
   });
 });

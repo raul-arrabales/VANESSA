@@ -29,6 +29,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/chat/conversations",
         "/v1/chat/conversations/<conversation_id>",
         "/v1/chat/conversations/<conversation_id>/messages",
+        "/v1/chat/conversations/<conversation_id>/messages/stream",
         "/v1/chat/knowledge",
         "/v1/models/inference",
         "/v1/models/generate",

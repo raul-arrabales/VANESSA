@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Protocol
 
 from app.schemas import EmbeddingRequest, ResponseRequest
@@ -19,6 +20,14 @@ class ProviderError(Exception):
 class RoutedModelProvider(Protocol):
     def generate(self, request: ResponseRequest, *, upstream_model: str) -> "ProviderResult":
         """Generates a response from the incoming request."""
+
+    def generate_stream(
+        self,
+        request: ResponseRequest,
+        *,
+        upstream_model: str,
+    ) -> Iterator[dict[str, object]]:
+        """Streams response deltas from the incoming request."""
 
     def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> "EmbeddingResult":
         """Generates embeddings from the incoming request."""

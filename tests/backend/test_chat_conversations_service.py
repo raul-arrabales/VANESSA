@@ -239,6 +239,66 @@ def test_send_plain_message_preserves_manual_title(monkeypatch: pytest.MonkeyPat
     assert conversations["conv-1"]["title_source"] == "manual"
 
 
+def test_stream_plain_message_persists_only_after_complete(monkeypatch: pytest.MonkeyPatch) -> None:
+    conversations = {"conv-1": _conversation_row("conv-1")}
+    messages: dict[str, list[dict[str, object]]] = {"conv-1": []}
+    _install_fake_repo(monkeypatch, conversations=conversations, messages=messages)
+
+    def _stream_response(**_kwargs):
+        def _events():
+            yield {"type": "delta", "text": "Assistant "}
+            assert messages["conv-1"] == []
+            yield {"type": "delta", "text": "reply"}
+            assert messages["conv-1"] == []
+            yield {"type": "complete", "response": _llm_response("Assistant reply")}
+
+        return _events(), None, 200
+
+    monkeypatch.setattr(service, "chat_completion_stream_with_allowed_model", _stream_response)
+
+    events = list(
+        service.stream_plain_message(
+            "postgresql://ignored",
+            owner_user_id=7,
+            conversation_id="conv-1",
+            prompt="First thread message",
+        )
+    )
+
+    assert [event["event"] for event in events] == ["delta", "delta", "complete"]
+    assert events[-1]["data"]["output"] == "Assistant reply"
+    assert [message["role"] for message in messages["conv-1"]] == ["user", "assistant"]
+    assert conversations["conv-1"]["title"] == "First thread message"
+
+
+def test_stream_plain_message_does_not_persist_on_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    conversations = {"conv-1": _conversation_row("conv-1")}
+    messages: dict[str, list[dict[str, object]]] = {"conv-1": []}
+    _install_fake_repo(monkeypatch, conversations=conversations, messages=messages)
+
+    def _stream_response(**_kwargs):
+        def _events():
+            yield {"type": "delta", "text": "partial"}
+            yield {"type": "error", "payload": {"error": "provider_failed", "message": "stream broke"}}
+
+        return _events(), None, 200
+
+    monkeypatch.setattr(service, "chat_completion_stream_with_allowed_model", _stream_response)
+
+    events = list(
+        service.stream_plain_message(
+            "postgresql://ignored",
+            owner_user_id=7,
+            conversation_id="conv-1",
+            prompt="First thread message",
+        )
+    )
+
+    assert [event["event"] for event in events] == ["delta", "error"]
+    assert messages["conv-1"] == []
+    assert conversations["conv-1"]["title"] == "New conversation"
+
+
 def test_update_plain_conversation_marks_title_as_manual(monkeypatch: pytest.MonkeyPatch) -> None:
     conversations = {"conv-1": _conversation_row("conv-1")}
     messages: dict[str, list[dict[str, object]]] = {"conv-1": []}

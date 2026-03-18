@@ -94,3 +94,83 @@ def test_get_conversation_route_returns_not_found(client, monkeypatch: pytest.Mo
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "conversation_not_found"
+
+
+def test_stream_message_route_returns_sse_events(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="stream@example.com",
+        username="streamer",
+        password_hash=hash_password("stream-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "stream-pass-123").get_json()["access_token"]
+
+    def _fake_stream(*_args, **_kwargs):
+        yield {"event": "delta", "data": {"text": "Hello"}}
+        yield {
+            "event": "complete",
+            "data": {
+                "conversation": {
+                    "id": "conv-1",
+                    "title": "Hello",
+                    "titleSource": "auto",
+                    "modelId": "safe-small",
+                    "messageCount": 2,
+                    "createdAt": "2026-03-18T11:00:00+00:00",
+                    "updatedAt": "2026-03-18T11:00:01+00:00",
+                },
+                "messages": [
+                    {"id": "msg-1", "role": "user", "content": "Hello", "metadata": {}, "createdAt": "2026-03-18T11:00:00+00:00"},
+                    {"id": "msg-2", "role": "assistant", "content": "Hi", "metadata": {}, "createdAt": "2026-03-18T11:00:01+00:00"},
+                ],
+                "output": "Hi",
+                "response": {"output": [{"content": [{"type": "text", "text": "Hi"}]}]},
+            },
+        }
+
+    monkeypatch.setattr(chat_routes, "stream_plain_message", _fake_stream)
+
+    response = test_client.post(
+        "/v1/chat/conversations/conv-1/messages/stream",
+        headers=_auth(token),
+        json={"prompt": "Hello"},
+    )
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert response.mimetype == "text/event-stream"
+    assert "event: delta" in body
+    assert '"text": "Hello"' in body
+    assert "event: complete" in body
+    assert '"output": "Hi"' in body
+
+
+def test_stream_message_route_returns_not_found(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="missing-stream@example.com",
+        username="missingstream",
+        password_hash=hash_password("stream-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "stream-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        chat_routes,
+        "stream_plain_message",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(chat_routes.ChatConversationNotFoundError()),
+    )
+
+    response = test_client.post(
+        "/v1/chat/conversations/missing/messages/stream",
+        headers=_auth(token),
+        json={"prompt": "Hello"},
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "conversation_not_found"

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from json import dumps
 from uuid import uuid4
 
-from flask import Blueprint, g, jsonify, request
+from flask import Blueprint, Response, g, jsonify, request, stream_with_context
 
 from ..authz import require_role
 from ..config import get_auth_config
@@ -17,6 +18,7 @@ from ..services.chat_conversations import (
     get_plain_conversation_detail,
     list_plain_conversations,
     send_plain_message,
+    stream_plain_message,
     update_plain_conversation,
 )
 from ..services.knowledge_chat_service import map_knowledge_chat_engine_error, run_knowledge_chat
@@ -39,6 +41,10 @@ def _request_id() -> str:
 
 def _json_error(status: int, code: str, message: str):
     return jsonify({"error": code, "message": message}), status
+
+
+def _format_sse_event(event_name: str, payload: dict[str, object]) -> str:
+    return f"event: {event_name}\ndata: {dumps(payload)}\n\n"
 
 
 @bp.get("/v1/chat/conversations")
@@ -148,6 +154,41 @@ def post_conversation_message_route(conversation_id: str):
         return jsonify(exc.payload), exc.status_code
 
     return jsonify(response_payload), 200
+
+
+@bp.post("/v1/chat/conversations/<conversation_id>/messages/stream")
+@require_role("user")
+def post_conversation_message_stream_route(conversation_id: str):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+
+    try:
+        stream = stream_plain_message(
+            _database_url(),
+            owner_user_id=int(g.current_user["id"]),
+            conversation_id=conversation_id,
+            prompt=payload.get("prompt"),
+        )
+    except ChatConversationValidationError as exc:
+        return _json_error(400, exc.code, exc.message)
+    except ChatConversationNotFoundError:
+        return _json_error(404, "conversation_not_found", "Conversation not found")
+    except ChatConversationInferenceError as exc:
+        return jsonify(exc.payload), exc.status_code
+
+    def _response_stream():
+        for event in stream:
+            yield _format_sse_event(str(event["event"]), dict(event["data"]))
+
+    return Response(
+        stream_with_context(_response_stream()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @bp.post("/v1/chat/knowledge")

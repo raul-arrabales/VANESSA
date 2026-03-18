@@ -73,6 +73,7 @@ class ResponseRequest(BaseModel):
 
     model: str = Field(min_length=1)
     input: list[Message] = Field(min_length=1)
+    stream: bool = False
     temperature: float | None = None
     max_tokens: int | None = None
     tools: list[ToolDefinition] = Field(default_factory=list)

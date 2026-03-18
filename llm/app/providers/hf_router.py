@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from app.registry import EmbeddingResult, ProviderResult
 from app.schemas import EmbeddingRequest, ResponseRequest
 
@@ -25,6 +27,20 @@ class HuggingFaceRouterProvider:
                 message="HF_TOKEN is required for Hugging Face router inference.",
             )
         return self._provider.generate(request, upstream_model=upstream_model)
+
+    def generate_stream(
+        self,
+        request: ResponseRequest,
+        *,
+        upstream_model: str,
+    ) -> Iterator[dict[str, object]]:
+        if not self._token:
+            raise ProviderError(
+                status_code=401,
+                code="hf_router_auth_error",
+                message="HF_TOKEN is required for Hugging Face router inference.",
+            )
+        return self._provider.generate_stream(request, upstream_model=upstream_model)
 
     def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> EmbeddingResult:
         if not self._token:

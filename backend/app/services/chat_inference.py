@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from flask import g
@@ -84,6 +85,33 @@ def _resolve_canonical_local_llm_model_id(adapter: Any, requested_model_id: str)
     return requested_model_id
 
 
+def _resolve_chat_completion_target(
+    *,
+    requested_model_id: str,
+) -> tuple[Any | None, str, bool, dict[str, Any] | None, int]:
+    resolved_model_id, error_payload, status_code = resolve_model_for_inference(
+        get_auth_config().database_url,
+        user_id=int(g.current_user["id"]),
+        requested_model_id=requested_model_id,
+    )
+    if error_payload is not None:
+        return None, requested_model_id, False, error_payload, status_code
+
+    try:
+        adapter = resolve_llm_inference_adapter(get_auth_config().database_url, get_auth_config())
+    except PlatformControlPlaneError as exc:
+        return None, requested_model_id, False, {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
+
+    effective_requested_model = str(resolved_model_id or requested_model_id)
+    allow_local_fallback = _can_use_local_llm_fallback(effective_requested_model)
+    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, effective_requested_model)
+    return adapter, llm_model_id, allow_local_fallback, None, 200
+
+
 def chat_completion_with_allowed_model(
     *,
     requested_model_id: str,
@@ -95,26 +123,11 @@ def chat_completion_with_allowed_model(
 ) -> tuple[dict[str, Any] | None, int]:
     _ = org_id
     _ = group_id
-    resolved_model_id, error_payload, status_code = resolve_model_for_inference(
-        get_auth_config().database_url,
-        user_id=int(g.current_user["id"]),
+    adapter, llm_model_id, allow_local_fallback, error_payload, status_code = _resolve_chat_completion_target(
         requested_model_id=requested_model_id,
     )
     if error_payload is not None:
         return error_payload, status_code
-
-    try:
-        adapter = resolve_llm_inference_adapter(get_auth_config().database_url, get_auth_config())
-    except PlatformControlPlaneError as exc:
-        return {
-            "error": exc.code,
-            "message": exc.message,
-            "details": exc.details or None,
-        }, exc.status_code
-
-    effective_requested_model = str(resolved_model_id or requested_model_id)
-    allow_local_fallback = _can_use_local_llm_fallback(effective_requested_model)
-    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, effective_requested_model)
 
     return adapter.chat_completion(
         model=llm_model_id,
@@ -122,4 +135,34 @@ def chat_completion_with_allowed_model(
         max_tokens=max_tokens,
         temperature=temperature,
         allow_local_fallback=allow_local_fallback,
+    )
+
+
+def chat_completion_stream_with_allowed_model(
+    *,
+    requested_model_id: str,
+    org_id: str | None,
+    group_id: str | None,
+    messages: list[dict[str, Any]],
+    max_tokens: int | None,
+    temperature: float | None,
+) -> tuple[Iterator[dict[str, Any]] | None, dict[str, Any] | None, int]:
+    _ = org_id
+    _ = group_id
+    adapter, llm_model_id, allow_local_fallback, error_payload, status_code = _resolve_chat_completion_target(
+        requested_model_id=requested_model_id,
+    )
+    if error_payload is not None:
+        return None, error_payload, status_code
+
+    return (
+        adapter.chat_completion_stream(
+            model=llm_model_id,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            allow_local_fallback=allow_local_fallback,
+        ),
+        None,
+        200,
     )

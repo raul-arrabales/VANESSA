@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from typing import Any
 
-from .chat_inference import chat_completion_with_allowed_model, extract_output_text
+from .chat_inference import (
+    chat_completion_stream_with_allowed_model,
+    chat_completion_with_allowed_model,
+    extract_output_text,
+)
 from ..repositories import chat_conversations as chat_repository
 
 DEFAULT_CONVERSATION_TITLE = "New conversation"
@@ -124,33 +128,18 @@ def send_plain_message(
     conversation_id: str,
     prompt: Any,
 ) -> dict[str, Any]:
-    prompt_text = _normalize_prompt(prompt)
-    conversation = _require_plain_conversation(
+    prepared = _prepare_plain_message_request(
         database_url,
         owner_user_id=owner_user_id,
         conversation_id=conversation_id,
-    )
-    model_id = str(conversation.get("model_id") or "").strip()
-    if not model_id:
-        raise ChatConversationValidationError(
-            "invalid_model_id",
-            "Conversation model_id is required before sending messages",
-        )
-
-    existing_messages = chat_repository.list_messages(database_url, conversation_id=conversation_id)
-    llm_messages = _build_context_messages(existing_messages)
-    llm_messages.append(
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": prompt_text}],
-        }
+        prompt=prompt,
     )
 
     llm_response, status_code = chat_completion_with_allowed_model(
-        requested_model_id=model_id,
+        requested_model_id=prepared["model_id"],
         org_id=None,
         group_id=None,
-        messages=llm_messages,
+        messages=prepared["llm_messages"],
         max_tokens=None,
         temperature=None,
     )
@@ -166,20 +155,20 @@ def send_plain_message(
         )
 
     assistant_output = extract_output_text(llm_response)
-    conversation_title = None
-    title_source = None
-    if not existing_messages and str(conversation.get("title_source") or DEFAULT_TITLE_SOURCE) == DEFAULT_TITLE_SOURCE:
-        conversation_title = _auto_title_from_prompt(prompt_text)
-        title_source = DEFAULT_TITLE_SOURCE
+    if not assistant_output:
+        raise ChatConversationInferenceError(
+            {"error": "empty_response", "message": "LLM stream completed without assistant output"},
+            502,
+        )
 
     persisted = chat_repository.append_message_pair(
         database_url,
         owner_user_id=owner_user_id,
         conversation_id=conversation_id,
-        user_content=prompt_text,
+        user_content=prepared["prompt_text"],
         assistant_content=assistant_output,
-        conversation_title=conversation_title,
-        title_source=title_source,
+        conversation_title=prepared["conversation_title"],
+        title_source=prepared["title_source"],
     )
     if persisted is None:
         raise ChatConversationNotFoundError
@@ -190,6 +179,120 @@ def send_plain_message(
         "output": assistant_output,
         "response": llm_response,
     }
+
+
+def stream_plain_message(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    conversation_id: str,
+    prompt: Any,
+) -> Iterator[dict[str, Any]]:
+    prepared = _prepare_plain_message_request(
+        database_url,
+        owner_user_id=owner_user_id,
+        conversation_id=conversation_id,
+        prompt=prompt,
+    )
+    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+        requested_model_id=prepared["model_id"],
+        org_id=None,
+        group_id=None,
+        messages=prepared["llm_messages"],
+        max_tokens=None,
+        temperature=None,
+    )
+    if error_payload is not None or stream is None:
+        raise ChatConversationInferenceError(
+            error_payload if isinstance(error_payload, dict) else {"error": "llm_unreachable"},
+            status_code,
+        )
+
+    def _stream() -> Iterator[dict[str, Any]]:
+        assistant_output_parts: list[str] = []
+        for event in stream:
+            event_type = str(event.get("type", "")).strip().lower()
+            if event_type == "delta":
+                text = str(event.get("text", ""))
+                if not text:
+                    continue
+                assistant_output_parts.append(text)
+                yield {"event": "delta", "data": {"text": text}}
+                continue
+
+            if event_type == "error":
+                payload = event.get("payload")
+                if not isinstance(payload, dict):
+                    payload = {
+                        "error": "chat_inference_failed",
+                        "message": "LLM stream failed",
+                    }
+                yield {
+                    "event": "error",
+                    "data": {
+                        "error": str(payload.get("error") or "chat_inference_failed"),
+                        "message": str(payload.get("message") or "LLM stream failed"),
+                    },
+                }
+                return
+
+            if event_type != "complete":
+                continue
+
+            llm_response = event.get("response")
+            if not isinstance(llm_response, dict):
+                llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
+
+            assistant_output = extract_output_text(llm_response) or "".join(assistant_output_parts)
+            if not assistant_output:
+                yield {
+                    "event": "error",
+                    "data": {
+                        "error": "empty_response",
+                        "message": "LLM stream completed without assistant output",
+                    },
+                }
+                return
+
+            persisted = chat_repository.append_message_pair(
+                database_url,
+                owner_user_id=owner_user_id,
+                conversation_id=conversation_id,
+                user_content=prepared["prompt_text"],
+                assistant_content=assistant_output,
+                conversation_title=prepared["conversation_title"],
+                title_source=prepared["title_source"],
+            )
+            if persisted is None:
+                yield {
+                    "event": "error",
+                    "data": {
+                        "error": "conversation_not_found",
+                        "message": "Conversation not found",
+                    },
+                }
+                return
+
+            yield {
+                "event": "complete",
+                "data": {
+                    "conversation": serialize_conversation_summary(persisted["conversation"]),
+                    "messages": [serialize_message(message) for message in persisted["messages"]],
+                    "output": assistant_output,
+                    "response": llm_response,
+                },
+            }
+            return
+
+        yield {
+            "event": "error",
+            "data": {
+                "error": "stream_incomplete",
+                "message": "LLM stream ended before completion",
+            },
+        }
+
+    return _stream()
 
 
 def serialize_conversation_summary(row: dict[str, Any]) -> dict[str, Any]:
@@ -240,6 +343,53 @@ def _require_plain_conversation(
     if conversation is None:
         raise ChatConversationNotFoundError
     return conversation
+
+
+def _prepare_plain_message_request(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    conversation_id: str,
+    prompt: Any,
+) -> dict[str, Any]:
+    prompt_text = _normalize_prompt(prompt)
+    conversation = _require_plain_conversation(
+        database_url,
+        owner_user_id=owner_user_id,
+        conversation_id=conversation_id,
+    )
+    model_id = str(conversation.get("model_id") or "").strip()
+    if not model_id:
+        raise ChatConversationValidationError(
+            "invalid_model_id",
+            "Conversation model_id is required before sending messages",
+        )
+
+    existing_messages = chat_repository.list_messages(database_url, conversation_id=conversation_id)
+    llm_messages = _build_context_messages(existing_messages)
+    llm_messages.append(
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": prompt_text}],
+        }
+    )
+
+    conversation_title = None
+    title_source = None
+    if not existing_messages and str(conversation.get("title_source") or DEFAULT_TITLE_SOURCE) == DEFAULT_TITLE_SOURCE:
+        conversation_title = _auto_title_from_prompt(prompt_text)
+        title_source = DEFAULT_TITLE_SOURCE
+
+    return {
+        "prompt_text": prompt_text,
+        "conversation": conversation,
+        "conversation_id": conversation_id,
+        "model_id": model_id,
+        "existing_messages": existing_messages,
+        "llm_messages": llm_messages,
+        "conversation_title": conversation_title,
+        "title_source": title_source,
+    }
 
 
 def _normalize_prompt(value: Any) -> str:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from app.registry import EmbeddingResult, ModelCapabilities, ModelInfo, ProviderResult
@@ -32,6 +33,22 @@ class DummyModelProvider:
             prompt_tokens=8,
             completion_tokens=8,
         )
+
+    def generate_stream(
+        self,
+        request: ResponseRequest,
+        *,
+        upstream_model: str,
+    ) -> Iterator[dict[str, object]]:
+        _ = request
+        _ = upstream_model
+        output_text = "Hello, this is the test dummy model."
+        yield {"type": "delta", "text": output_text}
+        yield {
+            "type": "complete",
+            "prompt_tokens": 8,
+            "completion_tokens": 8,
+        }
 
     def embed(self, request: EmbeddingRequest, *, upstream_model: str) -> EmbeddingResult:
         _ = (request, upstream_model)

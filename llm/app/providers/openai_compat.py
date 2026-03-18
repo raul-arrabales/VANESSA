@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from json import dumps, loads
 from socket import timeout as socket_timeout
 from typing import Any
@@ -136,6 +137,32 @@ def _extract_tool_calls(body: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
+def _extract_stream_delta(body: dict[str, Any]) -> str:
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    delta = first.get("delta")
+    if not isinstance(delta, dict):
+        return ""
+
+    content = delta.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict) and str(part.get("type", "")).strip().lower() == "text":
+                text = str(part.get("text", ""))
+                if text:
+                    text_parts.append(text)
+        return "".join(text_parts)
+    return ""
+
+
 def _extract_embeddings(body: dict[str, Any]) -> list[list[float]]:
     data = body.get("data")
     if not isinstance(data, list):
@@ -160,6 +187,26 @@ def _extract_embeddings(body: dict[str, Any]) -> list[list[float]]:
         if vector:
             embeddings.append(vector)
     return embeddings
+
+
+def _iter_sse_data_chunks(response) -> Iterator[str]:
+    data_lines: list[str] = []
+    while True:
+        raw_line = response.readline()
+        if not raw_line:
+            break
+        line = raw_line.decode("utf-8").rstrip("\r\n")
+        if not line:
+            if data_lines:
+                yield "\n".join(data_lines)
+                data_lines = []
+            continue
+        if line.startswith(":"):
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line[5:].lstrip())
+    if data_lines:
+        yield "\n".join(data_lines)
 
 
 class OpenAICompatibleProvider:
@@ -220,6 +267,112 @@ class OpenAICompatibleProvider:
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                 )
+        except HTTPError as error:
+            body = error.read().decode("utf-8")
+            message = "Upstream request failed"
+            try:
+                parsed_error = loads(body) if body else {}
+            except ValueError:
+                parsed_error = {}
+            if isinstance(parsed_error, dict):
+                err = parsed_error.get("error")
+                if isinstance(err, dict):
+                    message = str(err.get("message", "")).strip() or message
+                elif isinstance(err, str) and err.strip():
+                    message = err.strip()
+            status = int(error.code)
+            if status in {401, 403}:
+                raise ProviderError(
+                    status_code=status,
+                    code=f"{self._provider_code_prefix}_auth_error",
+                    message=message,
+                ) from error
+            if status == 429:
+                raise ProviderError(
+                    status_code=429,
+                    code=f"{self._provider_code_prefix}_rate_limited",
+                    message=message,
+                ) from error
+            if status >= 500:
+                raise ProviderError(
+                    status_code=502,
+                    code=f"{self._provider_code_prefix}_unavailable",
+                    message=message,
+                ) from error
+            raise ProviderError(
+                status_code=400,
+                code=f"{self._provider_code_prefix}_bad_request",
+                message=message,
+            ) from error
+        except (URLError, socket_timeout) as error:
+            raise ProviderError(
+                status_code=504,
+                code=f"{self._provider_code_prefix}_timeout",
+                message="Upstream request timed out or network was unreachable.",
+            ) from error
+
+    def generate_stream(
+        self,
+        request: ResponseRequest,
+        *,
+        upstream_model: str,
+    ) -> Iterator[dict[str, object]]:
+        payload: dict[str, Any] = {
+            "model": upstream_model,
+            "messages": _coerce_openai_message_content(request),
+            "stream": True,
+        }
+        if request.temperature is not None:
+            payload["temperature"] = request.temperature
+        if request.max_tokens is not None:
+            payload["max_tokens"] = request.max_tokens
+        if request.tools:
+            payload["tools"] = [
+                {
+                    "type": tool.type,
+                    "function": {
+                        "name": tool.function.name,
+                        "description": tool.function.description,
+                        "parameters": tool.function.parameters,
+                    },
+                }
+                for tool in request.tools
+            ]
+
+        headers = {
+            "Accept": "text/event-stream",
+            "Content-Type": "application/json",
+        }
+        if self._auth_header_value:
+            headers["Authorization"] = self._auth_header_value
+
+        url = f"{self._base_url}/chat/completions"
+        req = Request(url, data=dumps(payload).encode("utf-8"), headers=headers, method="POST")
+
+        try:
+            with urlopen(req, timeout=float(self._timeout_seconds)) as response:
+                prompt_tokens = 0
+                completion_tokens = 0
+                for chunk in _iter_sse_data_chunks(response):
+                    if chunk == "[DONE]":
+                        break
+                    parsed = loads(chunk) if chunk else {}
+                    if not isinstance(parsed, dict):
+                        continue
+                    usage = parsed.get("usage")
+                    if isinstance(usage, dict):
+                        prompt_tokens = int(usage.get("prompt_tokens", prompt_tokens) or prompt_tokens)
+                        completion_tokens = int(
+                            usage.get("completion_tokens", completion_tokens) or completion_tokens
+                        )
+                    delta_text = _extract_stream_delta(parsed)
+                    if delta_text:
+                        yield {"type": "delta", "text": delta_text}
+                yield {
+                    "type": "complete",
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                }
         except HTTPError as error:
             body = error.read().decode("utf-8")
             message = "Upstream request failed"
