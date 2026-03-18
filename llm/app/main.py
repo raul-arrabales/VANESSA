@@ -13,6 +13,8 @@ from app.schemas import (
     NormalizedOutputMessage,
     ResponseEnvelope,
     ResponseRequest,
+    ToolCall,
+    ToolCallFunction,
     TextPart,
     Usage,
 )
@@ -118,7 +120,18 @@ def _build_response(request: ResponseRequest) -> ResponseEnvelope:
         output=[
             NormalizedOutputMessage(
                 role="assistant",
-                content=[TextPart(type="text", text=result.output_text)],
+                content=([TextPart(type="text", text=result.output_text)] if result.output_text else []),
+                tool_calls=[
+                    ToolCall(
+                        id=str(tool_call.get("id", "")),
+                        type="function",
+                        function=ToolCallFunction(
+                            name=str(((tool_call.get("function") or {}).get("name", ""))),
+                            arguments=str(((tool_call.get("function") or {}).get("arguments", ""))),
+                        ),
+                    )
+                    for tool_call in result.tool_calls
+                ],
             )
         ],
         usage=usage,

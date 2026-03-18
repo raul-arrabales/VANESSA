@@ -9,8 +9,10 @@ from ..security import hash_password
 from . import auth_lifecycle
 from .knowledge_chat_bootstrap import ensure_knowledge_chat_agent
 from .model_download_worker import ensure_download_worker_started
+from .tool_registry_bootstrap import ensure_builtin_tools
 
 _knowledge_chat_bootstrapped = False
+_builtin_tools_bootstrapped = False
 
 
 def get_config() -> AuthConfig:
@@ -27,7 +29,7 @@ def bootstrap_superadmin(config: AuthConfig) -> None:
 
 
 def ensure_auth_initialized() -> bool:
-    global _knowledge_chat_bootstrapped
+    global _knowledge_chat_bootstrapped, _builtin_tools_bootstrapped
 
     ready = auth_lifecycle.ensure_auth_initialized(
         app_logger=current_app.logger,
@@ -43,6 +45,11 @@ def ensure_auth_initialized() -> bool:
             _knowledge_chat_bootstrapped = ensure_knowledge_chat_agent(get_config().database_url)
         except Exception as exc:  # pragma: no cover - guarded by route behavior tests
             current_app.logger.warning("Knowledge chat bootstrap unavailable: %s", exc)
+    if not _builtin_tools_bootstrapped:
+        try:
+            _builtin_tools_bootstrapped = ensure_builtin_tools(get_config().database_url)
+        except Exception as exc:  # pragma: no cover - guarded by route behavior tests
+            current_app.logger.warning("Builtin tool bootstrap unavailable: %s", exc)
     return True
 
 

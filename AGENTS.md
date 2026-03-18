@@ -16,6 +16,7 @@ VANESSA is a multi-container AI assistant that:
   - A **private LLM server** (Hugging Face-based).
   - A **custom agent orchestration engine**.
   - A **Python sandbox environment** where agents can execute code safely.
+  - An optional **MCP gateway** for remote/general-purpose agent tools.
   - A **wake-word (KWS) service** for offline voice activation.
   - A **persistent semantic index** (Weaviate by default, optional Qdrant alternate provider) for RAG.
   - A **relational database** (PostgreSQL) for structured data.
@@ -70,6 +71,7 @@ Please respect these boundaries when generating or modifying code or configurati
    - Coordinates:
      - Calls to the LLM API gateway.
      - RAG queries against the active vector-store provider.
+     - Tool calls against the active MCP and sandbox runtime providers.
      - Database operations (via a clean abstraction).
    - This is where “agent logic” lives (tools, planners, etc.).
 
@@ -79,24 +81,29 @@ Please respect these boundaries when generating or modifying code or configurati
    - Access is allowed from backend and agent_engine via approved service abstractions and policy-governed APIs.
    - Frontend must never call sandbox directly, and backend/agent_engine integrations must not bypass governance checks.
 
-8. **Container #8 — Wake-word (KWS) service**
+8. **Container #8 — Optional MCP gateway for agent tools (`mcp_gateway`)**
+   - Hosts or bridges MCP-backed tools behind a normalized HTTP interface.
+   - Used by backend control-plane validation and agent_engine tool dispatch.
+   - Frontend must never call this container directly.
+
+9. **Container #9 — Wake-word (KWS) service**
    - Runs offline wake-word detection and emits wake events.
    - Integrates with backend through a webhook/event API.
    - Model files must be downloadable and runnable in air-gapped environments.
    - No direct frontend dependency on this container.
 
-9. **Container #9 — Persistent semantic index for RAG (Weaviate)**
+10. **Container #10 — Persistent semantic index for RAG (Weaviate)**
    - Stores embeddings and metadata.
    - Used for semantic search / context retrieval.
    - Accessed from backend and/or agent engine through a client library.
    - Persistence must be enabled (data should survive container restarts).
 
-10. **Container #10 — Optional alternate vector store for RAG (`qdrant`)**
+11. **Container #11 — Optional alternate vector store for RAG (`qdrant`)**
    - Optional local vector database selected by the backend GenAI control plane as an alternate `vector_store` provider.
    - Used to prove provider switching without changing frontend or public execution APIs.
    - Not required for the default stack.
 
-11. **Container #11 — Database (PostgreSQL)**
+12. **Container #12 — Database (PostgreSQL)**
   - Stores structured data (users, sessions, logs, configs, etc.).
   - Access restricted to backend and agent engine through a data access layer.
   - No direct SQL from the frontend.
@@ -122,6 +129,9 @@ Agents should keep to this structure or evolve it consistently.
 - `sandbox/`
   - Code related to the Python sandbox container.
   - Security checks, execution policies, etc.
+- `mcp_gateway/`
+  - Code for the optional MCP gateway container.
+  - Normalized invoke surface for MCP-backed tools.
 - `kws/`
   - Wake-word service code and API/webhook adapter logic.
   - Model loading checks and detection event handling.
@@ -193,6 +203,7 @@ PostgreSQL
 Sandbox
 Optional llama.cpp
 Optional Qdrant
+Optional MCP gateway
 
 ## 5. Code style and conventions
 
@@ -268,6 +279,7 @@ When making changes or adding features:
 - Data access layer for PostgreSQL instead of inline SQL.
 - For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
 - Treat `LLAMA_CPP_URL` and `QDRANT_URL` as bootstrap flags for enabling the optional local provider runtimes and seeding the alternate deployment profiles.
+- For tools, keep individual tool specs in the registry and runtime transports in platform capabilities/providers. Do not collapse every tool into the provider registry.
 
 5. Be safe with the sandbox.
 - Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.
@@ -301,10 +313,10 @@ When making changes or adding features:
 
 ## 8. Future directions (for agents to keep in mind)
 
-These are planned but not necessarily implemented yet:
+These are planned or actively evolving:
 - Authentication/authorization for API endpoints.
 - Role-based agents (e.g. “research agent”, “data cleaning agent”, “automation agent”).
-- Configurable tools for agents, defined via YAML/JSON and leveraging MCP.
+- Configurable tools for agents, defined via registry specs and leveraging MCP or sandbox transports.
 - Observability stack (logging, metrics, tracing).
 
 When implementing new features, consider how they will interact with these future plans and keep the design extensible.

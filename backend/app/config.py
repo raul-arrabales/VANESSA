@@ -13,6 +13,7 @@ DEFAULT_LLM_RUNTIME_URL = "http://llm_runtime:8000"
 DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
 DEFAULT_SANDBOX_URL = "http://sandbox:6000"
+DEFAULT_MCP_GATEWAY_URL = ""
 DEFAULT_KWS_URL = "http://kws:10400"
 DEFAULT_WEAVIATE_URL = "http://weaviate:8080"
 DEFAULT_LLAMA_CPP_URL = ""
@@ -30,6 +31,7 @@ class BackendRuntimeConfig:
     agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
     agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
     sandbox_url: str = DEFAULT_SANDBOX_URL
+    mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
@@ -66,6 +68,7 @@ class AuthConfig:
     llm_url: str = DEFAULT_LLM_URL
     llm_runtime_url: str = DEFAULT_LLM_RUNTIME_URL
     sandbox_url: str = DEFAULT_SANDBOX_URL
+    mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
@@ -176,6 +179,7 @@ def get_auth_config() -> AuthConfig:
         llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
         llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
+        mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
@@ -198,6 +202,7 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
         or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
+        mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),

@@ -43,6 +43,7 @@ check_service_ready() {
     backend) http_ok "http://localhost:5000/health" ;;
     agent_engine) http_ok "http://localhost:7000/health" ;;
     sandbox) http_ok "http://localhost:6000/health" ;;
+    mcp_gateway) http_ok "http://localhost:6100/health" ;;
     kws) http_ok "http://localhost:10400/health" ;;
     llm) http_ok "http://localhost:8000/health" ;;
     llm_runtime) llm_runtime_internal_http_ok "/health" ;;
@@ -145,6 +146,9 @@ if [[ "${target_service}" == "llama_cpp" ]]; then
 fi
 if [[ "${target_service}" == "qdrant" ]]; then
   qdrant_enabled_requested || die "qdrant is disabled. Set QDRANT_URL to enable the optional Qdrant runtime."
+fi
+if [[ "${target_service}" == "mcp_gateway" ]]; then
+  mcp_gateway_enabled_requested || die "mcp_gateway is disabled. Set MCP_GATEWAY_URL to enable the optional MCP runtime."
 fi
 validate_llm_cpu_thread_binding
 

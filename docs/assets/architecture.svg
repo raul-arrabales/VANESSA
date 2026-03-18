@@ -1,4 +1,4 @@
-<svg class="architecture-svg" xmlns="http://www.w3.org/2000/svg" width="1372" height="604" viewBox="0 0 1372 604" role="img" aria-labelledby="architecture-title architecture-desc">
+<svg class="architecture-svg" xmlns="http://www.w3.org/2000/svg" width="1372" height="728" viewBox="0 0 1372 728" role="img" aria-labelledby="architecture-title architecture-desc">
 <title id="architecture-title">VANESSA Service Architecture</title>
 <desc id="architecture-desc">Container communication diagram generated from docker-compose metadata.</desc>
 <defs>
@@ -25,16 +25,18 @@
 <text class="group-label" x="1226" y="36">DATA</text>
 <g id="architecture-edges">
 <line id="edge-agent_engine-llm" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-mcp_gateway" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
 <line id="edge-agent_engine-postgres" class="architecture-edge architecture-edge-db" x1="796" y1="116" x2="1116" y2="364" marker-end="url(#architecture-arrow)" />
 <line id="edge-agent_engine-qdrant" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
-<line id="edge-agent_engine-sandbox" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
+<line id="edge-agent_engine-sandbox" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="846" y2="612" marker-end="url(#architecture-arrow)" />
 <line id="edge-agent_engine-weaviate" class="architecture-edge architecture-edge-http" x1="796" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-agent_engine" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="576" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-llama_cpp" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="364" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-llm" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="116" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-mcp_gateway" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-postgres" class="architecture-edge architecture-edge-db" x1="526" y1="116" x2="1116" y2="364" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-qdrant" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
-<line id="edge-backend-sandbox" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="488" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-sandbox" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="612" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-weaviate" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-frontend-backend" class="architecture-edge architecture-edge-http" x1="256" y1="116" x2="306" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-kws-backend" class="architecture-edge architecture-edge-event" x1="416" y1="282" x2="416" y2="74" marker-end="url(#architecture-arrow)" />
@@ -42,16 +44,18 @@
 </g>
 <g id="architecture-edge-labels">
 <text class="edge-label" x="821" y="110">HTTP - Agent LLM requests</text>
+<text class="edge-label" x="821" y="296">HTTP - Agent MCP tool invocation</text>
 <text class="edge-label" x="956" y="234">SQL - Agent structured persistence</text>
 <text class="edge-label" x="956" y="172">HTTP - Optional vector search and retrieval via alternate provider binding</text>
-<text class="edge-label" x="821" y="296">HTTP - Agent sandbox execution</text>
+<text class="edge-label" x="821" y="358">HTTP - Agent sandbox execution</text>
 <text class="edge-label" x="956" y="110">HTTP - Vector search and retrieval</text>
 <text class="edge-label" x="551" y="110">HTTP - Agent orchestration calls</text>
 <text class="edge-label" x="686" y="234">HTTP - Optional direct llama.cpp inference via platform provider binding</text>
 <text class="edge-label" x="686" y="110">HTTP - Model inference and discovery</text>
+<text class="edge-label" x="686" y="296">HTTP - Optional MCP runtime validation and control-plane provider checks</text>
 <text class="edge-label" x="821" y="234">SQL - Structured data access</text>
 <text class="edge-label" x="821" y="172">HTTP - Optional semantic retrieval operations via alternate provider binding</text>
-<text class="edge-label" x="686" y="296">HTTP - Controlled code execution</text>
+<text class="edge-label" x="686" y="358">HTTP - Controlled code execution</text>
 <text class="edge-label" x="821" y="110">HTTP - Semantic retrieval operations</text>
 <text class="edge-label" x="281" y="110">HTTP - UI API requests</text>
 <text class="edge-label" x="416" y="172">HTTP webhook - Wake event emission</text>
@@ -93,10 +97,15 @@
 <text class="node-title" x="860" y="352">llama.cpp</text>
 <text class="node-subtitle" x="860" y="374">llama_cpp</text>
 </g>
-<g id="node-sandbox" class="architecture-node architecture-node-sandbox architecture-group-runtime" data-container="sandbox">
+<g id="node-mcp_gateway" class="architecture-node architecture-node-mcp_gateway architecture-group-runtime" data-container="mcp_gateway">
 <rect x="846" y="446" width="220" height="84" rx="14" ry="14" />
-<text class="node-title" x="860" y="476">Sandbox</text>
-<text class="node-subtitle" x="860" y="498">sandbox</text>
+<text class="node-title" x="860" y="476">MCP Gateway</text>
+<text class="node-subtitle" x="860" y="498">mcp_gateway</text>
+</g>
+<g id="node-sandbox" class="architecture-node architecture-node-sandbox architecture-group-runtime" data-container="sandbox">
+<rect x="846" y="570" width="220" height="84" rx="14" ry="14" />
+<text class="node-title" x="860" y="600">Sandbox</text>
+<text class="node-subtitle" x="860" y="622">sandbox</text>
 </g>
 <g id="node-weaviate" class="architecture-node architecture-node-weaviate architecture-group-data" data-container="weaviate">
 <rect x="1116" y="74" width="220" height="84" rx="14" ry="14" />

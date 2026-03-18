@@ -15,4 +15,4 @@ cd infra
 docker compose up --build
 ```
 
-Services include frontend, backend, agent engine, sandbox, llm (gateway), llm_runtime (vLLM), kws, weaviate, postgres, and optional `llama_cpp` / `qdrant` provider runtimes.
+Services include frontend, backend, agent engine, sandbox, llm (gateway), llm_runtime (vLLM), kws, weaviate, postgres, and optional `llama_cpp`, `qdrant`, and `mcp_gateway` provider runtimes.

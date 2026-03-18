@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -31,7 +31,41 @@ MessagePart = TextPart | ImageUrlPart
 
 class Message(BaseModel):
     role: Literal["system", "user", "assistant", "tool"]
-    content: list[MessagePart] = Field(min_length=1)
+    content: list[MessagePart] = Field(default_factory=list)
+    tool_call_id: str | None = None
+    tool_calls: list["ToolCall"] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_message(self) -> "Message":
+        if self.role == "tool" and not self.tool_call_id:
+            raise ValueError("tool role messages must include tool_call_id.")
+        if self.tool_call_id is not None and self.role != "tool":
+            raise ValueError("tool_call_id is only valid for tool role messages.")
+        if not self.content and not self.tool_calls:
+            raise ValueError("message must include content or tool_calls.")
+        return self
+
+
+class ToolDefinitionFunction(BaseModel):
+    name: str = Field(min_length=1)
+    description: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolDefinition(BaseModel):
+    type: Literal["function"] = "function"
+    function: ToolDefinitionFunction
+
+
+class ToolCallFunction(BaseModel):
+    name: str = Field(min_length=1)
+    arguments: str
+
+
+class ToolCall(BaseModel):
+    id: str = Field(min_length=1)
+    type: Literal["function"] = "function"
+    function: ToolCallFunction
 
 
 class ResponseRequest(BaseModel):
@@ -41,6 +75,7 @@ class ResponseRequest(BaseModel):
     input: list[Message] = Field(min_length=1)
     temperature: float | None = None
     max_tokens: int | None = None
+    tools: list[ToolDefinition] = Field(default_factory=list)
 
 
 class EmbeddingRequest(BaseModel):
@@ -60,7 +95,14 @@ class EmbeddingRequest(BaseModel):
 
 class NormalizedOutputMessage(BaseModel):
     role: Literal["assistant"]
-    content: list[TextPart]
+    content: list[TextPart] = Field(default_factory=list)
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_output(self) -> "NormalizedOutputMessage":
+        if not self.content and not self.tool_calls:
+            raise ValueError("assistant output must include content or tool_calls.")
+        return self
 
 
 class Usage(BaseModel):

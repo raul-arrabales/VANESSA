@@ -40,6 +40,7 @@ def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.M
 
 def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store"})
     monkeypatch.setattr(
         platform_service.platform_repo,
         "get_provider_instance",
@@ -591,6 +592,10 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "deployment_profile_slug": deployment_slug,
                 "deployment_profile_display_name": "Runtime Deployment",
             }
+        if capability_key == "sandbox_execution":
+            return None
+        if capability_key == "mcp_runtime":
+            return None
         return {
             "capability_key": "vector_store",
             "provider_instance_id": "provider-2",
@@ -669,3 +674,86 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
             },
         },
     }
+
+
+def test_get_active_platform_runtime_includes_optional_tool_runtime_bindings(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+
+    def _active_binding(_db, *, capability_key):
+        rows = {
+            "llm_inference": {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-1",
+                "provider_slug": "llm-provider",
+                "provider_key": "vllm_local",
+                "provider_display_name": "LLM Provider",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_llm",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "embeddings": {
+                "capability_key": "embeddings",
+                "provider_instance_id": "provider-2",
+                "provider_slug": "embeddings-provider",
+                "provider_key": "vllm_embeddings_local",
+                "provider_display_name": "Embeddings Provider",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_embeddings",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "vector_store": {
+                "capability_key": "vector_store",
+                "provider_instance_id": "provider-3",
+                "provider_slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "provider_display_name": "Weaviate local",
+                "provider_description": "desc",
+                "endpoint_url": "http://weaviate:8080",
+                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "weaviate_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "sandbox_execution": {
+                "capability_key": "sandbox_execution",
+                "provider_instance_id": "provider-4",
+                "provider_slug": "sandbox-local",
+                "provider_key": "sandbox_local",
+                "provider_display_name": "Sandbox local",
+                "provider_description": "desc",
+                "endpoint_url": "http://sandbox:6000",
+                "healthcheck_url": "http://sandbox:6000/health",
+                "enabled": True,
+                "config_json": {"execute_path": "/v1/execute"},
+                "binding_config": {},
+                "adapter_kind": "sandbox_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+        }
+        return rows.get(capability_key)
+
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_binding_for_capability", _active_binding)
+
+    payload = platform_service.get_active_platform_runtime("ignored", object())  # type: ignore[arg-type]
+
+    assert payload["capabilities"]["sandbox_execution"]["provider_key"] == "sandbox_local"

@@ -38,6 +38,10 @@ qdrant_ready_ok() {
   qdrant_internal_http_ok "/healthz"
 }
 
+mcp_gateway_ready_ok() {
+  mcp_gateway_internal_http_ok "/health"
+}
+
 runtime_profile_endpoint_ok() {
   local status
   status="$(curl --silent --show-error --max-time 2 -o /dev/null -w '%{http_code}' "http://localhost:5000/v1/runtime/profile")"
@@ -130,6 +134,17 @@ run_checks() {
     fi
   else
     printf 'qdrant: SKIP (QDRANT_URL not set)\n'
+  fi
+
+  if mcp_gateway_enabled_requested; then
+    if mcp_gateway_ready_ok; then
+      printf 'mcp_gateway: OK (/health)\n'
+    else
+      printf 'mcp_gateway: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'mcp_gateway: SKIP (MCP_GATEWAY_URL not set)\n'
   fi
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then

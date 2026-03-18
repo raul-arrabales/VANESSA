@@ -36,6 +36,15 @@ class EmbeddingsRuntimeClientError(RuntimeError):
         self.details = details or {}
 
 
+class ToolRuntimeClientError(RuntimeError):
+    def __init__(self, *, code: str, message: str, status_code: int, details: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        self.details = details or {}
+
+
 class LlmRuntimeClient(ABC):
     def __init__(self, *, deployment_profile: dict[str, Any], llm_binding: dict[str, Any]):
         self.deployment_profile = deployment_profile
@@ -47,6 +56,7 @@ class LlmRuntimeClient(ABC):
         *,
         requested_model: str | None,
         messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -83,15 +93,49 @@ class EmbeddingsRuntimeClient(ABC):
         raise NotImplementedError
 
 
+class McpToolRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], mcp_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.mcp_binding = mcp_binding
+
+    @abstractmethod
+    def invoke(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        request_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class SandboxToolRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], sandbox_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.sandbox_binding = sandbox_binding
+
+    @abstractmethod
+    def execute_python(
+        self,
+        *,
+        code: str,
+        input_payload: Any,
+        timeout_seconds: int,
+        policy: dict[str, Any],
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
 class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
     def chat_completion(
         self,
         *,
         requested_model: str | None,
         messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         effective_model = _resolve_effective_model(requested_model, self.llm_binding)
-        payload = _build_request_payload(self.llm_binding, effective_model, messages)
+        payload = _build_request_payload(self.llm_binding, effective_model, messages, tools=tools)
         response_payload, status_code = http_json_request(
             self._chat_url(),
             method="POST",
@@ -125,6 +169,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
 
         return {
             "output_text": _extract_output_text(response_payload),
+            "tool_calls": _extract_tool_calls(response_payload),
             "status_code": status_code,
             "requested_model": effective_model,
         }
@@ -344,6 +389,124 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
         return endpoint_url + embeddings_path
 
 
+class HttpMcpToolRuntimeClient(McpToolRuntimeClient):
+    def invoke(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        request_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload, status_code = http_json_request(
+            self._invoke_url(),
+            method="POST",
+            payload={
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "request_metadata": request_metadata,
+            },
+        )
+        if payload is None:
+            error_code = "tool_runtime_timeout" if status_code == 504 else "tool_runtime_unreachable"
+            raise ToolRuntimeClientError(
+                code=error_code,
+                message="Tool runtime unavailable",
+                status_code=status_code,
+                details={"provider_slug": self.mcp_binding.get("slug"), "status_code": status_code},
+            )
+        if not 200 <= status_code < 300:
+            error_code = (
+                "tool_runtime_timeout"
+                if status_code == 504
+                else "tool_runtime_upstream_unavailable"
+                if status_code >= 502
+                else "tool_runtime_request_failed"
+            )
+            raise ToolRuntimeClientError(
+                code=error_code,
+                message="Tool runtime request failed",
+                status_code=status_code,
+                details={
+                    "provider_slug": self.mcp_binding.get("slug"),
+                    "status_code": status_code,
+                    "upstream": payload,
+                },
+            )
+        return {
+            "status_code": status_code,
+            "tool_name": tool_name,
+            "result": payload.get("result"),
+            "error": payload.get("error"),
+        }
+
+    def _invoke_url(self) -> str:
+        config = self.mcp_binding.get("config") if isinstance(self.mcp_binding.get("config"), dict) else {}
+        invoke_path = str(config.get("invoke_path", "/v1/tools/invoke")).strip() or "/v1/tools/invoke"
+        endpoint_url = str(self.mcp_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + invoke_path
+
+
+class HttpSandboxToolRuntimeClient(SandboxToolRuntimeClient):
+    def execute_python(
+        self,
+        *,
+        code: str,
+        input_payload: Any,
+        timeout_seconds: int,
+        policy: dict[str, Any],
+    ) -> dict[str, Any]:
+        payload, status_code = http_json_request(
+            self._execute_url(),
+            method="POST",
+            payload={
+                "language": "python",
+                "code": code,
+                "input": input_payload,
+                "timeout_seconds": timeout_seconds,
+                "policy": policy,
+            },
+        )
+        if payload is None:
+            error_code = "tool_runtime_timeout" if status_code == 504 else "tool_runtime_unreachable"
+            raise ToolRuntimeClientError(
+                code=error_code,
+                message="Tool runtime unavailable",
+                status_code=status_code,
+                details={"provider_slug": self.sandbox_binding.get("slug"), "status_code": status_code},
+            )
+        if status_code == 504:
+            raise ToolRuntimeClientError(
+                code="tool_runtime_timeout",
+                message="Tool runtime request timed out",
+                status_code=status_code,
+                details={"provider_slug": self.sandbox_binding.get("slug"), "status_code": status_code},
+            )
+        if status_code >= 502:
+            raise ToolRuntimeClientError(
+                code="tool_runtime_upstream_unavailable",
+                message="Tool runtime request failed",
+                status_code=status_code,
+                details={
+                    "provider_slug": self.sandbox_binding.get("slug"),
+                    "status_code": status_code,
+                    "upstream": payload,
+                },
+            )
+        return {
+            "status_code": status_code,
+            "stdout": payload.get("stdout", ""),
+            "stderr": payload.get("stderr", ""),
+            "result": payload.get("result"),
+            "error": payload.get("error"),
+        }
+
+    def _execute_url(self) -> str:
+        config = self.sandbox_binding.get("config") if isinstance(self.sandbox_binding.get("config"), dict) else {}
+        execute_path = str(config.get("execute_path", "/v1/execute")).strip() or "/v1/execute"
+        endpoint_url = str(self.sandbox_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + execute_path
+
+
 def build_llm_runtime_client(platform_runtime: dict[str, Any]) -> LlmRuntimeClient:
     deployment_profile, capabilities = _coerce_platform_runtime(
         platform_runtime,
@@ -418,6 +581,52 @@ def build_vector_store_runtime_client(platform_runtime: dict[str, Any]) -> Vecto
     )
 
 
+def build_mcp_tool_runtime_client(platform_runtime: dict[str, Any]) -> McpToolRuntimeClient:
+    deployment_profile, capabilities = _coerce_platform_runtime(
+        platform_runtime,
+        error_cls=ToolRuntimeClientError,
+    )
+    mcp_binding = capabilities.get("mcp_runtime")
+    if not isinstance(mcp_binding, dict):
+        raise ToolRuntimeClientError(
+            code="missing_tool_runtime",
+            message="platform_runtime is missing mcp_runtime binding",
+            status_code=500,
+        )
+    adapter_kind = str(mcp_binding.get("adapter_kind", "")).strip().lower()
+    if adapter_kind != "mcp_http":
+        raise ToolRuntimeClientError(
+            code="unsupported_adapter_kind",
+            message="Unsupported MCP runtime adapter",
+            status_code=500,
+            details={"adapter_kind": adapter_kind},
+        )
+    return HttpMcpToolRuntimeClient(deployment_profile=deployment_profile, mcp_binding=mcp_binding)
+
+
+def build_sandbox_tool_runtime_client(platform_runtime: dict[str, Any]) -> SandboxToolRuntimeClient:
+    deployment_profile, capabilities = _coerce_platform_runtime(
+        platform_runtime,
+        error_cls=ToolRuntimeClientError,
+    )
+    sandbox_binding = capabilities.get("sandbox_execution")
+    if not isinstance(sandbox_binding, dict):
+        raise ToolRuntimeClientError(
+            code="missing_tool_runtime",
+            message="platform_runtime is missing sandbox_execution binding",
+            status_code=500,
+        )
+    adapter_kind = str(sandbox_binding.get("adapter_kind", "")).strip().lower()
+    if adapter_kind != "sandbox_http":
+        raise ToolRuntimeClientError(
+            code="unsupported_adapter_kind",
+            message="Unsupported sandbox runtime adapter",
+            status_code=500,
+            details={"adapter_kind": adapter_kind},
+        )
+    return HttpSandboxToolRuntimeClient(deployment_profile=deployment_profile, sandbox_binding=sandbox_binding)
+
+
 def http_json_request(
     url: str,
     *,
@@ -455,7 +664,10 @@ def http_json_request(
 def _coerce_platform_runtime(
     platform_runtime: dict[str, Any],
     *,
-    error_cls: type[LlmRuntimeClientError] | type[VectorStoreRuntimeClientError] | type[EmbeddingsRuntimeClientError],
+    error_cls: type[LlmRuntimeClientError]
+    | type[VectorStoreRuntimeClientError]
+    | type[EmbeddingsRuntimeClientError]
+    | type[ToolRuntimeClientError],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     deployment_profile = platform_runtime.get("deployment_profile")
     capabilities = platform_runtime.get("capabilities")
@@ -487,18 +699,30 @@ def _resolve_effective_model(requested_model: str | None, llm_binding: dict[str,
     )
 
 
-def _build_request_payload(llm_binding: dict[str, Any], model: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_request_payload(
+    llm_binding: dict[str, Any],
+    model: str,
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     config = llm_binding.get("config") if isinstance(llm_binding.get("config"), dict) else {}
     request_format = str(config.get("request_format", "responses_api")).strip().lower() or "responses_api"
     if request_format == "openai_chat":
-        return {
+        payload = {
             "model": model,
             "messages": _coerce_openai_chat_messages(messages),
         }
-    return {
+        if tools:
+            payload["tools"] = tools
+        return payload
+    payload = {
         "model": model,
         "input": messages,
     }
+    if tools:
+        payload["tools"] = tools
+    return payload
 
 
 def _coerce_openai_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -507,6 +731,38 @@ def _coerce_openai_chat_messages(messages: list[dict[str, Any]]) -> list[dict[st
         role = str(message.get("role", "")).strip().lower()
         if not role:
             continue
+        tool_calls = message.get("tool_calls")
+        if role == "assistant" and isinstance(tool_calls, list) and tool_calls:
+            normalized.append(
+                {
+                    "role": "assistant",
+                    "content": _coerce_message_text(message.get("content")),
+                    "tool_calls": [
+                        {
+                            "id": str(item.get("id", "")).strip(),
+                            "type": "function",
+                            "function": {
+                                "name": str((item.get("function") or {}).get("name", "")).strip(),
+                                "arguments": str((item.get("function") or {}).get("arguments", "")),
+                            },
+                        }
+                        for item in tool_calls
+                        if isinstance(item, dict) and isinstance(item.get("function"), dict)
+                    ],
+                }
+            )
+            continue
+        if role == "tool":
+            tool_call_id = str(message.get("tool_call_id", "")).strip()
+            if tool_call_id:
+                normalized.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": _coerce_message_text(message.get("content")),
+                    }
+                )
+                continue
         content = message.get("content")
         if isinstance(content, str) and content.strip():
             normalized.append({"role": role, "content": content.strip()})
@@ -525,6 +781,23 @@ def _coerce_openai_chat_messages(messages: list[dict[str, Any]]) -> list[dict[st
         if text_parts:
             normalized.append({"role": role, "content": "\n".join(text_parts)})
     return normalized
+
+
+def _coerce_message_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, list):
+        return ""
+    text_parts: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        if str(part.get("type", "")).strip().lower() != "text":
+            continue
+        text = str(part.get("text", "")).strip()
+        if text:
+            text_parts.append(text)
+    return "\n".join(text_parts)
 
 
 def _extract_output_text(payload: dict[str, Any]) -> str:
@@ -550,6 +823,76 @@ def _extract_output_text(payload: dict[str, Any]) -> str:
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         return ""
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return ""
+
+    content = message.get("content")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if str(part.get("type", "")).strip().lower() != "text":
+                continue
+            text = str(part.get("text", "")).strip()
+            if text:
+                text_parts.append(text)
+        return "\n".join(text_parts)
+    return ""
+
+
+def _extract_tool_calls(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    output = payload.get("output")
+    if isinstance(output, list) and output:
+        first = output[0]
+        if isinstance(first, dict):
+            normalized = _normalize_tool_calls(first.get("tool_calls"))
+            if normalized:
+                return normalized
+    choices = payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            message = first.get("message")
+            if isinstance(message, dict):
+                normalized = _normalize_tool_calls(message.get("tool_calls"))
+                if normalized:
+                    return normalized
+    return []
+
+
+def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw_tool_calls, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for item in raw_tool_calls:
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function")
+        if not isinstance(function, dict):
+            continue
+        tool_id = str(item.get("id", "")).strip()
+        function_name = str(function.get("name", "")).strip()
+        if not tool_id or not function_name:
+            continue
+        normalized.append(
+            {
+                "id": tool_id,
+                "type": "function",
+                "function": {
+                    "name": function_name,
+                    "arguments": str(function.get("arguments", "")),
+                },
+            }
+        )
+    return normalized
     first = choices[0]
     if not isinstance(first, dict):
         return ""

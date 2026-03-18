@@ -14,6 +14,7 @@ rendering:
     - llm
     - llm_runtime
     - llama_cpp
+    - mcp_gateway
     - sandbox
     - weaviate
     - qdrant
@@ -67,6 +68,12 @@ services:
     description: Isolated Python execution environment for agents.
     public_exposed: true
     criticality: high
+  mcp_gateway:
+    label: MCP Gateway
+    group: runtime
+    description: Optional HTTP gateway for MCP-backed tool runtimes.
+    public_exposed: true
+    criticality: medium
   weaviate:
     label: Weaviate
     group: data
@@ -117,6 +124,12 @@ edges:
     kind: http
     direction: outbound
   - from: backend
+    to: mcp_gateway
+    protocol: HTTP
+    purpose: Optional MCP runtime validation and control-plane provider checks
+    kind: http
+    direction: outbound
+  - from: backend
     to: weaviate
     protocol: HTTP
     purpose: Semantic retrieval operations
@@ -144,6 +157,12 @@ edges:
     to: sandbox
     protocol: HTTP
     purpose: Agent sandbox execution
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: mcp_gateway
+    protocol: HTTP
+    purpose: Agent MCP tool invocation
     kind: http
     direction: outbound
   - from: agent_engine

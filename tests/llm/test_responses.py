@@ -140,3 +140,48 @@ def test_embeddings_reject_models_without_embedding_capability() -> None:
 
     assert exc.value.status_code == 422
     assert exc.value.detail["code"] == "unsupported_input"
+
+
+def test_chat_completion_normalizes_provider_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = ResponseRequest(
+        model="dummy",
+        input=[{"role": "user", "content": [{"type": "text", "text": "Search for hello"}]}],
+        tools=[
+            {
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the web",
+                    "parameters": {"type": "object"},
+                },
+            }
+        ],
+    )
+    resolved = registry.resolve_model("dummy")
+
+    def fake_generate(self, _request: ResponseRequest, *, upstream_model: str):
+        _ = (self, upstream_model)
+        assert _request.tools[0].function.name == "web_search"
+        return type(
+            "ProviderResult",
+            (),
+            {
+                "output_text": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "web_search", "arguments": "{\"query\":\"hello\"}"},
+                    }
+                ],
+                "prompt_tokens": 2,
+                "completion_tokens": 0,
+            },
+        )()
+
+    monkeypatch.setattr(type(resolved.provider), "generate", fake_generate)
+
+    response = create_chat_completion(request)
+
+    assert response.output[0].tool_calls[0].function.name == "web_search"
+    assert response.output[0].content == []

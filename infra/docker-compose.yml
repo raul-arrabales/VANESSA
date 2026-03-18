@@ -105,6 +105,21 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  mcp_gateway:
+    build:
+      context: ..
+      dockerfile: infra/docker/mcp_gateway/Dockerfile
+    container_name: vanessa-mcp-gateway
+    profiles:
+      - mcp_gateway
+    ports:
+      - "6100:6100"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+
   agent_engine:
     build:
       context: ..

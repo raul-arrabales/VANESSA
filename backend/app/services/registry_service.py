@@ -35,12 +35,25 @@ def _validate_spec(entity_type: str, spec: dict[str, Any]) -> None:
             if key not in spec:
                 raise ValueError(f"missing_agent_field:{key}")
     elif entity_type == "tool":
-        required = ["name", "transport", "connection_profile_ref", "tool_name", "input_schema", "output_schema", "safety_policy", "offline_compatible"]
+        required = [
+            "name",
+            "description",
+            "transport",
+            "connection_profile_ref",
+            "tool_name",
+            "input_schema",
+            "output_schema",
+            "safety_policy",
+            "offline_compatible",
+        ]
         for key in required:
             if key not in spec:
                 raise ValueError(f"missing_tool_field:{key}")
-        if str(spec.get("transport", "")).strip().lower() != "mcp":
+        transport = str(spec.get("transport", "")).strip().lower()
+        if transport not in {"mcp", "sandbox_http"}:
             raise ValueError("invalid_transport")
+        if str(spec.get("connection_profile_ref", "")).strip().lower() != "default":
+            raise ValueError("invalid_connection_profile_ref")
 
 
 def create_entity_with_version(

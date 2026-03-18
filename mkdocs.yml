@@ -23,6 +23,7 @@ nav:
       - Backend (Flask API): services/backend.md
       - Agent Engine: services/agent-engine.md
       - Sandbox: services/sandbox.md
+      - MCP Gateway: services/mcp-gateway.md
       - KWS: services/kws.md
       - Infrastructure: services/infra.md
       - Models: services/models.md

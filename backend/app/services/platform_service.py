@@ -7,16 +7,24 @@ from ..repositories import platform_control_plane as platform_repo
 from .platform_adapters import (
     EmbeddingsAdapter,
     LlmInferenceAdapter,
+    McpRuntimeAdapter,
     OpenAICompatibleEmbeddingsAdapter,
     OpenAICompatibleLlmAdapter,
     QdrantVectorStoreAdapter,
+    SandboxExecutionAdapter,
     VectorStoreAdapter,
     WeaviateVectorStoreAdapter,
+    HttpMcpRuntimeAdapter,
+    HttpSandboxExecutionAdapter,
 )
 from .platform_types import (
+    ALL_CAPABILITIES,
+    CAPABILITY_MCP_RUNTIME,
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_LLM_INFERENCE,
+    CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    OPTIONAL_CAPABILITIES,
     REQUIRED_CAPABILITIES,
     DeploymentBindingInput,
     DeploymentProfileCreateInput,
@@ -35,7 +43,13 @@ _QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
 _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
 
 
+def _known_capability_keys(database_url: str) -> set[str]:
+    return {str(row["capability_key"]).strip().lower() for row in platform_repo.list_capabilities(database_url)}
+
+
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
+    sandbox_url = str(getattr(config, "sandbox_url", "") or "").strip()
+    mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
     platform_repo.ensure_capability(
         database_url,
         capability_key=CAPABILITY_LLM_INFERENCE,
@@ -56,6 +70,20 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         display_name="Vector store",
         description="Semantic retrieval capability for embeddings and document search.",
         is_required=True,
+    )
+    platform_repo.ensure_capability(
+        database_url,
+        capability_key=CAPABILITY_MCP_RUNTIME,
+        display_name="MCP runtime",
+        description="Gateway capability for MCP-hosted tool execution.",
+        is_required=False,
+    )
+    platform_repo.ensure_capability(
+        database_url,
+        capability_key=CAPABILITY_SANDBOX_EXECUTION,
+        display_name="Sandbox execution",
+        description="Isolated code-execution capability for agent tools.",
+        is_required=False,
     )
 
     platform_repo.ensure_provider_family(
@@ -97,6 +125,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         adapter_kind="qdrant_http",
         display_name="Qdrant local",
         description="Optional local Qdrant semantic index endpoint.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="mcp_gateway_local",
+        capability_key=CAPABILITY_MCP_RUNTIME,
+        adapter_kind="mcp_http",
+        display_name="MCP gateway local",
+        description="Optional local MCP runtime gateway for remote and general-purpose tools.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="sandbox_local",
+        capability_key=CAPABILITY_SANDBOX_EXECUTION,
+        adapter_kind="sandbox_http",
+        display_name="Sandbox local",
+        description="Local sandbox execution runtime for agent tools.",
     )
 
     vllm_provider = platform_repo.ensure_provider_instance(
@@ -142,6 +186,23 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "input_type": "text",
         },
     )
+    sandbox_provider = None
+    if sandbox_url:
+        sandbox_provider = platform_repo.ensure_provider_instance(
+            database_url,
+            slug="sandbox-local",
+            provider_key="sandbox_local",
+            display_name="Sandbox local",
+            description="Primary sandbox execution runtime for agent tools.",
+            endpoint_url=sandbox_url,
+            healthcheck_url=sandbox_url.rstrip("/") + "/health",
+            enabled=True,
+            config_json={
+                "execute_path": "/v1/execute",
+                "dry_run_code": "result = {'status': 'ok'}",
+                "default_timeout_seconds": 5,
+            },
+        )
     llama_cpp_provider = platform_repo.ensure_provider_instance(
         database_url,
         slug="llama-cpp-local",
@@ -177,6 +238,23 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 "distance": "Cosine",
             },
         )
+    mcp_gateway_provider = None
+    if mcp_gateway_url:
+        mcp_gateway_provider = platform_repo.ensure_provider_instance(
+            database_url,
+            slug="mcp-gateway-local",
+            provider_key="mcp_gateway_local",
+            display_name="MCP gateway local",
+            description="Optional local MCP gateway for hosted tool runtimes.",
+            endpoint_url=mcp_gateway_url,
+            healthcheck_url=mcp_gateway_url.rstrip("/") + "/health",
+            enabled=True,
+            config_json={
+                "invoke_path": "/v1/tools/invoke",
+                "list_tools_path": "/v1/tools",
+                "healthcheck_tool_name": "web_search",
+            },
+        )
 
     profile = platform_repo.ensure_deployment_profile(
         database_url,
@@ -207,6 +285,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         provider_instance_id=str(weaviate_provider["id"]),
         binding_config={},
     )
+    if sandbox_provider is not None and sandbox_provider.get("id"):
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(profile["id"]),
+            capability_key=CAPABILITY_SANDBOX_EXECUTION,
+            provider_instance_id=str(sandbox_provider["id"]),
+            binding_config={},
+        )
+    if mcp_gateway_provider is not None:
+        platform_repo.upsert_deployment_binding(
+            database_url,
+            deployment_profile_id=str(profile["id"]),
+            capability_key=CAPABILITY_MCP_RUNTIME,
+            provider_instance_id=str(mcp_gateway_provider["id"]),
+            binding_config={},
+        )
 
     if getattr(config, "llama_cpp_url", "").strip():
         llama_profile = platform_repo.ensure_deployment_profile(
@@ -238,6 +332,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             provider_instance_id=str(weaviate_provider["id"]),
             binding_config={},
         )
+        if sandbox_provider is not None and sandbox_provider.get("id"):
+            platform_repo.upsert_deployment_binding(
+                database_url,
+                deployment_profile_id=str(llama_profile["id"]),
+                capability_key=CAPABILITY_SANDBOX_EXECUTION,
+                provider_instance_id=str(sandbox_provider["id"]),
+                binding_config={},
+            )
+        if mcp_gateway_provider is not None:
+            platform_repo.upsert_deployment_binding(
+                database_url,
+                deployment_profile_id=str(llama_profile["id"]),
+                capability_key=CAPABILITY_MCP_RUNTIME,
+                provider_instance_id=str(mcp_gateway_provider["id"]),
+                binding_config={},
+            )
 
     if qdrant_provider is not None:
         qdrant_profile = platform_repo.ensure_deployment_profile(
@@ -269,6 +379,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             provider_instance_id=str(qdrant_provider["id"]),
             binding_config={},
         )
+        if sandbox_provider is not None and sandbox_provider.get("id"):
+            platform_repo.upsert_deployment_binding(
+                database_url,
+                deployment_profile_id=str(qdrant_profile["id"]),
+                capability_key=CAPABILITY_SANDBOX_EXECUTION,
+                provider_instance_id=str(sandbox_provider["id"]),
+                binding_config={},
+            )
+        if mcp_gateway_provider is not None:
+            platform_repo.upsert_deployment_binding(
+                database_url,
+                deployment_profile_id=str(qdrant_profile["id"]),
+                capability_key=CAPABILITY_MCP_RUNTIME,
+                provider_instance_id=str(mcp_gateway_provider["id"]),
+                binding_config={},
+            )
 
     if platform_repo.get_active_deployment(database_url) is None:
         platform_repo.activate_deployment_profile(
@@ -281,10 +407,14 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
 def list_capabilities(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
     ensure_platform_bootstrap_state(database_url, config)
     active_by_capability: dict[str, dict[str, Any]] = {}
-    for capability_key in REQUIRED_CAPABILITIES:
-        row = platform_repo.get_active_binding_for_capability(database_url, capability_key=capability_key)
-        if row is not None:
-            active_by_capability[capability_key] = row
+    for row in platform_repo.list_capabilities(database_url):
+        capability_key = str(row["capability_key"]).strip().lower()
+        try:
+            active_row = platform_repo.get_active_binding_for_capability(database_url, capability_key=capability_key)
+        except ValueError:
+            active_row = None
+        if active_row is not None:
+            active_by_capability[capability_key] = active_row
 
     items: list[dict[str, Any]] = []
     for row in platform_repo.list_capabilities(database_url):
@@ -437,7 +567,7 @@ def create_deployment_profile(
     created_by_user_id: int,
 ) -> dict[str, Any]:
     ensure_platform_bootstrap_state(database_url, config)
-    normalized = _coerce_create_input(payload)
+    normalized = _coerce_create_input(database_url, payload)
     seen_capabilities: set[str] = set()
     resolved_bindings: list[dict[str, Any]] = []
 
@@ -500,7 +630,7 @@ def update_deployment_profile(
     existing = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
     if existing is None:
         raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
-    normalized = _coerce_create_input(payload)
+    normalized = _coerce_create_input(database_url, payload)
     resolved_bindings = _resolve_deployment_bindings(database_url, normalized.bindings)
     try:
         updated = platform_repo.update_deployment_profile(
@@ -699,6 +829,34 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
             },
         }
 
+    if binding.capability_key == CAPABILITY_SANDBOX_EXECUTION:
+        adapter = resolve_sandbox_execution_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        dry_run_payload, dry_run_status = adapter.execute_dry_run()
+        return {
+            "provider": _serialize_provider_row(provider_row),
+            "validation": {
+                "health": adapter.health(),
+                "execute_reachable": dry_run_payload is not None and 200 <= dry_run_status < 300,
+                "execute_status_code": dry_run_status,
+            },
+        }
+
+    if binding.capability_key == CAPABILITY_MCP_RUNTIME:
+        adapter = resolve_mcp_runtime_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        invoke_payload, invoke_status = adapter.invoke(
+            tool_name=str(binding.config.get("healthcheck_tool_name", "web_search")),
+            arguments={"query": "healthcheck", "top_k": 1},
+            request_metadata={"validation": True},
+        )
+        return {
+            "provider": _serialize_provider_row(provider_row),
+            "validation": {
+                "health": adapter.health(),
+                "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
+                "invoke_status_code": invoke_status,
+            },
+        }
+
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
 
 
@@ -755,40 +913,97 @@ def resolve_vector_store_adapter(
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported vector adapter kind", status_code=500)
 
 
+def resolve_sandbox_execution_adapter(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    provider_instance_id: str | None = None,
+) -> SandboxExecutionAdapter:
+    binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_SANDBOX_EXECUTION,
+        provider_instance_id=provider_instance_id,
+    )
+    if binding.adapter_kind == "sandbox_http":
+        return HttpSandboxExecutionAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported sandbox adapter kind", status_code=500)
+
+
+def resolve_mcp_runtime_adapter(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    provider_instance_id: str | None = None,
+) -> McpRuntimeAdapter:
+    binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_MCP_RUNTIME,
+        provider_instance_id=provider_instance_id,
+    )
+    if binding.adapter_kind == "mcp_http":
+        return HttpMcpRuntimeAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported MCP adapter kind", status_code=500)
+
+
 def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[str, Any]:
     ensure_platform_bootstrap_state(database_url, config)
-    llm_binding = _resolve_provider_binding(
-        database_url,
-        config,
-        capability_key=CAPABILITY_LLM_INFERENCE,
-        provider_instance_id=None,
-    )
-    embeddings_binding = _resolve_provider_binding(
-        database_url,
-        config,
-        capability_key=CAPABILITY_EMBEDDINGS,
-        provider_instance_id=None,
-    )
-    vector_binding = _resolve_provider_binding(
-        database_url,
-        config,
-        capability_key=CAPABILITY_VECTOR_STORE,
-        provider_instance_id=None,
-    )
-    if len({llm_binding.deployment_profile_id, embeddings_binding.deployment_profile_id, vector_binding.deployment_profile_id}) != 1:
+    required_bindings = {
+        CAPABILITY_LLM_INFERENCE: _resolve_provider_binding(
+            database_url,
+            config,
+            capability_key=CAPABILITY_LLM_INFERENCE,
+            provider_instance_id=None,
+        ),
+        CAPABILITY_EMBEDDINGS: _resolve_provider_binding(
+            database_url,
+            config,
+            capability_key=CAPABILITY_EMBEDDINGS,
+            provider_instance_id=None,
+        ),
+        CAPABILITY_VECTOR_STORE: _resolve_provider_binding(
+            database_url,
+            config,
+            capability_key=CAPABILITY_VECTOR_STORE,
+            provider_instance_id=None,
+        ),
+    }
+    if len({binding.deployment_profile_id for binding in required_bindings.values()}) != 1:
         raise PlatformControlPlaneError(
             "active_deployment_profile_mismatch",
             "Active capability bindings do not point to the same deployment profile",
             status_code=503,
         )
 
+    active_capabilities: dict[str, dict[str, Any]] = {
+        capability_key: _serialize_runtime_binding(binding)
+        for capability_key, binding in required_bindings.items()
+    }
+    deployment_binding = next(iter(required_bindings.values()))
+    for capability_key in OPTIONAL_CAPABILITIES:
+        try:
+            optional_binding = _resolve_provider_binding(
+                database_url,
+                config,
+                capability_key=capability_key,
+                provider_instance_id=None,
+            )
+        except PlatformControlPlaneError as exc:
+            if exc.code == "active_binding_not_found":
+                continue
+            raise
+        if optional_binding.deployment_profile_id != deployment_binding.deployment_profile_id:
+            raise PlatformControlPlaneError(
+                "active_deployment_profile_mismatch",
+                "Active capability bindings do not point to the same deployment profile",
+                status_code=503,
+            )
+        active_capabilities[capability_key] = _serialize_runtime_binding(optional_binding)
+
     return {
-        "deployment_profile": _serialize_runtime_deployment_profile(llm_binding),
-        "capabilities": {
-            CAPABILITY_LLM_INFERENCE: _serialize_runtime_binding(llm_binding),
-            CAPABILITY_EMBEDDINGS: _serialize_runtime_binding(embeddings_binding),
-            CAPABILITY_VECTOR_STORE: _serialize_runtime_binding(vector_binding),
-        },
+        "deployment_profile": _serialize_runtime_deployment_profile(deployment_binding),
+        "capabilities": active_capabilities,
     }
 
 
@@ -853,6 +1068,52 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
         }
     )
 
+    try:
+        sandbox_adapter = resolve_sandbox_execution_adapter(database_url, config)
+        statuses.append(
+            {
+                "capability": CAPABILITY_SANDBOX_EXECUTION,
+                "provider": {
+                    "id": sandbox_adapter.binding.provider_instance_id,
+                    "slug": sandbox_adapter.binding.provider_slug,
+                    "provider_key": sandbox_adapter.binding.provider_key,
+                    "display_name": sandbox_adapter.binding.provider_display_name,
+                },
+                "deployment_profile": {
+                    "id": sandbox_adapter.binding.deployment_profile_id,
+                    "slug": sandbox_adapter.binding.deployment_profile_slug,
+                    "display_name": sandbox_adapter.binding.deployment_profile_display_name,
+                },
+                "health": sandbox_adapter.health(),
+            }
+        )
+    except PlatformControlPlaneError as exc:
+        if exc.code != "active_binding_not_found":
+            raise
+
+    try:
+        mcp_adapter = resolve_mcp_runtime_adapter(database_url, config)
+        statuses.append(
+            {
+                "capability": CAPABILITY_MCP_RUNTIME,
+                "provider": {
+                    "id": mcp_adapter.binding.provider_instance_id,
+                    "slug": mcp_adapter.binding.provider_slug,
+                    "provider_key": mcp_adapter.binding.provider_key,
+                    "display_name": mcp_adapter.binding.provider_display_name,
+                },
+                "deployment_profile": {
+                    "id": mcp_adapter.binding.deployment_profile_id,
+                    "slug": mcp_adapter.binding.deployment_profile_slug,
+                    "display_name": mcp_adapter.binding.deployment_profile_display_name,
+                },
+                "health": mcp_adapter.health(),
+            }
+        )
+    except PlatformControlPlaneError as exc:
+        if exc.code != "active_binding_not_found":
+            raise
+
     return statuses
 
 
@@ -893,7 +1154,7 @@ def _resolve_provider_binding(
     return binding
 
 
-def _coerce_create_input(payload: dict[str, Any]) -> DeploymentProfileCreateInput:
+def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> DeploymentProfileCreateInput:
     slug = str(payload.get("slug", "")).strip().lower()
     display_name = str(payload.get("display_name", "")).strip()
     description = str(payload.get("description", "")).strip()
@@ -912,7 +1173,7 @@ def _coerce_create_input(payload: dict[str, Any]) -> DeploymentProfileCreateInpu
             raise PlatformControlPlaneError("invalid_binding", "Each binding must be an object", status_code=400)
         capability_key = str(item.get("capability", "")).strip().lower()
         provider_instance_id = str(item.get("provider_id", "")).strip()
-        if capability_key not in REQUIRED_CAPABILITIES:
+        if capability_key not in _known_capability_keys(database_url):
             raise PlatformControlPlaneError("invalid_capability", "Unsupported capability", status_code=400)
         if not provider_instance_id:
             raise PlatformControlPlaneError("invalid_provider_id", "provider_id is required", status_code=400)
@@ -1064,6 +1325,8 @@ def _validate_deployment_profile_bindings(
             not reachable
             or (capability == CAPABILITY_LLM_INFERENCE and models_reachable is False)
             or (capability == CAPABILITY_EMBEDDINGS and embeddings_reachable is False)
+            or (capability == CAPABILITY_SANDBOX_EXECUTION and validation.get("execute_reachable") is False)
+            or (capability == CAPABILITY_MCP_RUNTIME and validation.get("invoke_reachable") is False)
         )
         if failed:
             failures.append(

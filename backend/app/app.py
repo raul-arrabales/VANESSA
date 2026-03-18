@@ -74,6 +74,7 @@ def system_health_route():
     llm_runtime_url = config.llm_runtime_url.rstrip("/")
     agent_engine_url = config.agent_engine_url.rstrip("/")
     sandbox_url = config.sandbox_url.rstrip("/")
+    mcp_gateway_url = config.mcp_gateway_url.rstrip("/")
     kws_url = config.kws_url.rstrip("/")
     weaviate_url = config.weaviate_url.rstrip("/")
     llama_cpp_url = config.llama_cpp_url.rstrip("/")
@@ -153,6 +154,16 @@ def system_health_route():
                 "container": "qdrant",
                 "target": config.qdrant_url,
                 "reachable": _http_json_ok(qdrant_url + "/healthz"),
+            },
+        )
+    if config.mcp_gateway_url.strip():
+        services.insert(
+            6,
+            {
+                "service": "MCP Gateway",
+                "container": "mcp_gateway",
+                "target": config.mcp_gateway_url,
+                "reachable": _http_json_ok(mcp_gateway_url + "/health"),
             },
         )
 

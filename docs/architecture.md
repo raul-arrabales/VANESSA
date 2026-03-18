@@ -32,26 +32,27 @@ Legend:
 4. LLM Runtime: hardware-adaptive local vLLM runtime engine backing LLM API execution on CPU or GPU hosts.
 5. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
 6. Agent Engine: multi-step agent logic and tool workflows.
-7. Sandbox: isolated Python code execution environment.
-8. KWS: offline wake-word detection and wake-event emission.
-9. Weaviate: persistent semantic index for RAG context retrieval.
-10. Qdrant: optional vector database for alternate retrieval provider binding.
-11. PostgreSQL: persistent relational data for auth and metadata.
+7. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
+8. MCP Gateway: optional normalized HTTP provider for MCP-backed tools such as web search.
+9. KWS: offline wake-word detection and wake-event emission.
+10. Weaviate: persistent semantic index for RAG context retrieval.
+11. Qdrant: optional vector database for alternate retrieval provider binding.
+12. PostgreSQL: persistent relational data for auth and metadata.
 
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, optional Qdrant, PostgreSQL
-- Agent Engine -> LLM API, Sandbox, Weaviate, optional Qdrant, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
 - LLM API -> LLM Runtime
 - KWS -> Backend API
 
 ## GenAI Control Plane Terms
 
-The runtime architecture now distinguishes container topology from GenAI capability binding:
+The runtime architecture now distinguishes container topology from capability binding:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, or `vector_store`
-- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, or `qdrant_local`
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
+- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`
 - `deployment profile`: the named set of active capability-to-provider bindings
 - `adapter`: the capability-specific backend client that talks to a provider
 
@@ -62,7 +63,28 @@ Current provider proof state:
 - `local-default` keeps `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
-- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or model-governance APIs.
+- When `SANDBOX_URL` is configured, deployment profiles also bind `sandbox_execution -> sandbox_local`.
+- When `MCP_GATEWAY_URL` is configured, deployment profiles also bind `mcp_runtime -> mcp_gateway_local`.
+- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or model-governance APIs. Tool runtime capabilities remain optional and are enforced per execution when an agent references tools that need them.
+
+## Tool Runtime Convergence
+
+Agent tools now use a hybrid split:
+
+- Tool definitions remain registry entities, referenced by agents via `tool_refs`.
+- Tool transport runtimes are control-plane capabilities resolved from the active deployment profile.
+
+Current v1 transports:
+
+- `mcp`: remote/general-purpose tools executed through the optional MCP gateway provider.
+- `sandbox_http`: native Python execution tools executed through the sandbox provider.
+
+Current canonical tools:
+
+- `tool.web_search` -> `transport: mcp`, `tool_name: web_search`
+- `tool.python_exec` -> `transport: sandbox_http`, `tool_name: python_exec`
+
+Tool execution is LLM-driven. Agent engine passes tool definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the appropriate runtime provider, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.
 
 ## Design Principles
 

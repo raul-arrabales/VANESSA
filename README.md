@@ -7,6 +7,7 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Flask backend API
 - Agent orchestration service
 - Sandbox service for controlled code execution
+- Optional MCP gateway service for remote/general-purpose tool invocation
 - Private LLM gateway service (local-first routing)
 - Local vLLM runtime service
 - Optional local llama.cpp runtime service
@@ -17,8 +18,8 @@ VANESSA is a modular, containerized AI assistant stack with:
 
 The backend also owns a GenAI control plane that distinguishes:
 
-- `capabilities` such as `llm_inference`, `embeddings`, and `vector_store`
-- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, and `qdrant_local`
+- `capabilities` such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`
+- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`
 - `deployment profiles` that bind capabilities to active providers
 
 ## Documentation Site
@@ -64,6 +65,12 @@ Full guide: `ops/local-staging/README.md`
 
 - Set `QDRANT_URL` to enable the optional `qdrant` compose profile
 - When enabled, backend seeds an inactive `local-qdrant` deployment profile for platform switching
+
+`mcp_gateway` is optional in local staging:
+
+- Set `MCP_GATEWAY_URL` to enable the optional `mcp_gateway` compose profile
+- When enabled, backend seeds an active `mcp_runtime -> mcp_gateway_local` binding into each local deployment profile
+- The gateway currently exposes the built-in `web_search` tool for agent-driven tool calls
 
 ## LLM API Endpoints (Local)
 
@@ -168,6 +175,7 @@ Expected containers:
 - `vanessa-llm-runtime`
 - `vanessa-llama-cpp` (only when `LLAMA_CPP_URL` enables the optional profile)
 - `vanessa-qdrant` (only when `QDRANT_URL` enables the optional profile)
+- `vanessa-mcp-gateway` (only when `MCP_GATEWAY_URL` enables the optional profile)
 - `vanessa-sandbox`
 - `vanessa-kws`
 - `vanessa-weaviate`
@@ -183,7 +191,7 @@ docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 Service-specific logs:
 
 ```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox llm llm_runtime kws weaviate postgres frontend
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox mcp_gateway llm llm_runtime kws weaviate postgres frontend
 ```
 
 ### 6. Stop And Clean Up Test Run
@@ -206,6 +214,7 @@ VANESSA currently uses **global runtime profile semantics** for safety gates and
 - `GET /v1/runtime/profile` is available to authenticated users for visibility.
 - `PUT /v1/runtime/profile` is restricted to `superadmin` users.
 - Frontend settings show the runtime profile toggle to all authenticated users, but only superadmins can modify it.
+- Agent tool access also uses this same global runtime profile. For example, MCP-backed web search is blocked outside `online`, while sandbox-backed Python execution can remain available in `offline` and `air_gapped` profiles when the sandbox runtime capability is active.
 
 When adding new safety/tool gates, use this same global runtime profile contract instead of creating per-user overrides unless the platform semantics are explicitly revised.
 

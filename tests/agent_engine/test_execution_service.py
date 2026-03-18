@@ -847,3 +847,188 @@ def test_execution_rejects_invalid_retrieval_payload_before_persisting(monkeypat
 
     assert str(exc_info.value) == "invalid_retrieval_input"
     assert saved_statuses == []
+
+
+def test_execution_runs_mcp_tool_calls_before_final_model_response(monkeypatch: pytest.MonkeyPatch):
+    llm_seen_messages: list[list[dict[str, Any]]] = []
+    llm_seen_tools: list[list[dict[str, Any]] | None] = []
+    llm_round = {"count": 0}
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "online")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": ["tool.web_search"]}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_tools",
+        lambda **_kwargs: [
+            {
+                "entity_id": "tool.web_search",
+                "current_version": "v1",
+                "current_spec": {
+                    "name": "Web Search",
+                    "description": "Search the web",
+                    "transport": "mcp",
+                    "connection_profile_ref": "default",
+                    "tool_name": "web_search",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                    "safety_policy": {"timeout_seconds": 8},
+                    "offline_compatible": False,
+                },
+            }
+        ],
+    )
+
+    class FakeLlmClient:
+        def chat_completion(self, **kwargs):
+            llm_seen_messages.append(kwargs["messages"])
+            llm_seen_tools.append(kwargs.get("tools"))
+            llm_round["count"] += 1
+            if llm_round["count"] == 1:
+                return {
+                    "output_text": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "web_search", "arguments": "{\"query\":\"hello\"}"},
+                        }
+                    ],
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            return {
+                "output_text": "search answer",
+                "tool_calls": [],
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    class FakeMcpClient:
+        def invoke(self, **kwargs):
+            assert kwargs["tool_name"] == "web_search"
+            return {
+                "status_code": 200,
+                "result": {"query": "hello", "results": [{"title": "Result", "url": "https://search.local"}]},
+                "error": None,
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeLlmClient())
+    monkeypatch.setattr(execution_service, "build_mcp_tool_runtime_client", lambda _runtime: FakeMcpClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "online",
+            "input": {"prompt": "hello"},
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "mcp_runtime": {"slug": "mcp-gateway-local", "provider_key": "mcp_gateway_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"]["output_text"] == "search answer"
+    assert payload["execution"]["result"]["tool_calls"][0]["tool_ref"] == "tool.web_search"
+    assert payload["execution"]["result"]["model_calls"][0]["requested_model"] == "model.alpha"
+    assert len(payload["execution"]["result"]["model_calls"]) == 2
+    assert llm_seen_tools[0][0]["function"]["name"] == "web_search"
+    assert llm_seen_messages[1][-1]["role"] == "tool"
+
+
+def test_execution_runs_sandbox_tool_calls_in_offline_profile(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": ["tool.python_exec"]}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_tools",
+        lambda **_kwargs: [
+            {
+                "entity_id": "tool.python_exec",
+                "current_version": "v1",
+                "current_spec": {
+                    "name": "Python Execution",
+                    "description": "Run Python",
+                    "transport": "sandbox_http",
+                    "connection_profile_ref": "default",
+                    "tool_name": "python_exec",
+                    "input_schema": {"type": "object"},
+                    "output_schema": {"type": "object"},
+                    "safety_policy": {"timeout_seconds": 5, "network_access": False},
+                    "offline_compatible": True,
+                },
+            }
+        ],
+    )
+
+    class FakeLlmClient:
+        def __init__(self):
+            self.calls = 0
+
+        def chat_completion(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return {
+                    "output_text": "",
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "python_exec", "arguments": "{\"code\":\"result = 2 + 2\"}"},
+                        }
+                    ],
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            return {
+                "output_text": "4",
+                "tool_calls": [],
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    class FakeSandboxClient:
+        def execute_python(self, **kwargs):
+            assert kwargs["code"] == "result = 2 + 2"
+            return {"status_code": 200, "stdout": "", "stderr": "", "result": 4, "error": None}
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeLlmClient())
+    monkeypatch.setattr(execution_service, "build_sandbox_tool_runtime_client", lambda _runtime: FakeSandboxClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "solve this"},
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "sandbox_execution": {"slug": "sandbox-local", "provider_key": "sandbox_local"},
+                },
+            },
+        }
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"]["output_text"] == "4"
+    assert payload["execution"]["result"]["tool_calls"][0]["transport"] == "sandbox_http"

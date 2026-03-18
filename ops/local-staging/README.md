@@ -39,6 +39,7 @@ python scripts/generate_architecture.py --write
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
+  - Checks optional `mcp_gateway` when `MCP_GATEWAY_URL` is configured.
   - Also checks `llm_runtime` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
@@ -88,6 +89,7 @@ Supported launcher variables:
 - `LLAMA_CPP_MODEL_PATH` (required when `LLAMA_CPP_URL` is set; must point to a GGUF file under `models/llm/` or an absolute host path)
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
+- `MCP_GATEWAY_URL` (blank by default; when set, enables the optional `mcp_gateway` compose profile and backend bootstrap profile)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
@@ -126,6 +128,12 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - The optional `qdrant` service is enabled only when `QDRANT_URL` is non-empty.
 - Local-staging scripts automatically add the `qdrant` compose profile when enabled.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /healthz` inside the container.
+
+`mcp_gateway` selection:
+
+- The optional `mcp_gateway` service is enabled only when `MCP_GATEWAY_URL` is non-empty.
+- Local-staging scripts automatically add the `mcp_gateway` compose profile when enabled.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
 
 ## Sample Auth Seeding
 
@@ -184,7 +192,12 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - set `QDRANT_URL=http://qdrant:6333`
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `Qdrant local`, activate `Local Qdrant`, and confirm retrieval still succeeds
-18. Stop while keeping state: `./ops/local-staging/stop.sh`
+18. Optional MCP/tool-runtime proof:
+   - set `MCP_GATEWAY_URL=http://mcp_gateway:8080`
+   - run `./ops/local-staging/start.sh`
+   - validate `MCP gateway local` from Platform control
+   - execute an agent that references `tool.web_search` while the runtime profile is `online`
+19. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 If compose or architecture metadata changes, verify artifacts are fresh:
 

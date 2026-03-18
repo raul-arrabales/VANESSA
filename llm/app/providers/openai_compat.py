@@ -15,6 +15,38 @@ from .base import ProviderError
 def _coerce_openai_message_content(request: ResponseRequest) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for message in request.input:
+        if message.role == "assistant" and message.tool_calls:
+            normalized.append(
+                {
+                    "role": "assistant",
+                    "content": "\n".join(
+                        part.text for part in message.content if isinstance(part, TextPart)
+                    ).strip(),
+                    "tool_calls": [
+                        {
+                            "id": tool_call.id,
+                            "type": tool_call.type,
+                            "function": {
+                                "name": tool_call.function.name,
+                                "arguments": tool_call.function.arguments,
+                            },
+                        }
+                        for tool_call in message.tool_calls
+                    ],
+                }
+            )
+            continue
+        if message.role == "tool":
+            normalized.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": message.tool_call_id,
+                    "content": "\n".join(
+                        part.text for part in message.content if isinstance(part, TextPart)
+                    ).strip(),
+                }
+            )
+            continue
         content_parts: list[dict[str, Any]] = []
         text_segments: list[str] = []
         only_text = True
@@ -66,6 +98,44 @@ def _extract_output_text(body: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_tool_calls(body: dict[str, Any]) -> list[dict[str, Any]]:
+    choices = body.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return []
+    first = choices[0]
+    if not isinstance(first, dict):
+        return []
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return []
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for item in tool_calls:
+        if not isinstance(item, dict):
+            continue
+        function = item.get("function")
+        if not isinstance(function, dict):
+            continue
+        tool_id = str(item.get("id", "")).strip()
+        function_name = str(function.get("name", "")).strip()
+        arguments = str(function.get("arguments", ""))
+        if not tool_id or not function_name:
+            continue
+        normalized.append(
+            {
+                "id": tool_id,
+                "type": "function",
+                "function": {
+                    "name": function_name,
+                    "arguments": arguments,
+                },
+            }
+        )
+    return normalized
+
+
 def _extract_embeddings(body: dict[str, Any]) -> list[list[float]]:
     data = body.get("data")
     if not isinstance(data, list):
@@ -115,6 +185,18 @@ class OpenAICompatibleProvider:
             payload["temperature"] = request.temperature
         if request.max_tokens is not None:
             payload["max_tokens"] = request.max_tokens
+        if request.tools:
+            payload["tools"] = [
+                {
+                    "type": tool.type,
+                    "function": {
+                        "name": tool.function.name,
+                        "description": tool.function.description,
+                        "parameters": tool.function.parameters,
+                    },
+                }
+                for tool in request.tools
+            ]
 
         headers = {"Content-Type": "application/json"}
         if self._auth_header_value:
@@ -134,6 +216,7 @@ class OpenAICompatibleProvider:
                 )
                 return ProviderResult(
                     output_text=_extract_output_text(parsed if isinstance(parsed, dict) else {}),
+                    tool_calls=_extract_tool_calls(parsed if isinstance(parsed, dict) else {}),
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                 )

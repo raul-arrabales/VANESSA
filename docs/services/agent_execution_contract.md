@@ -80,6 +80,32 @@
         "enabled": true,
         "config": {},
         "binding_config": {}
+      },
+      "mcp_runtime": {
+        "id": "provider-mcp",
+        "slug": "mcp-gateway-local",
+        "provider_key": "mcp_gateway_local",
+        "display_name": "MCP gateway local",
+        "description": "Optional MCP runtime gateway",
+        "adapter_kind": "mcp_http",
+        "endpoint_url": "http://mcp_gateway:8080",
+        "healthcheck_url": "http://mcp_gateway:8080/health",
+        "enabled": true,
+        "config": {},
+        "binding_config": {}
+      },
+      "sandbox_execution": {
+        "id": "provider-sandbox",
+        "slug": "sandbox-local",
+        "provider_key": "sandbox_local",
+        "display_name": "Sandbox local",
+        "description": "Optional sandbox execution runtime",
+        "adapter_kind": "sandbox_http",
+        "endpoint_url": "http://sandbox:8000",
+        "healthcheck_url": "http://sandbox:8000/health",
+        "enabled": true,
+        "config": {},
+        "binding_config": {}
       }
     }
   },
@@ -103,8 +129,28 @@
     "started_at": "2026-01-01T00:00:00+00:00",
     "finished_at": "2026-01-01T00:00:01+00:00",
     "result": {
-      "output_text": "Agent 'agent.alpha' executed in offline profile",
-      "tool_calls": [],
+      "output_text": "Here is the final answer after using a tool.",
+      "tool_calls": [
+        {
+          "tool_ref": "tool.python_exec",
+          "tool_name": "python_exec",
+          "transport": "sandbox_http",
+          "runtime_capability": "sandbox_execution",
+          "provider_slug": "sandbox-local",
+          "provider_key": "sandbox_local",
+          "deployment_profile_slug": "local-default",
+          "status_code": 200,
+          "arguments": {
+            "code": "print(2 + 2)"
+          },
+          "result": {
+            "stdout": "4\n",
+            "stderr": "",
+            "result": null,
+            "error": null
+          }
+        }
+      ],
       "embedding_calls": [],
       "retrieval_calls": [],
       "model_calls": [
@@ -127,6 +173,13 @@
 `input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
 
 `input.model` is optional and execution-scoped. When present, agent engine uses it as the requested LLM model instead of the agent spec default. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
+
+Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent tool catalog requires them. In the current convergence phase:
+
+- `tool.web_search` uses `transport: mcp` and requires `platform_runtime.capabilities.mcp_runtime`
+- `tool.python_exec` uses `transport: sandbox_http` and requires `platform_runtime.capabilities.sandbox_execution`
+
+Tool loops are LLM-driven and bounded to three rounds.
 
 ## Error Codes
 

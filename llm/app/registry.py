@@ -29,6 +29,7 @@ class ModelInfo:
 @dataclass(frozen=True)
 class ProviderResult:
     output_text: str
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from json import dumps
+from json import dumps, loads
 from typing import Any
 from uuid import uuid4
 
@@ -10,6 +10,7 @@ from ..schemas.agent_executions import AgentExecutionRecord
 from .policy_runtime_gate import (
     ExecutionBlockedError,
     require_agent_execute_permission,
+    resolve_agent_tools,
     resolve_agent_spec,
     resolve_runtime_profile,
     validate_runtime_and_dependencies,
@@ -17,11 +18,16 @@ from .policy_runtime_gate import (
 from .runtime_client import (
     EmbeddingsRuntimeClientError,
     LlmRuntimeClientError,
+    ToolRuntimeClientError,
     VectorStoreRuntimeClientError,
     build_embeddings_runtime_client,
     build_llm_runtime_client,
+    build_mcp_tool_runtime_client,
+    build_sandbox_tool_runtime_client,
     build_vector_store_runtime_client,
 )
+
+_MAX_TOOL_CALL_ROUNDS = 3
 
 
 def _iso_now() -> str:
@@ -58,6 +64,174 @@ def _deterministic_execution_result(*, agent_id: str, runtime_profile: str) -> d
         "model_calls": [],
         "retrieval_calls": [],
     }
+
+
+def _runtime_capability_for_transport(transport: str) -> str:
+    normalized = transport.strip().lower()
+    if normalized == "mcp":
+        return "mcp_runtime"
+    if normalized == "sandbox_http":
+        return "sandbox_execution"
+    raise ExecutionBlockedError(
+        code="EXEC_TOOL_NOT_ALLOWED",
+        message=f"Unsupported tool transport '{transport}'",
+        status_code=403,
+    )
+
+
+def _tool_definition(tool_entity: dict[str, Any]) -> dict[str, Any]:
+    tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
+    return {
+        "type": "function",
+        "function": {
+            "name": str(tool_spec.get("tool_name", "")).strip(),
+            "description": str(tool_spec.get("description", "")).strip(),
+            "parameters": dict(tool_spec.get("input_schema") or {}),
+        },
+    }
+
+
+def _tool_message_content(payload: Any) -> list[dict[str, str]]:
+    return [{"type": "text", "text": dumps(payload, sort_keys=True, separators=(",", ":"))}]
+
+
+def _resolve_tool_runtime_binding(*, platform_runtime: dict[str, Any], capability_key: str) -> dict[str, Any]:
+    capabilities = platform_runtime.get("capabilities") if isinstance(platform_runtime.get("capabilities"), dict) else {}
+    binding = capabilities.get(capability_key)
+    if not isinstance(binding, dict):
+        raise ExecutionBlockedError(
+            code="EXEC_TOOL_NOT_ALLOWED",
+            message=f"Active platform runtime is missing capability '{capability_key}'",
+            status_code=403,
+        )
+    return binding
+
+
+def _map_tool_runtime_error(exc: ToolRuntimeClientError) -> ExecutionBlockedError:
+    if exc.code == "tool_runtime_timeout":
+        return ExecutionBlockedError(
+            code="EXEC_TIMEOUT",
+            message="Execution timed out",
+            status_code=504,
+            details=exc.details,
+        )
+    if exc.code in {"tool_runtime_unreachable", "tool_runtime_upstream_unavailable"}:
+        return ExecutionBlockedError(
+            code="EXEC_UPSTREAM_UNAVAILABLE",
+            message="Upstream LLM/tool dependency unavailable",
+            status_code=503,
+            details=exc.details,
+        )
+    return ExecutionBlockedError(
+        code="EXEC_INTERNAL_ERROR",
+        message="Execution failed internally",
+        status_code=500,
+        details=exc.details,
+    )
+
+
+def _invoke_tool_call(
+    *,
+    tool_entity: dict[str, Any],
+    tool_call: dict[str, Any],
+    platform_runtime: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
+    transport = str(tool_spec.get("transport", "")).strip().lower()
+    runtime_capability = _runtime_capability_for_transport(transport)
+    binding = _resolve_tool_runtime_binding(platform_runtime=platform_runtime, capability_key=runtime_capability)
+    deployment_profile = platform_runtime.get("deployment_profile") if isinstance(platform_runtime.get("deployment_profile"), dict) else {}
+    arguments_text = str(((tool_call.get("function") or {}).get("arguments", "")))
+    try:
+        arguments = loads(arguments_text) if arguments_text.strip() else {}
+    except ValueError:
+        error_payload = {
+            "code": "invalid_arguments",
+            "message": "Model returned invalid tool arguments",
+            "raw_arguments": arguments_text,
+        }
+        return (
+            {
+                "tool_ref": tool_entity.get("entity_id"),
+                "tool_name": tool_spec.get("tool_name"),
+                "transport": transport,
+                "runtime_capability": runtime_capability,
+                "provider_slug": binding.get("slug"),
+                "provider_key": binding.get("provider_key"),
+                "deployment_profile_slug": deployment_profile.get("slug"),
+                "status_code": 400,
+                "arguments": {},
+                "error": error_payload,
+            },
+            error_payload,
+        )
+    if not isinstance(arguments, dict):
+        error_payload = {
+            "code": "invalid_arguments",
+            "message": "Model returned non-object tool arguments",
+        }
+        return (
+            {
+                "tool_ref": tool_entity.get("entity_id"),
+                "tool_name": tool_spec.get("tool_name"),
+                "transport": transport,
+                "runtime_capability": runtime_capability,
+                "provider_slug": binding.get("slug"),
+                "provider_key": binding.get("provider_key"),
+                "deployment_profile_slug": deployment_profile.get("slug"),
+                "status_code": 400,
+                "arguments": arguments,
+                "error": error_payload,
+            },
+            error_payload,
+        )
+
+    try:
+        if transport == "mcp":
+            runtime_client = build_mcp_tool_runtime_client(platform_runtime)
+            runtime_payload = runtime_client.invoke(
+                tool_name=str(tool_spec.get("tool_name", "")).strip(),
+                arguments=arguments,
+                request_metadata={"tool_ref": tool_entity.get("entity_id")},
+            )
+        elif transport == "sandbox_http":
+            runtime_client = build_sandbox_tool_runtime_client(platform_runtime)
+            safety_policy = dict(tool_spec.get("safety_policy") or {})
+            timeout_seconds = int(arguments.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
+            runtime_payload = runtime_client.execute_python(
+                code=str(arguments.get("code", "")),
+                input_payload=arguments.get("input"),
+                timeout_seconds=timeout_seconds,
+                policy=safety_policy,
+            )
+        else:
+            raise ToolRuntimeClientError(
+                code="unsupported_adapter_kind",
+                message="Unsupported tool runtime adapter",
+                status_code=500,
+            )
+    except ToolRuntimeClientError as exc:
+        raise _map_tool_runtime_error(exc) from exc
+
+    status_code = int(runtime_payload.get("status_code", 200) or 200)
+    result_payload = runtime_payload.get("result")
+    error_payload = runtime_payload.get("error")
+    call_record = {
+        "tool_ref": tool_entity.get("entity_id"),
+        "tool_name": tool_spec.get("tool_name"),
+        "transport": transport,
+        "runtime_capability": runtime_capability,
+        "provider_slug": binding.get("slug"),
+        "provider_key": binding.get("provider_key"),
+        "deployment_profile_slug": deployment_profile.get("slug"),
+        "status_code": status_code,
+        "arguments": arguments,
+    }
+    if error_payload is not None:
+        call_record["error"] = error_payload
+        return call_record, error_payload
+    call_record["result"] = result_payload
+    return call_record, result_payload
 
 
 def _coerce_execution_messages(execution_input: dict[str, Any]) -> list[dict[str, Any]]:
@@ -318,6 +492,7 @@ def _execute_model_call(
     model_ref: str | None,
     platform_runtime: dict[str, Any] | None,
     retrieval_request: dict[str, Any] | None,
+    agent_tools: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], str | None]:
     _raise_simulated_error_if_requested(execution_input)
     messages = _coerce_execution_messages(execution_input)
@@ -333,12 +508,22 @@ def _execute_model_call(
     runtime_snapshot = platform_runtime if isinstance(platform_runtime, dict) else {}
     requested_model_override = str(execution_input.get("model", "")).strip() or None
     effective_requested_model = requested_model_override or model_ref
+    tool_lookup: dict[str, dict[str, Any]] = {}
+    tool_definitions: list[dict[str, Any]] = []
+    for tool_entity in agent_tools:
+        tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
+        tool_name = str(tool_spec.get("tool_name", "")).strip()
+        if not tool_name:
+            continue
+        runtime_capability = _runtime_capability_for_transport(str(tool_spec.get("transport", "")))
+        _resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
+        tool_lookup[tool_name] = tool_entity
+        tool_definitions.append(_tool_definition(tool_entity))
+
+    model_calls: list[dict[str, Any]] = []
+    tool_calls: list[dict[str, Any]] = []
     try:
         client = build_llm_runtime_client(runtime_snapshot)
-        completion = client.chat_completion(
-            requested_model=effective_requested_model,
-            messages=effective_messages,
-        )
     except LlmRuntimeClientError as exc:
         if exc.code == "runtime_timeout":
             raise ExecutionBlockedError(
@@ -363,21 +548,98 @@ def _execute_model_call(
 
     llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
     deployment_profile = runtime_snapshot.get("deployment_profile", {})
-    effective_model = str(completion.get("requested_model", "")).strip() or effective_requested_model
+    effective_model = effective_requested_model
+    completion: dict[str, Any] | None = None
+    for _round_index in range(_MAX_TOOL_CALL_ROUNDS):
+        try:
+            completion = client.chat_completion(
+                requested_model=effective_requested_model,
+                messages=effective_messages,
+                tools=tool_definitions or None,
+            )
+        except LlmRuntimeClientError as exc:
+            if exc.code == "runtime_timeout":
+                raise ExecutionBlockedError(
+                    code="EXEC_TIMEOUT",
+                    message="Execution timed out",
+                    status_code=504,
+                    details=exc.details,
+                ) from exc
+            if exc.code in {"runtime_unreachable", "runtime_upstream_unavailable"}:
+                raise ExecutionBlockedError(
+                    code="EXEC_UPSTREAM_UNAVAILABLE",
+                    message="Upstream LLM/tool dependency unavailable",
+                    status_code=503,
+                    details=exc.details,
+                ) from exc
+            raise ExecutionBlockedError(
+                code="EXEC_INTERNAL_ERROR",
+                message="Execution failed internally",
+                status_code=500,
+                details=exc.details,
+            ) from exc
+        effective_model = str(completion.get("requested_model", "")).strip() or effective_requested_model
+        model_calls.append(
+            {
+                "provider_slug": llm_binding.get("slug"),
+                "provider_key": llm_binding.get("provider_key"),
+                "deployment_profile_slug": deployment_profile.get("slug"),
+                "requested_model": effective_model,
+                "status_code": int(completion.get("status_code", 200) or 200),
+            }
+        )
+        completion_tool_calls = completion.get("tool_calls") if isinstance(completion.get("tool_calls"), list) else []
+        if not completion_tool_calls:
+            break
+
+        assistant_tool_message = {
+            "role": "assistant",
+            "content": [],
+            "tool_calls": completion_tool_calls,
+        }
+        effective_messages.append(assistant_tool_message)
+        for tool_call in completion_tool_calls:
+            tool_name = str(((tool_call.get("function") or {}).get("name", ""))).strip()
+            tool_entity = tool_lookup.get(tool_name)
+            if tool_entity is None:
+                raise ExecutionBlockedError(
+                    code="EXEC_TOOL_NOT_ALLOWED",
+                    message=f"Tool '{tool_name}' referenced by the model is not allowed",
+                    status_code=403,
+                )
+            call_record, tool_payload = _invoke_tool_call(
+                tool_entity=tool_entity,
+                tool_call=tool_call,
+                platform_runtime=runtime_snapshot,
+            )
+            tool_calls.append(call_record)
+            effective_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": str(tool_call.get("id", "")).strip(),
+                    "content": _tool_message_content(tool_payload),
+                }
+            )
+    else:
+        raise ExecutionBlockedError(
+            code="EXEC_INTERNAL_ERROR",
+            message="Execution failed internally",
+            status_code=500,
+            details={"reason": "tool_round_limit_exceeded"},
+        )
+
+    if completion is None:
+        raise ExecutionBlockedError(
+            code="EXEC_INTERNAL_ERROR",
+            message="Execution failed internally",
+            status_code=500,
+        )
     return (
         {
             "output_text": str(completion.get("output_text", "")),
-            "tool_calls": [],
+            "tool_calls": tool_calls,
             "embedding_calls": [embedding_call] if embedding_call is not None else [],
-            "model_calls": [
-                {
-                    "provider_slug": llm_binding.get("slug"),
-                    "provider_key": llm_binding.get("provider_key"),
-                    "deployment_profile_slug": deployment_profile.get("slug"),
-                    "requested_model": effective_model,
-                    "status_code": int(completion.get("status_code", 200) or 200),
-                }
-            ],
+            "model_calls": model_calls,
             "retrieval_calls": [retrieval_call] if retrieval_call is not None else [],
         },
         effective_model,
@@ -464,6 +726,7 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             agent_entity=agent_entity,
             runtime_profile=runtime_profile,
         )
+        agent_tools = resolve_agent_tools(agent_entity=agent_entity, runtime_profile=runtime_profile)
         requested_model_override = str(normalized_input.get("model", "")).strip() or None
         running_model_ref = requested_model_override or model_ref
         running_started_at = _iso_now()
@@ -492,6 +755,7 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             model_ref=model_ref,
             platform_runtime=platform_runtime if isinstance(platform_runtime, dict) else None,
             retrieval_request=normalized_retrieval,
+            agent_tools=agent_tools,
         )
         finished = _build_execution(
             execution_id=execution_id,

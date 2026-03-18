@@ -225,25 +225,65 @@ def validate_runtime_and_dependencies(*, agent_entity: dict[str, Any], runtime_p
                 status_code=403,
             )
 
-    tool_refs = current_spec.get("tool_refs") if isinstance(current_spec.get("tool_refs"), list) else []
-    if runtime_profile != "online":
-        for tool_ref in tool_refs:
-            tool_id = str(tool_ref).strip()
-            if not tool_id:
-                continue
-            tool = _get_entity(entity_type="tool", entity_id=tool_id) if _db_available() else None
-            if tool is None and _db_available():
-                raise ExecutionBlockedError(
-                    code="EXEC_TOOL_NOT_ALLOWED",
-                    message=f"Tool '{tool_id}' referenced by agent does not exist",
-                    status_code=403,
-                )
-            tool_spec = tool.get("current_spec") if isinstance((tool or {}).get("current_spec"), dict) else {}
-            if tool and not bool(tool_spec.get("offline_compatible", False)):
-                raise ExecutionBlockedError(
-                    code="EXEC_TOOL_NOT_ALLOWED",
-                    message=f"Tool '{tool_id}' is not allowed for profile '{runtime_profile}'",
-                    status_code=403,
-                )
+    resolve_agent_tools(agent_entity=agent_entity, runtime_profile=runtime_profile)
 
     return str(agent_entity.get("current_version", "v1") or "v1"), model_ref
+
+
+def resolve_agent_tools(*, agent_entity: dict[str, Any], runtime_profile: str) -> list[dict[str, Any]]:
+    current_spec = agent_entity.get("current_spec") if isinstance(agent_entity.get("current_spec"), dict) else {}
+    tool_refs = current_spec.get("tool_refs") if isinstance(current_spec.get("tool_refs"), list) else []
+    resolved_tools: list[dict[str, Any]] = []
+    for tool_ref in tool_refs:
+        tool_id = str(tool_ref).strip()
+        if not tool_id:
+            continue
+        tool = _get_entity(entity_type="tool", entity_id=tool_id) if _db_available() else None
+        if tool is None and _db_available():
+            raise ExecutionBlockedError(
+                code="EXEC_TOOL_NOT_ALLOWED",
+                message=f"Tool '{tool_id}' referenced by agent does not exist",
+                status_code=403,
+            )
+        if tool is None:
+            resolved_tools.append(
+                {
+                    "entity_id": tool_id,
+                    "current_version": "v1",
+                    "current_spec": {
+                        "name": tool_id,
+                        "description": "",
+                        "transport": "mcp",
+                        "connection_profile_ref": "default",
+                        "tool_name": tool_id,
+                        "input_schema": {},
+                        "output_schema": {},
+                        "safety_policy": {},
+                        "offline_compatible": False,
+                    },
+                }
+            )
+            continue
+        tool_spec = tool.get("current_spec") if isinstance(tool.get("current_spec"), dict) else {}
+        transport = str(tool_spec.get("transport", "")).strip().lower()
+        if transport not in {"mcp", "sandbox_http"}:
+            raise ExecutionBlockedError(
+                code="EXEC_TOOL_NOT_ALLOWED",
+                message=f"Tool '{tool_id}' has an unsupported transport",
+                status_code=403,
+            )
+        connection_profile_ref = str(tool_spec.get("connection_profile_ref", "")).strip().lower()
+        if connection_profile_ref != "default":
+            raise ExecutionBlockedError(
+                code="EXEC_TOOL_NOT_ALLOWED",
+                message=f"Tool '{tool_id}' uses an unsupported connection profile",
+                status_code=403,
+            )
+        if runtime_profile != "online" and not bool(tool_spec.get("offline_compatible", False)):
+            raise ExecutionBlockedError(
+                code="EXEC_TOOL_NOT_ALLOWED",
+                message=f"Tool '{tool_id}' is not allowed for profile '{runtime_profile}'",
+                status_code=403,
+            )
+        resolved_tools.append(tool)
+    return resolved_tools

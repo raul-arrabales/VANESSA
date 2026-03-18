@@ -1,0 +1,1 @@
+"""MCP gateway service package."""

@@ -121,6 +121,50 @@ class VectorStoreAdapter(ABC):
         raise NotImplementedError
 
 
+class SandboxExecutionAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def execute(
+        self,
+        *,
+        code: str,
+        language: str,
+        input_payload: Any,
+        timeout_seconds: int,
+        policy: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def execute_dry_run(self) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
+class McpRuntimeAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def invoke(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        request_metadata: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
     def _request_format(self) -> str:
         return str(self.binding.config.get("request_format", "responses_api")).strip().lower() or "responses_api"
@@ -617,6 +661,95 @@ class QdrantVectorStoreAdapter(VectorStoreAdapter):
                     status_code=status_code,
                     details={"provider": self.binding.provider_slug, "upstream": payload, "field_name": field_name},
                 )
+
+
+class HttpSandboxExecutionAdapter(SandboxExecutionAdapter):
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        return self.binding.endpoint_url.rstrip("/") + "/health"
+
+    def _execute_url(self) -> str:
+        path = str(self.binding.config.get("execute_path", "/v1/execute")).strip() or "/v1/execute"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(self._health_url(), method="GET")
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def execute(
+        self,
+        *,
+        code: str,
+        language: str,
+        input_payload: Any,
+        timeout_seconds: int,
+        policy: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, int]:
+        return http_json_request(
+            self._execute_url(),
+            method="POST",
+            payload={
+                "code": code,
+                "language": language,
+                "input": input_payload,
+                "timeout_seconds": timeout_seconds,
+                "policy": policy,
+            },
+        )
+
+    def execute_dry_run(self) -> tuple[dict[str, Any] | None, int]:
+        return self.execute(
+            code=str(self.binding.config.get("dry_run_code", "result = {'status': 'ok'}")),
+            language="python",
+            input_payload={},
+            timeout_seconds=int(self.binding.config.get("default_timeout_seconds", 5) or 5),
+            policy={"network_access": False},
+        )
+
+
+class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        return self.binding.endpoint_url.rstrip("/") + "/health"
+
+    def _invoke_url(self) -> str:
+        path = str(self.binding.config.get("invoke_path", "/v1/tools/invoke")).strip() or "/v1/tools/invoke"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(self._health_url(), method="GET")
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def invoke(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        request_metadata: dict[str, Any],
+    ) -> tuple[dict[str, Any] | None, int]:
+        return http_json_request(
+            self._invoke_url(),
+            method="POST",
+            payload={
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "request_metadata": request_metadata,
+            },
+        )
 
 
 def _is_model_not_found(payload: dict[str, Any] | None) -> bool:
