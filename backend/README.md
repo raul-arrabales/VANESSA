@@ -30,6 +30,19 @@ Unified registry and runtime governance endpoints:
 - `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
 - `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
 
+Typed catalog endpoints for agents and tools:
+
+- `GET /v1/catalog/agents` (superadmin)
+- `POST /v1/catalog/agents` (superadmin)
+- `GET /v1/catalog/agents/{id}` (superadmin)
+- `PUT /v1/catalog/agents/{id}` (superadmin)
+- `POST /v1/catalog/agents/{id}/validate` (superadmin)
+- `GET /v1/catalog/tools` (superadmin)
+- `POST /v1/catalog/tools` (superadmin)
+- `GET /v1/catalog/tools/{id}` (superadmin)
+- `PUT /v1/catalog/tools/{id}` (superadmin)
+- `POST /v1/catalog/tools/{id}/validate` (superadmin)
+
 Platform control plane endpoints:
 
 - `GET /v1/platform/capabilities` (authenticated)
@@ -72,6 +85,9 @@ Platform control plane semantics:
 - Registry bootstrap also seeds canonical built-in tools:
   - `tool.web_search` -> MCP-backed `web_search`
   - `tool.python_exec` -> sandbox-backed Python execution
+- The typed catalog surface is now canonical for superadmin agent/tool lifecycle management.
+  Generic `/v1/registry/*` routes remain available for compatibility, but catalog create/update
+  operations write typed agent/tool specs as new registry versions underneath.
 
 Model governance and runtime endpoints (canonical in Release N):
 

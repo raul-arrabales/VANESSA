@@ -23,6 +23,19 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `GET /v1/runtime/profile` (authenticated users; read-only for non-superadmins)
 - `PUT /v1/runtime/profile` (superadmin only; global runtime mode)
 
+## Typed Catalog Endpoints
+
+- `GET /v1/catalog/agents` (superadmin)
+- `POST /v1/catalog/agents` (superadmin)
+- `GET /v1/catalog/agents/{id}` (superadmin)
+- `PUT /v1/catalog/agents/{id}` (superadmin)
+- `POST /v1/catalog/agents/{id}/validate` (superadmin)
+- `GET /v1/catalog/tools` (superadmin)
+- `POST /v1/catalog/tools` (superadmin)
+- `GET /v1/catalog/tools/{id}` (superadmin)
+- `PUT /v1/catalog/tools/{id}` (superadmin)
+- `POST /v1/catalog/tools/{id}/validate` (superadmin)
+
 ## Platform Control Plane
 
 - `GET /v1/platform/capabilities` (authenticated)
@@ -71,6 +84,9 @@ Bootstrap defaults:
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
 - Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
 - Tool definitions remain registry entities. Backend bootstraps `tool.web_search` and `tool.python_exec`, and registry validation constrains tool specs to `transport in {"mcp", "sandbox_http"}` with `connection_profile_ref == "default"` in this first convergence phase.
+- The typed catalog API is now the canonical superadmin management surface for agents and tools.
+  Each catalog create/update writes a new registry version under the hood, so runtime consumers
+  still resolve from the registry while operators work with typed DTOs instead of opaque spec blobs.
 
 ## Model Governance Endpoints (Release N Canonical)
 

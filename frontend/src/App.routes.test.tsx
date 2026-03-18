@@ -49,6 +49,16 @@ vi.mock("./api/models", () => ({
 vi.mock("./api/knowledge", () => ({
   runKnowledgeChat: vi.fn(),
 }));
+vi.mock("./api/catalog", () => ({
+  listCatalogAgents: vi.fn(async () => []),
+  createCatalogAgent: vi.fn(),
+  updateCatalogAgent: vi.fn(),
+  validateCatalogAgent: vi.fn(),
+  listCatalogTools: vi.fn(async () => []),
+  createCatalogTool: vi.fn(),
+  updateCatalogTool: vi.fn(),
+  validateCatalogTool: vi.fn(),
+}));
 vi.mock("./api/platform", () => ({
   listPlatformCapabilities: vi.fn(async () => [
     {
@@ -176,6 +186,20 @@ describe("App superadmin models route", () => {
     expect(await screen.findByRole("heading", { name: await t("platformControl.title") })).toBeVisible();
   });
 
+  it("renders the catalog control page for superadmin", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/catalog" });
+
+    expect(await screen.findByRole("heading", { name: await t("catalogControl.title") })).toBeVisible();
+  });
+
   it("blocks admin users from the platform control route", async () => {
     mockUser = {
       id: 2,
@@ -186,6 +210,20 @@ describe("App superadmin models route", () => {
     };
 
     await renderWithAppProviders(<App />, { route: "/control/platform" });
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
+  });
+
+  it("blocks admin users from the catalog control route", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/catalog" });
 
     expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
   });

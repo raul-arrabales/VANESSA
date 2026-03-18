@@ -258,6 +258,23 @@ Backend exposes platform control-plane endpoints for capability/provider managem
 - `POST /v1/platform/deployments/{id}/activate`
 - `POST /v1/platform/providers/{id}/validate`
 - `POST /v1/platform/embeddings`
+
+Backend also exposes a typed superadmin catalog for agent/tool lifecycle management:
+
+- `GET /v1/catalog/agents`
+- `POST /v1/catalog/agents`
+- `GET /v1/catalog/agents/{id}`
+- `PUT /v1/catalog/agents/{id}`
+- `POST /v1/catalog/agents/{id}/validate`
+- `GET /v1/catalog/tools`
+- `POST /v1/catalog/tools`
+- `GET /v1/catalog/tools/{id}`
+- `PUT /v1/catalog/tools/{id}`
+- `POST /v1/catalog/tools/{id}/validate`
+
+This catalog surface is now canonical for superadmin CRUD and validation of typed agent/tool
+definitions, while the generic `/v1/registry/*` endpoints remain as compatibility infrastructure.
+The frontend exposes the same workflow at `/control/catalog`.
 - `POST /v1/platform/vector/indexes/ensure`
 - `POST /v1/platform/vector/documents/upsert`
 - `POST /v1/platform/vector/query`

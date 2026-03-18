@@ -4,6 +4,7 @@ import AiPage from "../pages/AiPage";
 import AdminApprovalsPage from "../pages/AdminApprovalsPage";
 import BackendHealthPage from "../pages/BackendHealthPage";
 import ChatbotPage from "../pages/ChatbotPage";
+import CatalogControlPage from "../pages/CatalogControlPage";
 import ControlModelsPage from "../pages/ControlModelsPage";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
@@ -139,6 +140,17 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "admin",
     element: <QuoteManagementPage />,
+  },
+  {
+    id: "control-catalog",
+    path: "/control/catalog",
+    titleKey: "nav.catalog",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <CatalogControlPage />,
   },
   {
     id: "control-system-health",

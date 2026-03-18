@@ -303,7 +303,8 @@ a {
 }
 
 .platform-summary-grid,
-.platform-capability-grid {
+.platform-capability-grid,
+.catalog-grid {
   display: grid;
   gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -1033,6 +1034,10 @@ a {
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.catalog-multiselect {
+  min-height: 10rem;
 }
 
 .status-demo {

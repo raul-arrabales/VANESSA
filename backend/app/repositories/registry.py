@@ -138,6 +138,45 @@ def create_registry_version(
     return dict(row)
 
 
+def update_registry_entity(
+    database_url: str,
+    *,
+    entity_id: str,
+    visibility: str | None = None,
+    status: str | None = None,
+) -> dict[str, Any]:
+    entity_id_value = entity_id.strip()
+    if not entity_id_value:
+        raise ValueError("entity_id_required")
+    if visibility is None and status is None:
+        raise ValueError("no_updates_requested")
+
+    assignments: list[str] = []
+    params: list[Any] = []
+    if visibility is not None:
+        assignments.append("visibility = %s")
+        params.append(visibility.strip().lower())
+    if status is not None:
+        assignments.append("status = %s")
+        params.append(status.strip().lower())
+    assignments.append("updated_at = NOW()")
+    params.append(entity_id_value)
+
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            f"""
+            UPDATE registry_entities
+            SET {", ".join(assignments)}
+            WHERE entity_id = %s
+            RETURNING *
+            """,
+            params,
+        ).fetchone()
+    if row is None:
+        raise LookupError("entity_not_found")
+    return dict(row)
+
+
 def list_registry_versions(database_url: str, *, entity_id: str) -> list[dict[str, Any]]:
     with get_connection(database_url) as connection:
         rows = connection.execute(

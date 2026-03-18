@@ -21,6 +21,7 @@
     "quotes": "Citas",
     "systemHealth": "Salud del sistema",
     "platform": "Control de plataforma",
+    "catalog": "Catalogo de agentes",
     "models": "Modelos",
     "settings": "Configuración",
     "designEditor": "Editor de diseno",
@@ -34,6 +35,7 @@
       "control": "Control",
       "systemHealth": "Salud del sistema",
       "platform": "Control de plataforma",
+      "catalog": "Catalogo de agentes",
       "ai": "Vanessa AI",
       "chat": "Chatbot",
       "knowledge": "Chat de conocimiento",
@@ -234,6 +236,10 @@
       "platform": {
         "title": "Control de plataforma",
         "description": "Inspecciona enlaces de capacidades, valida proveedores y activa perfiles de despliegue."
+      },
+      "catalog": {
+        "title": "Catalogo de agentes y herramientas",
+        "description": "Crea, publica y valida definiciones gestionadas de agentes y herramientas."
       }
     }
   },
@@ -685,6 +691,101 @@
       "deploymentDeleteFailed": "No se pudo eliminar el perfil de despliegue.",
       "activationSuccess": "Perfil de despliegue {{name}} activado.",
       "activationFailed": "No se pudo activar el perfil de despliegue."
+    }
+  },
+  "catalogControl": {
+    "title": "Catalogo de agentes y herramientas",
+    "description": "Administra definiciones tipadas de agentes y herramientas desde la superficie canonica del catalogo.",
+    "state": {
+      "idle": "Inactivo",
+      "loading": "Cargando",
+      "success": "Listo",
+      "error": "Error"
+    },
+    "sections": {
+      "agents": "Agentes",
+      "tools": "Herramientas"
+    },
+    "summary": {
+      "agents": "Agentes",
+      "tools": "Herramientas",
+      "models": "Modelos habilitados",
+      "publishedCount": "{{count}} publicados",
+      "version": "Version actual: {{version}}"
+    },
+    "actions": {
+      "refresh": "Actualizar",
+      "refreshing": "Actualizando...",
+      "saving": "Guardando...",
+      "validate": "Validar",
+      "validating": "Validando...",
+      "edit": "Editar",
+      "createAgent": "Crear agente",
+      "updateAgent": "Actualizar agente",
+      "newAgent": "Nuevo agente",
+      "createTool": "Crear herramienta",
+      "updateTool": "Actualizar herramienta",
+      "newTool": "Nueva herramienta"
+    },
+    "badges": {
+      "draft": "Borrador",
+      "published": "Publicado",
+      "yes": "Si",
+      "no": "No"
+    },
+    "transport": {
+      "mcp": "MCP",
+      "sandbox": "Sandbox"
+    },
+    "agents": {
+      "description": "Define instrucciones, modelos por defecto y enlaces de herramientas antes de publicar."
+    },
+    "tools": {
+      "description": "Define transporte, esquemas y politica de seguridad, y valida la compatibilidad con el runtime activo.",
+      "transportLabel": "Transporte: {{transport}}"
+    },
+    "forms": {
+      "status": "Estado de guardado",
+      "agent": {
+        "id": "ID del agente",
+        "name": "Nombre",
+        "description": "Descripcion",
+        "instructions": "Instrucciones",
+        "defaultModel": "Modelo por defecto",
+        "noDefaultModel": "Sin modelo por defecto",
+        "toolRefs": "Referencias de herramientas",
+        "internetRequired": "Requiere internet",
+        "sandboxRequired": "Requiere sandbox"
+      },
+      "tool": {
+        "id": "ID de la herramienta",
+        "name": "Nombre",
+        "description": "Descripcion",
+        "transport": "Transporte",
+        "toolName": "Nombre de herramienta en runtime",
+        "offlineCompatible": "Compatible sin conexion",
+        "inputSchema": "Esquema de entrada",
+        "outputSchema": "Esquema de salida",
+        "safetyPolicy": "Politica de seguridad",
+        "connectionProfile": "Perfil de conexion: default"
+      }
+    },
+    "validation": {
+      "valid": "Valido",
+      "invalid": "Invalido"
+    },
+    "feedback": {
+      "authRequired": "Se requiere autenticacion para administrar el catalogo.",
+      "loadFailed": "No se pudieron cargar los datos del catalogo.",
+      "saveFailed": "No se pudieron guardar los cambios del catalogo.",
+      "validationFailed": "No se pudo validar esta entrada del catalogo.",
+      "invalidJson": "{{field}} debe ser JSON valido.",
+      "agentCreated": "Agente {{name}} creado.",
+      "agentUpdated": "Agente {{name}} actualizado.",
+      "toolCreated": "Herramienta {{name}} creada.",
+      "toolUpdated": "Herramienta {{name}} actualizada.",
+      "agentValidated": "Agente {{name}} validado.",
+      "toolValidated": "Herramienta {{name}} validada."
     }
   },
   "runtimeMode": {

@@ -1,6 +1,7 @@
 from . import (
     auth,
     auth_legacy_routes,
+    catalog,
     chat,
     content,
     executions,
@@ -21,6 +22,7 @@ from . import (
 __all__ = [
     "auth",
     "auth_legacy_routes",
+    "catalog",
     "chat",
     "content",
     "system",

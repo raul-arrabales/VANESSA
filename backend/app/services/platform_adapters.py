@@ -164,6 +164,10 @@ class McpRuntimeAdapter(ABC):
     ) -> tuple[dict[str, Any] | None, int]:
         raise NotImplementedError
 
+    @abstractmethod
+    def list_tools(self) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
 
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
     def _request_format(self) -> str:
@@ -724,6 +728,10 @@ class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
         path = str(self.binding.config.get("invoke_path", "/v1/tools/invoke")).strip() or "/v1/tools/invoke"
         return self.binding.endpoint_url.rstrip("/") + path
 
+    def _tools_url(self) -> str:
+        path = str(self.binding.config.get("tools_path", "/v1/tools")).strip() or "/v1/tools"
+        return self.binding.endpoint_url.rstrip("/") + path
+
     def health(self) -> dict[str, Any]:
         payload, status_code = http_json_request(self._health_url(), method="GET")
         reachable = payload is not None and 200 <= status_code < 300
@@ -750,6 +758,9 @@ class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
                 "request_metadata": request_metadata,
             },
         )
+
+    def list_tools(self) -> tuple[dict[str, Any] | None, int]:
+        return http_json_request(self._tools_url(), method="GET")
 
 
 def _is_model_not_found(payload: dict[str, Any] | None) -> bool:

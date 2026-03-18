@@ -63,5 +63,6 @@ describe("ControlPage", () => {
     await renderPage();
 
     expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
+    expect(screen.getByRole("link", { name: await t("control.items.catalog.title") })).toHaveAttribute("href", "/control/catalog");
   });
 });
