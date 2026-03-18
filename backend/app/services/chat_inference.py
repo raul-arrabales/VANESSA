@@ -64,6 +64,26 @@ def _can_use_local_llm_fallback(requested_model_id: str) -> bool:
     return backend_kind == "local" or availability == "offline_ready"
 
 
+def _resolve_canonical_local_llm_model_id(adapter: Any, requested_model_id: str) -> str:
+    if not _can_use_local_llm_fallback(requested_model_id):
+        return requested_model_id
+
+    binding = getattr(adapter, "binding", None)
+    config = getattr(binding, "config", None)
+    if not isinstance(config, dict):
+        return requested_model_id
+
+    canonical_local_model_id = str(config.get("canonical_local_model_id", "")).strip()
+    if canonical_local_model_id:
+        return canonical_local_model_id
+
+    fallback_model_id = str(config.get("local_fallback_model_id", "")).strip()
+    if fallback_model_id:
+        return fallback_model_id
+
+    return requested_model_id
+
+
 def chat_completion_with_allowed_model(
     *,
     requested_model_id: str,
@@ -92,10 +112,14 @@ def chat_completion_with_allowed_model(
             "details": exc.details or None,
         }, exc.status_code
 
+    effective_requested_model = str(resolved_model_id or requested_model_id)
+    allow_local_fallback = _can_use_local_llm_fallback(effective_requested_model)
+    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, effective_requested_model)
+
     return adapter.chat_completion(
-        model=resolved_model_id or requested_model_id,
+        model=llm_model_id,
         messages=messages,
         max_tokens=max_tokens,
         temperature=temperature,
-        allow_local_fallback=_can_use_local_llm_fallback(str(resolved_model_id or requested_model_id)),
+        allow_local_fallback=allow_local_fallback,
     )

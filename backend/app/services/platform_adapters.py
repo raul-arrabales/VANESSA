@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from json import dumps, loads
+import logging
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 from urllib.error import HTTPError, URLError
@@ -10,6 +11,7 @@ from urllib.request import Request, urlopen
 from .platform_types import PlatformControlPlaneError, ProviderBinding
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
+logger = logging.getLogger(__name__)
 
 
 def http_json_request(
@@ -44,6 +46,15 @@ def http_json_request(
         return parsed, int(exc.code)
     except URLError:
         return None, 502
+
+
+def _binding_timeout_seconds(config: dict[str, Any]) -> float:
+    raw_timeout = config.get("request_timeout_seconds", _DEFAULT_HTTP_TIMEOUT_SECONDS)
+    try:
+        timeout_seconds = float(raw_timeout)
+    except (TypeError, ValueError):
+        return _DEFAULT_HTTP_TIMEOUT_SECONDS
+    return timeout_seconds if timeout_seconds > 0 else _DEFAULT_HTTP_TIMEOUT_SECONDS
 
 
 class LlmInferenceAdapter(ABC):
@@ -186,8 +197,15 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             return self.binding.healthcheck_url
         return self._models_url()
 
+    def _request_timeout_seconds(self) -> float:
+        return _binding_timeout_seconds(self.binding.config)
+
     def health(self) -> dict[str, Any]:
-        payload, status_code = http_json_request(self._health_url(), method="GET")
+        payload, status_code = http_json_request(
+            self._health_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
         reachable = payload is not None and 200 <= status_code < 300
         return {
             "reachable": reachable,
@@ -197,7 +215,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         }
 
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
-        return http_json_request(self._models_url(), method="GET")
+        return http_json_request(
+            self._models_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
 
     def chat_completion(
         self,
@@ -215,7 +237,12 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         if temperature is not None:
             payload["temperature"] = temperature
 
-        response_payload, status_code = http_json_request(self._chat_url(), method="POST", payload=payload)
+        response_payload, status_code = http_json_request(
+            self._chat_url(),
+            method="POST",
+            payload=payload,
+            timeout_seconds=self._request_timeout_seconds(),
+        )
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
         if (
             allow_local_fallback
@@ -224,9 +251,20 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             and effective_model != fallback_model_id
             and _is_model_not_found(response_payload)
         ):
+            logger.warning(
+                "LLM adapter falling back to local model alias '%s' after '%s' returned model_not_found via provider '%s'.",
+                fallback_model_id,
+                effective_model,
+                self.binding.provider_slug,
+            )
             fallback_payload = dict(payload)
             fallback_payload["model"] = fallback_model_id
-            fallback_response, fallback_status = http_json_request(self._chat_url(), method="POST", payload=fallback_payload)
+            fallback_response, fallback_status = http_json_request(
+                self._chat_url(),
+                method="POST",
+                payload=fallback_payload,
+                timeout_seconds=self._request_timeout_seconds(),
+            )
             return _normalize_chat_response_payload(fallback_response), fallback_status
         return _normalize_chat_response_payload(response_payload), status_code
 
@@ -253,8 +291,15 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             return self.binding.healthcheck_url
         return self._embeddings_url()
 
+    def _request_timeout_seconds(self) -> float:
+        return _binding_timeout_seconds(self.binding.config)
+
     def health(self) -> dict[str, Any]:
-        payload, status_code = http_json_request(self._health_url(), method="GET")
+        payload, status_code = http_json_request(
+            self._health_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
         reachable = payload is not None and 200 <= status_code < 300
         return {
             "reachable": reachable,
@@ -273,7 +318,12 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             "model": effective_model,
             "input": texts,
         }
-        response_payload, status_code = http_json_request(self._embeddings_url(), method="POST", payload=payload)
+        response_payload, status_code = http_json_request(
+            self._embeddings_url(),
+            method="POST",
+            payload=payload,
+            timeout_seconds=self._request_timeout_seconds(),
+        )
         return _normalize_embeddings_response_payload(response_payload), status_code
 
 

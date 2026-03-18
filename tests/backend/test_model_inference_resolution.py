@@ -172,6 +172,16 @@ def test_inference_retries_local_llm_alias_when_upstream_model_not_found(client,
     class FakeAdapter:
         def __init__(self):
             self.calls: list[dict[str, object]] = []
+            self.binding = type(
+                "Binding",
+                (),
+                {
+                    "config": {
+                        "canonical_local_model_id": "local-vllm-default",
+                        "local_fallback_model_id": "local-vllm-default",
+                    }
+                },
+            )()
 
         def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
             self.calls.append(
@@ -197,7 +207,7 @@ def test_inference_retries_local_llm_alias_when_upstream_model_not_found(client,
     assert response.get_json()["output"] == "ok"
     assert adapter.calls == [
         {
-            "model": "Qwen--Qwen2.5-0.5B-Instruct",
+            "model": "local-vllm-default",
             "allow_local_fallback": True,
         }
     ]

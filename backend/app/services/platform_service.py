@@ -50,6 +50,7 @@ def _known_capability_keys(database_url: str) -> set[str]:
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
     sandbox_url = str(getattr(config, "sandbox_url", "") or "").strip()
     mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
+    llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
     platform_repo.ensure_capability(
         database_url,
         capability_key=CAPABILITY_LLM_INFERENCE,
@@ -156,7 +157,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "models_path": "/v1/models",
             "chat_completion_path": "/v1/chat/completions",
             "runtime_base_url": config.llm_runtime_url,
+            "canonical_local_model_id": "local-vllm-default",
             "local_fallback_model_id": "local-vllm-default",
+            "request_timeout_seconds": llm_request_timeout_seconds,
         },
     )
     weaviate_provider = platform_repo.ensure_provider_instance(
@@ -184,6 +187,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "embeddings_path": "/v1/embeddings",
             "forced_model_id": "local-vllm-embeddings-default",
             "input_type": "text",
+            "request_timeout_seconds": llm_request_timeout_seconds,
         },
     )
     sandbox_provider = None
@@ -216,8 +220,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "models_path": "/v1/models",
             "chat_completion_path": "/v1/chat/completions",
             "request_format": "openai_chat",
+            "canonical_local_model_id": "local-llama-cpp-default",
             "forced_model_id": "local-llama-cpp-default",
             "local_fallback_model_id": "local-llama-cpp-default",
+            "request_timeout_seconds": llm_request_timeout_seconds,
         },
     )
     qdrant_provider = None

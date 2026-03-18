@@ -83,6 +83,7 @@ Supported launcher variables:
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
 - `LLM_LOCAL_UPSTREAM_MODEL` (default in `infra/.env.example`: same value as `LLM_LOCAL_MODEL_PATH`; must match a model id exposed by `llm_runtime /v1/models`)
+- `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
 - `LLAMA_CPP_URL` (blank by default; when set, enables the optional `llama_cpp` compose profile and backend bootstrap profile)
@@ -115,6 +116,7 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - CPU builds pin `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to avoid tokenizer/runtime incompatibilities as upstream releases move forward.
 - The first CPU build is intentionally heavy: it compiles `vllm` from source, can take several minutes, and requires network access for build dependencies.
 - During a cold CPU build, Docker may sit on a progress line such as `54/58` without printing new output for a while; that pause is not by itself a failure signal.
+- The first local chat request after startup can also be slower than steady-state while the runtime warms prompt/template paths; keep `LLM_REQUEST_TIMEOUT_SECONDS` comfortably above that cold-start latency.
 - If the CPU image is already present and you just want to restart services, run `./ops/local-staging/start.sh --no-build`.
 - CPU local staging defaults `VLLM_CPU_OMP_THREADS_BIND=0-7` on this single-NUMA-node 8-logical-core host.
 - `VLLM_CPU_OMP_THREADS_BIND` may also be set to `auto`, `nobind`, or a custom CPU set such as `0-3|4-7`.

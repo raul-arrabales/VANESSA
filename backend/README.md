@@ -71,6 +71,7 @@ Platform control plane semantics:
 - `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
 - Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
+- `LLM_REQUEST_TIMEOUT_SECONDS` sets the backend outbound timeout budget for active `llm_inference` and embeddings provider bindings; in local CPU staging it should exceed cold first-request latency.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
 - `SANDBOX_URL` seeds the optional `sandbox_local` provider instance and binds it as `sandbox_execution`.

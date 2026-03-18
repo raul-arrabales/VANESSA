@@ -238,6 +238,48 @@ def test_openai_adapter_retries_local_fallback_on_model_not_found(monkeypatch: p
     ]
 
 
+def test_openai_adapter_uses_configured_request_timeout_for_chat_requests(monkeypatch: pytest.MonkeyPatch):
+    seen_timeouts: list[float] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del url, method, payload, headers
+        seen_timeouts.append(timeout_seconds)
+        return {"output": [{"content": [{"type": "text", "text": "ok"}]}]}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleLlmAdapter(
+        platform_service.ProviderBinding(
+            capability_key="llm_inference",
+            provider_instance_id="provider-1",
+            provider_slug="vllm-local-gateway",
+            provider_key="vllm_local",
+            provider_display_name="vLLM local gateway",
+            provider_description="desc",
+            endpoint_url="http://llm:8000",
+            healthcheck_url="http://llm:8000/health",
+            enabled=True,
+            adapter_kind="openai_compatible_llm",
+            config={"request_timeout_seconds": 15},
+            binding_config={},
+            deployment_profile_id="deployment-1",
+            deployment_profile_slug="local-default",
+            deployment_profile_display_name="Local Default",
+        )
+    )
+
+    payload, status_code = adapter.chat_completion(
+        model="local-vllm-default",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hi"}]}],
+        max_tokens=None,
+        temperature=None,
+        allow_local_fallback=True,
+    )
+
+    assert status_code == 200
+    assert payload is not None
+    assert seen_timeouts == [15.0]
+
+
 def test_openai_adapter_uses_models_endpoint_for_health_when_no_healthcheck(monkeypatch: pytest.MonkeyPatch):
     seen_urls: list[str] = []
 
