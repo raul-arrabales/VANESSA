@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { runKnowledgeChat, type KnowledgeSource } from "../api/knowledge";
+import ChatMessageBody from "../components/ChatMessageBody";
 import { listEnabledModels, type ChatHistoryItem, type ModelCatalogItem } from "../api/models";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -308,7 +309,10 @@ export default function KnowledgeChatPage(): JSX.Element {
                 <p className="chatbot-message-role">
                   {message.role === "user" ? t("knowledgeChat.labels.you") : t("knowledgeChat.labels.assistant")}
                 </p>
-                <p>{message.content}</p>
+                <ChatMessageBody
+                  content={message.content}
+                  renderMarkdown={message.role === "assistant"}
+                />
                 {message.role === "assistant" && message.sources?.length
                   ? (
                     <section className="knowledge-chat-sources" aria-label={t("knowledgeChat.sources.title")}>

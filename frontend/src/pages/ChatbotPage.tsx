@@ -9,6 +9,7 @@ import {
   type ChatConversationDetail,
   type ChatConversationSummary,
 } from "../api/chat";
+import ChatMessageBody from "../components/ChatMessageBody";
 import { listEnabledModels, type ModelCatalogItem } from "../api/models";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -372,7 +373,10 @@ export default function ChatbotPage(): JSX.Element {
                 className={`chatbot-message chatbot-message-${message.role}`}
               >
                 <p className="chatbot-message-role">{message.role === "user" ? "You" : "Assistant"}</p>
-                <p>{message.content}</p>
+                <ChatMessageBody
+                  content={message.content}
+                  renderMarkdown={message.role === "assistant"}
+                />
               </article>
             ))
             : <p className="status-text">

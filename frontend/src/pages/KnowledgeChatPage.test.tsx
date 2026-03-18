@@ -104,4 +104,23 @@ describe("KnowledgeChatPage", () => {
     expect(window.localStorage.getItem("vanessa:knowledge-chat:10")).toContain("knowledge answer");
     expect(window.localStorage.getItem("vanessa:chat:10")).toBeNull();
   });
+
+  it("renders assistant markdown in knowledge chat replies", async () => {
+    modelApiMocks.listEnabledModels.mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
+    knowledgeApiMocks.runKnowledgeChat.mockResolvedValue({
+      output: "### Findings\n\n- First item\n- Second item",
+      sources: [],
+      retrieval: { index: "knowledge_base", result_count: 0 },
+    });
+
+    renderKnowledgeChat();
+
+    await screen.findByLabelText("Model");
+    await userEvent.type(screen.getByLabelText("Message"), "Summarize the docs");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+
+    expect(await screen.findByRole("heading", { name: "Findings" })).toBeVisible();
+    expect(screen.getByText("First item")).toBeVisible();
+    expect(screen.getByText("Second item")).toBeVisible();
+  });
 });

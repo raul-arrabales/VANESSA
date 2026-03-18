@@ -159,7 +159,7 @@ describe("ChatbotPage", () => {
           updatedAt: "2026-03-18T11:00:02Z",
         }),
         "Test prompt",
-        "hello",
+        "## hello\n\nUse `code`",
       ),
     );
 
@@ -181,7 +181,30 @@ describe("ChatbotPage", () => {
       { prompt: "Test prompt" },
       "token",
     );
-    expect(await screen.findByText("hello")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "hello" })).toBeVisible();
+    expect(screen.getByText("code", { selector: "code" })).toBeVisible();
+  });
+
+  it("keeps user messages as plain text while rendering assistant markdown", async () => {
+    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+      sendResult(
+        conversationSummary("conv-1", "Literal user", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:01Z",
+        }),
+        "**literal user**",
+        "Answer with **bold**",
+      ),
+    );
+
+    renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    await userEvent.type(screen.getByLabelText("Message"), "**literal user**");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("**literal user**")).toBeVisible();
+    expect(screen.getByText("bold", { selector: "strong" })).toBeVisible();
   });
 
   it("renders multiple conversations from the API and manages rename/delete", async () => {

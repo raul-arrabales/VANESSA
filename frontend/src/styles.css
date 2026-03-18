@@ -1151,8 +1151,14 @@ a {
   border-radius: var(--radius-md);
 }
 
-.chatbot-message p {
+.chatbot-message > p {
   margin: 0;
+}
+
+.chatbot-message-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .chatbot-message-role {
@@ -1168,6 +1174,111 @@ a {
 
 .chatbot-message-assistant {
   background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+}
+
+.chatbot-markdown {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chatbot-markdown > * {
+  margin: 0;
+}
+
+.chatbot-markdown p,
+.chatbot-markdown ul,
+.chatbot-markdown ol,
+.chatbot-markdown blockquote,
+.chatbot-markdown pre,
+.chatbot-markdown table {
+  margin: 0;
+}
+
+.chatbot-markdown ul,
+.chatbot-markdown ol {
+  padding-left: 1.35rem;
+}
+
+.chatbot-markdown li + li {
+  margin-top: 0.2rem;
+}
+
+.chatbot-markdown h1,
+.chatbot-markdown h2,
+.chatbot-markdown h3,
+.chatbot-markdown h4,
+.chatbot-markdown h5,
+.chatbot-markdown h6 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.chatbot-markdown h1 {
+  font-size: 1.15rem;
+}
+
+.chatbot-markdown h2 {
+  font-size: 1.05rem;
+}
+
+.chatbot-markdown h3,
+.chatbot-markdown h4,
+.chatbot-markdown h5,
+.chatbot-markdown h6 {
+  font-size: 0.98rem;
+}
+
+.chatbot-markdown a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+
+.chatbot-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.chatbot-markdown :not(pre) > code {
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 85%, transparent);
+}
+
+.chatbot-markdown pre {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.chatbot-markdown pre code {
+  white-space: pre;
+}
+
+.chatbot-markdown blockquote {
+  padding-left: var(--space-3);
+  border-left: 3px solid color-mix(in oklab, var(--accent-primary) 55%, transparent);
+  color: var(--text-muted);
+}
+
+.chatbot-markdown table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.chatbot-markdown th,
+.chatbot-markdown td {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-muted);
+  text-align: left;
+  vertical-align: top;
+}
+
+.chatbot-markdown th {
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  font-weight: 700;
 }
 
 .knowledge-chat-sources {
