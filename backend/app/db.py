@@ -428,6 +428,7 @@ def run_auth_schema_migration(database_url: str) -> None:
     run_model_management_schema_migration(database_url)
     run_platform_control_plane_schema_migration(database_url)
     run_quotes_schema_migration(database_url)
+    run_chat_conversations_schema_migration(database_url)
 
 
 def run_model_management_schema_migration(database_url: str) -> None:
@@ -563,3 +564,18 @@ def run_quotes_schema_migration(database_url: str) -> None:
                         row["updated_at"],
                     ),
                 )
+
+
+def run_chat_conversations_schema_migration(database_url: str) -> None:
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "007_chat_conversations.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(migration_sql)

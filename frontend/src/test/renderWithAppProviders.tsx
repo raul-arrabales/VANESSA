@@ -43,5 +43,9 @@ export async function renderWithAppProviders(
     await Promise.resolve();
   });
 
-  return rendered as RenderResult;
+  if (rendered === null) {
+    throw new Error("render_failed");
+  }
+
+  return rendered;
 }

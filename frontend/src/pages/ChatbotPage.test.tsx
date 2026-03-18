@@ -1,20 +1,37 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatConversationDetail, ChatConversationSummary, SendChatMessageResult } from "../api/chat";
 import type { AuthUser } from "../auth/types";
 import ChatbotPage from "./ChatbotPage";
 import TestRouter from "../test/TestRouter";
 
 const modelApiMocks = vi.hoisted(() => ({
   listEnabledModels: vi.fn(),
-  runInference: vi.fn(),
+}));
+
+const chatApiMocks = vi.hoisted(() => ({
+  listChatConversations: vi.fn(),
+  createChatConversation: vi.fn(),
+  getChatConversation: vi.fn(),
+  updateChatConversation: vi.fn(),
+  deleteChatConversation: vi.fn(),
+  sendChatMessage: vi.fn(),
 }));
 
 let mockUser: AuthUser | null = null;
 
 vi.mock("../api/models", () => ({
   listEnabledModels: modelApiMocks.listEnabledModels,
-  runInference: modelApiMocks.runInference,
+}));
+
+vi.mock("../api/chat", () => ({
+  listChatConversations: chatApiMocks.listChatConversations,
+  createChatConversation: chatApiMocks.createChatConversation,
+  getChatConversation: chatApiMocks.getChatConversation,
+  updateChatConversation: chatApiMocks.updateChatConversation,
+  deleteChatConversation: chatApiMocks.deleteChatConversation,
+  sendChatMessage: chatApiMocks.sendChatMessage,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -33,6 +50,50 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
+function conversationSummary(
+  id: string,
+  title: string,
+  overrides: Partial<ChatConversationSummary> = {},
+): ChatConversationSummary {
+  return {
+    id,
+    title,
+    titleSource: "auto",
+    modelId: "safe-small",
+    messageCount: 0,
+    createdAt: "2026-03-18T11:00:00Z",
+    updatedAt: "2026-03-18T11:00:00Z",
+    ...overrides,
+  };
+}
+
+function conversationDetail(
+  id: string,
+  title: string,
+  overrides: Partial<ChatConversationDetail> = {},
+): ChatConversationDetail {
+  return {
+    ...conversationSummary(id, title, overrides),
+    messages: [],
+    ...overrides,
+  };
+}
+
+function sendResult(
+  summary: ChatConversationSummary,
+  userContent: string,
+  assistantContent: string,
+): SendChatMessageResult {
+  return {
+    conversation: summary,
+    messages: [
+      { id: "msg-user", role: "user", content: userContent, metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+      { id: "msg-assistant", role: "assistant", content: assistantContent, metadata: {}, createdAt: "2026-03-18T11:00:01Z" },
+    ],
+    output: assistantContent,
+  };
+}
+
 function renderChatbot(): void {
   render(
     <TestRouter>
@@ -44,7 +105,6 @@ function renderChatbot(): void {
 describe("ChatbotPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -52,14 +112,19 @@ describe("ChatbotPage", () => {
       role: "user",
       is_active: true,
     };
-  });
-
-  it("shows backend-allowed models only", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
+    modelApiMocks.listEnabledModels.mockResolvedValue([
       { id: "safe-small", name: "Safe Small" },
       { id: "safe-large", name: "Safe Large" },
     ]);
+    chatApiMocks.listChatConversations.mockResolvedValue([
+      conversationSummary("conv-1", "Thread one"),
+    ]);
+    chatApiMocks.getChatConversation.mockResolvedValue(conversationDetail("conv-1", "Thread one"));
+    vi.spyOn(window, "prompt").mockImplementation(() => null);
+    vi.spyOn(window, "confirm").mockImplementation(() => true);
+  });
 
+  it("shows backend-allowed models only", async () => {
     renderChatbot();
 
     const picker = await screen.findByLabelText("Model");
@@ -69,69 +134,118 @@ describe("ChatbotPage", () => {
     expect(screen.queryByRole("option", { name: "Admin Internal" })).toBeNull();
   });
 
-  it("includes selected model and conversation context in inference requests", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
-      { id: "safe-small", name: "Safe Small" },
-      { id: "safe-large", name: "Safe Large" },
-    ]);
-    modelApiMocks.runInference.mockResolvedValue({ output: "hello" });
+  it("creates an empty conversation when the server has none", async () => {
+    chatApiMocks.listChatConversations.mockResolvedValueOnce([]);
+    chatApiMocks.createChatConversation.mockResolvedValueOnce(
+      conversationDetail("conv-new", "New conversation"),
+    );
 
     renderChatbot();
 
+    await screen.findByRole("button", { name: /New conversation/ });
+
+    expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
+  });
+
+  it("uses the conversation API for model changes and message sends", async () => {
+    chatApiMocks.updateChatConversation.mockResolvedValueOnce(
+      conversationSummary("conv-1", "Thread one", { modelId: "safe-large" }),
+    );
+    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+      sendResult(
+        conversationSummary("conv-1", "Test prompt", {
+          modelId: "safe-large",
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:02Z",
+        }),
+        "Test prompt",
+        "hello",
+      ),
+    );
+
+    renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
     await screen.findByRole("option", { name: "Safe Large" });
     await userEvent.selectOptions(screen.getByLabelText("Model"), "safe-large");
     await userEvent.type(screen.getByLabelText("Message"), "Test prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(modelApiMocks.runInference).toHaveBeenCalledWith(
-      "Test prompt",
-      "safe-large",
+    await waitFor(() => expect(chatApiMocks.updateChatConversation).toHaveBeenCalledWith(
+      "conv-1",
+      { model_id: "safe-large" },
       "token",
-      [{ role: "user", content: "Test prompt" }],
+    ));
+    expect(chatApiMocks.sendChatMessage).toHaveBeenCalledWith(
+      "conv-1",
+      { prompt: "Test prompt" },
+      "token",
     );
+    expect(await screen.findByText("hello")).toBeVisible();
   });
 
-  it("supports multiple conversations", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
-      { id: "safe-small", name: "Safe Small" },
+  it("renders multiple conversations from the API and manages rename/delete", async () => {
+    chatApiMocks.listChatConversations.mockResolvedValueOnce([
+      conversationSummary("conv-1", "Thread one", { updatedAt: "2026-03-18T11:00:02Z" }),
+      conversationSummary("conv-2", "Thread two", { updatedAt: "2026-03-18T11:00:01Z", messageCount: 2 }),
     ]);
-    modelApiMocks.runInference.mockResolvedValue({ output: "response" });
+    chatApiMocks.getChatConversation
+      .mockResolvedValueOnce(conversationDetail("conv-1", "Thread one"))
+      .mockResolvedValueOnce(conversationDetail("conv-2", "Thread two", { messageCount: 2 }));
+    chatApiMocks.updateChatConversation.mockResolvedValueOnce(
+      conversationSummary("conv-1", "Renamed thread", { updatedAt: "2026-03-18T11:00:03Z" }),
+    );
+    vi.mocked(window.prompt).mockImplementationOnce(() => "Renamed thread");
 
     renderChatbot();
 
-    await screen.findByLabelText("Model");
-    await userEvent.type(screen.getByLabelText("Message"), "First thread message");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByRole("button", { name: /Thread one/ });
+    expect(screen.getByRole("button", { name: /Thread two/ })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
-    await userEvent.type(screen.getByLabelText("Message"), "Second thread");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    const promptSpy = vi.mocked(window.prompt);
+    promptSpy.mockImplementationOnce(() => "Renamed thread");
+    await userEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(chatApiMocks.updateChatConversation).toHaveBeenCalledWith(
+      "conv-1",
+      { title: "Renamed thread" },
+      "token",
+    ));
+    expect(await screen.findByRole("heading", { name: "Renamed thread" })).toBeVisible();
 
-    expect(screen.getByRole("button", { name: /First thread message/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /Second thread/ })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(chatApiMocks.deleteChatConversation).toHaveBeenCalledWith("conv-1", "token");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Renamed thread/ })).toBeNull());
+    expect(chatApiMocks.getChatConversation).toHaveBeenLastCalledWith("conv-2", "token");
   });
 
   it("disables new chat while an empty conversation exists and re-enables after sending", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValueOnce([
-      { id: "safe-small", name: "Safe Small" },
-    ]);
-    modelApiMocks.runInference.mockResolvedValue({ output: "response" });
+    chatApiMocks.sendChatMessage.mockResolvedValueOnce(
+      sendResult(
+        conversationSummary("conv-1", "First message", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:01Z",
+        }),
+        "First message",
+        "response",
+      ),
+    );
+    chatApiMocks.createChatConversation.mockResolvedValueOnce(
+      conversationDetail("conv-2", "New conversation"),
+    );
 
     renderChatbot();
 
     const newChatButton = await screen.findByRole("button", { name: "New chat" });
     await waitFor(() => expect(newChatButton).toBeDisabled());
 
-    await userEvent.click(newChatButton);
-    expect(screen.queryAllByRole("button", { name: /New conversation/ })).toHaveLength(1);
-
     await userEvent.type(screen.getByLabelText("Message"), "First message");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(newChatButton).toBeEnabled();
+    await waitFor(() => expect(newChatButton).toBeEnabled());
 
     await userEvent.click(newChatButton);
-    expect(newChatButton).toBeDisabled();
-    expect(screen.queryAllByRole("button", { name: /New conversation/ })).toHaveLength(1);
+    expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
+    await waitFor(() => expect(newChatButton).toBeDisabled());
   });
 });

@@ -1,91 +1,65 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  listEnabledModels,
-  runInference,
-  type ChatHistoryItem,
-  type ModelCatalogItem,
-} from "../api/models";
+  createChatConversation,
+  deleteChatConversation,
+  getChatConversation,
+  listChatConversations,
+  sendChatMessage,
+  updateChatConversation,
+  type ChatConversationDetail,
+  type ChatConversationSummary,
+} from "../api/chat";
+import { listEnabledModels, type ModelCatalogItem } from "../api/models";
 import { useAuth } from "../auth/AuthProvider";
 
-type ConversationMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: string;
-};
-
-type Conversation = {
-  id: string;
-  title: string;
-  modelId: string;
-  messages: ConversationMessage[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-const CONTEXT_CHAR_BUDGET = 8000;
-const MAX_CONTEXT_MESSAGES = 14;
-
-function makeId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function sortConversations(conversations: ChatConversationSummary[]): ChatConversationSummary[] {
+  return [...conversations].sort((left, right) => {
+    const leftTime = left.updatedAt ? Date.parse(left.updatedAt) : 0;
+    const rightTime = right.updatedAt ? Date.parse(right.updatedAt) : 0;
+    return rightTime - leftTime;
+  });
 }
 
-function newConversation(initialModelId: string): Conversation {
-  const now = new Date().toISOString();
-  return {
-    id: makeId(),
-    title: "New conversation",
-    modelId: initialModelId,
-    messages: [],
-    createdAt: now,
-    updatedAt: now,
-  };
+function upsertConversationSummary(
+  conversations: ChatConversationSummary[],
+  nextConversation: ChatConversationSummary,
+): ChatConversationSummary[] {
+  const filtered = conversations.filter((conversation) => conversation.id !== nextConversation.id);
+  return sortConversations([nextConversation, ...filtered]);
 }
 
-function buildContextMessages(messages: ConversationMessage[]): ChatHistoryItem[] {
-  const reversed = [...messages].reverse();
-  const selected: ConversationMessage[] = [];
-  let runningChars = 0;
+function removeConversationSummary(
+  conversations: ChatConversationSummary[],
+  conversationId: string,
+): ChatConversationSummary[] {
+  return conversations.filter((conversation) => conversation.id !== conversationId);
+}
 
-  for (const message of reversed) {
-    const estimatedLength = message.content.length;
-    if (selected.length >= MAX_CONTEXT_MESSAGES) {
-      break;
-    }
-    if (runningChars + estimatedLength > CONTEXT_CHAR_BUDGET && selected.length > 0) {
-      break;
-    }
-    selected.push(message);
-    runningChars += estimatedLength;
+function formatTimestamp(value: string | null): string {
+  if (!value) {
+    return "";
   }
-
-  return selected.reverse().map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  return new Date(value).toLocaleString();
 }
 
 export default function ChatbotPage(): JSX.Element {
-  const { token, isAuthenticated, user } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversation, setActiveConversation] = useState<ChatConversationDetail | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
-
-  const storageKey = useMemo(() => {
-    if (!user) {
-      return "vanessa:chat:anonymous";
-    }
-    return `vanessa:chat:${user.id}`;
-  }, [user]);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [isConversationBusy, setIsConversationBusy] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
+      setModels([]);
+      setConversations([]);
+      setActiveConversationId(null);
+      setActiveConversation(null);
       return;
     }
 
@@ -102,86 +76,188 @@ export default function ChatbotPage(): JSX.Element {
   }, [isAuthenticated, token]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !token || models.length === 0) {
       return;
     }
 
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) {
-        return;
+    let cancelled = false;
+
+    const bootstrapConversations = async (): Promise<void> => {
+      setIsBootstrapping(true);
+      try {
+        const listed = await listChatConversations(token);
+        if (cancelled) {
+          return;
+        }
+        if (listed.length === 0) {
+          const created = await createChatConversation({ model_id: models[0]?.id ?? null }, token);
+          if (cancelled) {
+            return;
+          }
+          const { messages, ...summary } = created;
+          setConversations([summary]);
+          setActiveConversationId(created.id);
+          setActiveConversation(created);
+          return;
+        }
+
+        const sorted = sortConversations(listed);
+        setConversations(sorted);
+        setActiveConversationId((current) => (
+          current && sorted.some((conversation) => conversation.id === current)
+            ? current
+            : sorted[0]?.id ?? null
+        ));
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(requestError instanceof Error ? requestError.message : "Unable to load conversations.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBootstrapping(false);
+        }
       }
-      const parsed = JSON.parse(raw) as Conversation[];
-      if (!Array.isArray(parsed)) {
-        return;
-      }
-      setConversations(parsed);
-      setActiveConversationId(parsed[0]?.id ?? null);
-    } catch {
-      window.localStorage.removeItem(storageKey);
-    }
-  }, [isAuthenticated, storageKey]);
+    };
+
+    void bootstrapConversations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, models, token]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-    window.localStorage.setItem(storageKey, JSON.stringify(conversations));
-  }, [conversations, isAuthenticated, storageKey]);
-
-  useEffect(() => {
-    if (models.length === 0) {
+    if (!isAuthenticated || !token || !activeConversationId) {
+      setActiveConversation(null);
       return;
     }
 
-    if (conversations.length === 0) {
-      const created = newConversation(models[0].id);
-      setConversations([created]);
-      setActiveConversationId(created.id);
+    if (activeConversation?.id === activeConversationId) {
       return;
     }
 
-    setConversations((currentConversations) => currentConversations.map((conversation) => {
-      if (!conversation.modelId) {
-        return { ...conversation, modelId: models[0].id };
+    let cancelled = false;
+
+    const loadConversation = async (): Promise<void> => {
+      try {
+        const conversation = await getChatConversation(activeConversationId, token);
+        if (!cancelled) {
+          setActiveConversation(conversation);
+        }
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(requestError instanceof Error ? requestError.message : "Unable to load conversation.");
+        }
       }
-      return conversation;
-    }));
-  }, [models, conversations.length]);
+    };
 
-  const activeConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
-    [activeConversationId, conversations],
-  );
+    void loadConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConversation?.id, activeConversationId, isAuthenticated, token]);
 
   const canCreateConversation = useMemo(
-    () => models.length > 0 && conversations.every((conversation) => conversation.messages.length > 0),
+    () => models.length > 0 && conversations.every((conversation) => conversation.messageCount > 0),
     [conversations, models.length],
   );
 
-  const createConversation = (): void => {
-    if (!canCreateConversation) {
+  const activeConversationModelId = activeConversation?.modelId ?? "";
+
+  const createConversation = async (): Promise<void> => {
+    if (!token || !canCreateConversation) {
       return;
     }
-    const modelId = activeConversation?.modelId || models[0]?.id || "";
-    const created = newConversation(modelId);
-    setConversations((existing) => [created, ...existing]);
-    setActiveConversationId(created.id);
+
     setError("");
-    setDraft("");
+    setIsConversationBusy(true);
+    try {
+      const created = await createChatConversation({ model_id: activeConversationModelId || models[0]?.id || null }, token);
+      const { messages, ...summary } = created;
+      setConversations((existing) => upsertConversationSummary(existing, summary));
+      setActiveConversationId(created.id);
+      setActiveConversation(created);
+      setDraft("");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to create conversation.");
+    } finally {
+      setIsConversationBusy(false);
+    }
   };
 
-  const updateConversationModel = (conversationId: string, modelId: string): void => {
-    setConversations((existing) => existing.map((conversation) => {
-      if (conversation.id !== conversationId) {
-        return conversation;
+  const updateConversationModel = async (conversationId: string, modelId: string): Promise<void> => {
+    if (!token) {
+      return;
+    }
+
+    setError("");
+    try {
+      const updated = await updateChatConversation(conversationId, { model_id: modelId }, token);
+      setConversations((existing) => upsertConversationSummary(existing, updated));
+      setActiveConversation((current) => (
+        current && current.id === conversationId ? { ...current, ...updated } : current
+      ));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to update conversation model.");
+    }
+  };
+
+  const renameConversation = async (): Promise<void> => {
+    if (!token || !activeConversation) {
+      return;
+    }
+
+    const nextTitle = window.prompt("Rename conversation", activeConversation.title);
+    if (nextTitle === null) {
+      return;
+    }
+
+    setError("");
+    setIsConversationBusy(true);
+    try {
+      const updated = await updateChatConversation(activeConversation.id, { title: nextTitle }, token);
+      setConversations((existing) => upsertConversationSummary(existing, updated));
+      setActiveConversation((current) => (
+        current && current.id === updated.id ? { ...current, ...updated } : current
+      ));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to rename conversation.");
+    } finally {
+      setIsConversationBusy(false);
+    }
+  };
+
+  const deleteConversation = async (): Promise<void> => {
+    if (!token || !activeConversation) {
+      return;
+    }
+    if (!window.confirm("Delete this conversation?")) {
+      return;
+    }
+
+    setError("");
+    setIsConversationBusy(true);
+    try {
+      await deleteChatConversation(activeConversation.id, token);
+      const remaining = removeConversationSummary(conversations, activeConversation.id);
+      if (remaining.length === 0) {
+        const created = await createChatConversation({ model_id: models[0]?.id ?? null }, token);
+        const { messages, ...summary } = created;
+        setConversations([summary]);
+        setActiveConversationId(created.id);
+        setActiveConversation(created);
+      } else {
+        const sorted = sortConversations(remaining);
+        setConversations(sorted);
+        setActiveConversationId(sorted[0].id);
+        setActiveConversation(null);
       }
-      return {
-        ...conversation,
-        modelId,
-        updatedAt: new Date().toISOString(),
-      };
-    }));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to delete conversation.");
+    } finally {
+      setIsConversationBusy(false);
+    }
   };
 
   const sendPrompt = async (): Promise<void> => {
@@ -189,58 +265,26 @@ export default function ChatbotPage(): JSX.Element {
       return;
     }
 
-    const userMessage: ConversationMessage = {
-      id: makeId(),
-      role: "user",
-      content: draft.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
+    const prompt = draft.trim();
     setError("");
     setIsSending(true);
-    setDraft("");
-
-    const updatedConversation: Conversation = {
-      ...activeConversation,
-      title: activeConversation.messages.length === 0
-        ? userMessage.content.slice(0, 64)
-        : activeConversation.title,
-      messages: [...activeConversation.messages, userMessage],
-      updatedAt: new Date().toISOString(),
-    };
-
-    setConversations((existing) => existing.map((conversation) => (
-      conversation.id === activeConversation.id ? updatedConversation : conversation
-    )));
 
     try {
-      const context = buildContextMessages(updatedConversation.messages);
-      const result = await runInference(
-        userMessage.content,
-        activeConversation.modelId,
-        token,
-        context,
-      );
-
-      const assistantMessage: ConversationMessage = {
-        id: makeId(),
-        role: "assistant",
-        content: result.output,
-        createdAt: new Date().toISOString(),
-      };
-
-      setConversations((existing) => existing.map((conversation) => {
-        if (conversation.id !== activeConversation.id) {
-          return conversation;
+      const result = await sendChatMessage(activeConversation.id, { prompt }, token);
+      setConversations((existing) => upsertConversationSummary(existing, result.conversation));
+      setActiveConversation((current) => {
+        if (!current || current.id !== activeConversation.id) {
+          return current;
         }
         return {
-          ...conversation,
-          messages: [...conversation.messages, assistantMessage],
-          updatedAt: new Date().toISOString(),
+          ...current,
+          ...result.conversation,
+          messages: [...current.messages, ...result.messages],
         };
-      }));
+      });
+      setDraft("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Inference request failed.");
+      setError(requestError instanceof Error ? requestError.message : "Message request failed.");
     } finally {
       setIsSending(false);
     }
@@ -254,8 +298,8 @@ export default function ChatbotPage(): JSX.Element {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={createConversation}
-            disabled={!canCreateConversation}
+            onClick={() => void createConversation()}
+            disabled={!canCreateConversation || isConversationBusy}
           >
             New chat
           </button>
@@ -267,24 +311,49 @@ export default function ChatbotPage(): JSX.Element {
               key={conversation.id}
               type="button"
               className={`chatbot-conversation-item ${conversation.id === activeConversationId ? "active" : ""}`}
-              onClick={() => setActiveConversationId(conversation.id)}
+              onClick={() => {
+                setActiveConversationId(conversation.id);
+                setActiveConversation(null);
+              }}
             >
               <strong>{conversation.title}</strong>
-              <span>{new Date(conversation.updatedAt).toLocaleString()}</span>
+              <span>{formatTimestamp(conversation.updatedAt)}</span>
             </button>
           ))}
         </div>
       </aside>
 
       <div className="chatbot-main card-stack">
+        <div className="chatbot-sidebar-header">
+          <h3 className="section-title">{activeConversation?.title ?? "New conversation"}</h3>
+          <div className="chatbot-actions">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void renameConversation()}
+              disabled={!activeConversation || isConversationBusy}
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void deleteConversation()}
+              disabled={!activeConversation || isConversationBusy}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+
         <label className="field-label" htmlFor="model-picker">Model</label>
         <select
           id="model-picker"
           className="field-input"
-          value={activeConversation?.modelId ?? ""}
+          value={activeConversationModelId}
           onChange={(event) => {
             if (activeConversation) {
-              updateConversationModel(activeConversation.id, event.currentTarget.value);
+              void updateConversationModel(activeConversation.id, event.currentTarget.value);
             }
           }}
           disabled={models.length === 0 || !activeConversation}
@@ -306,7 +375,9 @@ export default function ChatbotPage(): JSX.Element {
                 <p>{message.content}</p>
               </article>
             ))
-            : <p className="status-text">No messages yet. Start chatting to build context memory.</p>}
+            : <p className="status-text">
+              {isBootstrapping ? "Loading conversations..." : "No messages yet. Start chatting to build context memory."}
+            </p>}
         </div>
 
         <label className="field-label" htmlFor="prompt">Message</label>
