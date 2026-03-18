@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import OptionCardGrid, { type OptionCardItem } from "./OptionCardGrid";
+import TestRouter from "../test/TestRouter";
 
 const items: OptionCardItem[] = [
   {
@@ -24,9 +24,9 @@ const items: OptionCardItem[] = [
 describe("OptionCardGrid", () => {
   it("renders cards as full-link tiles with icons", () => {
     const { container } = render(
-      <MemoryRouter>
+      <TestRouter>
         <OptionCardGrid items={items} ariaLabel="Available actions" />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(screen.getByRole("list", { name: "Available actions" })).toBeVisible();
@@ -39,9 +39,9 @@ describe("OptionCardGrid", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <OptionCardGrid items={items} ariaLabel="Available actions" />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await user.tab();

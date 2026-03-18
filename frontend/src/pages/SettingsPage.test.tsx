@@ -1,9 +1,19 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import type { AuthUser } from "../auth/types";
 import SettingsPage from "./SettingsPage";
+import TestRouter from "../test/TestRouter";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: {
+      resolvedLanguage: "en",
+      changeLanguage: vi.fn(),
+    },
+  }),
+}));
 
 let mockUser: AuthUser | null = null;
 
@@ -30,9 +40,9 @@ vi.mock("../components/RuntimeProfileSection", () => ({
 function renderSettings(initialPath = "/settings"): void {
   render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[initialPath]}>
+      <TestRouter route={initialPath}>
         <SettingsPage />
-      </MemoryRouter>
+      </TestRouter>
     </ThemeProvider>,
   );
 }

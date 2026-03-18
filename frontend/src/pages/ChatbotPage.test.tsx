@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "../auth/types";
 import ChatbotPage from "./ChatbotPage";
+import TestRouter from "../test/TestRouter";
 
 const modelApiMocks = vi.hoisted(() => ({
   listEnabledModels: vi.fn(),
@@ -35,9 +35,9 @@ vi.mock("../auth/AuthProvider", () => ({
 
 function renderChatbot(): void {
   render(
-    <MemoryRouter>
+    <TestRouter>
       <ChatbotPage />
-    </MemoryRouter>,
+    </TestRouter>,
   );
 }
 

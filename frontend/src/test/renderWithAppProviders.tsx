@@ -1,9 +1,9 @@
 import { act, render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
-import { MemoryRouter } from "react-router-dom";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import type { ReactElement } from "react";
 import { ensureTestI18n, testI18n } from "./testI18n";
+import TestRouter from "./TestRouter";
 
 type AppRenderOptions = Omit<RenderOptions, "wrapper"> & {
   route?: string;
@@ -30,11 +30,18 @@ export async function renderWithAppProviders(
 
   const content = (
     <I18nextProvider i18n={testI18n}>
-      <MemoryRouter initialEntries={[route]}>
+      <TestRouter route={route}>
         {withTheme ? <ThemeProvider>{ui}</ThemeProvider> : ui}
-      </MemoryRouter>
+      </TestRouter>
     </I18nextProvider>
   );
 
-  return render(content, renderOptions);
+  let rendered: RenderResult | null = null;
+  await act(async () => {
+    rendered = render(content, renderOptions);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  return rendered as RenderResult;
 }

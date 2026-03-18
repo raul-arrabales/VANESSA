@@ -1,8 +1,14 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import SuperAdminModelsPage from "./SuperAdminModelsPage";
+import TestRouter from "../test/TestRouter";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
 
 const modelApiMocks = vi.hoisted(() => ({
   listModelCatalog: vi.fn(),
@@ -69,9 +75,9 @@ describe("SuperAdminModelsPage", () => {
 
   it("renders catalog and assignment controls", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <SuperAdminModelsPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByRole("heading", { name: "models.catalog.title" })).toBeVisible();
@@ -86,9 +92,9 @@ describe("SuperAdminModelsPage", () => {
     modelApiMocks.updateModelAssignment.mockResolvedValue({ scope: "user", model_ids: ["mistral-small", "gpt-4"] });
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <SuperAdminModelsPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await screen.findByRole("heading", { name: "models.catalog.title" });
@@ -109,9 +115,9 @@ describe("SuperAdminModelsPage", () => {
     ]);
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <SuperAdminModelsPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await screen.findByRole("heading", { name: "models.catalog.title" });
@@ -126,9 +132,9 @@ describe("SuperAdminModelsPage", () => {
   it("does not poll when there are no active jobs", async () => {
     vi.useFakeTimers();
     render(
-      <MemoryRouter>
+      <TestRouter>
         <SuperAdminModelsPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(screen.getByRole("heading", { name: "models.catalog.title" })).toBeVisible();
@@ -161,9 +167,9 @@ describe("SuperAdminModelsPage", () => {
     modelApiMocks.listDownloadJobs.mockResolvedValue([runningJob]);
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <SuperAdminModelsPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("models.jobs.pollingActive")).toBeVisible();

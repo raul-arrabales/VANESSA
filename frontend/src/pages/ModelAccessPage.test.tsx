@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ModelAccessPage from "./ModelAccessPage";
+import TestRouter from "../test/TestRouter";
 
 const modelApiMocks = vi.hoisted(() => ({
   listModelCredentials: vi.fn(),
@@ -61,9 +61,9 @@ describe("ModelAccessPage", () => {
 
   it("renders credentials and available models", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <ModelAccessPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("My key · openai_compatible · ****1234")).toBeVisible();
@@ -74,9 +74,9 @@ describe("ModelAccessPage", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <ModelAccessPage />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await screen.findByText("My key · openai_compatible · ****1234");

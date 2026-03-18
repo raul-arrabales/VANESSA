@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { RequireAuth, RequireRole } from "./RouteGuards";
 import type { AuthUser } from "./types";
+import TestRouter from "../test/TestRouter";
 
 let mockAuthState: {
   user: AuthUser | null;
@@ -31,7 +32,7 @@ describe("RouteGuards", () => {
     mockAuthState = { user: null, isAuthenticated: false, isLoading: false };
 
     render(
-      <MemoryRouter initialEntries={["/settings"]}>
+      <TestRouter route="/settings">
         <Routes>
           <Route
             path="/settings"
@@ -43,7 +44,7 @@ describe("RouteGuards", () => {
           />
           <Route path="/login" element={<div>login-page</div>} />
         </Routes>
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("login-page")).toBeVisible();
@@ -63,11 +64,11 @@ describe("RouteGuards", () => {
     };
 
     render(
-      <MemoryRouter>
+      <TestRouter>
         <RequireRole role="admin">
           <div>admin-content</div>
         </RequireRole>
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(screen.getByText("Forbidden")).toBeVisible();
