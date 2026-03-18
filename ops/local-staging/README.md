@@ -113,6 +113,9 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 - CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - CPU builds install PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
 - CPU builds pin `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` to avoid tokenizer/runtime incompatibilities as upstream releases move forward.
+- The first CPU build is intentionally heavy: it compiles `vllm` from source, can take several minutes, and requires network access for build dependencies.
+- During a cold CPU build, Docker may sit on a progress line such as `54/58` without printing new output for a while; that pause is not by itself a failure signal.
+- If the CPU image is already present and you just want to restart services, run `./ops/local-staging/start.sh --no-build`.
 - CPU local staging defaults `VLLM_CPU_OMP_THREADS_BIND=0-7` on this single-NUMA-node 8-logical-core host.
 - `VLLM_CPU_OMP_THREADS_BIND` may also be set to `auto`, `nobind`, or a custom CPU set such as `0-3|4-7`.
 
@@ -120,6 +123,7 @@ For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.
 
 - The optional `llama_cpp` service is enabled only when `LLAMA_CPP_URL` is non-empty.
 - Local-staging scripts automatically add the `llama_cpp` compose profile when enabled.
+- When `LLAMA_CPP_URL` is unset, `docker compose config` and `./ops/local-staging/start.sh` should not warn about `LLAMA_CPP_MODEL_PATH`.
 - `LLAMA_CPP_MODEL_PATH` must point to a GGUF file that exists on the host.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /v1/models` inside the container.
 

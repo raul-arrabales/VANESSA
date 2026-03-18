@@ -75,8 +75,12 @@ if ! compose config >/dev/null; then
   die "Compose configuration is invalid"
 fi
 
-log_info "Starting VANESSA stack"
 mapfile -t selected_services < <(stack_services_for_start)
+if [[ -n "${build_flag}" ]] && printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+  log_info "CPU llm_runtime build selected. A cold build compiles vLLM from source, may take several minutes, and needs network access for build dependencies. If the image is already built, rerun with --no-build to skip rebuilding."
+fi
+
+log_info "Starting VANESSA stack"
 if [[ -n "${build_flag}" ]]; then
   if ! compose up -d --build "${selected_services[@]}"; then
     if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then

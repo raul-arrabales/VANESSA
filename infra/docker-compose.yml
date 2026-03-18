@@ -82,7 +82,7 @@ services:
       - path: .env.local
         required: false
     environment:
-      LLAMA_ARG_MODEL: ${LLAMA_CPP_MODEL_PATH}
+      LLAMA_ARG_MODEL: ${LLAMA_CPP_MODEL_PATH:-}
       LLAMA_ARG_ALIAS: local-llama-cpp-default
       LLAMA_ARG_CTX_SIZE: ${LLAMA_CPP_CONTEXT_SIZE:-4096}
       LLAMA_ARG_HOST: 0.0.0.0
