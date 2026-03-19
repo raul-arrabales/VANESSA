@@ -15,7 +15,7 @@ from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 @pytest.fixture()
 def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "online")
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "online")
     test_client, user_store, config = backend_test_client_factory(
         config_overrides={
             "model_storage_root": "/models/llm",

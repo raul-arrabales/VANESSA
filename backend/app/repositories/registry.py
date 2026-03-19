@@ -10,7 +10,17 @@ from ..db import get_connection
 _ENTITY_TYPES = {"model", "agent", "tool"}
 _SHARE_PERMISSIONS = {"view", "fork", "execute", "admin"}
 _GRANTEE_TYPES = {"user", "group", "org", "public"}
-_RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
+_RUNTIME_PROFILES = {"online", "offline"}
+_LEGACY_RUNTIME_PROFILES = {"air_gapped": "offline"}
+
+
+def _normalize_runtime_profile(value: str, *, allow_legacy: bool = True) -> str | None:
+    normalized = value.strip().lower()
+    if allow_legacy and normalized in _LEGACY_RUNTIME_PROFILES:
+        return _LEGACY_RUNTIME_PROFILES[normalized]
+    if normalized in _RUNTIME_PROFILES:
+        return normalized
+    return None
 
 
 def _ensure_system_runtime_config_table(connection) -> None:
@@ -253,7 +263,7 @@ def list_share_grants(database_url: str, *, entity_id: str) -> list[dict[str, An
 
 
 def upsert_runtime_profile(database_url: str, *, profile: str, updated_by_user_id: int | None) -> str:
-    normalized_profile = profile.strip().lower()
+    normalized_profile = _normalize_runtime_profile(profile, allow_legacy=False)
     if normalized_profile not in _RUNTIME_PROFILES:
         raise ValueError("invalid_runtime_profile")
 
@@ -274,6 +284,24 @@ def upsert_runtime_profile(database_url: str, *, profile: str, updated_by_user_i
     return normalized_profile
 
 
+def seed_runtime_profile_if_missing(database_url: str, *, profile: str, updated_by_user_id: int | None = None) -> str:
+    normalized_profile = _normalize_runtime_profile(profile, allow_legacy=True)
+    if normalized_profile not in _RUNTIME_PROFILES:
+        raise ValueError("invalid_runtime_profile")
+
+    with get_connection(database_url) as connection:
+        _ensure_system_runtime_config_table(connection)
+        connection.execute(
+            """
+            INSERT INTO system_runtime_config (config_key, config_value, updated_by_user_id)
+            VALUES ('runtime_profile', %s, %s)
+            ON CONFLICT (config_key) DO NOTHING
+            """,
+            (normalized_profile, updated_by_user_id),
+        )
+    return normalized_profile
+
+
 def get_runtime_profile(database_url: str) -> str | None:
     with get_connection(database_url) as connection:
         _ensure_system_runtime_config_table(connection)
@@ -282,8 +310,48 @@ def get_runtime_profile(database_url: str) -> str | None:
         ).fetchone()
     if not row:
         return None
-    value = str(row.get("config_value", "")).strip().lower()
-    return value if value in _RUNTIME_PROFILES else None
+    return _normalize_runtime_profile(str(row.get("config_value", "")))
+
+
+def normalize_runtime_profile_state(database_url: str) -> None:
+    with get_connection(database_url) as connection:
+        _ensure_system_runtime_config_table(connection)
+        connection.execute(
+            """
+            UPDATE system_runtime_config
+            SET config_value = 'offline',
+                updated_at = NOW()
+            WHERE config_key = 'runtime_profile'
+              AND config_value = 'air_gapped'
+            """
+        )
+
+        table_exists = connection.execute(
+            "SELECT to_regclass('public.agent_executions') AS table_name"
+        ).fetchone()
+        if not table_exists or table_exists.get("table_name") is None:
+            return
+
+        connection.execute(
+            """
+            UPDATE agent_executions
+            SET runtime_profile = 'offline',
+                result_json = CASE
+                    WHEN jsonb_typeof(result_json) = 'object'
+                     AND jsonb_typeof(result_json->'execution_payload') = 'object'
+                     AND result_json->'execution_payload'->>'runtime_profile' = 'air_gapped'
+                    THEN jsonb_set(result_json, '{execution_payload,runtime_profile}', '"offline"'::jsonb, TRUE)
+                    ELSE result_json
+                END,
+                updated_at = NOW()
+            WHERE runtime_profile = 'air_gapped'
+               OR (
+                    jsonb_typeof(result_json) = 'object'
+                AND jsonb_typeof(result_json->'execution_payload') = 'object'
+                AND result_json->'execution_payload'->>'runtime_profile' = 'air_gapped'
+               )
+            """
+        )
 
 
 def list_entity_permissions_for_user(

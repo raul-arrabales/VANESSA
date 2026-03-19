@@ -9,6 +9,7 @@ from ..security import hash_password
 from . import auth_lifecycle
 from .knowledge_chat_bootstrap import ensure_knowledge_chat_agent
 from .model_download_worker import ensure_download_worker_started
+from .runtime_profile_service import seed_runtime_profile_from_config
 from .tool_registry_bootstrap import ensure_builtin_tools
 
 _knowledge_chat_bootstrapped = False
@@ -40,6 +41,7 @@ def ensure_auth_initialized() -> bool:
     )
     if not ready:
         return False
+    seed_runtime_profile_from_config(get_config().database_url)
     if not _knowledge_chat_bootstrapped:
         try:
             _knowledge_chat_bootstrapped = ensure_knowledge_chat_agent(get_config().database_url)

@@ -22,6 +22,13 @@ _DB_READY = False
 _MEMORY_EXECUTIONS: dict[str, dict[str, Any]] = {}
 
 
+def _normalize_runtime_profile(value: str | None) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == "air_gapped":
+        return "offline"
+    return normalized if normalized in {"online", "offline"} else "offline"
+
+
 def _database_url() -> str:
     return get_config().database_url
 
@@ -52,6 +59,26 @@ def ensure_schema() -> None:
                 )
                 """
             )
+            connection.execute(
+                """
+                UPDATE agent_executions
+                SET runtime_profile = 'offline',
+                    result_json = CASE
+                        WHEN jsonb_typeof(result_json) = 'object'
+                         AND jsonb_typeof(result_json->'execution_payload') = 'object'
+                         AND result_json->'execution_payload'->>'runtime_profile' = 'air_gapped'
+                        THEN jsonb_set(result_json, '{execution_payload,runtime_profile}', '"offline"'::jsonb, TRUE)
+                        ELSE result_json
+                    END,
+                    updated_at = NOW()
+                WHERE runtime_profile = 'air_gapped'
+                   OR (
+                        jsonb_typeof(result_json) = 'object'
+                    AND jsonb_typeof(result_json->'execution_payload') = 'object'
+                    AND result_json->'execution_payload'->>'runtime_profile' = 'air_gapped'
+                   )
+                """
+            )
         _DB_READY = True
     except Exception:
         _DB_READY = False
@@ -59,7 +86,10 @@ def ensure_schema() -> None:
 
 def _encode_result_json(execution: AgentExecutionRecord) -> dict[str, Any]:
     return {
-        "execution_payload": execution.to_payload(),
+        "execution_payload": {
+            **execution.to_payload(),
+            "runtime_profile": _normalize_runtime_profile(execution.runtime_profile),
+        },
         "result": execution.result if execution.result is not None else {},
         "error": execution.error,
         "agent_version": execution.agent_version,
@@ -85,7 +115,7 @@ def _row_to_execution(row: dict[str, Any]) -> AgentExecutionRecord | None:
             "agent_ref": row.get("agent_id", ""),
             "agent_version": str(result_json.get("agent_version", "v1") or "v1"),
             "model_ref": result_json.get("model_ref"),
-            "runtime_profile": row.get("runtime_profile", "offline"),
+            "runtime_profile": _normalize_runtime_profile(row.get("runtime_profile", "offline")),
             "created_at": row["created_at"].isoformat() if row.get("created_at") else row.get("updated_at").isoformat(),
             "started_at": result_json.get("started_at"),
             "finished_at": result_json.get("finished_at"),
@@ -141,7 +171,7 @@ def save_execution(
                     execution.id,
                     execution.agent_ref,
                     execution.status,
-                    execution.runtime_profile,
+                    _normalize_runtime_profile(execution.runtime_profile),
                     requested_by_user_id,
                     json.dumps(input_payload if isinstance(input_payload, dict) else {}),
                     json.dumps(_encode_result_json(execution)),

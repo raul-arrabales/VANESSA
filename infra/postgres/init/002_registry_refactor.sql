@@ -100,10 +100,6 @@ CREATE TABLE IF NOT EXISTS system_runtime_config (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO system_runtime_config (config_key, config_value)
-VALUES ('runtime_profile', 'offline')
-ON CONFLICT (config_key) DO NOTHING;
-
 -- Compatibility mapping from legacy model_registry to unified registry entities.
 DO $$
 BEGIN

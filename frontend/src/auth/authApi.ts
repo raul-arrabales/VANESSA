@@ -11,10 +11,13 @@ import type {
 
 
 
-type RuntimeProfile = "offline" | "air_gapped" | "online";
+type RuntimeProfile = "offline" | "online";
+type RuntimeProfileSource = "database" | "default" | "forced";
 
 type RuntimeProfileResult = {
   profile: RuntimeProfile;
+  locked: boolean;
+  source: RuntimeProfileSource;
 };
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 

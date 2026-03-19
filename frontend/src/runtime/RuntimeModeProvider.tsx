@@ -10,10 +10,18 @@ import {
 } from "react";
 import { ApiError } from "../auth/authApi";
 import { useAuth } from "../auth/AuthProvider";
-import { getRuntimeProfile, setRuntimeProfile, type RuntimeProfile } from "../api/runtime";
+import {
+  getRuntimeProfile,
+  setRuntimeProfile,
+  type RuntimeProfile,
+  type RuntimeProfileResult,
+  type RuntimeProfileSource,
+} from "../api/runtime";
 
 type RuntimeModeContextValue = {
   mode: RuntimeProfile | null;
+  isLocked: boolean;
+  source: RuntimeProfileSource | null;
   isLoading: boolean;
   isSaving: boolean;
   error: string;
@@ -29,15 +37,25 @@ type RuntimeModeProviderProps = {
 export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX.Element {
   const { token, isAuthenticated } = useAuth();
   const [mode, setModeState] = useState<RuntimeProfile | null>(null);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [source, setSource] = useState<RuntimeProfileSource | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const loadedTokenRef = useRef<string>("");
 
+  const applyRuntimeProfileState = useCallback((result: RuntimeProfileResult): void => {
+    setModeState(result.profile);
+    setIsLocked(result.locked);
+    setSource(result.source);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated || !token) {
       loadedTokenRef.current = "";
       setModeState(null);
+      setIsLocked(false);
+      setSource(null);
       setError("");
       setIsLoading(false);
       return;
@@ -53,7 +71,7 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
 
     getRuntimeProfile(token)
       .then((result) => {
-        setModeState(result.profile);
+        applyRuntimeProfileState(result);
       })
       .catch((loadError: unknown) => {
         if (loadError instanceof ApiError) {
@@ -63,7 +81,7 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
         setError("settings.runtime.error.load");
       })
       .finally(() => setIsLoading(false));
-  }, [isAuthenticated, token]);
+  }, [applyRuntimeProfileState, isAuthenticated, token]);
 
   const setMode = useCallback(async (nextMode: RuntimeProfile): Promise<RuntimeProfile> => {
     if (!token) {
@@ -71,16 +89,20 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
     }
 
     const previousMode = mode;
+    const previousIsLocked = isLocked;
+    const previousSource = source;
     setModeState(nextMode);
     setError("");
     setIsSaving(true);
 
     try {
       const result = await setRuntimeProfile(token, nextMode);
-      setModeState(result.profile);
+      applyRuntimeProfileState(result);
       return result.profile;
     } catch (saveError) {
       setModeState(previousMode);
+      setIsLocked(previousIsLocked);
+      setSource(previousSource);
       if (saveError instanceof ApiError) {
         setError(saveError.message);
       } else {
@@ -90,15 +112,17 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
     } finally {
       setIsSaving(false);
     }
-  }, [mode, token]);
+  }, [applyRuntimeProfileState, isLocked, mode, source, token]);
 
   const value = useMemo<RuntimeModeContextValue>(() => ({
     mode,
+    isLocked,
+    source,
     isLoading,
     isSaving,
     error,
     setMode,
-  }), [error, isLoading, isSaving, mode, setMode]);
+  }), [error, isLoading, isLocked, isSaving, mode, setMode, source]);
 
   return <RuntimeModeContext.Provider value={value}>{children}</RuntimeModeContext.Provider>;
 }

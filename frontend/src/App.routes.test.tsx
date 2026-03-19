@@ -27,6 +27,8 @@ vi.mock("./auth/AuthProvider", () => ({
 vi.mock("./runtime/RuntimeModeProvider", () => ({
   useRuntimeMode: () => ({
     mode: "offline",
+    isLocked: false,
+    source: "database",
     isLoading: false,
     isSaving: false,
     error: "",

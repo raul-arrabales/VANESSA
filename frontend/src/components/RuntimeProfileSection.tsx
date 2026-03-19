@@ -4,17 +4,18 @@ import { useAuth } from "../auth/AuthProvider";
 import { useRuntimeMode } from "../runtime/RuntimeModeProvider";
 import type { RuntimeProfile } from "../api/runtime";
 
-const PROFILE_OPTIONS: RuntimeProfile[] = ["offline", "air_gapped", "online"];
+const PROFILE_OPTIONS: RuntimeProfile[] = ["offline", "online"];
 
 export default function RuntimeProfileSection(): JSX.Element {
   const { t } = useTranslation("common");
   const { user } = useAuth();
-  const { mode, isLoading, isSaving, error, setMode } = useRuntimeMode();
+  const { mode, isLocked, isLoading, isSaving, error, setMode } = useRuntimeMode();
   const isSuperadmin = user?.role === "superadmin";
   const [statusMessage, setStatusMessage] = useState<string>("");
+  const isFieldsetDisabled = isLoading || isSaving || !isSuperadmin || isLocked;
 
   const onChangeProfile = async (nextProfile: RuntimeProfile): Promise<void> => {
-    if (!isSuperadmin) {
+    if (!isSuperadmin || isLocked) {
       return;
     }
 
@@ -34,8 +35,8 @@ export default function RuntimeProfileSection(): JSX.Element {
       <p className="status-text">{t("settings.runtime.description")}</p>
       <fieldset
         className="card-stack"
-        disabled={isLoading || isSaving || !isSuperadmin}
-        title={!isSuperadmin ? t("settings.runtime.restrictionMessage") : undefined}
+        disabled={isFieldsetDisabled}
+        title={!isSuperadmin ? t("settings.runtime.restrictionMessage") : isLocked ? t("settings.runtime.lockedMessage") : undefined}
       >
         {PROFILE_OPTIONS.map((option) => (
           <label key={option}>
@@ -53,6 +54,7 @@ export default function RuntimeProfileSection(): JSX.Element {
         ))}
       </fieldset>
       {!isSuperadmin && <p className="status-text">{t("settings.runtime.restrictionMessage")}</p>}
+      {isLocked && <p className="status-text">{t("settings.runtime.lockedMessage")}</p>}
       {statusMessage && <p className="status-text">{statusMessage}</p>}
       {error && <p className="status-text">{error === "runtimeMode.updateFailed" ? t("runtimeMode.updateFailed") : error}</p>}
     </section>

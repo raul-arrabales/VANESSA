@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
+RUNTIME_PROFILES = {"online", "offline"}
 DEFAULT_RUNTIME_PROFILE = "offline"
+_LEGACY_RUNTIME_PROFILES = {"air_gapped": "offline"}
 
 DEFAULT_FRONTEND_URL = "http://frontend:3000"
 DEFAULT_BACKEND_URL = "http://backend:5000"
@@ -37,7 +38,8 @@ class BackendRuntimeConfig:
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
     qdrant_url: str = DEFAULT_QDRANT_URL
-    runtime_profile_override: str | None = None
+    runtime_profile_seed: str | None = None
+    runtime_profile_force: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
 
@@ -77,7 +79,8 @@ class AuthConfig:
     qdrant_url: str = DEFAULT_QDRANT_URL
     product_rag_index: str = DEFAULT_PRODUCT_RAG_INDEX
     product_rag_top_k: int = DEFAULT_PRODUCT_RAG_TOP_K
-    runtime_profile_override: str | None = None
+    runtime_profile_seed: str | None = None
+    runtime_profile_force: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
 
@@ -126,12 +129,18 @@ def _get_float_env(name: str, default: float) -> float:
         return default
 
 
-def _get_runtime_profile_override_env() -> str | None:
-    value = os.getenv("VANESSA_RUNTIME_PROFILE")
+def _get_runtime_profile_env(name: str) -> str | None:
+    value = os.getenv(name)
     if value is None:
         return None
 
     normalized = value.strip().lower()
+    legacy_normalized = _LEGACY_RUNTIME_PROFILES.get(normalized)
+    if legacy_normalized is not None:
+        print(
+            f"[WARN] {name}={normalized} is deprecated; normalizing runtime profile to '{legacy_normalized}'."
+        )
+        return legacy_normalized
     if normalized in RUNTIME_PROFILES:
         return normalized
     return None
@@ -189,7 +198,8 @@ def get_auth_config() -> AuthConfig:
         qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
         product_rag_index=os.getenv("PRODUCT_RAG_INDEX", DEFAULT_PRODUCT_RAG_INDEX).strip() or DEFAULT_PRODUCT_RAG_INDEX,
         product_rag_top_k=_get_int_env("PRODUCT_RAG_TOP_K", DEFAULT_PRODUCT_RAG_TOP_K),
-        runtime_profile_override=_get_runtime_profile_override_env(),
+        runtime_profile_seed=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
+        runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
     )
@@ -210,7 +220,8 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
         qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
-        runtime_profile_override=_get_runtime_profile_override_env(),
+        runtime_profile_seed=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
+        runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
     )

@@ -410,9 +410,9 @@
       "title": "Runtime profile",
       "description": "Controls the platform-wide runtime mode used for safety gates and tool access.",
       "restrictionMessage": "Only superadmins can change the runtime profile.",
+      "lockedMessage": "This runtime profile is locked by environment configuration.",
       "options": {
         "offline": "Offline",
-        "air_gapped": "Air-gapped",
         "online": "Online"
       },
       "feedback": {
@@ -805,17 +805,17 @@
     "toggleTooltip": "Current runtime mode: {{mode}}",
     "online": "Online",
     "offline": "Offline",
-    "airGapped": "Air-gapped",
     "permissionDenied": "Only superadmins can change runtime mode.",
+    "lockedByEnvironment": "Runtime mode is locked by environment configuration at {{mode}}.",
     "updateFailed": "Unable to update runtime mode.",
-    "localOnlyLabel": "Local only",
-    "confirmEnableLocalOnly": "Enable Local-only mode for all users? Internet-dependent actions will be blocked system-wide.",
+    "offlineLabel": "Offline",
+    "confirmEnableOffline": "Switch to Offline mode for all users? Internet-dependent actions will be blocked system-wide.",
     "confirmEnableOnline": "Switch to Online mode for all users?",
     "dialog": {
-      "titleLocalOnly": "Confirm local-only runtime",
+      "titleOffline": "Confirm offline runtime",
       "titleOnline": "Confirm online runtime",
       "cancel": "Cancel",
-      "confirmLocalOnly": "Enable local-only",
+      "confirmOffline": "Switch offline",
       "confirmOnline": "Switch online"
     }
   }

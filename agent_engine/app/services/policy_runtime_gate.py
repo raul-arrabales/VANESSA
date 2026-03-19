@@ -37,15 +37,24 @@ def _connect():
 
 
 def _runtime_profile_from_env() -> str | None:
-    return get_config().runtime_profile_override
+    return get_config().runtime_profile_force
+
+
+def _normalize_runtime_profile(value: str | None) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if normalized == "air_gapped":
+        return "offline"
+    if normalized in RUNTIME_PROFILES:
+        return normalized
+    return None
 
 
 def resolve_runtime_profile(requested_profile: str | None) -> str:
-    normalized_requested = str(requested_profile or "").strip().lower()
+    normalized_requested = _normalize_runtime_profile(requested_profile)
     if normalized_requested in RUNTIME_PROFILES:
         return normalized_requested
 
-    env_value = _runtime_profile_from_env()
+    env_value = _normalize_runtime_profile(_runtime_profile_from_env())
     if env_value is not None:
         return env_value
 
@@ -55,7 +64,7 @@ def resolve_runtime_profile(requested_profile: str | None) -> str:
                 row = connection.execute(
                     "SELECT config_value FROM system_runtime_config WHERE config_key = 'runtime_profile'"
                 ).fetchone()
-                value = str((row or {}).get("config_value", "")).strip().lower()
+                value = _normalize_runtime_profile(str((row or {}).get("config_value", "")))
                 if value in RUNTIME_PROFILES:
                     return value
         except Exception:

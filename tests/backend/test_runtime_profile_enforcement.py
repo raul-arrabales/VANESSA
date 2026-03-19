@@ -13,6 +13,7 @@ from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 @pytest.fixture()
 def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
+    monkeypatch.delenv("VANESSA_RUNTIME_PROFILE_FORCE", raising=False)
     test_client, user_store, config = backend_test_client_factory()
     monkeypatch.setattr(model_catalog_routes, "_config", lambda: config)
     monkeypatch.setattr(model_catalog_routes, "discover_hf_models", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
@@ -65,6 +66,7 @@ def test_internet_features_are_consistently_blocked_in_offline_profile(client):
 
 def test_outbound_services_share_same_runtime_policy_denial(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
+    monkeypatch.delenv("VANESSA_RUNTIME_PROFILE_FORCE", raising=False)
 
     for call in [
         lambda: discover_hf_models(database_url="postgresql://example", query="llama"),

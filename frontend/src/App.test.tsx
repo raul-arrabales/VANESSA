@@ -8,6 +8,7 @@ import { t } from "./test/translation";
 
 let mockUser: AuthUser | null = null;
 const mockSetMode = vi.fn();
+let mockRuntimeLocked = false;
 
 vi.mock("./auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -28,6 +29,8 @@ vi.mock("./auth/AuthProvider", () => ({
 vi.mock("./runtime/RuntimeModeProvider", () => ({
   useRuntimeMode: () => ({
     mode: "offline",
+    isLocked: mockRuntimeLocked,
+    source: mockRuntimeLocked ? "forced" : "database",
     isLoading: false,
     isSaving: false,
     error: "",
@@ -38,6 +41,7 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
 describe("App header", () => {
   beforeEach(() => {
     mockUser = null;
+    mockRuntimeLocked = false;
     mockSetMode.mockReset();
     vi.restoreAllMocks();
   });
@@ -83,6 +87,22 @@ describe("App header", () => {
     await renderApp();
 
     expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeEnabled();
+  });
+
+  it("disables runtime toggle when the runtime profile is environment-locked", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+    mockRuntimeLocked = true;
+
+    await renderApp();
+
+    expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
+    expect(screen.getByText(await t("runtimeMode.lockedByEnvironment", { mode: await t("runtimeMode.offline") }))).toBeVisible();
   });
 
   it("requires confirmation before changing runtime mode", async () => {

@@ -22,11 +22,13 @@ vi.mock("../api/runtime", () => ({
 }));
 
 function RuntimeModeConsumer(): JSX.Element {
-  const { mode, isLoading, isSaving, error, setMode } = useRuntimeMode();
+  const { mode, isLocked, source, isLoading, isSaving, error, setMode } = useRuntimeMode();
 
   return (
     <div>
       <p data-testid="mode">{mode ?? "none"}</p>
+      <p data-testid="locked">{String(isLocked)}</p>
+      <p data-testid="source">{source ?? "none"}</p>
       <p data-testid="is-loading">{String(isLoading)}</p>
       <p data-testid="is-saving">{String(isSaving)}</p>
       <p data-testid="error">{error}</p>
@@ -40,8 +42,8 @@ describe("RuntimeModeProvider", () => {
     vi.clearAllMocks();
     mockToken = "token";
     mockIsAuthenticated = true;
-    getRuntimeProfile.mockResolvedValue({ profile: "offline" });
-    setRuntimeProfile.mockResolvedValue({ profile: "online" });
+    getRuntimeProfile.mockResolvedValue({ profile: "offline", locked: false, source: "database" });
+    setRuntimeProfile.mockResolvedValue({ profile: "online", locked: false, source: "database" });
   });
 
   it("loads the runtime profile after auth", async () => {
@@ -53,6 +55,8 @@ describe("RuntimeModeProvider", () => {
 
     await waitFor(() => expect(getRuntimeProfile).toHaveBeenCalledWith("token"));
     expect(screen.getByTestId("mode")).toHaveTextContent("offline");
+    expect(screen.getByTestId("locked")).toHaveTextContent("false");
+    expect(screen.getByTestId("source")).toHaveTextContent("database");
   });
 
   it("optimistically updates and rolls back when update fails", async () => {
@@ -77,5 +81,18 @@ describe("RuntimeModeProvider", () => {
       rejectRequest(new Error("boom"));
     }
     await waitFor(() => expect(screen.getByTestId("mode")).toHaveTextContent("offline"));
+  });
+
+  it("tracks lock metadata from the runtime profile API", async () => {
+    getRuntimeProfile.mockResolvedValue({ profile: "offline", locked: true, source: "forced" });
+
+    render(
+      <RuntimeModeProvider>
+        <RuntimeModeConsumer />
+      </RuntimeModeProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("locked")).toHaveTextContent("true"));
+    expect(screen.getByTestId("source")).toHaveTextContent("forced");
   });
 });

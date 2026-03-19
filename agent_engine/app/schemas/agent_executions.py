@@ -5,11 +5,13 @@ from datetime import datetime
 from typing import Any
 
 VALID_STATUSES = {"queued", "running", "succeeded", "failed", "blocked", "cancelled"}
-VALID_RUNTIME_PROFILES = {"online", "offline", "air_gapped"}
+VALID_RUNTIME_PROFILES = {"online", "offline"}
 
 
 def ensure_runtime_profile(value: Any) -> str:
     profile = str(value or "").strip().lower()
+    if profile == "air_gapped":
+        return "offline"
     if profile not in VALID_RUNTIME_PROFILES:
         raise ValueError("invalid_runtime_profile")
     return profile
@@ -107,4 +109,3 @@ class AgentExecutionRecord:
             result=result,
             error=error,
         )
-

@@ -92,7 +92,8 @@ Supported launcher variables:
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
 - `MCP_GATEWAY_URL` (blank by default; when set, enables the optional `mcp_gateway` compose profile and backend bootstrap profile)
-- `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline|air_gapped`)
+- `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
+- `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
 - `AGENT_EXECUTION_VIA_ENGINE` (default: `true`)
 - `AGENT_EXECUTION_FALLBACK` (default: `false`)
@@ -103,6 +104,7 @@ Config source of truth in code:
 - Agent engine: `agent_engine/app/config.py`
 
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
+`VANESSA_RUNTIME_PROFILE` is a startup seed, not a permanent override. After bootstrap the navbar/settings controls read and update the DB-backed runtime profile unless `VANESSA_RUNTIME_PROFILE_FORCE` is set.
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
 
 `llm_runtime` selection:

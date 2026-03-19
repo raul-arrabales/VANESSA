@@ -9,7 +9,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import { appRoutes, getBreadcrumbRoutes, getNavRoutes, type AppRouteDefinition } from "./routes/appRoutes";
 
 type RuntimeModeConfirmationDialogProps = {
-  nextMode: "air_gapped" | "online";
+  nextMode: "offline" | "online";
   isPending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
@@ -41,14 +41,14 @@ function RuntimeModeConfirmationDialog({
     };
   }, [isPending, onCancel]);
 
-  const titleKey = nextMode === "air_gapped"
-    ? "runtimeMode.dialog.titleLocalOnly"
+  const titleKey = nextMode === "offline"
+    ? "runtimeMode.dialog.titleOffline"
     : "runtimeMode.dialog.titleOnline";
-  const messageKey = nextMode === "air_gapped"
-    ? "runtimeMode.confirmEnableLocalOnly"
+  const messageKey = nextMode === "offline"
+    ? "runtimeMode.confirmEnableOffline"
     : "runtimeMode.confirmEnableOnline";
-  const confirmLabelKey = nextMode === "air_gapped"
-    ? "runtimeMode.dialog.confirmLocalOnly"
+  const confirmLabelKey = nextMode === "offline"
+    ? "runtimeMode.dialog.confirmOffline"
     : "runtimeMode.dialog.confirmOnline";
 
   return (
@@ -94,21 +94,28 @@ function RuntimeModeConfirmationDialog({
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
-  const { mode, isLoading: isRuntimeLoading, isSaving: isRuntimeSaving, error: runtimeError, setMode } = useRuntimeMode();
+  const {
+    mode,
+    isLocked: isRuntimeLocked,
+    isLoading: isRuntimeLoading,
+    isSaving: isRuntimeSaving,
+    error: runtimeError,
+    setMode,
+  } = useRuntimeMode();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [pendingRuntimeMode, setPendingRuntimeMode] = useState<"air_gapped" | "online" | null>(null);
+  const [pendingRuntimeMode, setPendingRuntimeMode] = useState<"offline" | "online" | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
   const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
-  const runtimeModeLabel = mode ? t(`runtimeMode.${mode === "air_gapped" ? "airGapped" : mode}`) : "--";
+  const runtimeModeLabel = mode ? t(`runtimeMode.${mode}`) : "--";
   const canUpdateRuntimeMode = user?.role === "superadmin";
-  const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLoading || isRuntimeSaving || !mode;
-  const isLocalOnlyMode = mode ? mode !== "online" : false;
+  const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLocked || isRuntimeLoading || isRuntimeSaving || !mode;
+  const isOfflineMode = mode === "offline";
   const primaryNavRoutes = getNavRoutes("primary", { isAuthenticated });
   const userMenuRoutes = getNavRoutes("userMenu", { isAuthenticated });
 
-  const handleRuntimeModeRequest = (nextMode: "air_gapped" | "online"): void => {
+  const handleRuntimeModeRequest = (nextMode: "offline" | "online"): void => {
     setPendingRuntimeMode(nextMode);
   };
 
@@ -164,20 +171,29 @@ function AppHeader(): JSX.Element {
           ))}
         </nav>
         <div className="nav-links user-menu" role="group" aria-label={t("nav.settingsMenuLabel")} ref={menuContainerRef}>
-          <label className="runtime-toggle" title={canUpdateRuntimeMode ? t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel }) : t("runtimeMode.permissionDenied")}>
-            <span className="runtime-toggle-text">{t("runtimeMode.localOnlyLabel")}</span>
+          <label
+            className="runtime-toggle"
+            title={
+              !canUpdateRuntimeMode
+                ? t("runtimeMode.permissionDenied")
+                : isRuntimeLocked
+                  ? t("runtimeMode.lockedByEnvironment", { mode: runtimeModeLabel })
+                  : t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel })
+            }
+          >
+            <span className="runtime-toggle-text">{t("runtimeMode.offlineLabel")}</span>
             <input
               type="checkbox"
               role="switch"
               aria-label={t("runtimeMode.toggleLabel")}
               disabled={isRuntimeToggleDisabled}
-              checked={isLocalOnlyMode}
+              checked={isOfflineMode}
               onChange={(event) => {
                 if (!mode || isRuntimeToggleDisabled) {
                   return;
                 }
 
-                const nextMode = event.currentTarget.checked ? "air_gapped" : "online";
+                const nextMode = event.currentTarget.checked ? "offline" : "online";
                 handleRuntimeModeRequest(nextMode);
               }}
             />
@@ -230,6 +246,7 @@ function AppHeader(): JSX.Element {
           )}
         </div>
         {runtimeError && <p className="status-text">{runtimeError === "runtimeMode.updateFailed" ? t("runtimeMode.updateFailed") : runtimeError}</p>}
+        {isRuntimeLocked && <p className="status-text">{t("runtimeMode.lockedByEnvironment", { mode: runtimeModeLabel })}</p>}
       </div>
       {pendingRuntimeMode && (
         <RuntimeModeConfirmationDialog

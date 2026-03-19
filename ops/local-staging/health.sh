@@ -63,7 +63,8 @@ tcp_ok() {
 run_checks() {
   local failures=0
   local llm_routing_mode="${LLM_ROUTING_MODE:-local_only}"
-  local runtime_profile="${VANESSA_RUNTIME_PROFILE:-offline}"
+  local runtime_profile_seed="${VANESSA_RUNTIME_PROFILE:-offline}"
+  local runtime_profile_force="${VANESSA_RUNTIME_PROFILE_FORCE:-}"
   local runtime_accelerator
   runtime_accelerator="$(resolve_llm_runtime_accelerator)"
   local runtime_cpu_variant
@@ -188,7 +189,11 @@ run_checks() {
   fi
 
   if runtime_profile_endpoint_ok; then
-    printf 'runtime_profile: OK (env=%s, auth=required)\n' "${runtime_profile}"
+    if [[ -n "${runtime_profile_force}" ]]; then
+      printf 'runtime_profile: OK (seed=%s, forced=%s, auth=required)\n' "${runtime_profile_seed}" "${runtime_profile_force}"
+    else
+      printf 'runtime_profile: OK (seed=%s, auth=required)\n' "${runtime_profile_seed}"
+    fi
   else
     printf 'runtime_profile: FAIL\n'
     failures=$((failures + 1))

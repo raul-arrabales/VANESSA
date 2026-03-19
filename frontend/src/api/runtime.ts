@@ -1,9 +1,12 @@
 import { ApiError } from "../auth/authApi";
 
-export type RuntimeProfile = "offline" | "air_gapped" | "online";
+export type RuntimeProfile = "offline" | "online";
+export type RuntimeProfileSource = "database" | "default" | "forced";
 
-type RuntimeProfileResult = {
+export type RuntimeProfileResult = {
   profile: RuntimeProfile;
+  locked: boolean;
+  source: RuntimeProfileSource;
 };
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";

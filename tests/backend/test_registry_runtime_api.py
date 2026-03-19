@@ -116,7 +116,11 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(registry_routes, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
     monkeypatch.setattr(registry_models_routes, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
 
-    monkeypatch.setattr(runtime_routes, "resolve_runtime_profile", lambda _db: "offline")
+    monkeypatch.setattr(
+        runtime_routes,
+        "resolve_runtime_profile_state",
+        lambda _db: type("State", (), {"profile": "offline", "locked": False, "source": "database"})(),
+    )
     monkeypatch.setattr(runtime_routes, "update_runtime_profile", lambda _db, *, profile, updated_by_user_id: profile)
 
     yield test_client, user_store
@@ -175,15 +179,23 @@ def test_registry_and_runtime_endpoints(client):
 
     runtime_get = test_client.get("/v1/runtime/profile", headers=_auth(token))
     assert runtime_get.status_code == 200
-    assert runtime_get.get_json()["profile"] == "offline"
+    assert runtime_get.get_json() == {
+        "profile": "offline",
+        "locked": False,
+        "source": "database",
+    }
 
     runtime_set = test_client.put(
         "/v1/runtime/profile",
         headers=_auth(token),
-        json={"profile": "air_gapped"},
+        json={"profile": "online"},
     )
     assert runtime_set.status_code == 200
-    assert runtime_set.get_json()["profile"] == "air_gapped"
+    assert runtime_set.get_json() == {
+        "profile": "online",
+        "locked": False,
+        "source": "database",
+    }
 
 
 def test_runtime_profile_read_requires_auth(client):
@@ -213,6 +225,70 @@ def test_runtime_profile_write_rejects_non_superadmin(client):
     )
 
     assert response.status_code == 403
+
+
+def test_runtime_profile_write_rejects_legacy_air_gapped_profile(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        runtime_routes,
+        "update_runtime_profile",
+        lambda _db, *, profile, updated_by_user_id: (_ for _ in ()).throw(ValueError("invalid_runtime_profile")),
+    )
+
+    response = test_client.put(
+        "/v1/runtime/profile",
+        headers=_auth(token),
+        json={"profile": "air_gapped"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "invalid_profile",
+        "message": "invalid_runtime_profile",
+    }
+
+
+def test_runtime_profile_write_rejects_when_forced_lock_is_active(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        runtime_routes,
+        "update_runtime_profile",
+        lambda _db, *, profile, updated_by_user_id: (_ for _ in ()).throw(
+            runtime_routes.RuntimeProfileLockedError("offline")
+        ),
+    )
+
+    response = test_client.put(
+        "/v1/runtime/profile",
+        headers=_auth(token),
+        json={"profile": "online"},
+    )
+
+    assert response.status_code == 409
+    assert response.get_json() == {
+        "error": "runtime_profile_locked",
+        "message": "Runtime profile is locked to 'offline' by environment configuration",
+    }
 
 
 def test_agent_execution_proxy_endpoints(client, monkeypatch: pytest.MonkeyPatch):
@@ -325,19 +401,107 @@ def test_runtime_profile_resolution_prefers_db_when_no_env_override(monkeypatch:
     monkeypatch.setattr(
         runtime_profile_service,
         "get_backend_runtime_config",
-        lambda: type("Config", (), {"runtime_profile_override": None})(),
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": None})(),
     )
-    monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "air_gapped")
+    monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "offline")
 
-    assert runtime_profile_service.resolve_runtime_profile("ignored") == "air_gapped"
+    assert runtime_profile_service.resolve_runtime_profile("ignored") == "offline"
+
+
+def test_runtime_profile_resolution_ignores_seed_when_db_value_exists(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": "offline"})(),
+    )
+    monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "online")
+
+    assert runtime_profile_service.resolve_runtime_profile("ignored") == "online"
 
 
 def test_runtime_profile_resolution_uses_default_when_db_invalid_and_no_env(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         runtime_profile_service,
         "get_backend_runtime_config",
-        lambda: type("Config", (), {"runtime_profile_override": None})(),
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": None})(),
     )
     monkeypatch.setattr(runtime_profile_service, "get_runtime_profile", lambda _db: "invalid")
 
     assert runtime_profile_service.resolve_runtime_profile("ignored") == "offline"
+
+
+def test_runtime_profile_resolution_reports_forced_lock(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_force": "offline", "runtime_profile_seed": None})(),
+    )
+
+    state = runtime_profile_service.resolve_runtime_profile_state("ignored")
+
+    assert state.profile == "offline"
+    assert state.locked is True
+    assert state.source == "forced"
+
+
+def test_runtime_profile_seed_uses_config_value(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": "offline"})(),
+    )
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(runtime_profile_service, "normalize_runtime_profile_state", lambda _db: None)
+
+    def _seed(_db: str, *, profile: str):
+        captured["profile"] = profile
+        return profile
+
+    monkeypatch.setattr(runtime_profile_service, "seed_runtime_profile_if_missing", _seed)
+
+    assert runtime_profile_service.seed_runtime_profile_from_config("ignored") == "offline"
+    assert captured["profile"] == "offline"
+
+
+def test_runtime_profile_seed_defaults_to_offline_when_env_missing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": None})(),
+    )
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(runtime_profile_service, "normalize_runtime_profile_state", lambda _db: None)
+
+    def _seed(_db: str, *, profile: str):
+        captured["profile"] = profile
+        return profile
+
+    monkeypatch.setattr(runtime_profile_service, "seed_runtime_profile_if_missing", _seed)
+
+    assert runtime_profile_service.seed_runtime_profile_from_config("ignored") == "offline"
+    assert captured["profile"] == "offline"
+
+
+def test_runtime_profile_seed_normalizes_legacy_state_before_seeding(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "get_backend_runtime_config",
+        lambda: type("Config", (), {"runtime_profile_force": None, "runtime_profile_seed": None})(),
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "normalize_runtime_profile_state",
+        lambda _db: calls.append("normalize"),
+    )
+    monkeypatch.setattr(
+        runtime_profile_service,
+        "seed_runtime_profile_if_missing",
+        lambda _db, *, profile: calls.append(f"seed:{profile}") or profile,
+    )
+
+    assert runtime_profile_service.seed_runtime_profile_from_config("ignored") == "offline"
+    assert calls == ["normalize", "seed:offline"]

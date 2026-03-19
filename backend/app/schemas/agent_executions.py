@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 _VALID_STATUSES = {"queued", "running", "succeeded", "failed", "blocked", "cancelled"}
-_VALID_PROFILES = {"online", "offline", "air_gapped"}
+_VALID_PROFILES = {"online", "offline"}
 
 
 def _as_iso8601(value: Any) -> str | None:
@@ -22,6 +22,8 @@ def _as_iso8601(value: Any) -> str | None:
 
 def _as_runtime_profile(value: Any) -> str:
     profile = str(value or "").strip().lower()
+    if profile == "air_gapped":
+        return "offline"
     if profile not in _VALID_PROFILES:
         raise ValueError("invalid_runtime_profile")
     return profile
@@ -108,4 +110,3 @@ class AgentExecutionRecord:
             "result": self.result,
             "error": self.error,
         }
-

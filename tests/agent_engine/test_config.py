@@ -18,28 +18,36 @@ from agent_engine.app.config import (  # noqa: E402
 def test_engine_config_defaults(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
+    monkeypatch.delenv("VANESSA_RUNTIME_PROFILE_FORCE", raising=False)
     monkeypatch.delenv("AGENT_ENGINE_SERVICE_TOKEN", raising=False)
 
     config = get_config()
     assert config.database_url == ""
-    assert config.runtime_profile_override is None
+    assert config.runtime_profile_force is None
     assert config.agent_engine_service_token == DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
 
 
 def test_engine_config_env_overrides(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://example")
-    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "air_gapped")
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "offline")
     monkeypatch.setenv("AGENT_ENGINE_SERVICE_TOKEN", "custom-token")
 
     config = get_config()
     assert config.database_url == "postgresql://example"
-    assert config.runtime_profile_override == "air_gapped"
+    assert config.runtime_profile_force == "offline"
     assert config.agent_engine_service_token == "custom-token"
 
 
 
-def test_engine_config_invalid_runtime_profile_is_ignored(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "invalid")
+def test_engine_config_invalid_runtime_profile_force_is_ignored(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "invalid")
 
     config = get_config()
-    assert config.runtime_profile_override is None
+    assert config.runtime_profile_force is None
+
+
+def test_engine_config_normalizes_legacy_air_gapped(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "air_gapped")
+
+    config = get_config()
+    assert config.runtime_profile_force == "offline"

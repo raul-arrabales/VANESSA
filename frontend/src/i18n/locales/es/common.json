@@ -410,9 +410,9 @@
       "title": "Perfil de ejecucion",
       "description": "Controla el modo de ejecucion global que se usa para las compuertas de seguridad y acceso a herramientas.",
       "restrictionMessage": "Solo los superadministradores pueden cambiar el perfil de ejecucion.",
+      "lockedMessage": "Este perfil de ejecucion esta bloqueado por la configuracion del entorno.",
       "options": {
         "offline": "Sin conexion",
-        "air_gapped": "Aislado",
         "online": "En linea"
       },
       "feedback": {
@@ -805,17 +805,17 @@
     "toggleTooltip": "Modo de ejecución actual: {{mode}}",
     "online": "En línea",
     "offline": "Sin conexión",
-    "airGapped": "Aislado",
     "permissionDenied": "Solo los superadministradores pueden cambiar el modo de ejecución.",
+    "lockedByEnvironment": "El modo de ejecución está bloqueado por la configuración del entorno en {{mode}}.",
     "updateFailed": "No se pudo actualizar el modo de ejecución.",
-    "localOnlyLabel": "Solo local",
-    "confirmEnableLocalOnly": "¿Activar el modo solo local para todos los usuarios? Las acciones que dependen de internet se bloquearan en todo el sistema.",
+    "offlineLabel": "Sin conexión",
+    "confirmEnableOffline": "¿Cambiar al modo sin conexión para todos los usuarios? Las acciones que dependen de internet se bloquearán en todo el sistema.",
     "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?",
     "dialog": {
-      "titleLocalOnly": "Confirmar ejecución solo local",
+      "titleOffline": "Confirmar ejecución sin conexión",
       "titleOnline": "Confirmar ejecución en línea",
       "cancel": "Cancelar",
-      "confirmLocalOnly": "Activar solo local",
+      "confirmOffline": "Cambiar a sin conexión",
       "confirmOnline": "Cambiar a en línea"
     }
   }

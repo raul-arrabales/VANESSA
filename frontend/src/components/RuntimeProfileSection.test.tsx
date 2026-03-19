@@ -5,6 +5,7 @@ import RuntimeProfileSection from "./RuntimeProfileSection";
 const setMode = vi.fn();
 
 let mockRole: "user" | "superadmin" = "user";
+let mockIsLocked = false;
 
 vi.mock("../auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -21,6 +22,8 @@ vi.mock("../auth/AuthProvider", () => ({
 vi.mock("../runtime/RuntimeModeProvider", () => ({
   useRuntimeMode: () => ({
     mode: "offline",
+    isLocked: mockIsLocked,
+    source: "database",
     isLoading: false,
     isSaving: false,
     error: "",
@@ -33,6 +36,7 @@ describe("RuntimeProfileSection", () => {
     vi.clearAllMocks();
     setMode.mockResolvedValue("online");
     mockRole = "user";
+    mockIsLocked = false;
   });
 
   it("shows restriction message for non-superadmin users", async () => {
@@ -49,5 +53,15 @@ describe("RuntimeProfileSection", () => {
     fireEvent.click(screen.getByRole("radio", { name: "settings.runtime.options.online" }));
 
     await waitFor(() => expect(setMode).toHaveBeenCalledWith("online"));
+  });
+
+  it("shows a lock message when the runtime profile is forced by environment", async () => {
+    mockRole = "superadmin";
+    mockIsLocked = true;
+
+    render(<RuntimeProfileSection />);
+
+    await screen.findByText("settings.runtime.lockedMessage");
+    expect(screen.getByRole("group")).toBeDisabled();
   });
 });

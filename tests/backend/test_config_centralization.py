@@ -28,6 +28,7 @@ def test_backend_runtime_config_defaults(monkeypatch: pytest.MonkeyPatch):
         "KWS_URL",
         "WEAVIATE_URL",
         "VANESSA_RUNTIME_PROFILE",
+        "VANESSA_RUNTIME_PROFILE_FORCE",
         "KWS_DETECTION_THRESHOLD",
         "KWS_COOLDOWN_MS",
     ):
@@ -38,7 +39,8 @@ def test_backend_runtime_config_defaults(monkeypatch: pytest.MonkeyPatch):
     assert runtime.backend_url == backend_config.DEFAULT_BACKEND_URL
     assert runtime.llm_url == backend_config.DEFAULT_LLM_URL
     assert runtime.agent_engine_service_token == backend_config.DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
-    assert runtime.runtime_profile_override is None
+    assert runtime.runtime_profile_seed is None
+    assert runtime.runtime_profile_force is None
 
 
 def test_backend_and_engine_token_defaults_are_aligned():
@@ -54,11 +56,22 @@ def test_backend_and_engine_runtime_profiles_are_aligned():
 
 
 
-def test_backend_runtime_profile_override_ignores_invalid_values(monkeypatch: pytest.MonkeyPatch):
+def test_backend_runtime_profile_envs_ignore_invalid_values(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "invalid")
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "invalid")
 
     runtime = backend_config.get_backend_runtime_config()
-    assert runtime.runtime_profile_override is None
+    assert runtime.runtime_profile_seed is None
+    assert runtime.runtime_profile_force is None
+
+
+def test_backend_runtime_profile_envs_normalize_legacy_air_gapped(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE", "air_gapped")
+    monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "air_gapped")
+
+    runtime = backend_config.get_backend_runtime_config()
+    assert runtime.runtime_profile_seed == "offline"
+    assert runtime.runtime_profile_force == "offline"
 
 
 def test_model_credentials_encryption_key_prefers_dedicated_env(monkeypatch: pytest.MonkeyPatch):

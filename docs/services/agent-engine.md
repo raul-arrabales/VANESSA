@@ -28,7 +28,7 @@ Execution flow summary:
 
 1. Load the agent spec and referenced `tool_refs`.
 2. Resolve and validate tool specs from the registry.
-3. Enforce runtime-profile rules such as blocking online-only tools in `offline` and `air_gapped`.
+3. Enforce runtime-profile rules such as blocking online-only tools in `offline`.
 4. Convert allowed tools into OpenAI-compatible tool definitions.
 5. Call the active `llm_inference` provider with those tool definitions attached.
 6. If the model returns tool calls, dispatch them through the active `mcp_runtime` or `sandbox_execution` provider.

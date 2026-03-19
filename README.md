@@ -214,7 +214,7 @@ VANESSA currently uses **global runtime profile semantics** for safety gates and
 - `GET /v1/runtime/profile` is available to authenticated users for visibility.
 - `PUT /v1/runtime/profile` is restricted to `superadmin` users.
 - Frontend settings show the runtime profile toggle to all authenticated users, but only superadmins can modify it.
-- Agent tool access also uses this same global runtime profile. For example, MCP-backed web search is blocked outside `online`, while sandbox-backed Python execution can remain available in `offline` and `air_gapped` profiles when the sandbox runtime capability is active.
+- Agent tool access also uses this same global runtime profile. For example, MCP-backed web search is blocked outside `online`, while sandbox-backed Python execution can remain available in `offline` when the sandbox runtime capability is active. Legacy `air_gapped` values are normalized to `offline`.
 
 When adding new safety/tool gates, use this same global runtime profile contract instead of creating per-user overrides unless the platform semantics are explicitly revised.
 
