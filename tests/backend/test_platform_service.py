@@ -67,6 +67,36 @@ def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypa
     assert exc_info.value.code == "provider_capability_mismatch"
 
 
+def test_create_deployment_profile_requires_served_model_for_embeddings(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"embeddings"})
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_id: {
+            "id": provider_id,
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.create_deployment_profile(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            payload={
+                "slug": "profile-a",
+                "display_name": "Profile A",
+                "bindings": [
+                    {"capability": "embeddings", "provider_id": "provider-1"},
+                ],
+            },
+            created_by_user_id=1,
+        )
+
+    assert exc_info.value.code == "served_model_required"
+
+
 def test_activate_deployment_profile_requires_all_required_capabilities(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -110,30 +140,20 @@ def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeyp
             {"capability_key": "vector_store", "provider_instance_id": "provider-2", "enabled": True},
         ],
     )
-    def _validate_provider(_db, *, config, provider_instance_id):
-        del config
-        if provider_instance_id == "provider-1":
+    def _validate_binding(binding):
+        if binding.provider_instance_id == "provider-1":
             return {
-                "provider": {"id": provider_instance_id, "slug": "provider-1"},
-                "validation": {
-                    "health": {"reachable": False, "status_code": 503},
-                    "models_reachable": False,
-                },
+                "health": {"reachable": False, "status_code": 503},
+                "models_reachable": False,
             }
-        if provider_instance_id == "provider-embeddings":
+        if binding.provider_instance_id == "provider-embeddings":
             return {
-                "provider": {"id": provider_instance_id, "slug": "provider-embeddings"},
-                "validation": {
-                    "health": {"reachable": True, "status_code": 200},
-                    "embeddings_reachable": True,
-                },
+                "health": {"reachable": True, "status_code": 200},
+                "embeddings_reachable": True,
             }
-        return {
-            "provider": {"id": provider_instance_id, "slug": "provider-2"},
-            "validation": {"health": {"reachable": True, "status_code": 200}},
-        }
+        return {"health": {"reachable": True, "status_code": 200}}
 
-    monkeypatch.setattr(platform_service, "validate_provider", _validate_provider)
+    monkeypatch.setattr(platform_service, "_validate_provider_binding", _validate_binding)
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         platform_service.activate_deployment_profile(
@@ -319,6 +339,36 @@ def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.Mo
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
         platform_service.platform_repo,
+        "get_active_binding_for_provider_instance",
+        lambda _db, *, provider_instance_id: {
+            "capability_key": "embeddings",
+            "provider_instance_id": provider_instance_id,
+            "provider_slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "provider_display_name": "vLLM embeddings local",
+            "provider_description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config_json": {"embeddings_path": "/v1/embeddings"},
+            "binding_config": {},
+            "adapter_kind": "openai_compatible_embeddings",
+            "deployment_profile_id": "deployment-1",
+            "deployment_profile_slug": "local-default",
+            "deployment_profile_display_name": "Local Default",
+            "served_model_id": "local-embed",
+            "served_model_name": "Local Embed",
+            "served_model_provider": "huggingface",
+            "served_model_backend_kind": "local",
+            "served_model_type": "embedding",
+            "served_model_provider_model_id": "local-vllm-embeddings-default",
+            "served_model_local_path": "/models/embed",
+            "served_model_source_id": "hf/local-embed",
+            "served_model_availability": "offline_ready",
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
         "get_provider_instance",
         lambda _db, provider_instance_id: {
             "id": provider_instance_id,
@@ -331,33 +381,17 @@ def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.Mo
             "endpoint_url": "http://llm:8000",
             "healthcheck_url": "http://llm:8000/health",
             "enabled": True,
-            "config_json": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
-        },
+                "config_json": {"embeddings_path": "/v1/embeddings"},
+            },
     )
     monkeypatch.setattr(
         platform_service,
-        "resolve_embeddings_adapter",
-        lambda _db, config, provider_instance_id=None: type(
+        "_adapter_from_binding",
+        lambda binding: type(
             "FakeEmbeddingsAdapter",
             (),
             {
-                "binding": platform_service.ProviderBinding(
-                    capability_key="embeddings",
-                    provider_instance_id="provider-embeddings",
-                    provider_slug="vllm-embeddings-local",
-                    provider_key="vllm_embeddings_local",
-                    provider_display_name="vLLM embeddings local",
-                    provider_description="desc",
-                    endpoint_url="http://llm:8000",
-                    healthcheck_url="http://llm:8000/health",
-                    enabled=True,
-                    adapter_kind="openai_compatible_embeddings",
-                    config={"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
-                    binding_config={},
-                    deployment_profile_id="deployment-1",
-                    deployment_profile_slug="local-default",
-                    deployment_profile_display_name="Local Default",
-                ),
+                "binding": binding,
                 "health": lambda self: {"reachable": True, "status_code": 200},
                 "embed_texts": lambda self, *, texts: (
                     {"embeddings": [[0.1, 0.2, 0.3]], "embedding_dimension": 3},
@@ -456,7 +490,8 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
         created_profiles.append(slug)
         return {"id": f"{slug}-id"}
 
-    def _upsert_deployment_binding(_db, *, deployment_profile_id, capability_key, provider_instance_id, binding_config):
+    def _upsert_deployment_binding(_db, *, deployment_profile_id, capability_key, provider_instance_id, served_model_id=None, binding_config):
+        del served_model_id
         del binding_config
         binding_calls.append((deployment_profile_id, capability_key, provider_instance_id))
         return {}
@@ -526,7 +561,7 @@ def test_ensure_platform_bootstrap_state_seeds_qdrant_profile_when_configured(mo
     monkeypatch.setattr(
         platform_service.platform_repo,
         "upsert_deployment_binding",
-        lambda _db, *, deployment_profile_id, capability_key, provider_instance_id, binding_config: (
+        lambda _db, *, deployment_profile_id, capability_key, provider_instance_id, served_model_id=None, binding_config: (
             binding_calls.append((deployment_profile_id, capability_key, provider_instance_id)) or {}
         ),
     )
@@ -627,12 +662,21 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "endpoint_url": "http://llm:8000",
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
-                "config_json": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                "config_json": {"embeddings_path": "/v1/embeddings"},
                 "binding_config": {},
                 "adapter_kind": "openai_compatible_embeddings",
                 "deployment_profile_id": "deployment-1",
                 "deployment_profile_slug": deployment_slug,
                 "deployment_profile_display_name": "Runtime Deployment",
+                "served_model_id": "local-embed",
+                "served_model_name": "Local Embed",
+                "served_model_provider": "huggingface",
+                "served_model_backend_kind": "local",
+                "served_model_type": "embedding",
+                "served_model_provider_model_id": "local-vllm-embeddings-default",
+                "served_model_local_path": "/models/embed",
+                "served_model_source_id": "hf/local-embed",
+                "served_model_availability": "offline_ready",
             }
         if capability_key == "sandbox_execution":
             return None
@@ -682,6 +726,8 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
                 "config": {"chat_completion_path": "/v1/chat/completions"},
+                "served_model_id": None,
+                "served_model": None,
                 "binding_config": {},
             },
             "embeddings": {
@@ -694,7 +740,19 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "endpoint_url": "http://llm:8000",
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
-                "config": {"embeddings_path": "/v1/embeddings", "forced_model_id": "local-vllm-embeddings-default"},
+                "config": {"embeddings_path": "/v1/embeddings"},
+                "served_model_id": "local-embed",
+                "served_model": {
+                    "id": "local-embed",
+                    "name": "Local Embed",
+                    "provider": "huggingface",
+                    "backend": "local",
+                    "model_type": "embedding",
+                    "provider_model_id": "local-vllm-embeddings-default",
+                    "local_path": "/models/embed",
+                    "source_id": "hf/local-embed",
+                    "availability": "offline_ready",
+                },
                 "binding_config": {},
             },
             "vector_store": {
@@ -712,6 +770,8 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 ),
                 "enabled": True,
                 "config": {},
+                "served_model_id": None,
+                "served_model": None,
                 "binding_config": {},
             },
         },
@@ -756,6 +816,15 @@ def test_get_active_platform_runtime_includes_optional_tool_runtime_bindings(mon
                 "deployment_profile_id": "deployment-1",
                 "deployment_profile_slug": "local-default",
                 "deployment_profile_display_name": "Local Default",
+                "served_model_id": "local-embed",
+                "served_model_name": "Local Embed",
+                "served_model_provider": "huggingface",
+                "served_model_backend_kind": "local",
+                "served_model_type": "embedding",
+                "served_model_provider_model_id": "local-vllm-embeddings-default",
+                "served_model_local_path": "/models/embed",
+                "served_model_source_id": "hf/local-embed",
+                "served_model_availability": "offline_ready",
             },
             "vector_store": {
                 "capability_key": "vector_store",

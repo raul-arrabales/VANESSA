@@ -31,6 +31,7 @@ This adds database support for:
 
 - Provider credentials (`model_provider_credentials`) with encrypted API keys.
 - Extended model classification metadata on `model_registry`:
+  - model type (`llm`, `embedding`)
   - origin scope (`platform` vs `personal`)
   - backend kind (`local` vs `external_api`)
   - source kind (`hf_import`, `local_folder`, `external_provider`)
@@ -63,7 +64,9 @@ Backend now exposes model-management endpoints for credential and model lifecycl
 Key behavior:
 
 - Credentials are write-only from API responses (last4 only) and can only be revoked by owner.
-- External model registration requires fixed `provider_model_id` and live provider validation through OpenAI-compatible `/models` discovery.
+- Managed models are now typed with `model_type in {'llm', 'embedding'}`. Superadmin catalog/download flows persist that type, and Hugging Face discovery switches between `text-generation` and `feature-extraction` accordingly.
+- Personal external model registration still validates against user credentials. Platform external models may omit `credential_id` so shared platform providers can supply auth through control-plane `secret_refs`.
 - Platform model registration remains superadmin-only; personal model registration is available to regular users.
 - Available/enabled model listing (`/v1/models/available`, `/v1/model-governance/allowed`, `/v1/model-governance/enabled`) respects runtime profile (offline filtering) and assignment visibility.
 - Effective visibility is the union of role scope assignments (`model_scope_assignments`) and explicit target assignments (`model_user_assignments`, `model_group_assignments`, `model_global_assignments`).
+- Platform deployment bindings now reference the same canonical `model_registry` inventory via `served_model_id`. In v1 this is required for `embeddings`, which allows the same control-plane design to support both local models and shared cloud model IDs.

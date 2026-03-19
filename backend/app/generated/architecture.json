@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-03-17T22:27:10+00:00",
+  "generated_at": "2026-03-19T19:51:52+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -16,7 +16,7 @@
       "container": "backend",
       "label": "Backend API",
       "group": "api",
-      "description": "Flask API gateway and orchestration entrypoint.",
+      "description": "Flask API gateway, model governance surface, and capability/provider/served-model control plane.",
       "public_exposed": true,
       "criticality": "high"
     },
@@ -349,5 +349,5 @@
       }
     }
   },
-  "source_hash": "9be3b44f3a40d5500aa42c7e51dc67f24c0d3ac3e06aaf6de1b0ba72a4d5f14d"
+  "source_hash": "87173c2012ac7dcb37ecc89983e49e1d71672e3d28fcc49eb4c3a3f86651745e"
 }

@@ -48,8 +48,10 @@ export default function SuperAdminModelsPage(): JSX.Element {
   const [assignments, setAssignments] = useState<ModelScopeAssignment[]>([]);
   const [newModelName, setNewModelName] = useState("");
   const [newModelProvider, setNewModelProvider] = useState("");
+  const [catalogModelType, setCatalogModelType] = useState<"llm" | "embedding">("llm");
   const [feedback, setFeedback] = useState("");
   const [discoverQuery, setDiscoverQuery] = useState("");
+  const [discoveryModelType, setDiscoveryModelType] = useState<"llm" | "embedding">("llm");
   const [discoveredModels, setDiscoveredModels] = useState<HfDiscoveredModel[]>([]);
   const [selectedModelInfo, setSelectedModelInfo] = useState<string>("");
   const [downloadJobs, setDownloadJobs] = useState<ModelDownloadJob[]>([]);
@@ -196,12 +198,14 @@ export default function SuperAdminModelsPage(): JSX.Element {
         {
           name: newModelName.trim(),
           provider: newModelProvider.trim() || undefined,
+          model_type: catalogModelType,
         },
         token,
       );
       setModels((currentModels) => [...currentModels, created]);
       setNewModelName("");
       setNewModelProvider("");
+      setCatalogModelType("llm");
       setFeedback(t("models.feedback.created"));
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : t("models.feedback.createFailed"));
@@ -215,7 +219,8 @@ export default function SuperAdminModelsPage(): JSX.Element {
     try {
       const modelsFromHf = await discoverHfModels(token, {
         query: discoverQuery,
-        task: "text-generation",
+        task: discoveryModelType === "embedding" ? "feature-extraction" : "text-generation",
+        model_type: discoveryModelType,
         sort: "downloads",
         limit: 12,
       });
@@ -251,6 +256,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
         {
           source_id: model.source_id,
           name: model.name,
+          model_type: discoveryModelType,
         },
         token,
       );
@@ -294,6 +300,15 @@ export default function SuperAdminModelsPage(): JSX.Element {
         <h2 className="section-title">{t("models.discovery.title")}</h2>
         <p className="status-text">{t("models.discovery.description")}</p>
         <div className="button-row">
+          <select
+            className="field-input"
+            value={discoveryModelType}
+            onChange={(event) => setDiscoveryModelType(event.currentTarget.value as "llm" | "embedding")}
+            aria-label={t("models.discovery.typeLabel")}
+          >
+            <option value="llm">{t("models.types.llm")}</option>
+            <option value="embedding">{t("models.types.embedding")}</option>
+          </select>
           <input
             className="field-input"
             value={discoverQuery}
@@ -311,7 +326,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
             <li key={model.source_id} className="status-row">
               <strong>{model.source_id}</strong>
               <span className="status-text">
-                {t("models.discovery.downloadCount", { count: model.downloads ?? 0 })}
+                {`${t("models.discovery.downloadCount", { count: model.downloads ?? 0 })} · ${t(`models.types.${discoveryModelType}`)}`}
               </span>
               <div className="button-row">
                 <button type="button" className="btn btn-ghost" onClick={() => void inspectModel(model.source_id)}>
@@ -344,6 +359,16 @@ export default function SuperAdminModelsPage(): JSX.Element {
             value={newModelProvider}
             onChange={(event) => setNewModelProvider(event.currentTarget.value)}
           />
+          <label className="field-label" htmlFor="model-type">{t("models.catalog.typeLabel")}</label>
+          <select
+            id="model-type"
+            className="field-input"
+            value={catalogModelType}
+            onChange={(event) => setCatalogModelType(event.currentTarget.value as "llm" | "embedding")}
+          >
+            <option value="llm">{t("models.types.llm")}</option>
+            <option value="embedding">{t("models.types.embedding")}</option>
+          </select>
           <button type="button" className="btn btn-primary" onClick={() => void createModel()}>
             {t("models.catalog.addButton")}
           </button>
@@ -352,7 +377,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
           {models.map((model) => (
             <li key={model.id}>
               <strong>{model.name}</strong>
-              <p className="status-text">{model.id} · {model.provider} · {model.status ?? "available"}</p>
+              <p className="status-text">{model.id} · {model.model_type ?? "unknown"} · {model.provider} · {model.status ?? "available"}</p>
             </li>
           ))}
         </ul>

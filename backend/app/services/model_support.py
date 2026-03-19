@@ -20,6 +20,7 @@ def serialize_catalog_item(row: dict[str, Any]) -> dict[str, Any]:
         "source_id": row.get("source_id"),
         "local_path": row.get("local_path"),
         "status": row.get("status"),
+        "model_type": row.get("model_type"),
         "metadata": row.get("metadata") or {},
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,

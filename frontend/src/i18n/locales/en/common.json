@@ -496,17 +496,23 @@
   "models": {
     "title": "Model catalog management",
     "subtitle": "Manage catalog entries and role-based model assignments.",
+    "types": {
+      "llm": "LLM",
+      "embedding": "Embedding"
+    },
     "catalog": {
       "title": "Catalog operations",
       "description": "Add models to the platform catalog.",
       "nameLabel": "Model name",
       "providerLabel": "Provider",
+      "typeLabel": "Model type",
       "addButton": "Add model to catalog",
       "listAria": "Model catalog entries"
     },
     "discovery": {
       "title": "Hugging Face discovery",
       "description": "Search and inspect open models before downloading them to local storage.",
+      "typeLabel": "Discovery model type",
       "queryLabel": "Discovery query",
       "queryPlaceholder": "e.g. llama instruct",
       "searchButton": "Search models",
@@ -583,7 +589,8 @@
         "description": "Description",
         "llmProvider": "LLM provider",
         "vectorProvider": "Vector provider",
-        "providerForCapability": "{{capability}} provider"
+        "providerForCapability": "{{capability}} provider",
+        "servedModelForCapability": "{{capability}} served model"
       }
     },
     "capabilities": {
@@ -601,6 +608,9 @@
       "modelsUnavailable": "Model discovery unavailable",
       "embeddingsReachable": "Embeddings reachable ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings unavailable",
+      "bindingErrors": {
+        "served_model_required": "Select a served model in a deployment binding to validate embeddings."
+      },
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
       "editing": "Editing provider {{slug}}.",
@@ -625,6 +635,7 @@
       "columns": {
         "capability": "Capability",
         "provider": "Provider",
+        "servedModel": "Served model",
         "adapter": "Adapter",
         "status": "Status"
       }
@@ -676,6 +687,7 @@
       "loadFailed": "Unable to load platform control data.",
       "invalidJson": "{{field}} must be valid JSON object text.",
       "bindingRequired": "Both required capability bindings must be selected.",
+      "servedModelRequired": "{{capability}} requires a served model.",
       "validationSuccess": "Validated provider {{slug}}.",
       "validationFailed": "Unable to validate provider.",
       "providerCreated": "Created provider {{name}}.",

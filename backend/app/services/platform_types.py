@@ -40,6 +40,8 @@ class ProviderBinding:
     deployment_profile_id: str
     deployment_profile_slug: str
     deployment_profile_display_name: str
+    served_model_id: str | None = None
+    served_model: dict[str, Any] | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "ProviderBinding":
@@ -61,6 +63,12 @@ class ProviderBinding:
             enabled=bool(row.get("enabled", True)),
             adapter_kind=str(row.get("adapter_kind", "")).strip().lower(),
             config=dict(row.get("config_json") or row.get("config") or {}),
+            served_model_id=str(row.get("served_model_id", "")).strip() or None,
+            served_model=(
+                dict(row.get("served_model"))
+                if isinstance(row.get("served_model"), dict)
+                else _served_model_from_row(row)
+            ),
             binding_config=dict(row.get("binding_config") or {}),
             deployment_profile_id=str(row.get("deployment_profile_id", "")).strip(),
             deployment_profile_slug=str(row.get("deployment_profile_slug", "")).strip(),
@@ -72,6 +80,7 @@ class ProviderBinding:
 class DeploymentBindingInput:
     capability_key: str
     provider_instance_id: str
+    served_model_id: str | None
     binding_config: dict[str, Any]
 
 
@@ -81,3 +90,20 @@ class DeploymentProfileCreateInput:
     display_name: str
     description: str
     bindings: list[DeploymentBindingInput]
+
+
+def _served_model_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    model_id = str(row.get("served_model_id", "")).strip()
+    if not model_id:
+        return None
+    return {
+        "id": model_id,
+        "name": row.get("served_model_name"),
+        "provider": row.get("served_model_provider"),
+        "backend": row.get("served_model_backend_kind"),
+        "model_type": row.get("served_model_type"),
+        "provider_model_id": row.get("served_model_provider_model_id"),
+        "local_path": row.get("served_model_local_path"),
+        "source_id": row.get("served_model_source_id"),
+        "availability": row.get("served_model_availability"),
+    }

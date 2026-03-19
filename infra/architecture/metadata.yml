@@ -29,7 +29,7 @@ services:
   backend:
     label: Backend API
     group: api
-    description: Flask API gateway and orchestration entrypoint.
+    description: Flask API gateway, model governance surface, and capability/provider/served-model control plane.
     public_exposed: true
     criticality: high
   kws:

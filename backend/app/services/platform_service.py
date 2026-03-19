@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
+from ..repositories.model_management import get_model_by_id
 from ..repositories import platform_control_plane as platform_repo
 from .platform_adapters import (
     EmbeddingsAdapter,
@@ -41,6 +42,9 @@ _LLAMA_CPP_DEPLOYMENT_DESCRIPTION = "Optional local profile using llama.cpp for 
 _QDRANT_DEPLOYMENT_SLUG = "local-qdrant"
 _QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
 _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
+_MODEL_TYPE_EMBEDDING = "embedding"
+_MODEL_TYPE_LLM = "llm"
+_CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
 
 
 def _known_capability_keys(database_url: str) -> set[str]:
@@ -110,6 +114,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         adapter_kind="openai_compatible_embeddings",
         display_name="vLLM embeddings local",
         description="Local embeddings provider exposed through the llm gateway.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="openai_compatible_cloud_llm",
+        capability_key=CAPABILITY_LLM_INFERENCE,
+        adapter_kind="openai_compatible_llm",
+        display_name="OpenAI-compatible cloud LLM",
+        description="Shared cloud LLM endpoint using OpenAI-compatible APIs and platform secret refs.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="openai_compatible_cloud_embeddings",
+        capability_key=CAPABILITY_EMBEDDINGS,
+        adapter_kind="openai_compatible_embeddings",
+        display_name="OpenAI-compatible cloud embeddings",
+        description="Shared cloud embeddings endpoint using OpenAI-compatible APIs and platform secret refs.",
     )
     platform_repo.ensure_provider_family(
         database_url,
@@ -185,7 +205,6 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         config_json={
             "models_path": "/v1/models",
             "embeddings_path": "/v1/embeddings",
-            "forced_model_id": "local-vllm-embeddings-default",
             "input_type": "text",
             "request_timeout_seconds": llm_request_timeout_seconds,
         },
@@ -275,6 +294,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_LLM_INFERENCE,
         provider_instance_id=str(vllm_provider["id"]),
+        served_model_id=None,
         binding_config={},
     )
     platform_repo.upsert_deployment_binding(
@@ -282,6 +302,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_EMBEDDINGS,
         provider_instance_id=str(embeddings_provider["id"]),
+        served_model_id=None,
         binding_config={},
     )
     platform_repo.upsert_deployment_binding(
@@ -289,6 +310,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_VECTOR_STORE,
         provider_instance_id=str(weaviate_provider["id"]),
+        served_model_id=None,
         binding_config={},
     )
     if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -297,6 +319,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(profile["id"]),
             capability_key=CAPABILITY_SANDBOX_EXECUTION,
             provider_instance_id=str(sandbox_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
     if mcp_gateway_provider is not None:
@@ -305,6 +328,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(profile["id"]),
             capability_key=CAPABILITY_MCP_RUNTIME,
             provider_instance_id=str(mcp_gateway_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
 
@@ -322,6 +346,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=str(llama_cpp_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -329,6 +354,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_EMBEDDINGS,
             provider_instance_id=str(embeddings_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -336,6 +362,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(weaviate_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -344,6 +371,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(llama_profile["id"]),
                 capability_key=CAPABILITY_SANDBOX_EXECUTION,
                 provider_instance_id=str(sandbox_provider["id"]),
+                served_model_id=None,
                 binding_config={},
             )
         if mcp_gateway_provider is not None:
@@ -352,6 +380,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(llama_profile["id"]),
                 capability_key=CAPABILITY_MCP_RUNTIME,
                 provider_instance_id=str(mcp_gateway_provider["id"]),
+                served_model_id=None,
                 binding_config={},
             )
 
@@ -369,6 +398,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=str(vllm_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -376,6 +406,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_EMBEDDINGS,
             provider_instance_id=str(embeddings_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -383,6 +414,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(qdrant_provider["id"]),
+            served_model_id=None,
             binding_config={},
         )
         if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -391,6 +423,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(qdrant_profile["id"]),
                 capability_key=CAPABILITY_SANDBOX_EXECUTION,
                 provider_instance_id=str(sandbox_provider["id"]),
+                served_model_id=None,
                 binding_config={},
             )
         if mcp_gateway_provider is not None:
@@ -399,6 +432,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(qdrant_profile["id"]),
                 capability_key=CAPABILITY_MCP_RUNTIME,
                 provider_instance_id=str(mcp_gateway_provider["id"]),
+                served_model_id=None,
                 binding_config={},
             )
 
@@ -574,33 +608,7 @@ def create_deployment_profile(
 ) -> dict[str, Any]:
     ensure_platform_bootstrap_state(database_url, config)
     normalized = _coerce_create_input(database_url, payload)
-    seen_capabilities: set[str] = set()
-    resolved_bindings: list[dict[str, Any]] = []
-
-    for binding in normalized.bindings:
-        if binding.capability_key in seen_capabilities:
-            raise PlatformControlPlaneError(
-                "duplicate_capability_binding",
-                f"Capability '{binding.capability_key}' is bound more than once",
-                status_code=400,
-            )
-        provider = platform_repo.get_provider_instance(database_url, binding.provider_instance_id)
-        if provider is None:
-            raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
-        if str(provider["capability_key"]).strip().lower() != binding.capability_key:
-            raise PlatformControlPlaneError(
-                "provider_capability_mismatch",
-                "Provider instance does not implement the requested capability",
-                status_code=400,
-            )
-        resolved_bindings.append(
-            {
-                "capability_key": binding.capability_key,
-                "provider_instance_id": binding.provider_instance_id,
-                "binding_config": binding.binding_config,
-            }
-        )
-        seen_capabilities.add(binding.capability_key)
+    resolved_bindings = _resolve_deployment_bindings(database_url, normalized.bindings)
 
     try:
         created = platform_repo.create_deployment_profile(
@@ -698,6 +706,7 @@ def clone_deployment_profile(
                 {
                     "capability_key": str(binding["capability_key"]).strip().lower(),
                     "provider_instance_id": str(binding["provider_instance_id"]).strip(),
+                    "served_model_id": str(binding.get("served_model_id") or "").strip() or None,
                     "binding_config": dict(binding.get("binding_config") or {}),
                 }
                 for binding in source_bindings
@@ -796,9 +805,10 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
     if provider_row is None:
         raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
 
-    binding = ProviderBinding.from_row(provider_row)
+    binding_row = platform_repo.get_active_binding_for_provider_instance(database_url, provider_instance_id=provider_instance_id)
+    binding = ProviderBinding.from_row(binding_row or provider_row)
     if binding.capability_key == CAPABILITY_LLM_INFERENCE:
-        adapter = resolve_llm_inference_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        adapter = _adapter_from_binding(binding)
         health = adapter.health()
         models_payload, models_status = adapter.list_models()
         return {
@@ -811,7 +821,18 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
         }
 
     if binding.capability_key == CAPABILITY_EMBEDDINGS:
-        adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        health = OpenAICompatibleEmbeddingsAdapter(binding).health()
+        if not binding.served_model_id:
+            return {
+                "provider": _serialize_provider_row(provider_row),
+                "validation": {
+                    "health": health,
+                    "embeddings_reachable": False,
+                    "embeddings_status_code": 409,
+                    "binding_error": "served_model_required",
+                },
+            }
+        adapter = _adapter_from_binding(binding)
         health = adapter.health()
         embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
         embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
@@ -1132,7 +1153,9 @@ def _resolve_provider_binding(
 ) -> ProviderBinding:
     ensure_platform_bootstrap_state(database_url, config)
     if provider_instance_id:
-        row = platform_repo.get_provider_instance(database_url, provider_instance_id)
+        row = platform_repo.get_active_binding_for_provider_instance(database_url, provider_instance_id=provider_instance_id)
+        if row is None:
+            row = platform_repo.get_provider_instance(database_url, provider_instance_id)
         if row is None:
             raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
         if str(row["capability_key"]).strip().lower() != capability_key:
@@ -1179,6 +1202,7 @@ def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> Deployme
             raise PlatformControlPlaneError("invalid_binding", "Each binding must be an object", status_code=400)
         capability_key = str(item.get("capability", "")).strip().lower()
         provider_instance_id = str(item.get("provider_id", "")).strip()
+        served_model_id = str(item.get("served_model_id", "")).strip() or None
         if capability_key not in _known_capability_keys(database_url):
             raise PlatformControlPlaneError("invalid_capability", "Unsupported capability", status_code=400)
         if not provider_instance_id:
@@ -1188,6 +1212,7 @@ def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> Deployme
             DeploymentBindingInput(
                 capability_key=capability_key,
                 provider_instance_id=provider_instance_id,
+                served_model_id=served_model_id,
                 binding_config=dict(binding_config),
             )
         )
@@ -1305,6 +1330,12 @@ def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBin
             {
                 "capability_key": binding.capability_key,
                 "provider_instance_id": binding.provider_instance_id,
+                "served_model_id": _validate_binding_served_model(
+                    database_url,
+                    provider_row=provider,
+                    capability_key=binding.capability_key,
+                    served_model_id=binding.served_model_id,
+                ),
                 "binding_config": binding.binding_config,
             }
         )
@@ -1317,11 +1348,20 @@ def _validate_deployment_profile_bindings(
     config: AuthConfig,
     bindings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
+    del database_url, config
     failures: list[dict[str, Any]] = []
     for binding in bindings:
-        provider_instance_id = str(binding["provider_instance_id"])
-        result = validate_provider(database_url, config=config, provider_instance_id=provider_instance_id)
-        validation = dict(result.get("validation") or {})
+        provider_binding = ProviderBinding.from_row(binding)
+        validation = _validate_provider_binding(provider_binding)
+        result = {
+            "provider": {
+                "id": provider_binding.provider_instance_id,
+                "slug": provider_binding.provider_slug or provider_binding.provider_instance_id,
+                "provider_key": provider_binding.provider_key,
+                "display_name": provider_binding.provider_display_name,
+            },
+            "validation": validation,
+        }
         health = dict(validation.get("health") or {})
         reachable = bool(health.get("reachable"))
         models_reachable = validation.get("models_reachable")
@@ -1342,6 +1382,166 @@ def _validate_deployment_profile_bindings(
                 }
             )
     return failures
+
+
+def _adapter_from_binding(binding: ProviderBinding) -> Any:
+    if binding.adapter_kind == "openai_compatible_llm":
+        return OpenAICompatibleLlmAdapter(binding)
+    if binding.adapter_kind == "openai_compatible_embeddings":
+        return OpenAICompatibleEmbeddingsAdapter(binding)
+    if binding.adapter_kind == "weaviate_http":
+        return WeaviateVectorStoreAdapter(binding)
+    if binding.adapter_kind == "qdrant_http":
+        return QdrantVectorStoreAdapter(binding)
+    if binding.adapter_kind == "sandbox_http":
+        return HttpSandboxExecutionAdapter(binding)
+    if binding.adapter_kind == "mcp_http":
+        return HttpMcpRuntimeAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported adapter kind", status_code=500)
+
+
+def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
+    adapter = _adapter_from_binding(binding)
+    if binding.capability_key == CAPABILITY_LLM_INFERENCE:
+        health = adapter.health()
+        models_payload, models_status = adapter.list_models()
+        return {
+            "health": health,
+            "models_reachable": models_payload is not None and 200 <= models_status < 300,
+            "models_status_code": models_status,
+        }
+    if binding.capability_key == CAPABILITY_EMBEDDINGS:
+        health = adapter.health()
+        embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
+        embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
+        embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
+        return {
+            "health": health,
+            "embeddings_reachable": embeddings_payload is not None and 200 <= embeddings_status < 300,
+            "embeddings_status_code": embeddings_status,
+            "embedding_dimension": embedding_dimension,
+        }
+    if binding.capability_key == CAPABILITY_VECTOR_STORE:
+        return {"health": adapter.health()}
+    if binding.capability_key == CAPABILITY_SANDBOX_EXECUTION:
+        dry_run_payload, dry_run_status = adapter.execute_dry_run()
+        return {
+            "health": adapter.health(),
+            "execute_reachable": dry_run_payload is not None and 200 <= dry_run_status < 300,
+            "execute_status_code": dry_run_status,
+        }
+    if binding.capability_key == CAPABILITY_MCP_RUNTIME:
+        invoke_payload, invoke_status = adapter.invoke(
+            tool_name=str(binding.config.get("healthcheck_tool_name", "web_search")),
+            arguments={"query": "healthcheck", "top_k": 1},
+            request_metadata={"validation": True},
+        )
+        return {
+            "health": adapter.health(),
+            "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
+            "invoke_status_code": invoke_status,
+        }
+    raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
+
+
+def _validate_binding_served_model(
+    database_url: str,
+    *,
+    provider_row: dict[str, Any],
+    capability_key: str,
+    served_model_id: str | None,
+) -> str | None:
+    normalized_capability = capability_key.strip().lower()
+    normalized_served_model_id = str(served_model_id or "").strip() or None
+    if normalized_capability != CAPABILITY_EMBEDDINGS:
+        return normalized_served_model_id
+    if not normalized_served_model_id:
+        raise PlatformControlPlaneError(
+            "served_model_required",
+            "Embeddings bindings require a served_model_id",
+            status_code=400,
+        )
+
+    model_row = get_model_by_id(database_url, normalized_served_model_id)
+    if model_row is None:
+        raise PlatformControlPlaneError(
+            "served_model_not_found",
+            "Served model was not found",
+            status_code=404,
+            details={"served_model_id": normalized_served_model_id},
+        )
+
+    model_type = str(model_row.get("model_type", "")).strip().lower()
+    if model_type != _MODEL_TYPE_EMBEDDING:
+        raise PlatformControlPlaneError(
+            "served_model_type_mismatch",
+            "Embeddings bindings require a model with model_type=embedding",
+            status_code=400,
+            details={"served_model_id": normalized_served_model_id, "model_type": model_row.get("model_type")},
+        )
+
+    if _is_cloud_provider_row(provider_row):
+        if str(model_row.get("backend_kind", "")).strip().lower() != "external_api":
+            raise PlatformControlPlaneError(
+                "served_model_backend_mismatch",
+                "Cloud embeddings providers require an external_api embedding model",
+                status_code=400,
+                details={"served_model_id": normalized_served_model_id},
+            )
+        if not str(model_row.get("provider_model_id", "")).strip():
+            raise PlatformControlPlaneError(
+                "served_model_provider_model_id_required",
+                "Cloud embeddings providers require provider_model_id on the selected model",
+                status_code=400,
+                details={"served_model_id": normalized_served_model_id},
+            )
+        return normalized_served_model_id
+
+    backend_kind = str(model_row.get("backend_kind", "")).strip().lower()
+    availability = str(model_row.get("availability", "")).strip().lower()
+    if backend_kind != "local" and availability != "offline_ready":
+        raise PlatformControlPlaneError(
+            "served_model_backend_mismatch",
+            "Local embeddings providers require a local or offline-ready embedding model",
+            status_code=400,
+            details={"served_model_id": normalized_served_model_id},
+        )
+    if not _runtime_model_identifier(model_row):
+        raise PlatformControlPlaneError(
+            "served_model_runtime_id_required",
+            "Selected embedding model must define provider_model_id or local_path",
+            status_code=400,
+            details={"served_model_id": normalized_served_model_id},
+        )
+    return normalized_served_model_id
+
+
+def _runtime_model_identifier(model_row: dict[str, Any]) -> str:
+    provider_model_id = str(model_row.get("provider_model_id", "")).strip()
+    local_path = str(model_row.get("local_path", "")).strip()
+    return provider_model_id or local_path
+
+
+def _is_cloud_provider_row(provider_row: dict[str, Any]) -> bool:
+    provider_key = str(provider_row.get("provider_key", "")).strip().lower()
+    return provider_key in _CLOUD_PROVIDER_KEYS
+
+
+def _serialize_served_model_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    served_model_id = str(row.get("served_model_id", "")).strip()
+    if not served_model_id:
+        return None
+    return {
+        "id": served_model_id,
+        "name": row.get("served_model_name"),
+        "provider": row.get("served_model_provider"),
+        "backend": row.get("served_model_backend_kind"),
+        "model_type": row.get("served_model_type"),
+        "provider_model_id": row.get("served_model_provider_model_id"),
+        "local_path": row.get("served_model_local_path"),
+        "source_id": row.get("served_model_source_id"),
+        "availability": row.get("served_model_availability"),
+    }
 
 
 def _serialize_provider_family_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -1387,6 +1587,8 @@ def _serialize_runtime_binding(binding: ProviderBinding) -> dict[str, Any]:
         "healthcheck_url": binding.healthcheck_url,
         "enabled": binding.enabled,
         "config": dict(binding.config),
+        "served_model_id": binding.served_model_id,
+        "served_model": dict(binding.served_model) if binding.served_model else None,
         "binding_config": dict(binding.binding_config),
     }
 
@@ -1418,6 +1620,8 @@ def _serialize_deployment_profile(profile: dict[str, Any], bindings: list[dict[s
                     "enabled": bool(binding["enabled"]),
                     "adapter_kind": binding["adapter_kind"],
                 },
+                "served_model_id": str(binding.get("served_model_id") or "").strip() or None,
+                "served_model": _serialize_served_model_row(binding),
                 "config": dict(binding.get("binding_config") or {}),
             }
             for binding in bindings

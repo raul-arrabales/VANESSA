@@ -53,17 +53,24 @@ CREATE TABLE IF NOT EXISTS platform_deployment_bindings (
     deployment_profile_id UUID NOT NULL REFERENCES platform_deployment_profiles(id) ON DELETE CASCADE,
     capability_key TEXT NOT NULL REFERENCES platform_capabilities(capability_key) ON DELETE CASCADE,
     provider_instance_id UUID NOT NULL REFERENCES platform_provider_instances(id) ON DELETE RESTRICT,
+    served_model_id TEXT REFERENCES model_registry(model_id) ON DELETE SET NULL,
     binding_config JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (deployment_profile_id, capability_key)
 );
 
+ALTER TABLE platform_deployment_bindings
+    ADD COLUMN IF NOT EXISTS served_model_id TEXT REFERENCES model_registry(model_id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS platform_deployment_bindings_profile_idx
     ON platform_deployment_bindings (deployment_profile_id);
 
 CREATE INDEX IF NOT EXISTS platform_deployment_bindings_provider_idx
     ON platform_deployment_bindings (provider_instance_id);
+
+CREATE INDEX IF NOT EXISTS platform_deployment_bindings_served_model_idx
+    ON platform_deployment_bindings (served_model_id);
 
 CREATE TABLE IF NOT EXISTS platform_active_deployment (
     singleton_key TEXT PRIMARY KEY,

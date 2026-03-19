@@ -23,6 +23,11 @@ bp = Blueprint("model_catalog_v1", __name__)
 
 _DISCOVERY_LIMIT_MIN = 1
 _DISCOVERY_LIMIT_MAX = 50
+_ALLOWED_MODEL_TYPES = {"llm", "embedding"}
+_HF_TASK_BY_MODEL_TYPE = {
+    "llm": "text-generation",
+    "embedding": "feature-extraction",
+}
 
 
 def _json_error(status: int, code: str, message: str):
@@ -51,6 +56,7 @@ def create_catalog_item_v1():
     provider = str(payload.get("provider", "custom")).strip().lower() or "custom"
     source_id = str(payload.get("source_id", "")).strip() or None
     local_path = str(payload.get("local_path", "")).strip() or None
+    model_type = str(payload.get("model_type", "")).strip().lower()
     metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
 
     if not name:
@@ -70,6 +76,8 @@ def create_catalog_item_v1():
         local_path = str(candidate_resolved)
 
     model_id = str(payload.get("id", "")).strip() or model_id_from_source(source_id or name.lower().replace(" ", "-"))
+    if model_type not in _ALLOWED_MODEL_TYPES:
+        return _json_error(400, "invalid_model_type", "model_type must be llm or embedding")
 
     if provider == "huggingface" and source_id:
         try:
@@ -88,6 +96,7 @@ def create_catalog_item_v1():
             source_id=source_id,
             local_path=local_path,
             status=str(payload.get("status", "available")),
+            model_type=model_type,
             metadata=metadata,
             created_by_user_id=int(g.current_user["id"]),
         )
@@ -109,7 +118,10 @@ def discover_models_huggingface_v1():
         return _json_error(exc.status_code, exc.code, str(exc))
 
     query = str(request.args.get("query", "")).strip()
-    task = str(request.args.get("task", "text-generation")).strip() or "text-generation"
+    model_type = str(request.args.get("model_type", "")).strip().lower() or None
+    if model_type is not None and model_type and model_type not in _ALLOWED_MODEL_TYPES:
+        return _json_error(400, "invalid_model_type", "model_type must be llm or embedding")
+    task = str(request.args.get("task", "")).strip() or _HF_TASK_BY_MODEL_TYPE.get(model_type or "llm", "text-generation")
     sort = str(request.args.get("sort", "downloads")).strip() or "downloads"
     limit_raw = str(request.args.get("limit", "10")).strip()
     try:
@@ -167,8 +179,11 @@ def start_model_download_v1():
         return _json_error(400, "invalid_payload", "Expected JSON object")
 
     source_id = str(payload.get("source_id", "")).strip()
+    model_type = str(payload.get("model_type", "")).strip().lower()
     if not source_id:
         return _json_error(400, "invalid_source_id", "source_id is required")
+    if model_type not in _ALLOWED_MODEL_TYPES:
+        return _json_error(400, "invalid_model_type", "model_type must be llm or embedding")
 
     allow_patterns = parse_patterns(payload.get("allow_patterns"))
     ignore_patterns = parse_patterns(payload.get("ignore_patterns"))
@@ -190,6 +205,7 @@ def start_model_download_v1():
         source_id=source_id,
         local_path=target_dir,
         status="downloading",
+        model_type=model_type,
         metadata={
             "source": "huggingface",
             "allow_patterns": allow_patterns or parse_patterns(config.model_download_allow_patterns_default) or [],

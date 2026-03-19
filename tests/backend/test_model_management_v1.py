@@ -188,6 +188,7 @@ def test_register_external_model_requires_validation_path(client):
             "provider_model_id": "gpt-4o",
             "credential_id": credential["id"],
             "access_scope": "private",
+            "model_type": "llm",
         },
     )
     assert registered.status_code == 201
@@ -220,6 +221,7 @@ def test_available_models_endpoint_returns_models(client):
             "source": "local_folder",
             "availability": "offline_ready",
             "access_scope": "private",
+            "model_type": "llm",
         },
     )
 
@@ -227,3 +229,31 @@ def test_available_models_endpoint_returns_models(client):
     assert listed.status_code == 200
     assert listed.get_json()["runtime_profile"] == "online"
     assert listed.get_json()["models"][0]["id"] == "phi-offline"
+
+
+def test_register_model_requires_model_type(client):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="u5@example.com",
+        username="user5",
+        password_hash=hash_password("pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _token(test_client, user["username"], "pass-123")
+
+    response = test_client.post(
+        "/v1/models/register",
+        headers=_auth(token),
+        json={
+            "id": "phi-offline",
+            "name": "Phi Offline",
+            "provider": "local_filesystem",
+            "origin": "personal",
+            "backend": "local",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "invalid_model_type"

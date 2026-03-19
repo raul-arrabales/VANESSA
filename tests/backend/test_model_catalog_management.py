@@ -42,6 +42,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
         source_id: str | None,
         local_path: str | None,
         status: str,
+        model_type: str,
         metadata: dict[str, Any],
         created_by_user_id: int,
     ):
@@ -55,6 +56,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
             "source_id": source_id,
             "local_path": local_path,
             "status": status,
+            "model_type": model_type,
             "metadata": metadata,
             "created_at": now,
             "updated_at": now,
@@ -72,6 +74,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
         source_id: str | None,
         local_path: str | None,
         status: str,
+        model_type: str,
         metadata: dict[str, Any],
         updated_by_user_id: int | None = None,
     ):
@@ -85,6 +88,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
                 "source_id": source_id,
                 "local_path": local_path,
                 "status": status,
+                "model_type": model_type,
                 "metadata": metadata,
                 "created_at": row.get("created_at", now),
                 "updated_at": now,
@@ -175,7 +179,7 @@ def test_superadmin_catalog_discovery_and_download_apis(client):
     created = test_client.post(
         "/v1/models/catalog",
         headers=_auth(token),
-        json={"id": "llama-3-8b", "name": "Llama 3 8B", "provider": "huggingface", "source_id": "meta-llama/Llama-3-8B-Instruct"},
+        json={"id": "llama-3-8b", "name": "Llama 3 8B", "provider": "huggingface", "source_id": "meta-llama/Llama-3-8B-Instruct", "model_type": "llm"},
     )
     assert created.status_code == 201
     assert created.get_json()["model"]["id"] == "llama-3-8b"
@@ -195,7 +199,7 @@ def test_superadmin_catalog_discovery_and_download_apis(client):
     download = test_client.post(
         "/v1/models/downloads",
         headers=_auth(token),
-        json={"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama 3 8B"},
+        json={"source_id": "meta-llama/Llama-3-8B-Instruct", "name": "Llama 3 8B", "model_type": "llm"},
     )
     assert download.status_code == 202
     job_id = download.get_json()["job"]["job_id"]
@@ -203,6 +207,34 @@ def test_superadmin_catalog_discovery_and_download_apis(client):
     fetched = test_client.get(f"/v1/models/downloads/{job_id}", headers=_auth(token))
     assert fetched.status_code == 200
     assert fetched.get_json()["job"]["source_id"] == "meta-llama/Llama-3-8B-Instruct"
+
+
+def test_hf_discovery_uses_embedding_task_for_embedding_model_type(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root2@example.com",
+        username="root2",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+    captured: dict[str, Any] = {}
+
+    def _discover(**kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(model_catalog_routes, "discover_hf_models", _discover)
+
+    response = test_client.get(
+        "/v1/models/discovery/huggingface?query=embed&model_type=embedding",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert captured["task"] == "feature-extraction"
 
 
 def test_admin_can_manage_assignments_but_user_cannot(client):

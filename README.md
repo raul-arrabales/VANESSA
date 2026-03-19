@@ -290,8 +290,11 @@ Current bootstrapped local providers:
 
 - `vllm_local`
 - `llama_cpp_local`
+- `vllm_embeddings_local`
 - `weaviate_local`
 - `qdrant_local`
+
+Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider instances own endpoint/auth configuration, while deployment bindings can now select a `served_model_id` from the managed model inventory.
 
 The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve embeddings, ensure, upsert, query, and delete through the active `embeddings` and `vector_store` bindings using provider-agnostic payloads.
 
@@ -307,6 +310,7 @@ The control plane now supports an operator-managed lifecycle on top of bootstrap
 
 - provider instances can be created, updated, validated, and deleted through the API/UI
 - deployment profiles can be created, updated, cloned, activated, and deleted through the API/UI
+- deployment bindings can now choose a served managed model for capabilities that need one; `embeddings` requires this and no longer assumes it should reuse the chat model
 - activation history is readable through `/v1/platform/activation-audit`
 - deployment activation now performs provider preflight validation before switching
 

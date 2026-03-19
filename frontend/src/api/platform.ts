@@ -57,6 +57,18 @@ export type PlatformDeploymentBinding = {
     enabled: boolean;
     adapter_kind: string;
   };
+  served_model_id?: string | null;
+  served_model?: {
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+    backend?: string | null;
+    model_type?: "llm" | "embedding" | null;
+    provider_model_id?: string | null;
+    local_path?: string | null;
+    source_id?: string | null;
+    availability?: string | null;
+  } | null;
   config: Record<string, unknown>;
 };
 
@@ -97,6 +109,7 @@ export type PlatformProviderValidation = {
     embeddings_reachable?: boolean;
     embeddings_status_code?: number;
     embedding_dimension?: number;
+    binding_error?: string;
   };
 };
 
@@ -119,6 +132,7 @@ export type PlatformDeploymentMutationInput = {
   bindings: Array<{
     capability: string;
     provider_id: string;
+    served_model_id?: string | null;
     config?: Record<string, unknown>;
   }>;
 };

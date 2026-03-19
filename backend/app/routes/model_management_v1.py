@@ -23,6 +23,7 @@ bp = Blueprint("model_management_v1", __name__)
 
 
 _ALLOWED_PROVIDERS = {"openai", "anthropic", "hf", "local_filesystem", "openai_compatible"}
+_ALLOWED_MODEL_TYPES = {"llm", "embedding"}
 
 
 def _json_error(status: int, code: str, message: str):
@@ -182,30 +183,35 @@ def register_model_v1():
     access_scope = str(payload.get("access_scope", "private" if origin_scope == "personal" else "assigned")).strip().lower()
     provider_model_id = str(payload.get("provider_model_id", "")).strip() or None
     credential_id = str(payload.get("credential_id", "")).strip() or None
+    model_type = str(payload.get("model_type", "")).strip().lower()
+
+    if model_type not in _ALLOWED_MODEL_TYPES:
+        return _json_error(400, "invalid_model_type", "model_type must be llm or embedding")
 
     if backend_kind == "external_api":
         if not provider_model_id:
             return _json_error(400, "provider_model_id_required", "provider_model_id is required for external_api models")
-        if not credential_id:
+        if origin_scope != "platform" and not credential_id:
             return _json_error(400, "credential_id_required", "credential_id is required for external_api models")
-        credential = get_active_credential_secret(
-            _database_url(),
-            credential_id=credential_id,
-            requester_user_id=user_id,
-            requester_role=role,
-            encryption_key=_encryption_key(),
-        )
-        if credential is None:
-            return _json_error(404, "credential_not_found", "Active credential not found")
-
-        try:
-            validate_openai_compatible_model(
-                api_base_url=str(credential.get("api_base_url") or ""),
-                api_key=str(credential.get("api_key") or ""),
-                model_id=provider_model_id,
+        if credential_id:
+            credential = get_active_credential_secret(
+                _database_url(),
+                credential_id=credential_id,
+                requester_user_id=user_id,
+                requester_role=role,
+                encryption_key=_encryption_key(),
             )
-        except ProviderValidationError as exc:
-            return _json_error(400, str(exc), "Provider validation failed")
+            if credential is None:
+                return _json_error(404, "credential_not_found", "Active credential not found")
+
+            try:
+                validate_openai_compatible_model(
+                    api_base_url=str(credential.get("api_base_url") or ""),
+                    api_key=str(credential.get("api_key") or ""),
+                    model_id=provider_model_id,
+                )
+            except ProviderValidationError as exc:
+                return _json_error(400, str(exc), "Provider validation failed")
 
     try:
         model = register_model(
@@ -223,7 +229,7 @@ def register_model_v1():
             access_scope=access_scope,
             credential_id=credential_id,
             model_size_billion=float(payload.get("model_size_billion")) if payload.get("model_size_billion") is not None else None,
-            model_type=str(payload.get("model_type", "")).strip() or None,
+            model_type=model_type,
             comment=str(payload.get("comment", "")).strip() or None,
             metadata=payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {},
             registered_by_user_id=user_id,

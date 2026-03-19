@@ -496,17 +496,23 @@
   "models": {
     "title": "Gestion del catalogo de modelos",
     "subtitle": "Gestiona las entradas del catalogo y las asignaciones de modelos por rol.",
+    "types": {
+      "llm": "LLM",
+      "embedding": "Embedding"
+    },
     "catalog": {
       "title": "Operaciones de catalogo",
       "description": "Agrega modelos al catalogo de la plataforma.",
       "nameLabel": "Nombre del modelo",
       "providerLabel": "Proveedor",
+      "typeLabel": "Tipo de modelo",
       "addButton": "Agregar modelo al catalogo",
       "listAria": "Entradas del catalogo de modelos"
     },
     "discovery": {
       "title": "Descubrimiento en Hugging Face",
       "description": "Busca e inspecciona modelos abiertos antes de descargarlos al almacenamiento local.",
+      "typeLabel": "Tipo de modelo para descubrimiento",
       "queryLabel": "Busqueda de descubrimiento",
       "queryPlaceholder": "ej. llama instruct",
       "searchButton": "Buscar modelos",
@@ -583,7 +589,8 @@
         "description": "Descripcion",
         "llmProvider": "Proveedor LLM",
         "vectorProvider": "Proveedor vectorial",
-        "providerForCapability": "Proveedor de {{capability}}"
+        "providerForCapability": "Proveedor de {{capability}}",
+        "servedModelForCapability": "Modelo servido de {{capability}}"
       }
     },
     "capabilities": {
@@ -601,6 +608,9 @@
       "modelsUnavailable": "Descubrimiento de modelos no accesible",
       "embeddingsReachable": "Embeddings accesibles ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings no accesibles",
+      "bindingErrors": {
+        "served_model_required": "Selecciona un modelo servido en un despliegue para validar embeddings."
+      },
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
       "editing": "Editando proveedor {{slug}}.",
@@ -625,6 +635,7 @@
       "columns": {
         "capability": "Capacidad",
         "provider": "Proveedor",
+        "servedModel": "Modelo servido",
         "adapter": "Adaptador",
         "status": "Estado"
       }
@@ -676,6 +687,7 @@
       "loadFailed": "No se pudieron cargar los datos de control de plataforma.",
       "invalidJson": "{{field}} debe ser texto JSON de objeto valido.",
       "bindingRequired": "Deben seleccionarse ambos enlaces de capacidad requeridos.",
+      "servedModelRequired": "{{capability}} requiere un modelo servido.",
       "validationSuccess": "Proveedor {{slug}} validado.",
       "validationFailed": "No se pudo validar el proveedor.",
       "providerCreated": "Proveedor {{name}} creado.",

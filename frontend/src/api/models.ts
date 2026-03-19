@@ -15,6 +15,7 @@ export type ModelCatalogItem = {
   source_id?: string | null;
   local_path?: string | null;
   status?: string | null;
+  model_type?: "llm" | "embedding" | null;
   description?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -83,7 +84,7 @@ export type ManagedModel = {
   access_scope: "private" | "assigned" | "global";
   credential_owner: "platform" | "you";
   model_size_billion?: number | null;
-  model_type?: string | null;
+  model_type?: "llm" | "embedding" | null;
   comment?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -153,7 +154,7 @@ export async function listModelCatalog(token: string): Promise<ModelCatalogItem[
 }
 
 export async function createModelCatalogItem(
-  payload: Omit<ModelCatalogItem, "id"> & { id?: string },
+  payload: Omit<ModelCatalogItem, "id"> & { id?: string; model_type: "llm" | "embedding" },
   token: string,
 ): Promise<ModelCatalogItem> {
   const result = await requestJson<{ model: ModelCatalogItem }>("/v1/models/catalog", {
@@ -167,11 +168,12 @@ export async function createModelCatalogItem(
 
 export async function discoverHfModels(
   token: string,
-  options: { query?: string; task?: string; sort?: string; limit?: number } = {},
+  options: { query?: string; task?: string; model_type?: "llm" | "embedding"; sort?: string; limit?: number } = {},
 ): Promise<HfDiscoveredModel[]> {
   const params = new URLSearchParams();
   if (options.query) params.set("query", options.query);
   if (options.task) params.set("task", options.task);
+  if (options.model_type) params.set("model_type", options.model_type);
   if (options.sort) params.set("sort", options.sort);
   if (options.limit) params.set("limit", String(options.limit));
   const query = params.toString();
@@ -186,7 +188,7 @@ export async function getHfModelDetails(sourceId: string, token: string): Promis
 }
 
 export async function startModelDownload(
-  payload: { source_id: string; name?: string; allow_patterns?: string[]; ignore_patterns?: string[] },
+  payload: { source_id: string; name?: string; model_type: "llm" | "embedding"; allow_patterns?: string[]; ignore_patterns?: string[] },
   token: string,
 ): Promise<ModelDownloadJob> {
   const result = await requestJson<{ job: ModelDownloadJob }>("/v1/models/downloads", {
@@ -320,7 +322,7 @@ export async function registerManagedModel(
     source_id?: string;
     local_path?: string;
     model_size_billion?: number;
-    model_type?: string;
+    model_type: "llm" | "embedding";
     comment?: string;
     metadata?: Record<string, unknown>;
   },

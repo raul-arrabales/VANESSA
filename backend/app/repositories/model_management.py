@@ -12,6 +12,7 @@ _ALLOWED_BACKEND = {"local", "external_api"}
 _ALLOWED_SOURCE = {"hf_import", "local_folder", "external_provider"}
 _ALLOWED_AVAILABILITY = {"online_only", "offline_ready"}
 _ALLOWED_ACCESS = {"private", "assigned", "global"}
+_ALLOWED_MODEL_TYPES = {"llm", "embedding"}
 
 
 def register_model(
@@ -40,6 +41,7 @@ def register_model(
     source = source_kind.strip().lower()
     availability_value = availability.strip().lower()
     access = access_scope.strip().lower()
+    normalized_model_type = model_type.strip().lower() if model_type else None
 
     if origin not in _ALLOWED_ORIGIN:
         raise ValueError("invalid_origin_scope")
@@ -51,6 +53,8 @@ def register_model(
         raise ValueError("invalid_availability")
     if access not in _ALLOWED_ACCESS:
         raise ValueError("invalid_access_scope")
+    if normalized_model_type not in _ALLOWED_MODEL_TYPES:
+        raise ValueError("invalid_model_type")
 
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -107,7 +111,7 @@ def register_model(
                 provider_model_id.strip() if provider_model_id else None,
                 credential_id,
                 model_size_billion,
-                model_type.strip() if model_type else None,
+                normalized_model_type,
                 comment.strip() if comment else None,
             ),
         ).fetchone()

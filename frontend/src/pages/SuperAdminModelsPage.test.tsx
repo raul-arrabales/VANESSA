@@ -49,8 +49,8 @@ describe("SuperAdminModelsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     modelApiMocks.listModelCatalog.mockResolvedValue([
-      { id: "gpt-4", name: "GPT-4" },
-      { id: "mistral-small", name: "Mistral Small" },
+      { id: "gpt-4", name: "GPT-4", model_type: "llm" },
+      { id: "mistral-small", name: "Mistral Small", model_type: "llm" },
     ]);
     modelApiMocks.listModelAssignments.mockResolvedValue([
       { scope: "user", model_ids: ["mistral-small"] },
@@ -100,8 +100,12 @@ describe("SuperAdminModelsPage", () => {
     await screen.findByRole("heading", { name: "models.catalog.title" });
 
     await user.type(screen.getByLabelText("models.catalog.nameLabel"), "New Model");
+    await user.selectOptions(screen.getByLabelText("models.catalog.typeLabel"), "embedding");
     await user.click(screen.getByRole("button", { name: "models.catalog.addButton" }));
-    expect(modelApiMocks.createModelCatalogItem).toHaveBeenCalledWith({ name: "New Model", provider: undefined }, "token");
+    expect(modelApiMocks.createModelCatalogItem).toHaveBeenCalledWith(
+      { name: "New Model", provider: undefined, model_type: "embedding" },
+      "token",
+    );
 
     const gptCheckbox = screen.getAllByRole("checkbox")[0];
     await user.click(gptCheckbox);
@@ -121,12 +125,16 @@ describe("SuperAdminModelsPage", () => {
     );
 
     await screen.findByRole("heading", { name: "models.catalog.title" });
+    await user.selectOptions(screen.getByLabelText("models.discovery.typeLabel"), "embedding");
     await user.type(screen.getByLabelText("models.discovery.queryLabel"), "llama");
     await user.click(screen.getByRole("button", { name: "models.discovery.searchButton" }));
 
     expect(await screen.findByText("meta-llama/Llama-3-8B-Instruct")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "models.discovery.downloadButton" }));
-    expect(modelApiMocks.startModelDownload).toHaveBeenCalled();
+    expect(modelApiMocks.startModelDownload).toHaveBeenCalledWith(
+      expect.objectContaining({ source_id: "meta-llama/Llama-3-8B-Instruct", model_type: "embedding" }),
+      "token",
+    );
   });
 
   it("does not poll when there are no active jobs", async () => {

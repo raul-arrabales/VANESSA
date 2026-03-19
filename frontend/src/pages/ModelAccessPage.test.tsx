@@ -87,6 +87,7 @@ describe("ModelAccessPage", () => {
 
     await user.type(screen.getByLabelText("Model id"), "gpt-private");
     await user.type(screen.getByLabelText("Model name"), "GPT Private");
+    await user.selectOptions(screen.getByLabelText("Model type"), "llm");
     await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
     await user.selectOptions(screen.getByLabelText("Credential"), "cred-1");
     await user.click(screen.getByRole("button", { name: "Register model" }));

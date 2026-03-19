@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from json import dumps, loads
 import logging
+import os
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 from urllib.error import HTTPError, URLError
@@ -106,6 +107,45 @@ def _binding_timeout_seconds(config: dict[str, Any]) -> float:
     except (TypeError, ValueError):
         return _DEFAULT_HTTP_TIMEOUT_SECONDS
     return timeout_seconds if timeout_seconds > 0 else _DEFAULT_HTTP_TIMEOUT_SECONDS
+
+
+def _binding_secret_refs(binding: ProviderBinding) -> dict[str, str]:
+    secret_refs = binding.config.get("secret_refs")
+    return dict(secret_refs) if isinstance(secret_refs, dict) else {}
+
+
+def _resolve_secret_ref(reference: str) -> str | None:
+    normalized_reference = reference.strip()
+    if not normalized_reference:
+        return None
+    if normalized_reference.startswith("env://"):
+        env_name = normalized_reference.removeprefix("env://").strip()
+        return os.getenv(env_name, "").strip() or None
+    return normalized_reference
+
+
+def _openai_compatible_headers(binding: ProviderBinding) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    api_key_ref = _binding_secret_refs(binding).get("api_key")
+    if not api_key_ref:
+        return headers
+    api_key = _resolve_secret_ref(api_key_ref)
+    if not api_key:
+        raise PlatformControlPlaneError(
+            "provider_secret_missing",
+            "Provider secret ref could not be resolved",
+            status_code=409,
+            details={"provider": binding.provider_slug, "secret_ref": api_key_ref},
+        )
+    headers["Authorization"] = f"Bearer {api_key}"
+    return headers
+
+
+def _served_model_runtime_identifier(binding: ProviderBinding) -> str:
+    served_model = binding.served_model or {}
+    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+    local_path = str(served_model.get("local_path", "")).strip()
+    return provider_model_id or local_path
 
 
 class LlmInferenceAdapter(ABC):
@@ -244,6 +284,9 @@ class McpRuntimeAdapter(ABC):
 
 
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
+    def _request_headers(self) -> dict[str, str]:
+        return _openai_compatible_headers(self.binding)
+
     def _request_format(self) -> str:
         return str(self.binding.config.get("request_format", "responses_api")).strip().lower() or "responses_api"
 
@@ -267,6 +310,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         payload, status_code = http_json_request(
             self._health_url(),
             method="GET",
+            headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
         reachable = payload is not None and 200 <= status_code < 300
@@ -281,6 +325,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         return http_json_request(
             self._models_url(),
             method="GET",
+            headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
 
@@ -304,6 +349,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             self._chat_url(),
             method="POST",
             payload=payload,
+            headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
@@ -326,6 +372,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 self._chat_url(),
                 method="POST",
                 payload=fallback_payload,
+                headers=self._request_headers(),
                 timeout_seconds=self._request_timeout_seconds(),
             )
             return _normalize_chat_response_payload(fallback_response), fallback_status
@@ -355,6 +402,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 self._chat_url(),
                 method="POST",
                 payload=stream_payload,
+                headers=self._request_headers(),
                 timeout_seconds=self._request_timeout_seconds(),
             ):
                 normalized_event_name = event_name.strip().lower()
@@ -459,6 +507,9 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
 
 
 class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
+    def _request_headers(self) -> dict[str, str]:
+        return _openai_compatible_headers(self.binding)
+
     def _embeddings_url(self) -> str:
         path = str(self.binding.config.get("embeddings_path", "/v1/embeddings")).strip() or "/v1/embeddings"
         return self.binding.endpoint_url.rstrip("/") + path
@@ -475,6 +526,7 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
         payload, status_code = http_json_request(
             self._health_url(),
             method="GET",
+            headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
         reachable = payload is not None and 200 <= status_code < 300
@@ -490,7 +542,14 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
         *,
         texts: list[str],
     ) -> tuple[dict[str, Any] | None, int]:
-        effective_model = str(self.binding.config.get("forced_model_id", "")).strip()
+        effective_model = _served_model_runtime_identifier(self.binding)
+        if not effective_model:
+            raise PlatformControlPlaneError(
+                "served_model_required",
+                "Embeddings binding is missing a served model",
+                status_code=409,
+                details={"provider": self.binding.provider_slug},
+            )
         payload = {
             "model": effective_model,
             "input": texts,
@@ -499,6 +558,7 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             self._embeddings_url(),
             method="POST",
             payload=payload,
+            headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
         return _normalize_embeddings_response_payload(response_payload), status_code

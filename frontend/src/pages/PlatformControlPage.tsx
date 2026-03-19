@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
+import { listModelCatalog, type ModelCatalogItem } from "../api/models";
 import {
   activateDeploymentProfile,
   cloneDeploymentProfile,
@@ -50,6 +51,7 @@ type DeploymentFormState = {
   displayName: string;
   description: string;
   providerIdsByCapability: Record<string, string>;
+  servedModelIdsByCapability: Record<string, string>;
 };
 
 const DEFAULT_PROVIDER_FORM: ProviderFormState = {
@@ -74,6 +76,7 @@ const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
   displayName: "",
   description: "",
   providerIdsByCapability: {},
+  servedModelIdsByCapability: {},
 };
 
 function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
@@ -134,7 +137,14 @@ function buildDeploymentForm(
     providerIdsByCapability: Object.fromEntries(
       deployment.bindings.map((binding) => [binding.capability, binding.provider.id]),
     ),
+    servedModelIdsByCapability: Object.fromEntries(
+      deployment.bindings.map((binding) => [binding.capability, binding.served_model_id ?? ""]),
+    ),
   };
+}
+
+function capabilityRequiresServedModel(capability: string): boolean {
+  return capability === "embeddings";
 }
 
 export default function PlatformControlPage(): JSX.Element {
@@ -145,6 +155,7 @@ export default function PlatformControlPage(): JSX.Element {
   const [providerFamilies, setProviderFamilies] = useState<PlatformProviderFamily[]>([]);
   const [providers, setProviders] = useState<PlatformProvider[]>([]);
   const [deployments, setDeployments] = useState<PlatformDeploymentProfile[]>([]);
+  const [managedModels, setManagedModels] = useState<ModelCatalogItem[]>([]);
   const [activationAudit, setActivationAudit] = useState<PlatformActivationAuditEntry[]>([]);
   const [validatingProviderId, setValidatingProviderId] = useState("");
   const [validationResults, setValidationResults] = useState<Record<string, PlatformProviderValidation>>({});
@@ -172,18 +183,20 @@ export default function PlatformControlPage(): JSX.Element {
     setErrorMessage("");
 
     try {
-      const [capabilitiesPayload, providerFamiliesPayload, providersPayload, deploymentsPayload, activationAuditPayload] =
+      const [capabilitiesPayload, providerFamiliesPayload, providersPayload, deploymentsPayload, activationAuditPayload, modelsPayload] =
         await Promise.all([
           listPlatformCapabilities(token),
           listPlatformProviderFamilies(token),
           listPlatformProviders(token),
           listPlatformDeployments(token),
           listPlatformActivationAudit(token),
+          listModelCatalog(token),
         ]);
       setCapabilities(capabilitiesPayload);
       setProviderFamilies(providerFamiliesPayload);
       setProviders(providersPayload);
       setDeployments(deploymentsPayload);
+      setManagedModels(modelsPayload);
       setActivationAudit(activationAuditPayload);
       setState("success");
     } catch (error) {
@@ -203,6 +216,16 @@ export default function PlatformControlPage(): JSX.Element {
   const capabilityLabelByKey = new Map(capabilities.map((capability) => [capability.capability, capability.display_name]));
   const providersByCapability = requiredCapabilities.reduce<Record<string, PlatformProvider[]>>((accumulator, capability) => {
     accumulator[capability.capability] = providers.filter((provider) => provider.capability === capability.capability);
+    return accumulator;
+  }, {});
+  const servedModelsByCapability = requiredCapabilities.reduce<Record<string, ModelCatalogItem[]>>((accumulator, capability) => {
+    if (!capabilityRequiresServedModel(capability.capability)) {
+      accumulator[capability.capability] = [];
+      return accumulator;
+    }
+    accumulator[capability.capability] = managedModels.filter(
+      (model) => model.model_type === "embedding" && (model.status ?? "available") === "available",
+    );
     return accumulator;
   }, {});
 
@@ -320,6 +343,19 @@ export default function PlatformControlPage(): JSX.Element {
       setErrorMessage(t("platformControl.feedback.bindingRequired"));
       return;
     }
+    const missingServedModel = requiredCapabilities.find(
+      (capability) =>
+        capabilityRequiresServedModel(capability.capability) &&
+        !deploymentForm.servedModelIdsByCapability[capability.capability],
+    );
+    if (missingServedModel) {
+      setErrorMessage(
+        t("platformControl.feedback.servedModelRequired", {
+          capability: missingServedModel.display_name,
+        }),
+      );
+      return;
+    }
 
     setSavingDeployment(true);
     setFeedbackMessage("");
@@ -344,6 +380,9 @@ export default function PlatformControlPage(): JSX.Element {
           bindings: requiredCapabilities.map((capability) => ({
             capability: capability.capability,
             provider_id: deploymentForm.providerIdsByCapability[capability.capability],
+            served_model_id: capabilityRequiresServedModel(capability.capability)
+              ? deploymentForm.servedModelIdsByCapability[capability.capability] || null
+              : null,
             config: {},
           })),
         };
@@ -665,6 +704,11 @@ export default function PlatformControlPage(): JSX.Element {
                                   : t("platformControl.providers.embeddingsUnavailable")}
                               </span>
                             )}
+                            {validation.validation.binding_error && (
+                              <span className="status-text">
+                                {t(`platformControl.providers.bindingErrors.${validation.validation.binding_error}`)}
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <span className="status-text">{t("platformControl.providers.notValidated")}</span>
@@ -755,34 +799,66 @@ export default function PlatformControlPage(): JSX.Element {
               />
             </label>
             {requiredCapabilities.map((capability) => (
-              <label key={capability.capability} className="card-stack">
-                <span className="field-label">
-                  {t("platformControl.forms.deployment.providerForCapability", {
-                    capability: capability.display_name,
-                  })}
-                </span>
-                <select
-                  className="field-input"
-                  value={deploymentForm.providerIdsByCapability[capability.capability] ?? ""}
-                  disabled={deploymentForm.mode === "clone"}
-                  onChange={(event) =>
-                    setDeploymentForm((current) => ({
-                      ...current,
-                      providerIdsByCapability: {
-                        ...current.providerIdsByCapability,
-                        [capability.capability]: event.target.value,
-                      },
-                    }))
-                  }
-                >
-                  <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                  {(providersByCapability[capability.capability] ?? []).map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.display_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div key={capability.capability} className="card-stack">
+                <label className="card-stack">
+                  <span className="field-label">
+                    {t("platformControl.forms.deployment.providerForCapability", {
+                      capability: capability.display_name,
+                    })}
+                  </span>
+                  <select
+                    className="field-input"
+                    value={deploymentForm.providerIdsByCapability[capability.capability] ?? ""}
+                    disabled={deploymentForm.mode === "clone"}
+                    onChange={(event) =>
+                      setDeploymentForm((current) => ({
+                        ...current,
+                        providerIdsByCapability: {
+                          ...current.providerIdsByCapability,
+                          [capability.capability]: event.target.value,
+                        },
+                      }))
+                    }
+                  >
+                    <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                    {(providersByCapability[capability.capability] ?? []).map((provider) => (
+                      <option key={provider.id} value={provider.id}>
+                        {provider.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {capabilityRequiresServedModel(capability.capability) && (
+                  <label className="card-stack">
+                    <span className="field-label">
+                      {t("platformControl.forms.deployment.servedModelForCapability", {
+                        capability: capability.display_name,
+                      })}
+                    </span>
+                    <select
+                      className="field-input"
+                      value={deploymentForm.servedModelIdsByCapability[capability.capability] ?? ""}
+                      disabled={deploymentForm.mode === "clone"}
+                      onChange={(event) =>
+                        setDeploymentForm((current) => ({
+                          ...current,
+                          servedModelIdsByCapability: {
+                            ...current.servedModelIdsByCapability,
+                            [capability.capability]: event.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                      {(servedModelsByCapability[capability.capability] ?? []).map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
             ))}
           </div>
           <label className="card-stack">
@@ -844,6 +920,7 @@ export default function PlatformControlPage(): JSX.Element {
                       <tr>
                         <th>{t("platformControl.deployments.columns.capability")}</th>
                         <th>{t("platformControl.deployments.columns.provider")}</th>
+                        <th>{t("platformControl.deployments.columns.servedModel")}</th>
                         <th>{t("platformControl.deployments.columns.adapter")}</th>
                         <th>{t("platformControl.deployments.columns.status")}</th>
                       </tr>
@@ -858,6 +935,7 @@ export default function PlatformControlPage(): JSX.Element {
                               <code className="code-inline">{binding.provider.slug}</code>
                             </div>
                           </td>
+                          <td>{binding.served_model?.name ?? t("platformControl.summary.none")}</td>
                           <td>{binding.provider.adapter_kind}</td>
                           <td>
                             <span className="platform-badge" data-tone={binding.provider.enabled ? "enabled" : "disabled"}>

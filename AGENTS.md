@@ -278,6 +278,7 @@ When making changes or adding features:
 - Vector-store client wrapper (for example Weaviate/Qdrant adapters) instead of direct calls everywhere.
 - Data access layer for PostgreSQL instead of inline SQL.
 - For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
+- When a capability needs a concrete upstream model, bind that choice at the deployment-binding layer (`served_model_id`) rather than attaching a model directly to the provider instance.
 - Treat `LLAMA_CPP_URL` and `QDRANT_URL` as bootstrap flags for enabling the optional local provider runtimes and seeding the alternate deployment profiles.
 - For tools, keep individual tool specs in the registry and runtime transports in platform capabilities/providers. Do not collapse every tool into the provider registry.
 

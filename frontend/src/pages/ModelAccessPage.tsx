@@ -28,6 +28,7 @@ export default function ModelAccessPage(): JSX.Element {
   const [modelName, setModelName] = useState("");
   const [modelBackend, setModelBackend] = useState<"external_api" | "local">("external_api");
   const [modelOrigin, setModelOrigin] = useState<"platform" | "personal">("personal");
+  const [modelType, setModelType] = useState<"llm" | "embedding">("llm");
   const [providerModelId, setProviderModelId] = useState("");
   const [credentialId, setCredentialId] = useState("");
   const [localPath, setLocalPath] = useState("");
@@ -98,8 +99,12 @@ export default function ModelAccessPage(): JSX.Element {
           availability: modelBackend === "external_api" ? "online_only" : "offline_ready",
           access_scope: modelOrigin === "personal" ? "private" : "assigned",
           provider_model_id: modelBackend === "external_api" ? providerModelId.trim() : undefined,
-          credential_id: modelBackend === "external_api" ? credentialId || undefined : undefined,
+          credential_id:
+            modelBackend === "external_api" && (modelOrigin === "personal" || credentialId)
+              ? credentialId || undefined
+              : undefined,
           local_path: modelBackend === "local" ? localPath.trim() || undefined : undefined,
+          model_type: modelType,
           comment: comment.trim() || undefined,
         },
         token,
@@ -108,6 +113,7 @@ export default function ModelAccessPage(): JSX.Element {
       setModelName("");
       setProviderModelId("");
       setLocalPath("");
+      setModelType("llm");
       setComment("");
       await refreshData();
       setFeedback("Model registered.");
@@ -181,6 +187,11 @@ export default function ModelAccessPage(): JSX.Element {
             <option value="external_api">External API</option>
             <option value="local">Local</option>
           </select>
+          <label className="field-label" htmlFor="managed-model-type">Model type</label>
+          <select id="managed-model-type" className="field-input" value={modelType} onChange={(event) => setModelType(event.currentTarget.value as "llm" | "embedding") }>
+            <option value="llm">LLM</option>
+            <option value="embedding">Embedding</option>
+          </select>
           {modelBackend === "external_api" ? (
             <>
               <label className="field-label" htmlFor="managed-provider-model-id">Provider model id</label>
@@ -211,7 +222,7 @@ export default function ModelAccessPage(): JSX.Element {
           {models.map((model) => (
             <li key={model.id}>
               <strong>{model.name}</strong>
-              <p className="status-text">{model.id} · {model.origin} · {model.backend} · {model.provider} · {model.availability}</p>
+              <p className="status-text">{model.id} · {model.model_type ?? "unknown"} · {model.origin} · {model.backend} · {model.provider} · {model.availability}</p>
             </li>
           ))}
         </ul>

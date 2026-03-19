@@ -68,6 +68,34 @@ WHERE
 
 DO $$
 BEGIN
+    UPDATE model_registry
+    SET model_type = CASE
+        WHEN COALESCE(model_type, '') <> '' THEN lower(trim(model_type))
+        WHEN provider IN ('huggingface', 'local', 'vllm', 'local_filesystem') THEN 'llm'
+        ELSE model_type
+    END
+    WHERE model_type IS NULL OR trim(model_type) = '' OR model_type <> lower(trim(model_type));
+EXCEPTION
+    WHEN undefined_column THEN
+        NULL;
+END
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'model_registry_model_type_check'
+    ) THEN
+        ALTER TABLE model_registry
+        ADD CONSTRAINT model_registry_model_type_check
+        CHECK (model_type IS NULL OR model_type IN ('llm', 'embedding'));
+    END IF;
+END
+$$;
+
+DO $$
+BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
         WHERE conname = 'model_registry_origin_scope_check'

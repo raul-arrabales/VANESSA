@@ -8,6 +8,7 @@ from psycopg.types.json import Jsonb
 from ..db import get_connection
 
 _ALLOWED_STATUSES = {"available", "downloading", "failed", "archived"}
+_ALLOWED_MODEL_TYPES = {"llm", "embedding"}
 
 
 def list_model_catalog(database_url: str) -> list[dict[str, Any]]:
@@ -21,6 +22,7 @@ def list_model_catalog(database_url: str) -> list[dict[str, Any]]:
                 source_id,
                 local_path,
                 status,
+                model_type,
                 metadata,
                 created_at,
                 updated_at
@@ -40,6 +42,7 @@ def create_model_catalog_item(
     source_id: str | None,
     local_path: str | None,
     status: str,
+    model_type: str,
     metadata: dict[str, Any],
     created_by_user_id: int,
 ) -> dict[str, Any]:
@@ -47,6 +50,7 @@ def create_model_catalog_item(
     name_value = name.strip()
     provider_value = provider.strip().lower()
     status_value = status.strip().lower()
+    model_type_value = model_type.strip().lower()
 
     if not model_id_value:
         raise ValueError("model_id_required")
@@ -56,6 +60,8 @@ def create_model_catalog_item(
         raise ValueError("invalid_provider")
     if status_value not in _ALLOWED_STATUSES:
         raise ValueError("invalid_status")
+    if model_type_value not in _ALLOWED_MODEL_TYPES:
+        raise ValueError("invalid_model_type")
 
     with get_connection(database_url) as connection:
         try:
@@ -68,10 +74,11 @@ def create_model_catalog_item(
                     source_id,
                     local_path,
                     status,
+                    model_type,
                     metadata,
                     created_by_user_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
                 RETURNING *
                 """,
                 (
@@ -81,6 +88,7 @@ def create_model_catalog_item(
                     source_id.strip() if source_id else None,
                     local_path.strip() if local_path else None,
                     status_value,
+                    model_type_value,
                     Jsonb(metadata),
                     created_by_user_id,
                 ),
@@ -111,6 +119,7 @@ def upsert_model_catalog_item(
     source_id: str | None,
     local_path: str | None,
     status: str,
+    model_type: str,
     metadata: dict[str, Any],
     updated_by_user_id: int | None = None,
 ) -> dict[str, Any]:
@@ -118,6 +127,7 @@ def upsert_model_catalog_item(
     name_value = name.strip()
     provider_value = provider.strip().lower()
     status_value = status.strip().lower()
+    model_type_value = model_type.strip().lower()
 
     if not model_id_value:
         raise ValueError("model_id_required")
@@ -127,6 +137,8 @@ def upsert_model_catalog_item(
         raise ValueError("invalid_provider")
     if status_value not in _ALLOWED_STATUSES:
         raise ValueError("invalid_status")
+    if model_type_value not in _ALLOWED_MODEL_TYPES:
+        raise ValueError("invalid_model_type")
 
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -138,10 +150,11 @@ def upsert_model_catalog_item(
                 source_id,
                 local_path,
                 status,
+                model_type,
                 metadata,
                 created_by_user_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
             ON CONFLICT (model_id)
             DO UPDATE SET
                 name = EXCLUDED.name,
@@ -149,6 +162,7 @@ def upsert_model_catalog_item(
                 source_id = EXCLUDED.source_id,
                 local_path = EXCLUDED.local_path,
                 status = EXCLUDED.status,
+                model_type = EXCLUDED.model_type,
                 metadata = EXCLUDED.metadata,
                 created_by_user_id = COALESCE(model_registry.created_by_user_id, EXCLUDED.created_by_user_id),
                 updated_at = NOW()
@@ -161,6 +175,7 @@ def upsert_model_catalog_item(
                 source_id.strip() if source_id else None,
                 local_path.strip() if local_path else None,
                 status_value,
+                model_type_value,
                 Jsonb(metadata),
                 updated_by_user_id,
             ),

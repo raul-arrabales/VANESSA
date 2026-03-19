@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
+import type { ModelCatalogItem } from "../api/models";
+import type { PlatformDeploymentProfile } from "../api/platform";
 import PlatformControlPage from "./PlatformControlPage";
+import * as modelsApi from "../api/models";
 import * as platformApi from "../api/platform";
 
 let mockUser: AuthUser | null = null;
@@ -32,6 +35,10 @@ vi.mock("../api/platform", () => ({
   cloneDeploymentProfile: vi.fn(),
   deleteDeploymentProfile: vi.fn(),
   activateDeploymentProfile: vi.fn(),
+}));
+
+vi.mock("../api/models", () => ({
+  listModelCatalog: vi.fn(),
 }));
 
 const capabilitiesFixture = [
@@ -148,7 +155,17 @@ const providersFixture = [
   },
 ];
 
-const deploymentsFixture = [
+const modelCatalogFixture: ModelCatalogItem[] = [
+  {
+    id: "text-embedding-3-small",
+    name: "text-embedding-3-small",
+    provider: "openai",
+    model_type: "embedding",
+    status: "available",
+  },
+];
+
+const deploymentsFixture: PlatformDeploymentProfile[] = [
   {
     id: "deployment-1",
     slug: "local-default",
@@ -179,6 +196,13 @@ const deploymentsFixture = [
           endpoint_url: "http://llm:8000",
           enabled: true,
           adapter_kind: "openai_compatible_embeddings",
+        },
+        served_model_id: "text-embedding-3-small",
+        served_model: {
+          id: "text-embedding-3-small",
+          name: "text-embedding-3-small",
+          model_type: "embedding",
+          backend: "external_api",
         },
         config: {},
       },
@@ -227,6 +251,13 @@ const deploymentsFixture = [
           endpoint_url: "http://llm:8000",
           enabled: true,
           adapter_kind: "openai_compatible_embeddings",
+        },
+        served_model_id: "text-embedding-3-small",
+        served_model: {
+          id: "text-embedding-3-small",
+          name: "text-embedding-3-small",
+          model_type: "embedding",
+          backend: "external_api",
         },
         config: {},
       },
@@ -280,6 +311,7 @@ describe("PlatformControlPage", () => {
     vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(providersFixture);
     vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue(deploymentsFixture);
     vi.mocked(platformApi.listPlatformActivationAudit).mockResolvedValue(activationAuditFixture);
+    vi.mocked(modelsApi.listModelCatalog).mockResolvedValue(modelCatalogFixture);
   });
 
   it("loads and renders capability, provider, deployment, and audit data", async () => {
