@@ -36,4 +36,18 @@ describe("runKnowledgeChat", () => {
 
     await expect(runKnowledgeChat({ prompt: "", model: "safe-small" }, "token")).rejects.toBeInstanceOf(ApiError);
   });
+
+  it("throws a readable ApiError when the backend returns html on failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        "<!doctype html><html><body>server error</body></html>",
+        { status: 500, headers: { "Content-Type": "text/html" } },
+      ),
+    );
+
+    await expect(runKnowledgeChat({ prompt: "hello", model: "safe-small" }, "token")).rejects.toMatchObject({
+      message: "Knowledge chat request failed: HTTP 500",
+      status: 500,
+    });
+  });
 });

@@ -47,10 +47,21 @@ export async function runKnowledgeChat(
   });
 
   const rawBody = await response.text();
-  const parsed = rawBody ? JSON.parse(rawBody) as Record<string, unknown> : {};
+  let parsed: Record<string, unknown> = {};
+  if (rawBody) {
+    try {
+      parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      if (response.ok) {
+        throw new Error("Knowledge chat returned an invalid response.");
+      }
+    }
+  }
 
   if (!response.ok) {
-    const message = String(parsed.message ?? parsed.error ?? `HTTP ${response.status}`);
+    const message = rawBody && Object.keys(parsed).length > 0
+      ? String(parsed.message ?? parsed.error ?? `HTTP ${response.status}`)
+      : `Knowledge chat request failed: HTTP ${response.status}`;
     const code = parsed.error ? String(parsed.error) : undefined;
     throw new ApiError(message, response.status, code);
   }

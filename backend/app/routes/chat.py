@@ -3,7 +3,7 @@ from __future__ import annotations
 from json import dumps
 from uuid import uuid4
 
-from flask import Blueprint, Response, g, jsonify, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
 
 from ..authz import require_role
 from ..config import get_auth_config
@@ -210,5 +210,11 @@ def knowledge_chat_route():
     except AgentEngineClientError as exc:
         error_payload, error_status = map_knowledge_chat_engine_error(exc)
         return jsonify(error_payload), error_status
+    except Exception as exc:  # pragma: no cover - guarded by route behavior tests
+        current_app.logger.exception("Knowledge chat request failed: %s", exc)
+        return jsonify({
+            "error": "knowledge_chat_failed",
+            "message": "Knowledge chat request failed.",
+        }), 500
 
     return jsonify(response_payload), status_code

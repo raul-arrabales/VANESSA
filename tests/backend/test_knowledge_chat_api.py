@@ -65,3 +65,34 @@ def test_knowledge_chat_route_returns_service_payload(client, monkeypatch: pytes
 
     assert response.status_code == 200
     assert response.get_json()["output"] == "answer"
+
+
+def test_knowledge_chat_route_returns_json_on_unexpected_failure(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u2@example.com",
+        username="u2",
+        password_hash=hash_password("u2-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u2-pass-123").get_json()["access_token"]
+
+    def _raise_unexpected(**_kwargs):
+        raise RuntimeError("missing registry table")
+
+    monkeypatch.setattr(chat_routes, "run_knowledge_chat", _raise_unexpected)
+
+    response = test_client.post(
+        "/v1/chat/knowledge",
+        headers=_auth(token),
+        json={"prompt": "hello", "model": "safe-small"},
+    )
+
+    assert response.status_code == 500
+    assert response.is_json is True
+    assert response.get_json() == {
+        "error": "knowledge_chat_failed",
+        "message": "Knowledge chat request failed.",
+    }
