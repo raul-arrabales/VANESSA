@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from calendar import isleap
 from datetime import date, datetime, timezone
 import hashlib
 import random
@@ -40,14 +41,45 @@ def _date_key(selected_date: date) -> str:
     return selected_date.isoformat()
 
 
+def _days_in_year(year: int) -> int:
+    return 366 if isleap(year) else 365
+
+
+def _day_of_year(selected_date: date) -> int:
+    return selected_date.timetuple().tm_yday
+
+
+def _yearly_quote_order(
+    quotes: list[dict[str, Any]],
+    *,
+    language: str,
+    year: int,
+) -> list[dict[str, Any]]:
+    normalized_language = normalize_language(language)
+
+    def _sort_key(quote: dict[str, Any]) -> tuple[str, int]:
+        seed = (
+            f"{normalized_language}:{year}:{quote.get('id', 0)}:{quote.get('text', '')}"
+        ).encode("utf-8")
+        return hashlib.sha256(seed).hexdigest(), int(quote.get("id", 0))
+
+    return sorted(quotes, key=_sort_key)
+
+
 def select_quote_for_day(quotes: list[dict[str, Any]], *, language: str, selected_date: date) -> dict[str, Any]:
     if not quotes:
         raise ValueError("quotes are required")
 
-    seed = f"{normalize_language(language)}:{_date_key(selected_date)}".encode("utf-8")
-    digest = hashlib.sha256(seed).hexdigest()
-    index = int(digest[:8], 16) % len(quotes)
-    selected = dict(quotes[index])
+    ordered_quotes = _yearly_quote_order(
+        quotes,
+        language=language,
+        year=selected_date.year,
+    )
+    day_index = _day_of_year(selected_date) - 1
+    if len(ordered_quotes) >= _days_in_year(selected_date.year):
+        selected = dict(ordered_quotes[day_index])
+    else:
+        selected = dict(ordered_quotes[day_index % len(ordered_quotes)])
     selected["date"] = _date_key(selected_date)
     return selected
 

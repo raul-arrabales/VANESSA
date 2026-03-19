@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from app.services import quote_service
 
@@ -43,6 +43,26 @@ def test_select_quote_for_day_changes_with_date_when_pool_allows() -> None:
     )
 
     assert first["id"] != second["id"]
+
+
+def test_select_quote_for_day_is_unique_across_a_non_leap_year_when_pool_is_large_enough() -> None:
+    quotes = [_quote_template(quote_id) for quote_id in range(1, 366)]
+    selected_ids = {
+        quote_service.select_quote_for_day(quotes, language="en", selected_date=selected_date)["id"]
+        for selected_date in _dates_for_year(2025)
+    }
+
+    assert len(selected_ids) == 365
+
+
+def test_select_quote_for_day_is_unique_across_a_leap_year_when_pool_is_large_enough() -> None:
+    quotes = [_quote_template(quote_id) for quote_id in range(1, 367)]
+    selected_ids = {
+        quote_service.select_quote_for_day(quotes, language="en", selected_date=selected_date)["id"]
+        for selected_date in _dates_for_year(2024)
+    }
+
+    assert len(selected_ids) == 366
 
 
 def test_select_random_quote_uses_random_choice(monkeypatch) -> None:
@@ -109,3 +129,12 @@ def test_resolve_quote_of_the_day_returns_code_fallback_when_store_is_empty(monk
     assert resolved["id"] == 0
     assert resolved["language"] == "es"
     assert resolved["date"] == "2026-03-11"
+
+
+def _dates_for_year(year: int) -> list[date]:
+    current = date(year, 1, 1)
+    dates: list[date] = []
+    while current.year == year:
+        dates.append(current)
+        current += timedelta(days=1)
+    return dates

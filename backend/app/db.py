@@ -8,105 +8,13 @@ from typing import Iterator
 import psycopg
 from psycopg.rows import dict_row
 
+from .quote_seed_data import build_quote_seed_rows
+
 
 @contextmanager
 def get_connection(database_url: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         yield connection
-
-
-def _quote_seed_rows() -> list[dict[str, object]]:
-    now = datetime.now(tz=timezone.utc)
-    return [
-        {
-            "language": "en",
-            "text": "I asked the ship AI for meaning. It suggested a firmware update and a long walk among the stars.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "reflective",
-            "tags": ["ai", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "en",
-            "text": "A wise captain debugs the console before blaming the galaxy.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "funny",
-            "tags": ["ai", "funny", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "en",
-            "text": "Synthetic minds count possibilities. Sentient minds decide which ones deserve mercy.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "reflective",
-            "tags": ["ai", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "en",
-            "text": "On a starship, even existential dread sounds better with clean telemetry.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "funny",
-            "tags": ["funny", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "es",
-            "text": "Le pedi sentido a la IA de la nave. Me propuso una actualizacion de firmware y un paseo entre las estrellas.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "reflective",
-            "tags": ["ai", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "es",
-            "text": "Una capitana sabia depura la consola antes de culpar a la galaxia.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "funny",
-            "tags": ["ai", "funny", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "es",
-            "text": "Las mentes sinteticas cuentan posibilidades. Las conscientes eligen cuales merecen compasion.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "reflective",
-            "tags": ["ai", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-        {
-            "language": "es",
-            "text": "En una nave estelar, hasta la crisis existencial suena mejor con telemetria limpia.",
-            "author": "VANESSA Curated",
-            "source_universe": "Original",
-            "tone": "funny",
-            "tags": ["funny", "philosophy", "scifi"],
-            "origin": "local",
-            "created_at": now,
-            "updated_at": now,
-        },
-    ]
 
 
 def run_auth_schema_migration(database_url: str) -> None:
@@ -532,7 +440,7 @@ def run_quotes_schema_migration(database_url: str) -> None:
                 "CREATE INDEX IF NOT EXISTS quotes_lookup_idx ON quotes (language, is_active, is_approved)"
             )
 
-            quote_rows = _quote_seed_rows()
+            quote_rows = build_quote_seed_rows()
             for row in quote_rows:
                 cursor.execute(
                     """
