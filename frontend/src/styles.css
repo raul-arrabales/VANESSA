@@ -1133,6 +1133,10 @@ a {
   min-width: 0;
 }
 
+.chatbot-thread-shell {
+  position: relative;
+}
+
 .chatbot-thread {
   display: grid;
   gap: var(--space-3);
@@ -1142,6 +1146,14 @@ a {
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--bg-surface) 90%, transparent);
+  overscroll-behavior: contain;
+}
+
+.chatbot-jump-to-latest {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  box-shadow: var(--shadow-2);
 }
 
 .chatbot-message {

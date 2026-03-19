@@ -11,6 +11,7 @@ import {
   type ChatConversationSummary,
 } from "../api/chat";
 import ChatMessageBody from "../components/ChatMessageBody";
+import { useStickyChatScroll } from "../hooks/useStickyChatScroll";
 import { listEnabledModels, type ModelCatalogItem } from "../api/models";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -179,6 +180,27 @@ export default function ChatbotPage(): JSX.Element {
 
   const activeConversationModelId = activeConversation?.modelId ?? "";
   const isInteractionLocked = isConversationBusy || isSending;
+  const threadVersion = useMemo(() => {
+    if (!activeConversation) {
+      return "empty";
+    }
+
+    return `${activeConversation.id}:${activeConversation.messages.map((message) => (
+      `${message.id}:${message.content.length}`
+    )).join("|")}`;
+  }, [activeConversation]);
+  const {
+    threadRef,
+    isPinnedToBottom,
+    hasUnreadContentBelow,
+    handleScroll,
+    scrollToBottom,
+    pinToBottomOnNextUpdate,
+  } = useStickyChatScroll(threadVersion);
+
+  useEffect(() => {
+    pinToBottomOnNextUpdate("auto");
+  }, [activeConversationId, pinToBottomOnNextUpdate]);
 
   const createConversation = async (): Promise<void> => {
     if (!token || !canCreateConversation || isSending) {
@@ -306,6 +328,7 @@ export default function ChatbotPage(): JSX.Element {
     setError("");
     setIsSending(true);
     setDraft("");
+    pinToBottomOnNextUpdate("smooth");
     setActiveConversation((current) => (
       current && current.id === conversationId ? { ...current, messages: optimisticMessages } : current
     ));
@@ -437,23 +460,41 @@ export default function ChatbotPage(): JSX.Element {
           ))}
         </select>
 
-        <div className="chatbot-thread" aria-live="polite">
-          {activeConversation?.messages.length
-            ? activeConversation.messages.map((message) => (
-              <article
-                key={message.id}
-                className={`chatbot-message chatbot-message-${message.role}`}
+        <div className="chatbot-thread-shell">
+          <div
+            ref={threadRef}
+            className="chatbot-thread"
+            aria-live="polite"
+            onScroll={handleScroll}
+          >
+            {activeConversation?.messages.length
+              ? activeConversation.messages.map((message) => (
+                <article
+                  key={message.id}
+                  className={`chatbot-message chatbot-message-${message.role}`}
+                >
+                  <p className="chatbot-message-role">{message.role === "user" ? "You" : "Assistant"}</p>
+                  <ChatMessageBody
+                    content={message.content}
+                    renderMarkdown={message.role === "assistant"}
+                  />
+                </article>
+              ))
+              : <p className="status-text">
+                {isBootstrapping ? "Loading conversations..." : "No messages yet. Start chatting to build context memory."}
+              </p>}
+          </div>
+          {hasUnreadContentBelow && !isPinnedToBottom
+            ? (
+              <button
+                type="button"
+                className="btn btn-secondary chatbot-jump-to-latest"
+                onClick={() => scrollToBottom({ behavior: "smooth" })}
               >
-                <p className="chatbot-message-role">{message.role === "user" ? "You" : "Assistant"}</p>
-                <ChatMessageBody
-                  content={message.content}
-                  renderMarkdown={message.role === "assistant"}
-                />
-              </article>
-            ))
-            : <p className="status-text">
-              {isBootstrapping ? "Loading conversations..." : "No messages yet. Start chatting to build context memory."}
-            </p>}
+                Jump to latest
+              </button>
+            )
+            : null}
         </div>
 
         <label className="field-label" htmlFor="prompt">Message</label>

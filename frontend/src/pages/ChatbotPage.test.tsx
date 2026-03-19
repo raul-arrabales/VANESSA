@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatConversationDetail, ChatConversationSummary, SendChatMessageResult } from "../api/chat";
@@ -18,6 +18,8 @@ const chatApiMocks = vi.hoisted(() => ({
   deleteChatConversation: vi.fn(),
   streamChatMessage: vi.fn(),
 }));
+const scrollIntoViewMock = vi.fn();
+const scrollToMock = vi.fn();
 
 let mockUser: AuthUser | null = null;
 
@@ -94,17 +96,64 @@ function sendResult(
   };
 }
 
-function renderChatbot(): void {
-  render(
+function renderChatbot() {
+  return render(
     <TestRouter>
       <ChatbotPage />
     </TestRouter>,
   );
 }
 
+function getChatThread(container: HTMLElement): HTMLDivElement {
+  const thread = container.querySelector(".chatbot-thread");
+  if (!(thread instanceof HTMLDivElement)) {
+    throw new Error("Expected chatbot thread to be present");
+  }
+  return thread;
+}
+
+function setThreadMetrics(
+  thread: HTMLDivElement,
+  {
+    scrollTop,
+    scrollHeight = 1000,
+    clientHeight = 400,
+  }: {
+    scrollTop: number;
+    scrollHeight?: number;
+    clientHeight?: number;
+  },
+): void {
+  Object.defineProperties(thread, {
+    scrollTop: {
+      configurable: true,
+      writable: true,
+      value: scrollTop,
+    },
+    scrollHeight: {
+      configurable: true,
+      value: scrollHeight,
+    },
+    clientHeight: {
+      configurable: true,
+      value: clientHeight,
+    },
+  });
+}
+
 describe("ChatbotPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    Object.defineProperty(HTMLDivElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollToMock,
+    });
+    scrollIntoViewMock.mockReset();
+    scrollToMock.mockReset();
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -308,6 +357,169 @@ describe("ChatbotPage", () => {
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
     expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
+  });
+
+  it("autoscrolls on send and continues following streamed deltas while pinned", async () => {
+    let resolveStream: (value: SendChatMessageResult) => void = () => {};
+    chatApiMocks.streamChatMessage.mockImplementationOnce(
+      async (_conversationId, _payload, _token, options) => {
+        options?.onDelta?.("hello");
+        options?.onDelta?.(" world");
+        return await new Promise<SendChatMessageResult>((resolve) => {
+          resolveStream = resolve;
+        });
+      },
+    );
+
+    const { container } = renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    const thread = getChatThread(container);
+    setThreadMetrics(thread, { scrollTop: 600 });
+    scrollToMock.mockClear();
+    scrollIntoViewMock.mockClear();
+
+    await userEvent.type(screen.getByLabelText("Message"), "Keep pinned");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
+    expect(await screen.findByText("hello world")).toBeVisible();
+
+    resolveStream(
+      sendResult(
+        conversationSummary("conv-1", "Keep pinned", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:02Z",
+        }),
+        "Keep pinned",
+        "hello world",
+      ),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
+  });
+
+  it("pauses autoscroll when the user scrolls up and resumes from jump to latest", async () => {
+    let resolveStream: (value: SendChatMessageResult) => void = () => {};
+    let streamOptions: { onDelta?: (text: string) => void } | undefined;
+
+    chatApiMocks.streamChatMessage.mockImplementationOnce(
+      async (_conversationId, _payload, _token, options) => {
+        streamOptions = options;
+        return await new Promise<SendChatMessageResult>((resolve) => {
+          resolveStream = resolve;
+        });
+      },
+    );
+
+    const { container } = renderChatbot();
+
+    await screen.findByRole("heading", { name: "Thread one" });
+    const thread = getChatThread(container);
+    setThreadMetrics(thread, { scrollTop: 600 });
+
+    await userEvent.type(screen.getByLabelText("Message"), "Detach from stream");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(streamOptions).toBeDefined());
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+    scrollToMock.mockClear();
+    scrollIntoViewMock.mockClear();
+    setThreadMetrics(thread, { scrollTop: 200 });
+    fireEvent.scroll(thread);
+
+    await act(async () => {
+      streamOptions?.onDelta?.("new token");
+    });
+
+    expect(scrollToMock).not.toHaveBeenCalled();
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    const jumpButton = await screen.findByRole("button", { name: "Jump to latest" });
+    expect(jumpButton).toBeVisible();
+
+    await userEvent.click(jumpButton);
+    expect(scrollToMock).toHaveBeenCalledTimes(1);
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
+
+    scrollToMock.mockClear();
+    scrollIntoViewMock.mockClear();
+    await act(async () => {
+      streamOptions?.onDelta?.(" more");
+    });
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+    resolveStream(
+      sendResult(
+        conversationSummary("conv-1", "Detach from stream", {
+          messageCount: 2,
+          updatedAt: "2026-03-18T11:00:02Z",
+        }),
+        "Detach from stream",
+        "new token more",
+      ),
+    );
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
+  });
+
+  it("resets follow mode when sending a new prompt and when switching conversations", async () => {
+    chatApiMocks.getChatConversation
+      .mockResolvedValueOnce(conversationDetail("conv-1", "Thread one", {
+        messageCount: 2,
+        messages: [
+          { id: "msg-1", role: "assistant", content: "Existing reply", metadata: {}, createdAt: "2026-03-18T10:59:00Z" },
+        ],
+      }))
+      .mockResolvedValueOnce(conversationDetail("conv-2", "Thread two", {
+        messageCount: 2,
+        messages: [
+          { id: "msg-2", role: "assistant", content: "Second thread", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+        ],
+      }));
+    chatApiMocks.listChatConversations.mockResolvedValueOnce([
+      conversationSummary("conv-1", "Thread one", { messageCount: 2, updatedAt: "2026-03-18T11:00:02Z" }),
+      conversationSummary("conv-2", "Thread two", { messageCount: 2, updatedAt: "2026-03-18T11:00:01Z" }),
+    ]);
+    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
+      sendResult(
+        conversationSummary("conv-1", "Fresh send", {
+          messageCount: 4,
+          updatedAt: "2026-03-18T11:00:03Z",
+        }),
+        "Fresh send",
+        "response",
+      ),
+    );
+
+    const { container } = renderChatbot();
+
+    await screen.findByText("Existing reply");
+    const thread = getChatThread(container);
+    setThreadMetrics(thread, { scrollTop: 200 });
+    fireEvent.scroll(thread);
+    scrollToMock.mockClear();
+    scrollIntoViewMock.mockClear();
+
+    await userEvent.type(screen.getByLabelText("Message"), "Fresh send");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+    scrollToMock.mockClear();
+    scrollIntoViewMock.mockClear();
+    setThreadMetrics(thread, { scrollTop: 200 });
+    fireEvent.scroll(thread);
+
+    await userEvent.click(screen.getByRole("button", { name: /Thread two/ }));
+    await screen.findByText("Second thread");
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
   });
 
   it("restores the draft and removes the transient assistant reply when streaming fails", async () => {
