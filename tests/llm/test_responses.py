@@ -151,6 +151,41 @@ def test_embeddings_reject_models_without_embedding_capability() -> None:
     assert exc.value.detail["code"] == "unsupported_input"
 
 
+def test_embeddings_maps_openai_error_payloads_even_when_upstream_returns_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = OpenAICompatibleProvider(
+        base_url="http://example.test/v1",
+        timeout_seconds=5,
+        auth_header_value=None,
+        provider_code_prefix="local_vllm",
+    )
+
+    class _FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self) -> bytes:
+            return (
+                b'{"object":"error","message":"The model does not support Embeddings API","type":"BadRequestError","code":400}'
+            )
+
+    monkeypatch.setattr("app.providers.openai_compat.urlopen", lambda *args, **kwargs: _FakeResponse())
+
+    with pytest.raises(ProviderError) as exc_info:
+        provider.embed(
+            EmbeddingRequest(model="local-vllm-embeddings-default", input=["hello"]),
+            upstream_model="/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.code == "local_vllm_bad_request"
+    assert exc_info.value.message == "The model does not support Embeddings API"
+
+
 def test_chat_completion_normalizes_provider_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     request = ResponseRequest(
         model="dummy",

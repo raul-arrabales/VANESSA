@@ -41,6 +41,47 @@ def _error_payload(code: str, message: str, details: dict[str, Any] | None = Non
     return payload
 
 
+def _retrieval_dependency_error(exc: EmbeddingsRuntimeClientError) -> ExecutionBlockedError:
+    upstream = exc.details.get("upstream") if isinstance(exc.details.get("upstream"), dict) else {}
+    error_payload = upstream.get("error") if isinstance(upstream.get("error"), dict) else {}
+    detail_payload = upstream.get("detail") if isinstance(upstream.get("detail"), dict) else {}
+    upstream_message = " ".join(
+        [
+            str(error_payload.get("message", "")).strip(),
+            str(detail_payload.get("message", "")).strip(),
+            str(upstream.get("message", "")).strip(),
+        ]
+    ).strip()
+    normalized_message = upstream_message.lower()
+
+    if "does not support embeddings" in normalized_message:
+        return ExecutionBlockedError(
+            code="EXEC_UPSTREAM_UNAVAILABLE",
+            message=(
+                "Knowledge retrieval is unavailable because the configured embeddings model "
+                "does not support embeddings. Configure LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL "
+                "to an embeddings-capable model and restart the stack."
+            ),
+            status_code=503,
+            details=exc.details,
+        )
+
+    if exc.code == "embeddings_runtime_request_failed":
+        return ExecutionBlockedError(
+            code="EXEC_UPSTREAM_UNAVAILABLE",
+            message="Knowledge retrieval is currently unavailable.",
+            status_code=503,
+            details=exc.details,
+        )
+
+    return ExecutionBlockedError(
+        code="EXEC_INTERNAL_ERROR",
+        message="Execution failed internally",
+        status_code=500,
+        details=exc.details,
+    )
+
+
 def _raise_simulated_error_if_requested(execution_input: dict[str, Any]) -> None:
     simulate_error = str(execution_input.get("simulate_error", "")).strip().lower()
     if simulate_error == "timeout":
@@ -406,12 +447,7 @@ def _execute_retrieval_call(
                 status_code=503,
                 details=exc.details,
             ) from exc
-        raise ExecutionBlockedError(
-            code="EXEC_INTERNAL_ERROR",
-            message="Execution failed internally",
-            status_code=500,
-            details=exc.details,
-        ) from exc
+        raise _retrieval_dependency_error(exc) from exc
     except VectorStoreRuntimeClientError as exc:
         if exc.code == "vector_runtime_timeout":
             raise ExecutionBlockedError(

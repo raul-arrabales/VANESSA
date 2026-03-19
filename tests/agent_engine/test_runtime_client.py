@@ -372,6 +372,29 @@ def test_openai_compatible_embeddings_runtime_client_returns_vectors(monkeypatch
     assert seen_payloads == [{"model": "local-vllm-embeddings-default", "input": ["hello"]}]
 
 
+def test_openai_compatible_embeddings_runtime_client_surfaces_upstream_bad_requests(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, payload, headers, timeout_seconds
+        return {
+            "error": {
+                "code": "local_vllm_bad_request",
+                "message": "The model does not support Embeddings API",
+            }
+        }, 400
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_embeddings_runtime_client(_platform_runtime())
+
+    with pytest.raises(runtime_client.EmbeddingsRuntimeClientError) as exc_info:
+        client.embed_texts(texts=["hello"])
+
+    assert exc_info.value.code == "embeddings_runtime_request_failed"
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.details["upstream"]["error"]["message"] == "The model does not support Embeddings API"
+
+
 def test_mcp_tool_runtime_client_invokes_gateway(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
 

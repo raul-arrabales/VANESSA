@@ -96,3 +96,39 @@ def test_knowledge_chat_route_returns_json_on_unexpected_failure(client, monkeyp
         "error": "knowledge_chat_failed",
         "message": "Knowledge chat request failed.",
     }
+
+
+def test_knowledge_chat_route_passes_through_actionable_engine_errors(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u3@example.com",
+        username="u3",
+        password_hash=hash_password("u3-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u3-pass-123").get_json()["access_token"]
+
+    def _raise_engine_error(**_kwargs):
+        raise chat_routes.AgentEngineClientError(
+            code="EXEC_UPSTREAM_UNAVAILABLE",
+            message=(
+                "Knowledge retrieval is unavailable because the configured embeddings model "
+                "does not support embeddings. Configure LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL "
+                "to an embeddings-capable model and restart the stack."
+            ),
+            status_code=503,
+        )
+
+    monkeypatch.setattr(chat_routes, "run_knowledge_chat", _raise_engine_error)
+
+    response = test_client.post(
+        "/v1/chat/knowledge",
+        headers=_auth(token),
+        json={"prompt": "hello", "model": "safe-small"},
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "EXEC_UPSTREAM_UNAVAILABLE"
+    assert "LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL" in response.get_json()["message"]

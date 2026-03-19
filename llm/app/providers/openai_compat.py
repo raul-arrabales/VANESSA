@@ -189,6 +189,57 @@ def _extract_embeddings(body: dict[str, Any]) -> list[list[float]]:
     return embeddings
 
 
+def _extract_error_details(body: dict[str, Any]) -> tuple[int | None, str | None]:
+    object_type = str(body.get("object", "")).strip().lower()
+    if object_type == "error":
+        raw_code = body.get("code")
+        status_code: int | None = None
+        if isinstance(raw_code, int):
+            status_code = raw_code
+        elif isinstance(raw_code, str):
+            try:
+                status_code = int(raw_code.strip())
+            except ValueError:
+                status_code = None
+        message = str(body.get("message", "")).strip() or "Upstream request failed"
+        return status_code, message
+
+    err = body.get("error")
+    if isinstance(err, dict):
+        message = str(err.get("message", "")).strip() or "Upstream request failed"
+        raw_code = err.get("code")
+        status_code = raw_code if isinstance(raw_code, int) else None
+        return status_code, message
+    if isinstance(err, str) and err.strip():
+        return None, err.strip()
+    return None, None
+
+
+def _raise_payload_error_if_present(body: dict[str, Any], *, provider_code_prefix: str) -> None:
+    status_code, message = _extract_error_details(body)
+    if message is None:
+        return
+
+    normalized_status = status_code if isinstance(status_code, int) and status_code > 0 else 502
+    if normalized_status in {401, 403}:
+        code = f"{provider_code_prefix}_auth_error"
+    elif normalized_status == 429:
+        code = f"{provider_code_prefix}_rate_limited"
+    elif normalized_status >= 500:
+        normalized_status = 502
+        code = f"{provider_code_prefix}_unavailable"
+    elif normalized_status == 400:
+        code = f"{provider_code_prefix}_bad_request"
+    else:
+        code = f"{provider_code_prefix}_upstream_error"
+
+    raise ProviderError(
+        status_code=normalized_status,
+        code=code,
+        message=message,
+    )
+
+
 def _iter_sse_data_chunks(response) -> Iterator[str]:
     data_lines: list[str] = []
     while True:
@@ -256,6 +307,11 @@ class OpenAICompatibleProvider:
             with urlopen(req, timeout=float(self._timeout_seconds)) as response:
                 body = response.read().decode("utf-8")
                 parsed = loads(body) if body else {}
+                if isinstance(parsed, dict):
+                    _raise_payload_error_if_present(
+                        parsed,
+                        provider_code_prefix=self._provider_code_prefix,
+                    )
                 usage = parsed.get("usage") if isinstance(parsed, dict) else {}
                 prompt_tokens = int(usage.get("prompt_tokens", 0)) if isinstance(usage, dict) else 0
                 completion_tokens = (
@@ -434,6 +490,11 @@ class OpenAICompatibleProvider:
             with urlopen(req, timeout=float(self._timeout_seconds)) as response:
                 body = response.read().decode("utf-8")
                 parsed = loads(body) if body else {}
+                if isinstance(parsed, dict):
+                    _raise_payload_error_if_present(
+                        parsed,
+                        provider_code_prefix=self._provider_code_prefix,
+                    )
                 usage = parsed.get("usage") if isinstance(parsed, dict) else {}
                 prompt_tokens = int(usage.get("prompt_tokens", 0)) if isinstance(usage, dict) else 0
                 return EmbeddingResult(

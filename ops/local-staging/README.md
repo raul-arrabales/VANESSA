@@ -83,6 +83,7 @@ Supported launcher variables:
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
 - `LLM_LOCAL_UPSTREAM_MODEL` (default in `infra/.env.example`: same value as `LLM_LOCAL_MODEL_PATH`; must match a model id exposed by `llm_runtime /v1/models`)
+- `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` (blank by default; when set, should point to an embeddings-capable model id exposed by `llm_runtime /v1/models`; when blank, embeddings reuse `LLM_LOCAL_UPSTREAM_MODEL`)
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)

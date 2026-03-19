@@ -569,6 +569,69 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
     ]
 
 
+def test_execution_with_unsupported_embeddings_model_returns_actionable_503(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "build_embeddings_runtime_client",
+        lambda _runtime: type(
+            "FakeEmbeddingsClient",
+            (),
+            {
+                "embed_texts": lambda self, **kwargs: (_ for _ in ()).throw(
+                    execution_service.EmbeddingsRuntimeClientError(
+                        code="embeddings_runtime_request_failed",
+                        message="Embeddings runtime request failed",
+                        status_code=400,
+                        details={
+                            "provider_slug": "vllm-embeddings-local",
+                            "status_code": 400,
+                            "upstream": {
+                                "detail": {
+                                    "code": "local_vllm_bad_request",
+                                    "message": "The model does not support Embeddings API",
+                                }
+                            },
+                        },
+                    )
+                )
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(execution_service.ExecutionBlockedError) as exc_info:
+        execution_service.create_execution(
+            {
+                "agent_id": "agent.alpha",
+                "requested_by_user_id": 123,
+                "runtime_profile": "offline",
+                "input": {"prompt": "hello", "retrieval": {"index": "knowledge_base"}},
+                "platform_runtime": {
+                    "deployment_profile": {"slug": "local-default"},
+                    "capabilities": {
+                        "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                        "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
+                        "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
+                    },
+                },
+            }
+        )
+
+    assert exc_info.value.code == "EXEC_UPSTREAM_UNAVAILABLE"
+    assert exc_info.value.status_code == 503
+    assert "configured embeddings model does not support embeddings" in exc_info.value.message
+
+
 def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypatch: pytest.MonkeyPatch):
     seen_queries: list[str] = []
 
