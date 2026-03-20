@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.routes import model_catalog_v1 as model_catalog_routes  # noqa: E402
+from app.routes import modelops as modelops_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.connectivity_policy import ConnectivityPolicyError, assert_internet_allowed  # noqa: E402
 from app.services.hf_discovery import discover_hf_models, get_hf_model_details  # noqa: E402
@@ -15,9 +15,9 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE_FORCE", raising=False)
     test_client, user_store, config = backend_test_client_factory()
-    monkeypatch.setattr(model_catalog_routes, "_config", lambda: config)
-    monkeypatch.setattr(model_catalog_routes, "discover_hf_models", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
-    monkeypatch.setattr(model_catalog_routes, "get_hf_model_details", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
+    monkeypatch.setattr(modelops_routes, "_config", lambda: config)
+    monkeypatch.setattr(modelops_routes, "discover_hf_models", lambda **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
+    monkeypatch.setattr(modelops_routes, "get_hf_model_details", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("should not call")))
     yield test_client, user_store, config
 
 
@@ -42,14 +42,14 @@ def test_internet_features_are_consistently_blocked_in_offline_profile(client):
     token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
 
     for method, path, expected_message in [
-        ("get", "/v1/models/discovery/huggingface?query=llama", "Model discovery disabled for runtime profile 'offline'"),
-        ("get", "/v1/models/discovery/huggingface/meta-llama/Llama-3-8B-Instruct", "Model discovery disabled for runtime profile 'offline'"),
-        ("post", "/v1/models/downloads", "Model download disabled for runtime profile 'offline'"),
+        ("get", "/v1/modelops/discovery/huggingface?query=llama", "Model discovery disabled for runtime profile 'offline'"),
+        ("get", "/v1/modelops/discovery/huggingface/meta-llama/Llama-3-8B-Instruct", "Model discovery disabled for runtime profile 'offline'"),
+        ("post", "/v1/modelops/downloads", "Model download disabled for runtime profile 'offline'"),
     ]:
         response = getattr(test_client, method)(
             path,
             headers=_auth(token),
-            json={"source_id": "meta-llama/Llama-3-8B-Instruct"} if method == "post" else None,
+            json={"source_id": "meta-llama/Llama-3-8B-Instruct", "task_key": "llm"} if method == "post" else None,
         )
         assert response.status_code == 403
         assert response.get_json() == {

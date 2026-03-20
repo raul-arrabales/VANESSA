@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
-import { listModelCatalog, type ModelCatalogItem } from "../api/models";
+import { listModelOpsModels, type ManagedModel } from "../api/models";
 import {
   activateDeploymentProfile,
   cloneDeploymentProfile,
@@ -155,7 +155,7 @@ export default function PlatformControlPage(): JSX.Element {
   const [providerFamilies, setProviderFamilies] = useState<PlatformProviderFamily[]>([]);
   const [providers, setProviders] = useState<PlatformProvider[]>([]);
   const [deployments, setDeployments] = useState<PlatformDeploymentProfile[]>([]);
-  const [managedModels, setManagedModels] = useState<ModelCatalogItem[]>([]);
+  const [managedModels, setManagedModels] = useState<ManagedModel[]>([]);
   const [activationAudit, setActivationAudit] = useState<PlatformActivationAuditEntry[]>([]);
   const [validatingProviderId, setValidatingProviderId] = useState("");
   const [validationResults, setValidationResults] = useState<Record<string, PlatformProviderValidation>>({});
@@ -190,7 +190,7 @@ export default function PlatformControlPage(): JSX.Element {
           listPlatformProviders(token),
           listPlatformDeployments(token),
           listPlatformActivationAudit(token),
-          listModelCatalog(token),
+          listModelOpsModels(token, { eligible: true, capability: "embeddings" }),
         ]);
       setCapabilities(capabilitiesPayload);
       setProviderFamilies(providerFamiliesPayload);
@@ -218,13 +218,13 @@ export default function PlatformControlPage(): JSX.Element {
     accumulator[capability.capability] = providers.filter((provider) => provider.capability === capability.capability);
     return accumulator;
   }, {});
-  const servedModelsByCapability = requiredCapabilities.reduce<Record<string, ModelCatalogItem[]>>((accumulator, capability) => {
+  const servedModelsByCapability = requiredCapabilities.reduce<Record<string, ManagedModel[]>>((accumulator, capability) => {
     if (!capabilityRequiresServedModel(capability.capability)) {
       accumulator[capability.capability] = [];
       return accumulator;
     }
     accumulator[capability.capability] = managedModels.filter(
-      (model) => model.model_type === "embedding" && (model.status ?? "available") === "available",
+      (model) => model.task_key === "embeddings" && model.lifecycle_state === "active" && model.is_validation_current && model.last_validation_status === "success",
     );
     return accumulator;
   }, {});

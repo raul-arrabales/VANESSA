@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
-import type { ModelCatalogItem } from "../api/models";
+import type { ManagedModel } from "../api/models";
 import type { PlatformDeploymentProfile } from "../api/platform";
 import PlatformControlPage from "./PlatformControlPage";
 import * as modelsApi from "../api/models";
@@ -38,7 +38,7 @@ vi.mock("../api/platform", () => ({
 }));
 
 vi.mock("../api/models", () => ({
-  listModelCatalog: vi.fn(),
+  listModelOpsModels: vi.fn(),
 }));
 
 const capabilitiesFixture = [
@@ -155,13 +155,16 @@ const providersFixture = [
   },
 ];
 
-const modelCatalogFixture: ModelCatalogItem[] = [
+const modelCatalogFixture: ManagedModel[] = [
   {
     id: "text-embedding-3-small",
     name: "text-embedding-3-small",
     provider: "openai",
-    model_type: "embedding",
-    status: "available",
+    task_key: "embeddings",
+    category: "predictive",
+    lifecycle_state: "active",
+    is_validation_current: true,
+    last_validation_status: "success",
   },
 ];
 
@@ -201,7 +204,7 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
         served_model: {
           id: "text-embedding-3-small",
           name: "text-embedding-3-small",
-          model_type: "embedding",
+          task_key: "embeddings",
           backend: "external_api",
         },
         config: {},
@@ -256,7 +259,7 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
         served_model: {
           id: "text-embedding-3-small",
           name: "text-embedding-3-small",
-          model_type: "embedding",
+          task_key: "embeddings",
           backend: "external_api",
         },
         config: {},
@@ -311,7 +314,7 @@ describe("PlatformControlPage", () => {
     vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(providersFixture);
     vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue(deploymentsFixture);
     vi.mocked(platformApi.listPlatformActivationAudit).mockResolvedValue(activationAuditFixture);
-    vi.mocked(modelsApi.listModelCatalog).mockResolvedValue(modelCatalogFixture);
+    vi.mocked(modelsApi.listModelOpsModels).mockResolvedValue(modelCatalogFixture);
   });
 
   it("loads and renders capability, provider, deployment, and audit data", async () => {

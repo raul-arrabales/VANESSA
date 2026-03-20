@@ -2,17 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
 import {
+  activateManagedModel,
   createModelCatalogItem,
+  deactivateManagedModel,
+  deleteManagedModel,
   discoverHfModels,
   getHfModelDetails,
   listDownloadJobs,
   listModelAssignments,
-  listModelCatalog,
+  listModelOpsModels,
   startModelDownload,
+  unregisterManagedModel,
   updateModelAssignment,
+  validateManagedModel,
   type HfDiscoveredModel,
+  type ManagedModel,
   type ModelDownloadJob,
-  type ModelCatalogItem,
   type ModelScopeAssignment,
 } from "../api/models";
 
@@ -21,6 +26,10 @@ const activeJobStatuses = new Set(["queued", "running"]);
 const basePollIntervalMs = 3000;
 const backoffPollIntervalMs = 5000;
 const pollBackoffAfterMs = 120_000;
+const TASK_OPTIONS = [
+  { value: "llm", label: "llm", category: "generative" as const },
+  { value: "embeddings", label: "embedding", category: "predictive" as const },
+];
 
 function mergeActiveJobs(
   currentJobs: ModelDownloadJob[],
@@ -44,14 +53,14 @@ export default function SuperAdminModelsPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
 
-  const [models, setModels] = useState<ModelCatalogItem[]>([]);
+  const [models, setModels] = useState<ManagedModel[]>([]);
   const [assignments, setAssignments] = useState<ModelScopeAssignment[]>([]);
   const [newModelName, setNewModelName] = useState("");
   const [newModelProvider, setNewModelProvider] = useState("");
-  const [catalogModelType, setCatalogModelType] = useState<"llm" | "embedding">("llm");
+  const [catalogTaskKey, setCatalogTaskKey] = useState("llm");
   const [feedback, setFeedback] = useState("");
   const [discoverQuery, setDiscoverQuery] = useState("");
-  const [discoveryModelType, setDiscoveryModelType] = useState<"llm" | "embedding">("llm");
+  const [discoveryTaskKey, setDiscoveryTaskKey] = useState("llm");
   const [discoveredModels, setDiscoveredModels] = useState<HfDiscoveredModel[]>([]);
   const [selectedModelInfo, setSelectedModelInfo] = useState<string>("");
   const [downloadJobs, setDownloadJobs] = useState<ModelDownloadJob[]>([]);
@@ -137,7 +146,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
         setDownloadJobs(nextJobs);
         shouldContinuePolling = nextJobs.some((job) => activeJobStatuses.has(job.status));
         if (refreshCatalog) {
-          void listModelCatalog(token).then(setModels).catch(() => {});
+          void listModelOpsModels(token).then(setModels).catch(() => {});
         }
       } catch {
         // Polling errors are non-fatal; continue polling while there are active jobs.
@@ -165,7 +174,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
     const bootstrap = async (): Promise<void> => {
       try {
         const [catalog, assignmentRows] = await Promise.all([
-          listModelCatalog(token),
+          listModelOpsModels(token),
           listModelAssignments(token),
         ]);
         setModels(catalog);
@@ -198,14 +207,16 @@ export default function SuperAdminModelsPage(): JSX.Element {
         {
           name: newModelName.trim(),
           provider: newModelProvider.trim() || undefined,
-          model_type: catalogModelType,
+          task_key: catalogTaskKey,
+          category: TASK_OPTIONS.find((option) => option.value === catalogTaskKey)?.category,
         },
         token,
       );
-      setModels((currentModels) => [...currentModels, created]);
+      void created;
+      await refreshModels();
       setNewModelName("");
       setNewModelProvider("");
-      setCatalogModelType("llm");
+      setCatalogTaskKey("llm");
       setFeedback(t("models.feedback.created"));
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : t("models.feedback.createFailed"));
@@ -219,8 +230,8 @@ export default function SuperAdminModelsPage(): JSX.Element {
     try {
       const modelsFromHf = await discoverHfModels(token, {
         query: discoverQuery,
-        task: discoveryModelType === "embedding" ? "feature-extraction" : "text-generation",
-        model_type: discoveryModelType,
+        task: discoveryTaskKey === "embeddings" ? "feature-extraction" : "text-generation",
+        task_key: discoveryTaskKey,
         sort: "downloads",
         limit: 12,
       });
@@ -256,7 +267,8 @@ export default function SuperAdminModelsPage(): JSX.Element {
         {
           source_id: model.source_id,
           name: model.name,
-          model_type: discoveryModelType,
+          task_key: discoveryTaskKey,
+          category: TASK_OPTIONS.find((option) => option.value === discoveryTaskKey)?.category,
         },
         token,
       );
@@ -289,6 +301,14 @@ export default function SuperAdminModelsPage(): JSX.Element {
     }
   };
 
+  const refreshModels = async (): Promise<void> => {
+    if (!token) {
+      return;
+    }
+    const catalog = await listModelOpsModels(token);
+    setModels(catalog);
+  };
+
   return (
     <section className="card-stack">
       <article className="panel card-stack">
@@ -302,12 +322,12 @@ export default function SuperAdminModelsPage(): JSX.Element {
         <div className="button-row">
           <select
             className="field-input"
-            value={discoveryModelType}
-            onChange={(event) => setDiscoveryModelType(event.currentTarget.value as "llm" | "embedding")}
+            value={discoveryTaskKey}
+            onChange={(event) => setDiscoveryTaskKey(event.currentTarget.value)}
             aria-label={t("models.discovery.typeLabel")}
           >
             <option value="llm">{t("models.types.llm")}</option>
-            <option value="embedding">{t("models.types.embedding")}</option>
+            <option value="embeddings">{t("models.types.embedding")}</option>
           </select>
           <input
             className="field-input"
@@ -326,7 +346,7 @@ export default function SuperAdminModelsPage(): JSX.Element {
             <li key={model.source_id} className="status-row">
               <strong>{model.source_id}</strong>
               <span className="status-text">
-                {`${t("models.discovery.downloadCount", { count: model.downloads ?? 0 })} · ${t(`models.types.${discoveryModelType}`)}`}
+                {`${t("models.discovery.downloadCount", { count: model.downloads ?? 0 })} · ${t(`models.types.${discoveryTaskKey === "embeddings" ? "embedding" : "llm"}`)}`}
               </span>
               <div className="button-row">
                 <button type="button" className="btn btn-ghost" onClick={() => void inspectModel(model.source_id)}>
@@ -363,11 +383,11 @@ export default function SuperAdminModelsPage(): JSX.Element {
           <select
             id="model-type"
             className="field-input"
-            value={catalogModelType}
-            onChange={(event) => setCatalogModelType(event.currentTarget.value as "llm" | "embedding")}
+            value={catalogTaskKey}
+            onChange={(event) => setCatalogTaskKey(event.currentTarget.value)}
           >
             <option value="llm">{t("models.types.llm")}</option>
-            <option value="embedding">{t("models.types.embedding")}</option>
+            <option value="embeddings">{t("models.types.embedding")}</option>
           </select>
           <button type="button" className="btn btn-primary" onClick={() => void createModel()}>
             {t("models.catalog.addButton")}
@@ -375,9 +395,69 @@ export default function SuperAdminModelsPage(): JSX.Element {
         </div>
         <ul className="card-stack" aria-label={t("models.catalog.listAria")}>
           {models.map((model) => (
-            <li key={model.id}>
+            <li key={model.id} className="card-stack">
               <strong>{model.name}</strong>
-              <p className="status-text">{model.id} · {model.model_type ?? "unknown"} · {model.provider} · {model.status ?? "available"}</p>
+              <p className="status-text">
+                {model.id} · {model.task_key ?? "unknown"} · {model.provider} · {model.lifecycle_state ?? "unknown"}
+              </p>
+              <p className="status-text">
+                Validation: {model.last_validation_status ?? "pending"} · Current: {model.is_validation_current ? "yes" : "no"} · Requests: {model.usage_summary?.total_requests ?? 0}
+              </p>
+              <div className="button-row">
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  if (!token) {
+                    return;
+                  }
+                  void validateManagedModel(model.id, token)
+                    .then(() => refreshModels())
+                    .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
+                }}>
+                  Validate
+                </button>
+                {model.lifecycle_state === "active" ? (
+                  <button type="button" className="btn btn-ghost" onClick={() => {
+                    if (!token) {
+                      return;
+                    }
+                    void deactivateManagedModel(model.id, token)
+                      .then(() => refreshModels())
+                      .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
+                  }}>
+                    Deactivate
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-primary" onClick={() => {
+                    if (!token) {
+                      return;
+                    }
+                    void activateManagedModel(model.id, token)
+                      .then(() => refreshModels())
+                      .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
+                  }}>
+                    Activate
+                  </button>
+                )}
+                <button type="button" className="btn btn-ghost" onClick={() => {
+                  if (!token) {
+                    return;
+                  }
+                  void unregisterManagedModel(model.id, token)
+                    .then(() => refreshModels())
+                    .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
+                }}>
+                  Unregister
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => {
+                  if (!token) {
+                    return;
+                  }
+                  void deleteManagedModel(model.id, token)
+                    .then(() => refreshModels())
+                    .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
+                }}>
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -36,7 +36,7 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
   }),
 }));
 vi.mock("./api/models", () => ({
-  listModelCatalog: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4" }]),
+  listModelOpsModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success" }]),
   listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),
   createModelCatalogItem: vi.fn(),
   updateModelAssignment: vi.fn(),
@@ -46,7 +46,11 @@ vi.mock("./api/models", () => ({
   createModelCredential: vi.fn(),
   revokeModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
-  listAvailableManagedModels: vi.fn(async () => []),
+  validateManagedModel: vi.fn(),
+  activateManagedModel: vi.fn(),
+  deactivateManagedModel: vi.fn(),
+  unregisterManagedModel: vi.fn(),
+  deleteManagedModel: vi.fn(),
 }));
 vi.mock("./api/knowledge", () => ({
   runKnowledgeChat: vi.fn(),

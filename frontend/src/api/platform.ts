@@ -63,7 +63,7 @@ export type PlatformDeploymentBinding = {
     name?: string | null;
     provider?: string | null;
     backend?: string | null;
-    model_type?: "llm" | "embedding" | null;
+    task_key?: string | null;
     provider_model_id?: string | null;
     local_path?: string | null;
     source_id?: string | null;

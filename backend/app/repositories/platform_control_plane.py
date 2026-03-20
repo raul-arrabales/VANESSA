@@ -373,6 +373,19 @@ def count_deployment_bindings_for_provider(database_url: str, *, provider_instan
     return int(row["binding_count"]) if row is not None else 0
 
 
+def count_deployment_bindings_for_served_model(database_url: str, *, model_id: str) -> int:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT COUNT(*) AS binding_count
+            FROM platform_deployment_bindings
+            WHERE served_model_id = %s
+            """,
+            (model_id.strip(),),
+        ).fetchone()
+    return int(row["binding_count"]) if row is not None else 0
+
+
 def ensure_deployment_profile(
     database_url: str,
     *,
@@ -679,7 +692,7 @@ def list_deployment_bindings(database_url: str, *, deployment_profile_id: str) -
               m.name AS served_model_name,
               m.provider AS served_model_provider,
               m.backend_kind AS served_model_backend_kind,
-              m.model_type AS served_model_type,
+              m.task_key AS served_model_task_key,
               m.provider_model_id AS served_model_provider_model_id,
               m.local_path AS served_model_local_path,
               m.source_id AS served_model_source_id,
@@ -743,7 +756,7 @@ def get_active_binding_for_capability(database_url: str, *, capability_key: str)
               m.name AS served_model_name,
               m.provider AS served_model_provider,
               m.backend_kind AS served_model_backend_kind,
-              m.model_type AS served_model_type,
+              m.task_key AS served_model_task_key,
               m.provider_model_id AS served_model_provider_model_id,
               m.local_path AS served_model_local_path,
               m.source_id AS served_model_source_id,
@@ -786,7 +799,7 @@ def get_active_binding_for_provider_instance(database_url: str, *, provider_inst
               m.name AS served_model_name,
               m.provider AS served_model_provider,
               m.backend_kind AS served_model_backend_kind,
-              m.model_type AS served_model_type,
+              m.task_key AS served_model_task_key,
               m.provider_model_id AS served_model_provider_model_id,
               m.local_path AS served_model_local_path,
               m.source_id AS served_model_source_id,

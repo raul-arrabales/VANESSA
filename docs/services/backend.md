@@ -83,7 +83,7 @@ Bootstrap defaults:
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
-- `POST /v1/chat/knowledge` is the first product-facing RAG surface. It keeps frontend chat state browser-local, resolves the selected model through model governance, executes the fixed `agent.knowledge_chat` agent through backend-owned orchestration, and returns normalized `sources` plus `retrieval` metadata for citation rendering.
+- `POST /v1/chat/knowledge` is the first product-facing RAG surface. It keeps frontend chat state browser-local, resolves the selected model through ModelOps eligibility, executes the fixed `agent.knowledge_chat` agent through backend-owned orchestration, and returns normalized `sources` plus `retrieval` metadata for citation rendering.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment bindings now serialize `served_model_id` plus a compact served-model summary for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
@@ -93,21 +93,32 @@ Bootstrap defaults:
   Each catalog create/update writes a new registry version under the hood, so runtime consumers
   still resolve from the registry while operators work with typed DTOs instead of opaque spec blobs.
 
-## Model Governance Endpoints (Release N Canonical)
+## ModelOps Endpoints
 
 - `POST /v1/chat/knowledge`
-- `GET /v1/models/catalog`
-- `POST /v1/models/catalog`
-- `GET /v1/models/discovery/huggingface`
-- `GET /v1/models/discovery/huggingface/{source_id}`
-- `POST /v1/models/downloads`
-- `GET /v1/models/downloads`
-- `GET /v1/models/downloads/{id}`
-- `GET /v1/model-governance/assignments`
-- `PUT /v1/model-governance/assignments`
-- `POST /v1/model-governance/access-assignments`
-- `GET /v1/model-governance/allowed`
-- `GET /v1/model-governance/enabled`
+- `GET /v1/modelops/models`
+- `POST /v1/modelops/models`
+- `GET /v1/modelops/models/{id}`
+- `POST /v1/modelops/models/{id}/register`
+- `POST /v1/modelops/models/{id}/validate`
+- `POST /v1/modelops/models/{id}/activate`
+- `POST /v1/modelops/models/{id}/deactivate`
+- `POST /v1/modelops/models/{id}/unregister`
+- `DELETE /v1/modelops/models/{id}`
+- `GET /v1/modelops/models/{id}/usage`
+- `GET /v1/modelops/models/{id}/validations`
+- `GET /v1/modelops/credentials`
+- `POST /v1/modelops/credentials`
+- `DELETE /v1/modelops/credentials/{id}`
+- `GET /v1/modelops/catalog`
+- `POST /v1/modelops/catalog`
+- `GET /v1/modelops/sharing`
+- `PUT /v1/modelops/sharing`
+- `GET /v1/modelops/discovery/huggingface`
+- `GET /v1/modelops/discovery/huggingface/{source_id}`
+- `POST /v1/modelops/downloads`
+- `GET /v1/modelops/downloads`
+- `GET /v1/modelops/downloads/{id}`
 - `POST /v1/models/inference`
 - `POST /v1/models/generate`
 

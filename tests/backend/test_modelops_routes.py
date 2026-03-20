@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.routes import model_management_v1 as routes  # noqa: E402
+from app.routes import modelops as routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
@@ -50,55 +50,61 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
         item["revoked_at"] = datetime.now(tz=timezone.utc)
         return dict(item)
 
-    def _get_secret(_db: str, credential_id: str, requester_user_id: int, requester_role: str, encryption_key: str):
-        item = credentials.get(credential_id)
-        if not item:
-            return None
-        if requester_role != "superadmin" and item["owner_user_id"] != requester_user_id:
-            return None
-        return {
-            "id": credential_id,
-            "owner_user_id": item["owner_user_id"],
-            "credential_scope": item["credential_scope"],
-            "provider_slug": item["provider_slug"],
-            "display_name": item["display_name"],
-            "api_base_url": item["api_base_url"],
-            "api_key": item["api_key"],
-        }
-
-    def _register_model(_db: str, **kwargs):
+    def _create_model(_db: str, **kwargs):
+        if not kwargs["payload"].get("task_key"):
+            raise routes.ModelOpsError("missing_config", "task_key is required", status_code=400)
         now = datetime.now(tz=timezone.utc)
         row = {
-            "model_id": kwargs["model_id"],
-            "name": kwargs["name"],
-            "provider": kwargs["provider"],
-            "provider_model_id": kwargs.get("provider_model_id"),
-            "origin_scope": kwargs["origin_scope"],
-            "backend_kind": kwargs["backend_kind"],
-            "source_kind": kwargs["source_kind"],
-            "availability": kwargs["availability"],
-            "access_scope": kwargs["access_scope"],
-            "metadata": kwargs["metadata"],
-            "model_size_billion": kwargs.get("model_size_billion"),
-            "model_type": kwargs.get("model_type"),
-            "comment": kwargs.get("comment"),
+            "model_id": kwargs["payload"]["id"],
+            "name": kwargs["payload"]["name"],
+            "provider": kwargs["payload"]["provider"],
+            "provider_model_id": kwargs["payload"].get("provider_model_id"),
+            "backend_kind": kwargs["payload"]["backend"],
+            "owner_type": kwargs["payload"].get("owner_type", "user"),
+            "visibility_scope": kwargs["payload"].get("visibility_scope", "private"),
+            "availability": kwargs["payload"].get("availability", "online_only"),
+            "task_key": kwargs["payload"]["task_key"],
+            "category": kwargs["payload"].get("category", "generative"),
             "updated_at": now,
         }
         models[row["model_id"]] = row
-        return row
+        return {
+            "id": row["model_id"],
+            "name": row["name"],
+            "provider": row["provider"],
+            "provider_model_id": row["provider_model_id"],
+            "backend": row["backend_kind"],
+            "owner_type": row["owner_type"],
+            "visibility_scope": row["visibility_scope"],
+            "availability": row["availability"],
+            "task_key": row["task_key"],
+            "category": row["category"],
+        }
 
     monkeypatch.setattr(routes, "create_credential", _create_credential)
     monkeypatch.setattr(routes, "list_credentials_for_user", _list_credentials)
     monkeypatch.setattr(routes, "revoke_credential", _revoke_credential)
-    monkeypatch.setattr(routes, "get_active_credential_secret", _get_secret)
-    monkeypatch.setattr(routes, "register_model", _register_model)
-    monkeypatch.setattr(routes, "append_audit_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr(routes, "assign_model_to_user", lambda *args, **kwargs: {"model_id": kwargs["model_id"], "user_id": kwargs["user_id"]})
-    monkeypatch.setattr(routes, "resolve_runtime_profile", lambda _db: "online")
-    monkeypatch.setattr(routes, "list_models_visible_to_user", lambda _db, user_id, runtime_profile: list(models.values()))
-    monkeypatch.setattr(routes, "validate_openai_compatible_model", lambda **kwargs: None)
-    monkeypatch.setattr(routes, "_database_url", lambda: "ignored")
-    monkeypatch.setattr(routes, "_encryption_key", lambda: "test-secret")
+    monkeypatch.setattr(routes, "create_model", _create_model)
+    monkeypatch.setattr(routes.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        routes,
+        "list_models",
+        lambda _db, **kwargs: [
+            {
+                "id": row["model_id"],
+                "name": row["name"],
+                "provider": row["provider"],
+                "backend": row["backend_kind"],
+                "owner_type": row["owner_type"],
+                "visibility_scope": row["visibility_scope"],
+                "availability": row["availability"],
+                "task_key": row["task_key"],
+                "category": row["category"],
+            }
+            for row in models.values()
+        ],
+    )
+    monkeypatch.setattr(routes, "_config", lambda: _config)
 
     yield test_client, user_store
 
@@ -124,7 +130,7 @@ def test_user_can_create_and_list_personal_credential(client):
     token = _token(test_client, user["username"], "pass-123")
 
     created = test_client.post(
-        "/v1/models/credentials",
+        "/v1/modelops/credentials",
         headers=_auth(token),
         json={"provider": "openai_compatible", "display_name": "my-key", "api_base_url": "https://api.example.com/v1", "api_key": "sk-user-secret"},
     )
@@ -133,7 +139,7 @@ def test_user_can_create_and_list_personal_credential(client):
     assert body["api_key_last4"] == "cret"
     assert "api_key" not in body
 
-    listed = test_client.get("/v1/models/credentials", headers=_auth(token))
+    listed = test_client.get("/v1/modelops/credentials", headers=_auth(token))
     assert listed.status_code == 200
     assert listed.get_json()["credentials"][0]["display_name"] == "my-key"
 
@@ -151,7 +157,7 @@ def test_non_superadmin_cannot_create_platform_credential(client):
     token = _token(test_client, user["username"], "pass-123")
 
     response = test_client.post(
-        "/v1/models/credentials",
+        "/v1/modelops/credentials",
         headers=_auth(token),
         json={"credential_scope": "platform", "provider": "openai_compatible", "api_key": "sk-abc"},
     )
@@ -171,24 +177,24 @@ def test_register_external_model_requires_validation_path(client):
     token = _token(test_client, user["username"], "pass-123")
 
     credential = test_client.post(
-        "/v1/models/credentials",
+        "/v1/modelops/credentials",
         headers=_auth(token),
         json={"provider": "openai_compatible", "display_name": "my-key", "api_base_url": "https://api.example.com/v1", "api_key": "sk-user-secret"},
     ).get_json()["credential"]
 
     registered = test_client.post(
-        "/v1/models/register",
+        "/v1/modelops/models",
         headers=_auth(token),
         json={
             "id": "gpt-4o-private",
             "name": "GPT 4o Private",
             "provider": "openai_compatible",
-            "origin": "personal",
             "backend": "external_api",
             "provider_model_id": "gpt-4o",
             "credential_id": credential["id"],
-            "access_scope": "private",
-            "model_type": "llm",
+            "visibility_scope": "private",
+            "task_key": "llm",
+            "category": "generative",
         },
     )
     assert registered.status_code == 201
@@ -197,7 +203,7 @@ def test_register_external_model_requires_validation_path(client):
     assert model["backend"] == "external_api"
 
 
-def test_available_models_endpoint_returns_models(client):
+def test_modelops_models_endpoint_returns_models(client):
     test_client, user_store = client
     user = user_store.create_user(
         "ignored",
@@ -210,28 +216,27 @@ def test_available_models_endpoint_returns_models(client):
     token = _token(test_client, user["username"], "pass-123")
 
     test_client.post(
-        "/v1/models/register",
+        "/v1/modelops/models",
         headers=_auth(token),
         json={
             "id": "phi-offline",
             "name": "Phi Offline",
             "provider": "local_filesystem",
-            "origin": "personal",
             "backend": "local",
             "source": "local_folder",
             "availability": "offline_ready",
-            "access_scope": "private",
-            "model_type": "llm",
+            "visibility_scope": "private",
+            "task_key": "llm",
+            "category": "generative",
         },
     )
 
-    listed = test_client.get("/v1/models/available", headers=_auth(token))
+    listed = test_client.get("/v1/modelops/models", headers=_auth(token))
     assert listed.status_code == 200
-    assert listed.get_json()["runtime_profile"] == "online"
     assert listed.get_json()["models"][0]["id"] == "phi-offline"
 
 
-def test_register_model_requires_model_type(client):
+def test_create_model_requires_task_key(client):
     test_client, user_store = client
     user = user_store.create_user(
         "ignored",
@@ -244,16 +249,15 @@ def test_register_model_requires_model_type(client):
     token = _token(test_client, user["username"], "pass-123")
 
     response = test_client.post(
-        "/v1/models/register",
+        "/v1/modelops/models",
         headers=_auth(token),
         json={
             "id": "phi-offline",
             "name": "Phi Offline",
             "provider": "local_filesystem",
-            "origin": "personal",
             "backend": "local",
         },
     )
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "invalid_model_type"
+    assert response.get_json()["error"] == "missing_config"

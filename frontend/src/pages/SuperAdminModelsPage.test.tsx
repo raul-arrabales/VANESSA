@@ -11,7 +11,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 const modelApiMocks = vi.hoisted(() => ({
-  listModelCatalog: vi.fn(),
+  listModelOpsModels: vi.fn(),
   listModelAssignments: vi.fn(),
   createModelCatalogItem: vi.fn(),
   updateModelAssignment: vi.fn(),
@@ -19,10 +19,15 @@ const modelApiMocks = vi.hoisted(() => ({
   getHfModelDetails: vi.fn(),
   startModelDownload: vi.fn(),
   listDownloadJobs: vi.fn(),
+  validateManagedModel: vi.fn(),
+  activateManagedModel: vi.fn(),
+  deactivateManagedModel: vi.fn(),
+  unregisterManagedModel: vi.fn(),
+  deleteManagedModel: vi.fn(),
 }));
 
 vi.mock("../api/models", () => ({
-  listModelCatalog: modelApiMocks.listModelCatalog,
+  listModelOpsModels: modelApiMocks.listModelOpsModels,
   listModelAssignments: modelApiMocks.listModelAssignments,
   createModelCatalogItem: modelApiMocks.createModelCatalogItem,
   updateModelAssignment: modelApiMocks.updateModelAssignment,
@@ -30,6 +35,11 @@ vi.mock("../api/models", () => ({
   getHfModelDetails: modelApiMocks.getHfModelDetails,
   startModelDownload: modelApiMocks.startModelDownload,
   listDownloadJobs: modelApiMocks.listDownloadJobs,
+  validateManagedModel: modelApiMocks.validateManagedModel,
+  activateManagedModel: modelApiMocks.activateManagedModel,
+  deactivateManagedModel: modelApiMocks.deactivateManagedModel,
+  unregisterManagedModel: modelApiMocks.unregisterManagedModel,
+  deleteManagedModel: modelApiMocks.deleteManagedModel,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -48,9 +58,9 @@ vi.mock("../auth/AuthProvider", () => ({
 describe("SuperAdminModelsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    modelApiMocks.listModelCatalog.mockResolvedValue([
-      { id: "gpt-4", name: "GPT-4", model_type: "llm" },
-      { id: "mistral-small", name: "Mistral Small", model_type: "llm" },
+    modelApiMocks.listModelOpsModels.mockResolvedValue([
+      { id: "gpt-4", name: "GPT-4", task_key: "llm", category: "generative", lifecycle_state: "registered", is_validation_current: false, usage_summary: { total_requests: 0 } },
+      { id: "mistral-small", name: "Mistral Small", task_key: "llm", category: "generative", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success", usage_summary: { total_requests: 3 } },
     ]);
     modelApiMocks.listModelAssignments.mockResolvedValue([
       { scope: "user", model_ids: ["mistral-small"] },
@@ -67,6 +77,11 @@ describe("SuperAdminModelsPage", () => {
       target_dir: "/models/llm/hf--model",
       status: "queued",
     });
+    modelApiMocks.validateManagedModel.mockResolvedValue({});
+    modelApiMocks.activateManagedModel.mockResolvedValue({});
+    modelApiMocks.deactivateManagedModel.mockResolvedValue({});
+    modelApiMocks.unregisterManagedModel.mockResolvedValue({});
+    modelApiMocks.deleteManagedModel.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -100,10 +115,10 @@ describe("SuperAdminModelsPage", () => {
     await screen.findByRole("heading", { name: "models.catalog.title" });
 
     await user.type(screen.getByLabelText("models.catalog.nameLabel"), "New Model");
-    await user.selectOptions(screen.getByLabelText("models.catalog.typeLabel"), "embedding");
+    await user.selectOptions(screen.getByLabelText("models.catalog.typeLabel"), "embeddings");
     await user.click(screen.getByRole("button", { name: "models.catalog.addButton" }));
     expect(modelApiMocks.createModelCatalogItem).toHaveBeenCalledWith(
-      { name: "New Model", provider: undefined, model_type: "embedding" },
+      { name: "New Model", provider: undefined, task_key: "embeddings", category: "predictive" },
       "token",
     );
 
@@ -125,14 +140,14 @@ describe("SuperAdminModelsPage", () => {
     );
 
     await screen.findByRole("heading", { name: "models.catalog.title" });
-    await user.selectOptions(screen.getByLabelText("models.discovery.typeLabel"), "embedding");
+    await user.selectOptions(screen.getByLabelText("models.discovery.typeLabel"), "embeddings");
     await user.type(screen.getByLabelText("models.discovery.queryLabel"), "llama");
     await user.click(screen.getByRole("button", { name: "models.discovery.searchButton" }));
 
     expect(await screen.findByText("meta-llama/Llama-3-8B-Instruct")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "models.discovery.downloadButton" }));
     expect(modelApiMocks.startModelDownload).toHaveBeenCalledWith(
-      expect.objectContaining({ source_id: "meta-llama/Llama-3-8B-Instruct", model_type: "embedding" }),
+      expect.objectContaining({ source_id: "meta-llama/Llama-3-8B-Instruct", task_key: "embeddings", category: "predictive" }),
       "token",
     );
   });

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
-from ..repositories.model_management import get_model_by_id
+from ..repositories.modelops import get_model as get_model_by_id
 from ..repositories import platform_control_plane as platform_repo
 from .platform_adapters import (
     EmbeddingsAdapter,
@@ -42,8 +42,8 @@ _LLAMA_CPP_DEPLOYMENT_DESCRIPTION = "Optional local profile using llama.cpp for 
 _QDRANT_DEPLOYMENT_SLUG = "local-qdrant"
 _QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
 _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
-_MODEL_TYPE_EMBEDDING = "embedding"
-_MODEL_TYPE_LLM = "llm"
+_TASK_KEY_EMBEDDINGS = "embeddings"
+_TASK_KEY_LLM = "llm"
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
 
 
@@ -1471,13 +1471,27 @@ def _validate_binding_served_model(
             details={"served_model_id": normalized_served_model_id},
         )
 
-    model_type = str(model_row.get("model_type", "")).strip().lower()
-    if model_type != _MODEL_TYPE_EMBEDDING:
+    task_key = str(model_row.get("task_key", "")).strip().lower()
+    if task_key != _TASK_KEY_EMBEDDINGS:
         raise PlatformControlPlaneError(
-            "served_model_type_mismatch",
-            "Embeddings bindings require a model with model_type=embedding",
+            "served_model_task_mismatch",
+            "Embeddings bindings require a model with task_key=embeddings",
             status_code=400,
-            details={"served_model_id": normalized_served_model_id, "model_type": model_row.get("model_type")},
+            details={"served_model_id": normalized_served_model_id, "task_key": model_row.get("task_key")},
+        )
+    if str(model_row.get("lifecycle_state", "")).strip().lower() != "active":
+        raise PlatformControlPlaneError(
+            "served_model_not_active",
+            "Embeddings bindings require an active model",
+            status_code=409,
+            details={"served_model_id": normalized_served_model_id},
+        )
+    if not bool(model_row.get("is_validation_current")) or str(model_row.get("last_validation_status", "")).strip().lower() != "success":
+        raise PlatformControlPlaneError(
+            "served_model_not_validated",
+            "Embeddings bindings require a validated model",
+            status_code=409,
+            details={"served_model_id": normalized_served_model_id},
         )
 
     if _is_cloud_provider_row(provider_row):
@@ -1536,7 +1550,7 @@ def _serialize_served_model_row(row: dict[str, Any]) -> dict[str, Any] | None:
         "name": row.get("served_model_name"),
         "provider": row.get("served_model_provider"),
         "backend": row.get("served_model_backend_kind"),
-        "model_type": row.get("served_model_type"),
+        "task_key": row.get("served_model_task_key"),
         "provider_model_id": row.get("served_model_provider_model_id"),
         "local_path": row.get("served_model_local_path"),
         "source_id": row.get("served_model_source_id"),

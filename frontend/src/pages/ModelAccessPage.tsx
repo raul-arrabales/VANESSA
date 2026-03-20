@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  activateManagedModel,
   createModelCredential,
-  listAvailableManagedModels,
+  deactivateManagedModel,
+  listModelOpsModels,
   listModelCredentials,
   registerManagedModel,
   revokeModelCredential,
+  validateManagedModel,
   type ManagedModel,
   type ModelCredential,
 } from "../api/models";
 import { useAuth } from "../auth/AuthProvider";
+
+const TASK_OPTIONS = [
+  { value: "llm", label: "LLM / Text generation", category: "generative" as const },
+  { value: "embeddings", label: "Embeddings", category: "predictive" as const },
+  { value: "translation", label: "Translation", category: "generative" as const },
+  { value: "classification", label: "Classification", category: "predictive" as const },
+];
 
 export default function ModelAccessPage(): JSX.Element {
   const { token, user } = useAuth();
@@ -27,8 +37,9 @@ export default function ModelAccessPage(): JSX.Element {
   const [modelId, setModelId] = useState("");
   const [modelName, setModelName] = useState("");
   const [modelBackend, setModelBackend] = useState<"external_api" | "local">("external_api");
-  const [modelOrigin, setModelOrigin] = useState<"platform" | "personal">("personal");
-  const [modelType, setModelType] = useState<"llm" | "embedding">("llm");
+  const [ownerType, setOwnerType] = useState<"platform" | "user">("user");
+  const [visibilityScope, setVisibilityScope] = useState<"private" | "user" | "group" | "platform">("private");
+  const [taskKey, setTaskKey] = useState("llm");
   const [providerModelId, setProviderModelId] = useState("");
   const [credentialId, setCredentialId] = useState("");
   const [localPath, setLocalPath] = useState("");
@@ -44,7 +55,7 @@ export default function ModelAccessPage(): JSX.Element {
     }
     const [credentialRows, modelRows] = await Promise.all([
       listModelCredentials(token),
-      listAvailableManagedModels(token),
+      listModelOpsModels(token),
     ]);
     setCredentials(credentialRows);
     setModels(modelRows);
@@ -94,17 +105,18 @@ export default function ModelAccessPage(): JSX.Element {
           name: modelName.trim(),
           provider,
           backend: modelBackend,
-          origin: isSuperadmin ? modelOrigin : "personal",
+          owner_type: isSuperadmin ? ownerType : "user",
           source: modelBackend === "external_api" ? "external_provider" : "local_folder",
           availability: modelBackend === "external_api" ? "online_only" : "offline_ready",
-          access_scope: modelOrigin === "personal" ? "private" : "assigned",
+          visibility_scope: isSuperadmin ? visibilityScope : "private",
           provider_model_id: modelBackend === "external_api" ? providerModelId.trim() : undefined,
           credential_id:
-            modelBackend === "external_api" && (modelOrigin === "personal" || credentialId)
+            modelBackend === "external_api" && (ownerType === "user" || credentialId)
               ? credentialId || undefined
               : undefined,
           local_path: modelBackend === "local" ? localPath.trim() || undefined : undefined,
-          model_type: modelType,
+          task_key: taskKey,
+          category: TASK_OPTIONS.find((option) => option.value === taskKey)?.category ?? "generative",
           comment: comment.trim() || undefined,
         },
         token,
@@ -113,7 +125,7 @@ export default function ModelAccessPage(): JSX.Element {
       setModelName("");
       setProviderModelId("");
       setLocalPath("");
-      setModelType("llm");
+      setTaskKey("llm");
       setComment("");
       await refreshData();
       setFeedback("Model registered.");
@@ -175,10 +187,17 @@ export default function ModelAccessPage(): JSX.Element {
           <input id="managed-model-name" className="field-input" value={modelName} onChange={(event) => setModelName(event.currentTarget.value)} />
           {isSuperadmin && (
             <>
-              <label className="field-label" htmlFor="managed-model-origin">Origin</label>
-              <select id="managed-model-origin" className="field-input" value={modelOrigin} onChange={(event) => setModelOrigin(event.currentTarget.value as "platform" | "personal") }>
-                <option value="personal">Personal</option>
-                <option value="platform">Platform</option>
+              <label className="field-label" htmlFor="managed-owner-type">Owner type</label>
+              <select id="managed-owner-type" className="field-input" value={ownerType} onChange={(event) => setOwnerType(event.currentTarget.value as "platform" | "user") }>
+                <option value="user">User-owned</option>
+                <option value="platform">Platform-owned</option>
+              </select>
+              <label className="field-label" htmlFor="managed-visibility-scope">Visibility</label>
+              <select id="managed-visibility-scope" className="field-input" value={visibilityScope} onChange={(event) => setVisibilityScope(event.currentTarget.value as "private" | "user" | "group" | "platform") }>
+                <option value="private">Private</option>
+                <option value="user">User assignment</option>
+                <option value="group">Group assignment</option>
+                <option value="platform">Platform-wide</option>
               </select>
             </>
           )}
@@ -187,10 +206,11 @@ export default function ModelAccessPage(): JSX.Element {
             <option value="external_api">External API</option>
             <option value="local">Local</option>
           </select>
-          <label className="field-label" htmlFor="managed-model-type">Model type</label>
-          <select id="managed-model-type" className="field-input" value={modelType} onChange={(event) => setModelType(event.currentTarget.value as "llm" | "embedding") }>
-            <option value="llm">LLM</option>
-            <option value="embedding">Embedding</option>
+          <label className="field-label" htmlFor="managed-task-key">Task</label>
+          <select id="managed-task-key" className="field-input" value={taskKey} onChange={(event) => setTaskKey(event.currentTarget.value)}>
+            {TASK_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
           {modelBackend === "external_api" ? (
             <>
@@ -220,9 +240,61 @@ export default function ModelAccessPage(): JSX.Element {
         <h2 className="section-title">Available models</h2>
         <ul className="card-stack" aria-label="Available models list">
           {models.map((model) => (
-            <li key={model.id}>
+            <li key={model.id} className="card-stack">
               <strong>{model.name}</strong>
-              <p className="status-text">{model.id} · {model.model_type ?? "unknown"} · {model.origin} · {model.backend} · {model.provider} · {model.availability}</p>
+              <p className="status-text">
+                {model.id} · {model.task_key ?? "unknown"} · {model.owner_type ?? "unknown"} · {model.visibility_scope ?? "private"} · {model.backend} · {model.provider}
+              </p>
+              <p className="status-text">
+                State: {model.lifecycle_state ?? "unknown"} · Validation: {model.last_validation_status ?? "pending"} · Current: {model.is_validation_current ? "yes" : "no"}
+              </p>
+              <div className="button-row">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (!token) {
+                      return;
+                    }
+                    void validateManagedModel(model.id, token)
+                      .then(() => refreshData())
+                      .catch((error) => setFeedback(error instanceof Error ? error.message : "Unable to validate model."));
+                  }}
+                >
+                  Validate
+                </button>
+                {model.lifecycle_state === "active" ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      if (!token) {
+                        return;
+                      }
+                      void deactivateManagedModel(model.id, token)
+                        .then(() => refreshData())
+                        .catch((error) => setFeedback(error instanceof Error ? error.message : "Unable to deactivate model."));
+                    }}
+                  >
+                    Deactivate
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      if (!token) {
+                        return;
+                      }
+                      void activateManagedModel(model.id, token)
+                        .then(() => refreshData())
+                        .catch((error) => setFeedback(error instanceof Error ? error.message : "Unable to activate model."));
+                    }}
+                  >
+                    Activate
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

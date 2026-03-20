@@ -6,8 +6,8 @@ from typing import Any
 from flask import g
 
 from ..config import get_auth_config
-from ..repositories.model_management import get_model_by_id
-from .model_resolution import resolve_model_for_inference
+from ..repositories import modelops as modelops_repo
+from .modelops_service import ModelOpsError, ensure_model_invokable, measure_and_record_inference
 from .platform_service import resolve_llm_inference_adapter
 from .platform_types import PlatformControlPlaneError
 
@@ -56,8 +56,7 @@ def extract_output_text(llm_response: dict[str, Any]) -> str:
     return "\n".join(text_parts)
 
 
-def _can_use_local_llm_fallback(requested_model_id: str) -> bool:
-    model = get_model_by_id(get_auth_config().database_url, requested_model_id)
+def _can_use_local_llm_fallback(model: dict[str, Any] | None) -> bool:
     if model is None:
         return False
     backend_kind = str(model.get("backend_kind", "")).strip().lower()
@@ -65,8 +64,9 @@ def _can_use_local_llm_fallback(requested_model_id: str) -> bool:
     return backend_kind == "local" or availability == "offline_ready"
 
 
-def _resolve_canonical_local_llm_model_id(adapter: Any, requested_model_id: str) -> str:
-    if not _can_use_local_llm_fallback(requested_model_id):
+def _resolve_canonical_local_llm_model_id(adapter: Any, model_row: dict[str, Any]) -> str:
+    requested_model_id = str(model_row.get("id") or model_row.get("model_id") or "").strip()
+    if not _can_use_local_llm_fallback(model_row):
         return requested_model_id
 
     binding = getattr(adapter, "binding", None)
@@ -89,13 +89,20 @@ def _resolve_chat_completion_target(
     *,
     requested_model_id: str,
 ) -> tuple[Any | None, str, bool, dict[str, Any] | None, int]:
-    resolved_model_id, error_payload, status_code = resolve_model_for_inference(
-        get_auth_config().database_url,
-        user_id=int(g.current_user["id"]),
-        requested_model_id=requested_model_id,
-    )
-    if error_payload is not None:
-        return None, requested_model_id, False, error_payload, status_code
+    try:
+        model_row = ensure_model_invokable(
+            get_auth_config().database_url,
+            config=get_auth_config(),
+            user_id=int(g.current_user["id"]),
+            user_role=str(getattr(g, "current_user", {}) and g.current_user.get("role", "user")),
+            model_id=requested_model_id,
+        )
+    except ModelOpsError as exc:
+        return None, requested_model_id, False, {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
 
     try:
         adapter = resolve_llm_inference_adapter(get_auth_config().database_url, get_auth_config())
@@ -106,9 +113,9 @@ def _resolve_chat_completion_target(
             "details": exc.details or None,
         }, exc.status_code
 
-    effective_requested_model = str(resolved_model_id or requested_model_id)
-    allow_local_fallback = _can_use_local_llm_fallback(effective_requested_model)
-    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, effective_requested_model)
+    raw_model_row = modelops_repo.get_model(get_auth_config().database_url, requested_model_id) or model_row
+    allow_local_fallback = _can_use_local_llm_fallback(raw_model_row)
+    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, raw_model_row)
     return adapter, llm_model_id, allow_local_fallback, None, 200
 
 
@@ -129,12 +136,17 @@ def chat_completion_with_allowed_model(
     if error_payload is not None:
         return error_payload, status_code
 
-    return adapter.chat_completion(
-        model=llm_model_id,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        allow_local_fallback=allow_local_fallback,
+    return measure_and_record_inference(
+        get_auth_config().database_url,
+        model_id=requested_model_id,
+        user_id=int(g.current_user["id"]) if getattr(g, "current_user", None) else None,
+        callable_fn=lambda: adapter.chat_completion(
+            model=llm_model_id,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            allow_local_fallback=allow_local_fallback,
+        ),
     )
 
 

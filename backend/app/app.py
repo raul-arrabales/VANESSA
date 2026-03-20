@@ -222,9 +222,7 @@ from .routes import catalog as catalog_routes
 from .routes import chat as chat_routes
 from .routes import content as content_routes
 from .routes import executions as executions_routes
-from .routes import model_catalog_v1 as model_catalog_v1_routes
-from .routes import model_governance as model_governance_routes
-from .routes import model_management_v1 as model_management_v1_routes
+from .routes import modelops as modelops_routes
 from .routes import model_inference_v1 as model_inference_v1_routes
 from .routes import platform as platform_routes
 from .routes import policy as policy_routes
@@ -246,9 +244,7 @@ app.register_blueprint(policy_routes.bp)
 app.register_blueprint(quotes_v1_routes.bp)
 app.register_blueprint(runtime_routes.bp)
 app.register_blueprint(executions_routes.bp)
-app.register_blueprint(model_governance_routes.bp)
-app.register_blueprint(model_catalog_v1_routes.bp)
-app.register_blueprint(model_management_v1_routes.bp)
+app.register_blueprint(modelops_routes.bp)
 app.register_blueprint(model_inference_v1_routes.bp)
 app.register_blueprint(platform_routes.bp)
 app.register_blueprint(auth_legacy_routes.bp)

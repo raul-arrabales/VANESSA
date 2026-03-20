@@ -15,7 +15,8 @@ export type ModelCatalogItem = {
   source_id?: string | null;
   local_path?: string | null;
   status?: string | null;
-  model_type?: "llm" | "embedding" | null;
+  task_key?: string | null;
+  category?: "predictive" | "generative" | null;
   description?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -74,17 +75,36 @@ export type ModelCredential = {
 
 export type ManagedModel = {
   id: string;
+  global_model_id?: string | null;
+  node_id?: string | null;
   name: string;
   provider: string;
   provider_model_id?: string | null;
-  origin: "platform" | "personal";
   backend: "local" | "external_api";
+  hosting?: "local" | "cloud";
+  owner_type?: "platform" | "user";
+  owner_user_id?: number | null;
   source: string;
   availability: "online_only" | "offline_ready";
-  access_scope: "private" | "assigned" | "global";
-  credential_owner: "platform" | "you";
+  runtime_mode_policy?: "online_only" | "online_offline";
+  visibility_scope?: "private" | "user" | "group" | "platform";
   model_size_billion?: number | null;
-  model_type?: "llm" | "embedding" | null;
+  task_key?: string | null;
+  category?: "predictive" | "generative" | null;
+  lifecycle_state?: "created" | "registered" | "validated" | "active" | "inactive" | "unregistered" | "deleted" | null;
+  is_validation_current?: boolean;
+  last_validation_status?: "success" | "failure" | null;
+  last_validated_at?: string | null;
+  artifact?: {
+    storage_path?: string | null;
+    artifact_status?: string | null;
+    checksum?: string | null;
+    provenance?: string | null;
+  };
+  usage_summary?: {
+    total_requests?: number;
+    metrics?: Record<string, { value: number; requests: number }>;
+  };
   comment?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -149,15 +169,15 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
 }
 
 export async function listModelCatalog(token: string): Promise<ModelCatalogItem[]> {
-  const result = await requestJson<{ models: ModelCatalogItem[] }>("/v1/models/catalog", { token });
+  const result = await requestJson<{ models: ModelCatalogItem[] }>("/v1/modelops/catalog", { token });
   return result.models;
 }
 
 export async function createModelCatalogItem(
-  payload: Omit<ModelCatalogItem, "id"> & { id?: string; model_type: "llm" | "embedding" },
+  payload: Omit<ModelCatalogItem, "id"> & { id?: string; task_key: string; category?: "predictive" | "generative" },
   token: string,
 ): Promise<ModelCatalogItem> {
-  const result = await requestJson<{ model: ModelCatalogItem }>("/v1/models/catalog", {
+  const result = await requestJson<{ model: ModelCatalogItem }>("/v1/modelops/catalog", {
     method: "POST",
     token,
     body: payload,
@@ -168,30 +188,30 @@ export async function createModelCatalogItem(
 
 export async function discoverHfModels(
   token: string,
-  options: { query?: string; task?: string; model_type?: "llm" | "embedding"; sort?: string; limit?: number } = {},
+  options: { query?: string; task?: string; task_key?: string; sort?: string; limit?: number } = {},
 ): Promise<HfDiscoveredModel[]> {
   const params = new URLSearchParams();
   if (options.query) params.set("query", options.query);
   if (options.task) params.set("task", options.task);
-  if (options.model_type) params.set("model_type", options.model_type);
+  if (options.task_key) params.set("task_key", options.task_key);
   if (options.sort) params.set("sort", options.sort);
   if (options.limit) params.set("limit", String(options.limit));
   const query = params.toString();
-  const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/v1/models/discovery/huggingface${query ? `?${query}` : ""}`, { token });
+  const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/v1/modelops/discovery/huggingface${query ? `?${query}` : ""}`, { token });
   return result.models;
 }
 
 export async function getHfModelDetails(sourceId: string, token: string): Promise<HfModelDetails> {
   const encoded = encodeURIComponent(sourceId);
-  const result = await requestJson<{ model: HfModelDetails }>(`/v1/models/discovery/huggingface/${encoded}`, { token });
+  const result = await requestJson<{ model: HfModelDetails }>(`/v1/modelops/discovery/huggingface/${encoded}`, { token });
   return result.model;
 }
 
 export async function startModelDownload(
-  payload: { source_id: string; name?: string; model_type: "llm" | "embedding"; allow_patterns?: string[]; ignore_patterns?: string[] },
+  payload: { source_id: string; name?: string; task_key: string; category?: "predictive" | "generative"; allow_patterns?: string[]; ignore_patterns?: string[] },
   token: string,
 ): Promise<ModelDownloadJob> {
-  const result = await requestJson<{ job: ModelDownloadJob }>("/v1/models/downloads", {
+  const result = await requestJson<{ job: ModelDownloadJob }>("/v1/modelops/downloads", {
     method: "POST",
     token,
     body: payload,
@@ -200,19 +220,19 @@ export async function startModelDownload(
 }
 
 export async function getDownloadJob(jobId: string, token: string): Promise<ModelDownloadJob> {
-  const result = await requestJson<{ job: ModelDownloadJob }>(`/v1/models/downloads/${encodeURIComponent(jobId)}`, { token });
+  const result = await requestJson<{ job: ModelDownloadJob }>(`/v1/modelops/downloads/${encodeURIComponent(jobId)}`, { token });
   return result.job;
 }
 
 export async function listDownloadJobs(token: string, status?: string): Promise<ModelDownloadJob[]> {
   const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
-  const result = await requestJson<{ jobs: ModelDownloadJob[] }>(`/v1/models/downloads${suffix}`, { token });
+  const result = await requestJson<{ jobs: ModelDownloadJob[] }>(`/v1/modelops/downloads${suffix}`, { token });
   return result.jobs;
 }
 
 export async function listModelAssignments(token: string): Promise<ModelScopeAssignment[]> {
   try {
-    const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/v1/model-governance/assignments", { token });
+    const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/v1/modelops/sharing", { token });
     return result.assignments;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
@@ -227,7 +247,7 @@ export async function updateModelAssignment(
   modelIds: string[],
   token: string,
 ): Promise<ModelScopeAssignment> {
-  const result = await requestJson<{ assignment: ModelScopeAssignment }>("/v1/model-governance/assignments", {
+  const result = await requestJson<{ assignment: ModelScopeAssignment }>("/v1/modelops/sharing", {
     method: "PUT",
     token,
     body: { scope, model_ids: modelIds },
@@ -237,28 +257,15 @@ export async function updateModelAssignment(
 }
 
 export async function listEnabledModels(token: string): Promise<ModelCatalogItem[]> {
-  const result = await requestJson<{
-    models: Array<{
-      id?: string;
-      name?: string;
-      provider?: string | null;
-      description?: string | null;
-      model_id?: string;
-      metadata?: { name?: string; description?: string };
-    }>;
-  }>("/v1/model-governance/enabled", { token });
-
-  return result.models.map((model) => {
-    const fallbackId = model.model_id ?? "";
-    const id = model.id ?? fallbackId;
-    const metadata = model.metadata ?? {};
-    return {
-      id,
-      name: model.name ?? metadata.name ?? id,
-      provider: model.provider,
-      description: model.description ?? metadata.description ?? null,
-    };
-  }).filter((model) => model.id);
+  const result = await requestJson<{ models: ManagedModel[] }>("/v1/modelops/models?eligible=true&capability=llm_inference", { token });
+  return result.models.map((model) => ({
+    id: model.id,
+    name: model.name,
+    provider: model.provider,
+    description: typeof model.metadata?.description === "string" ? model.metadata.description : null,
+    task_key: model.task_key,
+    category: model.category,
+  }));
 }
 
 export async function runInference(
@@ -276,7 +283,7 @@ export async function runInference(
 
 
 export async function listModelCredentials(token: string): Promise<ModelCredential[]> {
-  const result = await requestJson<{ credentials: ModelCredential[] }>("/v1/models/credentials", { token });
+  const result = await requestJson<{ credentials: ModelCredential[] }>("/v1/modelops/credentials", { token });
   return result.credentials;
 }
 
@@ -291,7 +298,7 @@ export async function createModelCredential(
   },
   token: string,
 ): Promise<ModelCredential> {
-  const result = await requestJson<{ credential: ModelCredential }>("/v1/models/credentials", {
+  const result = await requestJson<{ credential: ModelCredential }>("/v1/modelops/credentials", {
     method: "POST",
     token,
     body: payload,
@@ -300,7 +307,7 @@ export async function createModelCredential(
 }
 
 export async function revokeModelCredential(credentialId: string, token: string): Promise<ModelCredential> {
-  const result = await requestJson<{ credential: ModelCredential }>(`/v1/models/credentials/${encodeURIComponent(credentialId)}`, {
+  const result = await requestJson<{ credential: ModelCredential }>(`/v1/modelops/credentials/${encodeURIComponent(credentialId)}`, {
     method: "DELETE",
     token,
   });
@@ -313,22 +320,23 @@ export async function registerManagedModel(
     name: string;
     provider: string;
     backend: "local" | "external_api";
-    origin: "platform" | "personal";
+    owner_type?: "platform" | "user";
     source?: string;
     availability?: "online_only" | "offline_ready";
-    access_scope?: "private" | "assigned" | "global";
+    visibility_scope?: "private" | "user" | "group" | "platform";
     provider_model_id?: string;
     credential_id?: string;
     source_id?: string;
     local_path?: string;
     model_size_billion?: number;
-    model_type: "llm" | "embedding";
+    task_key: string;
+    category?: "predictive" | "generative";
     comment?: string;
     metadata?: Record<string, unknown>;
   },
   token: string,
 ): Promise<ManagedModel> {
-  const result = await requestJson<{ model: ManagedModel }>("/v1/models/register", {
+  const result = await requestJson<{ model: ManagedModel }>("/v1/modelops/models", {
     method: "POST",
     token,
     body: payload,
@@ -337,6 +345,60 @@ export async function registerManagedModel(
 }
 
 export async function listAvailableManagedModels(token: string): Promise<ManagedModel[]> {
-  const result = await requestJson<{ models: ManagedModel[] }>("/v1/models/available", { token });
+  return listModelOpsModels(token, { eligible: true });
+}
+
+export async function listModelOpsModels(
+  token: string,
+  options: { eligible?: boolean; capability?: string } = {},
+): Promise<ManagedModel[]> {
+  const params = new URLSearchParams();
+  if (options.eligible) {
+    params.set("eligible", "true");
+  }
+  if (options.capability) {
+    params.set("capability", options.capability);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const result = await requestJson<{ models: ManagedModel[] }>(`/v1/modelops/models${suffix}`, { token });
   return result.models;
+}
+
+export async function validateManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/validate`, {
+    method: "POST",
+    token,
+  });
+  return result.model;
+}
+
+export async function activateManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/activate`, {
+    method: "POST",
+    token,
+  });
+  return result.model;
+}
+
+export async function deactivateManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/deactivate`, {
+    method: "POST",
+    token,
+  });
+  return result.model;
+}
+
+export async function unregisterManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/unregister`, {
+    method: "POST",
+    token,
+  });
+  return result.model;
+}
+
+export async function deleteManagedModel(modelId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/modelops/models/${encodeURIComponent(modelId)}`, {
+    method: "DELETE",
+    token,
+  });
 }

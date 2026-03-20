@@ -8,7 +8,7 @@ from ..config import AuthConfig
 from .agent_engine_client import AgentEngineClientError, create_execution
 from .chat_inference import coerce_chat_messages
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
-from .model_resolution import resolve_model_for_inference
+from .modelops_service import ModelOpsError, ensure_model_invokable
 from .platform_service import get_active_platform_runtime
 from .platform_types import PlatformControlPlaneError
 from .runtime_profile_service import resolve_runtime_profile
@@ -87,13 +87,20 @@ def run_knowledge_chat(
     ensure_knowledge_chat_agent_impl = ensure_knowledge_chat_agent_fn or ensure_knowledge_chat_agent
 
     history = coerce_chat_messages(history_payload)
-    resolved_model_id, error_payload, status_code = resolve_model_for_inference(
-        database_url,
-        user_id=int(g.current_user["id"]),
-        requested_model_id=normalized_model,
-    )
-    if error_payload is not None:
-        return error_payload, status_code
+    try:
+        resolved_model = ensure_model_invokable(
+            database_url,
+            config=config,
+            user_id=int(g.current_user["id"]),
+            user_role=str(g.current_user.get("role", "user")),
+            model_id=normalized_model,
+        )
+    except ModelOpsError as exc:
+        return {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
 
     ensure_knowledge_chat_agent_impl(database_url)
     try:
@@ -112,7 +119,7 @@ def run_knowledge_chat(
         agent_id=KNOWLEDGE_CHAT_AGENT_ID,
         execution_input={
             "prompt": normalized_prompt,
-            "model": resolved_model_id or normalized_model,
+            "model": str(resolved_model.get("id") or normalized_model),
             "messages": _build_execution_messages(normalized_prompt, history),
             "retrieval": {
                 "index": config.product_rag_index,

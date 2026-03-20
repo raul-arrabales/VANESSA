@@ -56,6 +56,7 @@ class AuthConfig:
     bootstrap_superadmin_username: str
     bootstrap_superadmin_password: str
     flask_env: str
+    modelops_node_id: str = "local"
     model_storage_root: str = "/models/llm"
     model_download_max_workers: int = 2
     model_download_stale_seconds: int = 900
@@ -167,6 +168,7 @@ def get_auth_config() -> AuthConfig:
         model_credentials_encryption_key=(
             os.getenv("MODEL_CREDENTIALS_ENCRYPTION_KEY", "").strip() or jwt_secret
         ),
+        modelops_node_id=os.getenv("MODEL_OPS_NODE_ID", "local").strip().lower() or "local",
         jwt_algorithm=os.getenv("AUTH_JWT_ALGORITHM", "HS256").strip() or "HS256",
         access_token_ttl_seconds=_get_int_env("AUTH_ACCESS_TOKEN_TTL_SECONDS", 28_800),
         allow_self_register=_get_bool_env("AUTH_ALLOW_SELF_REGISTER", True),

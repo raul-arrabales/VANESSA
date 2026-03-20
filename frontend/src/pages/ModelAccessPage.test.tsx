@@ -9,7 +9,10 @@ const modelApiMocks = vi.hoisted(() => ({
   createModelCredential: vi.fn(),
   revokeModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
-  listAvailableManagedModels: vi.fn(),
+  listModelOpsModels: vi.fn(),
+  validateManagedModel: vi.fn(),
+  activateManagedModel: vi.fn(),
+  deactivateManagedModel: vi.fn(),
 }));
 
 vi.mock("../api/models", () => ({
@@ -17,7 +20,10 @@ vi.mock("../api/models", () => ({
   createModelCredential: modelApiMocks.createModelCredential,
   revokeModelCredential: modelApiMocks.revokeModelCredential,
   registerManagedModel: modelApiMocks.registerManagedModel,
-  listAvailableManagedModels: modelApiMocks.listAvailableManagedModels,
+  listModelOpsModels: modelApiMocks.listModelOpsModels,
+  validateManagedModel: modelApiMocks.validateManagedModel,
+  activateManagedModel: modelApiMocks.activateManagedModel,
+  deactivateManagedModel: modelApiMocks.deactivateManagedModel,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -41,22 +47,29 @@ describe("ModelAccessPage", () => {
         is_active: true,
       },
     ]);
-    modelApiMocks.listAvailableManagedModels.mockResolvedValue([
+    modelApiMocks.listModelOpsModels.mockResolvedValue([
       {
         id: "phi-3-mini",
         name: "Phi 3 Mini",
         provider: "local_filesystem",
-        origin: "personal",
         backend: "local",
+        owner_type: "user",
+        owner_user_id: 1,
         source: "local_folder",
         availability: "offline_ready",
-        access_scope: "private",
-        credential_owner: "you",
+        visibility_scope: "private",
+        task_key: "llm",
+        category: "generative",
+        lifecycle_state: "registered",
+        is_validation_current: false,
       },
     ]);
     modelApiMocks.createModelCredential.mockResolvedValue({});
     modelApiMocks.registerManagedModel.mockResolvedValue({});
     modelApiMocks.revokeModelCredential.mockResolvedValue({});
+    modelApiMocks.validateManagedModel.mockResolvedValue({});
+    modelApiMocks.activateManagedModel.mockResolvedValue({});
+    modelApiMocks.deactivateManagedModel.mockResolvedValue({});
   });
 
   it("renders credentials and available models", async () => {
@@ -87,7 +100,7 @@ describe("ModelAccessPage", () => {
 
     await user.type(screen.getByLabelText("Model id"), "gpt-private");
     await user.type(screen.getByLabelText("Model name"), "GPT Private");
-    await user.selectOptions(screen.getByLabelText("Model type"), "llm");
+    await user.selectOptions(screen.getByLabelText("Task"), "llm");
     await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
     await user.selectOptions(screen.getByLabelText("Credential"), "cred-1");
     await user.click(screen.getByRole("button", { name: "Register model" }));

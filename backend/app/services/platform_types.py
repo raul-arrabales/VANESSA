@@ -101,7 +101,7 @@ def _served_model_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
         "name": row.get("served_model_name"),
         "provider": row.get("served_model_provider"),
         "backend": row.get("served_model_backend_kind"),
-        "model_type": row.get("served_model_type"),
+        "task_key": row.get("served_model_task_key"),
         "provider_model_id": row.get("served_model_provider_model_id"),
         "local_path": row.get("served_model_local_path"),
         "source_id": row.get("served_model_source_id"),

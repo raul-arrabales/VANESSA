@@ -5,7 +5,7 @@ import threading
 import time
 
 from ..config import get_auth_config
-from ..repositories.model_catalog import get_model_catalog_item, upsert_model_catalog_item
+from ..repositories import modelops as modelops_repo
 from ..repositories.model_download_jobs import (
     claim_next_queued_job,
     mark_job_failed,
@@ -38,7 +38,7 @@ def download_worker_loop() -> None:
             provider = str(job.get("provider", "huggingface"))
             model_id = model_id_from_source(source_id)
             model_name = source_id.split("/")[-1] if "/" in source_id else source_id
-            existing_model = get_model_catalog_item(config.database_url, model_id)
+            existing_model = modelops_repo.get_model(config.database_url, model_id)
             if existing_model is not None:
                 metadata = (
                     existing_model.get("metadata")
@@ -58,16 +58,31 @@ def download_worker_loop() -> None:
                     ignore_patterns=ignore_patterns,
                 )
             except Exception as exc:  # noqa: BLE001
-                upsert_model_catalog_item(
+                modelops_repo.upsert_model_record(
                     config.database_url,
                     model_id=model_id,
+                    node_id=config.modelops_node_id,
                     name=model_name,
                     provider=provider,
+                    task_key=str((existing_model or {}).get("task_key") or modelops_repo.TASK_LLM),
+                    category=str((existing_model or {}).get("category") or modelops_repo.infer_category(str((existing_model or {}).get("task_key") or modelops_repo.TASK_LLM))),
+                    backend_kind="local",
+                    source_kind="hf_import",
+                    availability="offline_ready",
+                    visibility_scope="platform",
+                    owner_type=modelops_repo.OWNER_PLATFORM,
+                    owner_user_id=None,
+                    provider_model_id=None,
+                    credential_id=None,
                     source_id=source_id,
                     local_path=str(job.get("target_dir", "")) or None,
                     status="failed",
+                    lifecycle_state=modelops_repo.LIFECYCLE_CREATED,
                     metadata={"source": "huggingface", "error": str(exc)},
-                    updated_by_user_id=None,
+                    comment=None,
+                    model_size_billion=None,
+                    created_by_user_id=None,
+                    registered_by_user_id=None,
                 )
                 mark_job_failed(
                     config.database_url,
@@ -76,16 +91,31 @@ def download_worker_loop() -> None:
                 )
                 continue
 
-            upsert_model_catalog_item(
+            modelops_repo.upsert_model_record(
                 config.database_url,
                 model_id=model_id,
+                node_id=config.modelops_node_id,
                 name=model_name,
                 provider=provider,
+                task_key=str((existing_model or {}).get("task_key") or modelops_repo.TASK_LLM),
+                category=str((existing_model or {}).get("category") or modelops_repo.infer_category(str((existing_model or {}).get("task_key") or modelops_repo.TASK_LLM))),
+                backend_kind="local",
+                source_kind="hf_import",
+                availability="offline_ready",
+                visibility_scope="platform",
+                owner_type=modelops_repo.OWNER_PLATFORM,
+                owner_user_id=None,
+                provider_model_id=None,
+                credential_id=None,
                 source_id=source_id,
                 local_path=local_path,
                 status="available",
+                lifecycle_state=modelops_repo.LIFECYCLE_REGISTERED,
                 metadata={"source": "huggingface"},
-                updated_by_user_id=None,
+                comment=None,
+                model_size_billion=None,
+                created_by_user_id=None,
+                registered_by_user_id=None,
             )
             mark_job_succeeded(
                 config.database_url,
