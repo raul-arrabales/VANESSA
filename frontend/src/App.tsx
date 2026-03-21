@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
@@ -301,19 +301,25 @@ function BreadcrumbsBar(): JSX.Element {
 }
 
 function renderRouteElement(route: AppRouteDefinition): JSX.Element {
+  const routeElement = (
+    <Suspense fallback={<p className="status-text">Loading...</p>}>
+      {route.element}
+    </Suspense>
+  );
+
   if (route.guestOnly) {
-    return <AuthRedirect>{route.element}</AuthRedirect>;
+    return <AuthRedirect>{routeElement}</AuthRedirect>;
   }
 
   if (route.minimumRole) {
-    return <RequireRole role={route.minimumRole}>{route.element}</RequireRole>;
+    return <RequireRole role={route.minimumRole}>{routeElement}</RequireRole>;
   }
 
   if (route.requiresAuth) {
-    return <RequireAuth>{route.element}</RequireAuth>;
+    return <RequireAuth>{routeElement}</RequireAuth>;
   }
 
-  return route.element;
+  return routeElement;
 }
 
 export default function App(): JSX.Element {
