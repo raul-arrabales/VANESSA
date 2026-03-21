@@ -84,6 +84,56 @@ def _serialize_catalog_item(row: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _serialize_local_artifact(row: dict[str, object]) -> dict[str, object]:
+    lifecycle_state = str(row.get("lifecycle_state", "")).strip().lower()
+    artifact_status = str(row.get("artifact_status", "")).strip().lower()
+    ready_for_registration = artifact_status == "ready" and lifecycle_state in {
+        modelops_repo.LIFECYCLE_CREATED,
+        modelops_repo.LIFECYCLE_UNREGISTERED,
+    }
+
+    if artifact_status == "ready":
+        validation_hint = (
+            "ready_to_register"
+            if ready_for_registration
+            else "artifact_ready"
+        )
+    elif artifact_status:
+        validation_hint = f"artifact_{artifact_status}"
+    else:
+        validation_hint = "artifact_unknown"
+
+    linked_model_id = None
+    if lifecycle_state not in {
+        modelops_repo.LIFECYCLE_CREATED,
+        modelops_repo.LIFECYCLE_UNREGISTERED,
+    }:
+        linked_model_id = str(row.get("model_id"))
+
+    suggested_model_id = str(row.get("model_id")) if ready_for_registration else None
+
+    return {
+        "artifact_id": f"{row.get('model_id')}:{row.get('artifact_type') or 'weights'}",
+        "artifact_type": row.get("artifact_type") or "weights",
+        "name": row.get("name"),
+        "source_id": row.get("source_id"),
+        "storage_path": row.get("storage_path"),
+        "artifact_status": row.get("artifact_status"),
+        "provenance": row.get("provenance"),
+        "checksum": row.get("checksum"),
+        "linked_model_id": linked_model_id,
+        "suggested_model_id": suggested_model_id,
+        "task_key": row.get("task_key"),
+        "category": row.get("category"),
+        "provider": row.get("provider"),
+        "lifecycle_state": row.get("lifecycle_state"),
+        "ready_for_registration": ready_for_registration,
+        "validation_hint": validation_hint,
+        "runtime_requirements": row.get("runtime_requirements") or {},
+        "metadata": row.get("metadata") or {},
+    }
+
+
 @bp.get("/v1/modelops/models")
 @require_role("user")
 def list_modelops_models_route():
@@ -355,6 +405,13 @@ def delete_modelops_credential_route(credential_id: str):
 def list_modelops_catalog_route():
     rows = modelops_repo.list_catalog_models(_config().database_url)
     return jsonify({"models": [_serialize_catalog_item(row) for row in rows]}), 200
+
+
+@bp.get("/v1/modelops/local-artifacts")
+@require_role("superadmin")
+def list_modelops_local_artifacts_route():
+    rows = modelops_repo.list_local_artifacts(_config().database_url)
+    return jsonify({"artifacts": [_serialize_local_artifact(row) for row in rows]}), 200
 
 
 @bp.post("/v1/modelops/catalog")

@@ -1,0 +1,84 @@
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import CloudModelRegisterPage from "./CloudModelRegisterPage";
+import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
+
+const modelApiMocks = vi.hoisted(() => ({
+  listModelCredentials: vi.fn(),
+  listModelOpsModels: vi.fn(),
+  createModelCredential: vi.fn(),
+  registerManagedModel: vi.fn(),
+  validateManagedModel: vi.fn(),
+}));
+
+let mockRole: "user" | "admin" | "superadmin" = "user";
+
+vi.mock("../../../api/models", () => ({
+  listModelCredentials: modelApiMocks.listModelCredentials,
+  listModelOpsModels: modelApiMocks.listModelOpsModels,
+  createModelCredential: modelApiMocks.createModelCredential,
+  registerManagedModel: modelApiMocks.registerManagedModel,
+  validateManagedModel: modelApiMocks.validateManagedModel,
+}));
+
+vi.mock("../../../auth/AuthProvider", () => ({
+  useAuth: () => ({
+    user: { id: 1, username: "tester", email: "t@example.com", role: mockRole, is_active: true },
+    token: "token",
+  }),
+}));
+
+describe("CloudModelRegisterPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    modelApiMocks.listModelCredentials.mockResolvedValue([
+      {
+        id: "cred-1",
+        owner_user_id: 1,
+        credential_scope: "personal",
+        provider: "openai_compatible",
+        display_name: "My key",
+        api_key_last4: "1234",
+        is_active: true,
+      },
+    ]);
+    modelApiMocks.listModelOpsModels.mockResolvedValue([]);
+    modelApiMocks.createModelCredential.mockResolvedValue({});
+    modelApiMocks.registerManagedModel.mockResolvedValue({ id: "gpt-private" });
+    modelApiMocks.validateManagedModel.mockResolvedValue({});
+  });
+
+  it("hides platform scope controls for regular users", async () => {
+    mockRole = "user";
+    await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    expect(await screen.findByRole("heading", { name: "Cloud model registration" })).toBeVisible();
+    expect(screen.queryByLabelText("Credential scope")).toBeNull();
+    expect(screen.queryByLabelText("Owner type")).toBeNull();
+  });
+
+  it("shows platform scope controls for superadmins", async () => {
+    mockRole = "superadmin";
+    await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    expect(await screen.findByLabelText("Credential scope")).toBeVisible();
+    expect(screen.getByLabelText("Owner type")).toBeVisible();
+  });
+
+  it("registers a cloud model and requests validation", async () => {
+    mockRole = "user";
+    const user = userEvent.setup();
+    await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await user.type(screen.getByLabelText("Model id"), "gpt-private");
+    await user.type(screen.getByLabelText("Model name"), "GPT Private");
+    await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
+    await user.selectOptions(screen.getByLabelText("Credential"), "cred-1");
+    await user.click(screen.getByRole("button", { name: "Register cloud model" }));
+
+    expect(modelApiMocks.registerManagedModel).toHaveBeenCalled();
+    expect(modelApiMocks.validateManagedModel).toHaveBeenCalledWith("gpt-private", "token");
+  });
+});

@@ -5,7 +5,6 @@ import AdminApprovalsPage from "../pages/AdminApprovalsPage";
 import BackendHealthPage from "../pages/BackendHealthPage";
 import ChatbotPage from "../pages/ChatbotPage";
 import CatalogControlPage from "../pages/CatalogControlPage";
-import ControlModelsPage from "../pages/ControlModelsPage";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
 import KnowledgeChatPage from "../pages/KnowledgeChatPage";
@@ -15,6 +14,13 @@ import QuoteManagementPage from "../pages/QuoteManagementPage";
 import RegisterPage from "../pages/RegisterPage";
 import SettingsPage from "../pages/SettingsPage";
 import StyleGuidePage from "../pages/StyleGuidePage";
+import CloudModelRegisterPage from "../features/modelops/pages/CloudModelRegisterPage";
+import LocalArtifactsPage from "../features/modelops/pages/LocalArtifactsPage";
+import LocalModelRegisterPage from "../features/modelops/pages/LocalModelRegisterPage";
+import ModelAccessManagementPage from "../features/modelops/pages/ModelAccessManagementPage";
+import ModelCatalogPage from "../features/modelops/pages/ModelCatalogPage";
+import ModelDetailPage from "../features/modelops/pages/ModelDetailPage";
+import ModelOpsHomePage from "../features/modelops/pages/ModelOpsHomePage";
 
 export type AppRouteSection = "public" | "settings" | "control" | "ai";
 export type AppRouteNavGroup = "primary" | "userMenu";
@@ -182,7 +188,70 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
-    element: <ControlModelsPage />,
+    element: <ModelOpsHomePage />,
+  },
+  {
+    id: "control-models-catalog",
+    path: "/control/models/catalog",
+    titleKey: "nav.modelsCatalog",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <ModelCatalogPage />,
+  },
+  {
+    id: "control-models-cloud-register",
+    path: "/control/models/cloud/register",
+    titleKey: "nav.modelsCloudRegister",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <CloudModelRegisterPage />,
+  },
+  {
+    id: "control-models-local-register",
+    path: "/control/models/local/register",
+    titleKey: "nav.modelsLocalRegister",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <LocalModelRegisterPage />,
+  },
+  {
+    id: "control-models-local-artifacts",
+    path: "/control/models/local/artifacts",
+    titleKey: "nav.modelsLocalArtifacts",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <LocalArtifactsPage />,
+  },
+  {
+    id: "control-models-access",
+    path: "/control/models/access",
+    titleKey: "nav.modelsAccess",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ModelAccessManagementPage />,
+  },
+  {
+    id: "control-models-detail",
+    path: "/control/models/:modelId",
+    titleKey: "nav.modelDetail",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <ModelDetailPage />,
   },
   {
     id: "ai",

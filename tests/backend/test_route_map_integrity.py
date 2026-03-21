@@ -35,6 +35,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/modelops/credentials",
         "/v1/modelops/credentials/<credential_id>",
         "/v1/modelops/catalog",
+        "/v1/modelops/local-artifacts",
         "/v1/modelops/sharing",
         "/v1/modelops/discovery/huggingface",
         "/v1/modelops/discovery/huggingface/<path:source_id>",

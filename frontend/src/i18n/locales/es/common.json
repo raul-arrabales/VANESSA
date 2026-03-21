@@ -23,6 +23,12 @@
     "platform": "Control de plataforma",
     "catalog": "Catalogo de agentes",
     "models": "Modelos",
+    "modelsCatalog": "Catalogo de modelos",
+    "modelsCloudRegister": "Registrar modelo cloud",
+    "modelsLocalRegister": "Registrar modelo local",
+    "modelsLocalArtifacts": "Artefactos locales",
+    "modelsAccess": "Acceso a modelos",
+    "modelDetail": "Detalle del modelo",
     "settings": "Configuración",
     "designEditor": "Editor de diseno",
     "settingsMenuLabel": "Menú de identidad y configuración",
@@ -544,6 +550,124 @@
       "createFailed": "No se pudo crear el modelo.",
       "assignmentSaved": "Asignacion de modelos guardada para {{scope}}.",
       "assignmentFailed": "No se pudieron actualizar las asignaciones de modelos."
+    }
+  },
+  "modelOps": {
+    "states": {
+      "loading": "Cargando datos de ModelOps..."
+    },
+    "actions": {
+      "openDetail": "Abrir detalle",
+      "register": "Registrar",
+      "validate": "Validar",
+      "activate": "Activar",
+      "deactivate": "Desactivar",
+      "unregister": "Anular registro",
+      "delete": "Eliminar",
+      "saveCredential": "Guardar credencial",
+      "validateAfterRegister": "Validar despues del registro",
+      "registerCloud": "Registrar modelo cloud",
+      "searchHf": "Buscar en Hugging Face",
+      "inspect": "Inspeccionar",
+      "download": "Descargar",
+      "viewArtifacts": "Ver artefactos locales",
+      "registerLocal": "Registrar modelo local",
+      "manageAccess": "Gestionar acceso"
+    },
+    "fields": {
+      "provider": "Proveedor",
+      "credentialScope": "Alcance de credencial",
+      "displayName": "Nombre visible",
+      "apiBaseUrl": "URL base de API",
+      "apiKey": "Clave API",
+      "modelId": "Id del modelo",
+      "modelName": "Nombre del modelo",
+      "ownerType": "Tipo de propietario",
+      "visibilityScope": "Visibilidad",
+      "providerModelId": "Id del modelo en proveedor",
+      "credential": "Credencial",
+      "task": "Tarea",
+      "comment": "Comentario",
+      "localPath": "Ruta local",
+      "search": "Buscar",
+      "source": "Origen"
+    },
+    "scopes": {
+      "personal": "Personal",
+      "platform": "Plataforma"
+    },
+    "visibility": {
+      "private": "Privado",
+      "user": "Asignacion por usuario",
+      "group": "Asignacion por grupo",
+      "platform": "Toda la plataforma"
+    },
+    "home": {
+      "title": "Inicio de ModelOps",
+      "description": "Revisa los modelos a los que tienes acceso, registra modelos cloud y entra en el flujo correcto sin mezclar operaciones.",
+      "superadminDescription": "Revisa el estado global de ModelOps, entra en onboarding cloud o local y gestiona accesos sin concentrar todo en una sola pagina.",
+      "summaryTitle": "Resumen",
+      "entryTitle": "Flujos",
+      "entryAria": "Navegacion de flujos de ModelOps",
+      "cards": {
+        "catalogTitle": "Explorar catalogo",
+        "catalogDescription": "Revisa los modelos accesibles y abre paginas de detalle mas claras.",
+        "cloudTitle": "Registrar modelo cloud",
+        "cloudDescription": "Agrega modelos BYOK con controles personales o de plataforma.",
+        "localTitle": "Registrar modelo local",
+        "localDescription": "Descubre, descarga y registra modelos locales.",
+        "artifactsTitle": "Revisar artefactos locales",
+        "artifactsDescription": "Inspecciona artefactos locales y completa su registro.",
+        "accessTitle": "Gestionar acceso",
+        "accessDescription": "Asigna disponibilidad de modelos por alcance de rol."
+      }
+    },
+    "catalog": {
+      "title": "Catalogo de modelos",
+      "description": "Explora los modelos visibles para tu rol y entra a paginas de detalle para el trabajo de ciclo de vida.",
+      "empty": "Ningun modelo coincide con los filtros actuales."
+    },
+    "cloud": {
+      "title": "Registro de modelos cloud",
+      "description": "Registra modelos alojados en la nube con credenciales personales y visibilidad acotada a tu cuenta.",
+      "superadminDescription": "Registra modelos cloud con credenciales personales o de plataforma y luego validalos o activalos desde paginas de detalle.",
+      "credentialsTitle": "Credenciales",
+      "registrationTitle": "Registrar modelo cloud",
+      "recentTitle": "Modelos cloud registrados recientemente",
+      "emptyRecent": "Todavia no hay modelos cloud registrados.",
+      "selectCredential": "Selecciona una credencial"
+    },
+    "local": {
+      "title": "Registro de modelos locales",
+      "description": "Incorpora modelos locales mediante descubrimiento en Hugging Face, descargas o registro manual de artefactos.",
+      "discoveryTitle": "Descubrimiento en Hugging Face",
+      "discoveryPlaceholder": "ej. llama instruct",
+      "pollingActive": "Consultando descargas activas.",
+      "noActiveJobs": "No hay descargas activas.",
+      "manualTitle": "Registro manual local",
+      "manualSuccess": "Modelo local registrado.",
+      "manualFailure": "No se pudo registrar el modelo local.",
+      "noArtifacts": "Todavia no hay artefactos locales disponibles."
+    },
+    "artifacts": {
+      "title": "Artefactos locales",
+      "description": "Revisa artefactos locales, comprueba su estado y registra los que ya estan listos para pasar al catalogo.",
+      "registered": "Artefacto registrado correctamente.",
+      "registerFailed": "No se pudo registrar el artefacto."
+    },
+    "access": {
+      "title": "Gestion de acceso a modelos",
+      "description": "Asigna acceso por rol sin mezclar estos controles con las paginas de registro."
+    },
+    "detail": {
+      "title": "Detalle del modelo",
+      "notFound": "Los detalles del modelo no estan disponibles.",
+      "metadataTitle": "Resumen",
+      "validationsTitle": "Historial de validacion",
+      "noValidations": "Todavia no se han registrado validaciones.",
+      "usageTitle": "Resumen de uso",
+      "totalRequests": "Solicitudes totales",
+      "noUsageMetrics": "Todavia no hay metricas de uso."
     }
   },
   "platformControl": {

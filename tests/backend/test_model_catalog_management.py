@@ -56,6 +56,30 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(modelops_routes, "_config", lambda: config)
     monkeypatch.setattr(modelops_routes.modelops_repo, "list_catalog_models", _list_catalog)
+    monkeypatch.setattr(
+        modelops_routes.modelops_repo,
+        "list_local_artifacts",
+        lambda _db: [
+            {
+                "model_id": model_id,
+                "name": row["name"],
+                "source_id": row.get("source_id"),
+                "task_key": row["task_key"],
+                "category": row["category"],
+                "lifecycle_state": row["lifecycle_state"],
+                "provider": row["provider"],
+                "metadata": row["metadata"],
+                "artifact_type": "weights",
+                "storage_path": row.get("local_path"),
+                "artifact_status": "ready" if row.get("local_path") else "missing",
+                "provenance": row.get("source_id"),
+                "checksum": None,
+                "runtime_requirements": {},
+            }
+            for model_id, row in catalog.items()
+            if row.get("local_path")
+        ],
+    )
     monkeypatch.setattr(modelops_routes.modelops_repo, "upsert_model_record", _upsert_model)
     monkeypatch.setattr(modelops_routes.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
     monkeypatch.setattr(modelops_routes, "list_scope_assignments", lambda _db: [{"scope": k, "model_ids": v} for k, v in assignments.items()])
@@ -195,6 +219,39 @@ def test_hf_discovery_uses_embedding_task_for_embedding_task_key(client, monkeyp
 
     assert response.status_code == 200
     assert captured["task"] == "feature-extraction"
+
+
+def test_superadmin_can_list_local_artifacts(client):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root3@example.com",
+        username="root3",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+
+    create_response = test_client.post(
+        "/v1/modelops/catalog",
+        headers=_auth(token),
+        json={
+            "id": "phi-local",
+            "name": "Phi Local",
+            "provider": "local",
+            "local_path": "/models/llm/phi-local",
+            "task_key": "llm",
+        },
+    )
+    assert create_response.status_code == 201
+
+    listed = test_client.get("/v1/modelops/local-artifacts", headers=_auth(token))
+    assert listed.status_code == 200
+    artifact = listed.get_json()["artifacts"][0]
+    assert artifact["artifact_id"] == "phi-local:weights"
+    assert artifact["linked_model_id"] == "phi-local"
+    assert artifact["ready_for_registration"] is False
 
 
 def test_admin_can_manage_sharing_but_user_cannot(client):

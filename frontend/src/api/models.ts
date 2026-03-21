@@ -59,6 +59,27 @@ export type ModelDownloadJob = {
   updated_at?: string | null;
 };
 
+export type LocalModelArtifact = {
+  artifact_id: string;
+  artifact_type: string;
+  name?: string | null;
+  source_id?: string | null;
+  storage_path?: string | null;
+  artifact_status?: string | null;
+  provenance?: string | null;
+  checksum?: string | null;
+  linked_model_id?: string | null;
+  suggested_model_id?: string | null;
+  task_key?: string | null;
+  category?: "predictive" | "generative" | null;
+  provider?: string | null;
+  lifecycle_state?: string | null;
+  ready_for_registration: boolean;
+  validation_hint?: string | null;
+  runtime_requirements?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
 
 
 export type ModelCredential = {
@@ -230,6 +251,11 @@ export async function listDownloadJobs(token: string, status?: string): Promise<
   return result.jobs;
 }
 
+export async function listLocalModelArtifacts(token: string): Promise<LocalModelArtifact[]> {
+  const result = await requestJson<{ artifacts: LocalModelArtifact[] }>("/v1/modelops/local-artifacts", { token });
+  return result.artifacts;
+}
+
 export async function listModelAssignments(token: string): Promise<ModelScopeAssignment[]> {
   try {
     const result = await requestJson<{ assignments: ModelScopeAssignment[] }>("/v1/modelops/sharing", { token });
@@ -362,6 +388,43 @@ export async function listModelOpsModels(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const result = await requestJson<{ models: ManagedModel[] }>(`/v1/modelops/models${suffix}`, { token });
   return result.models;
+}
+
+export async function getManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}`, { token });
+  return result.model;
+}
+
+export async function getManagedModelUsage(
+  modelId: string,
+  token: string,
+): Promise<{ model_id: string; usage: ManagedModel["usage_summary"] }> {
+  return requestJson<{ model_id: string; usage: ManagedModel["usage_summary"] }>(
+    `/v1/modelops/models/${encodeURIComponent(modelId)}/usage`,
+    { token },
+  );
+}
+
+export async function getManagedModelValidations(
+  modelId: string,
+  token: string,
+  limit = 20,
+): Promise<{
+  model_id: string;
+  validations: Array<Record<string, unknown>>;
+}> {
+  return requestJson<{
+    model_id: string;
+    validations: Array<Record<string, unknown>>;
+  }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/validations?limit=${encodeURIComponent(String(limit))}`, { token });
+}
+
+export async function registerExistingManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/register`, {
+    method: "POST",
+    token,
+  });
+  return result.model;
 }
 
 export async function validateManagedModel(modelId: string, token: string): Promise<ManagedModel> {

@@ -321,12 +321,36 @@ a {
   background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
 }
 
+.modelops-summary-grid,
+.modelops-filter-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.modelops-summary-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
 .platform-section-header,
 .platform-card-header,
 .platform-action-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.modelops-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: var(--space-3);
   flex-wrap: wrap;
 }
@@ -865,6 +889,35 @@ a {
   color: var(--text-secondary);
 }
 
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+}
+
+.status-chip-success {
+  color: var(--status-success);
+  border-color: color-mix(in oklab, var(--status-success) 32%, var(--border-muted));
+}
+
+.status-chip-warning {
+  color: #b06100;
+  border-color: color-mix(in oklab, #f79009 34%, var(--border-muted));
+}
+
+.status-chip-neutral {
+  color: var(--text-secondary);
+}
+
 .health-table-wrap {
   overflow-x: auto;
 }
@@ -1047,6 +1100,12 @@ a {
 .form-actions {
   display: flex;
   gap: var(--space-2);
+}
+
+.is-highlighted {
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: color-mix(in oklab, var(--accent-secondary) 12%, var(--bg-subtle));
 }
 
 .field-input:focus-visible,

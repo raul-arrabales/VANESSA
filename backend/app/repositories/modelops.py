@@ -324,6 +324,35 @@ def list_catalog_models(database_url: str) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def list_local_artifacts(database_url: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                m.model_id,
+                m.name,
+                m.source_id,
+                m.task_key,
+                m.category,
+                m.lifecycle_state,
+                m.provider,
+                m.metadata,
+                m.updated_at,
+                ma.artifact_type,
+                ma.storage_path,
+                ma.artifact_status,
+                ma.provenance,
+                ma.checksum,
+                ma.runtime_requirements
+            FROM model_registry m
+            JOIN model_artifacts ma ON ma.model_id = m.model_id
+            WHERE m.hosting_kind = 'local'
+            ORDER BY m.updated_at DESC, m.model_id ASC, ma.artifact_type ASC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_model(database_url: str, model_id: str) -> dict[str, Any] | None:
     with get_connection(database_url) as connection:
         row = connection.execute(

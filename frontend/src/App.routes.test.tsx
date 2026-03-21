@@ -38,19 +38,28 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
 vi.mock("./api/models", () => ({
   listModelOpsModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success" }]),
   listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),
+  listDownloadJobs: vi.fn(async () => []),
+  listLocalModelArtifacts: vi.fn(async () => []),
   createModelCatalogItem: vi.fn(),
   updateModelAssignment: vi.fn(),
   listEnabledModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4" }]),
   runInference: vi.fn(),
   listModelCredentials: vi.fn(async () => []),
+  getManagedModel: vi.fn(async () => ({ id: "gpt-4", name: "GPT-4", provider: "openai_compatible", backend: "external_api", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success", task_key: "llm", visibility_scope: "platform", owner_type: "platform", usage_summary: { total_requests: 5, metrics: {} }, artifact: {} })),
+  getManagedModelUsage: vi.fn(async () => ({ model_id: "gpt-4", usage: { total_requests: 5, metrics: {} } })),
+  getManagedModelValidations: vi.fn(async () => ({ model_id: "gpt-4", validations: [] })),
   createModelCredential: vi.fn(),
   revokeModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
+  registerExistingManagedModel: vi.fn(),
   validateManagedModel: vi.fn(),
   activateManagedModel: vi.fn(),
   deactivateManagedModel: vi.fn(),
   unregisterManagedModel: vi.fn(),
   deleteManagedModel: vi.fn(),
+  discoverHfModels: vi.fn(async () => []),
+  getHfModelDetails: vi.fn(async () => ({ source_id: "hf/model", name: "model", files: [] })),
+  startModelDownload: vi.fn(),
 }));
 vi.mock("./api/knowledge", () => ({
   runKnowledgeChat: vi.fn(),
@@ -161,7 +170,7 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("heading", { name: await t("models.title") })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("modelOps.home.title") })).toBeVisible();
   });
 
   it("blocks non-superadmin users", async () => {
@@ -317,5 +326,47 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/control/models" });
 
     expect(await screen.findByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
+  });
+
+  it("renders the model catalog subroute for authenticated users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models/catalog" });
+
+    expect(await screen.findByRole("heading", { name: await t("modelOps.catalog.title") })).toBeVisible();
+  });
+
+  it("renders the access management route for admin users", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models/access" });
+
+    expect(await screen.findByRole("heading", { name: await t("modelOps.access.title") })).toBeVisible();
+  });
+
+  it("blocks regular users from the local registration route", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models/local/register" });
+
+    expect(await screen.findByRole("heading", { name: "Forbidden" })).toBeVisible();
   });
 });

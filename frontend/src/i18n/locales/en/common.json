@@ -23,6 +23,12 @@
     "platform": "Platform control",
     "catalog": "Agent catalog",
     "models": "Models",
+    "modelsCatalog": "Model catalog",
+    "modelsCloudRegister": "Register cloud model",
+    "modelsLocalRegister": "Register local model",
+    "modelsLocalArtifacts": "Local artifacts",
+    "modelsAccess": "Model access",
+    "modelDetail": "Model detail",
     "settings": "Settings",
     "designEditor": "Design editor",
     "settingsMenuLabel": "Identity and settings menu",
@@ -544,6 +550,124 @@
       "createFailed": "Unable to create model.",
       "assignmentSaved": "Saved {{scope}} model assignment.",
       "assignmentFailed": "Failed to update model assignments."
+    }
+  },
+  "modelOps": {
+    "states": {
+      "loading": "Loading ModelOps data..."
+    },
+    "actions": {
+      "openDetail": "Open details",
+      "register": "Register",
+      "validate": "Validate",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "unregister": "Unregister",
+      "delete": "Delete",
+      "saveCredential": "Save credential",
+      "validateAfterRegister": "Validate after registration",
+      "registerCloud": "Register cloud model",
+      "searchHf": "Search Hugging Face",
+      "inspect": "Inspect",
+      "download": "Download",
+      "viewArtifacts": "View local artifacts",
+      "registerLocal": "Register local model",
+      "manageAccess": "Manage access"
+    },
+    "fields": {
+      "provider": "Provider",
+      "credentialScope": "Credential scope",
+      "displayName": "Display name",
+      "apiBaseUrl": "API base URL",
+      "apiKey": "API key",
+      "modelId": "Model id",
+      "modelName": "Model name",
+      "ownerType": "Owner type",
+      "visibilityScope": "Visibility",
+      "providerModelId": "Provider model id",
+      "credential": "Credential",
+      "task": "Task",
+      "comment": "Comment",
+      "localPath": "Local path",
+      "search": "Search",
+      "source": "Source"
+    },
+    "scopes": {
+      "personal": "Personal",
+      "platform": "Platform"
+    },
+    "visibility": {
+      "private": "Private",
+      "user": "User assignment",
+      "group": "Group assignment",
+      "platform": "Platform-wide"
+    },
+    "home": {
+      "title": "ModelOps home",
+      "description": "Review the models you can access, register cloud-hosted models, and move into the right workflow without operational clutter.",
+      "superadminDescription": "Review platform-wide ModelOps health, jump into cloud or local onboarding, and manage access without keeping every operation on one page.",
+      "summaryTitle": "Summary",
+      "entryTitle": "Workflows",
+      "entryAria": "ModelOps workflow navigation",
+      "cards": {
+        "catalogTitle": "Browse catalog",
+        "catalogDescription": "Review accessible models and open focused detail pages.",
+        "cloudTitle": "Register cloud model",
+        "cloudDescription": "Add BYOK cloud models with personal or platform-aware controls.",
+        "localTitle": "Register local model",
+        "localDescription": "Discover, download, and register local models.",
+        "artifactsTitle": "Review local artifacts",
+        "artifactsDescription": "Inspect local artifacts and finish registration work.",
+        "accessTitle": "Manage access",
+        "accessDescription": "Assign model availability by role scope."
+      }
+    },
+    "catalog": {
+      "title": "Model catalog",
+      "description": "Browse the models visible to your current role and move into detail pages for lifecycle work.",
+      "empty": "No models matched the current filters."
+    },
+    "cloud": {
+      "title": "Cloud model registration",
+      "description": "Register cloud-hosted models with personal credentials and account-scoped visibility.",
+      "superadminDescription": "Register cloud-hosted models with personal or platform credentials, then validate and activate them from focused detail pages.",
+      "credentialsTitle": "Credentials",
+      "registrationTitle": "Register cloud model",
+      "recentTitle": "Recently registered cloud models",
+      "emptyRecent": "No cloud models have been registered yet.",
+      "selectCredential": "Select credential"
+    },
+    "local": {
+      "title": "Local model registration",
+      "description": "Onboard local models through Hugging Face discovery, downloads, or manual artifact registration.",
+      "discoveryTitle": "Hugging Face discovery",
+      "discoveryPlaceholder": "e.g. llama instruct",
+      "pollingActive": "Polling active downloads.",
+      "noActiveJobs": "No active downloads.",
+      "manualTitle": "Manual local registration",
+      "manualSuccess": "Local model registered.",
+      "manualFailure": "Unable to register local model.",
+      "noArtifacts": "No local artifacts are available yet."
+    },
+    "artifacts": {
+      "title": "Local artifacts",
+      "description": "Review local artifacts, check readiness, and register artifacts that are ready to move into the catalog lifecycle.",
+      "registered": "Artifact registered successfully.",
+      "registerFailed": "Unable to register artifact."
+    },
+    "access": {
+      "title": "Model access management",
+      "description": "Assign role-scope access to models without mixing those controls into registration pages."
+    },
+    "detail": {
+      "title": "Model detail",
+      "notFound": "Model details are not available.",
+      "metadataTitle": "Overview",
+      "validationsTitle": "Validation history",
+      "noValidations": "No validations have been recorded yet.",
+      "usageTitle": "Usage summary",
+      "totalRequests": "Total requests",
+      "noUsageMetrics": "No usage metrics are available yet."
     }
   },
   "platformControl": {
