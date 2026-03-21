@@ -28,6 +28,7 @@
     "modelsLocalRegister": "Register local model",
     "modelsLocalArtifacts": "Local artifacts",
     "modelsAccess": "Model access",
+    "modelTest": "Model test",
     "modelDetail": "Model detail",
     "settings": "Settings",
     "designEditor": "Design editor",
@@ -567,12 +568,17 @@
       "saveCredential": "Save credential",
       "validateAfterRegister": "Validate after registration",
       "registerCloud": "Register cloud model",
+      "runTest": "Run test",
       "searchHf": "Search Hugging Face",
       "inspect": "Inspect",
       "download": "Download",
       "viewArtifacts": "View local artifacts",
       "registerLocal": "Register local model",
-      "manageAccess": "Manage access"
+      "manageAccess": "Manage access",
+      "testModel": "Test model",
+      "markValidated": "Mark as validated",
+      "confirmValidation": "Confirm validation",
+      "cancel": "Cancel"
     },
     "fields": {
       "provider": "Provider",
@@ -668,6 +674,31 @@
       "usageTitle": "Usage summary",
       "totalRequests": "Total requests",
       "noUsageMetrics": "No usage metrics are available yet."
+    },
+    "testing": {
+      "title": "Model test",
+      "validationStatus": "Validation",
+      "currentValidation": "Current",
+      "lastTestSummary": "Last test: {{result}} · {{timestamp}}",
+      "noTests": "No tests have been recorded yet.",
+      "resultTitle": "Latest result",
+      "success": "Test succeeded",
+      "failure": "Test failed",
+      "latency": "Latency: {{value}} ms",
+      "responseTitle": "Response",
+      "dimension": "Embedding dimension: {{value}}",
+      "noResult": "Run a model test to see the latest result summary.",
+      "validationActionTitle": "Validation",
+      "validationReady": "A successful test run is available. Confirm validation when you are ready.",
+      "validationBlocked": "Validation stays disabled until a successful test run is recorded.",
+      "debugTitle": "Debug details",
+      "llmTitle": "LLM test",
+      "promptLabel": "Prompt",
+      "running": "Running test...",
+      "embeddingsTitle": "Embeddings test",
+      "textLabel": "Input text",
+      "unsupportedTitle": "Testing unavailable",
+      "unsupportedDescription": "Testing is not yet supported for this model type or runtime combination."
     }
   },
   "platformControl": {

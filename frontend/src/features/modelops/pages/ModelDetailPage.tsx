@@ -5,7 +5,7 @@ import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
-import { getModelLifecyclePermissions } from "../permissions";
+import { canAccessModelTesting, getModelLifecyclePermissions } from "../permissions";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -13,6 +13,7 @@ export default function ModelDetailPage(): JSX.Element {
   const { token, user } = useAuth();
   const detail = useManagedModelDetail(modelId, token);
   const permissions = getModelLifecyclePermissions(user, detail.model);
+  const canTest = canAccessModelTesting(user);
 
   if (detail.isLoading) {
     return <p className="status-text">{t("modelOps.states.loading")}</p>;
@@ -37,11 +38,18 @@ export default function ModelDetailPage(): JSX.Element {
             <h2 className="section-title">{model.name}</h2>
             <p className="status-text">{model.id}</p>
           </div>
-          {(user?.role === "admin" || user?.role === "superadmin") && (
-            <Link className="btn btn-secondary" to={`/control/models/access?modelId=${encodeURIComponent(model.id)}`}>
-              {t("modelOps.actions.manageAccess")}
-            </Link>
-          )}
+          <div className="button-row">
+            {canTest && (
+              <Link className="btn btn-primary" to={`/control/models/${encodeURIComponent(model.id)}/test`}>
+                {t("modelOps.actions.testModel")}
+              </Link>
+            )}
+            {(user?.role === "admin" || user?.role === "superadmin") && (
+              <Link className="btn btn-secondary" to={`/control/models/access?modelId=${encodeURIComponent(model.id)}`}>
+                {t("modelOps.actions.manageAccess")}
+              </Link>
+            )}
+          </div>
         </div>
         <p className="status-text">
           {`${model.provider} · ${model.task_key ?? "unknown"} · ${model.lifecycle_state ?? "unknown"} · ${model.hosting ?? model.backend}`}
@@ -54,7 +62,6 @@ export default function ModelDetailPage(): JSX.Element {
           permissions={permissions}
           isPending={detail.isMutating}
           onRegister={detail.register}
-          onValidate={detail.validate}
           onActivate={detail.activate}
           onDeactivate={detail.deactivate}
           onUnregister={detail.unregister}

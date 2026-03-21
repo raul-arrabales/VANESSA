@@ -48,6 +48,8 @@ vi.mock("./api/models", () => ({
   getManagedModel: vi.fn(async () => ({ id: "gpt-4", name: "GPT-4", provider: "openai_compatible", backend: "external_api", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success", task_key: "llm", visibility_scope: "platform", owner_type: "platform", usage_summary: { total_requests: 5, metrics: {} }, artifact: {} })),
   getManagedModelUsage: vi.fn(async () => ({ model_id: "gpt-4", usage: { total_requests: 5, metrics: {} } })),
   getManagedModelValidations: vi.fn(async () => ({ model_id: "gpt-4", validations: [] })),
+  listManagedModelTests: vi.fn(async () => ({ model_id: "gpt-4", tests: [] })),
+  runManagedModelTest: vi.fn(),
   createModelCredential: vi.fn(),
   revokeModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
@@ -171,6 +173,20 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/control/models" });
 
     expect(await screen.findByRole("heading", { name: await t("modelOps.home.title") })).toBeVisible();
+  });
+
+  it("renders the model test page for admin", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models/gpt-4/test" });
+
+    expect(await screen.findByRole("heading", { name: "GPT-4" })).toBeVisible();
   });
 
   it("blocks non-superadmin users", async () => {

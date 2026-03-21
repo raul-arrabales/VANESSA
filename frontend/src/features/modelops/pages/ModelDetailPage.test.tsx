@@ -9,7 +9,6 @@ const modelApiMocks = vi.hoisted(() => ({
   getManagedModelUsage: vi.fn(),
   getManagedModelValidations: vi.fn(),
   registerExistingManagedModel: vi.fn(),
-  validateManagedModel: vi.fn(),
   activateManagedModel: vi.fn(),
   deactivateManagedModel: vi.fn(),
   unregisterManagedModel: vi.fn(),
@@ -29,7 +28,6 @@ vi.mock("../../../api/models", () => ({
   getManagedModelUsage: modelApiMocks.getManagedModelUsage,
   getManagedModelValidations: modelApiMocks.getManagedModelValidations,
   registerExistingManagedModel: modelApiMocks.registerExistingManagedModel,
-  validateManagedModel: modelApiMocks.validateManagedModel,
   activateManagedModel: modelApiMocks.activateManagedModel,
   deactivateManagedModel: modelApiMocks.deactivateManagedModel,
   unregisterManagedModel: modelApiMocks.unregisterManagedModel,
@@ -84,12 +82,12 @@ describe("ModelDetailPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "GPT Private" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Validate" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Activate" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Test model" })).toBeNull();
   });
 
-  it("shows access-management link for admin users", async () => {
+  it("shows access-management link and test action for admin users", async () => {
     mockUser = { id: 2, username: "admin", email: "admin@example.com", role: "admin", is_active: true };
     await renderWithAppProviders(
       <Routes>
@@ -98,6 +96,10 @@ describe("ModelDetailPage", () => {
       { route: "/control/models/gpt-private" },
     );
 
+    expect(await screen.findByRole("link", { name: "Test model" })).toHaveAttribute(
+      "href",
+      "/control/models/gpt-private/test",
+    );
     expect(await screen.findByRole("link", { name: "Manage access" })).toHaveAttribute(
       "href",
       "/control/models/access?modelId=gpt-private",

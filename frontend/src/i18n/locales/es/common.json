@@ -28,6 +28,7 @@
     "modelsLocalRegister": "Registrar modelo local",
     "modelsLocalArtifacts": "Artefactos locales",
     "modelsAccess": "Acceso a modelos",
+    "modelTest": "Prueba del modelo",
     "modelDetail": "Detalle del modelo",
     "settings": "Configuración",
     "designEditor": "Editor de diseno",
@@ -567,12 +568,17 @@
       "saveCredential": "Guardar credencial",
       "validateAfterRegister": "Validar despues del registro",
       "registerCloud": "Registrar modelo cloud",
+      "runTest": "Ejecutar prueba",
       "searchHf": "Buscar en Hugging Face",
       "inspect": "Inspeccionar",
       "download": "Descargar",
       "viewArtifacts": "Ver artefactos locales",
       "registerLocal": "Registrar modelo local",
-      "manageAccess": "Gestionar acceso"
+      "manageAccess": "Gestionar acceso",
+      "testModel": "Probar modelo",
+      "markValidated": "Marcar como validado",
+      "confirmValidation": "Confirmar validacion",
+      "cancel": "Cancelar"
     },
     "fields": {
       "provider": "Proveedor",
@@ -668,6 +674,31 @@
       "usageTitle": "Resumen de uso",
       "totalRequests": "Solicitudes totales",
       "noUsageMetrics": "Todavia no hay metricas de uso."
+    },
+    "testing": {
+      "title": "Prueba del modelo",
+      "validationStatus": "Validacion",
+      "currentValidation": "Actual",
+      "lastTestSummary": "Ultima prueba: {{result}} · {{timestamp}}",
+      "noTests": "Todavia no se han registrado pruebas.",
+      "resultTitle": "Resultado mas reciente",
+      "success": "La prueba fue correcta",
+      "failure": "La prueba fallo",
+      "latency": "Latencia: {{value}} ms",
+      "responseTitle": "Respuesta",
+      "dimension": "Dimension del embedding: {{value}}",
+      "noResult": "Ejecuta una prueba del modelo para ver el resultado mas reciente.",
+      "validationActionTitle": "Validacion",
+      "validationReady": "Hay una prueba correcta disponible. Confirma la validacion cuando quieras.",
+      "validationBlocked": "La validacion permanece deshabilitada hasta que exista una prueba correcta.",
+      "debugTitle": "Detalles de depuracion",
+      "llmTitle": "Prueba LLM",
+      "promptLabel": "Prompt",
+      "running": "Ejecutando prueba...",
+      "embeddingsTitle": "Prueba de embeddings",
+      "textLabel": "Texto de entrada",
+      "unsupportedTitle": "Prueba no disponible",
+      "unsupportedDescription": "La prueba aun no esta soportada para este tipo de modelo o combinacion de runtime."
     }
   },
   "platformControl": {

@@ -6,9 +6,21 @@ type ModelCatalogListProps = {
   models: ManagedModel[];
   emptyLabel: string;
   detailLabel: string;
+  testLabel?: string;
+  canTest?: boolean;
 };
 
-export default function ModelCatalogList({ models, emptyLabel, detailLabel }: ModelCatalogListProps): JSX.Element {
+function isModelTestEligible(model: ManagedModel): boolean {
+  return ["registered", "validated", "inactive", "active"].includes(String(model.lifecycle_state ?? "").toLowerCase());
+}
+
+export default function ModelCatalogList({
+  models,
+  emptyLabel,
+  detailLabel,
+  testLabel,
+  canTest = false,
+}: ModelCatalogListProps): JSX.Element {
   if (models.length === 0) {
     return <p className="status-text">{emptyLabel}</p>;
   }
@@ -37,6 +49,11 @@ export default function ModelCatalogList({ models, emptyLabel, detailLabel }: Mo
             Validation: {model.last_validation_status ?? "pending"} · Current: {model.is_validation_current ? "yes" : "no"}
           </p>
           <div className="button-row">
+            {canTest && isModelTestEligible(model) && (
+              <Link className="btn btn-primary" to={`/control/models/${encodeURIComponent(model.id)}/test`}>
+                {testLabel ?? "Test"}
+              </Link>
+            )}
             <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(model.id)}`}>
               {detailLabel}
             </Link>

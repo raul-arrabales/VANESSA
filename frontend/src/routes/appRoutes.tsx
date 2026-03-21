@@ -17,6 +17,7 @@ const CloudModelRegisterPage = lazy(() => import("../features/modelops/pages/Clo
 const LocalModelRegisterPage = lazy(() => import("../features/modelops/pages/LocalModelRegisterPage"));
 const LocalArtifactsPage = lazy(() => import("../features/modelops/pages/LocalArtifactsPage"));
 const ModelAccessManagementPage = lazy(() => import("../features/modelops/pages/ModelAccessManagementPage"));
+const ModelTestPage = lazy(() => import("../features/modelops/pages/ModelTestPage"));
 const ModelDetailPage = lazy(() => import("../features/modelops/pages/ModelDetailPage"));
 const AiPage = lazy(() => import("../pages/AiPage"));
 const ChatbotPage = lazy(() => import("../pages/ChatbotPage"));
@@ -242,6 +243,17 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "admin",
     element: <ModelAccessManagementPage />,
+  },
+  {
+    id: "control-models-test",
+    path: "/control/models/:modelId/test",
+    titleKey: "nav.modelTest",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ModelTestPage />,
   },
   {
     id: "control-models-detail",

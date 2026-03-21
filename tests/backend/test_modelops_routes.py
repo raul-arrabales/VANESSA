@@ -236,6 +236,83 @@ def test_modelops_models_endpoint_returns_models(client):
     assert listed.get_json()["models"][0]["id"] == "phi-offline"
 
 
+def test_admin_can_test_model_and_user_cannot(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    admin = user_store.create_user(
+        "ignored",
+        email="admin@example.com",
+        username="admin-user",
+        password_hash=hash_password("pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    user = user_store.create_user(
+        "ignored",
+        email="user@example.com",
+        username="plain-user",
+        password_hash=hash_password("pass-123"),
+        role="user",
+        is_active=True,
+    )
+    admin_token = _token(test_client, admin["username"], "pass-123")
+    user_token = _token(test_client, user["username"], "pass-123")
+
+    monkeypatch.setattr(
+        routes,
+        "run_model_test",
+        lambda _db, **kwargs: {
+            "model": {"id": kwargs["model_id"], "name": "GPT 4o"},
+            "test_run": {"id": "test-run-1", "result": "success"},
+            "result": {"kind": "llm", "success": True, "response_text": "hello"},
+        },
+    )
+
+    admin_response = test_client.post(
+        "/v1/modelops/models/gpt-4o/test",
+        headers=_auth(admin_token),
+        json={"inputs": {"prompt": "hello"}},
+    )
+    assert admin_response.status_code == 200
+    assert admin_response.get_json()["test_run"]["id"] == "test-run-1"
+
+    user_response = test_client.post(
+        "/v1/modelops/models/gpt-4o/test",
+        headers=_auth(user_token),
+        json={"inputs": {"prompt": "hello"}},
+    )
+    assert user_response.status_code == 403
+
+
+def test_validate_route_requires_test_run_id(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    admin = user_store.create_user(
+        "ignored",
+        email="admin2@example.com",
+        username="admin-two",
+        password_hash=hash_password("pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    admin_token = _token(test_client, admin["username"], "pass-123")
+
+    monkeypatch.setattr(
+        routes,
+        "validate_model",
+        lambda _db, **kwargs: {
+            "model": {"id": kwargs["model_id"]},
+            "validation": {"result": "success", "error_details": {"test_run_id": kwargs["test_run_id"]}},
+        },
+    )
+
+    response = test_client.post(
+        "/v1/modelops/models/gpt-4o/validate",
+        headers=_auth(admin_token),
+        json={"test_run_id": "test-run-1"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["validation"]["error_details"] == {"test_run_id": "test-run-1"}
+
+
 def test_create_model_requires_task_key(client):
     test_client, user_store = client
     user = user_store.create_user(

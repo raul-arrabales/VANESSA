@@ -7,7 +7,6 @@ type ModelLifecycleActionsProps = {
   permissions: ModelLifecyclePermissions;
   isPending: boolean;
   onRegister: () => Promise<void>;
-  onValidate: () => Promise<void>;
   onActivate: () => Promise<void>;
   onDeactivate: () => Promise<void>;
   onUnregister: () => Promise<void>;
@@ -19,7 +18,6 @@ export default function ModelLifecycleActions({
   permissions,
   isPending,
   onRegister,
-  onValidate,
   onActivate,
   onDeactivate,
   onUnregister,
@@ -32,11 +30,6 @@ export default function ModelLifecycleActions({
       {permissions.canRegister && (model.lifecycle_state === "created" || model.lifecycle_state === "unregistered") && (
         <button type="button" className="btn btn-secondary" disabled={isPending} onClick={() => void onRegister()}>
           {t("modelOps.actions.register")}
-        </button>
-      )}
-      {permissions.canValidate && (
-        <button type="button" className="btn btn-secondary" disabled={isPending} onClick={() => void onValidate()}>
-          {t("modelOps.actions.validate")}
         </button>
       )}
       {permissions.canActivate && model.lifecycle_state !== "active" && (

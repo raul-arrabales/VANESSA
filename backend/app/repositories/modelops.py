@@ -21,6 +21,8 @@ LIFECYCLE_INACTIVE = "inactive"
 LIFECYCLE_UNREGISTERED = "unregistered"
 VALIDATION_FAILURE = "failure"
 VALIDATION_SUCCESS = "success"
+TEST_FAILURE = "failure"
+TEST_SUCCESS = "success"
 
 
 def infer_task_key(row: dict[str, Any]) -> str:
@@ -619,6 +621,82 @@ def list_validation_history(database_url: str, *, model_id: str, limit: int = 10
             (model_id.strip(), limit),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def append_model_test_run(
+    database_url: str,
+    *,
+    model_id: str,
+    task_key: str,
+    result: str,
+    summary: str,
+    input_payload: dict[str, Any],
+    output_payload: dict[str, Any],
+    error_details: dict[str, Any],
+    latency_ms: float | None,
+    config_fingerprint: str | None,
+    tested_by_user_id: int | None,
+) -> dict[str, Any]:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            INSERT INTO model_test_runs (
+                model_id,
+                task_key,
+                result,
+                summary,
+                input_payload,
+                output_payload,
+                error_details,
+                latency_ms,
+                config_fingerprint,
+                tested_by_user_id
+            )
+            VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s)
+            RETURNING *
+            """,
+            (
+                model_id.strip(),
+                task_key.strip().lower(),
+                result.strip(),
+                summary.strip(),
+                Jsonb(input_payload),
+                Jsonb(output_payload),
+                Jsonb(error_details),
+                latency_ms,
+                config_fingerprint,
+                tested_by_user_id,
+            ),
+        ).fetchone()
+    return dict(row) if row else {}
+
+
+def list_model_test_runs(database_url: str, *, model_id: str, limit: int = 10) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM model_test_runs
+            WHERE model_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (model_id.strip(), limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_model_test_run(database_url: str, test_run_id: str) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM model_test_runs
+            WHERE id = %s::uuid
+            """,
+            (test_run_id.strip(),),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def set_lifecycle_state(

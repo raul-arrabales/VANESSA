@@ -9,7 +9,6 @@ const modelApiMocks = vi.hoisted(() => ({
   listModelOpsModels: vi.fn(),
   createModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
-  validateManagedModel: vi.fn(),
 }));
 
 let mockRole: "user" | "admin" | "superadmin" = "user";
@@ -19,7 +18,6 @@ vi.mock("../../../api/models", () => ({
   listModelOpsModels: modelApiMocks.listModelOpsModels,
   createModelCredential: modelApiMocks.createModelCredential,
   registerManagedModel: modelApiMocks.registerManagedModel,
-  validateManagedModel: modelApiMocks.validateManagedModel,
 }));
 
 vi.mock("../../../auth/AuthProvider", () => ({
@@ -46,7 +44,6 @@ describe("CloudModelRegisterPage", () => {
     modelApiMocks.listModelOpsModels.mockResolvedValue([]);
     modelApiMocks.createModelCredential.mockResolvedValue({});
     modelApiMocks.registerManagedModel.mockResolvedValue({ id: "gpt-private" });
-    modelApiMocks.validateManagedModel.mockResolvedValue({});
   });
 
   it("hides platform scope controls for regular users", async () => {
@@ -66,7 +63,7 @@ describe("CloudModelRegisterPage", () => {
     expect(screen.getByLabelText("Owner type")).toBeVisible();
   });
 
-  it("registers a cloud model and requests validation", async () => {
+  it("registers a cloud model and shows the next-step detail link for regular users", async () => {
     mockRole = "user";
     const user = userEvent.setup();
     await renderWithAppProviders(<CloudModelRegisterPage />);
@@ -79,6 +76,9 @@ describe("CloudModelRegisterPage", () => {
     await user.click(screen.getByRole("button", { name: "Register cloud model" }));
 
     expect(modelApiMocks.registerManagedModel).toHaveBeenCalled();
-    expect(modelApiMocks.validateManagedModel).toHaveBeenCalledWith("gpt-private", "token");
+    expect(await screen.findByRole("link", { name: "Open details" })).toHaveAttribute(
+      "href",
+      "/control/models/gpt-private",
+    );
   });
 });

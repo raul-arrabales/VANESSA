@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { registerManagedModel, validateManagedModel } from "../../../api/models";
+import { registerManagedModel } from "../../../api/models";
 import { useAuth } from "../../../auth/AuthProvider";
 import { TASK_OPTIONS } from "../constants";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
@@ -22,8 +22,8 @@ export default function LocalModelRegisterPage(): JSX.Element {
     localPath: "",
     taskKey: "llm",
     comment: "",
-    validateAfterRegister: false,
   });
+  const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
   const [manualFeedback, setManualFeedback] = useState("");
   const [manualError, setManualError] = useState("");
 
@@ -76,14 +76,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
           </select>
           <label className="field-label" htmlFor="local-model-comment">{t("modelOps.fields.comment")}</label>
           <input id="local-model-comment" className="field-input" value={manualState.comment} onChange={(event) => setManualState({ ...manualState, comment: event.currentTarget.value })} />
-          <label className="status-row">
-            <input
-              type="checkbox"
-              checked={manualState.validateAfterRegister}
-              onChange={(event) => setManualState({ ...manualState, validateAfterRegister: event.currentTarget.checked })}
-            />
-            <span>{t("modelOps.actions.validateAfterRegister")}</span>
-          </label>
           <button
             type="button"
             className="btn btn-primary"
@@ -109,10 +101,8 @@ export default function LocalModelRegisterPage(): JSX.Element {
                 },
                 token,
               )
-                .then(async (model) => {
-                  if (manualState.validateAfterRegister) {
-                    await validateManagedModel(model.id, token);
-                  }
+                .then((model) => {
+                  setLastRegisteredModelId(model.id);
                   setManualFeedback(t("modelOps.local.manualSuccess"));
                   setManualError("");
                   setManualState({
@@ -122,7 +112,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
                     localPath: "",
                     taskKey: "llm",
                     comment: "",
-                    validateAfterRegister: false,
                   });
                 })
                 .catch((requestError) => {
@@ -137,6 +126,13 @@ export default function LocalModelRegisterPage(): JSX.Element {
 
       {feedback && <p className="status-text">{feedback}</p>}
       {manualFeedback && <p className="status-text">{manualFeedback}</p>}
+      {lastRegisteredModelId && (
+        <div className="button-row">
+          <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(lastRegisteredModelId)}/test`}>
+            {t("modelOps.actions.testModel")}
+          </Link>
+        </div>
+      )}
       {(error || manualError) && <p className="error-text">{error || manualError}</p>}
     </section>
   );

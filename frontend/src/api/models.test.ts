@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getManagedModel,
+  listManagedModelTests,
   getManagedModelUsage,
   getManagedModelValidations,
   listLocalModelArtifacts,
   registerExistingManagedModel,
+  runManagedModelTest,
+  validateManagedModel,
 } from "./models";
 
 describe("models api", () => {
@@ -12,7 +15,7 @@ describe("models api", () => {
     vi.restoreAllMocks();
   });
 
-  it("loads managed model detail, usage, validations, and local artifacts with auth", async () => {
+  it("loads managed model detail, usage, validations, tests, and local artifacts with auth", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({
       ok: true,
       text: async () => {
@@ -22,6 +25,9 @@ describe("models api", () => {
         }
         if (url.includes("/validations")) {
           return JSON.stringify({ model_id: "gpt-4", validations: [] });
+        }
+        if (url.includes("/tests")) {
+          return JSON.stringify({ model_id: "gpt-4", tests: [] });
         }
         if (url.endsWith("/local-artifacts")) {
           return JSON.stringify({ artifacts: [] });
@@ -34,6 +40,7 @@ describe("models api", () => {
     await getManagedModel("gpt-4", "token");
     await getManagedModelUsage("gpt-4", "token");
     await getManagedModelValidations("gpt-4", "token");
+    await listManagedModelTests("gpt-4", "token");
     await listLocalModelArtifacts("token");
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -45,6 +52,13 @@ describe("models api", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
+      "/api/v1/modelops/models/gpt-4/tests?limit=10",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       "/api/v1/modelops/local-artifacts",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
@@ -66,6 +80,34 @@ describe("models api", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+  });
+
+  it("posts model tests and validation confirmation payloads", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ model: { id: "gpt-4", name: "GPT-4", backend: "external_api", provider: "openai_compatible" }, test_run: { id: "test-1" }, result: { kind: "llm", success: true } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await runManagedModelTest("gpt-4", { inputs: { prompt: "hello" } }, "token");
+    await validateManagedModel("gpt-4", "token", { testRunId: "test-1" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/modelops/models/gpt-4/test",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ inputs: { prompt: "hello" } }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/modelops/models/gpt-4/validate",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ test_run_id: "test-1" }),
       }),
     );
   });

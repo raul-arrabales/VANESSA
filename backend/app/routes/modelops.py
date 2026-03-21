@@ -22,10 +22,12 @@ from ..services.modelops_service import (
     deactivate_model,
     delete_model,
     get_model_detail,
+    get_model_tests,
     get_model_usage,
     get_model_validations,
     list_models,
     register_existing_model,
+    run_model_test,
     unregister_model,
     validate_model,
 )
@@ -243,8 +245,13 @@ def register_modelops_model_route(model_id: str):
 
 
 @bp.post("/v1/modelops/models/<model_id>/validate")
-@require_role("user")
+@require_role("admin")
 def validate_modelops_model_route(model_id: str):
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
     try:
         result = validate_model(
             _config().database_url,
@@ -252,7 +259,53 @@ def validate_modelops_model_route(model_id: str):
             actor_user_id=int(g.current_user["id"]),
             actor_role=str(g.current_user.get("role", "user")),
             model_id=model_id,
-            trigger_reason="manual",
+            trigger_reason="manual_after_test",
+            test_run_id=str(payload.get("test_run_id", "")).strip() or None,
+        )
+    except ModelOpsError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(result), 200
+
+
+@bp.get("/v1/modelops/models/<model_id>/tests")
+@require_role("admin")
+def get_modelops_model_tests_route(model_id: str):
+    limit_raw = str(request.args.get("limit", "10")).strip()
+    try:
+        limit = max(1, min(50, int(limit_raw)))
+    except ValueError:
+        return _json_error(400, "invalid_limit", "limit must be an integer")
+    try:
+        payload = get_model_tests(
+            _config().database_url,
+            config=_config(),
+            actor_user_id=int(g.current_user["id"]),
+            actor_role=str(g.current_user.get("role", "user")),
+            model_id=model_id,
+            limit=limit,
+        )
+    except ModelOpsError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
+
+
+@bp.post("/v1/modelops/models/<model_id>/test")
+@require_role("admin")
+def test_modelops_model_route(model_id: str):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+    raw_inputs = payload.get("inputs")
+    if not isinstance(raw_inputs, dict):
+        return _json_error(400, "invalid_payload", "inputs must be an object")
+    try:
+        result = run_model_test(
+            _config().database_url,
+            config=_config(),
+            actor_user_id=int(g.current_user["id"]),
+            actor_role=str(g.current_user.get("role", "user")),
+            model_id=model_id,
+            inputs=raw_inputs,
         )
     except ModelOpsError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)

@@ -14,7 +14,6 @@ import {
   startModelDownload,
   unregisterManagedModel,
   updateModelAssignment,
-  validateManagedModel,
   type HfDiscoveredModel,
   type ManagedModel,
   type ModelDownloadJob,
@@ -404,16 +403,6 @@ export default function SuperAdminModelsPage(): JSX.Element {
                 Validation: {model.last_validation_status ?? "pending"} · Current: {model.is_validation_current ? "yes" : "no"} · Requests: {model.usage_summary?.total_requests ?? 0}
               </p>
               <div className="button-row">
-                <button type="button" className="btn btn-secondary" onClick={() => {
-                  if (!token) {
-                    return;
-                  }
-                  void validateManagedModel(model.id, token)
-                    .then(() => refreshModels())
-                    .catch((error) => setFeedback(error instanceof Error ? error.message : t("models.feedback.assignmentFailed")));
-                }}>
-                  Validate
-                </button>
                 {model.lifecycle_state === "active" ? (
                   <button type="button" className="btn btn-ghost" onClick={() => {
                     if (!token) {

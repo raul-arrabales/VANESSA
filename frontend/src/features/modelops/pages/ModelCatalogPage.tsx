@@ -4,10 +4,11 @@ import ModelCatalogFilters from "../components/ModelCatalogFilters";
 import ModelCatalogList from "../components/ModelCatalogList";
 import { useModelCatalog } from "../hooks/useModelCatalog";
 import { useAuth } from "../../../auth/AuthProvider";
+import { canAccessModelTesting } from "../permissions";
 
 export default function ModelCatalogPage(): JSX.Element {
   const { t } = useTranslation("common");
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { models, isLoading, error } = useModelCatalog(token);
   const [search, setSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("");
@@ -28,6 +29,7 @@ export default function ModelCatalogPage(): JSX.Element {
       return matchesSearch && matchesTask && matchesHosting && matchesState;
     });
   }, [hostingFilter, models, search, stateFilter, taskFilter]);
+  const canTest = canAccessModelTesting(user);
 
   return (
     <section className="card-stack">
@@ -54,6 +56,8 @@ export default function ModelCatalogPage(): JSX.Element {
           models={filteredModels}
           emptyLabel={t("modelOps.catalog.empty")}
           detailLabel={t("modelOps.actions.openDetail")}
+          testLabel={t("modelOps.actions.testModel")}
+          canTest={canTest}
         />
       )}
       {error && <p className="error-text">{error}</p>}

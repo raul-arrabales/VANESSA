@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ManagedModel } from "../../../api/models";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -26,7 +27,6 @@ type CloudModelState = {
   credentialId: string;
   taskKey: string;
   comment: string;
-  validateAfterRegister: boolean;
 };
 
 export default function CloudModelRegisterPage(): JSX.Element {
@@ -35,6 +35,8 @@ export default function CloudModelRegisterPage(): JSX.Element {
   const { credentials, recentCloudModels, isLoading, isSaving, error, feedback, saveCredential, registerCloudModel } =
     useCloudRegistrationFlow(token);
   const isSuperadmin = user?.role === "superadmin";
+  const canTest = user?.role === "admin" || user?.role === "superadmin";
+  const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
 
   const [credentialState, setCredentialState] = useState<CredentialFormState>({
     provider: "openai_compatible",
@@ -54,7 +56,6 @@ export default function CloudModelRegisterPage(): JSX.Element {
     credentialId: "",
     taskKey: "llm",
     comment: "",
-    validateAfterRegister: true,
   });
 
   const recentModels = useMemo(
@@ -96,7 +97,7 @@ export default function CloudModelRegisterPage(): JSX.Element {
         onChange={setModelState}
         onSubmit={async () => {
           const category = TASK_OPTIONS.find((option) => option.value === modelState.taskKey)?.category ?? "generative";
-          await registerCloudModel({
+          const created = await registerCloudModel({
             id: modelState.id.trim(),
             name: modelState.name.trim(),
             provider: modelState.provider,
@@ -107,8 +108,8 @@ export default function CloudModelRegisterPage(): JSX.Element {
             task_key: modelState.taskKey,
             category,
             comment: modelState.comment.trim() || undefined,
-            validate_after_register: modelState.validateAfterRegister,
           });
+          setLastRegisteredModelId(created?.id ?? "");
           setModelState({
             id: "",
             name: "",
@@ -119,7 +120,6 @@ export default function CloudModelRegisterPage(): JSX.Element {
             credentialId: "",
             taskKey: "llm",
             comment: "",
-            validateAfterRegister: true,
           });
         }}
       />
@@ -138,6 +138,20 @@ export default function CloudModelRegisterPage(): JSX.Element {
       </article>
 
       {feedback && <p className="status-text">{feedback}</p>}
+      {lastRegisteredModelId && (
+        <div className="button-row">
+          <Link
+            className="btn btn-secondary"
+            to={
+              canTest
+                ? `/control/models/${encodeURIComponent(lastRegisteredModelId)}/test`
+                : `/control/models/${encodeURIComponent(lastRegisteredModelId)}`
+            }
+          >
+            {canTest ? t("modelOps.actions.testModel") : t("modelOps.actions.openDetail")}
+          </Link>
+        </div>
+      )}
       {error && <p className="error-text">{error}</p>}
     </section>
   );

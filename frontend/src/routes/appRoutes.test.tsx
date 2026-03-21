@@ -21,6 +21,7 @@ describe("app route registry", () => {
       "/control/models/local/register",
       "/control/models/local/artifacts",
       "/control/models/access",
+      "/control/models/:modelId/test",
       "/control/models/:modelId",
       "/ai",
       "/ai/chat",

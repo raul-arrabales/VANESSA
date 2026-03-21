@@ -13,7 +13,6 @@ type CloudModelRegistrationState = {
   credentialId: string;
   taskKey: string;
   comment: string;
-  validateAfterRegister: boolean;
 };
 
 type CloudModelRegistrationFormProps = {
@@ -124,14 +123,6 @@ export default function CloudModelRegistrationForm({
           value={state.comment}
           onChange={(event) => onChange({ ...state, comment: event.currentTarget.value })}
         />
-        <label className="status-row">
-          <input
-            type="checkbox"
-            checked={state.validateAfterRegister}
-            onChange={(event) => onChange({ ...state, validateAfterRegister: event.currentTarget.checked })}
-          />
-          <span>{t("modelOps.actions.validateAfterRegister")}</span>
-        </label>
         <button type="button" className="btn btn-primary" disabled={isSaving} onClick={() => void onSubmit()}>
           {t("modelOps.actions.registerCloud")}
         </button>

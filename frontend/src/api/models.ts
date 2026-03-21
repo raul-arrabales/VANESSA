@@ -130,6 +130,31 @@ export type ManagedModel = {
   metadata?: Record<string, unknown>;
 };
 
+export type ModelTestRun = {
+  id: string;
+  model_id: string;
+  task_key?: string | null;
+  result: "success" | "failure";
+  summary: string;
+  input_payload?: Record<string, unknown>;
+  output_payload?: Record<string, unknown>;
+  error_details?: Record<string, unknown>;
+  latency_ms?: number | null;
+  config_fingerprint?: string | null;
+  tested_by_user_id?: number | null;
+  created_at?: string | null;
+};
+
+export type ModelTestResult = {
+  kind: "llm" | "embeddings";
+  success: boolean;
+  response_text?: string;
+  dimension?: number;
+  latency_ms?: number | null;
+  vector_preview?: number[];
+  metadata?: Record<string, unknown>;
+};
+
 export type InferenceResult = {
   output: string;
   response?: Record<string, unknown>;
@@ -419,6 +444,40 @@ export async function getManagedModelValidations(
   }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/validations?limit=${encodeURIComponent(String(limit))}`, { token });
 }
 
+export async function listManagedModelTests(
+  modelId: string,
+  token: string,
+  limit = 10,
+): Promise<{
+  model_id: string;
+  tests: ModelTestRun[];
+}> {
+  return requestJson<{
+    model_id: string;
+    tests: ModelTestRun[];
+  }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/tests?limit=${encodeURIComponent(String(limit))}`, { token });
+}
+
+export async function runManagedModelTest(
+  modelId: string,
+  payload: { inputs: Record<string, unknown> },
+  token: string,
+): Promise<{
+  model: ManagedModel;
+  test_run: ModelTestRun;
+  result: ModelTestResult;
+}> {
+  return requestJson<{
+    model: ManagedModel;
+    test_run: ModelTestRun;
+    result: ModelTestResult;
+  }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/test`, {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
 export async function registerExistingManagedModel(modelId: string, token: string): Promise<ManagedModel> {
   const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/register`, {
     method: "POST",
@@ -427,10 +486,15 @@ export async function registerExistingManagedModel(modelId: string, token: strin
   return result.model;
 }
 
-export async function validateManagedModel(modelId: string, token: string): Promise<ManagedModel> {
+export async function validateManagedModel(
+  modelId: string,
+  token: string,
+  options: { testRunId: string },
+): Promise<ManagedModel> {
   const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/validate`, {
     method: "POST",
     token,
+    body: { test_run_id: options.testRunId },
   });
   return result.model;
 }

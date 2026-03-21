@@ -50,10 +50,14 @@ export function getModelLifecyclePermissions(
   const isOwnedByUser = model.owner_type === "user" && model.owner_user_id === user.id;
   return {
     canRegister: isOwnedByUser,
-    canValidate: isOwnedByUser,
+    canValidate: false,
     canActivate: isOwnedByUser,
     canDeactivate: isOwnedByUser,
     canUnregister: isOwnedByUser,
     canDelete: isOwnedByUser,
   };
+}
+
+export function canAccessModelTesting(user: AuthUser | null): boolean {
+  return user?.role === "admin" || user?.role === "superadmin";
 }

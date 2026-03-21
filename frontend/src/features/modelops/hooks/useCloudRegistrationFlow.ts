@@ -4,7 +4,6 @@ import {
   listModelCredentials,
   listModelOpsModels,
   registerManagedModel,
-  validateManagedModel,
   type ManagedModel,
   type ModelCredential,
 } from "../../../api/models";
@@ -37,8 +36,7 @@ export function useCloudRegistrationFlow(
     task_key: string;
     category?: "predictive" | "generative";
     comment?: string;
-    validate_after_register?: boolean;
-  }) => Promise<void>;
+  }) => Promise<ManagedModel | null>;
 } {
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [recentCloudModels, setRecentCloudModels] = useState<ManagedModel[]>([]);
@@ -106,10 +104,9 @@ export function useCloudRegistrationFlow(
     task_key: string;
     category?: "predictive" | "generative";
     comment?: string;
-    validate_after_register?: boolean;
-  }): Promise<void> => {
+  }): Promise<ManagedModel | null> => {
     if (!token) {
-      return;
+      return null;
     }
     setIsSaving(true);
     setError("");
@@ -133,13 +130,12 @@ export function useCloudRegistrationFlow(
         },
         token,
       );
-      if (payload.validate_after_register) {
-        await validateManagedModel(created.id, token);
-      }
-      setFeedback(payload.validate_after_register ? "Model registered and validated." : "Model registered.");
+      setFeedback("Model registered.");
       await refresh();
+      return created;
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to register cloud model.");
+      return null;
     } finally {
       setIsSaving(false);
     }

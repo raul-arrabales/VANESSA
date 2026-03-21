@@ -7,7 +7,6 @@ import {
   listModelCredentials,
   registerManagedModel,
   revokeModelCredential,
-  validateManagedModel,
   type ManagedModel,
   type ModelCredential,
 } from "../api/models";
@@ -249,20 +248,6 @@ export default function ModelAccessPage(): JSX.Element {
                 State: {model.lifecycle_state ?? "unknown"} · Validation: {model.last_validation_status ?? "pending"} · Current: {model.is_validation_current ? "yes" : "no"}
               </p>
               <div className="button-row">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    if (!token) {
-                      return;
-                    }
-                    void validateManagedModel(model.id, token)
-                      .then(() => refreshData())
-                      .catch((error) => setFeedback(error instanceof Error ? error.message : "Unable to validate model."));
-                  }}
-                >
-                  Validate
-                </button>
                 {model.lifecycle_state === "active" ? (
                   <button
                     type="button"

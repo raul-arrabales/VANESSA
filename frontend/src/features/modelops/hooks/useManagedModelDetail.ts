@@ -8,7 +8,6 @@ import {
   getManagedModelValidations,
   registerExistingManagedModel,
   unregisterManagedModel,
-  validateManagedModel,
   type ManagedModel,
 } from "../../../api/models";
 
@@ -27,7 +26,6 @@ export function useManagedModelDetail(
   feedback: string;
   refresh: () => Promise<void>;
   register: () => Promise<void>;
-  validate: () => Promise<void>;
   activate: () => Promise<void>;
   deactivate: () => Promise<void>;
   unregister: () => Promise<void>;
@@ -101,12 +99,6 @@ export function useManagedModelDetail(
         return;
       }
       await runMutation(() => registerExistingManagedModel(modelId, token), "Model registered.");
-    },
-    validate: async () => {
-      if (!token || !modelId) {
-        return;
-      }
-      await runMutation(() => validateManagedModel(modelId, token), "Validation started.");
     },
     activate: async () => {
       if (!token || !modelId) {
