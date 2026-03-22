@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
-import type { ManagedModel } from "../api/models";
+import type { ManagedModel } from "../api/modelops";
 import type { PlatformDeploymentProfile } from "../api/platform";
 import PlatformControlPage from "./PlatformControlPage";
-import * as modelsApi from "../api/models";
+import * as modelsApi from "../api/modelops";
 import * as platformApi from "../api/platform";
 
 let mockUser: AuthUser | null = null;
@@ -37,7 +37,7 @@ vi.mock("../api/platform", () => ({
   activateDeploymentProfile: vi.fn(),
 }));
 
-vi.mock("../api/models", () => ({
+vi.mock("../api/modelops", () => ({
   listModelOpsModels: vi.fn(),
 }));
 

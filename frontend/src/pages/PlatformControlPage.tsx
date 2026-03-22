@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
-import { listModelOpsModels, type ManagedModel } from "../api/models";
+import { listModelOpsModels, type ManagedModel } from "../api/modelops";
 import {
   activateDeploymentProfile,
   cloneDeploymentProfile,

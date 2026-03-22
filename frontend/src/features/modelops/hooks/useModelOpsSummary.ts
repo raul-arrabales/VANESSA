@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { listDownloadJobs, listModelCredentials, listModelOpsModels, type ManagedModel } from "../../../api/models";
+import { listModelOpsModels } from "../../../api/modelops/models";
+import { listModelCredentials } from "../../../api/modelops/credentials";
+import { listDownloadJobs } from "../../../api/modelops/local";
+import type { ManagedModel } from "../../../api/modelops/types";
 import type { Role } from "../../../auth/types";
 
 type SummaryState = {

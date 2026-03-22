@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import type { ManagedModel } from "../../../api/models";
+import type { ManagedModel } from "../../../api/modelops/types";
+import { isModelTestEligible } from "../domain";
 import ModelStatusBadge from "./ModelStatusBadge";
 
 type ModelCatalogListProps = {
@@ -9,10 +10,6 @@ type ModelCatalogListProps = {
   testLabel?: string;
   canTest?: boolean;
 };
-
-function isModelTestEligible(model: ManagedModel): boolean {
-  return ["registered", "validated", "inactive", "active"].includes(String(model.lifecycle_state ?? "").toLowerCase());
-}
 
 export default function ModelCatalogList({
   models,

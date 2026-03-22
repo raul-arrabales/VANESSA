@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  getManagedModel,
-  listManagedModelTests,
-  runManagedModelTest,
-  validateManagedModel,
-  type ManagedModel,
-  type ModelTestResult,
-  type ModelTestRun,
-} from "../../../../api/models";
+import { getManagedModel } from "../../../../api/modelops/models";
+import { listManagedModelTests, runManagedModelTest, validateManagedModel } from "../../../../api/modelops/testing";
+import type { ManagedModel, ModelTestResult, ModelTestRun } from "../../../../api/modelops/types";
 import type { ManagedModelTestState, ModelTestInput } from "../types";
 
 export function useManagedModelTest(

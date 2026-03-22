@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { ModelCredential } from "../../../api/models";
-import { TASK_OPTIONS } from "../constants";
+import type { ModelCredential } from "../../../api/modelops/types";
+import { TASK_OPTIONS } from "../domain";
 
 type CloudModelRegistrationState = {
   id: string;

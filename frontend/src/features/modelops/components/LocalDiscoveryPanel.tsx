@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/models";
+import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/modelops/types";
 
 type LocalDiscoveryPanelProps = {
   taskKey: string;

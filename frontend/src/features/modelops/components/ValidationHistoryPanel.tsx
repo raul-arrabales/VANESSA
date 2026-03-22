@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
+import type { ModelValidationRecord } from "../../../api/modelops/types";
 
 type ValidationHistoryPanelProps = {
-  validations: Array<Record<string, unknown>>;
+  validations: ModelValidationRecord[];
 };
 
 export default function ValidationHistoryPanel({ validations }: ValidationHistoryPanelProps): JSX.Element {
@@ -15,9 +16,9 @@ export default function ValidationHistoryPanel({ validations }: ValidationHistor
       ) : (
         <ul className="card-stack" aria-label="Model validations">
           {validations.map((validation, index) => (
-            <li key={`${String(validation.id ?? index)}`} className="status-row">
+            <li key={validation.id || `${index}`} className="status-row">
               <span>
-                {`${String(validation.result ?? "unknown")} · ${String(validation.summary ?? "No summary")}`}
+                {`${validation.result || "unknown"} · ${validation.summary || "No summary"}`}
               </span>
             </li>
           ))}

@@ -1,14 +1,36 @@
-import type { ManagedModel } from "../../api/models";
+import type { ManagedModel, ManagedModelLifecycleState } from "../../api/modelops/types";
 import type { AuthUser } from "../../auth/types";
+
+export const TASK_OPTIONS = [
+  { value: "llm", label: "LLM / Text generation", category: "generative" as const },
+  { value: "embeddings", label: "Embeddings", category: "predictive" as const },
+  { value: "translation", label: "Translation", category: "generative" as const },
+  { value: "classification", label: "Classification", category: "predictive" as const },
+] as const;
+
+export const MODEL_ACCESS_SCOPES = ["user", "admin", "superadmin"] as const;
+export const TESTABLE_MODEL_LIFECYCLE_STATES: ManagedModelLifecycleState[] = [
+  "registered",
+  "validated",
+  "inactive",
+  "active",
+];
+
+export type TaskOption = (typeof TASK_OPTIONS)[number];
 
 export type ModelLifecyclePermissions = {
   canRegister: boolean;
-  canValidate: boolean;
   canActivate: boolean;
   canDeactivate: boolean;
   canUnregister: boolean;
   canDelete: boolean;
 };
+
+export function isModelTestEligible(model: ManagedModel): boolean {
+  return TESTABLE_MODEL_LIFECYCLE_STATES.includes(
+    String(model.lifecycle_state ?? "").toLowerCase() as ManagedModelLifecycleState,
+  );
+}
 
 export function getModelLifecyclePermissions(
   user: AuthUser | null,
@@ -17,7 +39,6 @@ export function getModelLifecyclePermissions(
   if (!user || !model) {
     return {
       canRegister: false,
-      canValidate: false,
       canActivate: false,
       canDeactivate: false,
       canUnregister: false,
@@ -28,7 +49,6 @@ export function getModelLifecyclePermissions(
   if (user.role === "superadmin") {
     return {
       canRegister: true,
-      canValidate: true,
       canActivate: true,
       canDeactivate: true,
       canUnregister: true,
@@ -39,7 +59,6 @@ export function getModelLifecyclePermissions(
   if (user.role === "admin") {
     return {
       canRegister: false,
-      canValidate: true,
       canActivate: true,
       canDeactivate: true,
       canUnregister: false,
@@ -50,7 +69,6 @@ export function getModelLifecyclePermissions(
   const isOwnedByUser = model.owner_type === "user" && model.owner_user_id === user.id;
   return {
     canRegister: isOwnedByUser,
-    canValidate: false,
     canActivate: isOwnedByUser,
     canDeactivate: isOwnedByUser,
     canUnregister: isOwnedByUser,

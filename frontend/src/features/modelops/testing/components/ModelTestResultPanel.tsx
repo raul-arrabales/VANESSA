@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { ModelTestResult, ModelTestRun } from "../../../../api/models";
+import type { ModelTestResult, ModelTestRun } from "../../../../api/modelops/types";
 
 type ModelTestResultPanelProps = {
   result: ModelTestResult | null;

@@ -11,7 +11,7 @@ const modelApiMocks = vi.hoisted(() => ({
 
 let mockRole: "user" | "admin" | "superadmin" = "user";
 
-vi.mock("../../../api/models", () => ({
+vi.mock("../../../api/modelops", () => ({
   listModelOpsModels: modelApiMocks.listModelOpsModels,
   listModelCredentials: modelApiMocks.listModelCredentials,
   listDownloadJobs: modelApiMocks.listDownloadJobs,

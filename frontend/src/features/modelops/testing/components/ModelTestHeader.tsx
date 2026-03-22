@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { ManagedModel, ModelTestRun } from "../../../../api/models";
+import type { ManagedModel, ModelTestRun } from "../../../../api/modelops/types";
 
 type ModelTestHeaderProps = {
   model: ManagedModel;

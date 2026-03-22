@@ -4,7 +4,7 @@ import ModelCatalogFilters from "../components/ModelCatalogFilters";
 import ModelCatalogList from "../components/ModelCatalogList";
 import { useModelCatalog } from "../hooks/useModelCatalog";
 import { useAuth } from "../../../auth/AuthProvider";
-import { canAccessModelTesting } from "../permissions";
+import { canAccessModelTesting } from "../domain";
 
 export default function ModelCatalogPage(): JSX.Element {
   const { t } = useTranslation("common");

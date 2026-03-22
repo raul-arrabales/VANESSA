@@ -1,4 +1,4 @@
-import type { ManagedModel } from "../../../api/models";
+import type { ManagedModel } from "../../../api/modelops/types";
 
 type AccessMatrixProps = {
   scopes: readonly string[];

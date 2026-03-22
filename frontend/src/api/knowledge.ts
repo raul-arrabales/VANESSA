@@ -1,5 +1,5 @@
 import { ApiError } from "../auth/authApi";
-import type { ChatHistoryItem } from "./models";
+import type { ChatHistoryItem } from "./modelops/types";
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 

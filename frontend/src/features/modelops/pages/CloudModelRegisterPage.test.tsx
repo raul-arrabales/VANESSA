@@ -13,10 +13,13 @@ const modelApiMocks = vi.hoisted(() => ({
 
 let mockRole: "user" | "admin" | "superadmin" = "user";
 
-vi.mock("../../../api/models", () => ({
+vi.mock("../../../api/modelops/credentials", () => ({
   listModelCredentials: modelApiMocks.listModelCredentials,
-  listModelOpsModels: modelApiMocks.listModelOpsModels,
   createModelCredential: modelApiMocks.createModelCredential,
+}));
+
+vi.mock("../../../api/modelops/models", () => ({
+  listModelOpsModels: modelApiMocks.listModelOpsModels,
   registerManagedModel: modelApiMocks.registerManagedModel,
 }));
 

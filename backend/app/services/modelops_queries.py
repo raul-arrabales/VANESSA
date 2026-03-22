@@ -5,7 +5,12 @@ from typing import Any
 from ..config import AuthConfig
 from ..repositories import modelops as modelops_repo
 from .modelops_policy import can_manage_model, get_accessible_model
-from .modelops_serializers import serialize_model, serialize_model_test_run
+from .modelops_serializers import (
+    serialize_model,
+    serialize_model_test_run,
+    serialize_model_usage_summary,
+    serialize_model_validation,
+)
 from .runtime_profile_service import resolve_runtime_profile
 
 
@@ -31,7 +36,9 @@ def list_models(
     items: list[dict[str, Any]] = []
     for row in rows:
         payload = serialize_model(row)
-        payload["usage_summary"] = modelops_repo.get_usage_summary(database_url, model_id=str(row["model_id"]))
+        payload["usage_summary"] = serialize_model_usage_summary(
+            modelops_repo.get_usage_summary(database_url, model_id=str(row["model_id"])),
+        )
         items.append(payload)
     return items
 
@@ -61,8 +68,13 @@ def get_model_detail(
 
             raise ModelOpsError("not_found", "Model not found", status_code=404)
     payload = serialize_model(row)
-    payload["validation_history"] = modelops_repo.list_validation_history(database_url, model_id=model_id)
-    payload["usage_summary"] = modelops_repo.get_usage_summary(database_url, model_id=model_id)
+    payload["validation_history"] = [
+        serialize_model_validation(item)
+        for item in modelops_repo.list_validation_history(database_url, model_id=model_id)
+    ]
+    payload["usage_summary"] = serialize_model_usage_summary(
+        modelops_repo.get_usage_summary(database_url, model_id=model_id),
+    )
     return payload
 
 
@@ -83,7 +95,7 @@ def get_model_usage(
     )
     return {
         "model_id": model_id,
-        "usage": modelops_repo.get_usage_summary(database_url, model_id=model_id),
+        "usage": serialize_model_usage_summary(modelops_repo.get_usage_summary(database_url, model_id=model_id)),
     }
 
 
@@ -105,7 +117,10 @@ def get_model_validations(
     )
     return {
         "model_id": model_id,
-        "validations": modelops_repo.list_validation_history(database_url, model_id=model_id, limit=limit),
+        "validations": [
+            serialize_model_validation(item)
+            for item in modelops_repo.list_validation_history(database_url, model_id=model_id, limit=limit)
+        ],
     }
 
 

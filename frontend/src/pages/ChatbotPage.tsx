@@ -12,7 +12,7 @@ import {
 } from "../api/chat";
 import ChatMessageBody from "../components/ChatMessageBody";
 import { useStickyChatScroll } from "../hooks/useStickyChatScroll";
-import { listEnabledModels, type ModelCatalogItem } from "../api/models";
+import { listEnabledModels, type ModelCatalogItem } from "../api/modelops";
 import { useAuth } from "../auth/AuthProvider";
 
 function sortConversations(conversations: ChatConversationSummary[]): ChatConversationSummary[] {

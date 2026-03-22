@@ -23,7 +23,7 @@ let mockUser: {
   is_active: boolean;
 } = { id: 1, username: "tester", email: "t@example.com", role: "user", is_active: true };
 
-vi.mock("../../../api/models", () => ({
+vi.mock("../../../api/modelops/models", () => ({
   getManagedModel: modelApiMocks.getManagedModel,
   getManagedModelUsage: modelApiMocks.getManagedModelUsage,
   getManagedModelValidations: modelApiMocks.getManagedModelValidations,

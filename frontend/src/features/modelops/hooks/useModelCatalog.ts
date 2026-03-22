@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { listModelOpsModels, type ManagedModel } from "../../../api/models";
+import { listModelOpsModels } from "../../../api/modelops/models";
+import type { ManagedModel } from "../../../api/modelops/types";
 
 export function useModelCatalog(token: string): {
   models: ManagedModel[];

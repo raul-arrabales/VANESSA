@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { LocalModelArtifact } from "../../../api/models";
+import type { LocalModelArtifact } from "../../../api/modelops/types";
 import { useTranslation } from "react-i18next";
 
 type LocalArtifactListProps = {

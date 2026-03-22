@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { listLocalModelArtifacts, registerExistingManagedModel, type LocalModelArtifact } from "../../../api/models";
+import { registerExistingManagedModel } from "../../../api/modelops/models";
+import { listLocalModelArtifacts } from "../../../api/modelops/local";
+import type { LocalModelArtifact } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import LocalArtifactList from "../components/LocalArtifactList";
 

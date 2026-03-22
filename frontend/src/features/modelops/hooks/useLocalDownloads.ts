@@ -4,9 +4,8 @@ import {
   getHfModelDetails,
   listDownloadJobs,
   startModelDownload,
-  type HfDiscoveredModel,
-  type ModelDownloadJob,
-} from "../../../api/models";
+} from "../../../api/modelops/local";
+import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/modelops/types";
 
 const ACTIVE_JOB_STATUSES = new Set(["queued", "running"]);
 const BASE_POLL_INTERVAL_MS = 3000;

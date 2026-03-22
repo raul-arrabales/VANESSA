@@ -35,7 +35,7 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
     setMode: vi.fn(),
   }),
 }));
-vi.mock("./api/models", () => ({
+vi.mock("./api/modelops", () => ({
   listModelOpsModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success" }]),
   listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),
   listDownloadJobs: vi.fn(async () => []),
@@ -62,6 +62,55 @@ vi.mock("./api/models", () => ({
   discoverHfModels: vi.fn(async () => []),
   getHfModelDetails: vi.fn(async () => ({ source_id: "hf/model", name: "model", files: [] })),
   startModelDownload: vi.fn(),
+}));
+vi.mock("./api/modelops/models", () => ({
+  listEnabledModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4" }]),
+  registerManagedModel: vi.fn(),
+  listAvailableManagedModels: vi.fn(),
+  listModelOpsModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success" }]),
+  getManagedModel: vi.fn(async () => ({
+    id: "gpt-4",
+    name: "GPT-4",
+    provider: "openai_compatible",
+    backend: "external_api",
+    lifecycle_state: "active",
+    is_validation_current: true,
+    last_validation_status: "success",
+    task_key: "llm",
+    visibility_scope: "platform",
+    owner_type: "platform",
+    usage_summary: { total_requests: 5, metrics: {} },
+    artifact: {},
+  })),
+  getManagedModelUsage: vi.fn(async () => ({ model_id: "gpt-4", usage: { total_requests: 5, metrics: {} } })),
+  getManagedModelValidations: vi.fn(async () => ({ model_id: "gpt-4", validations: [] })),
+  registerExistingManagedModel: vi.fn(),
+  activateManagedModel: vi.fn(),
+  deactivateManagedModel: vi.fn(),
+  unregisterManagedModel: vi.fn(),
+  deleteManagedModel: vi.fn(),
+}));
+vi.mock("./api/modelops/testing", () => ({
+  listManagedModelTests: vi.fn(async () => ({ model_id: "gpt-4", tests: [] })),
+  runManagedModelTest: vi.fn(),
+  validateManagedModel: vi.fn(),
+}));
+vi.mock("./api/modelops/credentials", () => ({
+  listModelCredentials: vi.fn(async () => []),
+  createModelCredential: vi.fn(),
+  revokeModelCredential: vi.fn(),
+}));
+vi.mock("./api/modelops/local", () => ({
+  listDownloadJobs: vi.fn(async () => []),
+  listLocalModelArtifacts: vi.fn(async () => []),
+  createModelCatalogItem: vi.fn(),
+  discoverHfModels: vi.fn(async () => []),
+  getHfModelDetails: vi.fn(async () => ({ source_id: "hf/model", name: "model", files: [] })),
+  startModelDownload: vi.fn(),
+}));
+vi.mock("./api/modelops/access", () => ({
+  listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),
+  updateModelAssignment: vi.fn(),
 }));
 vi.mock("./api/knowledge", () => ({
   runKnowledgeChat: vi.fn(),

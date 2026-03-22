@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  listModelAssignments,
-  listModelOpsModels,
-  updateModelAssignment,
-  type ManagedModel,
-  type ModelScopeAssignment,
-} from "../../../api/models";
+import { listModelOpsModels } from "../../../api/modelops/models";
+import { listModelAssignments, updateModelAssignment } from "../../../api/modelops/access";
+import type { ManagedModel, ModelScopeAssignment } from "../../../api/modelops/types";
 
 export function useModelAssignments(token: string): {
   models: ManagedModel[];

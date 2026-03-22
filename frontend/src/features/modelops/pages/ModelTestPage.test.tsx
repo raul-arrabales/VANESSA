@@ -12,8 +12,11 @@ const modelApiMocks = vi.hoisted(() => ({
   validateManagedModel: vi.fn(),
 }));
 
-vi.mock("../../../api/models", () => ({
+vi.mock("../../../api/modelops/models", () => ({
   getManagedModel: modelApiMocks.getManagedModel,
+}));
+
+vi.mock("../../../api/modelops/testing", () => ({
   listManagedModelTests: modelApiMocks.listManagedModelTests,
   runManagedModelTest: modelApiMocks.runManagedModelTest,
   validateManagedModel: modelApiMocks.validateManagedModel,

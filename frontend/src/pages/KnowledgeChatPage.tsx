@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { runKnowledgeChat, type KnowledgeSource } from "../api/knowledge";
 import ChatMessageBody from "../components/ChatMessageBody";
-import { listEnabledModels, type ChatHistoryItem, type ModelCatalogItem } from "../api/models";
+import { listEnabledModels, type ChatHistoryItem, type ModelCatalogItem } from "../api/modelops";
 import { useAuth } from "../auth/AuthProvider";
 
 type ConversationMessage = {

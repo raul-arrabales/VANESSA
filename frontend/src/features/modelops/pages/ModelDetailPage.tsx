@@ -5,7 +5,7 @@ import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
-import { canAccessModelTesting, getModelLifecyclePermissions } from "../permissions";
+import { canAccessModelTesting, getModelLifecyclePermissions } from "../domain";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");

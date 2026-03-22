@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import type { ManagedModel } from "../../../api/models";
+import type { ManagedModel } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import ModelCatalogList from "../components/ModelCatalogList";
 import CloudCredentialForm from "../components/CloudCredentialForm";
 import CloudModelRegistrationForm from "../components/CloudModelRegistrationForm";
-import { TASK_OPTIONS } from "../constants";
+import { TASK_OPTIONS } from "../domain";
 import { useCloudRegistrationFlow } from "../hooks/useCloudRegistrationFlow";
 
 type CredentialFormState = {

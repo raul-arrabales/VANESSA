@@ -8,18 +8,16 @@ import {
   getManagedModelValidations,
   registerExistingManagedModel,
   unregisterManagedModel,
-  type ManagedModel,
-} from "../../../api/models";
-
-type ValidationRecord = Record<string, unknown>;
+} from "../../../api/modelops/models";
+import type { ManagedModel, ModelUsageSummary, ModelValidationRecord } from "../../../api/modelops/types";
 
 export function useManagedModelDetail(
   modelId: string | undefined,
   token: string,
 ): {
   model: ManagedModel | null;
-  usage: ManagedModel["usage_summary"] | null;
-  validations: ValidationRecord[];
+  usage: ModelUsageSummary | null;
+  validations: ModelValidationRecord[];
   isLoading: boolean;
   isMutating: boolean;
   error: string;
@@ -32,8 +30,8 @@ export function useManagedModelDetail(
   remove: () => Promise<void>;
 } {
   const [model, setModel] = useState<ManagedModel | null>(null);
-  const [usage, setUsage] = useState<ManagedModel["usage_summary"] | null>(null);
-  const [validations, setValidations] = useState<ValidationRecord[]>([]);
+  const [usage, setUsage] = useState<ModelUsageSummary | null>(null);
+  const [validations, setValidations] = useState<ModelValidationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState("");

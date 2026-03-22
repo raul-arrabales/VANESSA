@@ -3,11 +3,42 @@ from __future__ import annotations
 from typing import Any
 
 
+def serialize_model_usage_summary(summary: dict[str, Any] | None) -> dict[str, Any]:
+    payload = summary if isinstance(summary, dict) else {}
+    metrics = payload.get("metrics") if isinstance(payload.get("metrics"), dict) else {}
+    return {
+        "metrics": {
+            str(metric_key): {
+                "value": float(metric.get("value") or 0),
+                "requests": int(metric.get("requests") or 0),
+            }
+            for metric_key, metric in metrics.items()
+            if isinstance(metric, dict)
+        },
+        "total_requests": int(payload.get("total_requests") or 0),
+    }
+
+
+def serialize_model_validation(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id")),
+        "model_id": row.get("model_id"),
+        "validator_kind": row.get("validator_kind"),
+        "trigger_reason": row.get("trigger_reason"),
+        "result": row.get("result"),
+        "summary": row.get("summary"),
+        "error_details": row.get("error_details") or {},
+        "config_fingerprint": row.get("config_fingerprint"),
+        "validated_by_user_id": row.get("validated_by_user_id"),
+        "created_at": row.get("created_at"),
+    }
+
+
 def serialize_model(row: dict[str, Any]) -> dict[str, Any]:
     metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
     artifact = row.get("artifact") if isinstance(row.get("artifact"), dict) else {}
     dependencies = row.get("dependencies") if isinstance(row.get("dependencies"), list) else []
-    usage = row.get("usage_summary") if isinstance(row.get("usage_summary"), dict) else None
+    usage = serialize_model_usage_summary(row.get("usage_summary"))
     return {
         "id": row.get("model_id"),
         "global_model_id": row.get("global_model_id"),

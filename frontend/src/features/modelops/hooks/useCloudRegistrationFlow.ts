@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  createModelCredential,
-  listModelCredentials,
-  listModelOpsModels,
-  registerManagedModel,
-  type ManagedModel,
-  type ModelCredential,
-} from "../../../api/models";
+import { listModelOpsModels, registerManagedModel } from "../../../api/modelops/models";
+import { createModelCredential, listModelCredentials } from "../../../api/modelops/credentials";
+import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
 
 export function useCloudRegistrationFlow(
   token: string,

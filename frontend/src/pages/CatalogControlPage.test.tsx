@@ -27,11 +27,11 @@ vi.mock("../api/catalog", () => ({
   validateCatalogTool: vi.fn(),
 }));
 
-vi.mock("../api/models", () => ({
+vi.mock("../api/modelops", () => ({
   listEnabledModels: vi.fn(),
 }));
 
-const modelApi = await import("../api/models");
+const modelApi = await import("../api/modelops");
 
 const agentFixture = {
   id: "agent.alpha",

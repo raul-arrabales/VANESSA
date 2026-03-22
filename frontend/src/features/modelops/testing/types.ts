@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import type { ManagedModel, ModelTestResult, ModelTestRun } from "../../../api/models";
+import type { ManagedModel, ModelTestResult, ModelTestRun } from "../../../api/modelops/types";
 
 export type ModelTestInput = Record<string, unknown>;
 

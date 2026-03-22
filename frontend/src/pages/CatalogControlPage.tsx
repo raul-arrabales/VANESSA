@@ -17,7 +17,7 @@ import {
   validateCatalogAgent,
   validateCatalogTool,
 } from "../api/catalog";
-import { listEnabledModels, type ModelCatalogItem } from "../api/models";
+import { listEnabledModels, type ModelCatalogItem } from "../api/modelops";
 
 type LoadState = "idle" | "loading" | "success" | "error";
 type FormMode = "create" | "edit";

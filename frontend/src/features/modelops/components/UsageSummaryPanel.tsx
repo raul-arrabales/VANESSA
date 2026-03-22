@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import type { ManagedModel } from "../../../api/models";
+import type { ModelUsageSummary } from "../../../api/modelops/types";
 
 type UsageSummaryPanelProps = {
-  usage: ManagedModel["usage_summary"] | null;
+  usage: ModelUsageSummary | null;
 };
 
 export default function UsageSummaryPanel({ usage }: UsageSummaryPanelProps): JSX.Element {

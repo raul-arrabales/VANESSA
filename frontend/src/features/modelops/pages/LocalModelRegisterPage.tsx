@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { registerManagedModel } from "../../../api/models";
+import { registerManagedModel } from "../../../api/modelops/models";
 import { useAuth } from "../../../auth/AuthProvider";
-import { TASK_OPTIONS } from "../constants";
+import { TASK_OPTIONS } from "../domain";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import { useLocalDownloads } from "../hooks/useLocalDownloads";
 

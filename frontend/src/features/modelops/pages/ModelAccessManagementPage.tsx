@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import AccessMatrix from "../components/AccessMatrix";
-import { MODEL_ACCESS_SCOPES } from "../constants";
+import { MODEL_ACCESS_SCOPES } from "../domain";
 import { useModelAssignments } from "../hooks/useModelAssignments";
 import { useAuth } from "../../../auth/AuthProvider";
 

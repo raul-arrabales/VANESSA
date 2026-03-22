@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getManagedModel,
-  listManagedModelTests,
   getManagedModelUsage,
   getManagedModelValidations,
   listLocalModelArtifacts,
+  listManagedModelTests,
   registerExistingManagedModel,
   runManagedModelTest,
   validateManagedModel,
-} from "./models";
+} from "./index";
 
-describe("models api", () => {
+describe("modelops api", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -32,7 +32,14 @@ describe("models api", () => {
         if (url.endsWith("/local-artifacts")) {
           return JSON.stringify({ artifacts: [] });
         }
-        return JSON.stringify({ model: { id: "gpt-4", name: "GPT-4", backend: "external_api", provider: "openai_compatible" } });
+        return JSON.stringify({
+          model: {
+            id: "gpt-4",
+            name: "GPT-4",
+            backend: "external_api",
+            provider: "openai_compatible",
+          },
+        });
       },
     }));
     vi.stubGlobal("fetch", fetchMock);
@@ -69,7 +76,10 @@ describe("models api", () => {
   it("posts to register an existing managed model", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      text: async () => JSON.stringify({ model: { id: "phi-local", name: "Phi Local", backend: "local", provider: "local" } }),
+      text: async () =>
+        JSON.stringify({
+          model: { id: "phi-local", name: "Phi Local", backend: "local", provider: "local" },
+        }),
     }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -85,10 +95,34 @@ describe("models api", () => {
   });
 
   it("posts model tests and validation confirmation payloads", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      text: async () => JSON.stringify({ model: { id: "gpt-4", name: "GPT-4", backend: "external_api", provider: "openai_compatible" }, test_run: { id: "test-1" }, result: { kind: "llm", success: true } }),
-    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            model: {
+              id: "gpt-4",
+              name: "GPT-4",
+              backend: "external_api",
+              provider: "openai_compatible",
+            },
+            test_run: { id: "test-1" },
+            result: { kind: "llm", success: true },
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            model: {
+              id: "gpt-4",
+              name: "GPT-4",
+              backend: "external_api",
+              provider: "openai_compatible",
+            },
+          }),
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     await runManagedModelTest("gpt-4", { inputs: { prompt: "hello" } }, "token");

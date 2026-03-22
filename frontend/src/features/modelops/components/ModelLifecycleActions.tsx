@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
-import type { ManagedModel } from "../../../api/models";
-import type { ModelLifecyclePermissions } from "../permissions";
+import type { ManagedModel } from "../../../api/modelops/types";
+import type { ModelLifecyclePermissions } from "../domain";
 
 type ModelLifecycleActionsProps = {
   model: ManagedModel;

@@ -23,8 +23,14 @@ const scrollToMock = vi.fn();
 
 let mockUser: AuthUser | null = null;
 
-vi.mock("../api/models", () => ({
+vi.mock("../api/modelops", () => ({
   listEnabledModels: modelApiMocks.listEnabledModels,
+}));
+
+vi.mock("../components/ChatMessageBody", () => ({
+  default: ({ content, renderMarkdown }: { content: string; renderMarkdown: boolean }) => (
+    renderMarkdown ? <pre data-testid="markdown-message">{content}</pre> : <p className="chatbot-message-text">{content}</p>
+  ),
 }));
 
 vi.mock("../api/chat", () => ({
@@ -231,8 +237,10 @@ describe("ChatbotPage", () => {
       "token",
       expect.any(Object),
     );
-    expect(await screen.findByRole("heading", { name: "hello" })).toBeVisible();
-    expect(screen.getByText("code", { selector: "code" })).toBeVisible();
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-message")).toHaveTextContent("## hello");
+      expect(screen.getByTestId("markdown-message")).toHaveTextContent("Use `code`");
+    });
   });
 
   it("keeps user messages as plain text while rendering assistant markdown", async () => {
@@ -254,7 +262,7 @@ describe("ChatbotPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByText("**literal user**")).toBeVisible();
-    expect(screen.getByText("bold", { selector: "strong" })).toBeVisible();
+    expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Answer with **bold**");
   });
 
   it("renders multiple conversations from the API and manages rename/delete", async () => {
@@ -340,8 +348,10 @@ describe("ChatbotPage", () => {
     await userEvent.type(screen.getByLabelText("Message"), "Stream prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(await screen.findByRole("heading", { name: "hello" })).toBeVisible();
-    expect(screen.getByText("code", { selector: "code" })).toBeVisible();
+    await waitFor(() => {
+      expect(screen.getByTestId("markdown-message")).toHaveTextContent("## hello");
+      expect(screen.getByTestId("markdown-message")).toHaveTextContent("`code`");
+    });
     expect(screen.getByRole("button", { name: "Streaming..." })).toBeDisabled();
 
     resolveStream(

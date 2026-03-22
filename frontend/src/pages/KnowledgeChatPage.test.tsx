@@ -15,7 +15,7 @@ const knowledgeApiMocks = vi.hoisted(() => ({
 
 let mockUser: AuthUser | null = null;
 
-vi.mock("../api/models", () => ({
+vi.mock("../api/modelops", () => ({
   listEnabledModels: modelApiMocks.listEnabledModels,
 }));
 
