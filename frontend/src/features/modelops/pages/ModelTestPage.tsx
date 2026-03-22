@@ -2,12 +2,12 @@ import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
-import ModelTestDebugPanel from "../components/ModelTestDebugPanel";
-import ModelTestHeader from "../components/ModelTestHeader";
-import ModelTestResultPanel from "../components/ModelTestResultPanel";
-import ModelValidationAction from "../components/ModelValidationAction";
-import { useManagedModelTest } from "../hooks/useManagedModelTest";
-import { modelTestRegistry } from "../modelTestRegistry";
+import ModelTestDebugPanel from "../testing/components/ModelTestDebugPanel";
+import ModelTestHeader from "../testing/components/ModelTestHeader";
+import ModelTestResultPanel from "../testing/components/ModelTestResultPanel";
+import ModelValidationAction from "../testing/components/ModelValidationAction";
+import { useManagedModelTest } from "../testing/hooks/useManagedModelTest";
+import { modelTestRegistry } from "../testing/registry/modelTestRegistry";
 
 export default function ModelTestPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -32,6 +32,11 @@ export default function ModelTestPage(): JSX.Element {
 
   const registryEntry = testState.model.task_key ? modelTestRegistry[testState.model.task_key] : undefined;
   const canValidate = user?.role === "admin" || user?.role === "superadmin";
+  const resultSummary = registryEntry?.summarizeResult(testState.latestResult, latestTest) ?? "";
+  const debugPayload = registryEntry?.formatDebugPayload(latestTest) ?? {
+    requestPayload: latestTest?.input_payload ?? null,
+    responsePayload: latestTest?.output_payload ?? latestTest?.error_details ?? null,
+  };
 
   return (
     <section className="card-stack">
@@ -46,8 +51,9 @@ export default function ModelTestPage(): JSX.Element {
       {registryEntry ? (
         registryEntry.renderPanel({
           isPending: testState.isRunningTest,
+          defaultInputs: registryEntry.defaultInputs,
           onRun: async (inputs) => {
-            await testState.runTest(inputs);
+            await testState.runTest(registryEntry.buildRequest(inputs));
           },
         })
       ) : (
@@ -60,6 +66,7 @@ export default function ModelTestPage(): JSX.Element {
       <ModelTestResultPanel
         result={testState.latestResult}
         latestTest={latestTest}
+        summary={resultSummary}
         error={testState.error}
       />
 
@@ -70,7 +77,10 @@ export default function ModelTestPage(): JSX.Element {
         onValidate={testState.markValidated}
       />
 
-      <ModelTestDebugPanel latestTest={latestTest} />
+      <ModelTestDebugPanel
+        requestPayload={debugPayload.requestPayload}
+        responsePayload={debugPayload.responsePayload}
+      />
 
       {testState.feedback && <p className="status-text">{testState.feedback}</p>}
     </section>

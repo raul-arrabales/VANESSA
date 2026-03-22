@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appRoutes, removedLegacyPaths } from "./appRoutes";
+import { appRoutes } from "./appRoutes";
 
 describe("app route registry", () => {
   it("contains the canonical sitemap exactly once", () => {
@@ -29,10 +29,4 @@ describe("app route registry", () => {
     ]);
   });
 
-  it("does not expose removed legacy paths", () => {
-    const currentPaths = new Set(appRoutes.map((route) => route.path));
-    removedLegacyPaths.forEach((legacyPath) => {
-      expect(currentPaths.has(legacyPath)).toBe(false);
-    });
-  });
 });

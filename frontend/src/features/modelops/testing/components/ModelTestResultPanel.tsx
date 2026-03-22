@@ -1,15 +1,17 @@
 import { useTranslation } from "react-i18next";
-import type { ModelTestResult, ModelTestRun } from "../../../api/models";
+import type { ModelTestResult, ModelTestRun } from "../../../../api/models";
 
 type ModelTestResultPanelProps = {
   result: ModelTestResult | null;
   latestTest: ModelTestRun | null;
+  summary: string;
   error: string;
 };
 
 export default function ModelTestResultPanel({
   result,
   latestTest,
+  summary,
   error,
 }: ModelTestResultPanelProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -17,6 +19,7 @@ export default function ModelTestResultPanel({
   return (
     <article className="panel card-stack">
       <h2 className="section-title">{t("modelOps.testing.resultTitle")}</h2>
+      {summary && <p className="status-text">{summary}</p>}
       {result ? (
         <>
           <p className="status-text">
@@ -37,7 +40,7 @@ export default function ModelTestResultPanel({
         </>
       ) : latestTest ? (
         <>
-          <p className="status-text">{latestTest.summary}</p>
+          {!summary && <p className="status-text">{latestTest.summary}</p>}
           {typeof latestTest.latency_ms === "number" && (
             <p className="status-text">{t("modelOps.testing.latency", { value: Math.round(latestTest.latency_ms) })}</p>
           )}

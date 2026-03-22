@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { LlmModelTestInput, ModelTestPanelRendererProps } from "../types";
 
-type LLMModelTestPanelProps = {
-  isPending: boolean;
-  onRun: (inputs: { prompt: string }) => Promise<void>;
-};
-
-export default function LLMModelTestPanel({ isPending, onRun }: LLMModelTestPanelProps): JSX.Element {
+export default function LLMModelTestPanel({
+  isPending,
+  defaultInputs,
+  onRun,
+}: ModelTestPanelRendererProps<LlmModelTestInput>): JSX.Element {
   const { t } = useTranslation("common");
-  const [prompt, setPrompt] = useState("hello");
+  const [prompt, setPrompt] = useState(defaultInputs.prompt);
 
   useEffect(() => {
-    setPrompt("hello");
-  }, []);
+    setPrompt(defaultInputs.prompt);
+  }, [defaultInputs.prompt]);
 
   return (
     <article className="panel card-stack">

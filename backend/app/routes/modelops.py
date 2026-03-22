@@ -15,20 +15,24 @@ from ..services.connectivity_policy import ConnectivityPolicyError, assert_inter
 from ..services.hf_discovery import discover_hf_models, get_hf_model_details
 from ..services.model_download_worker import ensure_download_worker_started
 from ..services.model_downloader import resolve_target_dir
-from ..services.modelops_service import (
-    ModelOpsError,
+from ..services.modelops_common import ModelOpsError
+from ..services.modelops_lifecycle import (
     activate_model,
     create_model,
     deactivate_model,
     delete_model,
+    register_existing_model,
+    unregister_model,
+)
+from ..services.modelops_queries import (
     get_model_detail,
-    get_model_tests,
     get_model_usage,
     get_model_validations,
     list_models,
-    register_existing_model,
+)
+from ..services.modelops_testing import (
+    get_model_tests,
     run_model_test,
-    unregister_model,
     validate_model,
 )
 from ..services.model_support import parse_patterns, serialize_assignment, serialize_download_job

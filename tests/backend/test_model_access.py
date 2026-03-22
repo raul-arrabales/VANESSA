@@ -5,7 +5,8 @@ from typing import Any
 import pytest
 
 from app.routes import modelops as modelops_routes  # noqa: E402
-from app.services import chat_inference, modelops_service  # noqa: E402
+from app.services import chat_inference  # noqa: E402
+from app.services.modelops_common import ModelOpsError  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
@@ -80,7 +81,7 @@ def test_generate_route_enforces_modelops_eligibility(client, monkeypatch: pytes
         _ = (config, user_id, user_role)
         if model_id == "allowed-model":
             return {"id": model_id, "backend_kind": "local", "availability": "offline_ready"}
-        raise modelops_service.ModelOpsError("forbidden", "Requested model is not allowed", status_code=403)
+        raise ModelOpsError("forbidden", "Requested model is not allowed", status_code=403)
 
     monkeypatch.setattr(chat_inference, "ensure_model_invokable", _ensure_model_invokable)
     monkeypatch.setattr(

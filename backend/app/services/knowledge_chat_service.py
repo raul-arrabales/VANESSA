@@ -8,7 +8,8 @@ from ..config import AuthConfig
 from .agent_engine_client import AgentEngineClientError, create_execution
 from .chat_inference import coerce_chat_messages
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
-from .modelops_service import ModelOpsError, ensure_model_invokable
+from .modelops_common import ModelOpsError
+from .modelops_runtime import ensure_model_invokable
 from .platform_service import get_active_platform_runtime
 from .platform_types import PlatformControlPlaneError
 from .runtime_profile_service import resolve_runtime_profile

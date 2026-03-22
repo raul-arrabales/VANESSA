@@ -129,7 +129,7 @@ def get_active_credential_secret(
 ) -> dict[str, Any] | None:
     parsed = UUID(credential_id)
     with get_connection(database_url) as connection:
-        if requester_role in {"superadmin", "admin"}:
+        if requester_role == "superadmin":
             row = connection.execute(
                 """
                 SELECT id, owner_user_id, credential_scope, provider_slug, display_name, api_base_url,
@@ -149,4 +149,24 @@ def get_active_credential_secret(
                 """,
                 (encryption_key, str(parsed), requester_user_id),
             ).fetchone()
+    return dict(row) if row else None
+
+
+def get_active_credential_secret_by_id(
+    database_url: str,
+    *,
+    credential_id: str,
+    encryption_key: str,
+) -> dict[str, Any] | None:
+    parsed = UUID(credential_id)
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT id, owner_user_id, credential_scope, provider_slug, display_name, api_base_url,
+                   pgp_sym_decrypt(api_key_encrypted, %s) AS api_key
+            FROM model_provider_credentials
+            WHERE id = %s AND is_active = TRUE
+            """,
+            (encryption_key, str(parsed)),
+        ).fetchone()
     return dict(row) if row else None

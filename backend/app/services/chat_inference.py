@@ -7,7 +7,8 @@ from flask import g
 
 from ..config import get_auth_config
 from ..repositories import modelops as modelops_repo
-from .modelops_service import ModelOpsError, ensure_model_invokable, measure_and_record_inference
+from .modelops_common import ModelOpsError
+from .modelops_runtime import ensure_model_invokable, measure_and_record_inference
 from .platform_service import resolve_llm_inference_adapter
 from .platform_types import PlatformControlPlaneError
 

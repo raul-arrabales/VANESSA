@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services import chat_inference, modelops_service  # noqa: E402
+from app.services import chat_inference  # noqa: E402
+from app.services.modelops_common import ModelOpsError  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
@@ -38,7 +39,7 @@ def test_inference_returns_modelops_access_errors(client, monkeypatch: pytest.Mo
         chat_inference,
         "ensure_model_invokable",
         lambda *args, **kwargs: (_ for _ in ()).throw(
-            modelops_service.ModelOpsError(
+            ModelOpsError(
                 "offline_not_allowed",
                 "Model is not available in offline mode",
                 status_code=409,

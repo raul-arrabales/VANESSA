@@ -566,7 +566,6 @@
       "unregister": "Unregister",
       "delete": "Delete",
       "saveCredential": "Save credential",
-      "validateAfterRegister": "Validate after registration",
       "registerCloud": "Register cloud model",
       "runTest": "Run test",
       "searchHf": "Search Hugging Face",

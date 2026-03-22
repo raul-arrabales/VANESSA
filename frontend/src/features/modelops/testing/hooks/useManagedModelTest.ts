@@ -7,25 +7,13 @@ import {
   type ManagedModel,
   type ModelTestResult,
   type ModelTestRun,
-} from "../../../api/models";
+} from "../../../../api/models";
+import type { ManagedModelTestState, ModelTestInput } from "../types";
 
 export function useManagedModelTest(
   modelId: string | undefined,
   token: string,
-): {
-  model: ManagedModel | null;
-  tests: ModelTestRun[];
-  latestResult: ModelTestResult | null;
-  latestSuccessfulTestRunId: string;
-  isLoading: boolean;
-  isRunningTest: boolean;
-  isValidating: boolean;
-  error: string;
-  feedback: string;
-  refresh: () => Promise<void>;
-  runTest: (inputs: Record<string, unknown>) => Promise<void>;
-  markValidated: () => Promise<void>;
-} {
+): ManagedModelTestState {
   const [model, setModel] = useState<ManagedModel | null>(null);
   const [tests, setTests] = useState<ModelTestRun[]>([]);
   const [latestResult, setLatestResult] = useState<ModelTestResult | null>(null);
@@ -72,7 +60,7 @@ export function useManagedModelTest(
     return tests.find((item) => item.result === "success")?.id ?? "";
   }, [pendingTestRunId, tests]);
 
-  const runTest = useCallback(async (inputs: Record<string, unknown>): Promise<void> => {
+  const runTest = useCallback(async (inputs: ModelTestInput): Promise<void> => {
     if (!token || !modelId) {
       return;
     }

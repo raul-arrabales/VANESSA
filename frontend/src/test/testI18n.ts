@@ -12,6 +12,7 @@ export function ensureTestI18n(): Promise<typeof testI18n> {
     initializationPromise = testI18n.use(initReactI18next).init({
       lng: "en",
       fallbackLng: "en",
+      showSupportNotice: false,
       supportedLngs: ["en", "es"],
       ns: ["common"],
       defaultNS: "common",

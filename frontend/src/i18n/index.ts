@@ -31,6 +31,7 @@ export function initI18n(): Promise<typeof i18n> {
       .use(initReactI18next)
       .init({
         fallbackLng: "en",
+        showSupportNotice: false,
         supportedLngs: ["en", "es"],
         nonExplicitSupportedLngs: true,
         load: "languageOnly",

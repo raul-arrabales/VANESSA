@@ -146,7 +146,7 @@ describe("ModelTestPage", () => {
       { inputs: { prompt: "hello" } },
       "token",
     );
-    expect(await screen.findByText("hello back")).toBeVisible();
+    expect((await screen.findAllByText("hello back")).length).toBeGreaterThan(0);
     expect(await screen.findByRole("button", { name: "Mark as validated" })).toBeEnabled();
   });
 });

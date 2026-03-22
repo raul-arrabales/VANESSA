@@ -43,17 +43,6 @@ export type AppRouteDefinition = {
   element: JSX.Element;
 };
 
-export const removedLegacyPaths = [
-  "/welcome/user",
-  "/welcome/admin",
-  "/welcome/superadmin",
-  "/welcome/superadmin/models",
-  "/admin/approvals",
-  "/backend-health",
-  "/settings/model-access",
-  "/chat",
-] as const;
-
 export const appRoutes: AppRouteDefinition[] = [
   {
     id: "home",

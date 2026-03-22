@@ -1,21 +1,18 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-
-type EmbeddingModelTestPanelProps = {
-  isPending: boolean;
-  onRun: (inputs: { text: string }) => Promise<void>;
-};
+import type { EmbeddingModelTestInput, ModelTestPanelRendererProps } from "../types";
 
 export default function EmbeddingModelTestPanel({
   isPending,
+  defaultInputs,
   onRun,
-}: EmbeddingModelTestPanelProps): JSX.Element {
+}: ModelTestPanelRendererProps<EmbeddingModelTestInput>): JSX.Element {
   const { t } = useTranslation("common");
-  const [text, setText] = useState("hello world");
+  const [text, setText] = useState(defaultInputs.text);
 
   useEffect(() => {
-    setText("hello world");
-  }, []);
+    setText(defaultInputs.text);
+  }, [defaultInputs.text]);
 
   return (
     <article className="panel card-stack">

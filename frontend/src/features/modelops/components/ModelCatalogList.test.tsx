@@ -6,7 +6,12 @@ import ModelCatalogList from "./ModelCatalogList";
 describe("ModelCatalogList", () => {
   it("shows test actions only for eligible models when enabled", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <ModelCatalogList
           models={[
             {
