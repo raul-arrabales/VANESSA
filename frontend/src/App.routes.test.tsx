@@ -1,4 +1,5 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
 import App from "./App";
@@ -236,6 +237,30 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/control/models/gpt-4/test" });
 
     expect(await screen.findByRole("heading", { name: "GPT-4" })).toBeVisible();
+  });
+
+  it("navigates the main modelops flow from home to catalog, detail, and test", async () => {
+    mockUser = {
+      id: 2,
+      email: "admin@example.com",
+      username: "admin",
+      role: "admin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/models" });
+
+    expect(await screen.findByRole("heading", { name: await t("modelOps.home.title") })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("link", { name: "Browse catalog" }));
+    expect(await screen.findByRole("heading", { name: await t("modelOps.catalog.title") })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("link", { name: "Open details" }));
+    expect(await screen.findByRole("heading", { name: "GPT-4" })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("link", { name: "Test model" }));
+    expect(await screen.findByLabelText("Prompt")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Mark as validated" })).toBeDisabled();
   });
 
   it("blocks non-superadmin users", async () => {

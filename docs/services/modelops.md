@@ -116,3 +116,5 @@ Current implementation status:
 
 - schema, lifecycle, validation history, usage rollups, and served-model eligibility are implemented
 - group UI, federation sync, and richer validator plugins are intentionally deferred
+
+For implementation boundaries and maintenance conventions, see the companion [ModelOps maintenance note](modelops-maintenance.md).

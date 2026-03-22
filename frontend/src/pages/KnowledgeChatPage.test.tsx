@@ -39,8 +39,8 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
-function renderKnowledgeChat(): void {
-  renderWithAppProviders(<KnowledgeChatPage />);
+async function renderKnowledgeChat(): Promise<void> {
+  await renderWithAppProviders(<KnowledgeChatPage />);
 }
 
 describe("KnowledgeChatPage", () => {
@@ -60,7 +60,7 @@ describe("KnowledgeChatPage", () => {
     modelApiMocks.listEnabledModels.mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
     knowledgeApiMocks.runKnowledgeChat.mockResolvedValue({ output: "answer", sources: [], retrieval: { index: "knowledge_base", result_count: 0 } });
 
-    renderKnowledgeChat();
+    await renderKnowledgeChat();
 
     await screen.findByLabelText("Model");
     await userEvent.type(screen.getByLabelText("Message"), "First question");
@@ -93,7 +93,7 @@ describe("KnowledgeChatPage", () => {
       retrieval: { index: "knowledge_base", result_count: 1 },
     });
 
-    renderKnowledgeChat();
+    await renderKnowledgeChat();
 
     await screen.findByLabelText("Model");
     await userEvent.type(screen.getByLabelText("Message"), "How does retrieval work?");
@@ -113,7 +113,7 @@ describe("KnowledgeChatPage", () => {
       retrieval: { index: "knowledge_base", result_count: 0 },
     });
 
-    renderKnowledgeChat();
+    await renderKnowledgeChat();
 
     await screen.findByLabelText("Model");
     await userEvent.type(screen.getByLabelText("Message"), "Summarize the docs");
