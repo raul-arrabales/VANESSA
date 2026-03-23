@@ -21,6 +21,12 @@
     "quotes": "Quotes",
     "systemHealth": "System health",
     "platform": "Platform control",
+    "platformProviders": "Platform providers",
+    "platformProviderNew": "New platform provider",
+    "platformProviderDetail": "Platform provider detail",
+    "platformDeployments": "Platform deployments",
+    "platformDeploymentNew": "New deployment profile",
+    "platformDeploymentDetail": "Deployment profile detail",
     "catalog": "Agent catalog",
     "models": "Models",
     "modelsCatalog": "Model catalog",
@@ -242,7 +248,7 @@
       },
       "platform": {
         "title": "Platform control",
-        "description": "Inspect capability bindings, validate providers, and activate deployment profiles."
+        "description": "Review the active GenAI topology and jump into provider or deployment management from a focused control-plane home."
       },
       "catalog": {
         "title": "Agent and tool catalog",
@@ -716,7 +722,7 @@
   "platformControl": {
     "eyebrow": "GenAI control plane",
     "title": "Platform control",
-    "description": "Manage provider instances, deployment profiles, and activation history for the GenAI control plane.",
+    "description": "Review the active platform topology, then manage providers and deployment profiles from focused operational pages.",
     "state": {
       "idle": "IDLE",
       "loading": "LOADING",
@@ -727,7 +733,28 @@
       "capabilities": "Capabilities",
       "providers": "Providers",
       "deployments": "Deployment profiles",
-      "audit": "Activation history"
+      "audit": "Activation history",
+      "validation": "Validation",
+      "usage": "Usage",
+      "settings": "Settings",
+      "danger": "Danger zone",
+      "clone": "Clone deployment"
+    },
+    "navigation": {
+      "aria": "Platform control sections",
+      "home": "Overview",
+      "providers": "Providers",
+      "deployments": "Deployments"
+    },
+    "home": {
+      "description": "Use the control-plane landing page to understand the active GenAI deployment, then move into providers or deployments for operational work.",
+      "exploreTitle": "Management areas",
+      "exploreDescription": "Keep the landing page as a platform overview, and use these pages for day-to-day operations.",
+      "exploreAria": "Platform control management areas",
+      "providersTitle": "Providers",
+      "providersDescription": "Browse provider instances, inspect usage, and open detailed validation or configuration workflows.",
+      "deploymentsTitle": "Deployments",
+      "deploymentsDescription": "Review deployment profiles, activation history, and provider/model binding topology."
     },
     "summary": {
       "activeDeployment": "Active deployment profile",
@@ -762,20 +789,52 @@
       }
     },
     "capabilities": {
-      "description": "Each required platform capability should resolve to an active provider binding.",
+      "description": "Each capability reflects the active deployment binding: one active provider plus the models or artifacts served through that binding.",
       "activeProvider": "Active provider",
+      "runtime": "Runtime / adapter",
+      "servedArtifacts": "Served models / artifacts",
       "unbound": "No active provider is bound to this capability.",
       "empty": "No platform capabilities are registered."
     },
+    "filters": {
+      "search": "Search",
+      "capability": "Capability",
+      "providerFamily": "Provider family",
+      "state": "State",
+      "all": "All"
+    },
     "providers": {
       "description": "Create, update, validate, and remove provider instances without editing bootstrap code.",
+      "title": "Platform providers",
+      "pageDescription": "Browse provider inventory, see where each provider is used, and open focused operational detail pages.",
+      "newTitle": "New platform provider",
+      "newDescription": "Create a provider instance from a supported provider family and then continue validation and usage review from its detail page.",
+      "detailTitle": "Platform provider detail",
+      "detailDescription": "Inspect one provider, review its deployment usage, validate reachability, and update its configuration.",
+      "directoryDescription": "{{count}} providers match the current filters.",
       "tableAria": "Platform providers",
       "notValidated": "Not validated yet.",
+      "validationDescription": "Run live validation checks against this provider and the current binding context.",
       "validationStatus": "Health status: {{code}}",
       "modelsReachable": "Model discovery reachable",
       "modelsUnavailable": "Model discovery unavailable",
       "embeddingsReachable": "Embeddings reachable ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings unavailable",
+      "familyLabel": "Provider family",
+      "capabilityLabel": "Capability",
+      "endpointLabel": "Endpoint",
+      "activeDeploymentLabel": "Active deployment usage",
+      "usedByDeployments": "Referenced deployments",
+      "activeReference": "Used by the active deployment",
+      "inactiveReference": "Not used by the active deployment",
+      "moreDeployments": "+{{count}} more",
+      "noDescription": "No description provided.",
+      "settingsDescription": "Update provider metadata, endpoint settings, enabled state, config, and secret refs.",
+      "usageDescription": "Served models belong to deployment bindings, so usage is grouped by deployment profile.",
+      "usageTableAria": "Bindings referencing {{name}}",
+      "noUsage": "This provider is not referenced by any deployment profile.",
+      "deleteDescription": "Delete this provider only when it is no longer referenced by deployment profiles.",
+      "notFound": "The requested provider could not be found.",
       "bindingErrors": {
         "served_model_required": "Select served models in a deployment binding before validating this provider.",
         "served_model_not_exposed": "Model {{modelId}} is not exposed by the provider as {{runtimeModelId}}."
@@ -794,6 +853,13 @@
     },
     "deployments": {
       "description": "Create, edit, clone, activate, and delete deployment profiles from the active provider inventory.",
+      "title": "Deployment profiles",
+      "pageDescription": "Review deployment inventory, activation history, and the active binding topology across platform capabilities.",
+      "newTitle": "New deployment profile",
+      "newDescription": "Create a deployment profile by selecting one provider binding per required capability and assigning served models where needed.",
+      "detailTitle": "Deployment profile detail",
+      "detailDescription": "Inspect one deployment profile, update its bindings, clone it, and activate it when ready.",
+      "directoryDescription": "{{count}} deployment profiles match the current filters.",
       "tableAria": "Bindings for {{name}}",
       "empty": "No deployment profiles are available.",
       "noDescription": "No description provided.",
@@ -801,6 +867,12 @@
       "createHelp": "Define the provider bindings for a deployment profile.",
       "editing": "Editing deployment {{slug}}.",
       "cloning": "Cloning deployment into {{slug}}.",
+      "cloneDescription": "Create a new deployment profile by copying this deployment's current topology and metadata.",
+      "settingsDescription": "Edit provider bindings, served models, and default served models for this deployment profile.",
+      "deleteDescription": "Delete this deployment profile only when it is no longer the active deployment.",
+      "recentActivations": "Recent activations for this deployment",
+      "recentActivationsDescription": "Review when this deployment profile was promoted and what it replaced.",
+      "notFound": "The requested deployment profile could not be found.",
       "columns": {
         "capability": "Capability",
         "provider": "Provider",
@@ -834,6 +906,10 @@
       "confirmActivate": "Confirm activation",
       "activating": "Activating...",
       "active": "Active",
+      "openProvider": "Open provider",
+      "openDeployment": "Open deployment",
+      "viewProviders": "View providers",
+      "viewDeployments": "View deployments",
       "edit": "Edit",
       "clone": "Clone",
       "delete": "Delete",
@@ -847,8 +923,10 @@
       "active": "Active",
       "inactive": "Inactive",
       "required": "Required",
+      "optional": "Optional",
       "enabled": "Enabled",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "activeDeployment": "Active deployment"
     },
     "feedback": {
       "prefix": "Request failed:",

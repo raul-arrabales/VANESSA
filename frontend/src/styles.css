@@ -304,7 +304,10 @@ a {
 
 .platform-summary-grid,
 .platform-capability-grid,
-.catalog-grid {
+.catalog-grid,
+.platform-directory-grid,
+.platform-detail-grid,
+.platform-filter-grid {
   display: grid;
   gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -339,12 +342,31 @@ a {
 
 .platform-section-header,
 .platform-card-header,
-.platform-action-row {
+.platform-action-row,
+.platform-page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+.platform-page-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.platform-subnav {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.platform-subnav .link-chip[data-active="true"] {
+  background: color-mix(in oklab, var(--accent-primary) 18%, var(--bg-surface));
+  border-color: color-mix(in oklab, var(--accent-primary) 40%, var(--border-muted));
+  color: var(--text-primary);
 }
 
 .modelops-card-header {
@@ -394,6 +416,12 @@ a {
   color: var(--accent-secondary);
   border-color: color-mix(in oklab, var(--accent-secondary) 42%, var(--border-muted));
   background: color-mix(in oklab, var(--accent-secondary) 12%, var(--bg-surface));
+}
+
+.platform-badge[data-tone="optional"] {
+  color: var(--accent-primary);
+  border-color: color-mix(in oklab, var(--accent-primary) 42%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-primary) 12%, var(--bg-surface));
 }
 
 .platform-deployment-list {

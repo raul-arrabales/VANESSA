@@ -21,6 +21,12 @@
     "quotes": "Citas",
     "systemHealth": "Salud del sistema",
     "platform": "Control de plataforma",
+    "platformProviders": "Proveedores de plataforma",
+    "platformProviderNew": "Nuevo proveedor de plataforma",
+    "platformProviderDetail": "Detalle del proveedor de plataforma",
+    "platformDeployments": "Despliegues de plataforma",
+    "platformDeploymentNew": "Nuevo perfil de despliegue",
+    "platformDeploymentDetail": "Detalle del perfil de despliegue",
     "catalog": "Catalogo de agentes",
     "models": "Modelos",
     "modelsCatalog": "Catalogo de modelos",
@@ -242,7 +248,7 @@
       },
       "platform": {
         "title": "Control de plataforma",
-        "description": "Inspecciona enlaces de capacidades, valida proveedores y activa perfiles de despliegue."
+        "description": "Revisa la topologia activa de GenAI y entra en la gestion de proveedores o despliegues desde un home de control enfocado."
       },
       "catalog": {
         "title": "Catalogo de agentes y herramientas",
@@ -716,7 +722,7 @@
   "platformControl": {
     "eyebrow": "Plano de control GenAI",
     "title": "Control de plataforma",
-    "description": "Administra instancias de proveedor, perfiles de despliegue e historial de activacion del plano de control GenAI.",
+    "description": "Revisa la topologia activa de la plataforma y despues gestiona proveedores y perfiles de despliegue desde paginas operativas enfocadas.",
     "state": {
       "idle": "INACTIVO",
       "loading": "CARGANDO",
@@ -727,7 +733,28 @@
       "capabilities": "Capacidades",
       "providers": "Proveedores",
       "deployments": "Perfiles de despliegue",
-      "audit": "Historial de activacion"
+      "audit": "Historial de activacion",
+      "validation": "Validacion",
+      "usage": "Uso",
+      "settings": "Configuracion",
+      "danger": "Zona peligrosa",
+      "clone": "Clonar despliegue"
+    },
+    "navigation": {
+      "aria": "Secciones del control de plataforma",
+      "home": "Resumen",
+      "providers": "Proveedores",
+      "deployments": "Despliegues"
+    },
+    "home": {
+      "description": "Usa la pagina principal del plano de control para entender el despliegue GenAI activo y despues entra en proveedores o despliegues para el trabajo operativo.",
+      "exploreTitle": "Areas de gestion",
+      "exploreDescription": "Mantiene la pagina principal como una vista general y usa estas paginas para las operaciones del dia a dia.",
+      "exploreAria": "Areas de gestion del control de plataforma",
+      "providersTitle": "Proveedores",
+      "providersDescription": "Explora instancias de proveedor, inspecciona su uso y abre flujos detallados de validacion o configuracion.",
+      "deploymentsTitle": "Despliegues",
+      "deploymentsDescription": "Revisa perfiles de despliegue, historial de activacion y la topologia de enlaces de proveedores y modelos."
     },
     "summary": {
       "activeDeployment": "Perfil de despliegue activo",
@@ -762,20 +789,52 @@
       }
     },
     "capabilities": {
-      "description": "Cada capacidad requerida de la plataforma debe resolver a un proveedor activo.",
+      "description": "Cada capacidad refleja el enlace del despliegue activo: un proveedor activo y los modelos o artefactos servidos a traves de ese enlace.",
       "activeProvider": "Proveedor activo",
+      "runtime": "Runtime / adaptador",
+      "servedArtifacts": "Modelos / artefactos servidos",
       "unbound": "Ningun proveedor activo esta enlazado a esta capacidad.",
       "empty": "No hay capacidades de plataforma registradas."
     },
+    "filters": {
+      "search": "Buscar",
+      "capability": "Capacidad",
+      "providerFamily": "Familia de proveedor",
+      "state": "Estado",
+      "all": "Todos"
+    },
     "providers": {
       "description": "Crea, actualiza, valida y elimina instancias de proveedor sin editar codigo de bootstrap.",
+      "title": "Proveedores de plataforma",
+      "pageDescription": "Explora el inventario de proveedores, ve donde se usa cada uno y abre paginas de detalle para operaciones enfocadas.",
+      "newTitle": "Nuevo proveedor de plataforma",
+      "newDescription": "Crea una instancia de proveedor desde una familia compatible y continua la validacion y la revision de uso desde su detalle.",
+      "detailTitle": "Detalle del proveedor",
+      "detailDescription": "Inspecciona un proveedor, revisa su uso por despliegue, valida su alcance y actualiza su configuracion.",
+      "directoryDescription": "{{count}} proveedores coinciden con los filtros actuales.",
       "tableAria": "Proveedores de plataforma",
       "notValidated": "Todavia no validado.",
+      "validationDescription": "Ejecuta comprobaciones en vivo contra este proveedor y el contexto actual del enlace.",
       "validationStatus": "Estado de salud: {{code}}",
       "modelsReachable": "Descubrimiento de modelos accesible",
       "modelsUnavailable": "Descubrimiento de modelos no accesible",
       "embeddingsReachable": "Embeddings accesibles ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings no accesibles",
+      "familyLabel": "Familia de proveedor",
+      "capabilityLabel": "Capacidad",
+      "endpointLabel": "Endpoint",
+      "activeDeploymentLabel": "Uso en despliegue activo",
+      "usedByDeployments": "Despliegues que lo referencian",
+      "activeReference": "Usado por el despliegue activo",
+      "inactiveReference": "No usado por el despliegue activo",
+      "moreDeployments": "+{{count}} mas",
+      "noDescription": "No hay descripcion.",
+      "settingsDescription": "Actualiza metadatos, endpoint, estado habilitado, configuracion y referencias secretas del proveedor.",
+      "usageDescription": "Los modelos servidos pertenecen a enlaces de despliegue, asi que el uso se muestra agrupado por perfil de despliegue.",
+      "usageTableAria": "Enlaces que referencian {{name}}",
+      "noUsage": "Este proveedor no esta referenciado por ningun perfil de despliegue.",
+      "deleteDescription": "Elimina este proveedor solo cuando ya no este referenciado por perfiles de despliegue.",
+      "notFound": "No se pudo encontrar el proveedor solicitado.",
       "bindingErrors": {
         "served_model_required": "Selecciona modelos servidos en un despliegue antes de validar este proveedor.",
         "served_model_not_exposed": "El proveedor no expone el modelo {{modelId}} como {{runtimeModelId}}."
@@ -794,6 +853,13 @@
     },
     "deployments": {
       "description": "Crea, edita, clona, activa y elimina perfiles de despliegue desde el inventario activo de proveedores.",
+      "title": "Perfiles de despliegue",
+      "pageDescription": "Revisa el inventario de despliegues, el historial de activacion y la topologia activa de enlaces entre capacidades.",
+      "newTitle": "Nuevo perfil de despliegue",
+      "newDescription": "Crea un perfil de despliegue seleccionando un proveedor por cada capacidad requerida y asignando modelos servidos cuando haga falta.",
+      "detailTitle": "Detalle del perfil de despliegue",
+      "detailDescription": "Inspecciona un perfil de despliegue, actualiza sus enlaces, clonalo y activalo cuando este listo.",
+      "directoryDescription": "{{count}} perfiles de despliegue coinciden con los filtros actuales.",
       "tableAria": "Enlaces para {{name}}",
       "empty": "No hay perfiles de despliegue disponibles.",
       "noDescription": "No hay descripcion.",
@@ -801,6 +867,12 @@
       "createHelp": "Define los enlaces de proveedores para un perfil de despliegue.",
       "editing": "Editando despliegue {{slug}}.",
       "cloning": "Clonando despliegue en {{slug}}.",
+      "cloneDescription": "Crea un nuevo perfil de despliegue copiando la topologia y los metadatos actuales de este despliegue.",
+      "settingsDescription": "Edita enlaces de proveedor, modelos servidos y modelos servidos por defecto para este perfil.",
+      "deleteDescription": "Elimina este perfil de despliegue solo cuando ya no sea el despliegue activo.",
+      "recentActivations": "Activaciones recientes de este despliegue",
+      "recentActivationsDescription": "Revisa cuando se promovio este perfil y que reemplazo.",
+      "notFound": "No se pudo encontrar el perfil de despliegue solicitado.",
       "columns": {
         "capability": "Capacidad",
         "provider": "Proveedor",
@@ -834,6 +906,10 @@
       "confirmActivate": "Confirmar activacion",
       "activating": "Activando...",
       "active": "Activo",
+      "openProvider": "Abrir proveedor",
+      "openDeployment": "Abrir despliegue",
+      "viewProviders": "Ver proveedores",
+      "viewDeployments": "Ver despliegues",
       "edit": "Editar",
       "clone": "Clonar",
       "delete": "Eliminar",
@@ -847,8 +923,10 @@
       "active": "Activo",
       "inactive": "Inactivo",
       "required": "Requerido",
+      "optional": "Opcional",
       "enabled": "Habilitado",
-      "disabled": "Deshabilitado"
+      "disabled": "Deshabilitado",
+      "activeDeployment": "Despliegue activo"
     },
     "feedback": {
       "prefix": "Error de solicitud:",

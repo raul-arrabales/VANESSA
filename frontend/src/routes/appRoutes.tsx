@@ -1,4 +1,5 @@
 import { lazy, type JSX } from "react";
+import { matchPath } from "react-router-dom";
 import type { Role } from "../auth/types";
 import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
@@ -11,6 +12,12 @@ const QuoteManagementPage = lazy(() => import("../pages/QuoteManagementPage"));
 const CatalogControlPage = lazy(() => import("../pages/CatalogControlPage"));
 const BackendHealthPage = lazy(() => import("../pages/BackendHealthPage"));
 const PlatformControlPage = lazy(() => import("../pages/PlatformControlPage"));
+const PlatformProvidersPage = lazy(() => import("../pages/PlatformProvidersPage"));
+const PlatformProviderCreatePage = lazy(() => import("../pages/PlatformProviderCreatePage"));
+const PlatformProviderDetailPage = lazy(() => import("../pages/PlatformProviderDetailPage"));
+const PlatformDeploymentsPage = lazy(() => import("../pages/PlatformDeploymentsPage"));
+const PlatformDeploymentCreatePage = lazy(() => import("../pages/PlatformDeploymentCreatePage"));
+const PlatformDeploymentDetailPage = lazy(() => import("../pages/PlatformDeploymentDetailPage"));
 const ModelOpsHomePage = lazy(() => import("../features/modelops/pages/ModelOpsHomePage"));
 const ModelCatalogPage = lazy(() => import("../features/modelops/pages/ModelCatalogPage"));
 const CloudModelRegisterPage = lazy(() => import("../features/modelops/pages/CloudModelRegisterPage"));
@@ -171,6 +178,72 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <PlatformControlPage />,
   },
   {
+    id: "control-platform-providers",
+    path: "/control/platform/providers",
+    titleKey: "nav.platformProviders",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformProvidersPage />,
+  },
+  {
+    id: "control-platform-providers-new",
+    path: "/control/platform/providers/new",
+    titleKey: "nav.platformProviderNew",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformProviderCreatePage />,
+  },
+  {
+    id: "control-platform-providers-detail",
+    path: "/control/platform/providers/:providerId",
+    titleKey: "nav.platformProviderDetail",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformProviderDetailPage />,
+  },
+  {
+    id: "control-platform-deployments",
+    path: "/control/platform/deployments",
+    titleKey: "nav.platformDeployments",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformDeploymentsPage />,
+  },
+  {
+    id: "control-platform-deployments-new",
+    path: "/control/platform/deployments/new",
+    titleKey: "nav.platformDeploymentNew",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformDeploymentCreatePage />,
+  },
+  {
+    id: "control-platform-deployments-detail",
+    path: "/control/platform/deployments/:deploymentId",
+    titleKey: "nav.platformDeploymentDetail",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <PlatformDeploymentDetailPage />,
+  },
+  {
     id: "control-models",
     path: "/control/models",
     titleKey: "nav.models",
@@ -289,10 +362,7 @@ export const appRoutes: AppRouteDefinition[] = [
 ];
 
 function isRoutePrefix(pathname: string, routePath: string): boolean {
-  if (routePath === "/") {
-    return pathname === "/";
-  }
-  return pathname === routePath || pathname.startsWith(`${routePath}/`);
+  return matchPath({ path: routePath, end: false }, pathname) !== null;
 }
 
 export function getBreadcrumbRoutes(pathname: string): AppRouteDefinition[] {
