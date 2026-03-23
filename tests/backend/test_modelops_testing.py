@@ -103,6 +103,309 @@ def test_run_model_test_persists_successful_cloud_llm_result(monkeypatch: pytest
     assert audit_events == ["model.tested"]
 
 
+def test_run_model_test_allows_superadmin_local_llm_with_exact_runtime_match(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+    audit_events: list[str] = []
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "llm",
+            "provider_model_id": None,
+            "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+            "current_config_fingerprint": "fingerprint-local-1",
+            "artifact": {"storage_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "offline")
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "list_provider_instances",
+        lambda _database_url: [
+            {
+                "id": "provider-1",
+                "slug": "vllm-local-gateway",
+                "provider_key": "vllm_local",
+                "capability_key": "llm_inference",
+                "adapter_kind": "openai_compatible_llm",
+                "display_name": "vLLM local gateway",
+                "description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _database_url, capability_key: {"provider_instance_id": "provider-1"},
+    )
+    monkeypatch.setattr(modelops_testing, "ensure_platform_bootstrap_state", lambda _database_url, _config: None)
+
+    class FakeAdapter:
+        def __init__(self):
+            self.binding = type("Binding", (), {"enabled": True})()
+            self.chat_calls: list[dict[str, object]] = []
+
+        def list_models(self):
+            return {
+                "data": [
+                    {
+                        "id": "local-vllm-default",
+                        "display_name": "Local vLLM Default",
+                        "metadata": {"upstream_model": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"},
+                    }
+                ]
+            }, 200
+
+        def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
+            self.chat_calls.append(
+                {
+                    "model": model,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "allow_local_fallback": allow_local_fallback,
+                }
+            )
+            return {
+                "output": [{"content": [{"type": "text", "text": "local hello back"}]}],
+            }, 200
+
+    adapter = FakeAdapter()
+    monkeypatch.setattr(
+        modelops_testing,
+        "resolve_llm_inference_adapter",
+        lambda _database_url, _config, provider_instance_id=None: adapter,
+    )
+    monkeypatch.setattr(
+        modelops_testing.modelops_repo,
+        "get_model",
+        lambda _database_url, model_id: {
+            "model_id": model_id,
+            "artifact": {"storage_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"},
+        },
+    )
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-local-1",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+    monkeypatch.setattr(
+        modelops_testing.modelops_repo,
+        "append_audit_event",
+        lambda _database_url, **kwargs: audit_events.append(str(kwargs["event_type"])),
+    )
+
+    result = modelops_testing.run_model_test(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=1,
+        actor_role="superadmin",
+        model_id="Qwen--Qwen2.5-0.5B-Instruct",
+        inputs={"prompt": "hello"},
+        provider_instance_id="provider-1",
+    )
+
+    assert recorded_test_run["result"] == modelops_testing.modelops_repo.TEST_SUCCESS
+    assert recorded_test_run["input_payload"]["provider_instance_id"] == "provider-1"
+    assert recorded_test_run["input_payload"]["model"] == "local-vllm-default"
+    assert result["result"]["response_text"] == "local hello back"
+    assert adapter.chat_calls == [
+        {
+            "model": "local-vllm-default",
+            "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            "max_tokens": 64,
+            "temperature": 0,
+            "allow_local_fallback": False,
+        }
+    ]
+    assert audit_events == ["model.tested"]
+
+
+def test_run_model_test_rejects_local_runtime_when_selected_provider_does_not_serve_model(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "llm",
+            "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+            "current_config_fingerprint": "fingerprint-local-2",
+            "artifact": {"storage_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "online")
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "list_provider_instances",
+        lambda _database_url: [
+            {
+                "id": "provider-1",
+                "slug": "vllm-local-gateway",
+                "provider_key": "vllm_local",
+                "capability_key": "llm_inference",
+                "adapter_kind": "openai_compatible_llm",
+                "display_name": "vLLM local gateway",
+                "description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _database_url, capability_key: {"provider_instance_id": "provider-1"},
+    )
+    monkeypatch.setattr(modelops_testing, "ensure_platform_bootstrap_state", lambda _database_url, _config: None)
+
+    class FakeAdapter:
+        def list_models(self):
+            return {
+                "data": [
+                    {
+                        "id": "local-vllm-default",
+                        "display_name": "Local vLLM Default",
+                        "metadata": {"upstream_model": "/models/llm/another-model"},
+                    }
+                ]
+            }, 200
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "resolve_llm_inference_adapter",
+        lambda _database_url, _config, provider_instance_id=None: FakeAdapter(),
+    )
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-local-2",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+
+    with pytest.raises(modelops_testing.ModelOpsError) as exc_info:
+        modelops_testing.run_model_test(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=1,
+            actor_role="superadmin",
+            model_id="Qwen--Qwen2.5-0.5B-Instruct",
+            inputs={"prompt": "hello"},
+            provider_instance_id="provider-1",
+        )
+
+    assert exc_info.value.code == "local_model_not_served_by_runtime"
+    assert recorded_test_run["result"] == modelops_testing.modelops_repo.TEST_FAILURE
+    assert recorded_test_run["error_details"] == {
+        "error": "local_model_not_served_by_runtime",
+        "provider_instance_id": "provider-1",
+    }
+
+
+def test_run_model_test_rejects_local_provider_override_for_non_superadmin(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "llm",
+            "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+            "current_config_fingerprint": "fingerprint-local-3",
+            "artifact": {"storage_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "online")
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-local-3",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+
+    with pytest.raises(modelops_testing.ModelOpsError) as exc_info:
+        modelops_testing.run_model_test(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=7,
+            actor_role="admin",
+            model_id="Qwen--Qwen2.5-0.5B-Instruct",
+            inputs={"prompt": "hello"},
+            provider_instance_id="provider-1",
+        )
+
+    assert exc_info.value.code == "local_model_runtime_selection_required"
+    assert recorded_test_run["error_details"] == {"error": "local_model_runtime_selection_required"}
+
+
 def test_validate_model_requires_successful_matching_test_run(monkeypatch: pytest.MonkeyPatch, config: AuthConfig):
     recorded_validation: dict[str, object] = {}
 

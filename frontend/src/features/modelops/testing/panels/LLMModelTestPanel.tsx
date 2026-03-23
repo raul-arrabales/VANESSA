@@ -5,6 +5,7 @@ import type { LlmModelTestInput, ModelTestPanelRendererProps } from "../types";
 export default function LLMModelTestPanel({
   isPending,
   defaultInputs,
+  runDisabled = false,
   onRun,
 }: ModelTestPanelRendererProps<LlmModelTestInput>): JSX.Element {
   const { t } = useTranslation("common");
@@ -29,7 +30,7 @@ export default function LLMModelTestPanel({
         <button
           type="button"
           className="btn btn-primary"
-          disabled={isPending || !prompt.trim()}
+          disabled={isPending || runDisabled || !prompt.trim()}
           onClick={() => void onRun({ prompt: prompt.trim() })}
         >
           {isPending ? t("modelOps.testing.running") : t("modelOps.actions.runTest")}

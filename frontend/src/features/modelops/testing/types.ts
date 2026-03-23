@@ -16,6 +16,7 @@ export type ModelTestExecutionResult = ModelTestResult;
 export type ModelTestPanelRendererProps<TInputs extends ModelTestInput = ModelTestInput> = {
   isPending: boolean;
   defaultInputs: TInputs;
+  runDisabled?: boolean;
   onRun: (inputs: TInputs) => Promise<void>;
 };
 
@@ -44,6 +45,6 @@ export type ManagedModelTestState = {
   error: string;
   feedback: string;
   refresh: () => Promise<void>;
-  runTest: (inputs: ModelTestInput) => Promise<void>;
+  runTest: (inputs: ModelTestInput, options?: { providerInstanceId?: string }) => Promise<void>;
   markValidated: () => Promise<void>;
 };

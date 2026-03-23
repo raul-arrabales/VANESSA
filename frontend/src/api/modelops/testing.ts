@@ -1,5 +1,5 @@
 import { requestJson } from "./request";
-import type { ManagedModel, ModelTestResult, ModelTestRun } from "./types";
+import type { ManagedModel, ManagedModelTestRuntime, ModelTestResult, ModelTestRun } from "./types";
 
 export async function listManagedModelTests(
   modelId: string,
@@ -17,7 +17,7 @@ export async function listManagedModelTests(
 
 export async function runManagedModelTest(
   modelId: string,
-  payload: { inputs: Record<string, unknown> },
+  payload: { inputs: Record<string, unknown>; provider_instance_id?: string },
   token: string,
 ): Promise<{
   model: ManagedModel;
@@ -33,6 +33,21 @@ export async function runManagedModelTest(
     token,
     body: payload,
   });
+}
+
+export async function listManagedModelTestRuntimes(
+  modelId: string,
+  token: string,
+): Promise<{
+  model_id: string;
+  runtimes: ManagedModelTestRuntime[];
+  default_provider_instance_id?: string | null;
+}> {
+  return requestJson<{
+    model_id: string;
+    runtimes: ManagedModelTestRuntime[];
+    default_provider_instance_id?: string | null;
+  }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/test-runtimes`, { token });
 }
 
 export async function validateManagedModel(

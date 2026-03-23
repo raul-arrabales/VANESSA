@@ -28,6 +28,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/modelops/models/<model_id>/usage",
         "/v1/modelops/models/<model_id>/validations",
         "/v1/modelops/models/<model_id>/tests",
+        "/v1/modelops/models/<model_id>/test-runtimes",
         "/v1/modelops/models/<model_id>/test",
         "/v1/modelops/models/<model_id>/register",
         "/v1/modelops/models/<model_id>/validate",

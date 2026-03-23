@@ -11,10 +11,11 @@ export const modelTestRegistry: Record<string, ModelTestRegistryEntry> = {
       requestPayload: latestTest?.input_payload ?? {},
       responsePayload: latestTest?.output_payload ?? latestTest?.error_details ?? {},
     }),
-    renderPanel: ({ isPending, defaultInputs, onRun }) => (
+    renderPanel: ({ isPending, defaultInputs, runDisabled, onRun }) => (
       <LLMModelTestPanel
         isPending={isPending}
         defaultInputs={{ prompt: String(defaultInputs.prompt ?? "hello") }}
+        runDisabled={runDisabled}
         onRun={async (inputs) => {
           await onRun(inputs);
         }}
@@ -34,10 +35,11 @@ export const modelTestRegistry: Record<string, ModelTestRegistryEntry> = {
       requestPayload: latestTest?.input_payload ?? {},
       responsePayload: latestTest?.output_payload ?? latestTest?.error_details ?? {},
     }),
-    renderPanel: ({ isPending, defaultInputs, onRun }) => (
+    renderPanel: ({ isPending, defaultInputs, runDisabled, onRun }) => (
       <EmbeddingModelTestPanel
         isPending={isPending}
         defaultInputs={{ text: String(defaultInputs.text ?? "hello world") }}
+        runDisabled={runDisabled}
         onRun={async (inputs) => {
           await onRun(inputs);
         }}

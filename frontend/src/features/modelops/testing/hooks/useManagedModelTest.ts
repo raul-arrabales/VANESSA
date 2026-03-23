@@ -54,7 +54,10 @@ export function useManagedModelTest(
     return tests.find((item) => item.result === "success")?.id ?? "";
   }, [pendingTestRunId, tests]);
 
-  const runTest = useCallback(async (inputs: ModelTestInput): Promise<void> => {
+  const runTest = useCallback(async (
+    inputs: ModelTestInput,
+    options?: { providerInstanceId?: string },
+  ): Promise<void> => {
     if (!token || !modelId) {
       return;
     }
@@ -63,7 +66,14 @@ export function useManagedModelTest(
     setError("");
     setFeedback("");
     try {
-      const payload = await runManagedModelTest(modelId, { inputs }, token);
+      const payload = await runManagedModelTest(
+        modelId,
+        {
+          inputs,
+          provider_instance_id: options?.providerInstanceId,
+        },
+        token,
+      );
       setModel(payload.model);
       setLatestResult(payload.result);
       setPendingTestRunId(payload.test_run.result === "success" ? payload.test_run.id : "");

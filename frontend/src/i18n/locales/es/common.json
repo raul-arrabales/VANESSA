@@ -696,6 +696,15 @@
       "running": "Ejecutando prueba...",
       "embeddingsTitle": "Prueba de embeddings",
       "textLabel": "Texto de entrada",
+      "runtimeTitle": "Runtime de prueba",
+      "runtimeDescription": "Los superadministradores pueden elegir un runtime compatible para probar el modelo local exacto sin cambiar el despliegue activo de la plataforma.",
+      "runtimeLabel": "Proveedor de runtime",
+      "runtimePlaceholder": "Selecciona un runtime",
+      "runtimeActive": "activo",
+      "runtimeCompatible": "compatible",
+      "runtimeMismatch": "El runtime seleccionado no sirve actualmente este modelo local.",
+      "runtimeLoadFailed": "No se pudieron cargar runtimes compatibles para este modelo local.",
+      "noCompatibleRuntime": "Ningun runtime compatible sirve actualmente este modelo local.",
       "unsupportedTitle": "Prueba no disponible",
       "unsupportedDescription": "La prueba aun no esta soportada para este tipo de modelo o combinacion de runtime."
     }

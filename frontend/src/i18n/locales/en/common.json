@@ -696,6 +696,15 @@
       "running": "Running test...",
       "embeddingsTitle": "Embeddings test",
       "textLabel": "Input text",
+      "runtimeTitle": "Test runtime",
+      "runtimeDescription": "Superadmins can choose a compatible runtime for exact local-model testing without changing the active platform deployment.",
+      "runtimeLabel": "Runtime provider",
+      "runtimePlaceholder": "Select a runtime",
+      "runtimeActive": "active",
+      "runtimeCompatible": "compatible",
+      "runtimeMismatch": "The selected runtime does not currently serve this local model.",
+      "runtimeLoadFailed": "Unable to load compatible runtimes for this local model.",
+      "noCompatibleRuntime": "No compatible runtime currently serves this local model.",
       "unsupportedTitle": "Testing unavailable",
       "unsupportedDescription": "Testing is not yet supported for this model type or runtime combination."
     }

@@ -95,10 +95,15 @@ Canonical routes live under `/v1/modelops/models`:
 - `GET /v1/modelops/models/{id}`
 - `POST /v1/modelops/models/{id}/register`
 - `POST /v1/modelops/models/{id}/validate`
+- `GET /v1/modelops/models/{id}/tests`
+- `GET /v1/modelops/models/{id}/test-runtimes`
+- `POST /v1/modelops/models/{id}/test`
 - `POST /v1/modelops/models/{id}/activate`
 - `POST /v1/modelops/models/{id}/deactivate`
 - `POST /v1/modelops/models/{id}/unregister`
 - `DELETE /v1/modelops/models/{id}`
+
+For local LLM validation flows, superadmins can now select a compatible `llm_inference` runtime just for the test action. This does not change the active deployment profile, and ModelOps records a failure instead of silently falling back when the chosen runtime is not actually serving the selected local artifact.
 
 Runtime inference routes such as `/v1/models/generate` and `/v1/models/inference` remain product-facing, but they now resolve eligibility strictly through ModelOps.
 

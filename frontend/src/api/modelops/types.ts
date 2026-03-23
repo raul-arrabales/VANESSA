@@ -172,6 +172,25 @@ export type ModelTestRun = {
   created_at?: string | null;
 };
 
+export type ManagedModelTestRuntime = {
+  provider_instance_id: string;
+  slug: string;
+  display_name: string;
+  provider_key: string;
+  endpoint_url: string;
+  adapter_kind: string;
+  enabled: boolean;
+  is_active: boolean;
+  reachable: boolean;
+  status_code: number;
+  matches_model: boolean;
+  matched_model_id?: string | null;
+  matched_model_display_name?: string | null;
+  match_source?: string | null;
+  matched_value?: string | null;
+  message?: string | null;
+};
+
 export type ModelTestResult = {
   kind: "llm" | "embeddings";
   success: boolean;

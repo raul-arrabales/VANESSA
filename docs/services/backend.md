@@ -101,12 +101,16 @@ Bootstrap defaults:
 - `GET /v1/modelops/models/{id}`
 - `POST /v1/modelops/models/{id}/register`
 - `POST /v1/modelops/models/{id}/validate`
+- `GET /v1/modelops/models/{id}/tests`
+- `GET /v1/modelops/models/{id}/test-runtimes`
+- `POST /v1/modelops/models/{id}/test`
 - `POST /v1/modelops/models/{id}/activate`
 - `POST /v1/modelops/models/{id}/deactivate`
 - `POST /v1/modelops/models/{id}/unregister`
 - `DELETE /v1/modelops/models/{id}`
 - `GET /v1/modelops/models/{id}/usage`
 - `GET /v1/modelops/models/{id}/validations`
+- Superadmins can inspect compatible `llm_inference` runtime providers for a local LLM test without changing the active deployment profile. Local ModelOps tests execute only when the selected runtime is actually serving the chosen managed model.
 - `GET /v1/modelops/credentials`
 - `POST /v1/modelops/credentials`
 - `DELETE /v1/modelops/credentials/{id}`

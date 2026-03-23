@@ -283,6 +283,81 @@ def test_admin_can_test_model_and_user_cannot(client, monkeypatch: pytest.Monkey
     assert user_response.status_code == 403
 
 
+def test_superadmin_can_fetch_test_runtimes_and_send_provider_override(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root-user",
+        password_hash=hash_password("pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    admin = user_store.create_user(
+        "ignored",
+        email="admin3@example.com",
+        username="admin-three",
+        password_hash=hash_password("pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    root_token = _token(test_client, root["username"], "pass-123")
+    admin_token = _token(test_client, admin["username"], "pass-123")
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        routes,
+        "get_model_test_runtimes",
+        lambda _db, **kwargs: {
+            "model_id": kwargs["model_id"],
+            "runtimes": [
+                {
+                    "provider_instance_id": "provider-1",
+                    "display_name": "vLLM local gateway",
+                    "matches_model": True,
+                    "reachable": True,
+                    "status_code": 200,
+                }
+            ],
+            "default_provider_instance_id": "provider-1",
+        },
+    )
+
+    def _run_model_test(_db, **kwargs):
+        captured.update(kwargs)
+        return {
+            "model": {"id": kwargs["model_id"], "name": "Qwen Local"},
+            "test_run": {"id": "test-run-2", "result": "success"},
+            "result": {"kind": "llm", "success": True, "response_text": "hello"},
+        }
+
+    monkeypatch.setattr(routes, "run_model_test", _run_model_test)
+
+    runtimes_response = test_client.get(
+        "/v1/modelops/models/Qwen--Qwen2.5-0.5B-Instruct/test-runtimes",
+        headers=_auth(root_token),
+    )
+    assert runtimes_response.status_code == 200
+    assert runtimes_response.get_json()["default_provider_instance_id"] == "provider-1"
+
+    forbidden_response = test_client.get(
+        "/v1/modelops/models/Qwen--Qwen2.5-0.5B-Instruct/test-runtimes",
+        headers=_auth(admin_token),
+    )
+    assert forbidden_response.status_code == 403
+
+    test_response = test_client.post(
+        "/v1/modelops/models/Qwen--Qwen2.5-0.5B-Instruct/test",
+        headers=_auth(root_token),
+        json={
+            "inputs": {"prompt": "hello"},
+            "provider_instance_id": "provider-1",
+        },
+    )
+    assert test_response.status_code == 200
+    assert captured["provider_instance_id"] == "provider-1"
+
+
 def test_validate_route_requires_test_run_id(client, monkeypatch: pytest.MonkeyPatch):
     test_client, user_store = client
     admin = user_store.create_user(

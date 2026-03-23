@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 from ..config import AuthConfig
 from ..repositories import modelops as modelops_repo
+from ..repositories import platform_control_plane as platform_repo
 from ..repositories.model_credentials import get_active_credential_secret_by_id
 from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model, serialize_model_test_run
 from .platform_adapters import http_json_request
+from .platform_service import ensure_platform_bootstrap_state, resolve_llm_inference_adapter
 from .runtime_profile_service import resolve_runtime_profile
+
+_TASK_LLM = modelops_repo.TASK_LLM
+_TASK_EMBEDDINGS = modelops_repo.TASK_EMBEDDINGS
+_CLOUD_LLM_PROVIDER_KEYS = {"openai_compatible_cloud_llm"}
 
 
 def get_model_tests(
@@ -69,6 +76,21 @@ def _credential_secret_for_model_test(
 
 
 def _extract_llm_response_text(payload: dict[str, Any]) -> str:
+    output = payload.get("output")
+    if isinstance(output, list) and output:
+        first = output[0]
+        if isinstance(first, dict):
+            content = first.get("content")
+            if isinstance(content, list):
+                text_parts: list[str] = []
+                for item in content:
+                    if isinstance(item, dict) and str(item.get("type", "")).strip().lower() == "text":
+                        text = str(item.get("text", "")).strip()
+                        if text:
+                            text_parts.append(text)
+                if text_parts:
+                    return "\n".join(text_parts)
+
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         return ""
@@ -198,6 +220,315 @@ def _execute_cloud_embeddings_test(
     return "Cloud embeddings test succeeded", request_payload, response_payload, result_payload, latency_ms
 
 
+def _normalized_identifier_candidates(value: Any) -> set[str]:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return set()
+
+    candidates = {raw_value.lower()}
+    if any(raw_value.startswith(prefix) for prefix in ("/", ".", "~")) or "/" in raw_value:
+        try:
+            candidates.add(str(Path(raw_value).expanduser().resolve(strict=False)).lower())
+        except OSError:
+            pass
+    return candidates
+
+
+def _managed_model_identifiers(row: dict[str, Any]) -> list[tuple[str, str]]:
+    artifact = row.get("artifact") if isinstance(row.get("artifact"), dict) else {}
+    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    identifiers = [
+        ("model_id", str(row.get("model_id") or "").strip()),
+        ("provider_model_id", str(row.get("provider_model_id") or "").strip()),
+        ("local_path", str(row.get("local_path") or "").strip()),
+        ("artifact.storage_path", str(artifact.get("storage_path") or "").strip()),
+        ("metadata.local_path", str(metadata.get("local_path") or "").strip()),
+        ("metadata.upstream_model", str(metadata.get("upstream_model") or "").strip()),
+    ]
+    return [(label, value) for label, value in identifiers if value]
+
+
+def _runtime_entry_identifiers(entry: dict[str, Any]) -> list[tuple[str, str]]:
+    metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+    identifiers = [
+        ("id", str(entry.get("id") or "").strip()),
+        ("provider_model_id", str(entry.get("provider_model_id") or "").strip()),
+        ("local_path", str(entry.get("local_path") or "").strip()),
+        ("upstream_model", str(entry.get("upstream_model") or "").strip()),
+        ("metadata.local_path", str(metadata.get("local_path") or "").strip()),
+        ("metadata.upstream_model", str(metadata.get("upstream_model") or "").strip()),
+    ]
+    return [(label, value) for label, value in identifiers if value]
+
+
+def _find_runtime_model_match(model_row: dict[str, Any], runtime_models: list[dict[str, Any]]) -> dict[str, str] | None:
+    managed_identifiers = _managed_model_identifiers(model_row)
+    for runtime_entry in runtime_models:
+        runtime_identifiers = _runtime_entry_identifiers(runtime_entry)
+        for managed_source, managed_value in managed_identifiers:
+            managed_candidates = _normalized_identifier_candidates(managed_value)
+            if not managed_candidates:
+                continue
+            for runtime_source, runtime_value in runtime_identifiers:
+                runtime_candidates = _normalized_identifier_candidates(runtime_value)
+                if runtime_candidates and managed_candidates.intersection(runtime_candidates):
+                    return {
+                        "runtime_model_id": str(runtime_entry.get("id") or "").strip(),
+                        "runtime_model_display_name": str(runtime_entry.get("display_name") or runtime_entry.get("id") or "").strip(),
+                        "managed_source": managed_source,
+                        "runtime_source": runtime_source,
+                        "matched_value": runtime_value,
+                    }
+    return None
+
+
+def _list_local_llm_test_provider_rows(database_url: str, *, config: AuthConfig) -> tuple[list[dict[str, Any]], str | None]:
+    ensure_platform_bootstrap_state(database_url, config)
+    provider_rows = [
+        row
+        for row in platform_repo.list_provider_instances(database_url)
+        if str(row.get("capability_key", "")).strip().lower() == "llm_inference"
+        and bool(row.get("enabled"))
+        and str(row.get("provider_key", "")).strip().lower() not in _CLOUD_LLM_PROVIDER_KEYS
+    ]
+    active_binding = platform_repo.get_active_binding_for_capability(database_url, capability_key="llm_inference")
+    active_provider_instance_id = (
+        str(active_binding.get("provider_instance_id") or "").strip() if isinstance(active_binding, dict) else None
+    ) or None
+    return provider_rows, active_provider_instance_id
+
+
+def _inspect_local_llm_test_runtime(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    model_row: dict[str, Any],
+    provider_row: dict[str, Any],
+    is_active: bool,
+) -> dict[str, Any]:
+    provider_instance_id = str(provider_row.get("id") or "").strip()
+    adapter = resolve_llm_inference_adapter(
+        database_url,
+        config,
+        provider_instance_id=provider_instance_id,
+    )
+    models_payload, status_code = adapter.list_models()
+    runtime_models = models_payload.get("data") if isinstance(models_payload, dict) else None
+    available_models = [item for item in runtime_models if isinstance(item, dict)] if isinstance(runtime_models, list) else []
+    reachable = models_payload is not None and 200 <= status_code < 300
+    match = _find_runtime_model_match(model_row, available_models) if reachable else None
+    message = (
+        "Runtime serves the selected local model"
+        if match
+        else "Runtime does not currently serve the selected local model"
+        if reachable
+        else "Runtime is unavailable"
+    )
+    return {
+        "provider_instance_id": provider_instance_id,
+        "slug": str(provider_row.get("slug") or "").strip(),
+        "display_name": str(provider_row.get("display_name") or provider_row.get("slug") or "").strip(),
+        "provider_key": str(provider_row.get("provider_key") or "").strip(),
+        "endpoint_url": str(provider_row.get("endpoint_url") or "").strip(),
+        "adapter_kind": str(provider_row.get("adapter_kind") or "").strip(),
+        "enabled": bool(provider_row.get("enabled")),
+        "is_active": is_active,
+        "reachable": reachable,
+        "status_code": status_code,
+        "matches_model": match is not None,
+        "matched_model_id": match["runtime_model_id"] if match is not None else None,
+        "matched_model_display_name": match["runtime_model_display_name"] if match is not None else None,
+        "match_source": (
+            f"{match['managed_source']} -> {match['runtime_source']}"
+            if match is not None
+            else None
+        ),
+        "matched_value": match["matched_value"] if match is not None else None,
+        "message": message,
+    }
+
+
+def get_model_test_runtimes(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    actor_user_id: int,
+    actor_role: str,
+    model_id: str,
+) -> dict[str, Any]:
+    row = get_accessible_model(
+        database_url,
+        config=config,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+        model_id=model_id,
+    )
+    can_manage_model(row, actor_user_id=actor_user_id, actor_role=actor_role, action="validate")
+
+    backend_kind = str(row.get("backend_kind", "")).strip().lower()
+    task_key = str(row.get("task_key", "")).strip().lower() or _TASK_LLM
+    if backend_kind != "local" or task_key != _TASK_LLM:
+        return {
+            "model_id": model_id,
+            "runtimes": [],
+            "default_provider_instance_id": None,
+        }
+
+    provider_rows, active_provider_instance_id = _list_local_llm_test_provider_rows(database_url, config=config)
+    runtimes = [
+        _inspect_local_llm_test_runtime(
+            database_url,
+            config=config,
+            model_row=row,
+            provider_row=provider_row,
+            is_active=str(provider_row.get("id") or "").strip() == active_provider_instance_id,
+        )
+        for provider_row in provider_rows
+    ]
+
+    default_runtime = next((item for item in runtimes if item["is_active"] and item["matches_model"]), None)
+    if default_runtime is None:
+        default_runtime = next((item for item in runtimes if item["matches_model"]), None)
+
+    return {
+        "model_id": model_id,
+        "runtimes": runtimes,
+        "default_provider_instance_id": (
+            str(default_runtime.get("provider_instance_id") or "").strip() if isinstance(default_runtime, dict) else None
+        )
+        or None,
+    }
+
+
+def _append_failed_test_run(
+    database_url: str,
+    *,
+    model_id: str,
+    task_key: str,
+    normalized_inputs: dict[str, str],
+    config_fingerprint: str,
+    actor_user_id: int,
+    summary: str,
+    error_details: dict[str, Any],
+    latency_ms: float | None = None,
+) -> dict[str, Any]:
+    return modelops_repo.append_model_test_run(
+        database_url,
+        model_id=model_id,
+        task_key=task_key,
+        result=modelops_repo.TEST_FAILURE,
+        summary=summary,
+        input_payload=normalized_inputs,
+        output_payload={},
+        error_details=error_details,
+        latency_ms=latency_ms,
+        config_fingerprint=config_fingerprint,
+        tested_by_user_id=actor_user_id,
+    )
+
+
+def _resolve_superadmin_local_llm_test_runtime(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    row: dict[str, Any],
+    provider_instance_id: str | None,
+) -> dict[str, Any]:
+    runtime_payload = get_model_test_runtimes(
+        database_url,
+        config=config,
+        actor_user_id=0,
+        actor_role="superadmin",
+        model_id=str(row.get("model_id") or ""),
+    )
+    runtimes = runtime_payload.get("runtimes") if isinstance(runtime_payload, dict) else []
+    runtime_options = [item for item in runtimes if isinstance(item, dict)]
+    if provider_instance_id:
+        selected = next(
+            (item for item in runtime_options if str(item.get("provider_instance_id") or "").strip() == provider_instance_id),
+            None,
+        )
+    else:
+        default_provider_instance_id = str(runtime_payload.get("default_provider_instance_id") or "").strip()
+        selected = next(
+            (
+                item
+                for item in runtime_options
+                if str(item.get("provider_instance_id") or "").strip() == default_provider_instance_id
+            ),
+            None,
+        )
+    return {
+        "selected_runtime": selected,
+        "runtime_options": runtime_options,
+        "default_provider_instance_id": str(runtime_payload.get("default_provider_instance_id") or "").strip() or None,
+    }
+
+
+def _execute_local_llm_test(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    row: dict[str, Any],
+    prompt: str,
+    provider_instance_id: str,
+    runtime_model_id: str,
+) -> tuple[str, dict[str, Any], dict[str, Any], dict[str, Any], float]:
+    adapter = resolve_llm_inference_adapter(
+        database_url,
+        config,
+        provider_instance_id=provider_instance_id,
+    )
+    request_payload = {
+        "provider_instance_id": provider_instance_id,
+        "model": runtime_model_id,
+        "input": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+        "allow_local_fallback": False,
+    }
+    started_at = perf_counter()
+    payload, status_code = adapter.chat_completion(
+        model=runtime_model_id,
+        messages=request_payload["input"],
+        max_tokens=64,
+        temperature=0,
+        allow_local_fallback=False,
+    )
+    latency_ms = (perf_counter() - started_at) * 1000
+    response_payload = payload if isinstance(payload, dict) else {}
+    if payload is None or status_code >= 400:
+        message = str(response_payload.get("message") or response_payload.get("error") or "Local LLM test failed")
+        raise ModelOpsError(
+            "model_test_failed",
+            message,
+            status_code=409,
+            details={
+                "summary": "Local LLM test failed",
+                "output_payload": response_payload,
+                "error_details": {
+                    "status_code": status_code,
+                    "message": message,
+                    "provider_instance_id": provider_instance_id,
+                    "runtime_model_id": runtime_model_id,
+                },
+                "latency_ms": latency_ms,
+            },
+        )
+    response_text = _extract_llm_response_text(response_payload)
+    result_payload = {
+        "kind": _TASK_LLM,
+        "success": True,
+        "response_text": response_text,
+        "latency_ms": latency_ms,
+        "metadata": {
+            "provider_instance_id": provider_instance_id,
+            "runtime_model_id": runtime_model_id,
+            "managed_model_id": str(row.get("model_id") or "").strip(),
+            "status_code": status_code,
+        },
+    }
+    return "Local LLM test succeeded", request_payload, response_payload, result_payload, latency_ms
+
+
 def run_model_test(
     database_url: str,
     *,
@@ -206,6 +537,7 @@ def run_model_test(
     actor_role: str,
     model_id: str,
     inputs: dict[str, Any],
+    provider_instance_id: str | None = None,
 ) -> dict[str, Any]:
     row = get_accessible_model(
         database_url,
@@ -233,18 +565,15 @@ def run_model_test(
     runtime_mode_policy = str(row.get("runtime_mode_policy", "")).strip().lower()
 
     if runtime_profile != "online" and runtime_mode_policy == "online_only":
-        test_run = modelops_repo.append_model_test_run(
+        test_run = _append_failed_test_run(
             database_url,
             model_id=model_id,
             task_key=task_key,
-            result=modelops_repo.TEST_FAILURE,
             summary="Cloud model tests require online runtime",
-            input_payload=normalized_inputs,
-            output_payload={},
             error_details={"error": "offline_not_allowed", "runtime_profile": runtime_profile},
-            latency_ms=None,
             config_fingerprint=config_fingerprint,
-            tested_by_user_id=actor_user_id,
+            normalized_inputs=normalized_inputs,
+            actor_user_id=actor_user_id,
         )
         raise ModelOpsError(
             "offline_not_allowed",
@@ -253,23 +582,196 @@ def run_model_test(
             details={"test_run": serialize_model_test_run(test_run)},
         )
 
+    if backend_kind == "local" and task_key == _TASK_LLM:
+        normalized_provider_instance_id = str(provider_instance_id or "").strip() or None
+        if actor_role.strip().lower() != "superadmin":
+            test_run = _append_failed_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                summary="Local LLM tests require superadmin runtime selection",
+                error_details={"error": "local_model_runtime_selection_required"},
+                config_fingerprint=config_fingerprint,
+                normalized_inputs=normalized_inputs,
+                actor_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                "local_model_runtime_selection_required",
+                "Local model testing requires a superadmin to choose a compatible runtime",
+                status_code=409,
+                details={"test_run": serialize_model_test_run(test_run)},
+            )
+
+        runtime_resolution = _resolve_superadmin_local_llm_test_runtime(
+            database_url,
+            config=config,
+            row=row,
+            provider_instance_id=normalized_provider_instance_id,
+        )
+        selected_runtime = runtime_resolution["selected_runtime"]
+        runtime_options = runtime_resolution["runtime_options"]
+        default_provider_instance_id = runtime_resolution["default_provider_instance_id"]
+
+        if normalized_provider_instance_id and selected_runtime is None:
+            test_run = _append_failed_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                summary="Selected local LLM test runtime was not found",
+                error_details={
+                    "error": "test_runtime_not_found",
+                    "provider_instance_id": normalized_provider_instance_id,
+                },
+                config_fingerprint=config_fingerprint,
+                normalized_inputs=normalized_inputs,
+                actor_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                "test_runtime_not_found",
+                "Selected test runtime was not found",
+                status_code=404,
+                details={"test_run": serialize_model_test_run(test_run)},
+            )
+
+        if selected_runtime is None:
+            test_run = _append_failed_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                summary="No compatible local runtime currently serves this model",
+                error_details={
+                    "error": "local_model_not_served_by_runtime",
+                    "runtime_count": len(runtime_options),
+                    "default_provider_instance_id": default_provider_instance_id,
+                },
+                config_fingerprint=config_fingerprint,
+                normalized_inputs=normalized_inputs,
+                actor_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                "local_model_not_served_by_runtime",
+                "No compatible runtime currently serves this local model",
+                status_code=409,
+                details={"test_run": serialize_model_test_run(test_run)},
+            )
+
+        if not bool(selected_runtime.get("reachable")):
+            test_run = _append_failed_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                summary="Selected local LLM test runtime is unavailable",
+                error_details={
+                    "error": "test_runtime_unreachable",
+                    "provider_instance_id": selected_runtime.get("provider_instance_id"),
+                    "status_code": selected_runtime.get("status_code"),
+                },
+                config_fingerprint=config_fingerprint,
+                normalized_inputs=normalized_inputs,
+                actor_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                "test_runtime_unreachable",
+                "Selected runtime is unavailable for local model testing",
+                status_code=502,
+                details={"test_run": serialize_model_test_run(test_run)},
+            )
+
+        if not bool(selected_runtime.get("matches_model")):
+            test_run = _append_failed_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                summary="Selected runtime does not serve this local model",
+                error_details={
+                    "error": "local_model_not_served_by_runtime",
+                    "provider_instance_id": selected_runtime.get("provider_instance_id"),
+                },
+                config_fingerprint=config_fingerprint,
+                normalized_inputs=normalized_inputs,
+                actor_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                "local_model_not_served_by_runtime",
+                "Selected runtime does not serve this local model",
+                status_code=409,
+                details={"test_run": serialize_model_test_run(test_run)},
+            )
+
+        try:
+            summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_llm_test(
+                database_url,
+                config=config,
+                row=row,
+                prompt=normalized_inputs["prompt"],
+                provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
+                runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
+            )
+            test_run = modelops_repo.append_model_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                result=modelops_repo.TEST_SUCCESS,
+                summary=summary,
+                input_payload=request_payload,
+                output_payload=output_payload,
+                error_details={},
+                latency_ms=latency_ms,
+                config_fingerprint=config_fingerprint,
+                tested_by_user_id=actor_user_id,
+            )
+        except ModelOpsError as exc:
+            error_details = exc.details.get("error_details") if isinstance(exc.details, dict) else {}
+            output_payload = exc.details.get("output_payload") if isinstance(exc.details, dict) else {}
+            latency_ms = exc.details.get("latency_ms") if isinstance(exc.details, dict) else None
+            summary = str(exc.details.get("summary") or exc.message) if isinstance(exc.details, dict) else exc.message
+            test_run = modelops_repo.append_model_test_run(
+                database_url,
+                model_id=model_id,
+                task_key=task_key,
+                result=modelops_repo.TEST_FAILURE,
+                summary=summary,
+                input_payload=normalized_inputs,
+                output_payload=output_payload if isinstance(output_payload, dict) else {},
+                error_details=error_details if isinstance(error_details, dict) else {"message": exc.message},
+                latency_ms=float(latency_ms) if isinstance(latency_ms, (float, int)) else None,
+                config_fingerprint=config_fingerprint,
+                tested_by_user_id=actor_user_id,
+            )
+            raise ModelOpsError(
+                exc.code,
+                exc.message,
+                status_code=exc.status_code,
+                details={"test_run": serialize_model_test_run(test_run)},
+            ) from exc
+        modelops_repo.append_audit_event(
+            database_url,
+            actor_user_id=actor_user_id,
+            event_type="model.tested",
+            target_type="model",
+            target_id=model_id,
+            payload={"task_key": task_key, "test_run_id": str(test_run.get("id")), "result": test_run.get("result")},
+        )
+        return {
+            "model": serialize_model(modelops_repo.get_model(database_url, model_id) or row),
+            "test_run": serialize_model_test_run(test_run),
+            "result": result_payload,
+        }
+
     if backend_kind != "external_api":
-        test_run = modelops_repo.append_model_test_run(
+        test_run = _append_failed_test_run(
             database_url,
             model_id=model_id,
             task_key=task_key,
-            result=modelops_repo.TEST_FAILURE,
-            summary="Local model testing is not available in the current platform runtime",
-            input_payload=normalized_inputs,
-            output_payload={},
-            error_details={"error": "local_prevalidation_execution_unavailable"},
-            latency_ms=None,
+            summary="Testing is not supported for this model runtime combination",
+            error_details={"error": "model_test_not_supported"},
             config_fingerprint=config_fingerprint,
-            tested_by_user_id=actor_user_id,
+            normalized_inputs=normalized_inputs,
+            actor_user_id=actor_user_id,
         )
         raise ModelOpsError(
             "model_test_not_supported",
-            "Testing unavailable for this local model in the current platform runtime",
+            "Testing unavailable for this model in the current configuration",
             status_code=409,
             details={"test_run": serialize_model_test_run(test_run)},
         )

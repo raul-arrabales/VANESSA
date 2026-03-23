@@ -5,6 +5,7 @@ import type { EmbeddingModelTestInput, ModelTestPanelRendererProps } from "../ty
 export default function EmbeddingModelTestPanel({
   isPending,
   defaultInputs,
+  runDisabled = false,
   onRun,
 }: ModelTestPanelRendererProps<EmbeddingModelTestInput>): JSX.Element {
   const { t } = useTranslation("common");
@@ -29,7 +30,7 @@ export default function EmbeddingModelTestPanel({
         <button
           type="button"
           className="btn btn-primary"
-          disabled={isPending || !text.trim()}
+          disabled={isPending || runDisabled || !text.trim()}
           onClick={() => void onRun({ text: text.trim() })}
         >
           {isPending ? t("modelOps.testing.running") : t("modelOps.actions.runTest")}

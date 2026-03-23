@@ -19,6 +19,7 @@ def register_modelops_models_routes(
     register_existing_model_fn,
     validate_model_fn,
     get_model_tests_fn,
+    get_model_test_runtimes_fn,
     run_model_test_fn,
     activate_model_fn,
     deactivate_model_fn,
@@ -170,6 +171,21 @@ def register_modelops_models_routes(
             return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)
         return jsonify(payload), 200
 
+    @bp.get("/v1/modelops/models/<model_id>/test-runtimes")
+    @require_role("superadmin")
+    def get_modelops_model_test_runtimes_route(model_id: str):
+        try:
+            payload = get_model_test_runtimes_fn(
+                config_getter().database_url,
+                config=config_getter(),
+                actor_user_id=int(g.current_user["id"]),
+                actor_role=str(g.current_user.get("role", "user")),
+                model_id=model_id,
+            )
+        except ModelOpsError as exc:
+            return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)
+        return jsonify(payload), 200
+
     @bp.post("/v1/modelops/models/<model_id>/test")
     @require_role("admin")
     def test_modelops_model_route(model_id: str):
@@ -179,6 +195,7 @@ def register_modelops_models_routes(
         raw_inputs = payload.get("inputs")
         if not isinstance(raw_inputs, dict):
             return json_error_fn(400, "invalid_payload", "inputs must be an object")
+        provider_instance_id = str(payload.get("provider_instance_id", "")).strip() or None
         try:
             result = run_model_test_fn(
                 config_getter().database_url,
@@ -187,6 +204,7 @@ def register_modelops_models_routes(
                 actor_role=str(g.current_user.get("role", "user")),
                 model_id=model_id,
                 inputs=raw_inputs,
+                provider_instance_id=provider_instance_id,
             )
         except ModelOpsError as exc:
             return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)

@@ -25,7 +25,7 @@ from ..services.modelops_queries import (
     get_model_validations,
     list_models,
 )
-from ..services.modelops_testing import get_model_tests, run_model_test, validate_model
+from ..services.modelops_testing import get_model_test_runtimes, get_model_tests, run_model_test, validate_model
 from ..services.model_support import parse_patterns, serialize_assignment, serialize_download_job
 from .modelops_access_routes import register_modelops_access_routes
 from .modelops_credentials_routes import register_modelops_credentials_routes
@@ -53,6 +53,7 @@ register_modelops_models_routes(
     register_existing_model_fn=lambda *args, **kwargs: register_existing_model(*args, **kwargs),
     validate_model_fn=lambda *args, **kwargs: validate_model(*args, **kwargs),
     get_model_tests_fn=lambda *args, **kwargs: get_model_tests(*args, **kwargs),
+    get_model_test_runtimes_fn=lambda *args, **kwargs: get_model_test_runtimes(*args, **kwargs),
     run_model_test_fn=lambda *args, **kwargs: run_model_test(*args, **kwargs),
     activate_model_fn=lambda *args, **kwargs: activate_model(*args, **kwargs),
     deactivate_model_fn=lambda *args, **kwargs: deactivate_model(*args, **kwargs),
