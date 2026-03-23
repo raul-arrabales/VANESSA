@@ -630,7 +630,9 @@
     "catalog": {
       "title": "Model catalog",
       "description": "Browse the models visible to your current role and move into detail pages for lifecycle work.",
-      "empty": "No models matched the current filters."
+      "empty": "No models matched the current filters.",
+      "validatedBadge": "Validated",
+      "notValidatedBadge": "Not validated"
     },
     "cloud": {
       "title": "Cloud model registration",

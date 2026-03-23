@@ -630,7 +630,9 @@
     "catalog": {
       "title": "Catalogo de modelos",
       "description": "Explora los modelos visibles para tu rol y entra a paginas de detalle para el trabajo de ciclo de vida.",
-      "empty": "Ningun modelo coincide con los filtros actuales."
+      "empty": "Ningun modelo coincide con los filtros actuales.",
+      "validatedBadge": "Validado",
+      "notValidatedBadge": "No validado"
     },
     "cloud": {
       "title": "Registro de modelos cloud",

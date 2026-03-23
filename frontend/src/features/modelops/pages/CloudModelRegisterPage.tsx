@@ -133,6 +133,8 @@ export default function CloudModelRegisterPage(): JSX.Element {
             models={recentModels}
             emptyLabel={t("modelOps.cloud.emptyRecent")}
             detailLabel={t("modelOps.actions.openDetail")}
+            validatedLabel={t("modelOps.catalog.validatedBadge")}
+            notValidatedLabel={t("modelOps.catalog.notValidatedBadge")}
           />
         )}
       </article>
