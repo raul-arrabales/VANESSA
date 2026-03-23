@@ -757,7 +757,8 @@
         "llmProvider": "LLM provider",
         "vectorProvider": "Vector provider",
         "providerForCapability": "{{capability}} provider",
-        "servedModelForCapability": "{{capability}} served model"
+        "servedModelsForCapability": "{{capability}} served models",
+        "defaultServedModelForCapability": "{{capability}} default served model"
       }
     },
     "capabilities": {
@@ -776,7 +777,8 @@
       "embeddingsReachable": "Embeddings reachable ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings unavailable",
       "bindingErrors": {
-        "served_model_required": "Select a served model in a deployment binding to validate embeddings."
+        "served_model_required": "Select served models in a deployment binding before validating this provider.",
+        "served_model_not_exposed": "Model {{modelId}} is not exposed by the provider as {{runtimeModelId}}."
       },
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
@@ -855,6 +857,7 @@
       "invalidJson": "{{field}} must be valid JSON object text.",
       "bindingRequired": "Both required capability bindings must be selected.",
       "servedModelRequired": "{{capability}} requires a served model.",
+      "defaultServedModelRequired": "{{capability}} requires a default served model.",
       "validationSuccess": "Validated provider {{slug}}.",
       "validationFailed": "Unable to validate provider.",
       "providerCreated": "Created provider {{name}}.",

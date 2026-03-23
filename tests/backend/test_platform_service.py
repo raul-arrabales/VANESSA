@@ -464,7 +464,7 @@ def test_openai_adapter_normalizes_openai_chat_payloads(monkeypatch: pytest.Monk
     assert status_code == 200
     assert seen_payloads == [
         {
-            "model": "local-llama-cpp-default",
+            "model": "allowed-model",
             "messages": [{"role": "user", "content": "hello"}],
             "max_tokens": 64,
             "temperature": 0.1,
@@ -490,8 +490,18 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
         created_profiles.append(slug)
         return {"id": f"{slug}-id"}
 
-    def _upsert_deployment_binding(_db, *, deployment_profile_id, capability_key, provider_instance_id, served_model_id=None, binding_config):
-        del served_model_id
+    def _upsert_deployment_binding(
+        _db,
+        *,
+        deployment_profile_id,
+        capability_key,
+        provider_instance_id,
+        served_model_ids=None,
+        default_served_model_id=None,
+        binding_config,
+    ):
+        del served_model_ids
+        del default_served_model_id
         del binding_config
         binding_calls.append((deployment_profile_id, capability_key, provider_instance_id))
         return {}
@@ -561,7 +571,7 @@ def test_ensure_platform_bootstrap_state_seeds_qdrant_profile_when_configured(mo
     monkeypatch.setattr(
         platform_service.platform_repo,
         "upsert_deployment_binding",
-        lambda _db, *, deployment_profile_id, capability_key, provider_instance_id, served_model_id=None, binding_config: (
+        lambda _db, *, deployment_profile_id, capability_key, provider_instance_id, served_model_ids=None, default_served_model_id=None, binding_config: (
             binding_calls.append((deployment_profile_id, capability_key, provider_instance_id)) or {}
         ),
     )
@@ -668,15 +678,20 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "deployment_profile_id": "deployment-1",
                 "deployment_profile_slug": deployment_slug,
                 "deployment_profile_display_name": "Runtime Deployment",
-                "served_model_id": "local-embed",
-                "served_model_name": "Local Embed",
-                "served_model_provider": "huggingface",
-                "served_model_backend_kind": "local",
-                "served_model_task_key": "embeddings",
-                "served_model_provider_model_id": "local-vllm-embeddings-default",
-                "served_model_local_path": "/models/embed",
-                "served_model_source_id": "hf/local-embed",
-                "served_model_availability": "offline_ready",
+                "served_models": [
+                    {
+                        "id": "local-embed",
+                        "name": "Local Embed",
+                        "provider": "huggingface",
+                        "backend": "local",
+                        "task_key": "embeddings",
+                        "provider_model_id": "local-vllm-embeddings-default",
+                        "local_path": "/models/embed",
+                        "source_id": "hf/local-embed",
+                        "availability": "offline_ready",
+                    }
+                ],
+                "default_served_model_id": "local-embed",
             }
         if capability_key == "sandbox_execution":
             return None
@@ -726,8 +741,9 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
                 "config": {"chat_completion_path": "/v1/chat/completions"},
-                "served_model_id": None,
-                "served_model": None,
+                "served_models": [],
+                "default_served_model_id": None,
+                "default_served_model": None,
                 "binding_config": {},
             },
             "embeddings": {
@@ -741,8 +757,21 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "healthcheck_url": "http://llm:8000/health",
                 "enabled": True,
                 "config": {"embeddings_path": "/v1/embeddings"},
-                "served_model_id": "local-embed",
-                "served_model": {
+                "served_models": [
+                    {
+                        "id": "local-embed",
+                        "name": "Local Embed",
+                        "provider": "huggingface",
+                        "backend": "local",
+                        "task_key": "embeddings",
+                        "provider_model_id": "local-vllm-embeddings-default",
+                        "local_path": "/models/embed",
+                        "source_id": "hf/local-embed",
+                        "availability": "offline_ready",
+                    }
+                ],
+                "default_served_model_id": "local-embed",
+                "default_served_model": {
                     "id": "local-embed",
                     "name": "Local Embed",
                     "provider": "huggingface",
@@ -770,8 +799,9 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 ),
                 "enabled": True,
                 "config": {},
-                "served_model_id": None,
-                "served_model": None,
+                "served_models": [],
+                "default_served_model_id": None,
+                "default_served_model": None,
                 "binding_config": {},
             },
         },
@@ -816,15 +846,20 @@ def test_get_active_platform_runtime_includes_optional_tool_runtime_bindings(mon
                 "deployment_profile_id": "deployment-1",
                 "deployment_profile_slug": "local-default",
                 "deployment_profile_display_name": "Local Default",
-                "served_model_id": "local-embed",
-                "served_model_name": "Local Embed",
-                "served_model_provider": "huggingface",
-                "served_model_backend_kind": "local",
-                "served_model_task_key": "embeddings",
-                "served_model_provider_model_id": "local-vllm-embeddings-default",
-                "served_model_local_path": "/models/embed",
-                "served_model_source_id": "hf/local-embed",
-                "served_model_availability": "offline_ready",
+                "served_models": [
+                    {
+                        "id": "local-embed",
+                        "name": "Local Embed",
+                        "provider": "huggingface",
+                        "backend": "local",
+                        "task_key": "embeddings",
+                        "provider_model_id": "local-vllm-embeddings-default",
+                        "local_path": "/models/embed",
+                        "source_id": "hf/local-embed",
+                        "availability": "offline_ready",
+                    }
+                ],
+                "default_served_model_id": "local-embed",
             },
             "vector_store": {
                 "capability_key": "vector_store",

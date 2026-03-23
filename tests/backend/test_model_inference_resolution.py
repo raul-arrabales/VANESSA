@@ -95,12 +95,23 @@ def test_inference_uses_canonical_local_llm_alias(client, monkeypatch: pytest.Mo
                 "Binding",
                 (),
                 {
+                    "served_models": [
+                        {
+                            "id": "Qwen--Qwen2.5-0.5B-Instruct",
+                            "name": "Qwen 0.5B",
+                            "backend": "local",
+                            "local_path": "local-vllm-default",
+                        }
+                    ],
                     "config": {
                         "canonical_local_model_id": "local-vllm-default",
                         "local_fallback_model_id": "local-vllm-default",
-                    }
+                    },
                 },
             )()
+
+        def list_models(self):
+            return {"data": [{"id": "local-vllm-default"}]}, 200
 
         def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
             self.calls.append(

@@ -45,6 +45,24 @@ def _platform_runtime(
                 "request_format": request_format,
                 "forced_model_id": "local-default-model",
             },
+            "served_models": [
+                {
+                    "id": "model.alpha",
+                    "name": "Model Alpha",
+                    "provider_model_id": "model.alpha",
+                },
+                {
+                    "id": "local-default-model",
+                    "name": "Local Default Model",
+                    "provider_model_id": "local-default-model",
+                },
+            ],
+            "default_served_model_id": "local-default-model",
+            "default_served_model": {
+                "id": "local-default-model",
+                "name": "Local Default Model",
+                "provider_model_id": "local-default-model",
+            },
             "binding_config": {},
         },
         "embeddings": {
@@ -61,6 +79,19 @@ def _platform_runtime(
                 "embeddings_path": "/v1/embeddings",
                 "forced_model_id": "local-vllm-embeddings-default",
                 **(embeddings_config or {}),
+            },
+            "served_models": [
+                {
+                    "id": "local-vllm-embeddings-default",
+                    "name": "Local Embeddings Default",
+                    "provider_model_id": "local-vllm-embeddings-default",
+                }
+            ],
+            "default_served_model_id": "local-vllm-embeddings-default",
+            "default_served_model": {
+                "id": "local-vllm-embeddings-default",
+                "name": "Local Embeddings Default",
+                "provider_model_id": "local-vllm-embeddings-default",
             },
             "binding_config": {},
         },

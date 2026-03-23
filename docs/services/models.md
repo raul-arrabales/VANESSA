@@ -17,7 +17,8 @@ Model management is now owned by ModelOps.
 - Control-plane APIs live under `/v1/modelops/*`
 - Canonical task classification uses `task_key` and `category`
 - Ownership and sharing use `owner_type`, `owner_user_id`, and `visibility_scope`
-- Deployment bindings reference ModelOps-managed inventory through `served_model_id`
+- Deployment bindings reference ModelOps-managed inventory through `served_model_ids` plus one `default_served_model_id`
+- Only ModelOps models that are both `active` and currently validated may be bound into platform deployments
 
 See [ModelOps](modelops.md) for lifecycle, validation, sharing, and API details.
 

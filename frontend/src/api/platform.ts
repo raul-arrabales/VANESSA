@@ -57,8 +57,19 @@ export type PlatformDeploymentBinding = {
     enabled: boolean;
     adapter_kind: string;
   };
-  served_model_id?: string | null;
-  served_model?: {
+  served_models: Array<{
+    id: string;
+    name?: string | null;
+    provider?: string | null;
+    backend?: string | null;
+    task_key?: string | null;
+    provider_model_id?: string | null;
+    local_path?: string | null;
+    source_id?: string | null;
+    availability?: string | null;
+  }>;
+  default_served_model_id?: string | null;
+  default_served_model?: {
     id: string;
     name?: string | null;
     provider?: string | null;
@@ -110,6 +121,12 @@ export type PlatformProviderValidation = {
     embeddings_status_code?: number;
     embedding_dimension?: number;
     binding_error?: string;
+    served_model_errors?: Array<{
+      code: string;
+      served_model_id?: string | null;
+      runtime_model_id?: string | null;
+      message?: string | null;
+    }>;
   };
 };
 
@@ -132,7 +149,8 @@ export type PlatformDeploymentMutationInput = {
   bindings: Array<{
     capability: string;
     provider_id: string;
-    served_model_id?: string | null;
+    served_model_ids?: string[];
+    default_served_model_id?: string | null;
     config?: Record<string, unknown>;
   }>;
 };

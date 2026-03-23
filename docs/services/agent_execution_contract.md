@@ -50,6 +50,24 @@
         "config": {
           "chat_completion_path": "/v1/chat/completions"
         },
+        "served_models": [
+          {
+            "id": "model.alpha",
+            "name": "Model Alpha",
+            "provider_model_id": "model.alpha"
+          },
+          {
+            "id": "model.default",
+            "name": "Default Model",
+            "provider_model_id": "model.default"
+          }
+        ],
+        "default_served_model_id": "model.default",
+        "default_served_model": {
+          "id": "model.default",
+          "name": "Default Model",
+          "provider_model_id": "model.default"
+        },
         "binding_config": {}
       },
       "embeddings": {
@@ -63,8 +81,20 @@
         "healthcheck_url": "http://llm:8000/health",
         "enabled": true,
         "config": {
-          "embeddings_path": "/v1/embeddings",
-          "forced_model_id": "local-vllm-embeddings-default"
+          "embeddings_path": "/v1/embeddings"
+        },
+        "served_models": [
+          {
+            "id": "local-vllm-embeddings-default",
+            "name": "Local Embeddings Default",
+            "provider_model_id": "local-vllm-embeddings-default"
+          }
+        ],
+        "default_served_model_id": "local-vllm-embeddings-default",
+        "default_served_model": {
+          "id": "local-vllm-embeddings-default",
+          "name": "Local Embeddings Default",
+          "provider_model_id": "local-vllm-embeddings-default"
         },
         "binding_config": {}
       },
@@ -170,9 +200,16 @@
 
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
+For model-bearing capabilities, the runtime snapshot is authoritative:
+
+- `llm_inference.served_models` is the allow-list of managed model ids that may execute through the active binding.
+- `llm_inference.default_served_model_id` is used when `input.model` is omitted.
+- `embeddings.default_served_model_id` is the embeddings model used for retrieval and vector ingestion.
+- Agent engine resolves the selected managed model to the provider-facing model id before issuing upstream requests.
+
 `input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
 
-`input.model` is optional and execution-scoped. When present, agent engine uses it as the requested LLM model instead of the agent spec default. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
+`input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.served_models`. When omitted, the active binding default is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 
 Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent tool catalog requires them. In the current convergence phase:
 

@@ -45,6 +45,7 @@ _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM infe
 _TASK_KEY_EMBEDDINGS = "embeddings"
 _TASK_KEY_LLM = "llm"
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
+_MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS}
 
 
 def _known_capability_keys(database_url: str) -> set[str]:
@@ -294,7 +295,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_LLM_INFERENCE,
         provider_instance_id=str(vllm_provider["id"]),
-        served_model_id=None,
+        served_model_ids=[],
+        default_served_model_id=None,
         binding_config={},
     )
     platform_repo.upsert_deployment_binding(
@@ -302,7 +304,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_EMBEDDINGS,
         provider_instance_id=str(embeddings_provider["id"]),
-        served_model_id=None,
+        served_model_ids=[],
+        default_served_model_id=None,
         binding_config={},
     )
     platform_repo.upsert_deployment_binding(
@@ -310,7 +313,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         deployment_profile_id=str(profile["id"]),
         capability_key=CAPABILITY_VECTOR_STORE,
         provider_instance_id=str(weaviate_provider["id"]),
-        served_model_id=None,
+        served_model_ids=[],
+        default_served_model_id=None,
         binding_config={},
     )
     if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -319,7 +323,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(profile["id"]),
             capability_key=CAPABILITY_SANDBOX_EXECUTION,
             provider_instance_id=str(sandbox_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
     if mcp_gateway_provider is not None:
@@ -328,7 +333,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(profile["id"]),
             capability_key=CAPABILITY_MCP_RUNTIME,
             provider_instance_id=str(mcp_gateway_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
 
@@ -346,7 +352,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=str(llama_cpp_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -354,7 +361,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_EMBEDDINGS,
             provider_instance_id=str(embeddings_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -362,7 +370,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(llama_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(weaviate_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -371,7 +380,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(llama_profile["id"]),
                 capability_key=CAPABILITY_SANDBOX_EXECUTION,
                 provider_instance_id=str(sandbox_provider["id"]),
-                served_model_id=None,
+                served_model_ids=[],
+                default_served_model_id=None,
                 binding_config={},
             )
         if mcp_gateway_provider is not None:
@@ -380,7 +390,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(llama_profile["id"]),
                 capability_key=CAPABILITY_MCP_RUNTIME,
                 provider_instance_id=str(mcp_gateway_provider["id"]),
-                served_model_id=None,
+                served_model_ids=[],
+                default_served_model_id=None,
                 binding_config={},
             )
 
@@ -398,7 +409,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=str(vllm_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -406,7 +418,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_EMBEDDINGS,
             provider_instance_id=str(embeddings_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         platform_repo.upsert_deployment_binding(
@@ -414,7 +427,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(qdrant_profile["id"]),
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=str(qdrant_provider["id"]),
-            served_model_id=None,
+            served_model_ids=[],
+            default_served_model_id=None,
             binding_config={},
         )
         if sandbox_provider is not None and sandbox_provider.get("id"):
@@ -423,7 +437,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(qdrant_profile["id"]),
                 capability_key=CAPABILITY_SANDBOX_EXECUTION,
                 provider_instance_id=str(sandbox_provider["id"]),
-                served_model_id=None,
+                served_model_ids=[],
+                default_served_model_id=None,
                 binding_config={},
             )
         if mcp_gateway_provider is not None:
@@ -432,7 +447,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 deployment_profile_id=str(qdrant_profile["id"]),
                 capability_key=CAPABILITY_MCP_RUNTIME,
                 provider_instance_id=str(mcp_gateway_provider["id"]),
-                served_model_id=None,
+                served_model_ids=[],
+                default_served_model_id=None,
                 binding_config={},
             )
 
@@ -706,7 +722,12 @@ def clone_deployment_profile(
                 {
                     "capability_key": str(binding["capability_key"]).strip().lower(),
                     "provider_instance_id": str(binding["provider_instance_id"]).strip(),
-                    "served_model_id": str(binding.get("served_model_id") or "").strip() or None,
+                    "served_model_ids": [
+                        str(model.get("id") or "").strip()
+                        for model in (binding.get("served_models") or [])
+                        if str(model.get("id") or "").strip()
+                    ],
+                    "default_served_model_id": str(binding.get("default_served_model_id") or "").strip() or None,
                     "binding_config": dict(binding.get("binding_config") or {}),
                 }
                 for binding in source_bindings
@@ -821,8 +842,9 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
         }
 
     if binding.capability_key == CAPABILITY_EMBEDDINGS:
-        health = OpenAICompatibleEmbeddingsAdapter(binding).health()
-        if not binding.served_model_id:
+        adapter = _adapter_from_binding(binding)
+        health = adapter.health()
+        if not binding.default_served_model_id:
             return {
                 "provider": _serialize_provider_row(provider_row),
                 "validation": {
@@ -832,8 +854,6 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
                     "binding_error": "served_model_required",
                 },
             }
-        adapter = _adapter_from_binding(binding)
-        health = adapter.health()
         embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
         embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
         embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
@@ -1202,7 +1222,18 @@ def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> Deployme
             raise PlatformControlPlaneError("invalid_binding", "Each binding must be an object", status_code=400)
         capability_key = str(item.get("capability", "")).strip().lower()
         provider_instance_id = str(item.get("provider_id", "")).strip()
-        served_model_id = str(item.get("served_model_id", "")).strip() or None
+        raw_served_model_ids = item.get("served_model_ids")
+        if raw_served_model_ids is None:
+            served_model_ids: list[str] = []
+        elif isinstance(raw_served_model_ids, list):
+            served_model_ids = [str(model_id).strip() for model_id in raw_served_model_ids if str(model_id).strip()]
+        else:
+            raise PlatformControlPlaneError(
+                "invalid_served_models",
+                "served_model_ids must be an array",
+                status_code=400,
+            )
+        default_served_model_id = str(item.get("default_served_model_id", "")).strip() or None
         if capability_key not in _known_capability_keys(database_url):
             raise PlatformControlPlaneError("invalid_capability", "Unsupported capability", status_code=400)
         if not provider_instance_id:
@@ -1212,7 +1243,8 @@ def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> Deployme
             DeploymentBindingInput(
                 capability_key=capability_key,
                 provider_instance_id=provider_instance_id,
-                served_model_id=served_model_id,
+                served_model_ids=served_model_ids,
+                default_served_model_id=default_served_model_id,
                 binding_config=dict(binding_config),
             )
         )
@@ -1330,11 +1362,12 @@ def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBin
             {
                 "capability_key": binding.capability_key,
                 "provider_instance_id": binding.provider_instance_id,
-                "served_model_id": _validate_binding_served_model(
+                **_validate_binding_served_models(
                     database_url,
                     provider_row=provider,
                     capability_key=binding.capability_key,
-                    served_model_id=binding.served_model_id,
+                    served_model_ids=binding.served_model_ids,
+                    default_served_model_id=binding.default_served_model_id,
                 ),
                 "binding_config": binding.binding_config,
             }
@@ -1366,6 +1399,8 @@ def _validate_deployment_profile_bindings(
         reachable = bool(health.get("reachable"))
         models_reachable = validation.get("models_reachable")
         embeddings_reachable = validation.get("embeddings_reachable")
+        binding_error = str(validation.get("binding_error") or "").strip() or None
+        served_model_errors = validation.get("served_model_errors")
         capability = str(binding.get("capability_key", "")).strip().lower()
         failed = (
             not reachable
@@ -1373,6 +1408,8 @@ def _validate_deployment_profile_bindings(
             or (capability == CAPABILITY_EMBEDDINGS and embeddings_reachable is False)
             or (capability == CAPABILITY_SANDBOX_EXECUTION and validation.get("execute_reachable") is False)
             or (capability == CAPABILITY_MCP_RUNTIME and validation.get("invoke_reachable") is False)
+            or bool(binding_error)
+            or (isinstance(served_model_errors, list) and len(served_model_errors) > 0)
         )
         if failed:
             failures.append(
@@ -1405,13 +1442,25 @@ def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
     if binding.capability_key == CAPABILITY_LLM_INFERENCE:
         health = adapter.health()
         models_payload, models_status = adapter.list_models()
+        served_model_errors = _validate_bound_models_against_provider_inventory(
+            binding,
+            models_payload if models_payload is not None and 200 <= models_status < 300 else None,
+        )
         return {
             "health": health,
             "models_reachable": models_payload is not None and 200 <= models_status < 300,
             "models_status_code": models_status,
+            "served_model_errors": served_model_errors,
         }
     if binding.capability_key == CAPABILITY_EMBEDDINGS:
         health = adapter.health()
+        if not binding.default_served_model_id:
+            return {
+                "health": health,
+                "embeddings_reachable": False,
+                "embeddings_status_code": 409,
+                "binding_error": "served_model_required",
+            }
         embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
         embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
         embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
@@ -1444,90 +1493,181 @@ def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
 
 
-def _validate_binding_served_model(
+def _validate_binding_served_models(
     database_url: str,
     *,
     provider_row: dict[str, Any],
     capability_key: str,
-    served_model_id: str | None,
-) -> str | None:
+    served_model_ids: list[str],
+    default_served_model_id: str | None,
+) -> dict[str, Any]:
     normalized_capability = capability_key.strip().lower()
-    normalized_served_model_id = str(served_model_id or "").strip() or None
-    if normalized_capability != CAPABILITY_EMBEDDINGS:
-        return normalized_served_model_id
-    if not normalized_served_model_id:
+    normalized_served_model_ids = _normalize_served_model_ids(served_model_ids)
+    normalized_default = str(default_served_model_id or "").strip() or None
+    requires_models = normalized_capability in _MODEL_BEARING_CAPABILITIES
+    if not requires_models:
+        if normalized_served_model_ids or normalized_default:
+            raise PlatformControlPlaneError(
+                "served_models_not_allowed",
+                f"Capability '{normalized_capability}' does not support served models",
+                status_code=400,
+            )
+        return {"served_model_ids": [], "default_served_model_id": None}
+    if not normalized_served_model_ids:
         raise PlatformControlPlaneError(
             "served_model_required",
-            "Embeddings bindings require a served_model_id",
+            f"{normalized_capability} bindings require at least one served model",
             status_code=400,
         )
+    if not normalized_default:
+        raise PlatformControlPlaneError(
+            "default_served_model_required",
+            "default_served_model_id is required when served_model_ids are present",
+            status_code=400,
+        )
+    if normalized_default not in normalized_served_model_ids:
+        raise PlatformControlPlaneError(
+            "default_served_model_not_bound",
+            "default_served_model_id must be present in served_model_ids",
+            status_code=400,
+            details={"default_served_model_id": normalized_default},
+        )
 
-    model_row = get_model_by_id(database_url, normalized_served_model_id)
+    for model_id in normalized_served_model_ids:
+        _validate_binding_served_model_row(
+            database_url,
+            provider_row=provider_row,
+            capability_key=normalized_capability,
+            served_model_id=model_id,
+        )
+    return {
+        "served_model_ids": normalized_served_model_ids,
+        "default_served_model_id": normalized_default,
+    }
+
+
+def _normalize_served_model_ids(served_model_ids: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for model_id in served_model_ids:
+        normalized_model_id = str(model_id).strip()
+        if not normalized_model_id:
+            continue
+        if normalized_model_id in seen:
+            raise PlatformControlPlaneError(
+                "duplicate_served_model",
+                "A deployment binding cannot include the same served model more than once",
+                status_code=400,
+                details={"served_model_id": normalized_model_id},
+            )
+        seen.add(normalized_model_id)
+        normalized.append(normalized_model_id)
+    return normalized
+
+
+def _validate_binding_served_model_row(
+    database_url: str,
+    *,
+    provider_row: dict[str, Any],
+    capability_key: str,
+    served_model_id: str,
+) -> None:
+    model_row = get_model_by_id(database_url, served_model_id)
     if model_row is None:
         raise PlatformControlPlaneError(
             "served_model_not_found",
             "Served model was not found",
             status_code=404,
-            details={"served_model_id": normalized_served_model_id},
+            details={"served_model_id": served_model_id},
         )
 
+    expected_task_key = _TASK_KEY_LLM if capability_key == CAPABILITY_LLM_INFERENCE else _TASK_KEY_EMBEDDINGS
     task_key = str(model_row.get("task_key", "")).strip().lower()
-    if task_key != _TASK_KEY_EMBEDDINGS:
+    if task_key != expected_task_key:
         raise PlatformControlPlaneError(
             "served_model_task_mismatch",
-            "Embeddings bindings require a model with task_key=embeddings",
+            f"{capability_key} bindings require a model with task_key={expected_task_key}",
             status_code=400,
-            details={"served_model_id": normalized_served_model_id, "task_key": model_row.get("task_key")},
+            details={"served_model_id": served_model_id, "task_key": model_row.get("task_key")},
         )
     if str(model_row.get("lifecycle_state", "")).strip().lower() != "active":
         raise PlatformControlPlaneError(
             "served_model_not_active",
-            "Embeddings bindings require an active model",
+            f"{capability_key} bindings require an active model",
             status_code=409,
-            details={"served_model_id": normalized_served_model_id},
+            details={"served_model_id": served_model_id},
         )
     if not bool(model_row.get("is_validation_current")) or str(model_row.get("last_validation_status", "")).strip().lower() != "success":
         raise PlatformControlPlaneError(
             "served_model_not_validated",
-            "Embeddings bindings require a validated model",
+            f"{capability_key} bindings require a validated model",
             status_code=409,
-            details={"served_model_id": normalized_served_model_id},
+            details={"served_model_id": served_model_id},
         )
 
     if _is_cloud_provider_row(provider_row):
         if str(model_row.get("backend_kind", "")).strip().lower() != "external_api":
             raise PlatformControlPlaneError(
                 "served_model_backend_mismatch",
-                "Cloud embeddings providers require an external_api embedding model",
+                "Cloud providers require an external_api model",
                 status_code=400,
-                details={"served_model_id": normalized_served_model_id},
+                details={"served_model_id": served_model_id},
             )
         if not str(model_row.get("provider_model_id", "")).strip():
             raise PlatformControlPlaneError(
                 "served_model_provider_model_id_required",
-                "Cloud embeddings providers require provider_model_id on the selected model",
+                "Cloud providers require provider_model_id on the selected model",
                 status_code=400,
-                details={"served_model_id": normalized_served_model_id},
+                details={"served_model_id": served_model_id},
             )
-        return normalized_served_model_id
+        return
 
     backend_kind = str(model_row.get("backend_kind", "")).strip().lower()
     availability = str(model_row.get("availability", "")).strip().lower()
     if backend_kind != "local" and availability != "offline_ready":
         raise PlatformControlPlaneError(
             "served_model_backend_mismatch",
-            "Local embeddings providers require a local or offline-ready embedding model",
+            "Local providers require a local or offline-ready model",
             status_code=400,
-            details={"served_model_id": normalized_served_model_id},
+            details={"served_model_id": served_model_id},
         )
     if not _runtime_model_identifier(model_row):
         raise PlatformControlPlaneError(
             "served_model_runtime_id_required",
-            "Selected embedding model must define provider_model_id or local_path",
+            "Selected model must define provider_model_id or local_path",
             status_code=400,
-            details={"served_model_id": normalized_served_model_id},
+            details={"served_model_id": served_model_id},
         )
-    return normalized_served_model_id
+
+
+def _validate_bound_models_against_provider_inventory(
+    binding: ProviderBinding,
+    models_payload: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if not binding.served_models:
+        return [{"code": "served_model_required", "message": "At least one served model is required"}]
+    if models_payload is None:
+        return []
+    model_entries = models_payload.get("data") if isinstance(models_payload.get("data"), list) else []
+    available_ids = {
+        str(item.get("id", "")).strip()
+        for item in model_entries
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    if not available_ids:
+        return []
+    errors: list[dict[str, Any]] = []
+    for served_model in binding.served_models:
+        runtime_identifier = _runtime_identifier_for_served_model(served_model)
+        if runtime_identifier and runtime_identifier not in available_ids:
+            errors.append(
+                {
+                    "code": "served_model_not_exposed",
+                    "served_model_id": served_model.get("id"),
+                    "runtime_model_id": runtime_identifier,
+                }
+            )
+    return errors
 
 
 def _runtime_model_identifier(model_row: dict[str, Any]) -> str:
@@ -1541,20 +1681,23 @@ def _is_cloud_provider_row(provider_row: dict[str, Any]) -> bool:
     return provider_key in _CLOUD_PROVIDER_KEYS
 
 
-def _serialize_served_model_row(row: dict[str, Any]) -> dict[str, Any] | None:
-    served_model_id = str(row.get("served_model_id", "")).strip()
-    if not served_model_id:
-        return None
+def _runtime_identifier_for_served_model(served_model: dict[str, Any]) -> str:
+    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+    local_path = str(served_model.get("local_path", "")).strip()
+    return provider_model_id or local_path
+
+
+def _serialize_served_model(model: dict[str, Any]) -> dict[str, Any]:
     return {
-        "id": served_model_id,
-        "name": row.get("served_model_name"),
-        "provider": row.get("served_model_provider"),
-        "backend": row.get("served_model_backend_kind"),
-        "task_key": row.get("served_model_task_key"),
-        "provider_model_id": row.get("served_model_provider_model_id"),
-        "local_path": row.get("served_model_local_path"),
-        "source_id": row.get("served_model_source_id"),
-        "availability": row.get("served_model_availability"),
+        "id": str(model.get("id") or "").strip(),
+        "name": model.get("name"),
+        "provider": model.get("provider"),
+        "backend": model.get("backend"),
+        "task_key": model.get("task_key"),
+        "provider_model_id": model.get("provider_model_id"),
+        "local_path": model.get("local_path"),
+        "source_id": model.get("source_id"),
+        "availability": model.get("availability"),
     }
 
 
@@ -1601,8 +1744,9 @@ def _serialize_runtime_binding(binding: ProviderBinding) -> dict[str, Any]:
         "healthcheck_url": binding.healthcheck_url,
         "enabled": binding.enabled,
         "config": dict(binding.config),
-        "served_model_id": binding.served_model_id,
-        "served_model": dict(binding.served_model) if binding.served_model else None,
+        "served_models": [_serialize_served_model(model) for model in binding.served_models],
+        "default_served_model_id": binding.default_served_model_id,
+        "default_served_model": _serialize_served_model(binding.default_served_model) if binding.default_served_model else None,
         "binding_config": dict(binding.binding_config),
     }
 
@@ -1634,8 +1778,17 @@ def _serialize_deployment_profile(profile: dict[str, Any], bindings: list[dict[s
                     "enabled": bool(binding["enabled"]),
                     "adapter_kind": binding["adapter_kind"],
                 },
-                "served_model_id": str(binding.get("served_model_id") or "").strip() or None,
-                "served_model": _serialize_served_model_row(binding),
+                "served_models": [
+                    _serialize_served_model(model)
+                    for model in (binding.get("served_models") or [])
+                    if isinstance(model, dict)
+                ],
+                "default_served_model_id": str(binding.get("default_served_model_id") or "").strip() or None,
+                "default_served_model": (
+                    _serialize_served_model(binding["default_served_model"])
+                    if isinstance(binding.get("default_served_model"), dict)
+                    else None
+                ),
                 "config": dict(binding.get("binding_config") or {}),
             }
             for binding in bindings

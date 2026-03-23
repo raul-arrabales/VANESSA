@@ -98,7 +98,24 @@ def test_generate_route_enforces_modelops_eligibility(client, monkeypatch: pytes
 
     class FakeAdapter:
         def __init__(self):
-            self.binding = type("Binding", (), {"config": {"canonical_local_model_id": "allowed-model"}})()
+            self.binding = type(
+                "Binding",
+                (),
+                {
+                    "config": {"canonical_local_model_id": "allowed-model"},
+                    "served_models": [
+                        {
+                            "id": "allowed-model",
+                            "name": "Allowed Model",
+                            "backend": "local",
+                            "local_path": "allowed-model",
+                        }
+                    ],
+                },
+            )()
+
+        def list_models(self):
+            return {"data": [{"id": "allowed-model"}]}, 200
 
         def chat_completion(self, *, model, messages, max_tokens, temperature, allow_local_fallback):
             seen_payload.update(

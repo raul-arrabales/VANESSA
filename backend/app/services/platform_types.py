@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -40,11 +40,23 @@ class ProviderBinding:
     deployment_profile_id: str
     deployment_profile_slug: str
     deployment_profile_display_name: str
-    served_model_id: str | None = None
-    served_model: dict[str, Any] | None = None
+    served_models: list[dict[str, Any]] = field(default_factory=list)
+    default_served_model_id: str | None = None
+    default_served_model: dict[str, Any] | None = None
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "ProviderBinding":
+        served_models = _served_models_from_row(row)
+        default_served_model_id = (
+            str(row.get("default_served_model_id", "")).strip()
+            or str(row.get("served_model_id", "")).strip()
+            or None
+        )
+        default_served_model = (
+            dict(row.get("default_served_model"))
+            if isinstance(row.get("default_served_model"), dict)
+            else next((dict(model) for model in served_models if str(model.get("id", "")).strip() == default_served_model_id), None)
+        )
         return cls(
             capability_key=str(row.get("capability_key", "")).strip().lower(),
             provider_instance_id=str(row.get("provider_instance_id") or row.get("id") or "").strip(),
@@ -63,12 +75,9 @@ class ProviderBinding:
             enabled=bool(row.get("enabled", True)),
             adapter_kind=str(row.get("adapter_kind", "")).strip().lower(),
             config=dict(row.get("config_json") or row.get("config") or {}),
-            served_model_id=str(row.get("served_model_id", "")).strip() or None,
-            served_model=(
-                dict(row.get("served_model"))
-                if isinstance(row.get("served_model"), dict)
-                else _served_model_from_row(row)
-            ),
+            served_models=served_models,
+            default_served_model_id=default_served_model_id,
+            default_served_model=default_served_model,
             binding_config=dict(row.get("binding_config") or {}),
             deployment_profile_id=str(row.get("deployment_profile_id", "")).strip(),
             deployment_profile_slug=str(row.get("deployment_profile_slug", "")).strip(),
@@ -80,7 +89,8 @@ class ProviderBinding:
 class DeploymentBindingInput:
     capability_key: str
     provider_instance_id: str
-    served_model_id: str | None
+    served_model_ids: list[str]
+    default_served_model_id: str | None
     binding_config: dict[str, Any]
 
 
@@ -92,18 +102,27 @@ class DeploymentProfileCreateInput:
     bindings: list[DeploymentBindingInput]
 
 
-def _served_model_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
-    model_id = str(row.get("served_model_id", "")).strip()
-    if not model_id:
-        return None
-    return {
-        "id": model_id,
-        "name": row.get("served_model_name"),
-        "provider": row.get("served_model_provider"),
-        "backend": row.get("served_model_backend_kind"),
-        "task_key": row.get("served_model_task_key"),
-        "provider_model_id": row.get("served_model_provider_model_id"),
-        "local_path": row.get("served_model_local_path"),
-        "source_id": row.get("served_model_source_id"),
-        "availability": row.get("served_model_availability"),
-    }
+def _served_models_from_row(row: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_models = row.get("served_models")
+    if isinstance(raw_models, list):
+        normalized: list[dict[str, Any]] = []
+        for item in raw_models:
+            if isinstance(item, dict):
+                normalized.append(dict(item))
+        return normalized
+    legacy_model_id = str(row.get("served_model_id", "")).strip()
+    if legacy_model_id:
+        return [
+            {
+                "id": legacy_model_id,
+                "name": row.get("served_model_name"),
+                "provider": row.get("served_model_provider"),
+                "backend": row.get("served_model_backend_kind"),
+                "task_key": row.get("served_model_task_key"),
+                "provider_model_id": row.get("served_model_provider_model_id"),
+                "local_path": row.get("served_model_local_path"),
+                "source_id": row.get("served_model_source_id"),
+                "availability": row.get("served_model_availability"),
+            }
+        ]
+    return []

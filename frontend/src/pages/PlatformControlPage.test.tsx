@@ -155,7 +155,36 @@ const providersFixture = [
   },
 ];
 
-const modelCatalogFixture: ManagedModel[] = [
+const llmModelsFixture: ManagedModel[] = [
+  {
+    id: "gpt-5",
+    name: "GPT-5",
+    provider: "openai",
+    backend: "external_api",
+    source: "external_provider",
+    availability: "online_only",
+    task_key: "llm",
+    category: "generative",
+    lifecycle_state: "active",
+    is_validation_current: true,
+    last_validation_status: "success",
+  },
+  {
+    id: "gpt-4.1",
+    name: "GPT-4.1",
+    provider: "openai",
+    backend: "external_api",
+    source: "external_provider",
+    availability: "online_only",
+    task_key: "llm",
+    category: "generative",
+    lifecycle_state: "active",
+    is_validation_current: true,
+    last_validation_status: "success",
+  },
+];
+
+const embeddingsModelsFixture: ManagedModel[] = [
   {
     id: "text-embedding-3-small",
     name: "text-embedding-3-small",
@@ -190,6 +219,9 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "openai_compatible_llm",
         },
+        served_models: [],
+        default_served_model_id: null,
+        default_served_model: null,
         config: {},
       },
       {
@@ -203,8 +235,16 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "openai_compatible_embeddings",
         },
-        served_model_id: "text-embedding-3-small",
-        served_model: {
+        served_models: [
+          {
+            id: "text-embedding-3-small",
+            name: "text-embedding-3-small",
+            task_key: "embeddings",
+            backend: "external_api",
+          },
+        ],
+        default_served_model_id: "text-embedding-3-small",
+        default_served_model: {
           id: "text-embedding-3-small",
           name: "text-embedding-3-small",
           task_key: "embeddings",
@@ -223,6 +263,9 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "weaviate_http",
         },
+        served_models: [],
+        default_served_model_id: null,
+        default_served_model: null,
         config: {},
       },
     ],
@@ -245,6 +288,9 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "openai_compatible_llm",
         },
+        served_models: [],
+        default_served_model_id: null,
+        default_served_model: null,
         config: {},
       },
       {
@@ -258,8 +304,16 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "openai_compatible_embeddings",
         },
-        served_model_id: "text-embedding-3-small",
-        served_model: {
+        served_models: [
+          {
+            id: "text-embedding-3-small",
+            name: "text-embedding-3-small",
+            task_key: "embeddings",
+            backend: "external_api",
+          },
+        ],
+        default_served_model_id: "text-embedding-3-small",
+        default_served_model: {
           id: "text-embedding-3-small",
           name: "text-embedding-3-small",
           task_key: "embeddings",
@@ -278,6 +332,9 @@ const deploymentsFixture: PlatformDeploymentProfile[] = [
           enabled: true,
           adapter_kind: "weaviate_http",
         },
+        served_models: [],
+        default_served_model_id: null,
+        default_served_model: null,
         config: {},
       },
     ],
@@ -317,7 +374,15 @@ describe("PlatformControlPage", () => {
     vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(providersFixture);
     vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue(deploymentsFixture);
     vi.mocked(platformApi.listPlatformActivationAudit).mockResolvedValue(activationAuditFixture);
-    vi.mocked(modelsApi.listModelOpsModels).mockResolvedValue(modelCatalogFixture);
+    vi.mocked(modelsApi.listModelOpsModels).mockImplementation(async (_token, options) => {
+      if (options?.capability === "llm_inference") {
+        return llmModelsFixture;
+      }
+      if (options?.capability === "embeddings") {
+        return embeddingsModelsFixture;
+      }
+      return [...llmModelsFixture, ...embeddingsModelsFixture];
+    });
   });
 
   it("loads and renders capability, provider, deployment, and audit data", async () => {
@@ -425,6 +490,75 @@ describe("PlatformControlPage", () => {
         await t("platformControl.forms.deployment.providerForCapability", { capability: "Embeddings" }),
       ),
     ).toBeVisible();
+  });
+
+  it("submits multi-model deployment bindings with an explicit default", async () => {
+    vi.mocked(platformApi.createDeploymentProfile).mockResolvedValue({
+      ...deploymentsFixture[1],
+      id: "deployment-3",
+      slug: "cloud-profile",
+      display_name: "Cloud Profile",
+    });
+
+    await renderPage();
+
+    await userEvent.type(screen.getAllByLabelText(await t("platformControl.forms.deployment.slug"))[0], "cloud-profile");
+    await userEvent.type(screen.getAllByLabelText(await t("platformControl.forms.deployment.displayName"))[1], "Cloud Profile");
+
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "LLM inference" })),
+      "provider-1",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.servedModelsForCapability", { capability: "LLM inference" })),
+      ["gpt-5", "gpt-4.1"],
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.defaultServedModelForCapability", { capability: "LLM inference" })),
+      "gpt-4.1",
+    );
+
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "Embeddings" })),
+      "provider-embeddings",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.servedModelsForCapability", { capability: "Embeddings" })),
+      ["text-embedding-3-small"],
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.defaultServedModelForCapability", { capability: "Embeddings" })),
+      "text-embedding-3-small",
+    );
+
+    await userEvent.selectOptions(
+      screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "Vector store" })),
+      "provider-2",
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.createDeployment") }));
+
+    await waitFor(() => {
+      expect(platformApi.createDeploymentProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: "cloud-profile",
+          display_name: "Cloud Profile",
+          bindings: expect.arrayContaining([
+            expect.objectContaining({
+              capability: "llm_inference",
+              served_model_ids: ["gpt-5", "gpt-4.1"],
+              default_served_model_id: "gpt-4.1",
+            }),
+            expect.objectContaining({
+              capability: "embeddings",
+              served_model_ids: ["text-embedding-3-small"],
+              default_served_model_id: "text-embedding-3-small",
+            }),
+          ]),
+        }),
+        "token",
+      );
+    });
   });
 
   it("confirms activation, activates the deployment, and refreshes state", async () => {

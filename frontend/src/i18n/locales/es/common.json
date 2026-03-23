@@ -757,7 +757,8 @@
         "llmProvider": "Proveedor LLM",
         "vectorProvider": "Proveedor vectorial",
         "providerForCapability": "Proveedor de {{capability}}",
-        "servedModelForCapability": "Modelo servido de {{capability}}"
+        "servedModelsForCapability": "Modelos servidos de {{capability}}",
+        "defaultServedModelForCapability": "Modelo servido por defecto de {{capability}}"
       }
     },
     "capabilities": {
@@ -776,7 +777,8 @@
       "embeddingsReachable": "Embeddings accesibles ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings no accesibles",
       "bindingErrors": {
-        "served_model_required": "Selecciona un modelo servido en un despliegue para validar embeddings."
+        "served_model_required": "Selecciona modelos servidos en un despliegue antes de validar este proveedor.",
+        "served_model_not_exposed": "El proveedor no expone el modelo {{modelId}} como {{runtimeModelId}}."
       },
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
@@ -855,6 +857,7 @@
       "invalidJson": "{{field}} debe ser texto JSON de objeto valido.",
       "bindingRequired": "Deben seleccionarse ambos enlaces de capacidad requeridos.",
       "servedModelRequired": "{{capability}} requiere un modelo servido.",
+      "defaultServedModelRequired": "{{capability}} requiere un modelo servido por defecto.",
       "validationSuccess": "Proveedor {{slug}} validado.",
       "validationFailed": "No se pudo validar el proveedor.",
       "providerCreated": "Proveedor {{name}} creado.",

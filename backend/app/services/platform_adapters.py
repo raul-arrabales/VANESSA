@@ -142,7 +142,7 @@ def _openai_compatible_headers(binding: ProviderBinding) -> dict[str, str]:
 
 
 def _served_model_runtime_identifier(binding: ProviderBinding) -> str:
-    served_model = binding.served_model or {}
+    served_model = binding.default_served_model or {}
     provider_model_id = str(served_model.get("provider_model_id", "")).strip()
     local_path = str(served_model.get("local_path", "")).strip()
     return provider_model_id or local_path
@@ -338,7 +338,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         temperature: float | None,
         allow_local_fallback: bool,
     ) -> tuple[dict[str, Any] | None, int]:
-        effective_model = str(self.binding.config.get("forced_model_id", "")).strip() or model
+        effective_model = model or str(self.binding.config.get("forced_model_id", "")).strip()
         payload: dict[str, Any] = self._build_chat_payload(model=effective_model, messages=messages)
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
@@ -387,7 +387,7 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         temperature: float | None,
         allow_local_fallback: bool,
     ) -> Iterator[dict[str, Any]]:
-        effective_model = str(self.binding.config.get("forced_model_id", "")).strip() or model
+        effective_model = model or str(self.binding.config.get("forced_model_id", "")).strip()
         payload: dict[str, Any] = self._build_chat_payload(model=effective_model, messages=messages)
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens

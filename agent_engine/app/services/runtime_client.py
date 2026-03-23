@@ -134,8 +134,8 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        effective_model = _resolve_effective_model(requested_model, self.llm_binding)
-        payload = _build_request_payload(self.llm_binding, effective_model, messages, tools=tools)
+        selected_model_id, runtime_model_id = _resolve_effective_model(requested_model, self.llm_binding)
+        payload = _build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
         response_payload, status_code = http_json_request(
             self._chat_url(),
             method="POST",
@@ -171,7 +171,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             "output_text": _extract_output_text(response_payload),
             "tool_calls": _extract_tool_calls(response_payload),
             "status_code": status_code,
-            "requested_model": effective_model,
+            "requested_model": selected_model_id,
         }
 
     def _chat_url(self) -> str:
@@ -328,8 +328,9 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
         *,
         texts: list[str],
     ) -> dict[str, Any]:
+        selected_model_id, runtime_model_id = _resolve_effective_embedding_model(self.embeddings_binding)
         payload = {
-            "model": _resolve_effective_embedding_model(self.embeddings_binding),
+            "model": runtime_model_id,
             "input": texts,
         }
         response_payload, status_code = http_json_request(
@@ -379,7 +380,7 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
             "embeddings": embeddings,
             "dimension": len(embeddings[0]) if embeddings else 0,
             "status_code": status_code,
-            "requested_model": payload["model"],
+            "requested_model": selected_model_id,
         }
 
     def _embeddings_url(self) -> str:
@@ -680,22 +681,16 @@ def _coerce_platform_runtime(
     return deployment_profile, capabilities
 
 
-def _resolve_effective_model(requested_model: str | None, llm_binding: dict[str, Any]) -> str:
-    config = llm_binding.get("config") if isinstance(llm_binding.get("config"), dict) else {}
-    explicit_model = str(requested_model or "").strip()
-    if explicit_model:
-        return explicit_model
-    forced_model = str(config.get("forced_model_id", "")).strip()
-    if forced_model:
-        return forced_model
-    fallback_model = str(config.get("local_fallback_model_id", "")).strip()
-    if fallback_model:
-        return fallback_model
-    raise LlmRuntimeClientError(
-        code="missing_model_ref",
-        message="No model was resolved for execution",
-        status_code=500,
-        details={"provider_slug": llm_binding.get("slug")},
+def _resolve_effective_model(requested_model: str | None, llm_binding: dict[str, Any]) -> tuple[str, str]:
+    selected_model = _select_bound_served_model(
+        requested_model=requested_model,
+        binding=llm_binding,
+        error_cls=LlmRuntimeClientError,
+    )
+    return str(selected_model.get("id", "")).strip(), _resolve_runtime_model_identifier(
+        binding=llm_binding,
+        served_model=selected_model,
+        error_cls=LlmRuntimeClientError,
     )
 
 
@@ -1041,20 +1036,120 @@ def _normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _resolve_effective_embedding_model(embeddings_binding: dict[str, Any]) -> str:
-    config = embeddings_binding.get("config") if isinstance(embeddings_binding.get("config"), dict) else {}
-    forced_model = str(config.get("forced_model_id", "")).strip()
-    if forced_model:
-        return forced_model
-    fallback_model = str(config.get("local_fallback_model_id", "")).strip()
-    if fallback_model:
-        return fallback_model
-    raise EmbeddingsRuntimeClientError(
-        code="missing_model_ref",
-        message="No embedding model was resolved for execution",
-        status_code=500,
-        details={"provider_slug": embeddings_binding.get("slug")},
+def _resolve_effective_embedding_model(embeddings_binding: dict[str, Any]) -> tuple[str, str]:
+    selected_model = _select_bound_served_model(
+        requested_model=None,
+        binding=embeddings_binding,
+        error_cls=EmbeddingsRuntimeClientError,
     )
+    return str(selected_model.get("id", "")).strip(), _resolve_runtime_model_identifier(
+        binding=embeddings_binding,
+        served_model=selected_model,
+        error_cls=EmbeddingsRuntimeClientError,
+    )
+
+
+def _select_bound_served_model(
+    *,
+    requested_model: str | None,
+    binding: dict[str, Any],
+    error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
+) -> dict[str, Any]:
+    served_models = binding.get("served_models")
+    if not isinstance(served_models, list) or not served_models:
+        raise error_cls(
+            code="missing_model_ref",
+            message="No model was resolved for execution",
+            status_code=500,
+            details={"provider_slug": binding.get("slug")},
+        )
+
+    explicit_model = str(requested_model or "").strip()
+    if explicit_model:
+        for served_model in served_models:
+            if isinstance(served_model, dict) and str(served_model.get("id", "")).strip() == explicit_model:
+                return dict(served_model)
+        raise error_cls(
+            code="requested_model_not_bound",
+            message="Requested model is not served by the active deployment binding",
+            status_code=403,
+            details={"provider_slug": binding.get("slug"), "requested_model": explicit_model},
+        )
+
+    default_model = binding.get("default_served_model")
+    if isinstance(default_model, dict) and str(default_model.get("id", "")).strip():
+        return dict(default_model)
+    default_model_id = str(binding.get("default_served_model_id", "")).strip()
+    if default_model_id:
+        for served_model in served_models:
+            if isinstance(served_model, dict) and str(served_model.get("id", "")).strip() == default_model_id:
+                return dict(served_model)
+    raise error_cls(
+        code="missing_model_ref",
+        message="No model was resolved for execution",
+        status_code=500,
+        details={"provider_slug": binding.get("slug")},
+    )
+
+
+def _resolve_runtime_model_identifier(
+    *,
+    binding: dict[str, Any],
+    served_model: dict[str, Any],
+    error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
+) -> str:
+    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+    if provider_model_id:
+        return provider_model_id
+    return _resolve_local_runtime_model_identifier(binding=binding, served_model=served_model, error_cls=error_cls)
+
+
+def _resolve_local_runtime_model_identifier(
+    *,
+    binding: dict[str, Any],
+    served_model: dict[str, Any],
+    error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
+) -> str:
+    models_payload, status_code = http_json_request(
+        _models_url(binding),
+        method="GET",
+    )
+    if models_payload is None or not 200 <= status_code < 300:
+        raise error_cls(
+            code="model_inventory_unavailable",
+            message="Unable to resolve a provider-facing model identifier",
+            status_code=502 if status_code < 500 else status_code,
+            details={"provider_slug": binding.get("slug"), "status_code": status_code},
+        )
+    available_ids = {
+        str(item.get("id", "")).strip()
+        for item in (models_payload.get("data") if isinstance(models_payload.get("data"), list) else [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    for candidate in (
+        str(served_model.get("local_path", "")).strip(),
+        str(served_model.get("id", "")).strip(),
+        str(served_model.get("name", "")).strip(),
+        str(served_model.get("source_id", "")).strip(),
+    ):
+        if candidate and candidate in available_ids:
+            return candidate
+    raise error_cls(
+        code="requested_model_not_exposed",
+        message="Requested model is not exposed by the active provider",
+        status_code=409,
+        details={
+            "provider_slug": binding.get("slug"),
+            "served_model_id": served_model.get("id"),
+        },
+    )
+
+
+def _models_url(binding: dict[str, Any]) -> str:
+    config = binding.get("config") if isinstance(binding.get("config"), dict) else {}
+    path = str(config.get("models_path", "/v1/models")).strip() or "/v1/models"
+    endpoint_url = str(binding.get("endpoint_url", "")).rstrip("/")
+    return endpoint_url + path
 
 
 def _extract_embeddings(payload: dict[str, Any]) -> list[list[float]]:

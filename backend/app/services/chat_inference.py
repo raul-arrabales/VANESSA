@@ -86,6 +86,80 @@ def _resolve_canonical_local_llm_model_id(adapter: Any, model_row: dict[str, Any
     return requested_model_id
 
 
+def _select_bound_llm_model(adapter: Any, requested_model_id: str) -> dict[str, Any]:
+    binding = getattr(adapter, "binding", None)
+    served_models = getattr(binding, "served_models", None)
+    if not isinstance(served_models, list) or not served_models:
+        raise PlatformControlPlaneError(
+            "served_model_required",
+            "Active LLM binding is missing served models",
+            status_code=503,
+            details={"provider": getattr(binding, "provider_slug", None)},
+        )
+    for served_model in served_models:
+        if not isinstance(served_model, dict):
+            continue
+        if str(served_model.get("id", "")).strip() == requested_model_id:
+            return dict(served_model)
+    raise PlatformControlPlaneError(
+        "model_not_bound",
+        "Requested model is not served by the active LLM deployment binding",
+        status_code=409,
+        details={"model_id": requested_model_id, "provider": getattr(binding, "provider_slug", None)},
+    )
+
+
+def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str:
+    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+    if provider_model_id:
+        return provider_model_id
+
+    list_models = getattr(adapter, "list_models", None)
+    if not callable(list_models):
+        raise PlatformControlPlaneError(
+            "provider_inventory_unavailable",
+            "LLM provider cannot resolve served model identifiers",
+            status_code=502,
+            details={"served_model_id": served_model.get("id")},
+        )
+    models_payload, status_code = list_models()
+    if models_payload is None or not 200 <= status_code < 300:
+        raise PlatformControlPlaneError(
+            "provider_inventory_unavailable",
+            "Unable to query the active LLM provider model inventory",
+            status_code=502 if status_code < 500 else status_code,
+            details={"served_model_id": served_model.get("id"), "status_code": status_code},
+        )
+    candidates = [
+        str(served_model.get("local_path", "")).strip(),
+        str(served_model.get("id", "")).strip(),
+        str(served_model.get("name", "")).strip(),
+        str(served_model.get("source_id", "")).strip(),
+    ]
+    available_ids = {
+        str(item.get("id", "")).strip()
+        for item in (models_payload.get("data") if isinstance(models_payload.get("data"), list) else [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    for candidate in candidates:
+        if candidate and candidate in available_ids:
+            return candidate
+
+    raw_model_id = str(served_model.get("id", "")).strip()
+    raw_model_row = modelops_repo.get_model(get_auth_config().database_url, raw_model_id)
+    if raw_model_row is not None:
+        fallback_model_id = _resolve_canonical_local_llm_model_id(adapter, raw_model_row)
+        if fallback_model_id and fallback_model_id in available_ids:
+            return fallback_model_id
+
+    raise PlatformControlPlaneError(
+        "model_not_exposed_by_provider",
+        "Requested model is not exposed by the active LLM provider",
+        status_code=409,
+        details={"served_model_id": served_model.get("id"), "available_models": sorted(available_ids)},
+    )
+
+
 def _resolve_chat_completion_target(
     *,
     requested_model_id: str,
@@ -116,7 +190,15 @@ def _resolve_chat_completion_target(
 
     raw_model_row = modelops_repo.get_model(get_auth_config().database_url, requested_model_id) or model_row
     allow_local_fallback = _can_use_local_llm_fallback(raw_model_row)
-    llm_model_id = _resolve_canonical_local_llm_model_id(adapter, raw_model_row)
+    try:
+        served_model = _select_bound_llm_model(adapter, requested_model_id)
+        llm_model_id = _resolve_runtime_model_id(adapter, served_model)
+    except PlatformControlPlaneError as exc:
+        return None, requested_model_id, False, {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
     return adapter, llm_model_id, allow_local_fallback, None, 200
 
 

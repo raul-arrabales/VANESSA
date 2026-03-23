@@ -1,7 +1,7 @@
 # AGENTS.md
 
-This file is for AI coding agents (Codex, etc.).  
-It explains how this project is structured and how to work on it safely and consistently.
+This file is for AI coding agents working in this repository.
+It explains the current VANESSA platform design and how to make changes safely, consistently, and with the right architectural priorities.
 
 ---
 
@@ -9,315 +9,424 @@ It explains how this project is structured and how to work on it safely and cons
 
 **Project name:** VANESSA — Versatile AI Navigator for Enhanced Semantic Search & Automation
 
-VANESSA is a multi-container AI assistant that:
+VANESSA is a local-first but cloud-capable AI platform built around a backend-owned GenAI control plane, a separate ModelOps domain, and a runtime/orchestration layer for agents and tools.
 
-- Exposes a **responsive web frontend** for users.
-- Uses a **Flask backend API** to orchestrate:
-  - A **private LLM server** (Hugging Face-based).
-  - A **custom agent orchestration engine**.
-  - A **Python sandbox environment** where agents can execute code safely.
-  - An optional **MCP gateway** for remote/general-purpose agent tools.
-  - A **wake-word (KWS) service** for offline voice activation.
-  - A **persistent semantic index** (Weaviate by default, optional Qdrant alternate provider) for RAG.
-  - A **relational database** (PostgreSQL) for structured data.
+Current architectural pillars:
 
-The system is meant to be:
+- **GenAI control plane**
+  - Owned by the backend and PostgreSQL.
+  - Manages platform `capabilities`, `providers`, `deployment_profile`s, and binding-level served-model selection.
+  - Chooses which infrastructure implementation is active for inference, embeddings, vector retrieval, sandbox execution, and MCP tool runtime.
 
-- Modular (each major component in its own container).
-- Extensible (easy to add new tools and agents).
-- Local-first (easy to run on a single dev machine).
+- **ModelOps**
+  - Separate managed-model domain layered on top of the control plane.
+  - Owns model catalog records, lifecycle, validation, testing, sharing, usage, and access governance.
+  - Provides the source of truth for which models are eligible to be bound into platform deployments.
+
+- **Agent/runtime orchestration**
+  - Backend resolves the active `platform_runtime` snapshot from the active deployment profile.
+  - Backend sends that runtime snapshot to `agent_engine`.
+  - `agent_engine` consumes the resolved runtime snapshot and does not own control-plane tables or active-binding policy.
+
+- **Local-first, provider-flexible runtime**
+  - `llm` is the normalized private LLM gateway.
+  - `llm_runtime` and optional `llama_cpp` are alternate local inference runtimes/providers.
+  - Weaviate and optional Qdrant are alternate `vector_store` providers.
+  - Sandbox and optional MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
+
+Design goals:
+
+- Modularity
+- Scalability
+- Clean extensibility
+- Local-first development
+- Clear domain ownership
+
+Important current product-stage guidance:
+
+- There is **no production environment and no legacy user base to protect yet**.
+- Agents should **prefer clean scalable design over backward compatibility** unless the user explicitly requests compatibility work or an existing in-repo contract truly requires it.
 
 ---
 
-## 2. Containers and responsibilities
+## 2. Current architecture
 
-Please respect these boundaries when generating or modifying code or configuration.
+### 2.1. Core platform concepts
 
-1. **Container #1 — Responsive Web Frontend**
-   - Tech: React + Vite + TypeScript.
-   - Talks only to the **Flask Backend API** over HTTP.
-   - No direct DB, Weaviate or LLM access.
+Use these terms consistently:
 
-2. **Container #2 — Backend (Flask API)**
-   - Entry point for all external HTTP calls.
-   - Responsibilities:
-     - Authentication/authorization surfaces (implemented, and designed to stay extensible).
-     - REST/JSON endpoints for the frontend.
-     - Orchestration calls to:
-       - Agent engine (Container #6).
-       - LLM API gateway (Container #3).
-       - Sandbox (Container #7).
-       - Vector store (Container #9 or Container #10).
-       - Database (Container #11).
-     - Input validation, error handling, logging.
+- `capability`
+  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`.
 
-3. **Container #3 — LLM API/Gateway (`llm`)**
-   - Provides the private model-serving HTTP API used by backend and agent engine.
-   - Handles API/gateway concerns in front of the runtime service.
-   - Forwards model execution requests to Container #4 (`llm_runtime`); no direct frontend access.
+- `provider`
+  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`.
 
-4. **Container #4 — LLM Runtime (`llm_runtime`)**
-   - Runs local vLLM model execution for inference.
-   - Backing runtime for Container #3 (`llm`), exposed internally to the stack.
-   - Not called directly by the frontend.
+- `adapter`
+  - Capability-specific backend client used to talk to a provider.
 
-5. **Container #5 — Optional llama.cpp Runtime (`llama_cpp`)**
+- `deployment_profile`
+  - Named set of active capability bindings.
+
+- `served_models`
+  - The explicit list of ModelOps-managed models bound to a model-bearing deployment binding.
+
+- `default_served_model_id`
+  - The default managed model for a model-bearing binding when the caller does not explicitly request one.
+
+### 2.2. Platform control plane vs ModelOps
+
+Keep these domains distinct:
+
+- **Platform control plane**
+  - Decides which provider implementation powers a capability.
+  - Decides which managed models a model-bearing capability may serve.
+  - Owns active deployment selection and runtime snapshot resolution.
+
+- **ModelOps**
+  - Decides what models exist, who can access them, their lifecycle state, validation state, and usage history.
+  - Does **not** replace capability/provider/deployment selection.
+
+Rule:
+
+- Model-bearing deployment bindings may reference only ModelOps-managed models that are:
+  - `active`
+  - `is_validation_current == true`
+  - `last_validation_status == "success"`
+
+### 2.3. Runtime flow
+
+Current runtime ownership:
+
+1. Backend owns control-plane state and resolves the active `platform_runtime`.
+2. Backend enforces governance and product-facing orchestration.
+3. Backend passes `platform_runtime` to `agent_engine`.
+4. `agent_engine` executes against the resolved runtime snapshot.
+5. Runtime-facing model identifiers are resolved from the bound managed model, not guessed ad hoc in product code.
+
+For model-bearing capabilities:
+
+- `llm_inference` and `embeddings` bindings use `served_models` plus `default_served_model_id`.
+- Requested models must belong to the active binding.
+- If no model is requested, the binding default is used.
+
+### 2.4. Containers and service boundaries
+
+Respect these runtime boundaries when generating code or configuration.
+
+1. **Frontend**
+   - React + Vite + TypeScript.
+   - Talks only to backend over HTTP.
+   - No direct DB, vector store, LLM runtime, sandbox, or MCP access.
+
+2. **Backend API**
+   - Public HTTP entrypoint.
+   - Owns authentication/authorization surfaces, request validation, GenAI control plane, ModelOps APIs, active deployment resolution, and product-facing orchestration.
+   - Calls agent engine, LLM gateway/runtime providers, sandbox, MCP gateway, vector providers, and PostgreSQL through service abstractions.
+
+3. **LLM API (`llm`)**
+   - Private normalized model-serving gateway.
+   - Handles inference/discovery-facing API concerns.
+   - Forwards local vLLM-backed execution to `llm_runtime`.
+
+4. **LLM Runtime (`llm_runtime`)**
+   - Hardware-adaptive local vLLM runtime.
+   - Backing runtime for `llm`.
+
+5. **Optional llama.cpp (`llama_cpp`)**
    - Optional OpenAI-compatible local inference runtime.
-   - May be selected by the backend GenAI control plane as the active `llm_inference` provider.
-   - Does not replace the `llm` gateway by default; it is an alternate runtime path.
+   - Alternate `llm_inference` provider selected by the control plane.
 
-6. **Container #6 — Custom Agent Orchestration Engine**
-   - Implements multi-step workflows and tools for agents.
-   - Coordinates:
-     - Calls to the LLM API gateway.
-     - RAG queries against the active vector-store provider.
-     - Tool calls against the active MCP and sandbox runtime providers.
-     - Database operations (via a clean abstraction).
-   - This is where “agent logic” lives (tools, planners, etc.).
+6. **Agent Engine (`agent_engine`)**
+   - Multi-step agent workflows and tool orchestration.
+   - Consumes backend-provided `platform_runtime`.
+   - Must not own control-plane policy or platform tables.
 
-7. **Container #7 — Python env sandbox for agents**
-   - Isolated Python environment where agents can run controlled code.
-   - No direct network access unless explicitly allowed.
-   - Access is allowed from backend and agent_engine via approved service abstractions and policy-governed APIs.
-   - Frontend must never call sandbox directly, and backend/agent_engine integrations must not bypass governance checks.
+7. **Sandbox (`sandbox`)**
+   - Isolated Python execution environment.
+   - Native runtime provider for Python execution tools.
+   - Must only be accessed through approved backend/agent_engine abstractions and policy checks.
 
-8. **Container #8 — Optional MCP gateway for agent tools (`mcp_gateway`)**
-   - Hosts or bridges MCP-backed tools behind a normalized HTTP interface.
-   - Used by backend control-plane validation and agent_engine tool dispatch.
-   - Frontend must never call this container directly.
+8. **Optional MCP Gateway (`mcp_gateway`)**
+   - Optional normalized HTTP provider for MCP-backed tools.
+   - Used for provider validation and agent tool dispatch.
 
-9. **Container #9 — Wake-word (KWS) service**
-   - Runs offline wake-word detection and emits wake events.
-   - Integrates with backend through a webhook/event API.
-   - Model files must be downloadable and runnable in air-gapped environments.
-   - No direct frontend dependency on this container.
+9. **Wake-word service (`kws`)**
+   - Offline wake-word detection and wake-event emission.
+   - Integrates with backend via webhook/event flow.
 
-10. **Container #10 — Persistent semantic index for RAG (Weaviate)**
-   - Stores embeddings and metadata.
-   - Used for semantic search / context retrieval.
-   - Accessed from backend and/or agent engine through a client library.
-   - Persistence must be enabled (data should survive container restarts).
+10. **Weaviate**
+    - Persistent vector index.
+    - One possible `vector_store` provider.
 
-11. **Container #11 — Optional alternate vector store for RAG (`qdrant`)**
-   - Optional local vector database selected by the backend GenAI control plane as an alternate `vector_store` provider.
-   - Used to prove provider switching without changing frontend or public execution APIs.
-   - Not required for the default stack.
+11. **Optional Qdrant (`qdrant`)**
+    - Alternate vector database.
+    - Alternate `vector_store` provider selected by deployment profile.
 
-12. **Container #12 — Database (PostgreSQL)**
-  - Stores structured data (users, sessions, logs, configs, etc.).
-  - Access restricted to backend and agent engine through a data access layer.
-  - No direct SQL from the frontend.
+12. **PostgreSQL**
+    - Persistent relational storage for auth, metadata, control-plane state, ModelOps state, and execution metadata.
 
 ---
 
-## 3. Repository layout (expected)
-
-Agents should keep to this structure or evolve it consistently.
+## 3. Repository layout
 
 - `frontend/`
-  - Web UI code.
-  - Build tool configs (e.g. Vite, Webpack).
+  - Browser UI, superadmin control surfaces, typed API clients.
+
 - `backend/`
-  - Flask app, API routes, schemas, validation.
-  - Should not contain complex agent logic directly.
+  - Flask app, public/internal APIs, control plane, ModelOps, orchestration, service abstractions.
+
 - `agent_engine/`
-  - Agent orchestration logic (tools, planners, workflows).
-  - Integrations with:
-    - LLM server.
-    - Active vector store provider.
-    - DB (through an abstraction layer).
+  - Agent workflow execution, tool loops, runtime-client logic.
+
 - `sandbox/`
-  - Code related to the Python sandbox container.
-  - Security checks, execution policies, etc.
+  - Sandbox runtime and execution policy logic.
+
 - `mcp_gateway/`
-  - Code for the optional MCP gateway container.
-  - Normalized invoke surface for MCP-backed tools.
+  - MCP-backed tool runtime gateway.
+
 - `kws/`
-  - Wake-word service code and API/webhook adapter logic.
-  - Model loading checks and detection event handling.
+  - Wake-word service.
+
 - `models/`
-  - Local model assets mounted into containers for offline/air-gapped runtime.
-  - Includes wake-word model directories under `models/kws/`.
+  - Local model assets for local runtimes and offline operation.
+
 - `infra/`
-  - `docker-compose.yml` and container-specific Dockerfiles.
-  - Scripts for local setup and deployment.
+  - Compose files, Dockerfiles, architecture metadata, infrastructure wiring.
+
+- `ops/local-staging/`
+  - Human-facing staging-like local runtime workflow and scripts.
+
 - `tests/`
-  - Unit and integration tests (backend, agent engine, etc.).
+  - Backend, frontend, and agent_engine tests.
+
+- `docs/`
+  - Architecture and service-level documentation.
+
 - `AGENTS.md`
   - This file.
 
-If new top-level folders are introduced, they should be documented in this section.
+If new top-level folders are introduced, document them here.
 
 ---
 
-## 4. Setup commands (local development)
+## 4. Setup commands
 
-Use these commands unless the repo provides more specific scripts.
+Use these commands unless the repo already provides a more specific script for the task.
 
-### 4.1. Backend (Flask)
+### 4.1. Backend
 
-From the project root:
+From project root:
 
-- Create and activate virtual env:
-
-  ```bash
-  python3 -m venv .venv
-  source .venv/bin/activate
-
-- Install Python dependencies:
-
-  ```bash
-  pip install -r requirements.txt
-
-- Run backend in dev mode (example):
-
-  ```bash
-  cd backend
-  flask --app app run --debug
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cd backend
+flask --app app run --debug
+```
 
 ### 4.2. Frontend
 
-(Placeholder – adjust once framework is chosen)
-
-- Typical flow:
-
-  ```bash
-  cd frontend
-  npm install
-  npm run dev
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ### 4.3. Full stack with Docker
 
-- From the project root:
+```bash
+docker compose up --build
+```
 
-  ```bash
-  docker compose up --build
+This should start the current local stack, including at least:
 
-- This should start at least:
-Frontend
-Backend (Flask API)
-LLM server
-Agent engine
-Weaviate
-PostgreSQL
-Sandbox
-Optional llama.cpp
-Optional Qdrant
-Optional MCP gateway
+- Frontend
+- Backend
+- LLM API
+- LLM Runtime
+- Agent Engine
+- Weaviate
+- PostgreSQL
+- Sandbox
+- Optional llama.cpp
+- Optional Qdrant
+- Optional MCP gateway
+
+---
 
 ## 5. Code style and conventions
 
-### 5.1. Python (backend, agent engine, sandbox)
+### 5.1. Python
 
-- Use type hints (PEP 484).
-- Prefer Black formatting and isort for imports.
-- Keep functions small and composable.
-- Separate concerns:
-  backend/ handles HTTP and request/response.
-  agent_engine/ handles agent logic, tools, RAG flows.
-  sandbox/ handles isolated execution concerns.
+- Use type hints.
+- Prefer Black formatting and isort-compatible imports.
+- Keep functions focused and composable.
+- Keep route handlers thin.
+- Put orchestration/business logic in service modules, not directly in HTTP handlers.
 
-### 5.2. JavaScript/TypeScript (frontend)
+### 5.2. TypeScript/Frontend
 
-(Refine once frontend framework is chosen)
+- Use the project linting/formatting conventions.
+- Prefer functional React components and typed API boundaries.
+- Keep browser code behind frontend API client modules.
+- Do not call backend-private/internal endpoints directly from UI code.
 
-- Use ESLint + Prettier if available.
-- Prefer functional components and hooks if using React.
-- Do not call backend “private” endpoints directly from the browser without going through the public API layer.
+### 5.3. Naming and vocabulary
 
-## 6. Testing instructions
+Prefer current platform terms:
+
+- `capability`
+- `provider`
+- `adapter`
+- `deployment_profile`
+- `served_models`
+- `default_served_model_id`
+- `platform_runtime`
+- `ModelOps`
+
+Avoid reviving outdated singular terminology such as binding everything around one `served_model_id` when the current design is multi-model.
+
+---
+
+## 6. Testing expectations
 
 ### 6.1. Python tests
 
-- From project root (with virtualenv active):
-  ```bash
-  pytest
+From project root:
 
-If needed:
-- Backend-specific tests under tests/backend/.
-- Agent engine tests under tests/agent_engine/.
+```bash
+pytest
+```
+
+Common locations:
+
+- `tests/backend/`
+- `tests/agent_engine/`
 
 ### 6.2. Frontend tests
 
-- (Placeholder – update once framework is selected)
-  ```bash
-  cd frontend
-  npm test
+```bash
+cd frontend
+npm test
+```
 
+### 6.3. Integration checks
 
-### 6.3. Integration tests
-
-- For end-to-end flows, use docker compose + a small test harness.
-- Example (to be created):
-
-  ```bash
-  docker compose -f infra/docker-compose.test.yml up --build --exit-code-from tests
+Use Docker-based flows when validating multi-service behavior.
 
 Agents should:
-- Add or update tests when changing behavior.
-- Ensure test suite passes before assuming a change is complete.
+
+- Add or update tests when behavior changes.
+- Run the smallest relevant verification first.
+- Expand to broader verification when the change crosses subsystem boundaries.
+
+---
 
 ## 7. Guidelines for AI coding agents
 
-When making changes or adding features:
+When making changes:
 
-1. Respect the container boundaries.
-- Do not add direct DB or vector-store calls in the frontend.
-- Keep agent logic out of the plain Flask route handlers; call into agent_engine/.
+1. Respect domain ownership.
+- Frontend talks only to backend APIs.
+- Backend owns control-plane policy, active deployment resolution, ModelOps governance, and public orchestration.
+- `agent_engine` consumes runtime snapshots; it should not own platform control-plane state.
 
-2. Keep secrets out of the repo.
-- Never hard-code API keys or passwords.
-- Use environment variables and .env files (which must be ignored by git).
+2. Prefer clean design over backward compatibility.
+- Do **not** add compatibility layers, legacy aliases, migration shims, deprecated field support, or duplicate code paths by default.
+- Do **not** preserve old behavior just because it existed, unless the user explicitly requests it or the current code contract truly depends on it.
+- Optimize for scalability, modularity, and extensibility first.
+- This project is mid-development with no production environment yet, so clean architecture matters more than temporary compatibility concerns.
 
-3. Prefer small, focused changes.
-- Implement one logical change at a time.
-- Update documentation and tests along with the code.
+3. Keep abstractions clear.
+- Use backend service/adaptor layers instead of scattering HTTP calls.
+- Use vector-store adapters instead of provider-specific calls everywhere.
+- Use data access layers/repositories instead of inline SQL in feature code.
+- Keep tool definitions in the registry and tool transports in platform capabilities/providers.
+- Bind concrete managed models at the deployment-binding layer through `served_models` and `default_served_model_id`, not by attaching a single model directly to a provider instance.
 
-4. Maintain clear abstractions.
-- LLM client wrapper (e.g. llm_client.py) instead of scattering HTTP calls.
-- Vector-store client wrapper (for example Weaviate/Qdrant adapters) instead of direct calls everywhere.
-- Data access layer for PostgreSQL instead of inline SQL.
-- For GenAI infrastructure selection, prefer the terms `capability`, `provider`, `adapter`, and `deployment_profile` instead of overloading generic `service` terminology.
-- When a capability needs a concrete upstream model, bind that choice at the deployment-binding layer (`served_model_id`) rather than attaching a model directly to the provider instance.
-- Treat `LLAMA_CPP_URL` and `QDRANT_URL` as bootstrap flags for enabling the optional local provider runtimes and seeding the alternate deployment profiles.
-- For tools, keep individual tool specs in the registry and runtime transports in platform capabilities/providers. Do not collapse every tool into the provider registry.
+4. Keep backend and docs aligned with current architecture.
+- If a change affects topology, interfaces, runtime selection, provider binding, or architectural contracts, update the corresponding docs in the same change.
+- Treat `docs/architecture.md`, `docs/services/backend.md`, and `infra/architecture/metadata.yml` as architectural source-of-truth inputs.
 
-5. Be safe with the sandbox.
-- Any new capabilities involving code execution should integrate with the sandbox container via approved backend/agent_engine service abstractions and policy controls.
-- Frontend paths must never call sandbox directly, and no backend/agent_engine flow may bypass governance checks.
-- Assume sandbox must be isolated and constrained.
+5. Respect runtime/provider boundaries.
+- `llm` is the normalized gateway.
+- `llm_runtime` and `llama_cpp` are provider/runtime options behind control-plane selection.
+- Weaviate and Qdrant are alternate `vector_store` providers.
+- Sandbox and MCP gateway are optional runtime capabilities, not generic utilities to call directly from anywhere.
 
-6. When in doubt, document.
-- If you introduce new patterns, record them in this file or in dedicated docs.
-- Add docstrings for non-trivial functions and classes.
+6. Be safe with the sandbox.
+- Any code-execution feature must integrate through approved backend/agent_engine abstractions and governance checks.
+- Frontend must never call sandbox directly.
+- No backend or agent-engine path may bypass sandbox governance.
 
-7. Keep local staging tooling in sync.
-- If a code/config change impacts local manual runtime behavior (service names, ports, health endpoints, compose files, env vars, startup order, or required dependencies), update `ops/local-staging/` scripts and `ops/local-staging/README.md` in the same change.
-- Treat `ops/local-staging/` as a maintained interface for human staging-like validation on Ubuntu, not as optional docs.
+7. Keep secrets out of the repo.
+- Never hard-code secrets, tokens, or passwords.
+- Use env vars and ignored `.env` files.
 
-8. Follow the topology/interface maintenance workflow for architecture-affecting changes.
-- For any topology/interface change, update both `infra/docker-compose.yml` and `infra/architecture/metadata.yml`.
-- Regenerate artifacts with `python scripts/generate_architecture.py --write`.
-- Update narrative docs in the same change: `README.md`, `docs/architecture.md`, relevant `docs/services/*.md`, and `AGENTS.md`.
-- Verify generated artifacts are current with `python scripts/generate_architecture.py --check` before considering the change done.
-- Use this concise checklist:
-  - [ ] `infra/docker-compose.yml`
-  - [ ] `infra/architecture/metadata.yml`
-  - [ ] `python scripts/generate_architecture.py --write`
-  - [ ] `README.md`
-  - [ ] `docs/architecture.md`
-  - [ ] Relevant `docs/services/*.md`
-  - [ ] `AGENTS.md`
-  - [ ] `python scripts/generate_architecture.py --check`
+8. Prefer focused changes.
+- Implement one coherent logical change at a time.
+- Update tests and docs in the same change when behavior or architecture changes.
 
-9. Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+9. When in doubt, document.
+- Record new patterns in `AGENTS.md` or the relevant service docs.
+- Add docstrings/comments for non-trivial code.
 
-## 8. Future directions (for agents to keep in mind)
+10. Keep local staging tooling in sync.
+- If runtime behavior changes in a way that affects local manual validation, update `ops/local-staging/` scripts and `ops/local-staging/README.md` in the same change.
+- Treat `ops/local-staging/` as a maintained interface, not optional notes.
 
-These are planned or actively evolving:
-- Authentication/authorization for API endpoints.
-- Role-based agents (e.g. “research agent”, “data cleaning agent”, “automation agent”).
-- Configurable tools for agents, defined via registry specs and leveraging MCP or sandbox transports.
-- Observability stack (logging, metrics, tracing).
+11. Follow the topology/interface maintenance workflow for architecture-affecting changes.
+- Update both:
+  - `infra/docker-compose.yml`
+  - `infra/architecture/metadata.yml`
+- Regenerate artifacts:
+  - `python scripts/generate_architecture.py --write`
+- Update narrative docs in the same change:
+  - `README.md`
+  - `docs/architecture.md`
+  - relevant `docs/services/*.md`
+  - `AGENTS.md`
+- Verify generated artifacts are current:
+  - `python scripts/generate_architecture.py --check`
 
-When implementing new features, consider how they will interact with these future plans and keep the design extensible.
+Checklist:
+
+- [ ] `infra/docker-compose.yml`
+- [ ] `infra/architecture/metadata.yml`
+- [ ] `python scripts/generate_architecture.py --write`
+- [ ] `README.md`
+- [ ] `docs/architecture.md`
+- [ ] relevant `docs/services/*.md`
+- [ ] `AGENTS.md`
+- [ ] `python scripts/generate_architecture.py --check`
+
+12. Use Context7 MCP for library/API documentation.
+- When you need library or API documentation, setup guidance, or configuration examples, use Context7 MCP without waiting for the user to ask explicitly.
+
+---
+
+## 8. Current implementation defaults
+
+Keep these current repo truths in mind:
+
+- Backend owns the GenAI control plane.
+- ModelOps is the source of truth for managed models and validation state.
+- Active runtime selection happens through deployment profiles.
+- Model-bearing bindings are multi-model and require an explicit default.
+- `agent_engine` executes against backend-provided `platform_runtime`.
+- Tool execution currently converges around registry tool specs plus runtime transports selected through platform capabilities.
+
+---
+
+## 9. Future directions
+
+These are still evolving and should influence design toward extensibility:
+
+- richer authentication/authorization surfaces
+- broader role-aware agent behaviors
+- expanded tool catalog and runtime transports
+- observability, logging, metrics, and tracing improvements
+- continued evolution of platform/provider switching and ModelOps governance
+
+When implementing new features, design for extension without introducing premature compatibility baggage.
