@@ -128,6 +128,54 @@ describe("ModelTestPage", () => {
     expect(await screen.findByRole("heading", { name: "GPT Private" })).toBeVisible();
     expect(screen.getByLabelText("Prompt")).toHaveValue("hello");
     expect(screen.getByRole("button", { name: "Mark as validated" })).toBeDisabled();
+    expect(screen.getByText("Validation stays disabled until a successful test run is recorded.")).toBeVisible();
+  });
+
+  it("keeps validation disabled when the model is already currently validated", async () => {
+    modelApiMocks.getManagedModel.mockResolvedValue({
+      id: "gpt-private",
+      name: "GPT Private",
+      provider: "openai_compatible",
+      provider_model_id: "gpt-4.1-mini",
+      backend: "external_api",
+      hosting: "cloud",
+      owner_type: "user",
+      owner_user_id: 2,
+      visibility_scope: "private",
+      lifecycle_state: "active",
+      is_validation_current: true,
+      last_validation_status: "success",
+      task_key: "llm",
+      source: "external_provider",
+      artifact: {},
+      usage_summary: { total_requests: 0, metrics: {} },
+    });
+    modelApiMocks.listManagedModelTests.mockResolvedValue({
+      model_id: "gpt-private",
+      tests: [
+        {
+          id: "test-1",
+          model_id: "gpt-private",
+          task_key: "llm",
+          result: "success",
+          summary: "Cloud LLM test succeeded",
+          input_payload: { prompt: "hello" },
+          output_payload: { choices: [] },
+          error_details: {},
+          latency_ms: 25,
+        },
+      ],
+    });
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId/test" element={<ModelTestPage />} />
+      </Routes>,
+      { route: "/control/models/gpt-private/test" },
+    );
+
+    expect(await screen.findByRole("button", { name: "Mark as validated" })).toBeDisabled();
+    expect(screen.getByText("This model is already validated for its current configuration.")).toBeVisible();
   });
 
   it("runs a test and enables validation", async () => {

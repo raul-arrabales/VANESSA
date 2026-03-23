@@ -415,6 +415,8 @@ def test_validate_model_requires_successful_matching_test_run(monkeypatch: pytes
         lambda *args, **kwargs: {
             "model_id": "cloud-model-1",
             "lifecycle_state": "registered",
+            "is_validation_current": False,
+            "last_validation_status": "failure",
             "task_key": "llm",
             "current_config_fingerprint": "fingerprint-1",
         },
@@ -455,3 +457,34 @@ def test_validate_model_requires_successful_matching_test_run(monkeypatch: pytes
     assert recorded_validation["result"] == modelops_testing.modelops_repo.VALIDATION_SUCCESS
     assert recorded_validation["error_details"] == {"test_run_id": "test-run-1"}
     assert payload["validation"]["result"] == "success"
+
+
+def test_validate_model_rejects_when_validation_is_already_current(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "cloud-model-1",
+            "lifecycle_state": "active",
+            "is_validation_current": True,
+            "last_validation_status": "success",
+            "task_key": "llm",
+            "current_config_fingerprint": "fingerprint-1",
+        },
+    )
+
+    with pytest.raises(modelops_testing.ModelOpsError) as exc_info:
+        modelops_testing.validate_model(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=1,
+            actor_role="superadmin",
+            model_id="cloud-model-1",
+            test_run_id="test-run-1",
+        )
+
+    assert exc_info.value.code == "validation_already_current"
+    assert exc_info.value.status_code == 409

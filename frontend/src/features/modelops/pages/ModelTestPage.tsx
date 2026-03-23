@@ -78,7 +78,9 @@ export default function ModelTestPage(): JSX.Element {
   }
 
   const registryEntry = testState.model.task_key ? modelTestRegistry[testState.model.task_key] : undefined;
-  const canValidate = user?.role === "admin" || user?.role === "superadmin";
+  const isCurrentlyValidated =
+    testState.model.is_validation_current === true && testState.model.last_validation_status === "success";
+  const canValidate = (user?.role === "admin" || user?.role === "superadmin") && !isCurrentlyValidated;
   const resultSummary = registryEntry?.summarizeResult(testState.latestResult, latestTest) ?? "";
   const debugPayload = registryEntry?.formatDebugPayload(latestTest) ?? {
     requestPayload: latestTest?.input_payload ?? null,
@@ -170,6 +172,7 @@ export default function ModelTestPage(): JSX.Element {
 
       <ModelValidationAction
         canValidate={canValidate && Boolean(registryEntry)}
+        isAlreadyValidated={isCurrentlyValidated}
         latestSuccessfulTestRunId={testState.latestSuccessfulTestRunId}
         isPending={testState.isValidating}
         onValidate={testState.markValidated}

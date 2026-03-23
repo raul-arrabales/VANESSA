@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 type ModelValidationActionProps = {
   canValidate: boolean;
+  isAlreadyValidated: boolean;
   latestSuccessfulTestRunId: string;
   isPending: boolean;
   onValidate: () => Promise<void>;
@@ -10,22 +11,24 @@ type ModelValidationActionProps = {
 
 export default function ModelValidationAction({
   canValidate,
+  isAlreadyValidated,
   latestSuccessfulTestRunId,
   isPending,
   onValidate,
 }: ModelValidationActionProps): JSX.Element {
   const { t } = useTranslation("common");
   const [isConfirming, setIsConfirming] = useState(false);
-  const isDisabled = !canValidate || !latestSuccessfulTestRunId || isPending;
+  const isDisabled = isAlreadyValidated || !canValidate || !latestSuccessfulTestRunId || isPending;
+  const helperText = isAlreadyValidated
+    ? t("modelOps.testing.validationAlreadyCurrent")
+    : latestSuccessfulTestRunId
+    ? t("modelOps.testing.validationReady")
+    : t("modelOps.testing.validationBlocked");
 
   return (
     <article className="panel card-stack">
       <h2 className="section-title">{t("modelOps.testing.validationActionTitle")}</h2>
-      <p className="status-text">
-        {latestSuccessfulTestRunId
-          ? t("modelOps.testing.validationReady")
-          : t("modelOps.testing.validationBlocked")}
-      </p>
+      <p className="status-text">{helperText}</p>
       {!isConfirming ? (
         <button
           type="button"

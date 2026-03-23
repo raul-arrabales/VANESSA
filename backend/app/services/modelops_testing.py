@@ -876,6 +876,12 @@ def validate_model(
         modelops_repo.LIFECYCLE_ACTIVE,
     }:
         raise ModelOpsError("invalid_state_transition", "Model cannot be validated in its current state", status_code=409)
+    if bool(row.get("is_validation_current")) and str(row.get("last_validation_status", "")).strip().lower() == modelops_repo.VALIDATION_SUCCESS:
+        raise ModelOpsError(
+            "validation_already_current",
+            "Model is already validated for its current configuration",
+            status_code=409,
+        )
     if not test_run_id:
         raise ModelOpsError("validation_test_required", "Validation requires a successful model test run", status_code=400)
 
