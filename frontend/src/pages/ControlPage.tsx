@@ -16,14 +16,6 @@ export default function ControlPage(): JSX.Element {
 
   const items: ControlItem[] = [
     {
-      id: "profile",
-      title: t("control.items.profile.title"),
-      description: t("control.items.profile.description"),
-      to: "/settings",
-      icon: "profile",
-      minimumRole: "user",
-    },
-    {
       id: "models",
       title: t("control.items.models.title"),
       description: t("control.items.models.description"),

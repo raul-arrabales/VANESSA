@@ -222,10 +222,6 @@
     "description": "Usa tu superficie de control por rol para gestionar herramientas de cuenta, aprobaciones, modelos y operaciones.",
     "aria": "Destinos del panel de control",
     "items": {
-      "profile": {
-        "title": "Perfil y configuracion",
-        "description": "Revisa los detalles de tu cuenta y personaliza la interfaz."
-      },
       "models": {
         "title": "Modelos",
         "description": "Gestiona credenciales de modelos, modelos registrados y capacidades permitidas."

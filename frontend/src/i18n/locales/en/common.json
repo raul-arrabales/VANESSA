@@ -222,10 +222,6 @@
     "description": "Use your role-based control surface to manage account tools, approvals, models, and operations.",
     "aria": "Control panel destinations",
     "items": {
-      "profile": {
-        "title": "Profile and settings",
-        "description": "Review your account details and personalize the interface."
-      },
       "models": {
         "title": "Models",
         "description": "Manage model credentials, registered models, and allowed capabilities."
