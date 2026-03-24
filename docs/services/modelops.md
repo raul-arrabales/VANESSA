@@ -9,7 +9,7 @@ ModelOps is the control-plane domain for managed models in VANESSA. It sits besi
 - Centralize ownership, visibility, and invocation eligibility.
 - Persist validation history and current validation state.
 - Track model usage in generic daily rollups.
-- Expose only eligible models to deployment bindings such as `served_model_id`.
+- Expose only eligible models to deployment bindings as managed-model resources.
 
 ## Canonical Model Record
 
@@ -81,10 +81,10 @@ Assignment tables remain part of the implementation, but access decisions flow o
 Model activation is not the same as deployment binding.
 
 - ModelOps decides whether a model is active, validated, visible, and invokable.
-- `/control/platform` decides which provider/deployment binding should use which served model.
+- `/control/platform` decides which provider/deployment binding should use which managed-model resources.
 - Deployment binding pickers should only show ModelOps-eligible models for the relevant capability.
 
-This separation is especially important for embeddings, where a provider binding may exist before an operator selects the served model.
+This separation is especially important for embeddings, where a provider binding may exist before an operator selects the bound model resource.
 
 ## APIs
 
@@ -119,7 +119,7 @@ The current implementation leaves room for:
 
 Current implementation status:
 
-- schema, lifecycle, validation history, usage rollups, and served-model eligibility are implemented
+- schema, lifecycle, validation history, usage rollups, and deployment-binding eligibility are implemented
 - group UI, federation sync, and richer validator plugins are intentionally deferred
 
 For implementation boundaries and maintenance conventions, see the companion [ModelOps maintenance note](modelops-maintenance.md).

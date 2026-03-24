@@ -54,32 +54,29 @@ export type PlatformDeploymentBinding = {
     provider_key: string;
     display_name: string;
     endpoint_url: string;
-    enabled: boolean;
-    adapter_kind: string;
+      enabled: boolean;
+      adapter_kind: string;
   };
-  served_models: Array<{
+  resources: Array<{
     id: string;
-    name?: string | null;
-    provider?: string | null;
-    backend?: string | null;
-    task_key?: string | null;
-    provider_model_id?: string | null;
-    local_path?: string | null;
-    source_id?: string | null;
-    availability?: string | null;
+    resource_kind?: string | null;
+    ref_type?: string | null;
+    managed_model_id?: string | null;
+    provider_resource_id?: string | null;
+    display_name?: string | null;
+    metadata?: Record<string, unknown>;
   }>;
-  default_served_model_id?: string | null;
-  default_served_model?: {
+  default_resource_id?: string | null;
+  default_resource?: {
     id: string;
-    name?: string | null;
-    provider?: string | null;
-    backend?: string | null;
-    task_key?: string | null;
-    provider_model_id?: string | null;
-    local_path?: string | null;
-    source_id?: string | null;
-    availability?: string | null;
+    resource_kind?: string | null;
+    ref_type?: string | null;
+    managed_model_id?: string | null;
+    provider_resource_id?: string | null;
+    display_name?: string | null;
+    metadata?: Record<string, unknown>;
   } | null;
+  resource_policy?: Record<string, unknown>;
   config: Record<string, unknown>;
 };
 
@@ -115,16 +112,25 @@ export type PlatformProviderValidation = {
       reachable: boolean;
       status_code: number;
     };
-    models_reachable?: boolean;
-    models_status_code?: number;
     embeddings_reachable?: boolean;
     embeddings_status_code?: number;
     embedding_dimension?: number;
+    resources_reachable?: boolean;
+    resources_status_code?: number;
+    resources?: Array<{
+      id: string;
+      resource_kind?: string | null;
+      ref_type?: string | null;
+      managed_model_id?: string | null;
+      provider_resource_id?: string | null;
+      display_name?: string | null;
+      metadata?: Record<string, unknown>;
+    }>;
     binding_error?: string;
-    served_model_errors?: Array<{
+    resource_errors?: Array<{
       code: string;
-      served_model_id?: string | null;
-      runtime_model_id?: string | null;
+      resource_id?: string | null;
+      provider_resource_id?: string | null;
       message?: string | null;
     }>;
   };
@@ -149,8 +155,17 @@ export type PlatformDeploymentMutationInput = {
   bindings: Array<{
     capability: string;
     provider_id: string;
-    served_model_ids?: string[];
-    default_served_model_id?: string | null;
+    resources?: Array<{
+      id: string;
+      resource_kind?: string | null;
+      ref_type?: string | null;
+      managed_model_id?: string | null;
+      provider_resource_id?: string | null;
+      display_name?: string | null;
+      metadata?: Record<string, unknown>;
+    }>;
+    default_resource_id?: string | null;
+    resource_policy?: Record<string, unknown>;
     config?: Record<string, unknown>;
   }>;
 };

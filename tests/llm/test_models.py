@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import sys
+import importlib.util
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-LLM_PATH = PROJECT_ROOT / "llm"
-if str(LLM_PATH) not in sys.path:
-    sys.path.insert(0, str(LLM_PATH))
+LLM_MAIN_PATH = PROJECT_ROOT / "llm" / "app" / "main.py"
 
-from app.main import list_models  # noqa: E402
+
+def _load_list_models_fn():
+    spec = importlib.util.spec_from_file_location("vanessa_llm_main", LLM_MAIN_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.list_models
 
 
 def test_models_catalog_output_shape() -> None:
+    list_models = _load_list_models_fn()
     payload = list_models()
 
     assert payload["object"] == "list"
@@ -39,6 +44,7 @@ def test_models_catalog_output_shape() -> None:
 
 
 def test_models_catalog_includes_dummy_model() -> None:
+    list_models = _load_list_models_fn()
     payload = list_models()
 
     dummy = next((model for model in payload["data"] if model["id"] == "dummy"), None)
@@ -50,6 +56,7 @@ def test_models_catalog_includes_dummy_model() -> None:
 
 
 def test_models_catalog_includes_local_vllm_model() -> None:
+    list_models = _load_list_models_fn()
     payload = list_models()
     local_default = next(
         (model for model in payload["data"] if model["id"] == "local-vllm-default"), None
@@ -60,6 +67,7 @@ def test_models_catalog_includes_local_vllm_model() -> None:
 
 
 def test_models_catalog_includes_local_vllm_embeddings_model() -> None:
+    list_models = _load_list_models_fn()
     payload = list_models()
     embeddings_model = next(
         (model for model in payload["data"] if model["id"] == "local-vllm-embeddings-default"), None

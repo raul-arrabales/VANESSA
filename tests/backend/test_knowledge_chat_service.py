@@ -37,7 +37,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
     monkeypatch.setattr(
         knowledge_chat_service,
         "resolve_model_for_inference",
-        lambda _db, *, user_id, requested_model_id: (f"{requested_model_id}-resolved", None, 200),
+        lambda _db, *, user_id, requested_model_id, **_kwargs: {"id": f"{requested_model_id}-resolved"},
     )
     monkeypatch.setattr(knowledge_chat_service, "ensure_knowledge_chat_agent", lambda _db: True)
     monkeypatch.setattr(
@@ -141,7 +141,7 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
     monkeypatch.setattr(
         knowledge_chat_service,
         "resolve_model_for_inference",
-        lambda _db, *, user_id, requested_model_id: (requested_model_id, None, 200),
+        lambda _db, *, user_id, requested_model_id, **_kwargs: {"id": requested_model_id},
     )
     monkeypatch.setattr(knowledge_chat_service, "ensure_knowledge_chat_agent", lambda _db: True)
     monkeypatch.setattr(

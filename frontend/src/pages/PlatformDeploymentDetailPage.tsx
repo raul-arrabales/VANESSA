@@ -17,8 +17,8 @@ import {
   buildDeploymentForm,
   buildDeploymentMutationInput,
   getCapabilityProviders,
-  getServedModelsByCapability,
-  summarizeBindingServedModels,
+  getManagedModelsByCapability,
+  summarizeBindingResources,
   validateDeploymentForm,
   type DeploymentCloneFormState,
   type DeploymentFormState,
@@ -69,8 +69,8 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     () => getCapabilityProviders(providers, requiredCapabilities),
     [providers, requiredCapabilities],
   );
-  const servedModelsByCapability = useMemo(
-    () => getServedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
+  const modelResourcesByCapability = useMemo(
+    () => getManagedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
     [eligibleModelsByCapability, requiredCapabilities],
   );
   const deploymentAudit = activationAudit.filter((entry) => entry.deployment_profile.id === deploymentId);
@@ -90,10 +90,10 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
 
     const validationError = validateDeploymentForm(requiredCapabilities, form, {
       bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
-      servedModelRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.servedModelRequired", { capability: capabilityDisplayName }),
-      defaultServedModelRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.defaultServedModelRequired", { capability: capabilityDisplayName }),
+      resourceRequiredMessage: (capabilityDisplayName) =>
+        t("platformControl.feedback.resourceRequired", { capability: capabilityDisplayName }),
+      defaultResourceRequiredMessage: (capabilityDisplayName) =>
+        t("platformControl.feedback.defaultResourceRequired", { capability: capabilityDisplayName }),
     });
     if (validationError) {
       setErrorMessage(validationError);
@@ -224,7 +224,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                   <tr>
                     <th>{t("platformControl.deployments.columns.capability")}</th>
                     <th>{t("platformControl.deployments.columns.provider")}</th>
-                    <th>{t("platformControl.deployments.columns.servedModel")}</th>
+                    <th>{t("platformControl.deployments.columns.resources")}</th>
                     <th>{t("platformControl.deployments.columns.adapter")}</th>
                     <th>{t("platformControl.deployments.columns.status")}</th>
                   </tr>
@@ -241,7 +241,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                           </Link>
                         </div>
                       </td>
-                      <td>{summarizeBindingServedModels(binding, t("platformControl.summary.none"))}</td>
+                      <td>{summarizeBindingResources(binding, t("platformControl.summary.none"))}</td>
                       <td>{binding.provider.adapter_kind}</td>
                       <td>
                         <span className="platform-badge" data-tone={binding.provider.enabled ? "enabled" : "disabled"}>
@@ -279,7 +279,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 value={form}
                 capabilities={requiredCapabilities}
                 providersByCapability={providersByCapability}
-                servedModelsByCapability={servedModelsByCapability}
+                modelResourcesByCapability={modelResourcesByCapability}
                 helperText={t("platformControl.deployments.editing", { slug: deployment.slug })}
                 isSubmitting={saving}
                 submitLabel={t("platformControl.actions.saveDeployment")}

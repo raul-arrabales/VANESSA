@@ -103,12 +103,16 @@ def test_generate_route_enforces_modelops_eligibility(client, monkeypatch: pytes
                 (),
                 {
                     "config": {"canonical_local_model_id": "allowed-model"},
-                    "served_models": [
+                    "resources": [
                         {
                             "id": "allowed-model",
-                            "name": "Allowed Model",
-                            "backend": "local",
-                            "local_path": "allowed-model",
+                            "resource_kind": "model",
+                            "provider_resource_id": "allowed-model",
+                            "display_name": "Allowed Model",
+                            "metadata": {
+                                "backend": "local",
+                                "local_path": "allowed-model",
+                            },
                         }
                     ],
                 },

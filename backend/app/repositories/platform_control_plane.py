@@ -373,13 +373,13 @@ def count_deployment_bindings_for_provider(database_url: str, *, provider_instan
     return int(row["binding_count"]) if row is not None else 0
 
 
-def count_deployment_bindings_for_served_model(database_url: str, *, model_id: str) -> int:
+def count_deployment_bindings_for_managed_model(database_url: str, *, model_id: str) -> int:
     with get_connection(database_url) as connection:
         row = connection.execute(
             """
             SELECT COUNT(*) AS binding_count
-            FROM platform_binding_served_models
-            WHERE model_id = %s
+            FROM platform_binding_resources
+            WHERE managed_model_id = %s
             """,
             (model_id.strip(),),
         ).fetchone()
@@ -482,9 +482,10 @@ def create_deployment_profile(
                     deployment_profile_id,
                     capability_key,
                     provider_instance_id,
-                    binding_config
+                    binding_config,
+                    resource_policy
                 )
-                VALUES (%s, %s, %s, %s, %s::jsonb)
+                VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
                 """,
                 (
                     binding_id,
@@ -492,13 +493,14 @@ def create_deployment_profile(
                     str(binding["capability_key"]).strip().lower(),
                     str(binding["provider_instance_id"]).strip(),
                     Jsonb(binding.get("binding_config") or {}),
+                    Jsonb(binding.get("resource_policy") or {}),
                 ),
             )
-            _replace_binding_served_models(
+            _replace_binding_resources(
                 connection,
                 binding_id=binding_id,
-                served_model_ids=binding.get("served_model_ids") or [],
-                default_served_model_id=str(binding.get("default_served_model_id") or "").strip() or None,
+                resources=binding.get("resources") or [],
+                default_resource_id=str(binding.get("default_resource_id") or "").strip() or None,
             )
     return get_deployment_profile(database_url, str(profile_row["id"])) or {}
 
@@ -553,9 +555,10 @@ def update_deployment_profile(
                     deployment_profile_id,
                     capability_key,
                     provider_instance_id,
-                    binding_config
+                    binding_config,
+                    resource_policy
                 )
-                VALUES (%s, %s, %s, %s, %s::jsonb)
+                VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
                 """,
                 (
                     binding_id,
@@ -563,13 +566,14 @@ def update_deployment_profile(
                     str(binding["capability_key"]).strip().lower(),
                     str(binding["provider_instance_id"]).strip(),
                     Jsonb(binding.get("binding_config") or {}),
+                    Jsonb(binding.get("resource_policy") or {}),
                 ),
             )
-            _replace_binding_served_models(
+            _replace_binding_resources(
                 connection,
                 binding_id=binding_id,
-                served_model_ids=binding.get("served_model_ids") or [],
-                default_served_model_id=str(binding.get("default_served_model_id") or "").strip() or None,
+                resources=binding.get("resources") or [],
+                default_resource_id=str(binding.get("default_resource_id") or "").strip() or None,
             )
     return get_deployment_profile(database_url, deployment_profile_id.strip())
 
@@ -593,25 +597,28 @@ def upsert_deployment_binding(
     deployment_profile_id: str,
     capability_key: str,
     provider_instance_id: str,
-    served_model_ids: list[str] | None = None,
-    default_served_model_id: str | None = None,
+    resources: list[dict[str, Any]] | None = None,
+    default_resource_id: str | None = None,
     binding_config: dict[str, Any] | None = None,
+    resource_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     with get_connection(database_url) as connection:
         row = connection.execute(
             """
-            INSERT INTO platform_deployment_bindings (
-                id,
-                deployment_profile_id,
-                capability_key,
-                provider_instance_id,
-                binding_config
-            )
-            VALUES (%s, %s, %s, %s, %s::jsonb)
+                INSERT INTO platform_deployment_bindings (
+                    id,
+                    deployment_profile_id,
+                    capability_key,
+                    provider_instance_id,
+                    binding_config,
+                    resource_policy
+                )
+            VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb)
             ON CONFLICT (deployment_profile_id, capability_key)
             DO UPDATE SET
               provider_instance_id = EXCLUDED.provider_instance_id,
               binding_config = EXCLUDED.binding_config,
+              resource_policy = EXCLUDED.resource_policy,
               updated_at = NOW()
             RETURNING *
             """,
@@ -621,14 +628,15 @@ def upsert_deployment_binding(
                 capability_key.strip().lower(),
                 provider_instance_id.strip(),
                 Jsonb(binding_config or {}),
+                Jsonb(resource_policy or {}),
             ),
         ).fetchone()
         if row is not None:
-            _replace_binding_served_models(
+            _replace_binding_resources(
                 connection,
                 binding_id=str(row["id"]),
-                served_model_ids=served_model_ids or [],
-                default_served_model_id=default_served_model_id.strip() if default_served_model_id else None,
+                resources=resources or [],
+                default_resource_id=default_resource_id.strip() if default_resource_id else None,
             )
     if row is None:
         raise RuntimeError("failed_to_upsert_deployment_binding")
@@ -692,6 +700,7 @@ def list_deployment_bindings(database_url: str, *, deployment_profile_id: str) -
               b.capability_key,
               b.provider_instance_id,
               b.binding_config,
+              b.resource_policy,
               b.created_at,
               b.updated_at,
               i.slug AS provider_slug,
@@ -711,7 +720,7 @@ def list_deployment_bindings(database_url: str, *, deployment_profile_id: str) -
             """,
             (deployment_profile_id.strip(),),
         ).fetchall()
-        return _attach_served_models(connection, [dict(row) for row in rows])
+        return _attach_resources(connection, [dict(row) for row in rows])
 
 
 def get_active_deployment(database_url: str) -> dict[str, Any] | None:
@@ -748,6 +757,7 @@ def get_active_binding_for_capability(database_url: str, *, capability_key: str)
               b.capability_key,
               b.provider_instance_id,
               b.binding_config,
+              b.resource_policy,
               i.slug AS provider_slug,
               i.provider_key,
               i.display_name AS provider_display_name,
@@ -771,7 +781,7 @@ def get_active_binding_for_capability(database_url: str, *, capability_key: str)
         ).fetchone()
         if row is None:
             return None
-        return _attach_served_models(connection, [dict(row)])[0]
+        return _attach_resources(connection, [dict(row)])[0]
 
 
 def get_active_binding_for_provider_instance(database_url: str, *, provider_instance_id: str) -> dict[str, Any] | None:
@@ -783,6 +793,7 @@ def get_active_binding_for_provider_instance(database_url: str, *, provider_inst
               b.capability_key,
               b.provider_instance_id,
               b.binding_config,
+              b.resource_policy,
               i.slug AS provider_slug,
               i.provider_key,
               i.display_name AS provider_display_name,
@@ -806,57 +817,79 @@ def get_active_binding_for_provider_instance(database_url: str, *, provider_inst
         ).fetchone()
         if row is None:
             return None
-        return _attach_served_models(connection, [dict(row)])[0]
+        return _attach_resources(connection, [dict(row)])[0]
 
 
-def _replace_binding_served_models(
+def _replace_binding_resources(
     connection: Any,
     *,
     binding_id: str,
-    served_model_ids: list[str],
-    default_served_model_id: str | None,
+    resources: list[dict[str, Any]],
+    default_resource_id: str | None,
 ) -> None:
     connection.execute(
         """
-        DELETE FROM platform_binding_served_models
+        DELETE FROM platform_binding_resources
         WHERE binding_id = %s
         """,
         (binding_id,),
     )
-    for index, model_id in enumerate(served_model_ids):
-        normalized_model_id = str(model_id).strip()
-        if not normalized_model_id:
+    for index, resource in enumerate(resources):
+        if not isinstance(resource, dict):
             continue
+        resource_id = str(resource.get("id") or resource.get("managed_model_id") or resource.get("provider_resource_id") or "").strip()
+        if not resource_id:
+            continue
+        managed_model_id = str(resource.get("managed_model_id") or "").strip() or None
+        provider_resource_id = str(resource.get("provider_resource_id") or "").strip() or None
         connection.execute(
             """
-            INSERT INTO platform_binding_served_models (
+            INSERT INTO platform_binding_resources (
                 binding_id,
-                model_id,
+                resource_id,
+                resource_kind,
+                ref_type,
+                managed_model_id,
+                provider_resource_id,
+                display_name,
+                metadata_json,
                 is_default,
                 sort_order
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
             """,
             (
                 binding_id,
-                normalized_model_id,
-                normalized_model_id == (default_served_model_id or ""),
+                resource_id,
+                str(resource.get("resource_kind") or "").strip().lower(),
+                str(resource.get("ref_type") or "").strip().lower(),
+                managed_model_id,
+                provider_resource_id,
+                str(resource.get("display_name") or "").strip() or None,
+                Jsonb(resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}),
+                resource_id == (default_resource_id or ""),
                 index,
             ),
         )
 
 
-def _attach_served_models(connection: Any, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _attach_resources(connection: Any, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     binding_ids = [str(row.get("id") or "").strip() for row in rows if str(row.get("id") or "").strip()]
     if not binding_ids:
         return rows
-    served_rows = connection.execute(
+    resource_rows = connection.execute(
         """
         SELECT
-          bsm.binding_id,
-          bsm.model_id,
-          bsm.is_default,
-          bsm.sort_order,
+          br.binding_id,
+          br.resource_id,
+          br.resource_kind,
+          br.ref_type,
+          br.managed_model_id,
+          br.provider_resource_id,
+          br.display_name,
+          br.metadata_json,
+          br.is_default,
+          br.sort_order,
           m.name AS model_name,
           m.provider AS model_provider,
           m.backend_kind AS model_backend_kind,
@@ -865,40 +898,51 @@ def _attach_served_models(connection: Any, rows: list[dict[str, Any]]) -> list[d
           m.local_path AS model_local_path,
           m.source_id AS model_source_id,
           m.availability AS model_availability
-        FROM platform_binding_served_models bsm
-        JOIN model_registry m ON m.model_id = bsm.model_id
-        WHERE bsm.binding_id = ANY(%s)
-        ORDER BY bsm.binding_id ASC, bsm.sort_order ASC, bsm.model_id ASC
+        FROM platform_binding_resources br
+        LEFT JOIN model_registry m ON m.model_id = br.managed_model_id
+        WHERE br.binding_id = ANY(%s)
+        ORDER BY br.binding_id ASC, br.sort_order ASC, br.resource_id ASC
         """,
         (binding_ids,),
     ).fetchall()
-    served_by_binding: dict[str, list[dict[str, Any]]] = {}
-    for raw in served_rows:
+    resources_by_binding: dict[str, list[dict[str, Any]]] = {}
+    for raw in resource_rows:
         row = dict(raw)
         binding_id = str(row["binding_id"])
-        served_by_binding.setdefault(binding_id, []).append(
+        metadata = dict(row.get("metadata_json") or {})
+        if str(row.get("resource_kind") or "").strip().lower() == "model":
+            metadata = {
+                **metadata,
+                "name": row.get("model_name") or metadata.get("name"),
+                "provider": row.get("model_provider") or metadata.get("provider"),
+                "backend": row.get("model_backend_kind") or metadata.get("backend"),
+                "task_key": row.get("model_task_key") or metadata.get("task_key"),
+                "provider_model_id": row.get("model_provider_model_id") or metadata.get("provider_model_id"),
+                "local_path": row.get("model_local_path") or metadata.get("local_path"),
+                "source_id": row.get("model_source_id") or metadata.get("source_id"),
+                "availability": row.get("model_availability") or metadata.get("availability"),
+            }
+        resources_by_binding.setdefault(binding_id, []).append(
             {
-                "id": str(row["model_id"]),
-                "name": row.get("model_name"),
-                "provider": row.get("model_provider"),
-                "backend": row.get("model_backend_kind"),
-                "task_key": row.get("model_task_key"),
-                "provider_model_id": row.get("model_provider_model_id"),
-                "local_path": row.get("model_local_path"),
-                "source_id": row.get("model_source_id"),
-                "availability": row.get("model_availability"),
+                "id": str(row["resource_id"]),
+                "resource_kind": str(row.get("resource_kind") or "").strip().lower(),
+                "ref_type": str(row.get("ref_type") or "").strip().lower(),
+                "managed_model_id": str(row.get("managed_model_id") or "").strip() or None,
+                "provider_resource_id": str(row.get("provider_resource_id") or "").strip() or None,
+                "display_name": row.get("display_name") or row.get("model_name"),
+                "metadata": metadata,
                 "is_default": bool(row.get("is_default")),
                 "sort_order": int(row.get("sort_order") or 0),
             }
         )
     for row in rows:
         binding_id = str(row.get("id") or "").strip()
-        served_models = served_by_binding.get(binding_id, [])
-        default_served_model = next((dict(item) for item in served_models if bool(item.get("is_default"))), None)
-        row["served_models"] = [dict(item) for item in served_models]
-        row["default_served_model"] = default_served_model
-        row["default_served_model_id"] = (
-            str(default_served_model.get("id", "")).strip() if isinstance(default_served_model, dict) else None
+        resources = resources_by_binding.get(binding_id, [])
+        default_resource = next((dict(item) for item in resources if bool(item.get("is_default"))), None)
+        row["resources"] = [dict(item) for item in resources]
+        row["default_resource"] = default_resource
+        row["default_resource_id"] = (
+            str(default_resource.get("id", "")).strip() if isinstance(default_resource, dict) else None
         ) or None
     return rows
 

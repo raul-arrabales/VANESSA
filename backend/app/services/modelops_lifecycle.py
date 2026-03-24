@@ -5,7 +5,7 @@ from typing import Any
 from ..config import AuthConfig
 from ..repositories import modelops as modelops_repo
 from ..repositories.model_credentials import get_active_credential_secret
-from ..repositories.platform_control_plane import count_deployment_bindings_for_served_model
+from ..repositories.platform_control_plane import count_deployment_bindings_for_managed_model
 from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model
@@ -247,7 +247,7 @@ def delete_model(
     can_manage_model(row, actor_user_id=actor_user_id, actor_role=actor_role, action="delete")
     if str(row.get("lifecycle_state", "")).strip().lower() != modelops_repo.LIFECYCLE_UNREGISTERED:
         raise ModelOpsError("invalid_state_transition", "Model must be unregistered before deletion", status_code=409)
-    if count_deployment_bindings_for_served_model(database_url, model_id=model_id) > 0:
+    if count_deployment_bindings_for_managed_model(database_url, model_id=model_id) > 0:
         raise ModelOpsError("dependencies_unsatisfied", "Model is still referenced by a deployment binding", status_code=409)
     deleted = modelops_repo.delete_model(database_url, model_id=model_id)
     if not deleted:

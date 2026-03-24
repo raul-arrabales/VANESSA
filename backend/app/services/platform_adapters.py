@@ -141,11 +141,35 @@ def _openai_compatible_headers(binding: ProviderBinding) -> dict[str, str]:
     return headers
 
 
-def _served_model_runtime_identifier(binding: ProviderBinding) -> str:
-    served_model = binding.default_served_model or {}
-    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
-    local_path = str(served_model.get("local_path", "")).strip()
-    return provider_model_id or local_path
+def _default_resource_runtime_identifier(binding: ProviderBinding) -> str:
+    resource = binding.default_resource or {}
+    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    if provider_resource_id:
+        return provider_resource_id
+    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
+    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
+    local_path = str(metadata.get("local_path", "")).strip()
+    source_id = str(metadata.get("source_id", "")).strip()
+    return provider_model_id or local_path or source_id
+
+
+def _normalize_model_resource(item: dict[str, Any]) -> dict[str, Any]:
+    resource_id = str(item.get("id", "")).strip()
+    metadata = {
+        "name": item.get("name") or item.get("id"),
+        "provider_model_id": str(item.get("id", "")).strip() or None,
+        "source_id": str(item.get("source_id", "")).strip() or None,
+        "owned_by": item.get("owned_by"),
+    }
+    return {
+        "id": resource_id,
+        "resource_kind": "model",
+        "ref_type": "provider_resource",
+        "managed_model_id": None,
+        "provider_resource_id": resource_id or None,
+        "display_name": item.get("id") or item.get("name"),
+        "metadata": {key: value for key, value in metadata.items() if value not in {None, ""}},
+    }
 
 
 class LlmInferenceAdapter(ABC):
@@ -159,6 +183,12 @@ class LlmInferenceAdapter(ABC):
     @abstractmethod
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
         raise NotImplementedError
+
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = self.list_models()
+        items = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), list) else []
+        resources = [_normalize_model_resource(item) for item in items if isinstance(item, dict)]
+        return resources, status_code
 
     @abstractmethod
     def chat_completion(
@@ -197,6 +227,12 @@ class EmbeddingsAdapter(ABC):
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
         raise NotImplementedError
 
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = self.list_models()
+        items = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), list) else []
+        resources = [_normalize_model_resource(item) for item in items if isinstance(item, dict)]
+        return resources, status_code
+
     @abstractmethod
     def embed_texts(
         self,
@@ -213,6 +249,10 @@ class VectorStoreAdapter(ABC):
 
     @abstractmethod
     def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
         raise NotImplementedError
 
     @abstractmethod
@@ -561,11 +601,11 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
         texts: list[str],
         model: str | None = None,
     ) -> tuple[dict[str, Any] | None, int]:
-        effective_model = str(model or "").strip() or _served_model_runtime_identifier(self.binding)
+        effective_model = str(model or "").strip() or _default_resource_runtime_identifier(self.binding)
         if not effective_model:
             raise PlatformControlPlaneError(
-                "served_model_required",
-                "Embeddings binding is missing a served model",
+                "default_resource_required",
+                "Embeddings binding is missing a default resource",
                 status_code=409,
                 details={"provider": self.binding.provider_slug},
             )
@@ -598,6 +638,29 @@ class WeaviateVectorStoreAdapter(VectorStoreAdapter):
             "provider_key": self.binding.provider_key,
             "provider_slug": self.binding.provider_slug,
         }
+
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = http_json_request(self._schema_url(), method="GET")
+        classes = payload.get("classes") if isinstance(payload, dict) and isinstance(payload.get("classes"), list) else []
+        resources = []
+        for item in classes:
+            if not isinstance(item, dict):
+                continue
+            class_name = str(item.get("class", "")).strip()
+            if not class_name:
+                continue
+            resources.append(
+                {
+                    "id": class_name,
+                    "resource_kind": "index",
+                    "ref_type": "provider_resource",
+                    "managed_model_id": None,
+                    "provider_resource_id": class_name,
+                    "display_name": class_name,
+                    "metadata": {},
+                }
+            )
+        return resources, status_code
 
     def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
         class_name = _coerce_weaviate_class_name(index_name)
@@ -777,6 +840,31 @@ class QdrantVectorStoreAdapter(VectorStoreAdapter):
             "provider_slug": self.binding.provider_slug,
         }
 
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = http_json_request(self._collections_url(), method="GET")
+        collections = (((payload.get("result") or {}).get("collections")) if isinstance(payload, dict) else [])
+        if not isinstance(collections, list):
+            collections = []
+        resources = []
+        for item in collections:
+            if not isinstance(item, dict):
+                continue
+            collection_name = str(item.get("name", "")).strip()
+            if not collection_name:
+                continue
+            resources.append(
+                {
+                    "id": collection_name,
+                    "resource_kind": "collection",
+                    "ref_type": "provider_resource",
+                    "managed_model_id": None,
+                    "provider_resource_id": collection_name,
+                    "display_name": collection_name,
+                    "metadata": {},
+                }
+            )
+        return resources, status_code
+
     def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
         collection_name = _coerce_qdrant_collection_name(index_name)
         existing_payload, existing_status = http_json_request(self._collection_url(collection_name), method="GET")
@@ -941,6 +1029,10 @@ class QdrantVectorStoreAdapter(VectorStoreAdapter):
 
     def _collection_url(self, collection_name: str) -> str:
         return self.binding.endpoint_url.rstrip("/") + f"/collections/{collection_name}"
+
+    def _collections_url(self) -> str:
+        path = str(self.binding.config.get("collections_path", "/collections")).strip() or "/collections"
+        return self.binding.endpoint_url.rstrip("/") + path
 
     def _points_url(self, collection_name: str) -> str:
         return self._collection_url(collection_name) + "/points"

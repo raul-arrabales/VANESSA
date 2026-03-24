@@ -95,12 +95,16 @@ def test_inference_uses_canonical_local_llm_alias(client, monkeypatch: pytest.Mo
                 "Binding",
                 (),
                 {
-                    "served_models": [
+                    "resources": [
                         {
                             "id": "Qwen--Qwen2.5-0.5B-Instruct",
-                            "name": "Qwen 0.5B",
-                            "backend": "local",
-                            "local_path": "local-vllm-default",
+                            "resource_kind": "model",
+                            "provider_resource_id": "local-vllm-default",
+                            "display_name": "Qwen 0.5B",
+                            "metadata": {
+                                "backend": "local",
+                                "local_path": "local-vllm-default",
+                            },
                         }
                     ],
                     "config": {

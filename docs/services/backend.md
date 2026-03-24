@@ -63,11 +63,11 @@ Key terms:
 - `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
 - `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`
 - `deployment profile`: named set of active capability bindings
-- `served model`: ModelOps-managed model explicitly bound to a model-bearing capability at the deployment-binding layer
+- `binding resource`: capability-scoped resource explicitly bound at the deployment-binding layer, such as a ModelOps-managed model or a vector-store index
 - `adapter`: capability-specific backend client used by runtime paths
 
 This layer stays separate from user-facing model/provider governance. Model governance decides which models users can access; the platform control plane decides which infrastructure implementation powers a capability.
-For shared cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed served managed models plus one default.
+For shared cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed managed-model resources plus one default.
 
 Bootstrap defaults:
 
@@ -78,9 +78,9 @@ Bootstrap defaults:
 - `mcp_gateway_local` is seeded only when `MCP_GATEWAY_URL` is configured and bound as optional `mcp_runtime` into local deployment profiles when available.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
-- Model-bearing deployment bindings now require one or more served models plus a default served model for both `llm_inference` and `embeddings`.
+- Model-bearing deployment bindings now require one or more model resources plus a default resource for both `llm_inference` and `embeddings`.
 - Deployment bindings may reference only ModelOps models that are already `active`, `is_validation_current=true`, and `last_validation_status=success`.
-- The runtime snapshot now serializes `served_models`, `default_served_model_id`, and `default_served_model` instead of a single `served_model_id`.
+- The runtime snapshot now serializes generic binding `resources`, `default_resource_id`, `default_resource`, and `resource_policy` for every capability binding.
 - Direct backend inference and agent-engine runtime selection both enforce active-binding membership: requested LLM model ids must be present in the active `llm_inference` binding and omitted requests fall back to the binding default.
 - Runtime-facing provider model ids are resolved per bound managed model. Cloud models resolve through `provider_model_id`; local models resolve by matching the provider `/models` inventory against managed model metadata.
 - Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
@@ -89,7 +89,7 @@ Bootstrap defaults:
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
 - `POST /v1/chat/knowledge` is the first product-facing RAG surface. It keeps frontend chat state browser-local, resolves the selected model through ModelOps eligibility, executes the fixed `agent.knowledge_chat` agent through backend-owned orchestration, and returns normalized `sources` plus `retrieval` metadata for citation rendering.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
-- Deployment bindings now serialize the full served-model list plus the default served model for UI rendering.
+- Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
 - Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
 - Tool definitions remain registry entities. Backend bootstraps `tool.web_search` and `tool.python_exec`, and registry validation constrains tool specs to `transport in {"mcp", "sandbox_http"}` with `connection_profile_ref == "default"` in this first convergence phase.

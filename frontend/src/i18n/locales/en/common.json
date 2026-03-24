@@ -783,15 +783,18 @@
         "llmProvider": "LLM provider",
         "vectorProvider": "Vector provider",
         "providerForCapability": "{{capability}} provider",
-        "servedModelsForCapability": "{{capability}} served models",
-        "defaultServedModelForCapability": "{{capability}} default served model"
+        "resourcesForCapability": "{{capability}} resources",
+        "defaultResourceForCapability": "{{capability}} default resource",
+        "vectorSelectionMode": "Vector selection mode",
+        "namespacePrefix": "Namespace prefix",
+        "explicitResources": "Explicit vector resources"
       }
     },
     "capabilities": {
-      "description": "Each capability reflects the active deployment binding: one active provider plus the models or artifacts served through that binding.",
+      "description": "Each capability reflects the active deployment binding: one active provider plus the resources or artifacts bound through that binding.",
       "activeProvider": "Active provider",
       "runtime": "Runtime / adapter",
-      "servedArtifacts": "Served models / artifacts",
+      "servedArtifacts": "Bound resources / artifacts",
       "unbound": "No active provider is bound to this capability.",
       "empty": "No platform capabilities are registered."
     },
@@ -815,8 +818,8 @@
       "notValidated": "Not validated yet.",
       "validationDescription": "Run live validation checks against this provider and the current binding context.",
       "validationStatus": "Health status: {{code}}",
-      "modelsReachable": "Model discovery reachable",
-      "modelsUnavailable": "Model discovery unavailable",
+      "resourcesReachable": "Resource discovery reachable",
+      "resourcesUnavailable": "Resource discovery unavailable",
       "embeddingsReachable": "Embeddings reachable ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings unavailable",
       "familyLabel": "Provider family",
@@ -829,14 +832,14 @@
       "moreDeployments": "+{{count}} more",
       "noDescription": "No description provided.",
       "settingsDescription": "Update provider metadata, endpoint settings, enabled state, config, and secret refs.",
-      "usageDescription": "Served models belong to deployment bindings, so usage is grouped by deployment profile.",
+      "usageDescription": "Bound resources belong to deployment bindings, so usage is grouped by deployment profile.",
       "usageTableAria": "Bindings referencing {{name}}",
       "noUsage": "This provider is not referenced by any deployment profile.",
       "deleteDescription": "Delete this provider only when it is no longer referenced by deployment profiles.",
       "notFound": "The requested provider could not be found.",
       "bindingErrors": {
-        "served_model_required": "Select served models in a deployment binding before validating this provider.",
-        "served_model_not_exposed": "Model {{modelId}} is not exposed by the provider as {{runtimeModelId}}."
+        "resource_required": "Select bound resources in a deployment binding before validating this provider.",
+        "resource_not_exposed": "Resource {{resourceId}} is not exposed by the provider as {{providerResourceId}}."
       },
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
@@ -855,7 +858,7 @@
       "title": "Deployment profiles",
       "pageDescription": "Review deployment inventory, activation history, and the active binding topology across platform capabilities.",
       "newTitle": "New deployment profile",
-      "newDescription": "Create a deployment profile by selecting one provider binding per required capability and assigning served models where needed.",
+      "newDescription": "Create a deployment profile by selecting one provider binding per required capability and assigning resources where needed.",
       "detailTitle": "Deployment profile detail",
       "detailDescription": "Inspect one deployment profile, update its bindings, clone it, and activate it when ready.",
       "directoryDescription": "{{count}} deployment profiles match the current filters.",
@@ -867,7 +870,7 @@
       "editing": "Editing deployment {{slug}}.",
       "cloning": "Cloning deployment into {{slug}}.",
       "cloneDescription": "Create a new deployment profile by copying this deployment's current topology and metadata.",
-      "settingsDescription": "Edit provider bindings, served models, and default served models for this deployment profile.",
+      "settingsDescription": "Edit provider bindings, resources, and default resources for this deployment profile.",
       "deleteDescription": "Delete this deployment profile only when it is no longer the active deployment.",
       "recentActivations": "Recent activations for this deployment",
       "recentActivationsDescription": "Review when this deployment profile was promoted and what it replaced.",
@@ -875,7 +878,7 @@
       "columns": {
         "capability": "Capability",
         "provider": "Provider",
-        "servedModel": "Served model",
+        "resources": "Resources",
         "adapter": "Adapter",
         "status": "Status"
       }
@@ -933,8 +936,8 @@
       "loadFailed": "Unable to load platform control data.",
       "invalidJson": "{{field}} must be valid JSON object text.",
       "bindingRequired": "Both required capability bindings must be selected.",
-      "servedModelRequired": "{{capability}} requires a served model.",
-      "defaultServedModelRequired": "{{capability}} requires a default served model.",
+      "resourceRequired": "{{capability}} requires at least one bound resource.",
+      "defaultResourceRequired": "{{capability}} requires a default resource.",
       "validationSuccess": "Validated provider {{slug}}.",
       "validationFailed": "Unable to validate provider.",
       "providerCreated": "Created provider {{name}}.",

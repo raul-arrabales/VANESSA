@@ -50,24 +50,34 @@
         "config": {
           "chat_completion_path": "/v1/chat/completions"
         },
-        "served_models": [
+        "resources": [
           {
             "id": "model.alpha",
-            "name": "Model Alpha",
-            "provider_model_id": "model.alpha"
+            "resource_kind": "model",
+            "ref_type": "managed_model",
+            "managed_model_id": "model.alpha",
+            "provider_resource_id": "model.alpha",
+            "display_name": "Model Alpha"
           },
           {
             "id": "model.default",
-            "name": "Default Model",
-            "provider_model_id": "model.default"
+            "resource_kind": "model",
+            "ref_type": "managed_model",
+            "managed_model_id": "model.default",
+            "provider_resource_id": "model.default",
+            "display_name": "Default Model"
           }
         ],
-        "default_served_model_id": "model.default",
-        "default_served_model": {
+        "default_resource_id": "model.default",
+        "default_resource": {
           "id": "model.default",
-          "name": "Default Model",
-          "provider_model_id": "model.default"
+          "resource_kind": "model",
+          "ref_type": "managed_model",
+          "managed_model_id": "model.default",
+          "provider_resource_id": "model.default",
+          "display_name": "Default Model"
         },
+        "resource_policy": {},
         "binding_config": {}
       },
       "embeddings": {
@@ -83,19 +93,26 @@
         "config": {
           "embeddings_path": "/v1/embeddings"
         },
-        "served_models": [
+        "resources": [
           {
             "id": "local-vllm-embeddings-default",
-            "name": "Local Embeddings Default",
-            "provider_model_id": "local-vllm-embeddings-default"
+            "resource_kind": "model",
+            "ref_type": "managed_model",
+            "managed_model_id": "local-vllm-embeddings-default",
+            "provider_resource_id": "local-vllm-embeddings-default",
+            "display_name": "Local Embeddings Default"
           }
         ],
-        "default_served_model_id": "local-vllm-embeddings-default",
-        "default_served_model": {
+        "default_resource_id": "local-vllm-embeddings-default",
+        "default_resource": {
           "id": "local-vllm-embeddings-default",
-          "name": "Local Embeddings Default",
-          "provider_model_id": "local-vllm-embeddings-default"
+          "resource_kind": "model",
+          "ref_type": "managed_model",
+          "managed_model_id": "local-vllm-embeddings-default",
+          "provider_resource_id": "local-vllm-embeddings-default",
+          "display_name": "Local Embeddings Default"
         },
+        "resource_policy": {},
         "binding_config": {}
       },
       "vector_store": {
@@ -109,6 +126,10 @@
         "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
         "enabled": true,
         "config": {},
+        "resources": [],
+        "default_resource_id": null,
+        "default_resource": null,
+        "resource_policy": {},
         "binding_config": {}
       },
       "mcp_runtime": {
@@ -122,6 +143,10 @@
         "healthcheck_url": "http://mcp_gateway:8080/health",
         "enabled": true,
         "config": {},
+        "resources": [],
+        "default_resource_id": null,
+        "default_resource": null,
+        "resource_policy": {},
         "binding_config": {}
       },
       "sandbox_execution": {
@@ -135,6 +160,10 @@
         "healthcheck_url": "http://sandbox:8000/health",
         "enabled": true,
         "config": {},
+        "resources": [],
+        "default_resource_id": null,
+        "default_resource": null,
+        "resource_policy": {},
         "binding_config": {}
       }
     }
@@ -200,16 +229,17 @@
 
 `platform_runtime` is execution-scoped and resolved by backend from the active platform bindings immediately before the internal engine call. Agent engine consumes this snapshot directly and does not query the backend control plane or platform tables itself.
 
-For model-bearing capabilities, the runtime snapshot is authoritative:
+For resource-bearing capabilities, the runtime snapshot is authoritative:
 
-- `llm_inference.served_models` is the allow-list of managed model ids that may execute through the active binding.
-- `llm_inference.default_served_model_id` is used when `input.model` is omitted.
-- `embeddings.default_served_model_id` is the embeddings model used for retrieval and vector ingestion.
-- Agent engine resolves the selected managed model to the provider-facing model id before issuing upstream requests.
+- `llm_inference.resources` is the allow-list of managed model resources that may execute through the active binding.
+- `llm_inference.default_resource_id` is used when `input.model` is omitted.
+- `embeddings.default_resource_id` is the embeddings resource used for retrieval and vector ingestion.
+- `vector_store.resource_policy` governs whether vector indexes must be explicitly bound or may be created/resolved under a deployment namespace.
+- Agent engine resolves the selected managed model resource to the provider-facing model id before issuing upstream requests.
 
 `input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
 
-`input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.served_models`. When omitted, the active binding default is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
+`input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.resources`. When omitted, the active binding default resource is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 
 Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent tool catalog requires them. In the current convergence phase:
 

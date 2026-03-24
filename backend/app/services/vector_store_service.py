@@ -14,6 +14,7 @@ def ensure_vector_index(database_url: str, config: AuthConfig, payload: dict[str
     index_name = _require_index_name(payload.get("index"))
     schema = _normalize_schema(payload.get("schema"))
     adapter = resolve_vector_store_adapter(database_url, config)
+    _validate_bound_vector_resource(getattr(adapter, "binding", None), index_name)
     return adapter.ensure_index(index_name=index_name, schema=schema)
 
 
@@ -26,6 +27,7 @@ def upsert_vector_documents(database_url: str, config: AuthConfig, payload: dict
     normalized_documents = [_normalize_document(document, position=index) for index, document in enumerate(documents)]
     _populate_missing_embeddings(database_url, config, normalized_documents)
     adapter = resolve_vector_store_adapter(database_url, config)
+    _validate_bound_vector_resource(getattr(adapter, "binding", None), index_name)
     return adapter.upsert(index_name=index_name, documents=normalized_documents)
 
 
@@ -51,6 +53,7 @@ def query_vector_documents(database_url: str, config: AuthConfig, payload: dict[
         query_text = None
 
     adapter = resolve_vector_store_adapter(database_url, config)
+    _validate_bound_vector_resource(getattr(adapter, "binding", None), index_name)
     return adapter.query(
         index_name=index_name,
         query_text=query_text,
@@ -78,6 +81,7 @@ def delete_vector_documents(database_url: str, config: AuthConfig, payload: dict
         normalized_ids.append(document_id)
 
     adapter = resolve_vector_store_adapter(database_url, config)
+    _validate_bound_vector_resource(getattr(adapter, "binding", None), index_name)
     return adapter.delete(index_name=index_name, ids=normalized_ids)
 
 
@@ -225,6 +229,48 @@ def _normalize_embedding(value: Any, *, field_name: str) -> list[float]:
                 status_code=400,
             ) from exc
     return normalized
+
+
+def _validate_bound_vector_resource(binding: Any, index_name: str) -> None:
+    if binding is None:
+        return
+    resource_policy = getattr(binding, "resource_policy", {}) if binding is not None else {}
+    selection_mode = str(resource_policy.get("selection_mode") or "explicit").strip().lower()
+    if selection_mode == "dynamic_namespace":
+        namespace_prefix = str(resource_policy.get("namespace_prefix") or "").strip()
+        name_pattern = str(resource_policy.get("name_pattern") or "").strip()
+        if namespace_prefix and not index_name.startswith(namespace_prefix):
+            raise PlatformControlPlaneError(
+                "vector_index_not_allowed",
+                "Requested vector index is outside the active deployment namespace",
+                status_code=403,
+                details={"index": index_name, "namespace_prefix": namespace_prefix},
+            )
+        if name_pattern:
+            import re
+            if re.fullmatch(name_pattern, index_name) is None:
+                raise PlatformControlPlaneError(
+                    "vector_index_not_allowed",
+                    "Requested vector index does not match the active deployment naming policy",
+                    status_code=403,
+                    details={"index": index_name, "name_pattern": name_pattern},
+                )
+        return
+
+    resources = getattr(binding, "resources", []) if binding is not None else []
+    allowed_ids = {
+        str(resource.get("provider_resource_id") or resource.get("id") or "").strip()
+        for resource in resources
+        if isinstance(resource, dict)
+    }
+    if allowed_ids and index_name in allowed_ids:
+        return
+    raise PlatformControlPlaneError(
+        "vector_index_not_allowed",
+        "Requested vector index is not bound by the active deployment",
+        status_code=403,
+        details={"index": index_name, "allowed_indexes": sorted(item for item in allowed_ids if item)},
+    )
 
 
 def _normalize_metadata(value: Any, *, field_name: str) -> dict[str, Any]:

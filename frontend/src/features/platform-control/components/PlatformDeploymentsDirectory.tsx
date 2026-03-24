@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { summarizeBindingServedModels } from "../utils";
+import { summarizeBindingResources } from "../utils";
 
 type PlatformDeploymentsDirectoryProps = {
   deployments: PlatformDeploymentProfile[];
@@ -41,7 +41,7 @@ export default function PlatformDeploymentsDirectory({
                 <tr>
                   <th>{t("platformControl.deployments.columns.capability")}</th>
                   <th>{t("platformControl.deployments.columns.provider")}</th>
-                  <th>{t("platformControl.deployments.columns.servedModel")}</th>
+                  <th>{t("platformControl.deployments.columns.resources")}</th>
                   <th>{t("platformControl.deployments.columns.adapter")}</th>
                   <th>{t("platformControl.deployments.columns.status")}</th>
                 </tr>
@@ -56,7 +56,7 @@ export default function PlatformDeploymentsDirectory({
                         <code className="code-inline">{binding.provider.slug}</code>
                       </div>
                     </td>
-                    <td>{summarizeBindingServedModels(binding, t("platformControl.summary.none"))}</td>
+                    <td>{summarizeBindingResources(binding, t("platformControl.summary.none"))}</td>
                     <td>{binding.provider.adapter_kind}</td>
                     <td>
                       <span className="platform-badge" data-tone={binding.provider.enabled ? "enabled" : "disabled"}>

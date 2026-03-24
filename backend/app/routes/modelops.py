@@ -99,7 +99,7 @@ register_modelops_local_routes(
     get_download_job_fn=lambda *args, **kwargs: get_download_job(*args, **kwargs),
     list_download_jobs_fn=lambda *args, **kwargs: list_download_jobs(*args, **kwargs),
     serialize_download_job_fn=serialize_download_job,
-    ensure_download_worker_started_fn=ensure_download_worker_started,
+    ensure_download_worker_started_fn=lambda: ensure_download_worker_started(),
 )
 
 __all__ = [

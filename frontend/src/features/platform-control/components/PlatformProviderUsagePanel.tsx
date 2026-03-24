@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { getProviderUsageEntries, summarizeBindingServedModels } from "../utils";
+import { getProviderUsageEntries, summarizeBindingResources } from "../utils";
 
 type PlatformProviderUsagePanelProps = {
   providerId: string;
@@ -47,7 +47,7 @@ export default function PlatformProviderUsagePanel({
                   <thead>
                     <tr>
                       <th>{t("platformControl.deployments.columns.capability")}</th>
-                      <th>{t("platformControl.deployments.columns.servedModel")}</th>
+                      <th>{t("platformControl.deployments.columns.resources")}</th>
                       <th>{t("platformControl.deployments.columns.adapter")}</th>
                     </tr>
                   </thead>
@@ -55,7 +55,7 @@ export default function PlatformProviderUsagePanel({
                     {entry.bindings.map((binding) => (
                       <tr key={`${entry.deployment.id}-${binding.capability}`}>
                         <td>{capabilityLabelByKey.get(binding.capability) ?? binding.capability}</td>
-                        <td>{summarizeBindingServedModels(binding, t("platformControl.summary.none"))}</td>
+                        <td>{summarizeBindingResources(binding, t("platformControl.summary.none"))}</td>
                         <td>{binding.provider.adapter_kind}</td>
                       </tr>
                     ))}

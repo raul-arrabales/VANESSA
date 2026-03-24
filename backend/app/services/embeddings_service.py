@@ -37,6 +37,7 @@ def embed_text_inputs(database_url: str, config: AuthConfig, texts: list[str]) -
             "provider_key": adapter.binding.provider_key,
             "display_name": adapter.binding.provider_display_name,
             "deployment_profile_slug": adapter.binding.deployment_profile_slug,
+            "default_resource_id": adapter.binding.default_resource_id,
         },
         "count": len(embeddings),
         "dimension": normalized_dimension,

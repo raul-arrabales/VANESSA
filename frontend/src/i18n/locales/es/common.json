@@ -783,15 +783,18 @@
         "llmProvider": "Proveedor LLM",
         "vectorProvider": "Proveedor vectorial",
         "providerForCapability": "Proveedor de {{capability}}",
-        "servedModelsForCapability": "Modelos servidos de {{capability}}",
-        "defaultServedModelForCapability": "Modelo servido por defecto de {{capability}}"
+        "resourcesForCapability": "Recursos de {{capability}}",
+        "defaultResourceForCapability": "Recurso por defecto de {{capability}}",
+        "vectorSelectionMode": "Modo de seleccion vectorial",
+        "namespacePrefix": "Prefijo de namespace",
+        "explicitResources": "Recursos vectoriales explicitos"
       }
     },
     "capabilities": {
-      "description": "Cada capacidad refleja el enlace del despliegue activo: un proveedor activo y los modelos o artefactos servidos a traves de ese enlace.",
+      "description": "Cada capacidad refleja el enlace del despliegue activo: un proveedor activo y los recursos o artefactos enlazados a traves de ese enlace.",
       "activeProvider": "Proveedor activo",
       "runtime": "Runtime / adaptador",
-      "servedArtifacts": "Modelos / artefactos servidos",
+      "servedArtifacts": "Recursos / artefactos enlazados",
       "unbound": "Ningun proveedor activo esta enlazado a esta capacidad.",
       "empty": "No hay capacidades de plataforma registradas."
     },
@@ -815,8 +818,8 @@
       "notValidated": "Todavia no validado.",
       "validationDescription": "Ejecuta comprobaciones en vivo contra este proveedor y el contexto actual del enlace.",
       "validationStatus": "Estado de salud: {{code}}",
-      "modelsReachable": "Descubrimiento de modelos accesible",
-      "modelsUnavailable": "Descubrimiento de modelos no accesible",
+      "resourcesReachable": "Descubrimiento de recursos accesible",
+      "resourcesUnavailable": "Descubrimiento de recursos no accesible",
       "embeddingsReachable": "Embeddings accesibles ({{dimension}}d)",
       "embeddingsUnavailable": "Embeddings no accesibles",
       "familyLabel": "Familia de proveedor",
@@ -829,14 +832,14 @@
       "moreDeployments": "+{{count}} mas",
       "noDescription": "No hay descripcion.",
       "settingsDescription": "Actualiza metadatos, endpoint, estado habilitado, configuracion y referencias secretas del proveedor.",
-      "usageDescription": "Los modelos servidos pertenecen a enlaces de despliegue, asi que el uso se muestra agrupado por perfil de despliegue.",
+      "usageDescription": "Los recursos enlazados pertenecen a enlaces de despliegue, asi que el uso se muestra agrupado por perfil de despliegue.",
       "usageTableAria": "Enlaces que referencian {{name}}",
       "noUsage": "Este proveedor no esta referenciado por ningun perfil de despliegue.",
       "deleteDescription": "Elimina este proveedor solo cuando ya no este referenciado por perfiles de despliegue.",
       "notFound": "No se pudo encontrar el proveedor solicitado.",
       "bindingErrors": {
-        "served_model_required": "Selecciona modelos servidos en un despliegue antes de validar este proveedor.",
-        "served_model_not_exposed": "El proveedor no expone el modelo {{modelId}} como {{runtimeModelId}}."
+        "resource_required": "Selecciona recursos enlazados en un despliegue antes de validar este proveedor.",
+        "resource_not_exposed": "El proveedor no expone el recurso {{resourceId}} como {{providerResourceId}}."
       },
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
@@ -855,7 +858,7 @@
       "title": "Perfiles de despliegue",
       "pageDescription": "Revisa el inventario de despliegues, el historial de activacion y la topologia activa de enlaces entre capacidades.",
       "newTitle": "Nuevo perfil de despliegue",
-      "newDescription": "Crea un perfil de despliegue seleccionando un proveedor por cada capacidad requerida y asignando modelos servidos cuando haga falta.",
+      "newDescription": "Crea un perfil de despliegue seleccionando un proveedor por cada capacidad requerida y asignando recursos cuando haga falta.",
       "detailTitle": "Detalle del perfil de despliegue",
       "detailDescription": "Inspecciona un perfil de despliegue, actualiza sus enlaces, clonalo y activalo cuando este listo.",
       "directoryDescription": "{{count}} perfiles de despliegue coinciden con los filtros actuales.",
@@ -867,7 +870,7 @@
       "editing": "Editando despliegue {{slug}}.",
       "cloning": "Clonando despliegue en {{slug}}.",
       "cloneDescription": "Crea un nuevo perfil de despliegue copiando la topologia y los metadatos actuales de este despliegue.",
-      "settingsDescription": "Edita enlaces de proveedor, modelos servidos y modelos servidos por defecto para este perfil.",
+      "settingsDescription": "Edita enlaces de proveedor, recursos y recursos por defecto para este perfil.",
       "deleteDescription": "Elimina este perfil de despliegue solo cuando ya no sea el despliegue activo.",
       "recentActivations": "Activaciones recientes de este despliegue",
       "recentActivationsDescription": "Revisa cuando se promovio este perfil y que reemplazo.",
@@ -875,7 +878,7 @@
       "columns": {
         "capability": "Capacidad",
         "provider": "Proveedor",
-        "servedModel": "Modelo servido",
+        "resources": "Recursos",
         "adapter": "Adaptador",
         "status": "Estado"
       }
@@ -933,8 +936,8 @@
       "loadFailed": "No se pudieron cargar los datos de control de plataforma.",
       "invalidJson": "{{field}} debe ser texto JSON de objeto valido.",
       "bindingRequired": "Deben seleccionarse ambos enlaces de capacidad requeridos.",
-      "servedModelRequired": "{{capability}} requiere un modelo servido.",
-      "defaultServedModelRequired": "{{capability}} requiere un modelo servido por defecto.",
+      "resourceRequired": "{{capability}} requiere al menos un recurso enlazado.",
+      "defaultResourceRequired": "{{capability}} requiere un recurso por defecto.",
       "validationSuccess": "Proveedor {{slug}} validado.",
       "validationFailed": "No se pudo validar el proveedor.",
       "providerCreated": "Proveedor {{name}} creado.",

@@ -15,7 +15,7 @@ Current architectural pillars:
 
 - **GenAI control plane**
   - Owned by the backend and PostgreSQL.
-  - Manages platform `capabilities`, `providers`, `deployment_profile`s, and binding-level served-model selection.
+  - Manages platform `capabilities`, `providers`, `deployment_profile`s, and binding-level resource selection.
   - Chooses which infrastructure implementation is active for inference, embeddings, vector retrieval, sandbox execution, and MCP tool runtime.
 
 - **ModelOps**
@@ -67,11 +67,11 @@ Use these terms consistently:
 - `deployment_profile`
   - Named set of active capability bindings.
 
-- `served_models`
-  - The explicit list of ModelOps-managed models bound to a model-bearing deployment binding.
+- `resources`
+  - The explicit list of deployment-bound capability resources, including managed-model resources and provider-native resources such as vector indexes.
 
-- `default_served_model_id`
-  - The default managed model for a model-bearing binding when the caller does not explicitly request one.
+- `default_resource_id`
+  - The default deployment-bound resource for a capability when the caller does not explicitly request one.
 
 ### 2.2. Platform control plane vs ModelOps
 
@@ -105,7 +105,7 @@ Current runtime ownership:
 
 For model-bearing capabilities:
 
-- `llm_inference` and `embeddings` bindings use `served_models` plus `default_served_model_id`.
+- `llm_inference` and `embeddings` bindings use managed-model `resources` plus `default_resource_id`.
 - Requested models must belong to the active binding.
 - If no model is requested, the binding default is used.
 
@@ -280,12 +280,12 @@ Prefer current platform terms:
 - `provider`
 - `adapter`
 - `deployment_profile`
-- `served_models`
-- `default_served_model_id`
+- `resources`
+- `default_resource_id`
 - `platform_runtime`
 - `ModelOps`
 
-Avoid reviving outdated singular terminology such as binding everything around one `served_model_id` when the current design is multi-model.
+Avoid reviving outdated singular terminology such as binding everything around one `served_model_id` when the current design is resource-oriented and multi-model.
 
 ---
 
@@ -343,7 +343,7 @@ When making changes:
 - Use vector-store adapters instead of provider-specific calls everywhere.
 - Use data access layers/repositories instead of inline SQL in feature code.
 - Keep tool definitions in the registry and tool transports in platform capabilities/providers.
-- Bind concrete managed models at the deployment-binding layer through `served_models` and `default_served_model_id`, not by attaching a single model directly to a provider instance.
+- Bind concrete managed models and other provider resources at the deployment-binding layer through `resources` and `default_resource_id`, not by attaching a single model directly to a provider instance.
 
 4. Keep backend and docs aligned with current architecture.
 - If a change affects topology, interfaces, runtime selection, provider binding, or architectural contracts, update the corresponding docs in the same change.

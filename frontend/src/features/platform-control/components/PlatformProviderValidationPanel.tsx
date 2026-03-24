@@ -36,11 +36,11 @@ export default function PlatformProviderValidationPanel({
               {t("platformControl.providers.validationStatus", { code: validation.validation.health.status_code })}
             </span>
           </div>
-          {typeof validation.validation.models_reachable === "boolean" ? (
+          {typeof validation.validation.resources_reachable === "boolean" ? (
             <span className="status-text">
-              {validation.validation.models_reachable
-                ? t("platformControl.providers.modelsReachable")
-                : t("platformControl.providers.modelsUnavailable")}
+              {validation.validation.resources_reachable
+                ? t("platformControl.providers.resourcesReachable")
+                : t("platformControl.providers.resourcesUnavailable")}
             </span>
           ) : null}
           {typeof validation.validation.embeddings_reachable === "boolean" ? (
@@ -57,14 +57,23 @@ export default function PlatformProviderValidationPanel({
               {t(`platformControl.providers.bindingErrors.${validation.validation.binding_error}`)}
             </span>
           ) : null}
-          {(validation.validation.served_model_errors ?? []).map((error, index) => (
-            <span key={`${error.code}-${error.served_model_id ?? index}`} className="status-text">
+          {(validation.validation.resource_errors ?? []).map((error, index) => (
+            <span key={`${error.code}-${error.resource_id ?? index}`} className="status-text">
               {t(`platformControl.providers.bindingErrors.${error.code}`, {
-                modelId: error.served_model_id ?? t("platformControl.summary.none"),
-                runtimeModelId: error.runtime_model_id ?? t("platformControl.summary.none"),
+                resourceId: error.resource_id ?? t("platformControl.summary.none"),
+                providerResourceId: error.provider_resource_id ?? t("platformControl.summary.none"),
               })}
             </span>
           ))}
+          {(validation.validation.resources ?? []).length ? (
+            <div className="card-stack">
+              {(validation.validation.resources ?? []).map((resource) => (
+                <span key={resource.id} className="status-text">
+                  {resource.display_name ?? resource.id}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="status-text">{t("platformControl.providers.notValidated")}</p>

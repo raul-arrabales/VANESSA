@@ -26,8 +26,9 @@ export type DeploymentFormState = {
   displayName: string;
   description: string;
   providerIdsByCapability: Record<string, string>;
-  servedModelIdsByCapability: Record<string, string[]>;
-  defaultServedModelIdsByCapability: Record<string, string>;
+  resourceIdsByCapability: Record<string, string[]>;
+  defaultResourceIdsByCapability: Record<string, string>;
+  resourcePolicyByCapability: Record<string, Record<string, unknown>>;
 };
 
 export type DeploymentCloneFormState = {
@@ -53,8 +54,9 @@ export const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
   displayName: "",
   description: "",
   providerIdsByCapability: {},
-  servedModelIdsByCapability: {},
-  defaultServedModelIdsByCapability: {},
+  resourceIdsByCapability: {},
+  defaultResourceIdsByCapability: {},
+  resourcePolicyByCapability: {},
 };
 
 export function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
@@ -81,8 +83,12 @@ export function parseJsonObject(text: string, errorMessage: string): Record<stri
   return parsed as Record<string, unknown>;
 }
 
-export function capabilityRequiresServedModel(capability: string): boolean {
+export function capabilityRequiresModelResource(capability: string): boolean {
   return capability === "llm_inference" || capability === "embeddings";
+}
+
+export function capabilitySupportsResources(capability: string): boolean {
+  return capability === "llm_inference" || capability === "embeddings" || capability === "vector_store";
 }
 
 export function buildProviderForm(provider: PlatformProvider): ProviderFormState {
@@ -107,11 +113,14 @@ export function buildDeploymentForm(deployment: PlatformDeploymentProfile): Depl
     providerIdsByCapability: Object.fromEntries(
       deployment.bindings.map((binding) => [binding.capability, binding.provider.id]),
     ),
-    servedModelIdsByCapability: Object.fromEntries(
-      deployment.bindings.map((binding) => [binding.capability, (binding.served_models ?? []).map((model) => model.id)]),
+    resourceIdsByCapability: Object.fromEntries(
+      deployment.bindings.map((binding) => [binding.capability, (binding.resources ?? []).map((resource) => resource.id)]),
     ),
-    defaultServedModelIdsByCapability: Object.fromEntries(
-      deployment.bindings.map((binding) => [binding.capability, binding.default_served_model_id ?? ""]),
+    defaultResourceIdsByCapability: Object.fromEntries(
+      deployment.bindings.map((binding) => [binding.capability, binding.default_resource_id ?? ""]),
+    ),
+    resourcePolicyByCapability: Object.fromEntries(
+      deployment.bindings.map((binding) => [binding.capability, binding.resource_policy ?? {}]),
     ),
   };
 }
@@ -128,31 +137,31 @@ export function getModelDisplayName(model: { id: string; name?: string | null })
   return model.name?.trim() || model.id;
 }
 
-export function summarizeServedModels(
-  servedModels: Array<{ id: string; name?: string | null }> | undefined,
-  defaultServedModel: { id: string; name?: string | null } | null | undefined,
+export function summarizeResources(
+  resources: Array<{ id: string; display_name?: string | null; metadata?: Record<string, unknown> }> | undefined,
+  defaultResource: { id: string; display_name?: string | null; metadata?: Record<string, unknown> } | null | undefined,
   noneLabel: string,
 ): string {
-  const models = servedModels ?? [];
-  if (!defaultServedModel && models.length === 0) {
+  const items = resources ?? [];
+  if (!defaultResource && items.length === 0) {
     return noneLabel;
   }
 
-  const primary = defaultServedModel ?? models[0];
+  const primary = defaultResource ?? items[0];
   if (!primary) {
     return noneLabel;
   }
 
-  const primaryLabel = getModelDisplayName(primary);
-  const additionalCount = Math.max(models.length - 1, 0);
+  const primaryLabel = primary.display_name?.trim() || String(primary.metadata?.name ?? primary.id);
+  const additionalCount = Math.max(items.length - 1, 0);
   if (additionalCount === 0) {
     return primaryLabel;
   }
   return `${primaryLabel} (+${additionalCount})`;
 }
 
-export function summarizeBindingServedModels(binding: PlatformDeploymentBinding, noneLabel: string): string {
-  return summarizeServedModels(binding.served_models, binding.default_served_model, noneLabel);
+export function summarizeBindingResources(binding: PlatformDeploymentBinding, noneLabel: string): string {
+  return summarizeResources(binding.resources, binding.default_resource, noneLabel);
 }
 
 export function getActiveDeployment(
@@ -171,12 +180,12 @@ export function getCapabilityProviders(
   }, {});
 }
 
-export function getServedModelsByCapability(
+export function getManagedModelsByCapability(
   eligibleModelsByCapability: Record<string, ManagedModel[]>,
   capabilities: PlatformCapability[],
 ): Record<string, ManagedModel[]> {
   return capabilities.reduce<Record<string, ManagedModel[]>>((accumulator, capability) => {
-    accumulator[capability.capability] = capabilityRequiresServedModel(capability.capability)
+    accumulator[capability.capability] = capabilityRequiresModelResource(capability.capability)
       ? eligibleModelsByCapability[capability.capability] ?? []
       : [];
     return accumulator;
@@ -203,8 +212,8 @@ export function validateDeploymentForm(
   form: DeploymentFormState,
   options: {
     bindingRequiredMessage: string;
-    servedModelRequiredMessage: (capabilityDisplayName: string) => string;
-    defaultServedModelRequiredMessage: (capabilityDisplayName: string) => string;
+    resourceRequiredMessage: (capabilityDisplayName: string) => string;
+    defaultResourceRequiredMessage: (capabilityDisplayName: string) => string;
   },
 ): string | null {
   const missingBinding = requiredCapabilities.find((capability) => !form.providerIdsByCapability[capability.capability]);
@@ -214,21 +223,36 @@ export function validateDeploymentForm(
 
   const missingServedModel = requiredCapabilities.find(
     (capability) =>
-      capabilityRequiresServedModel(capability.capability) &&
-      (form.servedModelIdsByCapability[capability.capability]?.length ?? 0) === 0,
+      capabilityRequiresModelResource(capability.capability) &&
+      (form.resourceIdsByCapability[capability.capability]?.length ?? 0) === 0,
   );
   if (missingServedModel) {
-    return options.servedModelRequiredMessage(missingServedModel.display_name);
+    return options.resourceRequiredMessage(missingServedModel.display_name);
   }
 
   const missingDefaultServedModel = requiredCapabilities.find(
     (capability) =>
-      capabilityRequiresServedModel(capability.capability) &&
-      (form.servedModelIdsByCapability[capability.capability]?.length ?? 0) > 0 &&
-      !form.defaultServedModelIdsByCapability[capability.capability],
+      capabilityRequiresModelResource(capability.capability) &&
+      (form.resourceIdsByCapability[capability.capability]?.length ?? 0) > 0 &&
+      !form.defaultResourceIdsByCapability[capability.capability],
   );
   if (missingDefaultServedModel) {
-    return options.defaultServedModelRequiredMessage(missingDefaultServedModel.display_name);
+    return options.defaultResourceRequiredMessage(missingDefaultServedModel.display_name);
+  }
+
+  const invalidVectorBinding = requiredCapabilities.find((capability) => {
+    if (capability.capability !== "vector_store") {
+      return false;
+    }
+    const policy = form.resourcePolicyByCapability[capability.capability] ?? {};
+    const selectionMode = String(policy.selection_mode ?? "explicit");
+    if (selectionMode === "dynamic_namespace") {
+      return !String(policy.namespace_prefix ?? "").trim();
+    }
+    return (form.resourceIdsByCapability[capability.capability]?.length ?? 0) === 0;
+  });
+  if (invalidVectorBinding) {
+    return options.resourceRequiredMessage(invalidVectorBinding.display_name);
   }
 
   return null;
@@ -245,12 +269,35 @@ export function buildDeploymentMutationInput(
     bindings: requiredCapabilities.map((capability) => ({
       capability: capability.capability,
       provider_id: form.providerIdsByCapability[capability.capability],
-      served_model_ids: capabilityRequiresServedModel(capability.capability)
-        ? form.servedModelIdsByCapability[capability.capability] ?? []
-        : [],
-      default_served_model_id: capabilityRequiresServedModel(capability.capability)
-        ? form.defaultServedModelIdsByCapability[capability.capability] || null
+      resources: capability.capability === "vector_store"
+        ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
+            id: resourceId,
+            resource_kind: "index",
+            ref_type: "provider_resource",
+            provider_resource_id: resourceId,
+            display_name: resourceId,
+            metadata: {},
+          }))
+        : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
+            id: resourceId,
+            resource_kind: "model",
+            ref_type: "managed_model",
+            managed_model_id: resourceId,
+            display_name: resourceId,
+            metadata: {},
+          })),
+      default_resource_id: capabilitySupportsResources(capability.capability)
+        ? form.defaultResourceIdsByCapability[capability.capability] || null
         : null,
+      resource_policy: capability.capability === "vector_store"
+        ? {
+            selection_mode:
+              String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
+            ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
+          }
+        : (capabilitySupportsResources(capability.capability)
+            ? form.resourcePolicyByCapability[capability.capability] ?? {}
+            : {}),
       config: {},
     })),
   };

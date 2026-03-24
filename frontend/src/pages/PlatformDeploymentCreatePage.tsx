@@ -10,7 +10,7 @@ import {
   buildDeploymentMutationInput,
   DEFAULT_DEPLOYMENT_FORM,
   getCapabilityProviders,
-  getServedModelsByCapability,
+  getManagedModelsByCapability,
   validateDeploymentForm,
 } from "../features/platform-control/utils";
 
@@ -36,8 +36,8 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     () => getCapabilityProviders(providers, requiredCapabilities),
     [providers, requiredCapabilities],
   );
-  const servedModelsByCapability = useMemo(
-    () => getServedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
+  const modelResourcesByCapability = useMemo(
+    () => getManagedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
     [eligibleModelsByCapability, requiredCapabilities],
   );
 
@@ -49,10 +49,10 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
 
     const validationError = validateDeploymentForm(requiredCapabilities, form, {
       bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
-      servedModelRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.servedModelRequired", { capability: capabilityDisplayName }),
-      defaultServedModelRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.defaultServedModelRequired", { capability: capabilityDisplayName }),
+      resourceRequiredMessage: (capabilityDisplayName) =>
+        t("platformControl.feedback.resourceRequired", { capability: capabilityDisplayName }),
+      defaultResourceRequiredMessage: (capabilityDisplayName) =>
+        t("platformControl.feedback.defaultResourceRequired", { capability: capabilityDisplayName }),
     });
     if (validationError) {
       setErrorMessage(validationError);
@@ -87,7 +87,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
           value={form}
           capabilities={requiredCapabilities}
           providersByCapability={providersByCapability}
-          servedModelsByCapability={servedModelsByCapability}
+          modelResourcesByCapability={modelResourcesByCapability}
           helperText={t("platformControl.deployments.createHelp")}
           isSubmitting={saving}
           submitLabel={t("platformControl.actions.createDeployment")}

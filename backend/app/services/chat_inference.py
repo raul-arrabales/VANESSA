@@ -88,29 +88,33 @@ def _resolve_canonical_local_llm_model_id(adapter: Any, model_row: dict[str, Any
 
 def _select_bound_llm_model(adapter: Any, requested_model_id: str) -> dict[str, Any]:
     binding = getattr(adapter, "binding", None)
-    served_models = getattr(binding, "served_models", None)
-    if not isinstance(served_models, list) or not served_models:
+    resources = getattr(binding, "resources", None)
+    if not isinstance(resources, list) or not resources:
         raise PlatformControlPlaneError(
-            "served_model_required",
-            "Active LLM binding is missing served models",
+            "resource_required",
+            "Active LLM binding is missing resources",
             status_code=503,
             details={"provider": getattr(binding, "provider_slug", None)},
         )
-    for served_model in served_models:
-        if not isinstance(served_model, dict):
+    for resource in resources:
+        if not isinstance(resource, dict):
             continue
-        if str(served_model.get("id", "")).strip() == requested_model_id:
-            return dict(served_model)
+        if str(resource.get("id", "")).strip() == requested_model_id:
+            return dict(resource)
     raise PlatformControlPlaneError(
         "model_not_bound",
-        "Requested model is not served by the active LLM deployment binding",
+        "Requested model is not bound by the active LLM deployment binding",
         status_code=409,
         details={"model_id": requested_model_id, "provider": getattr(binding, "provider_slug", None)},
     )
 
 
-def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str:
-    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+def _resolve_runtime_model_id(adapter: Any, resource: dict[str, Any]) -> str:
+    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    if provider_resource_id:
+        return provider_resource_id
+    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
+    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
     if provider_model_id:
         return provider_model_id
 
@@ -118,9 +122,9 @@ def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str
     if not callable(list_models):
         raise PlatformControlPlaneError(
             "provider_inventory_unavailable",
-            "LLM provider cannot resolve served model identifiers",
+            "LLM provider cannot resolve bound resource identifiers",
             status_code=502,
-            details={"served_model_id": served_model.get("id")},
+            details={"resource_id": resource.get("id")},
         )
     models_payload, status_code = list_models()
     if models_payload is None or not 200 <= status_code < 300:
@@ -128,13 +132,13 @@ def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str
             "provider_inventory_unavailable",
             "Unable to query the active LLM provider model inventory",
             status_code=502 if status_code < 500 else status_code,
-            details={"served_model_id": served_model.get("id"), "status_code": status_code},
+            details={"resource_id": resource.get("id"), "status_code": status_code},
         )
     candidates = [
-        str(served_model.get("local_path", "")).strip(),
-        str(served_model.get("id", "")).strip(),
-        str(served_model.get("name", "")).strip(),
-        str(served_model.get("source_id", "")).strip(),
+        str(metadata.get("local_path", "")).strip(),
+        str(resource.get("id", "")).strip(),
+        str(resource.get("display_name", "")).strip(),
+        str(metadata.get("source_id", "")).strip(),
     ]
     available_ids = {
         str(item.get("id", "")).strip()
@@ -145,7 +149,7 @@ def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str
         if candidate and candidate in available_ids:
             return candidate
 
-    raw_model_id = str(served_model.get("id", "")).strip()
+    raw_model_id = str(resource.get("managed_model_id") or resource.get("id", "")).strip()
     raw_model_row = modelops_repo.get_model(get_auth_config().database_url, raw_model_id)
     if raw_model_row is not None:
         fallback_model_id = _resolve_canonical_local_llm_model_id(adapter, raw_model_row)
@@ -156,7 +160,7 @@ def _resolve_runtime_model_id(adapter: Any, served_model: dict[str, Any]) -> str
         "model_not_exposed_by_provider",
         "Requested model is not exposed by the active LLM provider",
         status_code=409,
-        details={"served_model_id": served_model.get("id"), "available_models": sorted(available_ids)},
+        details={"resource_id": resource.get("id"), "available_models": sorted(available_ids)},
     )
 
 
@@ -191,8 +195,8 @@ def _resolve_chat_completion_target(
     raw_model_row = modelops_repo.get_model(get_auth_config().database_url, requested_model_id) or model_row
     allow_local_fallback = _can_use_local_llm_fallback(raw_model_row)
     try:
-        served_model = _select_bound_llm_model(adapter, requested_model_id)
-        llm_model_id = _resolve_runtime_model_id(adapter, served_model)
+        resource = _select_bound_llm_model(adapter, requested_model_id)
+        llm_model_id = _resolve_runtime_model_id(adapter, resource)
     except PlatformControlPlaneError as exc:
         return None, requested_model_id, False, {
             "error": exc.code,

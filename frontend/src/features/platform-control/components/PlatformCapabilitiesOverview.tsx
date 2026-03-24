@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { capabilityRequiresServedModel, summarizeBindingServedModels } from "../utils";
+import { capabilityRequiresModelResource, summarizeBindingResources } from "../utils";
 
 type PlatformCapabilitiesOverviewProps = {
   capabilities: PlatformCapability[];
@@ -64,11 +64,11 @@ export default function PlatformCapabilitiesOverview({
                           <span className="field-label">{t("platformControl.capabilities.runtime")}</span>
                           <span className="status-text">{binding.provider.adapter_kind}</span>
                         </div>
-                        {capabilityRequiresServedModel(capability.capability) ? (
+                        {capabilityRequiresModelResource(capability.capability) ? (
                           <div className="status-row">
                             <span className="field-label">{t("platformControl.capabilities.servedArtifacts")}</span>
                             <span className="status-text">
-                              {summarizeBindingServedModels(binding, t("platformControl.summary.none"))}
+                              {summarizeBindingResources(binding, t("platformControl.summary.none"))}
                             </span>
                           </div>
                         ) : null}

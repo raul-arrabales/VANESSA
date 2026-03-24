@@ -52,8 +52,8 @@ describe("PlatformProviderDetailPage", () => {
       provider: { id: "provider-1", slug: "vllm-local-gateway" },
       validation: {
         health: { reachable: true, status_code: 200 },
-        models_reachable: true,
-        models_status_code: 200,
+        resources_reachable: true,
+        resources_status_code: 200,
       },
     });
 
@@ -72,7 +72,7 @@ describe("PlatformProviderDetailPage", () => {
     await waitFor(() => {
       expect(platformApi.validatePlatformProvider).toHaveBeenCalledWith("provider-1", "token");
     });
-    expect(await screen.findByText(await t("platformControl.providers.modelsReachable"))).toBeVisible();
+    expect(await screen.findByText(await t("platformControl.providers.resourcesReachable"))).toBeVisible();
   });
 
   it("saves provider changes from the detail page", async () => {

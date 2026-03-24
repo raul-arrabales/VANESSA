@@ -23,6 +23,14 @@ _download_worker_lock = threading.Lock()
 logger = logging.getLogger(__name__)
 
 
+def get_model_catalog_item(database_url: str, model_id: str) -> dict[str, object] | None:
+    return modelops_repo.get_model(database_url, model_id)
+
+
+def upsert_model_catalog_item(database_url: str, **kwargs):
+    return modelops_repo.upsert_model_record(database_url, **kwargs)
+
+
 def download_worker_loop() -> None:
     while True:
         try:
@@ -38,7 +46,7 @@ def download_worker_loop() -> None:
             provider = str(job.get("provider", "huggingface"))
             model_id = model_id_from_source(source_id)
             model_name = source_id.split("/")[-1] if "/" in source_id else source_id
-            existing_model = modelops_repo.get_model(config.database_url, model_id)
+            existing_model = get_model_catalog_item(config.database_url, model_id)
             if existing_model is not None:
                 metadata = (
                     existing_model.get("metadata")
@@ -58,7 +66,7 @@ def download_worker_loop() -> None:
                     ignore_patterns=ignore_patterns,
                 )
             except Exception as exc:  # noqa: BLE001
-                modelops_repo.upsert_model_record(
+                upsert_model_catalog_item(
                     config.database_url,
                     model_id=model_id,
                     node_id=config.modelops_node_id,
@@ -91,7 +99,7 @@ def download_worker_loop() -> None:
                 )
                 continue
 
-            modelops_repo.upsert_model_record(
+            upsert_model_catalog_item(
                 config.database_url,
                 model_id=model_id,
                 node_id=config.modelops_node_id,

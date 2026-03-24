@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS platform_deployment_bindings (
     capability_key TEXT NOT NULL REFERENCES platform_capabilities(capability_key) ON DELETE CASCADE,
     provider_instance_id UUID NOT NULL REFERENCES platform_provider_instances(id) ON DELETE RESTRICT,
     binding_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    resource_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (deployment_profile_id, capability_key)
@@ -62,18 +63,24 @@ CREATE TABLE IF NOT EXISTS platform_deployment_bindings (
 ALTER TABLE platform_deployment_bindings
     DROP COLUMN IF EXISTS served_model_id;
 
-CREATE TABLE IF NOT EXISTS platform_binding_served_models (
+CREATE TABLE IF NOT EXISTS platform_binding_resources (
     binding_id UUID NOT NULL REFERENCES platform_deployment_bindings(id) ON DELETE CASCADE,
-    model_id TEXT NOT NULL REFERENCES model_registry(model_id) ON DELETE RESTRICT,
+    resource_id TEXT NOT NULL,
+    resource_kind TEXT NOT NULL,
+    ref_type TEXT NOT NULL,
+    managed_model_id TEXT REFERENCES model_registry(model_id) ON DELETE RESTRICT,
+    provider_resource_id TEXT,
+    display_name TEXT,
+    metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (binding_id, model_id)
+    PRIMARY KEY (binding_id, resource_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS platform_binding_served_models_default_idx
-    ON platform_binding_served_models (binding_id)
+CREATE UNIQUE INDEX IF NOT EXISTS platform_binding_resources_default_idx
+    ON platform_binding_resources (binding_id)
     WHERE is_default = TRUE;
 
 CREATE INDEX IF NOT EXISTS platform_deployment_bindings_profile_idx
@@ -82,8 +89,8 @@ CREATE INDEX IF NOT EXISTS platform_deployment_bindings_profile_idx
 CREATE INDEX IF NOT EXISTS platform_deployment_bindings_provider_idx
     ON platform_deployment_bindings (provider_instance_id);
 
-CREATE INDEX IF NOT EXISTS platform_binding_served_models_model_idx
-    ON platform_binding_served_models (model_id);
+CREATE INDEX IF NOT EXISTS platform_binding_resources_managed_model_idx
+    ON platform_binding_resources (managed_model_id);
 
 CREATE TABLE IF NOT EXISTS platform_active_deployment (
     singleton_key TEXT PRIMARY KEY,

@@ -70,11 +70,11 @@ describe("PlatformDeploymentCreatePage", () => {
       "provider-1",
     );
     await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.servedModelsForCapability", { capability: "LLM inference" })),
+      screen.getByLabelText(await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" })),
       ["gpt-5", "gpt-4.1"],
     );
     await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.defaultServedModelForCapability", { capability: "LLM inference" })),
+      screen.getByLabelText(await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "LLM inference" })),
       "gpt-4.1",
     );
 
@@ -83,17 +83,21 @@ describe("PlatformDeploymentCreatePage", () => {
       "provider-embeddings",
     );
     await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.servedModelsForCapability", { capability: "Embeddings" })),
+      screen.getByLabelText(await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Embeddings" })),
       ["text-embedding-3-small"],
     );
     await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.defaultServedModelForCapability", { capability: "Embeddings" })),
+      screen.getByLabelText(await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "Embeddings" })),
       "text-embedding-3-small",
     );
 
     await userEvent.selectOptions(
       screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "Vector store" })),
       "provider-2",
+    );
+    await userEvent.type(
+      screen.getByLabelText(await t("platformControl.forms.deployment.explicitResources")),
+      "kb_primary",
     );
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.createDeployment") }));
@@ -106,13 +110,33 @@ describe("PlatformDeploymentCreatePage", () => {
           bindings: expect.arrayContaining([
             expect.objectContaining({
               capability: "llm_inference",
-              served_model_ids: ["gpt-5", "gpt-4.1"],
-              default_served_model_id: "gpt-4.1",
+              default_resource_id: "gpt-4.1",
+              resources: expect.arrayContaining([
+                expect.objectContaining({ id: "gpt-5", resource_kind: "model", ref_type: "managed_model" }),
+                expect.objectContaining({ id: "gpt-4.1", resource_kind: "model", ref_type: "managed_model" }),
+              ]),
             }),
             expect.objectContaining({
               capability: "embeddings",
-              served_model_ids: ["text-embedding-3-small"],
-              default_served_model_id: "text-embedding-3-small",
+              default_resource_id: "text-embedding-3-small",
+              resources: expect.arrayContaining([
+                expect.objectContaining({
+                  id: "text-embedding-3-small",
+                  resource_kind: "model",
+                  ref_type: "managed_model",
+                }),
+              ]),
+            }),
+            expect.objectContaining({
+              capability: "vector_store",
+              resource_policy: expect.objectContaining({ selection_mode: "explicit" }),
+              resources: expect.arrayContaining([
+                expect.objectContaining({
+                  id: "kb_primary",
+                  resource_kind: "index",
+                  ref_type: "provider_resource",
+                }),
+              ]),
             }),
           ]),
         }),

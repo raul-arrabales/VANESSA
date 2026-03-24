@@ -82,8 +82,8 @@ Supported launcher variables:
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
-- `LLM_LOCAL_UPSTREAM_MODEL` (default in `infra/.env.example`: same value as `LLM_LOCAL_MODEL_PATH`; must match a model id exposed by `llm_runtime /v1/models`)
-- `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` (blank by default; when set, should point to an embeddings-capable model id exposed by `llm_runtime /v1/models`; when blank, embeddings reuse `LLM_LOCAL_UPSTREAM_MODEL`)
+- Local staging model selection now comes from the active deployment binding `resources` and `default_resource_id` rather than `LLM_LOCAL_UPSTREAM_MODEL` or `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL`.
+- Keep runtime/provider env focused on endpoint topology and secrets; use the platform deployment UI to choose local and cloud model resources, plus vector-store resource policy.
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
@@ -106,6 +106,7 @@ Config source of truth in code:
 Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
 `VANESSA_RUNTIME_PROFILE` is a startup seed, not a permanent override. After bootstrap the navbar/settings controls read and update the DB-backed runtime profile unless `VANESSA_RUNTIME_PROFILE_FORCE` is set.
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
+When running the frontend dev server directly on the host, keep browser requests on `/api` and set `VITE_DEV_PROXY_TARGET=http://127.0.0.1:5000` so Vite proxies to the local-staging backend instead of the Docker-only `backend` hostname.
 
 `llm_runtime` selection:
 

@@ -62,6 +62,23 @@ def _build_execution_messages(prompt: str, history: list[dict[str, Any]]) -> lis
     ]
 
 
+def resolve_model_for_inference(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    user_id: int,
+    user_role: str,
+    requested_model_id: str,
+) -> dict[str, Any]:
+    return ensure_model_invokable(
+        database_url,
+        config=config,
+        user_id=user_id,
+        user_role=user_role,
+        model_id=requested_model_id,
+    )
+
+
 def run_knowledge_chat(
     *,
     database_url: str,
@@ -86,15 +103,17 @@ def run_knowledge_chat(
     get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
     resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
     ensure_knowledge_chat_agent_impl = ensure_knowledge_chat_agent_fn or ensure_knowledge_chat_agent
+    user_id = int(g.current_user["id"])
+    user_role = str(g.current_user.get("role", "user"))
 
     history = coerce_chat_messages(history_payload)
     try:
-        resolved_model = ensure_model_invokable(
+        resolved_model = resolve_model_for_inference(
             database_url,
             config=config,
-            user_id=int(g.current_user["id"]),
-            user_role=str(g.current_user.get("role", "user")),
-            model_id=normalized_model,
+            user_id=user_id,
+            user_role=user_role,
+            requested_model_id=normalized_model,
         )
     except ModelOpsError as exc:
         return {
@@ -127,8 +146,8 @@ def run_knowledge_chat(
                 "top_k": config.product_rag_top_k,
             },
         },
-        requested_by_user_id=int(g.current_user["id"]),
-        requested_by_role=str(g.current_user.get("role", "user")),
+        requested_by_user_id=user_id,
+        requested_by_role=user_role,
         runtime_profile=resolve_runtime_profile_impl(database_url),
         platform_runtime=platform_runtime,
     )

@@ -682,14 +682,14 @@ def _coerce_platform_runtime(
 
 
 def _resolve_effective_model(requested_model: str | None, llm_binding: dict[str, Any]) -> tuple[str, str]:
-    selected_model = _select_bound_served_model(
+    selected_model = _select_bound_resource(
         requested_model=requested_model,
         binding=llm_binding,
         error_cls=LlmRuntimeClientError,
     )
     return str(selected_model.get("id", "")).strip(), _resolve_runtime_model_identifier(
         binding=llm_binding,
-        served_model=selected_model,
+        resource=selected_model,
         error_cls=LlmRuntimeClientError,
     )
 
@@ -1037,26 +1037,26 @@ def _normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_effective_embedding_model(embeddings_binding: dict[str, Any]) -> tuple[str, str]:
-    selected_model = _select_bound_served_model(
+    selected_model = _select_bound_resource(
         requested_model=None,
         binding=embeddings_binding,
         error_cls=EmbeddingsRuntimeClientError,
     )
     return str(selected_model.get("id", "")).strip(), _resolve_runtime_model_identifier(
         binding=embeddings_binding,
-        served_model=selected_model,
+        resource=selected_model,
         error_cls=EmbeddingsRuntimeClientError,
     )
 
 
-def _select_bound_served_model(
+def _select_bound_resource(
     *,
     requested_model: str | None,
     binding: dict[str, Any],
     error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
 ) -> dict[str, Any]:
-    served_models = binding.get("served_models")
-    if not isinstance(served_models, list) or not served_models:
+    resources = binding.get("resources")
+    if not isinstance(resources, list) or not resources:
         raise error_cls(
             code="missing_model_ref",
             message="No model was resolved for execution",
@@ -1066,24 +1066,24 @@ def _select_bound_served_model(
 
     explicit_model = str(requested_model or "").strip()
     if explicit_model:
-        for served_model in served_models:
-            if isinstance(served_model, dict) and str(served_model.get("id", "")).strip() == explicit_model:
-                return dict(served_model)
+        for resource in resources:
+            if isinstance(resource, dict) and str(resource.get("id", "")).strip() == explicit_model:
+                return dict(resource)
         raise error_cls(
             code="requested_model_not_bound",
-            message="Requested model is not served by the active deployment binding",
+            message="Requested model is not bound by the active deployment binding",
             status_code=403,
             details={"provider_slug": binding.get("slug"), "requested_model": explicit_model},
         )
 
-    default_model = binding.get("default_served_model")
+    default_model = binding.get("default_resource")
     if isinstance(default_model, dict) and str(default_model.get("id", "")).strip():
         return dict(default_model)
-    default_model_id = str(binding.get("default_served_model_id", "")).strip()
+    default_model_id = str(binding.get("default_resource_id", "")).strip()
     if default_model_id:
-        for served_model in served_models:
-            if isinstance(served_model, dict) and str(served_model.get("id", "")).strip() == default_model_id:
-                return dict(served_model)
+        for resource in resources:
+            if isinstance(resource, dict) and str(resource.get("id", "")).strip() == default_model_id:
+                return dict(resource)
     raise error_cls(
         code="missing_model_ref",
         message="No model was resolved for execution",
@@ -1095,13 +1095,17 @@ def _select_bound_served_model(
 def _resolve_runtime_model_identifier(
     *,
     binding: dict[str, Any],
-    served_model: dict[str, Any],
+    resource: dict[str, Any],
     error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
 ) -> str:
-    provider_model_id = str(served_model.get("provider_model_id", "")).strip()
+    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    if provider_resource_id:
+        return provider_resource_id
+    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
+    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
     if provider_model_id:
         return provider_model_id
-    return _resolve_local_runtime_model_identifier(binding=binding, served_model=served_model, error_cls=error_cls)
+    return _resolve_local_runtime_model_identifier(binding=binding, served_model=resource, error_cls=error_cls)
 
 
 def _resolve_local_runtime_model_identifier(

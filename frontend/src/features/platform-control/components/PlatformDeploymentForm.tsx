@@ -8,7 +8,7 @@ type PlatformDeploymentFormProps = {
   value: DeploymentFormState;
   capabilities: PlatformCapability[];
   providersByCapability: Record<string, PlatformProvider[]>;
-  servedModelsByCapability: Record<string, ManagedModel[]>;
+  modelResourcesByCapability: Record<string, ManagedModel[]>;
   helperText: string;
   isSubmitting: boolean;
   submitLabel: string;
@@ -21,15 +21,19 @@ type PlatformDeploymentFormProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-function requiresServedModels(capability: string): boolean {
+function requiresModelResources(capability: string): boolean {
   return capability === "llm_inference" || capability === "embeddings";
+}
+
+function supportsVectorResources(capability: string): boolean {
+  return capability === "vector_store";
 }
 
 export default function PlatformDeploymentForm({
   value,
   capabilities,
   providersByCapability,
-  servedModelsByCapability,
+  modelResourcesByCapability,
   helperText,
   isSubmitting,
   submitLabel,
@@ -50,17 +54,17 @@ export default function PlatformDeploymentForm({
     });
   };
 
-  const updateCapabilityServedModels = (capability: string, servedModelIds: string[]): void => {
-    const previousDefault = value.defaultServedModelIdsByCapability[capability] ?? "";
-    const nextDefault = servedModelIds.includes(previousDefault) ? previousDefault : (servedModelIds[0] ?? "");
+  const updateCapabilityResources = (capability: string, resourceIds: string[]): void => {
+    const previousDefault = value.defaultResourceIdsByCapability[capability] ?? "";
+    const nextDefault = resourceIds.includes(previousDefault) ? previousDefault : (resourceIds[0] ?? "");
     onChange({
       ...value,
-      servedModelIdsByCapability: {
-        ...value.servedModelIdsByCapability,
-        [capability]: servedModelIds,
+      resourceIdsByCapability: {
+        ...value.resourceIdsByCapability,
+        [capability]: resourceIds,
       },
-      defaultServedModelIdsByCapability: {
-        ...value.defaultServedModelIdsByCapability,
+      defaultResourceIdsByCapability: {
+        ...value.defaultResourceIdsByCapability,
         [capability]: nextDefault,
       },
     });
@@ -106,26 +110,26 @@ export default function PlatformDeploymentForm({
                 ))}
               </select>
             </label>
-            {requiresServedModels(capability.capability) ? (
+            {requiresModelResources(capability.capability) ? (
               <>
                 <label className="card-stack">
                   <span className="field-label">
-                    {t("platformControl.forms.deployment.servedModelsForCapability", {
+                    {t("platformControl.forms.deployment.resourcesForCapability", {
                       capability: capability.display_name,
                     })}
                   </span>
                   <select
                     className="field-input"
                     multiple
-                    value={value.servedModelIdsByCapability[capability.capability] ?? []}
+                    value={value.resourceIdsByCapability[capability.capability] ?? []}
                     onChange={(event) =>
-                      updateCapabilityServedModels(
+                      updateCapabilityResources(
                         capability.capability,
                         Array.from(event.target.selectedOptions, (option) => option.value),
                       )
                     }
                   >
-                    {(servedModelsByCapability[capability.capability] ?? []).map((model) => (
+                    {(modelResourcesByCapability[capability.capability] ?? []).map((model) => (
                       <option key={model.id} value={model.id}>
                         {model.name}
                       </option>
@@ -134,26 +138,26 @@ export default function PlatformDeploymentForm({
                 </label>
                 <label className="card-stack">
                   <span className="field-label">
-                    {t("platformControl.forms.deployment.defaultServedModelForCapability", {
+                    {t("platformControl.forms.deployment.defaultResourceForCapability", {
                       capability: capability.display_name,
                     })}
                   </span>
                   <select
                     className="field-input"
-                    value={value.defaultServedModelIdsByCapability[capability.capability] ?? ""}
+                    value={value.defaultResourceIdsByCapability[capability.capability] ?? ""}
                     onChange={(event) =>
                       onChange({
                         ...value,
-                        defaultServedModelIdsByCapability: {
-                          ...value.defaultServedModelIdsByCapability,
+                        defaultResourceIdsByCapability: {
+                          ...value.defaultResourceIdsByCapability,
                           [capability.capability]: event.target.value,
                         },
                       })
                     }
                   >
                     <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                    {(servedModelsByCapability[capability.capability] ?? [])
-                      .filter((model) => (value.servedModelIdsByCapability[capability.capability] ?? []).includes(model.id))
+                    {(modelResourcesByCapability[capability.capability] ?? [])
+                      .filter((model) => (value.resourceIdsByCapability[capability.capability] ?? []).includes(model.id))
                       .map((model) => (
                         <option key={model.id} value={model.id}>
                           {model.name}
@@ -161,6 +165,70 @@ export default function PlatformDeploymentForm({
                       ))}
                   </select>
                 </label>
+              </>
+            ) : supportsVectorResources(capability.capability) ? (
+              <>
+                <label className="card-stack">
+                  <span className="field-label">{t("platformControl.forms.deployment.vectorSelectionMode")}</span>
+                  <select
+                    className="field-input"
+                    value={String(value.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit")}
+                    onChange={(event) =>
+                      onChange({
+                        ...value,
+                        resourcePolicyByCapability: {
+                          ...value.resourcePolicyByCapability,
+                          [capability.capability]: {
+                            ...value.resourcePolicyByCapability[capability.capability],
+                            selection_mode: event.target.value,
+                          },
+                        },
+                      })
+                    }
+                  >
+                    <option value="explicit">Explicit resources</option>
+                    <option value="dynamic_namespace">Dynamic namespace</option>
+                  </select>
+                </label>
+                {String(value.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit") === "dynamic_namespace" ? (
+                  <label className="card-stack">
+                    <span className="field-label">{t("platformControl.forms.deployment.namespacePrefix")}</span>
+                    <input
+                      className="field-input"
+                      value={String(value.resourcePolicyByCapability[capability.capability]?.namespace_prefix ?? "")}
+                      onChange={(event) =>
+                        onChange({
+                          ...value,
+                          resourcePolicyByCapability: {
+                            ...value.resourcePolicyByCapability,
+                            [capability.capability]: {
+                              ...value.resourcePolicyByCapability[capability.capability],
+                              selection_mode: "dynamic_namespace",
+                              namespace_prefix: event.target.value,
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ) : (
+                  <label className="card-stack">
+                    <span className="field-label">{t("platformControl.forms.deployment.explicitResources")}</span>
+                    <textarea
+                      className="field-input quote-admin-textarea"
+                      value={(value.resourceIdsByCapability[capability.capability] ?? []).join("\n")}
+                      onChange={(event) =>
+                        updateCapabilityResources(
+                          capability.capability,
+                          event.target.value
+                            .split("\n")
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        )
+                      }
+                    />
+                  </label>
+                )}
               </>
             ) : null}
           </div>
