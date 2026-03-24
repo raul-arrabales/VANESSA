@@ -12,12 +12,16 @@ from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model, serialize_model_test_run
 from .platform_adapters import http_json_request
-from .platform_service import ensure_platform_bootstrap_state, resolve_llm_inference_adapter
+from .platform_service import ensure_platform_bootstrap_state, resolve_embeddings_adapter, resolve_llm_inference_adapter
 from .runtime_profile_service import resolve_runtime_profile
 
 _TASK_LLM = modelops_repo.TASK_LLM
 _TASK_EMBEDDINGS = modelops_repo.TASK_EMBEDDINGS
-_CLOUD_LLM_PROVIDER_KEYS = {"openai_compatible_cloud_llm"}
+_CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
+_LOCAL_TEST_CAPABILITY_BY_TASK = {
+    _TASK_LLM: "llm_inference",
+    _TASK_EMBEDDINGS: "embeddings",
+}
 
 
 def get_model_tests(
@@ -239,9 +243,11 @@ def _managed_model_identifiers(row: dict[str, Any]) -> list[tuple[str, str]]:
     metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
     identifiers = [
         ("model_id", str(row.get("model_id") or "").strip()),
+        ("source_id", str(row.get("source_id") or "").strip()),
         ("provider_model_id", str(row.get("provider_model_id") or "").strip()),
         ("local_path", str(row.get("local_path") or "").strip()),
         ("artifact.storage_path", str(artifact.get("storage_path") or "").strip()),
+        ("metadata.source_id", str(metadata.get("source_id") or "").strip()),
         ("metadata.local_path", str(metadata.get("local_path") or "").strip()),
         ("metadata.upstream_model", str(metadata.get("upstream_model") or "").strip()),
     ]
@@ -252,13 +258,28 @@ def _runtime_entry_identifiers(entry: dict[str, Any]) -> list[tuple[str, str]]:
     metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
     identifiers = [
         ("id", str(entry.get("id") or "").strip()),
+        ("source_id", str(entry.get("source_id") or "").strip()),
         ("provider_model_id", str(entry.get("provider_model_id") or "").strip()),
         ("local_path", str(entry.get("local_path") or "").strip()),
         ("upstream_model", str(entry.get("upstream_model") or "").strip()),
+        ("metadata.source_id", str(metadata.get("source_id") or "").strip()),
         ("metadata.local_path", str(metadata.get("local_path") or "").strip()),
         ("metadata.upstream_model", str(metadata.get("upstream_model") or "").strip()),
     ]
     return [(label, value) for label, value in identifiers if value]
+
+
+def _runtime_advertised_model_ids(runtime_models: list[dict[str, Any]]) -> list[str]:
+    advertised: list[str] = []
+    seen: set[str] = set()
+    for runtime_entry in runtime_models:
+        for _source, runtime_value in _runtime_entry_identifiers(runtime_entry):
+            normalized = runtime_value.strip()
+            lowered = normalized.lower()
+            if normalized and lowered not in seen:
+                advertised.append(normalized)
+                seen.add(lowered)
+    return advertised
 
 
 def _find_runtime_model_match(model_row: dict[str, Any], runtime_models: list[dict[str, Any]]) -> dict[str, str] | None:
@@ -282,16 +303,28 @@ def _find_runtime_model_match(model_row: dict[str, Any], runtime_models: list[di
     return None
 
 
-def _list_local_llm_test_provider_rows(database_url: str, *, config: AuthConfig) -> tuple[list[dict[str, Any]], str | None]:
+def _local_test_capability_for_task(task_key: str) -> str | None:
+    return _LOCAL_TEST_CAPABILITY_BY_TASK.get(task_key.strip().lower())
+
+
+def _list_local_test_provider_rows(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    task_key: str,
+) -> tuple[list[dict[str, Any]], str | None]:
+    capability_key = _local_test_capability_for_task(task_key)
+    if capability_key is None:
+        return [], None
     ensure_platform_bootstrap_state(database_url, config)
     provider_rows = [
         row
         for row in platform_repo.list_provider_instances(database_url)
-        if str(row.get("capability_key", "")).strip().lower() == "llm_inference"
+        if str(row.get("capability_key", "")).strip().lower() == capability_key
         and bool(row.get("enabled"))
-        and str(row.get("provider_key", "")).strip().lower() not in _CLOUD_LLM_PROVIDER_KEYS
+        and str(row.get("provider_key", "")).strip().lower() not in _CLOUD_PROVIDER_KEYS
     ]
-    active_binding = platform_repo.get_active_binding_for_capability(database_url, capability_key="llm_inference")
+    active_binding = platform_repo.get_active_binding_for_capability(database_url, capability_key=capability_key)
     active_provider_instance_id = (
         str(active_binding.get("provider_instance_id") or "").strip() if isinstance(active_binding, dict) else None
     ) or None
@@ -307,16 +340,27 @@ def _inspect_local_llm_test_runtime(
     is_active: bool,
 ) -> dict[str, Any]:
     provider_instance_id = str(provider_row.get("id") or "").strip()
-    adapter = resolve_llm_inference_adapter(
-        database_url,
-        config,
-        provider_instance_id=provider_instance_id,
-    )
+    capability_key = str(provider_row.get("capability_key") or "").strip().lower()
+    if capability_key == "llm_inference":
+        adapter = resolve_llm_inference_adapter(
+            database_url,
+            config,
+            provider_instance_id=provider_instance_id,
+        )
+    elif capability_key == "embeddings":
+        adapter = resolve_embeddings_adapter(
+            database_url,
+            config,
+            provider_instance_id=provider_instance_id,
+        )
+    else:
+        raise ModelOpsError("test_runtime_not_supported", "Provider does not support local model testing", status_code=409)
     models_payload, status_code = adapter.list_models()
     runtime_models = models_payload.get("data") if isinstance(models_payload, dict) else None
     available_models = [item for item in runtime_models if isinstance(item, dict)] if isinstance(runtime_models, list) else []
     reachable = models_payload is not None and 200 <= status_code < 300
     match = _find_runtime_model_match(model_row, available_models) if reachable else None
+    advertised_model_ids = _runtime_advertised_model_ids(available_models) if reachable else []
     message = (
         "Runtime serves the selected local model"
         if match
@@ -344,6 +388,7 @@ def _inspect_local_llm_test_runtime(
             else None
         ),
         "matched_value": match["matched_value"] if match is not None else None,
+        "advertised_model_ids": advertised_model_ids,
         "message": message,
     }
 
@@ -367,14 +412,18 @@ def get_model_test_runtimes(
 
     backend_kind = str(row.get("backend_kind", "")).strip().lower()
     task_key = str(row.get("task_key", "")).strip().lower() or _TASK_LLM
-    if backend_kind != "local" or task_key != _TASK_LLM:
+    if backend_kind != "local" or _local_test_capability_for_task(task_key) is None:
         return {
             "model_id": model_id,
             "runtimes": [],
             "default_provider_instance_id": None,
         }
 
-    provider_rows, active_provider_instance_id = _list_local_llm_test_provider_rows(database_url, config=config)
+    provider_rows, active_provider_instance_id = _list_local_test_provider_rows(
+        database_url,
+        config=config,
+        task_key=task_key,
+    )
     runtimes = [
         _inspect_local_llm_test_runtime(
             database_url,
@@ -427,7 +476,7 @@ def _append_failed_test_run(
     )
 
 
-def _resolve_superadmin_local_llm_test_runtime(
+def _resolve_superadmin_local_test_runtime(
     database_url: str,
     *,
     config: AuthConfig,
@@ -529,6 +578,68 @@ def _execute_local_llm_test(
     return "Local LLM test succeeded", request_payload, response_payload, result_payload, latency_ms
 
 
+def _execute_local_embeddings_test(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    row: dict[str, Any],
+    text: str,
+    provider_instance_id: str,
+    runtime_model_id: str,
+) -> tuple[str, dict[str, Any], dict[str, Any], dict[str, Any], float]:
+    adapter = resolve_embeddings_adapter(
+        database_url,
+        config,
+        provider_instance_id=provider_instance_id,
+    )
+    request_payload = {
+        "provider_instance_id": provider_instance_id,
+        "model": runtime_model_id,
+        "input": [text],
+    }
+    started_at = perf_counter()
+    payload, status_code = adapter.embed_texts(texts=[text], model=runtime_model_id)
+    latency_ms = (perf_counter() - started_at) * 1000
+    response_payload = payload if isinstance(payload, dict) else {}
+    if payload is None or status_code >= 400:
+        message = str(response_payload.get("message") or response_payload.get("error") or "Local embeddings test failed")
+        raise ModelOpsError(
+            "model_test_failed",
+            message,
+            status_code=409,
+            details={
+                "summary": "Local embeddings test failed",
+                "output_payload": response_payload,
+                "error_details": {
+                    "status_code": status_code,
+                    "message": message,
+                    "provider_instance_id": provider_instance_id,
+                    "runtime_model_id": runtime_model_id,
+                },
+                "latency_ms": latency_ms,
+            },
+        )
+
+    embeddings = response_payload.get("embeddings")
+    vectors = embeddings if isinstance(embeddings, list) else []
+    first_vector = vectors[0] if vectors else []
+    dimension = len(first_vector) if isinstance(first_vector, list) else 0
+    result_payload = {
+        "kind": _TASK_EMBEDDINGS,
+        "success": True,
+        "dimension": dimension,
+        "latency_ms": latency_ms,
+        "vector_preview": first_vector[:8] if isinstance(first_vector, list) else [],
+        "metadata": {
+            "provider_instance_id": provider_instance_id,
+            "runtime_model_id": runtime_model_id,
+            "managed_model_id": str(row.get("model_id") or "").strip(),
+            "status_code": status_code,
+        },
+    }
+    return "Local embeddings test succeeded", request_payload, response_payload, result_payload, latency_ms
+
+
 def run_model_test(
     database_url: str,
     *,
@@ -582,14 +693,14 @@ def run_model_test(
             details={"test_run": serialize_model_test_run(test_run)},
         )
 
-    if backend_kind == "local" and task_key == _TASK_LLM:
+    if backend_kind == "local" and task_key in {_TASK_LLM, _TASK_EMBEDDINGS}:
         normalized_provider_instance_id = str(provider_instance_id or "").strip() or None
         if actor_role.strip().lower() != "superadmin":
             test_run = _append_failed_test_run(
                 database_url,
                 model_id=model_id,
                 task_key=task_key,
-                summary="Local LLM tests require superadmin runtime selection",
+                summary="Local model tests require superadmin runtime selection",
                 error_details={"error": "local_model_runtime_selection_required"},
                 config_fingerprint=config_fingerprint,
                 normalized_inputs=normalized_inputs,
@@ -602,7 +713,7 @@ def run_model_test(
                 details={"test_run": serialize_model_test_run(test_run)},
             )
 
-        runtime_resolution = _resolve_superadmin_local_llm_test_runtime(
+        runtime_resolution = _resolve_superadmin_local_test_runtime(
             database_url,
             config=config,
             row=row,
@@ -617,7 +728,7 @@ def run_model_test(
                 database_url,
                 model_id=model_id,
                 task_key=task_key,
-                summary="Selected local LLM test runtime was not found",
+                summary="Selected local test runtime was not found",
                 error_details={
                     "error": "test_runtime_not_found",
                     "provider_instance_id": normalized_provider_instance_id,
@@ -660,7 +771,7 @@ def run_model_test(
                 database_url,
                 model_id=model_id,
                 task_key=task_key,
-                summary="Selected local LLM test runtime is unavailable",
+                summary="Selected local test runtime is unavailable",
                 error_details={
                     "error": "test_runtime_unreachable",
                     "provider_instance_id": selected_runtime.get("provider_instance_id"),
@@ -699,14 +810,24 @@ def run_model_test(
             )
 
         try:
-            summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_llm_test(
-                database_url,
-                config=config,
-                row=row,
-                prompt=normalized_inputs["prompt"],
-                provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
-                runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
-            )
+            if task_key == _TASK_LLM:
+                summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_llm_test(
+                    database_url,
+                    config=config,
+                    row=row,
+                    prompt=normalized_inputs["prompt"],
+                    provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
+                    runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
+                )
+            else:
+                summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_embeddings_test(
+                    database_url,
+                    config=config,
+                    row=row,
+                    text=normalized_inputs["text"],
+                    provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
+                    runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
+                )
             test_run = modelops_repo.append_model_test_run(
                 database_url,
                 model_id=model_id,

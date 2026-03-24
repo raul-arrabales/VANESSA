@@ -406,6 +406,387 @@ def test_run_model_test_rejects_local_provider_override_for_non_superadmin(
     assert recorded_test_run["error_details"] == {"error": "local_model_runtime_selection_required"}
 
 
+def test_get_model_test_runtimes_returns_embeddings_runtime_for_local_embeddings_model(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "embeddings",
+            "local_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "current_config_fingerprint": "fingerprint-embeddings-runtimes",
+            "artifact": {"storage_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "ensure_platform_bootstrap_state", lambda _database_url, _config: None)
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "list_provider_instances",
+        lambda _database_url: [
+            {
+                "id": "provider-embeddings-1",
+                "slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "capability_key": "embeddings",
+                "adapter_kind": "openai_compatible_embeddings",
+                "display_name": "vLLM embeddings local",
+                "description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {"models_path": "/v1/models"},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _database_url, capability_key: {"provider_instance_id": "provider-embeddings-1"},
+    )
+
+    class FakeEmbeddingsAdapter:
+        def list_models(self):
+            return {
+                "data": [
+                    {
+                        "id": "local-vllm-embeddings-default",
+                        "display_name": "Local vLLM Embeddings",
+                        "metadata": {"upstream_model": "sentence-transformers/all-MiniLM-L6-v2"},
+                    }
+                ]
+            }, 200
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "resolve_embeddings_adapter",
+        lambda _database_url, _config, provider_instance_id=None: FakeEmbeddingsAdapter(),
+    )
+
+    payload = modelops_testing.get_model_test_runtimes(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=1,
+        actor_role="superadmin",
+        model_id="sentence-transformers--all-MiniLM-L6-v2",
+    )
+
+    assert payload["default_provider_instance_id"] == "provider-embeddings-1"
+    assert payload["runtimes"][0]["provider_instance_id"] == "provider-embeddings-1"
+    assert payload["runtimes"][0]["matches_model"] is True
+    assert payload["runtimes"][0]["matched_model_id"] == "local-vllm-embeddings-default"
+    assert payload["runtimes"][0]["match_source"] == "source_id -> metadata.upstream_model"
+
+
+def test_run_model_test_allows_superadmin_local_embeddings_with_exact_runtime_match(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+    audit_events: list[str] = []
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "embeddings",
+            "provider_model_id": None,
+            "local_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "current_config_fingerprint": "fingerprint-embed-local-1",
+            "artifact": {"storage_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "offline")
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "list_provider_instances",
+        lambda _database_url: [
+            {
+                "id": "provider-embeddings-1",
+                "slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "capability_key": "embeddings",
+                "adapter_kind": "openai_compatible_embeddings",
+                "display_name": "vLLM embeddings local",
+                "description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {"models_path": "/v1/models", "embeddings_path": "/v1/embeddings"},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _database_url, capability_key: {"provider_instance_id": "provider-embeddings-1"},
+    )
+    monkeypatch.setattr(modelops_testing, "ensure_platform_bootstrap_state", lambda _database_url, _config: None)
+
+    class FakeEmbeddingsAdapter:
+        def __init__(self):
+            self.embed_calls: list[dict[str, object]] = []
+
+        def list_models(self):
+            return {
+                "data": [
+                    {
+                        "id": "local-vllm-embeddings-default",
+                        "display_name": "Local vLLM Embeddings",
+                        "metadata": {"upstream_model": "sentence-transformers/all-MiniLM-L6-v2"},
+                    }
+                ]
+            }, 200
+
+        def embed_texts(self, *, texts, model=None):
+            self.embed_calls.append({"texts": texts, "model": model})
+            return {"embeddings": [[0.1, 0.2, 0.3]]}, 200
+
+    adapter = FakeEmbeddingsAdapter()
+    monkeypatch.setattr(
+        modelops_testing,
+        "resolve_embeddings_adapter",
+        lambda _database_url, _config, provider_instance_id=None: adapter,
+    )
+    monkeypatch.setattr(
+        modelops_testing.modelops_repo,
+        "get_model",
+        lambda _database_url, model_id: {
+            "model_id": model_id,
+            "artifact": {"storage_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"},
+        },
+    )
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-embeddings-local-1",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+    monkeypatch.setattr(
+        modelops_testing.modelops_repo,
+        "append_audit_event",
+        lambda _database_url, **kwargs: audit_events.append(str(kwargs["event_type"])),
+    )
+
+    result = modelops_testing.run_model_test(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=1,
+        actor_role="superadmin",
+        model_id="sentence-transformers--all-MiniLM-L6-v2",
+        inputs={"text": "hello world"},
+        provider_instance_id="provider-embeddings-1",
+    )
+
+    assert recorded_test_run["result"] == modelops_testing.modelops_repo.TEST_SUCCESS
+    assert recorded_test_run["input_payload"] == {
+        "provider_instance_id": "provider-embeddings-1",
+        "model": "local-vllm-embeddings-default",
+        "input": ["hello world"],
+    }
+    assert result["result"]["dimension"] == 3
+    assert result["result"]["vector_preview"] == [0.1, 0.2, 0.3]
+    assert adapter.embed_calls == [{"texts": ["hello world"], "model": "local-vllm-embeddings-default"}]
+    assert audit_events == ["model.tested"]
+
+
+def test_run_model_test_rejects_local_embeddings_runtime_when_selected_provider_does_not_serve_model(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "embeddings",
+            "local_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "current_config_fingerprint": "fingerprint-embed-local-2",
+            "artifact": {"storage_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "online")
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "list_provider_instances",
+        lambda _database_url: [
+            {
+                "id": "provider-embeddings-1",
+                "slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "capability_key": "embeddings",
+                "adapter_kind": "openai_compatible_embeddings",
+                "display_name": "vLLM embeddings local",
+                "description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {"models_path": "/v1/models"},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        modelops_testing.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _database_url, capability_key: {"provider_instance_id": "provider-embeddings-1"},
+    )
+    monkeypatch.setattr(modelops_testing, "ensure_platform_bootstrap_state", lambda _database_url, _config: None)
+
+    class FakeEmbeddingsAdapter:
+        def list_models(self):
+            return {
+                "data": [
+                    {
+                        "id": "local-vllm-embeddings-default",
+                        "display_name": "Local vLLM Embeddings",
+                        "metadata": {"upstream_model": "/models/embeddings/another-model"},
+                    }
+                ]
+            }, 200
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "resolve_embeddings_adapter",
+        lambda _database_url, _config, provider_instance_id=None: FakeEmbeddingsAdapter(),
+    )
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-embeddings-local-2",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+
+    with pytest.raises(modelops_testing.ModelOpsError) as exc_info:
+        modelops_testing.run_model_test(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=1,
+            actor_role="superadmin",
+            model_id="sentence-transformers--all-MiniLM-L6-v2",
+            inputs={"text": "hello world"},
+            provider_instance_id="provider-embeddings-1",
+        )
+
+    assert exc_info.value.code == "local_model_not_served_by_runtime"
+    assert recorded_test_run["result"] == modelops_testing.modelops_repo.TEST_FAILURE
+    assert recorded_test_run["error_details"] == {
+        "error": "local_model_not_served_by_runtime",
+        "provider_instance_id": "provider-embeddings-1",
+    }
+    runtime_payload = modelops_testing.get_model_test_runtimes(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=1,
+        actor_role="superadmin",
+        model_id="sentence-transformers--all-MiniLM-L6-v2",
+    )
+    assert runtime_payload["runtimes"][0]["advertised_model_ids"] == [
+        "local-vllm-embeddings-default",
+        "/models/embeddings/another-model",
+    ]
+
+
+def test_run_model_test_rejects_local_embeddings_provider_override_for_non_superadmin(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "lifecycle_state": "registered",
+            "backend_kind": "local",
+            "hosting_kind": "local",
+            "runtime_mode_policy": "online_offline",
+            "task_key": "embeddings",
+            "local_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "current_config_fingerprint": "fingerprint-embed-local-3",
+            "artifact": {"storage_path": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"},
+            "metadata": {},
+        },
+    )
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "online")
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-embeddings-local-3",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+
+    with pytest.raises(modelops_testing.ModelOpsError) as exc_info:
+        modelops_testing.run_model_test(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=7,
+            actor_role="admin",
+            model_id="sentence-transformers--all-MiniLM-L6-v2",
+            inputs={"text": "hello world"},
+            provider_instance_id="provider-embeddings-1",
+        )
+
+    assert exc_info.value.code == "local_model_runtime_selection_required"
+    assert recorded_test_run["error_details"] == {"error": "local_model_runtime_selection_required"}
+
+
 def test_validate_model_requires_successful_matching_test_run(monkeypatch: pytest.MonkeyPatch, config: AuthConfig):
     recorded_validation: dict[str, object] = {}
 

@@ -364,4 +364,164 @@ describe("ModelTestPage", () => {
     expect(await screen.findByText("No compatible runtime currently serves this local model.")).toBeVisible();
     expect(screen.getByRole("button", { name: "Run test" })).toBeDisabled();
   });
+
+  it("shows runtime selection for superadmin local embeddings tests and sends provider override", async () => {
+    authState.role = "superadmin";
+    modelApiMocks.getManagedModel.mockResolvedValue({
+      id: "sentence-transformers--all-MiniLM-L6-v2",
+      name: "MiniLM Embeddings",
+      provider: "local",
+      source_id: "sentence-transformers/all-MiniLM-L6-v2",
+      backend: "local",
+      hosting: "local",
+      owner_type: "platform",
+      owner_user_id: null,
+      visibility_scope: "platform",
+      lifecycle_state: "registered",
+      is_validation_current: false,
+      last_validation_status: null,
+      task_key: "embeddings",
+      source: "local_folder",
+      artifact: { storage_path: "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2" },
+      usage_summary: { total_requests: 0, metrics: {} },
+    });
+    modelApiMocks.listManagedModelTestRuntimes.mockResolvedValue({
+      model_id: "sentence-transformers--all-MiniLM-L6-v2",
+      default_provider_instance_id: "provider-embeddings-1",
+      runtimes: [
+        {
+          provider_instance_id: "provider-embeddings-1",
+          slug: "vllm-embeddings-local",
+          display_name: "vLLM embeddings local",
+          provider_key: "vllm_embeddings_local",
+          endpoint_url: "http://llm:8000",
+          adapter_kind: "openai_compatible_embeddings",
+          enabled: true,
+          is_active: true,
+          reachable: true,
+          status_code: 200,
+          matches_model: true,
+          matched_model_id: "local-vllm-embeddings-default",
+          message: "Runtime serves the selected local model",
+        },
+      ],
+    });
+    modelApiMocks.runManagedModelTest.mockResolvedValue({
+      model: {
+        id: "sentence-transformers--all-MiniLM-L6-v2",
+        name: "MiniLM Embeddings",
+        provider: "local",
+        backend: "local",
+        hosting: "local",
+        lifecycle_state: "registered",
+        is_validation_current: false,
+        last_validation_status: null,
+        task_key: "embeddings",
+        artifact: { storage_path: "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2" },
+      },
+      test_run: {
+        id: "test-embed-local-1",
+        model_id: "sentence-transformers--all-MiniLM-L6-v2",
+        task_key: "embeddings",
+        result: "success",
+        summary: "Local embeddings test succeeded",
+        input_payload: { provider_instance_id: "provider-embeddings-1", model: "local-vllm-embeddings-default" },
+        output_payload: { embeddings: [[0.1, 0.2, 0.3]] },
+        error_details: {},
+        latency_ms: 10,
+      },
+      result: {
+        kind: "embeddings",
+        success: true,
+        dimension: 3,
+        latency_ms: 10,
+        vector_preview: [0.1, 0.2, 0.3],
+      },
+    });
+
+    const user = userEvent.setup();
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId/test" element={<ModelTestPage />} />
+      </Routes>,
+      { route: "/control/models/sentence-transformers--all-MiniLM-L6-v2/test" },
+    );
+
+    expect(await screen.findByLabelText("Runtime provider")).toHaveValue("provider-embeddings-1");
+
+    await user.click(screen.getByRole("button", { name: "Run test" }));
+
+    expect(modelApiMocks.runManagedModelTest).toHaveBeenCalledWith(
+      "sentence-transformers--all-MiniLM-L6-v2",
+      {
+        inputs: { text: "hello world" },
+        provider_instance_id: "provider-embeddings-1",
+      },
+      "token",
+    );
+  });
+
+  it("shows compatibility guidance when no runtime serves the local embeddings model", async () => {
+    authState.role = "superadmin";
+    modelApiMocks.getManagedModel.mockResolvedValue({
+      id: "sentence-transformers--all-MiniLM-L6-v2",
+      name: "MiniLM Embeddings",
+      provider: "local",
+      source_id: "sentence-transformers/all-MiniLM-L6-v2",
+      backend: "local",
+      hosting: "local",
+      owner_type: "platform",
+      owner_user_id: null,
+      visibility_scope: "platform",
+      lifecycle_state: "registered",
+      is_validation_current: false,
+      last_validation_status: null,
+      task_key: "embeddings",
+      source: "local_folder",
+      artifact: { storage_path: "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2" },
+      usage_summary: { total_requests: 0, metrics: {} },
+    });
+    modelApiMocks.listManagedModelTestRuntimes.mockResolvedValue({
+      model_id: "sentence-transformers--all-MiniLM-L6-v2",
+      default_provider_instance_id: null,
+      runtimes: [
+        {
+          provider_instance_id: "provider-embeddings-1",
+          slug: "vllm-embeddings-local",
+          display_name: "vLLM embeddings local",
+          provider_key: "vllm_embeddings_local",
+          endpoint_url: "http://llm:8000",
+          adapter_kind: "openai_compatible_embeddings",
+          enabled: true,
+          is_active: true,
+          reachable: true,
+          status_code: 200,
+          matches_model: false,
+          matched_model_id: null,
+          advertised_model_ids: [
+            "local-vllm-embeddings-default",
+            "/models/embeddings/another-model",
+          ],
+          message: "Runtime does not currently serve the selected local model",
+        },
+      ],
+    });
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId/test" element={<ModelTestPage />} />
+      </Routes>,
+      { route: "/control/models/sentence-transformers--all-MiniLM-L6-v2/test" },
+    );
+
+    expect(await screen.findByText("No compatible runtime currently serves this local model.")).toBeVisible();
+    expect(screen.getByText("Runtime currently advertises: local-vllm-embeddings-default, /models/embeddings/another-model")).toBeVisible();
+    expect(screen.getByText("Exact local embeddings testing only works when an embeddings runtime already serves this model.")).toBeVisible();
+    expect(
+      screen.getByText(
+        "For local staging, set LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL so /v1/models advertises sentence-transformers/all-MiniLM-L6-v2.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Run test" })).toBeDisabled();
+  });
 });

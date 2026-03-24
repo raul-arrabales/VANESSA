@@ -194,10 +194,15 @@ class EmbeddingsAdapter(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_models(self) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+    @abstractmethod
     def embed_texts(
         self,
         *,
         texts: list[str],
+        model: str | None = None,
     ) -> tuple[dict[str, Any] | None, int]:
         raise NotImplementedError
 
@@ -510,6 +515,10 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
     def _request_headers(self) -> dict[str, str]:
         return _openai_compatible_headers(self.binding)
 
+    def _models_url(self) -> str:
+        path = str(self.binding.config.get("models_path", "/v1/models")).strip() or "/v1/models"
+        return self.binding.endpoint_url.rstrip("/") + path
+
     def _embeddings_url(self) -> str:
         path = str(self.binding.config.get("embeddings_path", "/v1/embeddings")).strip() or "/v1/embeddings"
         return self.binding.endpoint_url.rstrip("/") + path
@@ -537,12 +546,22 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             "provider_slug": self.binding.provider_slug,
         }
 
+    def list_models(self) -> tuple[dict[str, Any] | None, int]:
+        payload, status_code = http_json_request(
+            self._models_url(),
+            method="GET",
+            headers=self._request_headers(),
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+        return payload if isinstance(payload, dict) else None, status_code
+
     def embed_texts(
         self,
         *,
         texts: list[str],
+        model: str | None = None,
     ) -> tuple[dict[str, Any] | None, int]:
-        effective_model = _served_model_runtime_identifier(self.binding)
+        effective_model = str(model or "").strip() or _served_model_runtime_identifier(self.binding)
         if not effective_model:
             raise PlatformControlPlaneError(
                 "served_model_required",

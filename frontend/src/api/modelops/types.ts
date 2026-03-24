@@ -135,6 +135,7 @@ export type ManagedModel = {
   name: string;
   provider: string;
   provider_model_id?: string | null;
+  source_id?: string | null;
   backend: "local" | "external_api";
   hosting?: "local" | "cloud";
   owner_type?: "platform" | "user";
@@ -188,6 +189,7 @@ export type ManagedModelTestRuntime = {
   matched_model_display_name?: string | null;
   match_source?: string | null;
   matched_value?: string | null;
+  advertised_model_ids?: string[];
   message?: string | null;
 };
 

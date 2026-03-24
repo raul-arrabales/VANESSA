@@ -23,7 +23,11 @@ export default function ModelTestPage(): JSX.Element {
 
   const latestTest = useMemo(() => testState.tests[0] ?? null, [testState.tests]);
   const isSuperadmin = user?.role === "superadmin";
-  const needsRuntimeSelection = isSuperadmin && testState.model?.backend === "local" && testState.model?.task_key === "llm";
+  const needsRuntimeSelection = Boolean(
+    isSuperadmin
+    && testState.model?.backend === "local"
+    && (testState.model?.task_key === "llm" || testState.model?.task_key === "embeddings"),
+  );
 
   useEffect(() => {
     if (!token || !modelId || !needsRuntimeSelection) {
@@ -88,6 +92,8 @@ export default function ModelTestPage(): JSX.Element {
   };
   const selectedRuntime = runtimes.find((runtime) => runtime.provider_instance_id === selectedRuntimeId) ?? null;
   const hasCompatibleRuntime = runtimes.some((runtime) => runtime.matches_model);
+  const isLocalEmbeddingsModel = testState.model.task_key === "embeddings" && testState.model.backend === "local";
+  const diagnosticRuntime = selectedRuntime ?? (!hasCompatibleRuntime ? runtimes[0] ?? null : null);
   const runtimeSelectionRequired = needsRuntimeSelection;
   const runDisabled = Boolean(
     runtimeSelectionRequired
@@ -99,6 +105,12 @@ export default function ModelTestPage(): JSX.Element {
       : selectedRuntime && !selectedRuntime.matches_model
       ? t("modelOps.testing.runtimeMismatch")
       : "");
+  const runtimeAdvertisedIdentifiers = diagnosticRuntime?.advertised_model_ids?.filter((value) => value.trim()) ?? [];
+  const embeddingsRuntimeConfigTarget =
+    testState.model.source_id
+    || testState.model.artifact?.storage_path
+    || testState.model.provider_model_id
+    || testState.model.id;
 
   return (
     <section className="card-stack">
@@ -134,13 +146,32 @@ export default function ModelTestPage(): JSX.Element {
             ))}
           </select>
           {isLoadingRuntimes && <p className="status-text">{t("modelOps.states.loading")}</p>}
-          {selectedRuntime && (
-            <p className="status-text">
-              {selectedRuntime.message}
-              {selectedRuntime.matched_model_id ? ` (${selectedRuntime.matched_model_id})` : ""}
-            </p>
+          {diagnosticRuntime && (
+            <>
+              <p className="status-text">
+                {diagnosticRuntime.message}
+                {diagnosticRuntime.matched_model_id ? ` (${diagnosticRuntime.matched_model_id})` : ""}
+              </p>
+              {!diagnosticRuntime.matches_model && runtimeAdvertisedIdentifiers.length > 0 && (
+                <p className="status-text">
+                  {t("modelOps.testing.runtimeAdvertisedIdentifiers", {
+                    identifiers: runtimeAdvertisedIdentifiers.join(", "),
+                  })}
+                </p>
+              )}
+            </>
           )}
           {runtimeStatusMessage && <p className={runtimeError ? "error-text" : "status-text"}>{runtimeStatusMessage}</p>}
+          {isLocalEmbeddingsModel && runtimeSelectionRequired && !isLoadingRuntimes && !hasCompatibleRuntime && (
+            <>
+              <p className="status-text">{t("modelOps.testing.embeddingsRuntimeGuidance")}</p>
+              <p className="status-text">
+                {t("modelOps.testing.embeddingsRuntimeConfigHint", {
+                  target: embeddingsRuntimeConfigTarget,
+                })}
+              </p>
+            </>
+          )}
         </article>
       )}
 

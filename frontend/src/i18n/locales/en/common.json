@@ -711,6 +711,9 @@
       "runtimeMismatch": "The selected runtime does not currently serve this local model.",
       "runtimeLoadFailed": "Unable to load compatible runtimes for this local model.",
       "noCompatibleRuntime": "No compatible runtime currently serves this local model.",
+      "runtimeAdvertisedIdentifiers": "Runtime currently advertises: {{identifiers}}",
+      "embeddingsRuntimeGuidance": "Exact local embeddings testing only works when an embeddings runtime already serves this model.",
+      "embeddingsRuntimeConfigHint": "For local staging, set LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL so /v1/models advertises {{target}}.",
       "unsupportedTitle": "Testing unavailable",
       "unsupportedDescription": "Testing is not yet supported for this model type or runtime combination."
     }
