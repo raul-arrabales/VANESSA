@@ -89,97 +89,133 @@ export default function PlatformDeploymentForm({
             onChange={(event) => onChange({ ...value, displayName: event.target.value })}
           />
         </label>
-        {capabilities.map((capability) => (
-          <div key={capability.capability} className="card-stack">
-            <label className="card-stack">
-              <span className="field-label">
-                {t("platformControl.forms.deployment.providerForCapability", {
-                  capability: capability.display_name,
-                })}
-              </span>
-              <select
-                className="field-input"
-                value={value.providerIdsByCapability[capability.capability] ?? ""}
-                onChange={(event) => updateCapabilityProvider(capability.capability, event.target.value)}
-              >
-                <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                {(providersByCapability[capability.capability] ?? []).map((provider) => (
-                  <option key={provider.id} value={provider.id}>
-                    {provider.display_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {requiresModelResources(capability.capability) ? (
-              <>
-                <label className="card-stack">
-                  <span className="field-label">
-                    {t("platformControl.forms.deployment.resourcesForCapability", {
-                      capability: capability.display_name,
-                    })}
-                  </span>
-                  <select
-                    className="field-input"
-                    multiple
-                    value={value.resourceIdsByCapability[capability.capability] ?? []}
-                    onChange={(event) =>
-                      updateCapabilityResources(
-                        capability.capability,
-                        Array.from(event.target.selectedOptions, (option) => option.value),
-                      )
-                    }
-                  >
-                    {(modelResourcesByCapability[capability.capability] ?? []).map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="card-stack">
-                  <span className="field-label">
-                    {t("platformControl.forms.deployment.defaultResourceForCapability", {
-                      capability: capability.display_name,
-                    })}
-                  </span>
-                  <select
-                    className="field-input"
-                    value={value.defaultResourceIdsByCapability[capability.capability] ?? ""}
-                    onChange={(event) =>
-                      onChange({
-                        ...value,
-                        defaultResourceIdsByCapability: {
-                          ...value.defaultResourceIdsByCapability,
-                          [capability.capability]: event.target.value,
-                        },
-                      })
-                    }
-                  >
-                    <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-                    {(modelResourcesByCapability[capability.capability] ?? [])
-                      .filter((model) => (value.resourceIdsByCapability[capability.capability] ?? []).includes(model.id))
-                      .map((model) => (
+        {capabilities.map((capability) => {
+          const capabilityKey = capability.capability;
+          const capabilityProviders = providersByCapability[capabilityKey] ?? [];
+          const selectedProviderId = value.providerIdsByCapability[capabilityKey] ?? "";
+          const selectedProvider = capabilityProviders.find((provider) => provider.id === selectedProviderId) ?? null;
+          const modelOptions = modelResourcesByCapability[capabilityKey] ?? [];
+          const selectedResourceIds = value.resourceIdsByCapability[capabilityKey] ?? [];
+          const availableDefaultResources = modelOptions.filter((model) => selectedResourceIds.includes(model.id));
+          const loadedManagedModelId = selectedProvider?.loaded_managed_model_id ?? null;
+          const loadedManagedModelName = selectedProvider?.loaded_managed_model_name ?? loadedManagedModelId ?? "";
+          const loadedModelIsEligible = loadedManagedModelId
+            ? modelOptions.some((model) => model.id === loadedManagedModelId)
+            : false;
+          const showLoadedModelEligibilityHint = requiresModelResources(capabilityKey)
+            && modelOptions.length === 0
+            && Boolean(loadedManagedModelId)
+            && !loadedModelIsEligible;
+          const showGenericEmptyHint = requiresModelResources(capabilityKey)
+            && modelOptions.length === 0
+            && !showLoadedModelEligibilityHint;
+
+          return (
+            <div key={capabilityKey} className="card-stack">
+              <label className="card-stack">
+                <span className="field-label">
+                  {t("platformControl.forms.deployment.providerForCapability", {
+                    capability: capability.display_name,
+                  })}
+                </span>
+                <select
+                  className="field-input"
+                  value={selectedProviderId}
+                  onChange={(event) => updateCapabilityProvider(capabilityKey, event.target.value)}
+                >
+                  <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                  {capabilityProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {requiresModelResources(capabilityKey) ? (
+                <>
+                  <label className="card-stack">
+                    <span className="field-label">
+                      {t("platformControl.forms.deployment.resourcesForCapability", {
+                        capability: capability.display_name,
+                      })}
+                    </span>
+                    <select
+                      className="field-input"
+                      multiple
+                      value={selectedResourceIds}
+                      onChange={(event) =>
+                        updateCapabilityResources(
+                          capabilityKey,
+                          Array.from(event.target.selectedOptions, (option) => option.value),
+                        )
+                      }
+                    >
+                      {modelOptions.map((model) => (
                         <option key={model.id} value={model.id}>
                           {model.name}
                         </option>
                       ))}
-                  </select>
-                </label>
-              </>
-            ) : supportsVectorResources(capability.capability) ? (
+                    </select>
+                  </label>
+                  {showLoadedModelEligibilityHint ? (
+                    <p className="status-text">
+                      {t("platformControl.forms.deployment.loadedModelNotEligibleHint", {
+                        capability: capability.display_name,
+                        provider: selectedProvider?.display_name ?? t("platformControl.summary.none"),
+                        model: loadedManagedModelName,
+                      })}
+                    </p>
+                  ) : null}
+                  {showGenericEmptyHint ? (
+                    <p className="status-text">
+                      {t("platformControl.forms.deployment.noEligibleResourcesHint", {
+                        capability: capability.display_name,
+                      })}
+                    </p>
+                  ) : null}
+                  <label className="card-stack">
+                    <span className="field-label">
+                      {t("platformControl.forms.deployment.defaultResourceForCapability", {
+                        capability: capability.display_name,
+                      })}
+                    </span>
+                    <select
+                      className="field-input"
+                      value={value.defaultResourceIdsByCapability[capabilityKey] ?? ""}
+                      disabled={modelOptions.length === 0}
+                      onChange={(event) =>
+                        onChange({
+                          ...value,
+                          defaultResourceIdsByCapability: {
+                            ...value.defaultResourceIdsByCapability,
+                            [capabilityKey]: event.target.value,
+                          },
+                        })
+                      }
+                    >
+                      <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+                      {availableDefaultResources.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : supportsVectorResources(capabilityKey) ? (
               <>
                 <label className="card-stack">
                   <span className="field-label">{t("platformControl.forms.deployment.vectorSelectionMode")}</span>
                   <select
                     className="field-input"
-                    value={String(value.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit")}
+                    value={String(value.resourcePolicyByCapability[capabilityKey]?.selection_mode ?? "explicit")}
                     onChange={(event) =>
                       onChange({
                         ...value,
                         resourcePolicyByCapability: {
                           ...value.resourcePolicyByCapability,
-                          [capability.capability]: {
-                            ...value.resourcePolicyByCapability[capability.capability],
+                          [capabilityKey]: {
+                            ...value.resourcePolicyByCapability[capabilityKey],
                             selection_mode: event.target.value,
                           },
                         },
@@ -190,19 +226,19 @@ export default function PlatformDeploymentForm({
                     <option value="dynamic_namespace">Dynamic namespace</option>
                   </select>
                 </label>
-                {String(value.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit") === "dynamic_namespace" ? (
+                {String(value.resourcePolicyByCapability[capabilityKey]?.selection_mode ?? "explicit") === "dynamic_namespace" ? (
                   <label className="card-stack">
                     <span className="field-label">{t("platformControl.forms.deployment.namespacePrefix")}</span>
                     <input
                       className="field-input"
-                      value={String(value.resourcePolicyByCapability[capability.capability]?.namespace_prefix ?? "")}
+                      value={String(value.resourcePolicyByCapability[capabilityKey]?.namespace_prefix ?? "")}
                       onChange={(event) =>
                         onChange({
                           ...value,
                           resourcePolicyByCapability: {
                             ...value.resourcePolicyByCapability,
-                            [capability.capability]: {
-                              ...value.resourcePolicyByCapability[capability.capability],
+                            [capabilityKey]: {
+                              ...value.resourcePolicyByCapability[capabilityKey],
                               selection_mode: "dynamic_namespace",
                               namespace_prefix: event.target.value,
                             },
@@ -216,10 +252,10 @@ export default function PlatformDeploymentForm({
                     <span className="field-label">{t("platformControl.forms.deployment.explicitResources")}</span>
                     <textarea
                       className="field-input quote-admin-textarea"
-                      value={(value.resourceIdsByCapability[capability.capability] ?? []).join("\n")}
+                      value={selectedResourceIds.join("\n")}
                       onChange={(event) =>
                         updateCapabilityResources(
-                          capability.capability,
+                          capabilityKey,
                           event.target.value
                             .split("\n")
                             .map((item) => item.trim())
@@ -230,9 +266,10 @@ export default function PlatformDeploymentForm({
                   </label>
                 )}
               </>
-            ) : null}
-          </div>
-        ))}
+              ) : null}
+            </div>
+          );
+        })}
       </div>
       <label className="card-stack">
         <span className="field-label">{t("platformControl.forms.deployment.description")}</span>

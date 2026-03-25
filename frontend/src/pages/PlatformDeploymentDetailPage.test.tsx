@@ -7,7 +7,14 @@ import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import PlatformDeploymentDetailPage from "./PlatformDeploymentDetailPage";
 import * as platformApi from "../api/platform";
-import { activationAuditFixture, deploymentsFixture, primePlatformControlMocks } from "../test/platformControlFixtures";
+import * as modelopsApi from "../api/modelops";
+import {
+  activationAuditFixture,
+  deploymentsFixture,
+  llmModelsFixture,
+  primePlatformControlMocks,
+  providersFixture,
+} from "../test/platformControlFixtures";
 
 let mockUser: AuthUser | null = null;
 
@@ -126,5 +133,64 @@ describe("PlatformDeploymentDetailPage", () => {
         "token",
       );
     });
+  });
+
+  it("explains when a selected provider has a loaded model that is not yet eligible for binding", async () => {
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(
+      providersFixture.map((provider) =>
+        provider.id === "provider-embeddings"
+          ? {
+              ...provider,
+              loaded_managed_model_id: "sentence-transformers--all-MiniLM-L6-v2",
+              loaded_managed_model_name: "all-MiniLM-L6-v2",
+            }
+          : provider,
+      ),
+    );
+    vi.mocked(modelopsApi.listModelOpsModels).mockImplementation(async (_token, options) => {
+      if (options?.capability === "llm_inference") {
+        return llmModelsFixture;
+      }
+      if (options?.capability === "embeddings") {
+        return [];
+      }
+      return llmModelsFixture;
+    });
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-1" },
+    );
+
+    expect(await screen.findByText(/vLLM embeddings local currently has all-MiniLM-L6-v2 loaded/i)).toBeVisible();
+    expect(screen.getAllByText("GPT-5").length).toBeGreaterThan(0);
+
+    const embeddingsDefaultSelect = screen.getByLabelText(
+      await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "Embeddings" }),
+    );
+    expect(embeddingsDefaultSelect).toBeDisabled();
+  });
+
+  it("explains when no eligible model resources are available for the selected capability", async () => {
+    vi.mocked(modelopsApi.listModelOpsModels).mockImplementation(async (_token, options) => {
+      if (options?.capability === "llm_inference") {
+        return llmModelsFixture;
+      }
+      if (options?.capability === "embeddings") {
+        return [];
+      }
+      return llmModelsFixture;
+    });
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-1" },
+    );
+
+    expect(await screen.findByText(/No ModelOps-eligible Embeddings resources are currently available for binding\./i)).toBeVisible();
   });
 });

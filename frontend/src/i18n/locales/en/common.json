@@ -789,6 +789,8 @@
         "providerForCapability": "{{capability}} provider",
         "resourcesForCapability": "{{capability}} resources",
         "defaultResourceForCapability": "{{capability}} default resource",
+        "loadedModelNotEligibleHint": "{{provider}} currently has {{model}} loaded, but deployment bindings only allow ModelOps-eligible {{capability}} models. Validate and activate this model in ModelOps before binding it.",
+        "noEligibleResourcesHint": "No ModelOps-eligible {{capability}} resources are currently available for binding.",
         "vectorSelectionMode": "Vector selection mode",
         "namespacePrefix": "Namespace prefix",
         "explicitResources": "Explicit vector resources"

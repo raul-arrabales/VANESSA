@@ -785,6 +785,8 @@
         "providerForCapability": "Proveedor de {{capability}}",
         "resourcesForCapability": "Recursos de {{capability}}",
         "defaultResourceForCapability": "Recurso por defecto de {{capability}}",
+        "loadedModelNotEligibleHint": "{{provider}} tiene actualmente cargado {{model}}, pero los enlaces del despliegue solo permiten modelos de {{capability}} elegibles en ModelOps. Valida y activa este modelo en ModelOps antes de enlazarlo.",
+        "noEligibleResourcesHint": "No hay recursos de {{capability}} elegibles en ModelOps disponibles para enlazar ahora mismo.",
         "vectorSelectionMode": "Modo de seleccion vectorial",
         "namespacePrefix": "Prefijo de namespace",
         "explicitResources": "Recursos vectoriales explicitos"
