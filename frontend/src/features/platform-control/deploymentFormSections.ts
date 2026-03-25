@@ -1,9 +1,7 @@
 import type { ManagedModel } from "../../api/modelops";
 import type { PlatformCapability, PlatformProvider } from "../../api/platform";
 import type { DeploymentFormState } from "./deploymentEditor";
-import {
-  getDeploymentCapabilityMode,
-} from "./utils";
+import { getDeploymentCapabilityMode } from "./capabilities";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 

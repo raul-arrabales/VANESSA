@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { summarizeBindingResources } from "../utils";
+import { summarizeBindingResources } from "../platformTopology";
 
 type PlatformDeploymentsDirectoryProps = {
   deployments: PlatformDeploymentProfile[];

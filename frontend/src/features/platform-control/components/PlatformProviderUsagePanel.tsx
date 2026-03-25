@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { getProviderUsageEntries, summarizeBindingResources } from "../utils";
+import { getProviderUsageEntries, summarizeBindingResources } from "../platformTopology";
 
 type PlatformProviderUsagePanelProps = {
   providerId: string;

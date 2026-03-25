@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { PlatformProviderFamily } from "../../../api/platform";
-import type { ProviderFormState } from "../utils";
+import type { ProviderFormState } from "../providerForm";
 
 type PlatformProviderFormProps = {
   value: ProviderFormState;

@@ -17,9 +17,7 @@ import {
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
-import {
-  summarizeBindingResources,
-} from "../features/platform-control/utils";
+import { summarizeBindingResources } from "../features/platform-control/platformTopology";
 
 function readLocationFeedback(state: unknown): string {
   if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {

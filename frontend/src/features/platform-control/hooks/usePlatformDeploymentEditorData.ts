@@ -11,7 +11,7 @@ import {
   type PlatformDeploymentProfile,
   type PlatformProvider,
 } from "../../../api/platform";
-import type { LoadState } from "../utils";
+import type { LoadState } from "../platformControlState";
 
 type PlatformDeploymentEditorDataState = {
   state: LoadState;

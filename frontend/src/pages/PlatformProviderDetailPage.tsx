@@ -19,16 +19,16 @@ import PlatformProviderUsagePanel from "../features/platform-control/components/
 import PlatformProviderValidationPanel from "../features/platform-control/components/PlatformProviderValidationPanel";
 import { usePlatformProviderLoadState } from "../features/platform-control/hooks/usePlatformProviderLoadState";
 import { usePlatformProvidersData } from "../features/platform-control/hooks/usePlatformProvidersData";
+import { getActiveDeployment } from "../features/platform-control/platformTopology";
+import {
+  buildProviderForm,
+  parseJsonObject,
+  type ProviderFormState,
+} from "../features/platform-control/providerForm";
 import {
   buildProviderLoadDisplayData,
   type StoredProviderLoadStatus,
 } from "../features/platform-control/providerLoad";
-import {
-  buildProviderForm,
-  getActiveDeployment,
-  parseJsonObject,
-  type ProviderFormState,
-} from "../features/platform-control/utils";
 
 function readLocationFeedback(state: unknown): string {
   if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {

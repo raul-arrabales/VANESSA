@@ -6,7 +6,7 @@ import PlatformCapabilitiesOverview from "../features/platform-control/component
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import PlatformSummaryCards from "../features/platform-control/components/PlatformSummaryCards";
 import { usePlatformOverview } from "../features/platform-control/hooks/usePlatformOverview";
-import { getActiveDeployment } from "../features/platform-control/utils";
+import { getActiveDeployment } from "../features/platform-control/platformTopology";
 import { useAuth } from "../auth/AuthProvider";
 
 export default function PlatformControlPage(): JSX.Element {

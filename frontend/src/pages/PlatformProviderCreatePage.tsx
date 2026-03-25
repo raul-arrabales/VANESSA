@@ -6,7 +6,7 @@ import { useAuth } from "../auth/AuthProvider";
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import PlatformProviderForm from "../features/platform-control/components/PlatformProviderForm";
 import { usePlatformProvidersData } from "../features/platform-control/hooks/usePlatformProvidersData";
-import { DEFAULT_PROVIDER_FORM, parseJsonObject } from "../features/platform-control/utils";
+import { DEFAULT_PROVIDER_FORM, parseJsonObject } from "../features/platform-control/providerForm";
 
 export default function PlatformProviderCreatePage(): JSX.Element {
   const { t } = useTranslation("common");

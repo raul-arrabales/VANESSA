@@ -5,10 +5,7 @@ import type {
   PlatformDeploymentProfile,
   PlatformProvider,
 } from "../../api/platform";
-import {
-  capabilityRequiresModelResource,
-  capabilitySupportsResources,
-} from "./utils";
+import { capabilityRequiresModelResource, capabilitySupportsResources } from "./capabilities";
 
 export type DeploymentFormState = {
   slug: string;

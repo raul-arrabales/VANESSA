@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
-import { getActiveDeployment, getProviderUsageEntries } from "../utils";
+import { getActiveDeployment, getProviderUsageEntries } from "../platformTopology";
 
 type PlatformProvidersDirectoryProps = {
   providers: PlatformProvider[];

@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
-import { capabilityRequiresModelResource, summarizeBindingResources } from "../utils";
+import { capabilityRequiresModelResource } from "../capabilities";
+import { summarizeBindingResources } from "../platformTopology";
 
 type PlatformCapabilitiesOverviewProps = {
   capabilities: PlatformCapability[];

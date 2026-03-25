@@ -8,7 +8,7 @@ import {
   type PlatformCapability,
   type PlatformDeploymentProfile,
 } from "../../../api/platform";
-import type { LoadState } from "../utils";
+import type { LoadState } from "../platformControlState";
 
 type PlatformOverviewState = {
   state: LoadState;

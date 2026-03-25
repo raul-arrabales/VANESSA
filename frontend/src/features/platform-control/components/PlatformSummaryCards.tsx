@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { PlatformActivationAuditEntry, PlatformDeploymentProfile } from "../../../api/platform";
-import type { LoadState } from "../utils";
+import type { LoadState } from "../platformControlState";
 
 type PlatformSummaryCardsProps = {
   state: LoadState;

@@ -10,7 +10,7 @@ import {
   type PlatformProvider,
   type PlatformProviderFamily,
 } from "../../../api/platform";
-import type { LoadState } from "../utils";
+import type { LoadState } from "../platformControlState";
 
 type PlatformProvidersDataState = {
   state: LoadState;
