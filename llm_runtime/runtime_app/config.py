@@ -38,20 +38,16 @@ class RuntimeControllerConfig:
 
 def load_runtime_controller_config() -> RuntimeControllerConfig:
     capability = os.getenv("LLM_RUNTIME_CAPABILITY", "llm_inference").strip().lower() or "llm_inference"
-    startup_local_path = (
-        os.getenv(
-            "LLM_EMBEDDINGS_LOCAL_MODEL_PATH" if capability == "embeddings" else "LLM_INFERENCE_LOCAL_MODEL_PATH",
-            "",
-        ).strip()
-        or os.getenv("LLM_LOCAL_MODEL_PATH", "").strip()
-        or None
-    )
-    startup_runtime_model_id = os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip() or startup_local_path
     if capability == "embeddings":
-        startup_runtime_model_id = (
-            os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
-            or startup_runtime_model_id
+        startup_local_path = os.getenv("LLM_EMBEDDINGS_LOCAL_MODEL_PATH", "").strip() or None
+        startup_runtime_model_id = os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip() or startup_local_path
+    else:
+        startup_local_path = (
+            os.getenv("LLM_INFERENCE_LOCAL_MODEL_PATH", "").strip()
+            or os.getenv("LLM_LOCAL_MODEL_PATH", "").strip()
+            or None
         )
+        startup_runtime_model_id = os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip() or startup_local_path
     startup_display_name = os.getenv("LLM_RUNTIME_STARTUP_DISPLAY_NAME", "").strip() or None
     additional_args = tuple(
         arg

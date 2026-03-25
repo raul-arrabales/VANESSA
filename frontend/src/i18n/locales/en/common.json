@@ -717,7 +717,7 @@
       "runtimeAdvertisedModels": "Runtime advertises these models: {{models}}",
       "runtimeAdvertisedIdentifiers": "Runtime currently advertises: {{identifiers}}",
       "embeddingsRuntimeGuidance": "Exact local embeddings testing only works when an embeddings runtime already serves this model.",
-      "embeddingsRuntimeConfigHint": "For local staging, set LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL so /v1/models advertises {{target}}.",
+      "embeddingsRuntimeConfigHint": "Assign {{target}} to the local embeddings provider slot in Platform Control so the runtime controller loads it.",
       "unsupportedTitle": "Testing unavailable",
       "unsupportedDescription": "Testing is not yet supported for this model type or runtime combination."
     }

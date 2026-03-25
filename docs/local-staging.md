@@ -32,6 +32,7 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 - Local ModelOps runtime loading:
   - Downloading a local model into ModelOps does not make the runtime advertise it. Assign the model to the local provider slot in Platform Control and the backend now triggers the matching local runtime controller to load it immediately.
   - `./ops/local-staging/reconcile-local-model-slot.sh` is now only a fallback/debug tool for syncing cold-start defaults in `infra/.env.local`; it is not required for the normal superadmin workflow.
+  - `llm_runtime_embeddings` now starts empty by default. Leave `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` and `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` blank unless you intentionally want a fallback embeddings preload at startup.
 - GPU runtime prerequisite:
   - On NVIDIA hosts, Docker must advertise the `nvidia` runtime, not just the host driver. If `docker info --format '{{json .Runtimes}}'` does not include `nvidia`, install/configure `nvidia-container-toolkit` and restart Docker.
   - The default CUDA 12 local runtime images also need a sufficiently recent GPU. Older cards such as GTX 960-class hardware can pass Docker GPU smoke tests and still fail when vLLM initializes CUDA. Use `LLM_RUNTIME_ACCELERATOR=cpu` on those hosts.

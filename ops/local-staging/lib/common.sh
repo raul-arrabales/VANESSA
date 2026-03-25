@@ -22,7 +22,7 @@ LLM_RUNTIME_CPU_VARIANT="${LLM_RUNTIME_CPU_VARIANT:-auto}"
 LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
 LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
 LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH}}"
-LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH}}"
+LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
 readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant mcp_gateway agent_engine sandbox kws weaviate postgres)
@@ -308,6 +308,9 @@ resolve_llm_local_model_host_path() {
 validate_llm_local_model_path() {
   local env_name="${1:-LLM_LOCAL_MODEL_PATH}"
   local model_path="${2:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}"
+  if [[ -z "${model_path}" ]]; then
+    return 0
+  fi
   local host_model_path
   host_model_path="$(resolve_llm_local_model_host_path "${model_path}")"
 

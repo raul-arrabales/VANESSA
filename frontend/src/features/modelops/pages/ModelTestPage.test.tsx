@@ -519,7 +519,7 @@ describe("ModelTestPage", () => {
     expect(screen.getByText("Exact local embeddings testing only works when an embeddings runtime already serves this model.")).toBeVisible();
     expect(
       screen.getByText(
-        "For local staging, set LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL so /v1/models advertises sentence-transformers/all-MiniLM-L6-v2.",
+        "Assign sentence-transformers/all-MiniLM-L6-v2 to the local embeddings provider slot in Platform Control so the runtime controller loads it.",
       ),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Run test" })).toBeDisabled();

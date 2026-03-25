@@ -104,3 +104,30 @@ def test_runtime_controller_config_uses_split_startup_paths(monkeypatch):
     assert config.capability == "embeddings"
     assert config.startup_local_path == "/models/llm/embeddings-model"
     assert config.startup_runtime_model_id == "embeddings-runtime-id"
+
+
+def test_embeddings_runtime_config_stays_empty_without_dedicated_startup_env(monkeypatch):
+    monkeypatch.setenv("LLM_RUNTIME_CAPABILITY", "embeddings")
+    monkeypatch.setenv("LLM_LOCAL_MODEL_PATH", "/models/llm/fallback-model")
+    monkeypatch.setenv("LLM_LOCAL_UPSTREAM_MODEL", "inference-runtime-id")
+    monkeypatch.delenv("LLM_EMBEDDINGS_LOCAL_MODEL_PATH", raising=False)
+    monkeypatch.delenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", raising=False)
+
+    config = load_runtime_controller_config()
+
+    assert config.capability == "embeddings"
+    assert config.startup_local_path is None
+    assert config.startup_runtime_model_id is None
+
+
+def test_inference_runtime_config_keeps_generic_local_fallback(monkeypatch):
+    monkeypatch.setenv("LLM_RUNTIME_CAPABILITY", "llm_inference")
+    monkeypatch.setenv("LLM_LOCAL_MODEL_PATH", "/models/llm/fallback-model")
+    monkeypatch.setenv("LLM_LOCAL_UPSTREAM_MODEL", "inference-runtime-id")
+    monkeypatch.delenv("LLM_INFERENCE_LOCAL_MODEL_PATH", raising=False)
+
+    config = load_runtime_controller_config()
+
+    assert config.capability == "llm_inference"
+    assert config.startup_local_path == "/models/llm/fallback-model"
+    assert config.startup_runtime_model_id == "inference-runtime-id"

@@ -86,7 +86,8 @@ Supported launcher variables:
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
 - Deployment bindings still choose which active validated managed models are allowed for a capability, but local vLLM runtime advertisement is now reconciled from backend-owned provider slot intent.
-- `LLM_LOCAL_UPSTREAM_MODEL`, `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL`, `LLM_INFERENCE_LOCAL_MODEL_PATH`, and `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` are fallback/debug startup defaults; do not treat them as the primary operator interface.
+- `LLM_LOCAL_UPSTREAM_MODEL` and `LLM_INFERENCE_LOCAL_MODEL_PATH` are fallback/debug startup defaults for the inference runtime.
+- `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` and `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` are opt-in fallback/debug startup defaults for the embeddings runtime and should normally be left blank so embeddings starts empty until Platform Control loads a model.
 - Keep runtime/provider env focused on endpoint topology and secrets; use Platform Control to choose deployment-bound resources and to assign the local loaded-model slot for local vLLM providers.
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
