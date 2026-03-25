@@ -211,6 +211,133 @@ def test_serialize_provider_row_exposes_secret_refs_separately():
     assert payload["secret_refs"] == {"api_key": "env://API_KEY"}
 
 
+def test_local_slot_payload_from_config_treats_string_none_values_as_missing():
+    payload = platform_service._local_slot_payload_from_config(  # type: ignore[attr-defined]
+        {
+            "loaded_managed_model_id": "None",
+            "loaded_managed_model_name": "None",
+            "loaded_runtime_model_id": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+            "loaded_local_path": "null",
+            "loaded_source_id": "None",
+            "load_state": "loaded",
+            "load_error": "None",
+        }
+    )
+
+    assert payload["loaded_managed_model_id"] is None
+    assert payload["loaded_managed_model_name"] is None
+    assert payload["loaded_runtime_model_id"] == "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
+    assert payload["loaded_local_path"] is None
+    assert payload["loaded_source_id"] is None
+    assert payload["load_error"] is None
+
+
+def test_local_slot_runtime_state_backfills_missing_managed_model_metadata():
+    payload = platform_service._local_slot_with_runtime_state(  # type: ignore[attr-defined]
+        {
+            "loaded_managed_model_id": None,
+            "loaded_managed_model_name": None,
+            "loaded_runtime_model_id": None,
+            "loaded_local_path": None,
+            "load_state": "reconciling",
+            "load_error": None,
+        },
+        {
+            "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "display_name": "sentence-transformers/all-MiniLM-L6-v2",
+            "runtime_model_id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "load_state": "loaded",
+            "last_error": None,
+        },
+        200,
+    )
+
+    assert payload["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert payload["loaded_managed_model_name"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert payload["loaded_runtime_model_id"] == "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"
+    assert payload["load_state"] == "loaded"
+
+
+def test_local_slot_runtime_state_preserves_persisted_managed_model_metadata_when_runtime_omits_it():
+    payload = platform_service._local_slot_with_runtime_state(  # type: ignore[attr-defined]
+        {
+            "loaded_managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_managed_model_name": "Persisted MiniLM",
+            "loaded_runtime_model_id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "load_state": "loading",
+            "load_error": None,
+        },
+        {
+            "managed_model_id": None,
+            "display_name": None,
+            "runtime_model_id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "load_state": "loaded",
+            "last_error": None,
+        },
+        200,
+    )
+
+    assert payload["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert payload["loaded_managed_model_name"] == "Persisted MiniLM"
+    assert payload["load_state"] == "loaded"
+
+
+def test_effective_local_slot_only_marks_loaded_when_runtime_inventory_advertises_loaded_model(monkeypatch: pytest.MonkeyPatch):
+    provider_row = {
+        "id": "provider-embeddings",
+        "slug": "vllm-embeddings-local",
+        "provider_key": "vllm_embeddings_local",
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+        "display_name": "vLLM embeddings local",
+        "description": "desc",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": True,
+        "config_json": {
+            "loaded_runtime_model_id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+            "load_state": "reconciling",
+        },
+    }
+    monkeypatch.setattr(
+        platform_service,
+        "_runtime_admin_state",
+        lambda _row: (
+            {
+                "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+                "display_name": "sentence-transformers/all-MiniLM-L6-v2",
+                "runtime_model_id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+                "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                "load_state": "loaded",
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+    monkeypatch.setattr(platform_service, "_provider_runtime_inventory", lambda _row: ([], 200))
+
+    payload = platform_service._effective_local_slot(provider_row)  # type: ignore[attr-defined]
+
+    assert payload["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert payload["loaded_managed_model_name"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert payload["load_state"] == "reconciling"
+
+    monkeypatch.setattr(
+        platform_service,
+        "_provider_runtime_inventory",
+        lambda _row: ([{"id": "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2"}], 200),
+    )
+
+    loaded_payload = platform_service._effective_local_slot(provider_row)  # type: ignore[attr-defined]
+
+    assert loaded_payload["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert loaded_payload["loaded_managed_model_name"] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert loaded_payload["load_state"] == "loaded"
+
+
 def test_assign_provider_loaded_model_persists_local_slot(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(

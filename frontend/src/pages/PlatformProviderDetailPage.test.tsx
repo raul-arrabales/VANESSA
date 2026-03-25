@@ -188,6 +188,7 @@ describe("PlatformProviderDetailPage", () => {
     const loadPanelTitle = await t("platformControl.providers.loadPanelTitle");
     const loadedSummary = await t("platformControl.providers.loadPanelSummaryLoaded", { name: localEmbeddingsModel.name });
     const dismissLabel = await t("platformControl.providers.loadPanelDismiss");
+    const loadedStateHint = await t("platformControl.providers.loadedModelStateHintLoaded");
     vi.mocked(platformApi.listPlatformProviders)
       .mockResolvedValueOnce(buildProvidersList(buildEmbeddingsProvider()))
       .mockResolvedValueOnce(buildProvidersList(buildEmbeddingsProvider({
@@ -223,13 +224,105 @@ describe("PlatformProviderDetailPage", () => {
       expect(within(panel).getByText(loadedSummary)).toBeVisible();
     });
     expect(within(panel).getByText("/models/embeddings/sentence-transformers--all-MiniLM-L6-v2")).toBeVisible();
+    expect(within(panel).getByText(loadedStateHint)).toBeVisible();
+    expect(within(panel).queryByText("platformControl.providers.loadedModelStateHint")).not.toBeInTheDocument();
+    expect(within(panel).queryByText(await t("platformControl.summary.none"))).not.toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: dismissLabel })).toBeVisible();
+  });
+
+  it("keeps the assigned model card compact when no runtime detail is available", async () => {
+    const loadedModelTitle = await t("platformControl.providers.loadedModelTitle");
+    const loadedStateHint = await t("platformControl.providers.loadedModelStateHintLoaded");
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(buildProvidersList(buildEmbeddingsProvider({
+      loaded_managed_model_id: localEmbeddingsModel.id,
+      loaded_managed_model_name: localEmbeddingsModel.name,
+      load_state: "loaded",
+    })));
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-embeddings" },
+    );
+
+    const loadedModelSection = (await screen.findByRole("heading", { name: loadedModelTitle })).closest("article");
+    expect(loadedModelSection).not.toBeNull();
+    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".platform-summary-card");
+    expect(loadedModelCard).not.toBeNull();
+    expect(within(loadedModelCard as HTMLElement).getByText(localEmbeddingsModel.name)).toBeVisible();
+    expect(within(loadedModelCard as HTMLElement).queryByText(await t("platformControl.summary.none"))).not.toBeInTheDocument();
+    expect(within(loadedModelSection as HTMLElement).getByText(loadedStateHint)).toBeVisible();
+  });
+
+  it("uses the runtime model as the only assigned-model line when no managed model is assigned", async () => {
+    const loadedModelTitle = await t("platformControl.providers.loadedModelTitle");
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(buildProvidersList(buildEmbeddingsProvider({
+      loaded_managed_model_id: null,
+      loaded_managed_model_name: null,
+      loaded_runtime_model_id: "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+      load_state: "loaded",
+    })));
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-embeddings" },
+    );
+
+    const loadedModelSection = (await screen.findByRole("heading", { name: loadedModelTitle })).closest("article");
+    expect(loadedModelSection).not.toBeNull();
+    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".platform-summary-card");
+    expect(loadedModelCard).not.toBeNull();
+    expect(within(loadedModelCard as HTMLElement).getByText("/models/llm/Qwen--Qwen2.5-0.5B-Instruct")).toBeVisible();
+    expect(within(loadedModelCard as HTMLElement).queryByText(await t("platformControl.summary.none"))).not.toBeInTheDocument();
+  });
+
+  it("shows runtime detail when a runtime model id exists and uses state-specific helper text", async () => {
+    const loadedModelTitle = await t("platformControl.providers.loadedModelTitle");
+    const loadedStateHint = await t("platformControl.providers.loadedModelStateHintLoaded");
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(buildProvidersList(buildEmbeddingsProvider({
+      loaded_managed_model_id: localEmbeddingsModel.id,
+      loaded_managed_model_name: localEmbeddingsModel.name,
+      loaded_runtime_model_id: "/models/embeddings/sentence-transformers--all-MiniLM-L6-v2",
+      load_state: "loaded",
+    })));
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-embeddings" },
+    );
+
+    const loadedModelSection = (await screen.findByRole("heading", { name: loadedModelTitle })).closest("article");
+    expect(loadedModelSection).not.toBeNull();
+    expect(within(loadedModelSection as HTMLElement).getByText("/models/embeddings/sentence-transformers--all-MiniLM-L6-v2")).toBeVisible();
+    expect(within(loadedModelSection as HTMLElement).getByText(loadedStateHint)).toBeVisible();
+  });
+
+  it("shows the empty-state helper text when no local model is assigned", async () => {
+    const emptyStateHint = await t("platformControl.providers.loadedModelStateHintEmpty");
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(buildProvidersList(buildEmbeddingsProvider({
+      load_state: "empty",
+    })));
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-embeddings" },
+    );
+
+    expect(await screen.findByText(emptyStateHint)).toBeVisible();
   });
 
   it("shows runtime errors in the side panel when model loading fails", async () => {
     const user = userEvent.setup();
     const errorSummary = await t("platformControl.providers.loadPanelSummaryError", { name: localEmbeddingsModel.name });
     const dismissLabel = await t("platformControl.providers.loadPanelDismiss");
+    const loadedModelTitle = await t("platformControl.providers.loadedModelTitle");
     vi.mocked(platformApi.listPlatformProviders)
       .mockResolvedValueOnce(buildProvidersList(buildEmbeddingsProvider()))
       .mockResolvedValueOnce(buildProvidersList(buildEmbeddingsProvider({
@@ -265,11 +358,15 @@ describe("PlatformProviderDetailPage", () => {
     });
     expect(within(panel).getByText("GPU out of memory")).toBeVisible();
     expect(within(panel).getByRole("button", { name: dismissLabel })).toBeVisible();
+    const loadedModelSection = screen.getByRole("heading", { name: loadedModelTitle }).closest("article");
+    expect(loadedModelSection).not.toBeNull();
+    expect(within(loadedModelSection as HTMLElement).getByText("GPU out of memory")).toBeVisible();
   });
 
   it("restores the side panel across reloads and keeps dismissed terminal states closed", async () => {
     const loadPanelTitle = await t("platformControl.providers.loadPanelTitle");
     const dismissLabel = await t("platformControl.providers.loadPanelDismiss");
+    const loadedModelTitle = await t("platformControl.providers.loadedModelTitle");
     const storedStatus = {
       providerId: "provider-embeddings",
       requestedModelId: localEmbeddingsModel.id,
@@ -297,11 +394,15 @@ describe("PlatformProviderDetailPage", () => {
     );
 
     expect(await screen.findByRole("status", { name: loadPanelTitle })).toBeVisible();
+    const loadedModelSection = screen.getByRole("heading", { name: loadedModelTitle }).closest("article");
+    expect(loadedModelSection).not.toBeNull();
+    expect(within(loadedModelSection as HTMLElement).getByText(localEmbeddingsModel.name)).toBeVisible();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: dismissLabel }));
     await waitFor(() => {
       expect(screen.queryByRole("status", { name: loadPanelTitle })).not.toBeInTheDocument();
     });
+    expect(within(loadedModelSection as HTMLElement).getByText(localEmbeddingsModel.name)).toBeVisible();
 
     firstRender.unmount();
 

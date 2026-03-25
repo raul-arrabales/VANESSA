@@ -1571,13 +1571,22 @@ def _provider_storage_config(config: dict[str, Any], secret_refs: dict[str, str]
     return stored
 
 
+def _normalized_optional_slot_string(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"none", "null"}:
+        return None
+    return normalized
+
+
 def _local_slot_payload_from_config(config: dict[str, Any]) -> dict[str, Any]:
-    loaded_managed_model_id = str(config.get("loaded_managed_model_id") or "").strip() or None
-    loaded_managed_model_name = str(config.get("loaded_managed_model_name") or "").strip() or None
-    loaded_runtime_model_id = str(config.get("loaded_runtime_model_id") or "").strip() or None
-    loaded_local_path = str(config.get("loaded_local_path") or "").strip() or None
-    loaded_source_id = str(config.get("loaded_source_id") or "").strip() or None
-    load_error = str(config.get("load_error") or "").strip() or None
+    loaded_managed_model_id = _normalized_optional_slot_string(config.get("loaded_managed_model_id"))
+    loaded_managed_model_name = _normalized_optional_slot_string(config.get("loaded_managed_model_name"))
+    loaded_runtime_model_id = _normalized_optional_slot_string(config.get("loaded_runtime_model_id"))
+    loaded_local_path = _normalized_optional_slot_string(config.get("loaded_local_path"))
+    loaded_source_id = _normalized_optional_slot_string(config.get("loaded_source_id"))
+    load_error = _normalized_optional_slot_string(config.get("load_error"))
     raw_state = str(config.get("load_state") or "").strip().lower()
     if loaded_managed_model_id:
         load_state = raw_state or _LOCAL_SLOT_STATE_RECONCILING
@@ -1711,10 +1720,16 @@ def _local_slot_with_runtime_state(slot: dict[str, Any], runtime_state: dict[str
             if not resolved.get("load_error"):
                 resolved["load_error"] = f"runtime_state_unavailable:{status_code}"
         return resolved
-    runtime_model_id = str(runtime_state.get("runtime_model_id") or "").strip() or None
-    local_path = str(runtime_state.get("local_path") or "").strip() or None
-    last_error = str(runtime_state.get("last_error") or "").strip() or None
+    managed_model_id = _normalized_optional_slot_string(runtime_state.get("managed_model_id"))
+    display_name = _normalized_optional_slot_string(runtime_state.get("display_name"))
+    runtime_model_id = _normalized_optional_slot_string(runtime_state.get("runtime_model_id"))
+    local_path = _normalized_optional_slot_string(runtime_state.get("local_path"))
+    last_error = _normalized_optional_slot_string(runtime_state.get("last_error"))
     raw_state = str(runtime_state.get("load_state") or "").strip().lower()
+    if managed_model_id and not resolved.get("loaded_managed_model_id"):
+        resolved["loaded_managed_model_id"] = managed_model_id
+    if display_name and not resolved.get("loaded_managed_model_name"):
+        resolved["loaded_managed_model_name"] = display_name
     if runtime_model_id:
         resolved["loaded_runtime_model_id"] = runtime_model_id
     if local_path:

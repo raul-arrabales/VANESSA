@@ -427,9 +427,28 @@ export default function PlatformProviderDetailPage(): JSX.Element {
   }
 
   const combinedFeedback = feedbackMessage || readLocationFeedback(location.state);
+  const loadedModelPrimary = provider?.loaded_managed_model_name
+    ?? provider?.loaded_managed_model_id
+    ?? provider?.loaded_runtime_model_id
+    ?? provider?.loaded_local_path
+    ?? t("platformControl.summary.none");
+  const loadedModelSecondaryDetailCandidate = provider?.loaded_runtime_model_id ?? provider?.loaded_local_path ?? null;
+  const loadedModelSecondaryDetail = loadedModelSecondaryDetailCandidate && loadedModelSecondaryDetailCandidate !== loadedModelPrimary
+    ? loadedModelSecondaryDetailCandidate
+    : null;
+  const providerLoadState = String(provider?.load_state ?? "empty").trim() || "empty";
+  const loadStateHelperText = provider?.load_error
+    ? provider.load_error
+    : providerLoadState === "loaded"
+      ? t("platformControl.providers.loadedModelStateHintLoaded")
+      : providerLoadState === "reconciling"
+        ? t("platformControl.providers.loadedModelStateHintReconciling")
+        : providerLoadState === "loading"
+          ? t("platformControl.providers.loadedModelStateHintLoading")
+          : t("platformControl.providers.loadedModelStateHintEmpty");
   const loadPanelModelName = trackedLoad?.requestedModelName || provider?.loaded_managed_model_name || provider?.loaded_managed_model_id || t("platformControl.summary.none");
   const loadPanelModelId = trackedLoad?.requestedModelId || provider?.loaded_managed_model_id || t("platformControl.summary.none");
-  const loadPanelRuntimeLabel = provider?.loaded_runtime_model_id ?? provider?.loaded_local_path ?? t("platformControl.summary.none");
+  const loadPanelRuntimeLabel = provider?.loaded_runtime_model_id ?? provider?.loaded_local_path ?? providerLoadState;
   const loadPanelPhaseLabel = t(`platformControl.providers.loadPanelPhases.${loadPanelPhase}`);
   const loadPanelSummary = loadPanelPhase === "loading"
     ? t("platformControl.providers.loadPanelSummaryLoading", { name: loadPanelModelName })
@@ -546,13 +565,15 @@ export default function PlatformProviderDetailPage(): JSX.Element {
               <div className="platform-detail-grid">
                 <div className="platform-summary-card">
                   <span className="field-label">{t("platformControl.providers.loadedModelLabel")}</span>
-                  <strong>{provider.loaded_managed_model_name ?? provider.loaded_managed_model_id ?? t("platformControl.summary.none")}</strong>
-                  <span className="status-text">{provider.loaded_runtime_model_id ?? provider.loaded_local_path ?? t("platformControl.summary.none")}</span>
+                  <strong>{loadedModelPrimary}</strong>
+                  {loadedModelSecondaryDetail ? (
+                    <span className="status-text">{loadedModelSecondaryDetail}</span>
+                  ) : null}
                 </div>
                 <div className="platform-summary-card">
                   <span className="field-label">{t("platformControl.providers.loadedModelStateLabel")}</span>
-                  <strong>{provider.load_state ?? "empty"}</strong>
-                  <span className="status-text">{provider.load_error ?? t("platformControl.providers.loadedModelStateHint")}</span>
+                  <strong>{providerLoadState}</strong>
+                  <span className={provider?.load_error ? "status-text error-text" : "status-text"}>{loadStateHelperText}</span>
                 </div>
               </div>
               <label className="field-label" htmlFor="provider-loaded-model">
@@ -666,7 +687,7 @@ export default function PlatformProviderDetailPage(): JSX.Element {
               <span className="field-label">{t("platformControl.providers.loadPanelRuntimeLabel")}</span>
               <strong>{loadPanelRuntimeLabel}</strong>
               <span className={provider.load_error ? "status-text error-text" : "status-text"}>
-                {provider.load_error ?? t("platformControl.providers.loadedModelStateHint")}
+                {loadStateHelperText}
               </span>
             </div>
           </div>
