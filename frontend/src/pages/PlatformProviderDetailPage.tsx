@@ -31,6 +31,104 @@ function readLocationFeedback(state: unknown): string {
   return "";
 }
 
+type ProviderLoadPanelPhase = "idle" | "loading" | "reconciling" | "loaded" | "error";
+
+type StoredProviderLoadStatus = {
+  providerId: string;
+  requestedModelId: string;
+  requestedModelName: string;
+  statusOpen: boolean;
+  dismissedTerminalState: boolean;
+};
+
+const PROVIDER_LOAD_STATUS_STORAGE_PREFIX = "vanessa:platform-provider-load:";
+
+function normalizeProviderLoadPhase(value: string | null | undefined): ProviderLoadPanelPhase {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (
+    normalized === "loading"
+    || normalized === "reconciling"
+    || normalized === "loaded"
+    || normalized === "error"
+  ) {
+    return normalized;
+  }
+  return "idle";
+}
+
+function isActiveProviderLoadPhase(phase: ProviderLoadPanelPhase): boolean {
+  return phase === "loading" || phase === "reconciling";
+}
+
+function isTerminalProviderLoadPhase(phase: ProviderLoadPanelPhase): boolean {
+  return phase === "loaded" || phase === "error";
+}
+
+function providerLoadStatusStorageKey(providerId: string): string {
+  return `${PROVIDER_LOAD_STATUS_STORAGE_PREFIX}${providerId}`;
+}
+
+function readStoredProviderLoadStatus(providerId: string): StoredProviderLoadStatus | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const rawValue = window.sessionStorage.getItem(providerLoadStatusStorageKey(providerId));
+    if (!rawValue) {
+      return null;
+    }
+    const parsed = JSON.parse(rawValue) as Partial<StoredProviderLoadStatus>;
+    if (parsed.providerId !== providerId) {
+      return null;
+    }
+    return {
+      providerId,
+      requestedModelId: String(parsed.requestedModelId ?? ""),
+      requestedModelName: String(parsed.requestedModelName ?? ""),
+      statusOpen: Boolean(parsed.statusOpen),
+      dismissedTerminalState: Boolean(parsed.dismissedTerminalState),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredProviderLoadStatus(payload: StoredProviderLoadStatus): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.sessionStorage.setItem(
+    providerLoadStatusStorageKey(payload.providerId),
+    JSON.stringify(payload),
+  );
+}
+
+function clearStoredProviderLoadStatus(providerId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.sessionStorage.removeItem(providerLoadStatusStorageKey(providerId));
+}
+
+function sameStoredProviderLoadStatus(
+  left: StoredProviderLoadStatus | null,
+  right: StoredProviderLoadStatus | null,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.providerId === right.providerId
+    && left.requestedModelId === right.requestedModelId
+    && left.requestedModelName === right.requestedModelName
+    && left.statusOpen === right.statusOpen
+    && left.dismissedTerminalState === right.dismissedTerminalState
+  );
+}
+
 export default function PlatformProviderDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
@@ -48,6 +146,9 @@ export default function PlatformProviderDetailPage(): JSX.Element {
   const [slotModels, setSlotModels] = useState<ManagedModel[]>([]);
   const [slotModelId, setSlotModelId] = useState("");
   const [slotLoading, setSlotLoading] = useState(false);
+  const [isLoadPanelOpen, setIsLoadPanelOpen] = useState(false);
+  const [loadPanelPhase, setLoadPanelPhase] = useState<ProviderLoadPanelPhase>("idle");
+  const [trackedLoad, setTrackedLoad] = useState<StoredProviderLoadStatus | null>(null);
 
   const provider = providers.find((item) => item.id === providerId) ?? null;
   const providerFamily = provider ? providerFamilies.find((family) => family.provider_key === provider.provider_key) ?? null : null;
@@ -63,6 +164,10 @@ export default function PlatformProviderDetailPage(): JSX.Element {
       && provider.provider_key !== "openai_compatible_cloud_llm"
       && provider.provider_key !== "openai_compatible_cloud_embeddings"
     : false;
+  const selectedSlotModel = useMemo(
+    () => slotModels.find((model) => model.id === slotModelId) ?? null,
+    [slotModelId, slotModels],
+  );
 
   useEffect(() => {
     if (provider) {
@@ -113,6 +218,86 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     }, 1500);
     return () => window.clearTimeout(timer);
   }, [provider, reload, supportsLocalSlot]);
+
+  useEffect(() => {
+    if (!supportsLocalSlot || !providerId) {
+      setTrackedLoad(null);
+      setIsLoadPanelOpen(false);
+      setLoadPanelPhase("idle");
+      return;
+    }
+    setTrackedLoad(readStoredProviderLoadStatus(providerId));
+  }, [providerId, supportsLocalSlot]);
+
+  useEffect(() => {
+    if (!supportsLocalSlot || !provider) {
+      return;
+    }
+
+    const backendPhase = normalizeProviderLoadPhase(provider.load_state);
+    const providerModelId = provider.loaded_managed_model_id ?? "";
+    const providerModelName = provider.loaded_managed_model_name ?? providerModelId;
+    let nextTrackedLoad = trackedLoad;
+
+    if (isActiveProviderLoadPhase(backendPhase)) {
+      const candidate: StoredProviderLoadStatus = {
+        providerId: provider.id,
+        requestedModelId: providerModelId || trackedLoad?.requestedModelId || slotModelId,
+        requestedModelName: providerModelName || trackedLoad?.requestedModelName || selectedSlotModel?.name || slotModelId,
+        statusOpen: true,
+        dismissedTerminalState: false,
+      };
+      if (!sameStoredProviderLoadStatus(trackedLoad, candidate)) {
+        setTrackedLoad(candidate);
+        writeStoredProviderLoadStatus(candidate);
+        nextTrackedLoad = candidate;
+      }
+      setLoadPanelPhase(backendPhase);
+      setIsLoadPanelOpen(true);
+      return;
+    }
+
+    if (isTerminalProviderLoadPhase(backendPhase)) {
+      setLoadPanelPhase(backendPhase);
+      if (nextTrackedLoad && nextTrackedLoad.statusOpen && !nextTrackedLoad.dismissedTerminalState) {
+        const candidate: StoredProviderLoadStatus = {
+          ...nextTrackedLoad,
+          requestedModelId: nextTrackedLoad.requestedModelId || providerModelId,
+          requestedModelName: nextTrackedLoad.requestedModelName || providerModelName,
+        };
+        if (!sameStoredProviderLoadStatus(nextTrackedLoad, candidate)) {
+          setTrackedLoad(candidate);
+          writeStoredProviderLoadStatus(candidate);
+        }
+        setIsLoadPanelOpen(true);
+      }
+      return;
+    }
+
+    if (!nextTrackedLoad || nextTrackedLoad.dismissedTerminalState || !nextTrackedLoad.statusOpen) {
+      setIsLoadPanelOpen(false);
+      setLoadPanelPhase("idle");
+    }
+  }, [provider, selectedSlotModel, slotModelId, supportsLocalSlot, trackedLoad]);
+
+  function persistTrackedLoad(nextTrackedLoad: StoredProviderLoadStatus): void {
+    setTrackedLoad(nextTrackedLoad);
+    writeStoredProviderLoadStatus(nextTrackedLoad);
+  }
+
+  function dismissTrackedLoadPanel(): void {
+    if (!provider || !trackedLoad) {
+      setIsLoadPanelOpen(false);
+      return;
+    }
+    const dismissedStatus: StoredProviderLoadStatus = {
+      ...trackedLoad,
+      statusOpen: false,
+      dismissedTerminalState: true,
+    };
+    persistTrackedLoad(dismissedStatus);
+    setIsLoadPanelOpen(false);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -197,12 +382,26 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     }
     setErrorMessage("");
     setFeedbackMessage("");
+    const nextTrackedLoad: StoredProviderLoadStatus = {
+      providerId: provider.id,
+      requestedModelId: slotModelId,
+      requestedModelName: selectedSlotModel?.name ?? slotModelId,
+      statusOpen: true,
+      dismissedTerminalState: false,
+    };
+    persistTrackedLoad(nextTrackedLoad);
+    setLoadPanelPhase("loading");
+    setIsLoadPanelOpen(true);
     try {
       const updatedProvider = await assignPlatformProviderLoadedModel(provider.id, slotModelId, token);
       setSlotModelId(updatedProvider.loaded_managed_model_id ?? slotModelId);
-      setFeedbackMessage(t("platformControl.feedback.providerLoadedModelAssigned", { name: updatedProvider.display_name }));
+      setLoadPanelPhase(normalizeProviderLoadPhase(updatedProvider.load_state) || "loading");
       await reload();
     } catch (error) {
+      clearStoredProviderLoadStatus(provider.id);
+      setTrackedLoad(null);
+      setIsLoadPanelOpen(false);
+      setLoadPanelPhase("idle");
       setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerLoadedModelAssignFailed"));
     }
   }
@@ -216,6 +415,10 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     try {
       const updatedProvider = await clearPlatformProviderLoadedModel(provider.id, token);
       setSlotModelId(updatedProvider.loaded_managed_model_id ?? "");
+      clearStoredProviderLoadStatus(provider.id);
+      setTrackedLoad(null);
+      setIsLoadPanelOpen(false);
+      setLoadPanelPhase("idle");
       setFeedbackMessage(t("platformControl.feedback.providerLoadedModelCleared", { name: updatedProvider.display_name }));
       await reload();
     } catch (error) {
@@ -224,6 +427,45 @@ export default function PlatformProviderDetailPage(): JSX.Element {
   }
 
   const combinedFeedback = feedbackMessage || readLocationFeedback(location.state);
+  const loadPanelModelName = trackedLoad?.requestedModelName || provider?.loaded_managed_model_name || provider?.loaded_managed_model_id || t("platformControl.summary.none");
+  const loadPanelModelId = trackedLoad?.requestedModelId || provider?.loaded_managed_model_id || t("platformControl.summary.none");
+  const loadPanelRuntimeLabel = provider?.loaded_runtime_model_id ?? provider?.loaded_local_path ?? t("platformControl.summary.none");
+  const loadPanelPhaseLabel = t(`platformControl.providers.loadPanelPhases.${loadPanelPhase}`);
+  const loadPanelSummary = loadPanelPhase === "loading"
+    ? t("platformControl.providers.loadPanelSummaryLoading", { name: loadPanelModelName })
+    : loadPanelPhase === "reconciling"
+      ? t("platformControl.providers.loadPanelSummaryReconciling", { name: loadPanelModelName })
+      : loadPanelPhase === "loaded"
+        ? t("platformControl.providers.loadPanelSummaryLoaded", { name: loadPanelModelName })
+        : loadPanelPhase === "error"
+          ? t("platformControl.providers.loadPanelSummaryError", { name: loadPanelModelName })
+          : "";
+  const loadTimelineItems = [
+    {
+      label: t("platformControl.providers.loadPanelTimelineAccepted"),
+      state: "done",
+    },
+    {
+      label: t("platformControl.providers.loadPanelTimelineLoading"),
+      state: loadPanelPhase === "loaded"
+        ? "done"
+        : loadPanelPhase === "error"
+          ? "error"
+          : isActiveProviderLoadPhase(loadPanelPhase)
+            ? "active"
+            : "pending",
+    },
+    {
+      label: loadPanelPhase === "error"
+        ? t("platformControl.providers.loadPanelTimelineFailed")
+        : t("platformControl.providers.loadPanelTimelineReady"),
+      state: loadPanelPhase === "loaded"
+        ? "done"
+        : loadPanelPhase === "error"
+          ? "error"
+          : "pending",
+    },
+  ];
 
   return (
     <PlatformPageLayout
@@ -395,6 +637,63 @@ export default function PlatformProviderDetailPage(): JSX.Element {
             </div>
           </article>
         </>
+      ) : null}
+
+      {provider && supportsLocalSlot && isLoadPanelOpen && loadPanelPhase !== "idle" ? (
+        <aside
+          className="provider-load-panel panel"
+          role="status"
+          aria-live="polite"
+          aria-label={t("platformControl.providers.loadPanelTitle")}
+        >
+          <div className="provider-load-panel-header">
+            <div className="card-stack">
+              <p className="eyebrow">{t("platformControl.providers.loadPanelTitle")}</p>
+              <h3 className="section-title">{provider.display_name}</h3>
+            </div>
+            <span className="status-pill" data-state={loadPanelPhase === "loaded" ? "success" : loadPanelPhase === "error" ? "error" : "loading"}>
+              {loadPanelPhaseLabel}
+            </span>
+          </div>
+          <p className="modal-message">{loadPanelSummary}</p>
+          <div className="platform-detail-grid">
+            <div className="platform-summary-card">
+              <span className="field-label">{t("platformControl.providers.loadPanelRequestedModelLabel")}</span>
+              <strong>{loadPanelModelName}</strong>
+              <span className="status-text">{loadPanelModelId}</span>
+            </div>
+            <div className="platform-summary-card">
+              <span className="field-label">{t("platformControl.providers.loadPanelRuntimeLabel")}</span>
+              <strong>{loadPanelRuntimeLabel}</strong>
+              <span className={provider.load_error ? "status-text error-text" : "status-text"}>
+                {provider.load_error ?? t("platformControl.providers.loadedModelStateHint")}
+              </span>
+            </div>
+          </div>
+          <div
+            className="provider-load-progress"
+            data-phase={loadPanelPhase}
+            role="progressbar"
+            aria-valuetext={loadPanelPhaseLabel}
+          >
+            <div className="provider-load-progress-bar" />
+          </div>
+          <ul className="provider-load-timeline">
+            {loadTimelineItems.map((item) => (
+              <li key={item.label} className="provider-load-timeline-item" data-state={item.state}>
+                <span className="provider-load-timeline-marker" aria-hidden="true" />
+                <span className="status-text">{item.label}</span>
+              </li>
+            ))}
+          </ul>
+          {isTerminalProviderLoadPhase(loadPanelPhase) ? (
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={dismissTrackedLoadPanel}>
+                {t("platformControl.providers.loadPanelDismiss")}
+              </button>
+            </div>
+          ) : null}
+        </aside>
       ) : null}
     </PlatformPageLayout>
   );

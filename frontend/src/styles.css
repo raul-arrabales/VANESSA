@@ -499,6 +499,121 @@ a {
   }
 }
 
+.provider-load-panel {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 900;
+  width: min(28rem, calc(100vw - 2rem));
+  display: grid;
+  gap: var(--space-4);
+  padding-right: var(--space-6);
+  box-shadow: var(--shadow-3);
+}
+
+.provider-load-panel::before {
+  width: 0.55rem;
+}
+
+.provider-load-panel-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.provider-load-progress {
+  position: relative;
+  height: 0.8rem;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--border-muted) 78%, transparent);
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+}
+
+.provider-load-progress-bar {
+  height: 100%;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  animation: provider-load-progress-indeterminate 1.4s linear infinite;
+}
+
+.provider-load-progress[data-phase="reconciling"] .provider-load-progress-bar {
+  background: linear-gradient(90deg, var(--accent-secondary), var(--lcars-rail));
+}
+
+.provider-load-progress[data-phase="loaded"] .provider-load-progress-bar,
+.provider-load-progress[data-phase="error"] .provider-load-progress-bar {
+  width: 100%;
+  animation: none;
+}
+
+.provider-load-progress[data-phase="loaded"] .provider-load-progress-bar {
+  background: linear-gradient(90deg, var(--status-success), color-mix(in oklab, var(--status-success) 64%, white));
+}
+
+.provider-load-progress[data-phase="error"] .provider-load-progress-bar {
+  background: linear-gradient(90deg, var(--status-error), color-mix(in oklab, var(--status-error) 64%, white));
+}
+
+.provider-load-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.provider-load-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.provider-load-timeline-marker {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  flex: 0 0 auto;
+}
+
+.provider-load-timeline-item[data-state="done"] .provider-load-timeline-marker {
+  border-color: color-mix(in oklab, var(--status-success) 46%, var(--border-muted));
+  background: color-mix(in oklab, var(--status-success) 75%, white);
+}
+
+.provider-load-timeline-item[data-state="active"] .provider-load-timeline-marker {
+  border-color: color-mix(in oklab, var(--accent-primary) 46%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-primary) 70%, white);
+  box-shadow: 0 0 0 0.25rem color-mix(in oklab, var(--accent-primary) 16%, transparent);
+}
+
+.provider-load-timeline-item[data-state="error"] .provider-load-timeline-marker {
+  border-color: color-mix(in oklab, var(--status-error) 46%, var(--border-muted));
+  background: color-mix(in oklab, var(--status-error) 72%, white);
+}
+
+@keyframes provider-load-progress-indeterminate {
+  from {
+    transform: translateX(-115%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+
+@media (max-width: 720px) {
+  .provider-load-panel {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: auto;
+  }
+}
+
 .app-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
