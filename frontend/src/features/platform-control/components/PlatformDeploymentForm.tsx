@@ -2,8 +2,8 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ManagedModel } from "../../../api/modelops";
 import type { PlatformCapability, PlatformProvider } from "../../../api/platform";
+import type { DeploymentFormState } from "../deploymentEditor";
 import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
-import type { DeploymentFormState } from "../utils";
 import PlatformDeploymentCapabilitySection from "./PlatformDeploymentCapabilitySection";
 
 type PlatformDeploymentFormProps = {

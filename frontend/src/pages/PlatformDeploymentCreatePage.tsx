@@ -1,18 +1,13 @@
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { createDeploymentProfile } from "../api/platform";
 import { useAuth } from "../auth/AuthProvider";
 import PlatformDeploymentForm from "../features/platform-control/components/PlatformDeploymentForm";
+import type { DeploymentFormState } from "../features/platform-control/deploymentEditor";
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
+import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
-import {
-  buildDeploymentMutationInput,
-  DEFAULT_DEPLOYMENT_FORM,
-  getCapabilityProviders,
-  getManagedModelsByCapability,
-  validateDeploymentForm,
-} from "../features/platform-control/utils";
 
 export default function PlatformDeploymentCreatePage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -24,22 +19,22 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     providers,
     eligibleModelsByCapability,
   } = usePlatformDeploymentEditorData(token);
-  const [form, setForm] = useState(DEFAULT_DEPLOYMENT_FORM);
+  const {
+    requiredCapabilities,
+    providersByCapability,
+    modelResourcesByCapability,
+    buildInitialForm,
+    validateAndBuildMutation,
+  } = usePlatformDeploymentEditor({
+    mode: "create",
+    capabilities,
+    providers,
+    eligibleModelsByCapability,
+    t,
+  });
+  const [form, setForm] = useState<DeploymentFormState>(() => buildInitialForm());
   const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const requiredCapabilities = useMemo(
-    () => capabilities.filter((capability) => capability.required),
-    [capabilities],
-  );
-  const providersByCapability = useMemo(
-    () => getCapabilityProviders(providers, requiredCapabilities),
-    [providers, requiredCapabilities],
-  );
-  const modelResourcesByCapability = useMemo(
-    () => getManagedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
-    [eligibleModelsByCapability, requiredCapabilities],
-  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -47,25 +42,19 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
       return;
     }
 
-    const validationError = validateDeploymentForm(requiredCapabilities, form, {
-      bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
-      resourceRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.resourceRequired", { capability: capabilityDisplayName }),
-      defaultResourceRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.defaultResourceRequired", { capability: capabilityDisplayName }),
-    });
+    const { validationError, mutationInput } = validateAndBuildMutation(form);
     if (validationError) {
       setErrorMessage(validationError);
+      return;
+    }
+    if (!mutationInput) {
       return;
     }
 
     setSaving(true);
     setErrorMessage("");
     try {
-      const deployment = await createDeploymentProfile(
-        buildDeploymentMutationInput(requiredCapabilities, form),
-        token,
-      );
+      const deployment = await createDeploymentProfile(mutationInput, token);
       navigate(`/control/platform/deployments/${deployment.id}`, {
         state: { feedbackMessage: t("platformControl.feedback.deploymentCreated", { name: deployment.display_name }) },
       });

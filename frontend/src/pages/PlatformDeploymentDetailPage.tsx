@@ -10,18 +10,15 @@ import {
 import { useAuth } from "../auth/AuthProvider";
 import PlatformDeploymentAuditTable from "../features/platform-control/components/PlatformDeploymentAuditTable";
 import PlatformDeploymentForm from "../features/platform-control/components/PlatformDeploymentForm";
-import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
-import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
 import {
-  buildCloneForm,
-  buildDeploymentForm,
-  buildDeploymentMutationInput,
-  getCapabilityProviders,
-  getManagedModelsByCapability,
-  summarizeBindingResources,
-  validateDeploymentForm,
   type DeploymentCloneFormState,
   type DeploymentFormState,
+} from "../features/platform-control/deploymentEditor";
+import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
+import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
+import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
+import {
+  summarizeBindingResources,
 } from "../features/platform-control/utils";
 
 function readLocationFeedback(state: unknown): string {
@@ -57,30 +54,33 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const deployment = deployments.find((item) => item.id === deploymentId) ?? null;
-  const requiredCapabilities = useMemo(
-    () => capabilities.filter((capability) => capability.required),
-    [capabilities],
-  );
   const capabilityLabelByKey = useMemo(
     () => new Map(capabilities.map((capability) => [capability.capability, capability.display_name])),
     [capabilities],
   );
-  const providersByCapability = useMemo(
-    () => getCapabilityProviders(providers, requiredCapabilities),
-    [providers, requiredCapabilities],
-  );
-  const modelResourcesByCapability = useMemo(
-    () => getManagedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
-    [eligibleModelsByCapability, requiredCapabilities],
-  );
+  const {
+    requiredCapabilities,
+    providersByCapability,
+    modelResourcesByCapability,
+    buildInitialForm,
+    buildInitialCloneForm,
+    validateAndBuildMutation,
+  } = usePlatformDeploymentEditor({
+    mode: "edit",
+    capabilities,
+    providers,
+    eligibleModelsByCapability,
+    deployment,
+    t,
+  });
   const deploymentAudit = activationAudit.filter((entry) => entry.deployment_profile.id === deploymentId);
 
   useEffect(() => {
     if (deployment) {
-      setForm(buildDeploymentForm(deployment));
-      setCloneForm(buildCloneForm(deployment));
+      setForm(buildInitialForm());
+      setCloneForm(buildInitialCloneForm());
     }
-  }, [deployment]);
+  }, [buildInitialCloneForm, buildInitialForm, deployment]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -88,13 +88,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
       return;
     }
 
-    const validationError = validateDeploymentForm(requiredCapabilities, form, {
-      bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
-      resourceRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.resourceRequired", { capability: capabilityDisplayName }),
-      defaultResourceRequiredMessage: (capabilityDisplayName) =>
-        t("platformControl.feedback.defaultResourceRequired", { capability: capabilityDisplayName }),
-    });
+    const { validationError, mutationInput } = validateAndBuildMutation(form);
     if (validationError) {
       setErrorMessage(validationError);
       return;
@@ -106,7 +100,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     try {
       await updateDeploymentProfile(
         deployment.id,
-        buildDeploymentMutationInput(requiredCapabilities, form),
+        mutationInput!,
         token,
       );
       setFeedbackMessage(t("platformControl.feedback.deploymentUpdated", { name: form.displayName }));
@@ -286,7 +280,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 submitBusyLabel={t("platformControl.actions.saving")}
                 secondaryAction={{
                   label: t("platformControl.actions.reset"),
-                  onClick: () => setForm(buildDeploymentForm(deployment)),
+                  onClick: () => setForm(buildInitialForm()),
                 }}
                 onChange={setForm}
                 onSubmit={(event) => void handleSave(event)}

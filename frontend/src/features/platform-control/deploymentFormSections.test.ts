@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ManagedModel } from "../../api/modelops";
 import type { PlatformCapability, PlatformProvider } from "../../api/platform";
+import type { DeploymentFormState } from "./deploymentEditor";
 import {
   buildDeploymentCapabilitySectionState,
 } from "./deploymentFormSections";
-import type { DeploymentFormState } from "./utils";
 
 function translate(key: string, options: Record<string, unknown> = {}): string {
   if (key === "platformControl.summary.none") {

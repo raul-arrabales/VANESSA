@@ -5,13 +5,13 @@ import * as React from "react";
 import PlatformDeploymentForm from "./PlatformDeploymentForm";
 import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
 import { t } from "../../../test/translation";
+import type { DeploymentFormState } from "../deploymentEditor";
 import {
   capabilitiesFixture,
   embeddingsModelsFixture,
   llmModelsFixture,
   providersFixture,
 } from "../../../test/platformControlFixtures";
-import type { DeploymentFormState } from "../utils";
 
 function buildFormState(overrides: Partial<DeploymentFormState> = {}): DeploymentFormState {
   return {
