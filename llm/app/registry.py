@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.config import LLMConfig
+from app.providers.base import ProviderError
 from app.providers.base import RoutedModelProvider
 
 
@@ -50,6 +51,7 @@ class ModelRegistry:
     def __init__(self) -> None:
         self._providers: dict[str, RoutedModelProvider] = {}
         self._models: dict[str, ModelInfo] = {}
+        self._aliases: dict[str, str] = {}
         self._config: LLMConfig | None = None
 
     @property
@@ -67,45 +69,15 @@ class ModelRegistry:
         self._config = config
         self._providers = {}
         self._models = {}
+        self._aliases = {}
 
         self.register_provider(
             "local_vllm",
             LocalVLLMProvider(
-                base_url=config.local_base_url,
+                text_base_url=config.local_base_url,
+                embeddings_base_url=config.local_embeddings_base_url,
                 timeout_seconds=config.request_timeout_seconds,
             ),
-        )
-
-        self.register_model(
-            ModelInfo(
-                id="local-vllm-default",
-                display_name="Local vLLM Default",
-                capabilities=ModelCapabilities(text=True, image_input=False, embeddings=False),
-                status="available",
-                provider_type="local_vllm",
-                provider_config_ref="local/default",
-                upstream_model=config.local_upstream_model,
-                metadata={
-                    "upstream_model": config.local_upstream_model,
-                    "supports_image_input": False,
-                    "max_tokens_default": 512,
-                },
-            )
-        )
-        self.register_model(
-            ModelInfo(
-                id="local-vllm-embeddings-default",
-                display_name="Local vLLM Embeddings Default",
-                capabilities=ModelCapabilities(text=False, image_input=False, embeddings=True),
-                status="available",
-                provider_type="local_vllm",
-                provider_config_ref="local/embeddings",
-                upstream_model=config.local_embeddings_upstream_model,
-                metadata={
-                    "upstream_model": config.local_embeddings_upstream_model,
-                    "supports_embeddings": True,
-                },
-            )
         )
 
         if config.enable_hf_router:
@@ -170,12 +142,39 @@ class ModelRegistry:
     def register_model(self, model: ModelInfo) -> None:
         self._models[model.id] = model
 
+    def _register_or_merge_model(self, model: ModelInfo) -> None:
+        existing = self._models.get(model.id)
+        if existing is None:
+            self.register_model(model)
+            return
+        merged_metadata = {**existing.metadata, **model.metadata}
+        self._models[model.id] = ModelInfo(
+            id=existing.id,
+            display_name=existing.display_name if existing.display_name == model.display_name else existing.display_name,
+            capabilities=ModelCapabilities(
+                text=existing.capabilities.text or model.capabilities.text,
+                image_input=existing.capabilities.image_input or model.capabilities.image_input,
+                embeddings=existing.capabilities.embeddings or model.capabilities.embeddings,
+            ),
+            status=existing.status,
+            provider_type=existing.provider_type,
+            provider_config_ref=existing.provider_config_ref,
+            upstream_model=existing.upstream_model or model.upstream_model,
+            metadata=merged_metadata,
+        )
+
     def list_models(self) -> list[ModelInfo]:
-        return [self._models[model_id] for model_id in sorted(self._models.keys())]
+        models = dict(self._models)
+        models.update(self._local_runtime_models())
+        return [models[model_id] for model_id in sorted(models.keys())]
 
     def resolve_model(self, model_id: str) -> ResolvedModel:
+        runtime_models = self._local_runtime_models()
+        runtime_aliases = self._local_runtime_aliases(runtime_models)
+        resolved_model_id = runtime_aliases.get(self._aliases.get(model_id, model_id), self._aliases.get(model_id, model_id))
+        models = {**self._models, **runtime_models}
         try:
-            model = self._models[model_id]
+            model = models[resolved_model_id]
         except KeyError as exc:
             raise KeyError(f"Unknown model: {model_id}") from exc
 
@@ -197,6 +196,128 @@ class ModelRegistry:
             if model_id in self._models:
                 candidates.append(self.resolve_model(model_id))
         return candidates
+
+    def _local_runtime_models(self) -> dict[str, ModelInfo]:
+        provider = self._providers.get("local_vllm")
+        if provider is None:
+            return {}
+        had_error = False
+        text_items: list[dict[str, object]] = []
+        embeddings_items: list[dict[str, object]] = []
+        try:
+            text_items = provider.list_models(capability="llm_inference")
+        except ProviderError:
+            had_error = True
+        try:
+            embeddings_items = provider.list_models(capability="embeddings")
+        except ProviderError:
+            had_error = True
+        if not text_items and not embeddings_items and had_error:
+            return self._fallback_local_models()
+        models: dict[str, ModelInfo] = {}
+        for item in text_items:
+            info = self._model_from_runtime_item(item, capability="llm_inference")
+            if info is not None:
+                models[info.id] = info
+        for item in embeddings_items:
+            info = self._model_from_runtime_item(item, capability="embeddings")
+            if info is None:
+                continue
+            existing = models.get(info.id)
+            if existing is None:
+                models[info.id] = info
+                continue
+            models[info.id] = ModelInfo(
+                id=existing.id,
+                display_name=existing.display_name,
+                capabilities=ModelCapabilities(
+                    text=existing.capabilities.text or info.capabilities.text,
+                    image_input=existing.capabilities.image_input or info.capabilities.image_input,
+                    embeddings=existing.capabilities.embeddings or info.capabilities.embeddings,
+                ),
+                status=existing.status,
+                provider_type=existing.provider_type,
+                provider_config_ref=existing.provider_config_ref,
+                upstream_model=existing.upstream_model or info.upstream_model,
+                metadata={**existing.metadata, **info.metadata},
+            )
+        return models
+
+    def _local_runtime_aliases(self, models: dict[str, ModelInfo]) -> dict[str, str]:
+        aliases: dict[str, str] = {}
+        text_candidates = [model.id for model in models.values() if model.capabilities.text]
+        embeddings_candidates = [model.id for model in models.values() if model.capabilities.embeddings]
+        if text_candidates:
+            aliases["local-vllm-default"] = sorted(text_candidates)[0]
+        if embeddings_candidates:
+            aliases["local-vllm-embeddings-default"] = sorted(embeddings_candidates)[0]
+        return aliases
+
+    def _model_from_runtime_item(self, item: dict[str, object], *, capability: str) -> ModelInfo | None:
+        model_id = str(item.get("id") or "").strip()
+        if not model_id:
+            return None
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        capabilities = item.get("capabilities") if isinstance(item.get("capabilities"), dict) else {}
+        display_name = str(item.get("display_name") or model_id).strip() or model_id
+        return ModelInfo(
+            id=model_id,
+            display_name=display_name,
+            capabilities=ModelCapabilities(
+                text=bool(capabilities.get("text")) if capability == "llm_inference" else False,
+                image_input=bool(capabilities.get("image_input")) if capability == "llm_inference" else False,
+                embeddings=bool(capabilities.get("embeddings")) if capability == "embeddings" else False,
+            ),
+            status=str(item.get("status") or "available").strip() or "available",
+            provider_type="local_vllm",
+            provider_config_ref="local/default" if capability == "llm_inference" else "local/embeddings",
+            upstream_model=str(metadata.get("upstream_model") or model_id).strip() or model_id,
+            metadata=dict(metadata),
+        )
+
+    def _fallback_local_models(self) -> dict[str, ModelInfo]:
+        config = self.config
+        models: dict[str, ModelInfo] = {
+            config.local_upstream_model: ModelInfo(
+                id=config.local_upstream_model,
+                display_name="Local vLLM Default",
+                capabilities=ModelCapabilities(text=True, image_input=False, embeddings=False),
+                status="available",
+                provider_type="local_vllm",
+                provider_config_ref="local/default",
+                upstream_model=config.local_upstream_model,
+                metadata={
+                    "upstream_model": config.local_upstream_model,
+                    "supports_image_input": False,
+                    "max_tokens_default": 512,
+                },
+            )
+        }
+        embeddings = ModelInfo(
+            id=config.local_embeddings_upstream_model,
+            display_name="Local vLLM Embeddings Default",
+            capabilities=ModelCapabilities(text=False, image_input=False, embeddings=True),
+            status="available",
+            provider_type="local_vllm",
+            provider_config_ref="local/embeddings",
+            upstream_model=config.local_embeddings_upstream_model,
+            metadata={"upstream_model": config.local_embeddings_upstream_model, "supports_embeddings": True},
+        )
+        existing = models.get(embeddings.id)
+        if existing is None:
+            models[embeddings.id] = embeddings
+        else:
+            models[embeddings.id] = ModelInfo(
+                id=existing.id,
+                display_name=existing.display_name,
+                capabilities=ModelCapabilities(text=True, image_input=False, embeddings=True),
+                status=existing.status,
+                provider_type=existing.provider_type,
+                provider_config_ref=existing.provider_config_ref,
+                upstream_model=existing.upstream_model,
+                metadata={**existing.metadata, **embeddings.metadata},
+            )
+        return models
 
 
 registry = ModelRegistry()

@@ -10,8 +10,11 @@ _LEGACY_RUNTIME_PROFILES = {"air_gapped": "offline"}
 DEFAULT_FRONTEND_URL = "http://frontend:3000"
 DEFAULT_BACKEND_URL = "http://backend:5000"
 DEFAULT_LLM_URL = "http://llm:8000"
-DEFAULT_LLM_RUNTIME_URL = "http://llm_runtime:8000"
+DEFAULT_LLM_INFERENCE_RUNTIME_URL = "http://llm_runtime_inference:8000"
+DEFAULT_LLM_RUNTIME_URL = DEFAULT_LLM_INFERENCE_RUNTIME_URL
+DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL = "http://llm_runtime_embeddings:8000"
 DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 60
+DEFAULT_LLM_LOCAL_MODEL_PATH = "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
 DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
 DEFAULT_SANDBOX_URL = "http://sandbox:6000"
@@ -30,6 +33,8 @@ class BackendRuntimeConfig:
     backend_url: str = DEFAULT_BACKEND_URL
     llm_url: str = DEFAULT_LLM_URL
     llm_runtime_url: str = DEFAULT_LLM_RUNTIME_URL
+    llm_inference_runtime_url: str = DEFAULT_LLM_INFERENCE_RUNTIME_URL
+    llm_embeddings_runtime_url: str = DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
     agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
     agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
     sandbox_url: str = DEFAULT_SANDBOX_URL
@@ -71,7 +76,11 @@ class AuthConfig:
     backend_url: str = DEFAULT_BACKEND_URL
     llm_url: str = DEFAULT_LLM_URL
     llm_runtime_url: str = DEFAULT_LLM_RUNTIME_URL
+    llm_inference_runtime_url: str = DEFAULT_LLM_INFERENCE_RUNTIME_URL
+    llm_embeddings_runtime_url: str = DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
     llm_request_timeout_seconds: int = DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
+    llm_local_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
+    llm_local_embeddings_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     sandbox_url: str = DEFAULT_SANDBOX_URL
     mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
     kws_url: str = DEFAULT_KWS_URL
@@ -191,7 +200,26 @@ def get_auth_config() -> AuthConfig:
         backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
         llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
         llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
+        llm_inference_runtime_url=(
+            os.getenv("LLM_INFERENCE_RUNTIME_URL", DEFAULT_LLM_INFERENCE_RUNTIME_URL).strip()
+            or DEFAULT_LLM_INFERENCE_RUNTIME_URL
+        ),
+        llm_embeddings_runtime_url=(
+            os.getenv("LLM_EMBEDDINGS_RUNTIME_URL", DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL).strip()
+            or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
+        ),
         llm_request_timeout_seconds=_get_int_env("LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS),
+        llm_local_upstream_model=(
+            os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
+            or DEFAULT_LLM_LOCAL_MODEL_PATH
+        ),
+        llm_local_embeddings_upstream_model=(
+            os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
+            or DEFAULT_LLM_LOCAL_MODEL_PATH
+        ),
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
         mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
@@ -213,6 +241,14 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
         llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
         llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
+        llm_inference_runtime_url=(
+            os.getenv("LLM_INFERENCE_RUNTIME_URL", DEFAULT_LLM_INFERENCE_RUNTIME_URL).strip()
+            or DEFAULT_LLM_INFERENCE_RUNTIME_URL
+        ),
+        llm_embeddings_runtime_url=(
+            os.getenv("LLM_EMBEDDINGS_RUNTIME_URL", DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL).strip()
+            or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
+        ),
         agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
         agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
         or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,

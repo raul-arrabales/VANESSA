@@ -30,7 +30,7 @@ Current architectural pillars:
 
 - **Local-first, provider-flexible runtime**
   - `llm` is the normalized private LLM gateway.
-  - `llm_runtime` and optional `llama_cpp` are alternate local inference runtimes/providers.
+  - `llm_runtime_inference`, `llm_runtime_embeddings`, and optional `llama_cpp` are local runtime/provider options behind the control plane.
   - Weaviate and optional Qdrant are alternate `vector_store` providers.
   - Sandbox and optional MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
 
@@ -126,43 +126,47 @@ Respect these runtime boundaries when generating code or configuration.
 3. **LLM API (`llm`)**
    - Private normalized model-serving gateway.
    - Handles inference/discovery-facing API concerns.
-   - Forwards local vLLM-backed execution to `llm_runtime`.
+   - Forwards local vLLM-backed execution to `llm_runtime_inference` and `llm_runtime_embeddings`.
 
-4. **LLM Runtime (`llm_runtime`)**
-   - Hardware-adaptive local vLLM runtime.
-   - Backing runtime for `llm`.
+4. **LLM Runtime Inference (`llm_runtime_inference`)**
+   - Hardware-adaptive local vLLM runtime for text generation.
+   - Backing inference runtime for `llm`.
 
-5. **Optional llama.cpp (`llama_cpp`)**
+5. **LLM Runtime Embeddings (`llm_runtime_embeddings`)**
+   - Hardware-adaptive local vLLM runtime for embeddings.
+   - Backing embeddings runtime for `llm`.
+
+6. **Optional llama.cpp (`llama_cpp`)**
    - Optional OpenAI-compatible local inference runtime.
    - Alternate `llm_inference` provider selected by the control plane.
 
-6. **Agent Engine (`agent_engine`)**
+7. **Agent Engine (`agent_engine`)**
    - Multi-step agent workflows and tool orchestration.
    - Consumes backend-provided `platform_runtime`.
    - Must not own control-plane policy or platform tables.
 
-7. **Sandbox (`sandbox`)**
+8. **Sandbox (`sandbox`)**
    - Isolated Python execution environment.
    - Native runtime provider for Python execution tools.
    - Must only be accessed through approved backend/agent_engine abstractions and policy checks.
 
-8. **Optional MCP Gateway (`mcp_gateway`)**
+9. **Optional MCP Gateway (`mcp_gateway`)**
    - Optional normalized HTTP provider for MCP-backed tools.
    - Used for provider validation and agent tool dispatch.
 
-9. **Wake-word service (`kws`)**
+10. **Wake-word service (`kws`)**
    - Offline wake-word detection and wake-event emission.
    - Integrates with backend via webhook/event flow.
 
-10. **Weaviate**
+11. **Weaviate**
     - Persistent vector index.
     - One possible `vector_store` provider.
 
-11. **Optional Qdrant (`qdrant`)**
+12. **Optional Qdrant (`qdrant`)**
     - Alternate vector database.
     - Alternate `vector_store` provider selected by deployment profile.
 
-12. **PostgreSQL**
+13. **PostgreSQL**
     - Persistent relational storage for auth, metadata, control-plane state, ModelOps state, and execution metadata.
 
 ---
@@ -186,6 +190,9 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `kws/`
   - Wake-word service.
+
+- `llm_runtime/`
+  - Local runtime controller service for split vLLM execution.
 
 - `models/`
   - Local model assets for local runtimes and offline operation.
@@ -244,7 +251,8 @@ This should start the current local stack, including at least:
 - Frontend
 - Backend
 - LLM API
-- LLM Runtime
+- LLM Runtime Inference
+- LLM Runtime Embeddings
 - Agent Engine
 - Weaviate
 - PostgreSQL
@@ -351,7 +359,7 @@ When making changes:
 
 5. Respect runtime/provider boundaries.
 - `llm` is the normalized gateway.
-- `llm_runtime` and `llama_cpp` are provider/runtime options behind control-plane selection.
+- `llm_runtime_inference`, `llm_runtime_embeddings`, and `llama_cpp` are provider/runtime options behind control-plane selection.
 - Weaviate and Qdrant are alternate `vector_store` providers.
 - Sandbox and MCP gateway are optional runtime capabilities, not generic utilities to call directly from anywhere.
 

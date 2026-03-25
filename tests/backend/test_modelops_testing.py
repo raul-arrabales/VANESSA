@@ -727,7 +727,18 @@ def test_run_model_test_rejects_local_embeddings_runtime_when_selected_provider_
     )
     assert runtime_payload["runtimes"][0]["advertised_model_ids"] == [
         "local-vllm-embeddings-default",
-        "/models/embeddings/another-model",
+    ]
+    assert runtime_payload["runtimes"][0]["advertised_models"] == [
+        {
+            "id": "local-vllm-embeddings-default",
+            "display_name": "Local vLLM Embeddings",
+            "capabilities": {
+                "text": False,
+                "image_input": False,
+                "embeddings": False,
+            },
+            "metadata": {"upstream_model": "/models/embeddings/another-model"},
+        }
     ]
 
 

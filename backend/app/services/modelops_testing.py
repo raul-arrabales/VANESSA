@@ -12,7 +12,12 @@ from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model, serialize_model_test_run
 from .platform_adapters import http_json_request
-from .platform_service import ensure_platform_bootstrap_state, resolve_embeddings_adapter, resolve_llm_inference_adapter
+from .platform_service import (
+    _effective_local_slot,
+    ensure_platform_bootstrap_state,
+    resolve_embeddings_adapter,
+    resolve_llm_inference_adapter,
+)
 from .runtime_profile_service import resolve_runtime_profile
 
 _TASK_LLM = modelops_repo.TASK_LLM
@@ -273,13 +278,27 @@ def _runtime_advertised_model_ids(runtime_models: list[dict[str, Any]]) -> list[
     advertised: list[str] = []
     seen: set[str] = set()
     for runtime_entry in runtime_models:
-        for _source, runtime_value in _runtime_entry_identifiers(runtime_entry):
-            normalized = runtime_value.strip()
-            lowered = normalized.lower()
-            if normalized and lowered not in seen:
-                advertised.append(normalized)
-                seen.add(lowered)
+        normalized = str(runtime_entry.get("id") or "").strip()
+        lowered = normalized.lower()
+        if normalized and lowered not in seen:
+            advertised.append(normalized)
+            seen.add(lowered)
     return advertised
+
+
+def _serialize_runtime_inventory_entry(runtime_entry: dict[str, Any]) -> dict[str, Any]:
+    capabilities = runtime_entry.get("capabilities") if isinstance(runtime_entry.get("capabilities"), dict) else {}
+    metadata = runtime_entry.get("metadata") if isinstance(runtime_entry.get("metadata"), dict) else {}
+    return {
+        "id": str(runtime_entry.get("id") or "").strip(),
+        "display_name": str(runtime_entry.get("display_name") or runtime_entry.get("id") or "").strip(),
+        "capabilities": {
+            "text": bool(capabilities.get("text")),
+            "image_input": bool(capabilities.get("image_input")),
+            "embeddings": bool(capabilities.get("embeddings")),
+        },
+        "metadata": dict(metadata),
+    }
 
 
 def _find_runtime_model_match(model_row: dict[str, Any], runtime_models: list[dict[str, Any]]) -> dict[str, str] | None:
@@ -341,6 +360,14 @@ def _inspect_local_llm_test_runtime(
 ) -> dict[str, Any]:
     provider_instance_id = str(provider_row.get("id") or "").strip()
     capability_key = str(provider_row.get("capability_key") or "").strip().lower()
+    local_slot = _effective_local_slot(provider_row)
+    loaded_managed_model_id = str(local_slot.get("loaded_managed_model_id") or "").strip() or None
+    loaded_managed_model_name = str(local_slot.get("loaded_managed_model_name") or "").strip() or None
+    loaded_runtime_model_id = str(local_slot.get("loaded_runtime_model_id") or "").strip() or None
+    loaded_local_path = str(local_slot.get("loaded_local_path") or "").strip() or None
+    loaded_source_id = str(local_slot.get("loaded_source_id") or "").strip() or None
+    load_state = str(local_slot.get("load_state") or "").strip().lower() or ("reconciling" if loaded_managed_model_id else "empty")
+    load_error = str(local_slot.get("load_error") or "").strip() or None
     if capability_key == "llm_inference":
         adapter = resolve_llm_inference_adapter(
             database_url,
@@ -361,6 +388,24 @@ def _inspect_local_llm_test_runtime(
     reachable = models_payload is not None and 200 <= status_code < 300
     match = _find_runtime_model_match(model_row, available_models) if reachable else None
     advertised_model_ids = _runtime_advertised_model_ids(available_models) if reachable else []
+    advertised_models = [_serialize_runtime_inventory_entry(item) for item in available_models]
+    if loaded_runtime_model_id:
+        available_runtime_ids = {
+            str(item.get("id") or "").strip()
+            for item in available_models
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+        if loaded_runtime_model_id in available_runtime_ids:
+            load_state = "loaded"
+            load_error = None
+        elif load_state == "loading":
+            pass
+        elif reachable:
+            load_state = "reconciling"
+        else:
+            load_state = "error"
+            if not load_error:
+                load_error = f"runtime_inventory_unavailable:{status_code}"
     message = (
         "Runtime serves the selected local model"
         if match
@@ -388,7 +433,15 @@ def _inspect_local_llm_test_runtime(
             else None
         ),
         "matched_value": match["matched_value"] if match is not None else None,
+        "loaded_managed_model_id": loaded_managed_model_id,
+        "loaded_managed_model_name": loaded_managed_model_name,
+        "loaded_runtime_model_id": loaded_runtime_model_id,
+        "loaded_local_path": loaded_local_path,
+        "loaded_source_id": loaded_source_id,
+        "load_state": load_state,
+        "load_error": load_error,
         "advertised_model_ids": advertised_model_ids,
+        "advertised_models": advertised_models,
         "message": message,
     }
 

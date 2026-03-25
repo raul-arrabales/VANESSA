@@ -21,9 +21,11 @@ LLM_RUNTIME_ACCELERATOR="${LLM_RUNTIME_ACCELERATOR:-auto}"
 LLM_RUNTIME_CPU_VARIANT="${LLM_RUNTIME_CPU_VARIANT:-auto}"
 LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU="${LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU:-false}"
 LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH}}"
+LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH}}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime llama_cpp qdrant mcp_gateway agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant mcp_gateway agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -183,7 +185,7 @@ validate_llm_runtime_support() {
   if [[ "${variant}" == "unsupported" ]]; then
     export LLM_RUNTIME_CPU_SUPPORTED=false
     if llm_routing_requires_local_runtime && ! llm_runtime_disable_local_requested; then
-      die "CPU host does not advertise avx2 or avx512f; local llm_runtime is unsupported on this machine."
+      die "CPU host does not advertise avx2 or avx512f; local split runtimes are unsupported on this machine."
     fi
     return 1
   fi
@@ -262,8 +264,9 @@ validate_llm_cpu_thread_binding() {
 }
 
 llm_runtime_internal_http_ok() {
-  local path="$1"
-  compose exec -T llm_runtime python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+  local service_name="$1"
+  local path="$2"
+  compose exec -T "${service_name}" python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8000${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
 llama_cpp_enabled_requested() {
@@ -294,7 +297,7 @@ mcp_gateway_internal_http_ok() {
 }
 
 resolve_llm_local_model_host_path() {
-  local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+  local model_path="${1:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}"
   if [[ "${model_path}" == /models/llm/* ]]; then
     printf '%s\n' "${REPO_ROOT}/models/llm/${model_path#/models/llm/}"
     return 0
@@ -303,17 +306,31 @@ resolve_llm_local_model_host_path() {
 }
 
 validate_llm_local_model_path() {
-  local model_path="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}"
+  local env_name="${1:-LLM_LOCAL_MODEL_PATH}"
+  local model_path="${2:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}"
   local host_model_path
-  host_model_path="$(resolve_llm_local_model_host_path)"
+  host_model_path="$(resolve_llm_local_model_host_path "${model_path}")"
 
   if [[ ! -d "${host_model_path}" ]]; then
-    die "Configured LLM_LOCAL_MODEL_PATH=${model_path} does not exist on host at ${host_model_path}."
+    die "Configured ${env_name}=${model_path} does not exist on host at ${host_model_path}."
   fi
 
   if [[ ! -f "${host_model_path}/config.json" && ! -f "${host_model_path}/params.json" ]]; then
-    die "Configured LLM_LOCAL_MODEL_PATH=${model_path} is missing config.json or params.json at ${host_model_path}."
+    die "Configured ${env_name}=${model_path} is missing config.json or params.json at ${host_model_path}."
   fi
+}
+
+validate_llm_inference_local_model_path() {
+  validate_llm_local_model_path "LLM_INFERENCE_LOCAL_MODEL_PATH" "${LLM_INFERENCE_LOCAL_MODEL_PATH}"
+}
+
+validate_llm_embeddings_local_model_path() {
+  validate_llm_local_model_path "LLM_EMBEDDINGS_LOCAL_MODEL_PATH" "${LLM_EMBEDDINGS_LOCAL_MODEL_PATH}"
+}
+
+validate_all_llm_local_model_paths() {
+  validate_llm_inference_local_model_path
+  validate_llm_embeddings_local_model_path
 }
 
 resolve_llama_cpp_model_host_path() {
@@ -379,9 +396,9 @@ compose() {
   fi
 
   if ! validate_llm_runtime_support; then
-    log_warn "Local llm_runtime CPU support is unavailable on this host."
+    log_warn "Local llm runtime CPU support is unavailable on this host."
     if llm_runtime_disable_local_requested; then
-      log_warn "LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU is enabled; local-only routing must be disabled to run without llm_runtime."
+      log_warn "LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU is enabled; local-only routing must be disabled to run without local runtimes."
     fi
   fi
 
@@ -425,7 +442,7 @@ stack_services_for_start() {
   local cpu_supported="${LLM_RUNTIME_CPU_SUPPORTED:-true}"
   if [[ "${cpu_supported}" == "false" ]] && llm_runtime_disable_local_requested && ! llm_routing_requires_local_runtime; then
     for service in "${services_to_start[@]}"; do
-      if [[ "${service}" != "llm_runtime" ]]; then
+      if [[ "${service}" != "llm_runtime_inference" && "${service}" != "llm_runtime_embeddings" ]]; then
         printf '%s\n' "${service}"
       fi
     done

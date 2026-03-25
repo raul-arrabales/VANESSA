@@ -2,7 +2,7 @@
 
 Docker assets for local development.
 
-`llm_runtime` is hardware-adaptive in local staging:
+The split local vLLM runtimes are hardware-adaptive in local staging:
 
 - CPU hosts add `infra/docker-compose.cpu.override.yml` and build a local vLLM CPU image selected for the detected ISA (`avx2` or `avx512`)
 - NVIDIA GPU hosts add `infra/docker-compose.gpu.override.yml`
@@ -15,4 +15,4 @@ cd infra
 docker compose up --build
 ```
 
-Services include frontend, backend, agent engine, sandbox, llm (gateway), llm_runtime (vLLM), kws, weaviate, postgres, and optional `llama_cpp`, `qdrant`, and `mcp_gateway` provider runtimes.
+Services include frontend, backend, agent engine, sandbox, llm (gateway), `llm_runtime_inference` (vLLM text), `llm_runtime_embeddings` (vLLM embeddings), kws, weaviate, postgres, and optional `llama_cpp`, `qdrant`, and `mcp_gateway` provider runtimes.

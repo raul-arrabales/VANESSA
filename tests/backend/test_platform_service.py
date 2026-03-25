@@ -211,6 +211,125 @@ def test_serialize_provider_row_exposes_secret_refs_separately():
     assert payload["secret_refs"] == {"api_key": "env://API_KEY"}
 
 
+def test_assign_provider_loaded_model_persists_local_slot(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": "vLLM embeddings local",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config_json": {"models_path": "/v1/models"},
+        },
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "get_model_by_id",
+        lambda _db, model_id: {
+            "id": model_id,
+            "model_id": model_id,
+            "name": "MiniLM",
+            "task_key": "embeddings",
+            "backend_kind": "local",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+        },
+    )
+    seen_config: dict[str, object] = {}
+
+    def _update_provider_instance(_db, **kwargs):
+        seen_config.update(kwargs["config_json"])
+        return {
+            "id": kwargs["provider_instance_id"],
+            "slug": kwargs["slug"],
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "endpoint_url": kwargs["endpoint_url"],
+            "healthcheck_url": kwargs["healthcheck_url"],
+            "enabled": kwargs["enabled"],
+            "config_json": kwargs["config_json"],
+        }
+
+    monkeypatch.setattr(platform_service.platform_repo, "update_provider_instance", _update_provider_instance)
+    monkeypatch.setattr(platform_service, "_provider_runtime_inventory", lambda _row: ([], 200))
+
+    payload = platform_service.assign_provider_loaded_model(
+        "ignored",
+        config=object(),  # type: ignore[arg-type]
+        provider_instance_id="provider-1",
+        managed_model_id="sentence-transformers--all-MiniLM-L6-v2",
+    )
+
+    assert seen_config["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert seen_config["loaded_runtime_model_id"] == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"
+    assert payload["load_state"] == "loading"
+
+
+def test_clear_provider_loaded_model_resets_local_slot(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "vllm-local-gateway",
+            "provider_key": "vllm_local",
+            "capability_key": "llm_inference",
+            "adapter_kind": "openai_compatible_llm",
+            "display_name": "vLLM local gateway",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config_json": {
+                "loaded_managed_model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+                "loaded_managed_model_name": "Qwen",
+                "loaded_runtime_model_id": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+                "load_state": "loaded",
+            },
+        },
+    )
+
+    def _update_provider_instance(_db, **kwargs):
+        return {
+            "id": kwargs["provider_instance_id"],
+            "slug": kwargs["slug"],
+            "provider_key": "vllm_local",
+            "capability_key": "llm_inference",
+            "adapter_kind": "openai_compatible_llm",
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "endpoint_url": kwargs["endpoint_url"],
+            "healthcheck_url": kwargs["healthcheck_url"],
+            "enabled": kwargs["enabled"],
+            "config_json": kwargs["config_json"],
+        }
+
+    monkeypatch.setattr(platform_service.platform_repo, "update_provider_instance", _update_provider_instance)
+    monkeypatch.setattr(platform_service, "_provider_runtime_inventory", lambda _row: ([], 200))
+
+    payload = platform_service.clear_provider_loaded_model(
+        "ignored",
+        config=object(),  # type: ignore[arg-type]
+        provider_instance_id="provider-1",
+    )
+
+    assert payload["loaded_managed_model_id"] is None
+    assert payload["loaded_runtime_model_id"] is None
+    assert payload["load_state"] == "empty"
+
+
 def test_openai_adapter_retries_local_fallback_on_model_not_found(monkeypatch: pytest.MonkeyPatch):
     calls: list[dict[str, object]] = []
 

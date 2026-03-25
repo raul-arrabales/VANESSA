@@ -29,22 +29,23 @@ Legend:
 1. Frontend: browser UI, HTTP calls only to backend API.
 2. Backend (Flask API): public API entrypoint, validation, orchestration.
 3. LLM API: private model-serving HTTP gateway for inference/discovery requests.
-4. LLM Runtime: hardware-adaptive local vLLM runtime engine backing LLM API execution on CPU or GPU hosts.
-5. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
-6. Agent Engine: multi-step agent logic and tool workflows.
-7. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
-8. MCP Gateway: optional normalized HTTP provider for MCP-backed tools such as web search.
-9. KWS: offline wake-word detection and wake-event emission.
-10. Weaviate: persistent semantic index for RAG context retrieval.
-11. Qdrant: optional vector database for alternate retrieval provider binding.
-12. PostgreSQL: persistent relational data for auth and metadata.
+4. LLM Runtime Inference: hardware-adaptive local vLLM runtime engine backing text generation on CPU or GPU hosts.
+5. LLM Runtime Embeddings: hardware-adaptive local vLLM runtime engine backing embeddings on CPU or GPU hosts.
+6. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
+7. Agent Engine: multi-step agent logic and tool workflows.
+8. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
+9. MCP Gateway: optional normalized HTTP provider for MCP-backed tools such as web search.
+10. KWS: offline wake-word detection and wake-event emission.
+11. Weaviate: persistent semantic index for RAG context retrieval.
+12. Qdrant: optional vector database for alternate retrieval provider binding.
+13. PostgreSQL: persistent relational data for auth and metadata.
 
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
 - Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
 - Agent Engine -> LLM API, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
-- LLM API -> LLM Runtime
+- LLM API -> LLM Runtime Inference, LLM Runtime Embeddings
 - KWS -> Backend API
 
 ## GenAI Control Plane Terms

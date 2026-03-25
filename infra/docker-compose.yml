@@ -47,18 +47,16 @@ services:
         required: true
       - path: .env.local
         required: false
+    depends_on:
+      - llm_runtime_inference
+      - llm_runtime_embeddings
 
-  llm_runtime:
-    image: ${LLM_RUNTIME_GPU_IMAGE:-vllm/vllm-openai:latest}
-    container_name: vanessa-llm-runtime
-    command:
-      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --dtype
-      - ${LLM_RUNTIME_GPU_DTYPE:-auto}
+  llm_runtime_inference:
+    build:
+      context: ..
+      dockerfile: infra/docker/llm_runtime/Dockerfile.gpu
+    image: ${LLM_RUNTIME_GPU_IMAGE:-vanessa-llm-runtime-gpu:local}
+    container_name: vanessa-llm-runtime-inference
     expose:
       - "8000"
     env_file:
@@ -66,6 +64,38 @@ services:
         required: true
       - path: .env.local
         required: false
+    environment:
+      LLM_RUNTIME_SERVICE_NAME: llm_runtime_inference
+      LLM_RUNTIME_CAPABILITY: llm_inference
+      LLM_RUNTIME_DTYPE: ${LLM_RUNTIME_GPU_DTYPE:-auto}
+      LLM_RUNTIME_CONTROLLER_PORT: 8000
+      LLM_RUNTIME_CHILD_PORT: 8001
+      LLM_LOCAL_UPSTREAM_MODEL: ${LLM_LOCAL_UPSTREAM_MODEL:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}
+      LLM_INFERENCE_LOCAL_MODEL_PATH: ${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}
+    volumes:
+      - ../models/llm:/models/llm
+
+  llm_runtime_embeddings:
+    build:
+      context: ..
+      dockerfile: infra/docker/llm_runtime/Dockerfile.gpu
+    image: ${LLM_RUNTIME_GPU_IMAGE:-vanessa-llm-runtime-gpu:local}
+    container_name: vanessa-llm-runtime-embeddings
+    expose:
+      - "8000"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      LLM_RUNTIME_SERVICE_NAME: llm_runtime_embeddings
+      LLM_RUNTIME_CAPABILITY: embeddings
+      LLM_RUNTIME_DTYPE: ${LLM_RUNTIME_GPU_DTYPE:-auto}
+      LLM_RUNTIME_CONTROLLER_PORT: 8000
+      LLM_RUNTIME_CHILD_PORT: 8001
+      LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL: ${LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL:-${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}}
+      LLM_EMBEDDINGS_LOCAL_MODEL_PATH: ${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}}
     volumes:
       - ../models/llm:/models/llm
 

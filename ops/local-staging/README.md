@@ -40,7 +40,7 @@ python scripts/generate_architecture.py --write
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
   - Checks optional `mcp_gateway` when `MCP_GATEWAY_URL` is configured.
-  - Also checks `llm_runtime` when `LLM_ROUTING_MODE=local_only`.
+  - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
@@ -51,6 +51,9 @@ python scripts/generate_architecture.py --write
   - Rebuilds/restarts one service for fast iteration; defaults to `--build --no-deps --wait`.
   - Flags: `--service <name>`, `--no-build`, `--with-deps`, `--no-wait`, `--timeout <seconds>`, `--env-file <path>`
   - Exit codes: `0` success, `2` readiness timeout
+- `reconcile-local-model-slot.sh`
+  - Reads the backend-owned local model slot assignment for local vLLM providers, syncs split-runtime startup defaults into `infra/.env.local`, and optionally restarts `llm_runtime_inference`, `llm_runtime_embeddings`, and `llm`.
+  - Flags: `--no-restart`
 - `stop.sh`
   - Stops stack and preserves data by default.
   - Flag: `--volumes` to run `down -v`
@@ -82,8 +85,9 @@ Supported launcher variables:
 - `SAMPLE_USER_PASSWORD` (default: `sample-user-123`)
 - `LLM_ROUTING_MODE` (default: `local_only`)
 - `LLM_RUNTIME_ACCELERATOR` (default: `auto`; values: `auto|cpu|gpu`)
-- Local staging model selection now comes from the active deployment binding `resources` and `default_resource_id` rather than `LLM_LOCAL_UPSTREAM_MODEL` or `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL`.
-- Keep runtime/provider env focused on endpoint topology and secrets; use the platform deployment UI to choose local and cloud model resources, plus vector-store resource policy.
+- Deployment bindings still choose which active validated managed models are allowed for a capability, but local vLLM runtime advertisement is now reconciled from backend-owned provider slot intent.
+- `LLM_LOCAL_UPSTREAM_MODEL`, `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL`, `LLM_INFERENCE_LOCAL_MODEL_PATH`, and `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` are fallback/debug startup defaults; do not treat them as the primary operator interface.
+- Keep runtime/provider env focused on endpoint topology and secrets; use Platform Control to choose deployment-bound resources and to assign the local loaded-model slot for local vLLM providers.
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
@@ -108,12 +112,12 @@ Note: service runtime environment still comes from compose/env files (for exampl
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
 When running the frontend dev server directly on the host, keep browser requests on `/api` and set `VITE_DEV_PROXY_TARGET=http://127.0.0.1:5000` so Vite proxies to the local-staging backend instead of the Docker-only `backend` hostname.
 
-`llm_runtime` selection:
+Split local runtime selection:
 
-- Base compose defines the common `llm_runtime` service and launcher scripts add a CPU or GPU override compose file.
+- Base compose defines `llm_runtime_inference` and `llm_runtime_embeddings`, and launcher scripts add a CPU or GPU override compose file for both.
 - Local-staging scripts resolve `LLM_RUNTIME_ACCELERATOR` before every compose action.
 - `auto` picks `gpu` only when `nvidia-smi -L` succeeds; otherwise it falls back to `cpu`.
-- `gpu` adds `infra/docker-compose.gpu.override.yml`, which switches `llm_runtime` to the NVIDIA-targeted `vllm/vllm-openai:latest` image and requests `gpus: all`.
+- `gpu` adds `infra/docker-compose.gpu.override.yml`, which switches both split runtimes to the NVIDIA-targeted `vllm/vllm-openai:latest` image and requests `gpus: all`.
 - `cpu` adds `infra/docker-compose.cpu.override.yml` and resolves the CPU ISA automatically unless `LLM_RUNTIME_CPU_VARIANT` forces `avx2` or `avx512`.
 - CPU builds are pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 - CPU builds install PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
@@ -180,34 +184,54 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 4. Login as `sample-superadmin` and validate approvals/promotion flows.
 5. In superadmin control panel, open "Model catalog management" and validate Hugging Face discovery/download flows.
 6. Confirm downloaded model files are written under host directory `models/llm/`.
-7. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
-8. Check API health directly (host-to-container): `http://localhost:5000/health`
-8.1. Check runtime profile directly: `http://localhost:5000/v1/runtime/profile`
-9. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
-10. Check generated architecture JSON: `http://localhost:5000/system/architecture`
-11. Check generated architecture SVG: `http://localhost:5000/system/architecture.svg`
-12. Check wake-word service health: `http://localhost:10400/health`
-13. Simulate wake detection event:
+7. If the model should be served locally, open Platform Control, assign it to the appropriate local provider slot, and wait for the page to report that the runtime finished loading it.
+8. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
+9. Check API health directly (host-to-container): `http://localhost:5000/health`
+9.1. Check runtime profile directly: `http://localhost:5000/v1/runtime/profile`
+10. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`
+11. Check generated architecture JSON: `http://localhost:5000/system/architecture`
+12. Check generated architecture SVG: `http://localhost:5000/system/architecture.svg`
+13. Check wake-word service health: `http://localhost:10400/health`
+14. Simulate wake detection event:
    `curl -sS -X POST http://localhost:10400/simulate-detect -H 'Content-Type: application/json' -d '{"wake_word":"ok_vanessa","confidence":0.95,"source_device_id":"ubuntu-local"}'`
-14. Validate backend voice endpoints:
+15. Validate backend voice endpoints:
    - `http://localhost:5000/voice/health`
    - `http://localhost:5000/health`
-15. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
-16. Optional llama.cpp provider proof:
+16. Tail logs while testing: `./ops/local-staging/logs.sh --follow`
+17. Optional llama.cpp provider proof:
    - set `LLAMA_CPP_URL=http://llama_cpp:8080`
    - set `LLAMA_CPP_MODEL_PATH` to a valid GGUF file
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `llama.cpp local`, activate `Local llama.cpp`, and confirm inference still succeeds
-17. Optional Qdrant provider proof:
+18. Optional Qdrant provider proof:
    - set `QDRANT_URL=http://qdrant:6333`
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `Qdrant local`, activate `Local Qdrant`, and confirm retrieval still succeeds
-18. Optional MCP/tool-runtime proof:
+19. Optional MCP/tool-runtime proof:
    - set `MCP_GATEWAY_URL=http://mcp_gateway:8080`
    - run `./ops/local-staging/start.sh`
    - validate `MCP gateway local` from Platform control
    - execute an agent that references `tool.web_search` while the runtime profile is `online`
-19. Stop while keeping state: `./ops/local-staging/stop.sh`
+20. Stop while keeping state: `./ops/local-staging/stop.sh`
+
+Local ModelOps note:
+
+- Local provider "advertised models" come from the runtime's `/v1/models`, not directly from ModelOps catalog rows.
+- Downloading a Hugging Face model creates or updates the managed-model record and local artifact metadata, but does not automatically make the runtime advertise that model.
+- For local vLLM in current local staging, the superadmin workflow is:
+  1. download/register the model in ModelOps
+  2. assign it to the local `llm_inference` or `embeddings` provider slot in Platform Control
+  3. wait for the matching local runtime controller to load it
+  4. check `GET /v1/modelops/models/{id}/test-runtimes` or the UI test page
+  5. run a ModelOps test
+  6. activate the model
+  7. bind it into the deployment profile resources
+- `./ops/local-staging/reconcile-local-model-slot.sh` remains available only as a fallback/debug tool to sync cold-start defaults into `infra/.env.local`; it is not required for the normal UI-driven workflow.
+
+Platform-control troubleshooting note:
+
+- If Platform Control starts returning 500s after pulling newer backend code, restart the backend or rerun `./ops/local-staging/start.sh` before resetting volumes.
+- Backend startup now reapplies additive platform-control-plane schema migrations to existing local Postgres volumes, so `down -v` or `reset-data.sh --yes` should be a last resort.
 
 If compose or architecture metadata changes, verify artifacts are fresh:
 
@@ -296,9 +320,9 @@ Use the targeted restart script when only one service changed:
   - With `AGENT_EXECUTION_FALLBACK=false`, transport failures are returned directly (for example `502 agent_engine_unreachable`).
   - With `AGENT_EXECUTION_FALLBACK=true`, backend returns deterministic
     `503 EXEC_UPSTREAM_UNAVAILABLE` with `details.fallback_applied=true`.
-- `llm_runtime` fails to start:
+- `llm_runtime_inference` or `llm_runtime_embeddings` fails to start:
   - Ensure local model files exist under `models/llm/`.
-  - Set `LLM_LOCAL_MODEL_PATH` in `infra/.env.example` or compose env override to a valid model path.
+  - Set `LLM_INFERENCE_LOCAL_MODEL_PATH` or `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` in `infra/.env.example` or a compose env override to a valid model path.
   - The path must exist under `models/llm/` on the host and include `config.json` or `params.json`.
   - Confirm the resolved accelerator matches the host:
     - CPU host: `LLM_RUNTIME_ACCELERATOR=cpu` or `auto`

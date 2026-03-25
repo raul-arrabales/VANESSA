@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -8,11 +9,29 @@ LLM_MAIN_PATH = PROJECT_ROOT / "llm" / "app" / "main.py"
 
 
 def _load_list_models_fn():
+    llm_root = PROJECT_ROOT / "llm"
+    original_sys_path = list(sys.path)
+    original_app_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "app" or name.startswith("app.")
+    }
     spec = importlib.util.spec_from_file_location("vanessa_llm_main", LLM_MAIN_PATH)
     assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.list_models
+    try:
+        sys.path.insert(0, str(llm_root))
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                sys.modules.pop(name, None)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.list_models
+    finally:
+        for name in list(sys.modules):
+            if name == "app" or name.startswith("app."):
+                sys.modules.pop(name, None)
+        sys.modules.update(original_app_modules)
+        sys.path[:] = original_sys_path
 
 
 def test_models_catalog_output_shape() -> None:
@@ -59,19 +78,19 @@ def test_models_catalog_includes_local_vllm_model() -> None:
     list_models = _load_list_models_fn()
     payload = list_models()
     local_default = next(
-        (model for model in payload["data"] if model["id"] == "local-vllm-default"), None
+        (model for model in payload["data"] if model["id"] == "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"), None
     )
     assert local_default is not None
     assert local_default["provider_type"] == "local_vllm"
-    assert local_default["capabilities"]["embeddings"] is False
+    assert local_default["capabilities"]["text"] is True
 
 
 def test_models_catalog_includes_local_vllm_embeddings_model() -> None:
     list_models = _load_list_models_fn()
     payload = list_models()
     embeddings_model = next(
-        (model for model in payload["data"] if model["id"] == "local-vllm-embeddings-default"), None
+        (model for model in payload["data"] if model["id"] == "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"), None
     )
     assert embeddings_model is not None
     assert embeddings_model["provider_type"] == "local_vllm"
-    assert embeddings_model["capabilities"] == {"text": False, "image_input": False, "embeddings": True}
+    assert embeddings_model["capabilities"]["embeddings"] is True

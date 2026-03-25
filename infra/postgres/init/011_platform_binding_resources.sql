@@ -17,42 +17,48 @@ CREATE TABLE IF NOT EXISTS platform_binding_resources (
     PRIMARY KEY (binding_id, resource_id)
 );
 
-INSERT INTO platform_binding_resources (
-    binding_id,
-    resource_id,
-    resource_kind,
-    ref_type,
-    managed_model_id,
-    provider_resource_id,
-    display_name,
-    metadata_json,
-    is_default,
-    sort_order
-)
-SELECT
-    bsm.binding_id,
-    bsm.model_id,
-    'model',
-    'managed_model',
-    bsm.model_id,
-    COALESCE(NULLIF(m.provider_model_id, ''), NULLIF(m.local_path, '')),
-    NULLIF(m.name, ''),
-    jsonb_strip_nulls(
-        jsonb_build_object(
-            'provider', NULLIF(m.provider, ''),
-            'backend', NULLIF(m.backend_kind, ''),
-            'task_key', NULLIF(m.task_key, ''),
-            'provider_model_id', NULLIF(m.provider_model_id, ''),
-            'local_path', NULLIF(m.local_path, ''),
-            'source_id', NULLIF(m.source_id, ''),
-            'availability', NULLIF(m.availability, '')
+DO $migration$
+BEGIN
+    IF to_regclass('public.platform_binding_served_models') IS NOT NULL THEN
+        INSERT INTO platform_binding_resources (
+            binding_id,
+            resource_id,
+            resource_kind,
+            ref_type,
+            managed_model_id,
+            provider_resource_id,
+            display_name,
+            metadata_json,
+            is_default,
+            sort_order
         )
-    ),
-    bsm.is_default,
-    bsm.sort_order
-FROM platform_binding_served_models bsm
-JOIN model_registry m ON m.model_id = bsm.model_id
-ON CONFLICT (binding_id, resource_id) DO NOTHING;
+        SELECT
+            bsm.binding_id,
+            bsm.model_id,
+            'model',
+            'managed_model',
+            bsm.model_id,
+            COALESCE(NULLIF(m.provider_model_id, ''), NULLIF(m.local_path, '')),
+            NULLIF(m.name, ''),
+            jsonb_strip_nulls(
+                jsonb_build_object(
+                    'provider', NULLIF(m.provider, ''),
+                    'backend', NULLIF(m.backend_kind, ''),
+                    'task_key', NULLIF(m.task_key, ''),
+                    'provider_model_id', NULLIF(m.provider_model_id, ''),
+                    'local_path', NULLIF(m.local_path, ''),
+                    'source_id', NULLIF(m.source_id, ''),
+                    'availability', NULLIF(m.availability, '')
+                )
+            ),
+            bsm.is_default,
+            bsm.sort_order
+        FROM platform_binding_served_models bsm
+        JOIN model_registry m ON m.model_id = bsm.model_id
+        ON CONFLICT (binding_id, resource_id) DO NOTHING;
+    END IF;
+END
+$migration$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS platform_binding_resources_default_idx
     ON platform_binding_resources (binding_id)

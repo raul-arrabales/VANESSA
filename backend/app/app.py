@@ -71,7 +71,8 @@ def system_health_route():
     frontend_url = config.frontend_url.rstrip("/")
     backend_url = config.backend_url.rstrip("/")
     llm_url = config.llm_url.rstrip("/")
-    llm_runtime_url = config.llm_runtime_url.rstrip("/")
+    llm_inference_runtime_url = config.llm_inference_runtime_url.rstrip("/")
+    llm_embeddings_runtime_url = config.llm_embeddings_runtime_url.rstrip("/")
     agent_engine_url = config.agent_engine_url.rstrip("/")
     sandbox_url = config.sandbox_url.rstrip("/")
     mcp_gateway_url = config.mcp_gateway_url.rstrip("/")
@@ -100,10 +101,16 @@ def system_health_route():
             "reachable": _http_json_ok(llm_url + "/health"),
         },
         {
-            "service": "LLM Runtime",
-            "container": "llm_runtime",
-            "target": config.llm_runtime_url,
-            "reachable": _http_json_ok(llm_runtime_url + "/health"),
+            "service": "LLM Runtime Inference",
+            "container": "llm_runtime_inference",
+            "target": config.llm_inference_runtime_url,
+            "reachable": _http_json_ok(llm_inference_runtime_url + "/health"),
+        },
+        {
+            "service": "LLM Runtime Embeddings",
+            "container": "llm_runtime_embeddings",
+            "target": config.llm_embeddings_runtime_url,
+            "reachable": _http_json_ok(llm_embeddings_runtime_url + "/health"),
         },
         {
             "service": "Agent Engine",

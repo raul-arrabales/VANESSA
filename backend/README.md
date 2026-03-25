@@ -70,7 +70,7 @@ Platform control plane semantics:
 - `capabilities` represent platform functions such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
 - `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
-- Existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
+- Existing `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 - `LLM_REQUEST_TIMEOUT_SECONDS` sets the backend outbound timeout budget for active `llm_inference` and embeddings provider bindings; in local CPU staging it should exceed cold first-request latency.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
@@ -82,6 +82,7 @@ Platform control plane semantics:
 - Agent executions may also use optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` bindings for LLM-driven tool execution.
 - Product-facing knowledge chat now lives on `POST /v1/chat/knowledge`; backend resolves the selected model through governance, injects the configured retrieval settings, and routes the request through the fixed `agent.knowledge_chat` agent before returning normalized citations and snippets.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
+- Local `vllm_local` and `vllm_embeddings_local` provider slots are now live runtime controls: assigning or clearing a loaded model persists slot intent and immediately calls the matching local runtime controller.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
 - Registry bootstrap also seeds canonical built-in tools:
   - `tool.web_search` -> MCP-backed `web_search`

@@ -87,6 +87,12 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     activation_audit = test_client.get("/v1/platform/activation-audit", headers=_auth(token))
     create_provider = test_client.post("/v1/platform/providers", headers=_auth(token), json={})
     update_provider = test_client.put("/v1/platform/providers/provider-1", headers=_auth(token), json={})
+    assign_loaded_model = test_client.post(
+        "/v1/platform/providers/provider-1/loaded-model",
+        headers=_auth(token),
+        json={"managed_model_id": "model-1"},
+    )
+    clear_loaded_model = test_client.delete("/v1/platform/providers/provider-1/loaded-model", headers=_auth(token))
     delete_provider = test_client.delete("/v1/platform/providers/provider-1", headers=_auth(token))
     deployments = test_client.get("/v1/platform/deployments", headers=_auth(token))
     update_deployment = test_client.put("/v1/platform/deployments/deployment-1", headers=_auth(token), json={})
@@ -116,6 +122,8 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     assert activation_audit.status_code == 403
     assert create_provider.status_code == 403
     assert update_provider.status_code == 403
+    assert assign_loaded_model.status_code == 403
+    assert clear_loaded_model.status_code == 403
     assert delete_provider.status_code == 403
     assert deployments.status_code == 403
     assert update_deployment.status_code == 403
@@ -208,6 +216,52 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "enabled": payload.get("enabled", True),
             "config": payload.get("config", {}),
             "secret_refs": payload.get("secret_refs", {}),
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "assign_provider_loaded_model",
+        lambda _db, *, config, provider_instance_id, managed_model_id: {
+            "id": provider_instance_id,
+            "slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "capability": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": "vLLM embeddings local",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config": {},
+            "secret_refs": {},
+            "loaded_managed_model_id": managed_model_id,
+            "loaded_managed_model_name": "Assigned Model",
+            "loaded_runtime_model_id": "/models/llm/Assigned-Model",
+            "load_state": "loading",
+            "load_error": None,
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "clear_provider_loaded_model",
+        lambda _db, *, config, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "capability": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": "vLLM embeddings local",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "config": {},
+            "secret_refs": {},
+            "loaded_managed_model_id": None,
+            "loaded_managed_model_name": None,
+            "loaded_runtime_model_id": None,
+            "load_state": "empty",
+            "load_error": None,
         },
     )
     monkeypatch.setattr(platform_routes, "delete_provider", lambda _db, *, config, provider_instance_id: None)
@@ -371,6 +425,15 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "secret_refs": {"api_key": "env://VLLM_API_KEY"},
         },
     )
+    assign_loaded_model_response = test_client.post(
+        "/v1/platform/providers/provider-1/loaded-model",
+        headers=_auth(token),
+        json={"managed_model_id": "sentence-transformers--all-MiniLM-L6-v2"},
+    )
+    clear_loaded_model_response = test_client.delete(
+        "/v1/platform/providers/provider-1/loaded-model",
+        headers=_auth(token),
+    )
     delete_provider_response = test_client.delete("/v1/platform/providers/provider-2", headers=_auth(token))
     deployments = test_client.get("/v1/platform/deployments", headers=_auth(token))
     create_response = test_client.post(
@@ -444,6 +507,10 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     assert create_provider_response.get_json()["provider"]["secret_refs"]["api_key"] == "env://VLLM_API_KEY"
     assert update_provider_response.status_code == 200
     assert update_provider_response.get_json()["provider"]["config"]["request_format"] == "openai_chat"
+    assert assign_loaded_model_response.status_code == 200
+    assert assign_loaded_model_response.get_json()["provider"]["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert clear_loaded_model_response.status_code == 200
+    assert clear_loaded_model_response.get_json()["provider"]["load_state"] == "empty"
     assert delete_provider_response.status_code == 200
     assert delete_provider_response.get_json()["deleted"] is True
     assert deployments.status_code == 200

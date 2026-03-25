@@ -46,8 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local /usr/local
+COPY llm_runtime /app/llm_runtime
 
 WORKDIR /app
 EXPOSE 8000
 
-ENTRYPOINT ["vllm", "serve"]
+ENTRYPOINT ["python", "-m", "uvicorn", "llm_runtime.runtime_app.main:app"]
+CMD ["--host", "0.0.0.0", "--port", "8000"]

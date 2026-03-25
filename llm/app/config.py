@@ -31,6 +31,7 @@ def _get_int_env(name: str, default: int) -> int:
 class LLMConfig:
     routing_mode: str
     local_base_url: str
+    local_embeddings_base_url: str
     local_upstream_model: str
     local_embeddings_upstream_model: str
     enable_hf_router: bool
@@ -57,8 +58,13 @@ def load_llm_config() -> LLMConfig:
     )
     return LLMConfig(
         routing_mode=os.getenv("LLM_ROUTING_MODE", "local_only").strip().lower() or "local_only",
-        local_base_url=os.getenv("LLM_LOCAL_BASE_URL", "http://llm_runtime:8000/v1").strip()
-        or "http://llm_runtime:8000/v1",
+        local_base_url=os.getenv("LLM_LOCAL_BASE_URL", "http://llm_runtime_inference:8000/v1").strip()
+        or "http://llm_runtime_inference:8000/v1",
+        local_embeddings_base_url=(
+            os.getenv("LLM_LOCAL_EMBEDDINGS_BASE_URL", "").strip()
+            or os.getenv("LLM_LOCAL_BASE_URL", "http://llm_runtime_embeddings:8000/v1").strip()
+            or "http://llm_runtime_embeddings:8000/v1"
+        ),
         local_upstream_model=local_upstream_model,
         local_embeddings_upstream_model=os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
         or local_upstream_model,

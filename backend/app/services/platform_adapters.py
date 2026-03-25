@@ -161,6 +161,31 @@ def _normalize_model_resource(item: dict[str, Any]) -> dict[str, Any]:
         "source_id": str(item.get("source_id", "")).strip() or None,
         "owned_by": item.get("owned_by"),
     }
+
+
+def _filter_models_payload_by_capability(
+    binding: ProviderBinding,
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    items = payload.get("data")
+    if not isinstance(items, list):
+        return payload
+    filtered: list[dict[str, Any]] = []
+    capability_key = str(binding.capability_key).strip().lower()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        capabilities = item.get("capabilities") if isinstance(item.get("capabilities"), dict) else {}
+        include_item = True
+        if capability_key == "llm_inference":
+            include_item = bool(capabilities.get("text"))
+        elif capability_key == "embeddings":
+            include_item = bool(capabilities.get("embeddings"))
+        if include_item:
+            filtered.append(dict(item))
+    return {**payload, "data": filtered}
     return {
         "id": resource_id,
         "resource_kind": "model",
@@ -367,12 +392,13 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         }
 
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
-        return http_json_request(
+        payload, status_code = http_json_request(
             self._models_url(),
             method="GET",
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
+        return _filter_models_payload_by_capability(self.binding, payload if isinstance(payload, dict) else None), status_code
 
     def chat_completion(
         self,
@@ -593,7 +619,7 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
-        return payload if isinstance(payload, dict) else None, status_code
+        return _filter_models_payload_by_capability(self.binding, payload if isinstance(payload, dict) else None), status_code
 
     def embed_texts(
         self,

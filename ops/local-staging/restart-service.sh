@@ -46,7 +46,8 @@ check_service_ready() {
     mcp_gateway) http_ok "http://localhost:6100/health" ;;
     kws) http_ok "http://localhost:10400/health" ;;
     llm) http_ok "http://localhost:8000/health" ;;
-    llm_runtime) llm_runtime_internal_http_ok "/health" ;;
+    llm_runtime_inference) llm_runtime_internal_http_ok "llm_runtime_inference" "/health" ;;
+    llm_runtime_embeddings) llm_runtime_internal_http_ok "llm_runtime_embeddings" "/health" ;;
     llama_cpp) llama_cpp_internal_http_ok "/v1/models" ;;
     qdrant) qdrant_internal_http_ok "/healthz" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
@@ -124,21 +125,27 @@ require_prerequisites
 resolved_accelerator="$(resolve_llm_runtime_accelerator)"
 resolved_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
 validate_llm_runtime_support || true
-log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
+log_info "Resolved local runtime accelerator: ${resolved_accelerator}"
 if [[ "${resolved_accelerator}" == "cpu" ]]; then
-  log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
-  log_info "Resolved llm_runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
+  log_info "Resolved local runtime CPU variant: ${resolved_cpu_variant}"
+  log_info "Resolved local runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
 fi
 
-if [[ "${target_service}" == "llm_runtime" ]] && [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" ]]; then
+if [[ ( "${target_service}" == "llm_runtime_inference" || "${target_service}" == "llm_runtime_embeddings" ) && "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" ]]; then
   if llm_runtime_disable_local_requested && ! llm_routing_requires_local_runtime; then
-    die "llm_runtime is unsupported on this CPU host and has been disabled for non-local routing."
+    die "${target_service} is unsupported on this CPU host and has been disabled for non-local routing."
   fi
-  die "llm_runtime is unsupported on this CPU host. Use a compatible AVX2/AVX512 CPU or an NVIDIA GPU host."
+  die "${target_service} is unsupported on this CPU host. Use a compatible AVX2/AVX512 CPU or an NVIDIA GPU host."
 fi
 
-if [[ "${target_service}" == "llm_runtime" || "${target_service}" == "llm" ]]; then
-  validate_llm_local_model_path
+if [[ "${target_service}" == "llm_runtime_inference" ]]; then
+  validate_llm_inference_local_model_path
+fi
+if [[ "${target_service}" == "llm_runtime_embeddings" ]]; then
+  validate_llm_embeddings_local_model_path
+fi
+if [[ "${target_service}" == "llm" ]]; then
+  validate_all_llm_local_model_paths
 fi
 if [[ "${target_service}" == "llama_cpp" ]]; then
   llama_cpp_enabled_requested || die "llama_cpp is disabled. Set LLAMA_CPP_URL to enable the optional llama.cpp runtime."
@@ -165,9 +172,9 @@ fi
 
 log_info "Restarting service '${target_service}'"
 if ! compose up "${compose_args[@]}" "${target_service}"; then
-  if [[ "${target_service}" == "llm_runtime" && "${resolved_accelerator}" == "cpu" ]]; then
+  if [[ ( "${target_service}" == "llm_runtime_inference" || "${target_service}" == "llm_runtime_embeddings" ) && "${resolved_accelerator}" == "cpu" ]]; then
     log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
-    log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
+    log_warn "CPU ${target_service} failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
   fi
   die "Failed to restart service: ${target_service}"
 fi

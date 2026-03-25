@@ -6,6 +6,8 @@ from ..authz import require_auth, require_role
 from ..config import get_auth_config
 from ..services.platform_service import (
     activate_deployment_profile,
+    assign_provider_loaded_model,
+    clear_provider_loaded_model,
     clone_deployment_profile,
     create_deployment_profile,
     create_provider,
@@ -121,6 +123,39 @@ def validate_platform_provider_route(provider_id: str):
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(payload), 200
+
+
+@bp.post("/v1/platform/providers/<provider_id>/loaded-model")
+@require_role("superadmin")
+def assign_platform_provider_loaded_model_route(provider_id: str):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+    managed_model_id = str(payload.get("managed_model_id", "")).strip()
+    try:
+        provider = assign_provider_loaded_model(
+            _database_url(),
+            config=_config(),
+            provider_instance_id=provider_id,
+            managed_model_id=managed_model_id,
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"provider": provider}), 200
+
+
+@bp.delete("/v1/platform/providers/<provider_id>/loaded-model")
+@require_role("superadmin")
+def clear_platform_provider_loaded_model_route(provider_id: str):
+    try:
+        provider = clear_provider_loaded_model(
+            _database_url(),
+            config=_config(),
+            provider_instance_id=provider_id,
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"provider": provider}), 200
 
 
 @bp.get("/v1/platform/deployments")

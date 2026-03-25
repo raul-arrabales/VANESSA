@@ -12,7 +12,8 @@ rendering:
     - kws
     - agent_engine
     - llm
-    - llm_runtime
+    - llm_runtime_inference
+    - llm_runtime_embeddings
     - llama_cpp
     - mcp_gateway
     - sandbox
@@ -50,10 +51,16 @@ services:
     description: Private model-serving HTTP gateway.
     public_exposed: true
     criticality: high
-  llm_runtime:
-    label: LLM Runtime
+  llm_runtime_inference:
+    label: LLM Runtime Inference
     group: runtime
-    description: Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.
+    description: Hardware-adaptive local vLLM runtime backing LLM inference on CPU or GPU hosts.
+    public_exposed: false
+    criticality: high
+  llm_runtime_embeddings:
+    label: LLM Runtime Embeddings
+    group: runtime
+    description: Hardware-adaptive local vLLM runtime backing embeddings on CPU or GPU hosts.
     public_exposed: false
     criticality: high
   llama_cpp:
@@ -184,9 +191,15 @@ edges:
     kind: db
     direction: outbound
   - from: llm
-    to: llm_runtime
+    to: llm_runtime_inference
     protocol: Internal HTTP
-    purpose: Runtime model execution path
+    purpose: Runtime text generation path
+    kind: internal
+    direction: outbound
+  - from: llm
+    to: llm_runtime_embeddings
+    protocol: Internal HTTP
+    purpose: Runtime embeddings execution path
     kind: internal
     direction: outbound
   - from: kws

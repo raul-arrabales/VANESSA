@@ -1,5 +1,7 @@
 services:
-  llm_runtime:
-    image: ${LLM_RUNTIME_GPU_IMAGE:-vllm/vllm-openai:latest}
+  llm_runtime_inference:
+    gpus: ${LLM_RUNTIME_GPU_REQUEST:-all}
+    ipc: host
+  llm_runtime_embeddings:
     gpus: ${LLM_RUNTIME_GPU_REQUEST:-all}
     ipc: host

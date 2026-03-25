@@ -9,7 +9,8 @@ VANESSA is a modular, containerized AI assistant stack with:
 - Sandbox service for controlled code execution
 - Optional MCP gateway service for remote/general-purpose tool invocation
 - Private LLM gateway service (local-first routing)
-- Local vLLM runtime service
+- Local vLLM inference runtime service
+- Local vLLM embeddings runtime service
 - Optional local llama.cpp runtime service
 - Wake-word (KWS) service
 - Weaviate vector store
@@ -48,7 +49,7 @@ Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflo
 
 Full guide: `ops/local-staging/README.md`
 
-`llm_runtime` adapts to host hardware in local staging:
+The split local vLLM runtimes adapt to host hardware in local staging:
 
 - NVIDIA GPU hosts use the GPU runtime override image
 - CPU-only hosts add the CPU override compose file and build a local CPU vLLM image matched to the detected ISA (`avx512` or `avx2`)
@@ -116,7 +117,7 @@ When running local staging (`./ops/local-staging/start.sh`), the LLM service is 
 
 ## Local LLM Runtime Selection
 
-Local staging resolves `llm_runtime` automatically:
+Local staging resolves the split local runtimes automatically:
 
 - `LLM_RUNTIME_ACCELERATOR=auto|cpu|gpu`
 - `LLM_RUNTIME_CPU_VARIANT=auto|avx2|avx512`
@@ -129,7 +130,7 @@ Default behavior:
 
 Optional fallback control:
 
-- `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true` allows launcher scripts to omit `llm_runtime` only when routing does not require local runtime
+- `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true` allows launcher scripts to omit the split local runtimes only when routing does not require local runtime
 
 The CPU runtime build is pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
 The CPU builder installs PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
@@ -172,7 +173,8 @@ Expected containers:
 - `vanessa-backend`
 - `vanessa-agent-engine`
 - `vanessa-llm`
-- `vanessa-llm-runtime`
+- `vanessa-llm-runtime-inference`
+- `vanessa-llm-runtime-embeddings`
 - `vanessa-llama-cpp` (only when `LLAMA_CPP_URL` enables the optional profile)
 - `vanessa-qdrant` (only when `QDRANT_URL` enables the optional profile)
 - `vanessa-mcp-gateway` (only when `MCP_GATEWAY_URL` enables the optional profile)
@@ -191,7 +193,7 @@ docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 Service-specific logs:
 
 ```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox mcp_gateway llm llm_runtime kws weaviate postgres frontend
+docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox mcp_gateway llm llm_runtime_inference llm_runtime_embeddings kws weaviate postgres frontend
 ```
 
 ### 6. Stop And Clean Up Test Run
@@ -304,7 +306,7 @@ Bootstrapped deployment profiles:
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured
 
-The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL` values so current local staging behavior remains compatible.
+The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL` values.
 
 The control plane now supports an operator-managed lifecycle on top of bootstrap seeding:
 

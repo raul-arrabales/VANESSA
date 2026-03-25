@@ -1,5 +1,5 @@
 services:
-  llm_runtime:
+  llm_runtime_inference:
     build:
       context: ..
       dockerfile: infra/docker/llm_runtime/Dockerfile.cpu
@@ -11,21 +11,35 @@ services:
         VLLM_CPU_AVX2: ${LLM_RUNTIME_CPU_BUILD_AVX2:-true}
         VLLM_CPU_AVX512: ${LLM_RUNTIME_CPU_BUILD_AVX512:-false}
     image: ${LLM_RUNTIME_CPU_IMAGE:-vanessa-llm-runtime-cpu:local}
-    command:
-      - ${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Instruct}
-      - --device
-      - ${LLM_RUNTIME_DEVICE:-cpu}
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --dtype
-      - ${LLM_RUNTIME_DTYPE:-float}
     shm_size: ${LLM_RUNTIME_SHM_SIZE:-4g}
     cap_add:
       - SYS_NICE
     security_opt:
       - seccomp=unconfined
     environment:
+      LLM_RUNTIME_DEVICE: ${LLM_RUNTIME_DEVICE:-cpu}
+      LLM_RUNTIME_DTYPE: ${LLM_RUNTIME_DTYPE:-float}
+      VLLM_CPU_KVCACHE_SPACE: ${VLLM_CPU_KVCACHE_SPACE:-8}
+      VLLM_CPU_OMP_THREADS_BIND: ${VLLM_CPU_OMP_THREADS_BIND:-0-7}
+  llm_runtime_embeddings:
+    build:
+      context: ..
+      dockerfile: infra/docker/llm_runtime/Dockerfile.cpu
+      args:
+        VLLM_VERSION: ${LLM_RUNTIME_CPU_VLLM_VERSION:-v0.8.5}
+        LLM_RUNTIME_CPU_TORCH_INDEX_URL: ${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}
+        LLM_RUNTIME_CPU_TRANSFORMERS_VERSION: ${LLM_RUNTIME_CPU_TRANSFORMERS_VERSION:-4.51.3}
+        VLLM_CPU_DISABLE_AVX512: ${LLM_RUNTIME_CPU_BUILD_DISABLE_AVX512:-true}
+        VLLM_CPU_AVX2: ${LLM_RUNTIME_CPU_BUILD_AVX2:-true}
+        VLLM_CPU_AVX512: ${LLM_RUNTIME_CPU_BUILD_AVX512:-false}
+    image: ${LLM_RUNTIME_CPU_IMAGE:-vanessa-llm-runtime-cpu:local}
+    shm_size: ${LLM_RUNTIME_SHM_SIZE:-4g}
+    cap_add:
+      - SYS_NICE
+    security_opt:
+      - seccomp=unconfined
+    environment:
+      LLM_RUNTIME_DEVICE: ${LLM_RUNTIME_DEVICE:-cpu}
+      LLM_RUNTIME_DTYPE: ${LLM_RUNTIME_DTYPE:-float}
       VLLM_CPU_KVCACHE_SPACE: ${VLLM_CPU_KVCACHE_SPACE:-8}
       VLLM_CPU_OMP_THREADS_BIND: ${VLLM_CPU_OMP_THREADS_BIND:-0-7}

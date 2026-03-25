@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activateDeploymentProfile,
+  assignPlatformProviderLoadedModel,
+  clearPlatformProviderLoadedModel,
   cloneDeploymentProfile,
   createDeploymentProfile,
   createPlatformProvider,
@@ -207,6 +209,8 @@ describe("platform api", () => {
       },
       "token",
     );
+    await assignPlatformProviderLoadedModel("provider-1", "model-1", "token");
+    await clearPlatformProviderLoadedModel("provider-1", "token");
     await deletePlatformProvider("provider-1", "token");
     await createDeploymentProfile(
       {
@@ -250,26 +254,36 @@ describe("platform api", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      "/api/v1/platform/providers/provider-1/loaded-model",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/v1/platform/providers/provider-1/loaded-model",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       "/api/v1/platform/providers/provider-1",
       expect.objectContaining({ method: "DELETE" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
+      6,
       "/api/v1/platform/deployments",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      5,
+      7,
       "/api/v1/platform/deployments/deployment-1",
       expect.objectContaining({ method: "PUT" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      6,
+      8,
       "/api/v1/platform/deployments/deployment-1/clone",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      7,
+      9,
       "/api/v1/platform/deployments/deployment-1",
       expect.objectContaining({ method: "DELETE" }),
     );

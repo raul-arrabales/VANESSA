@@ -58,13 +58,13 @@ require_prerequisites
 resolved_accelerator="$(resolve_llm_runtime_accelerator)"
 resolved_cpu_variant="$(resolve_llm_runtime_cpu_variant)"
 validate_llm_runtime_support || true
-log_info "Resolved llm_runtime accelerator: ${resolved_accelerator}"
+log_info "Resolved local runtime accelerator: ${resolved_accelerator}"
 if [[ "${resolved_accelerator}" == "cpu" ]]; then
-  log_info "Resolved llm_runtime CPU variant: ${resolved_cpu_variant}"
-  log_info "Resolved llm_runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
+  log_info "Resolved local runtime CPU variant: ${resolved_cpu_variant}"
+  log_info "Resolved local runtime CPU thread binding: ${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}"
 fi
 
-validate_llm_local_model_path
+validate_all_llm_local_model_paths
 if llama_cpp_enabled_requested; then
   validate_llama_cpp_model_path
 fi
@@ -76,25 +76,25 @@ if ! compose config >/dev/null; then
 fi
 
 mapfile -t selected_services < <(stack_services_for_start)
-if [[ -n "${build_flag}" ]] && printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
-  log_info "CPU llm_runtime build selected. A cold build compiles vLLM from source, may take several minutes, and needs network access for build dependencies. If the image is already built, rerun with --no-build to skip rebuilding."
+if [[ -n "${build_flag}" ]] && printf '%s\n' "${selected_services[@]}" | grep -Eq '^(llm_runtime_inference|llm_runtime_embeddings)$' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+  log_info "CPU local runtime build selected. A cold build compiles vLLM from source, may take several minutes, and needs network access for build dependencies. If the image is already built, rerun with --no-build to skip rebuilding."
 fi
 
 log_info "Starting VANESSA stack"
 if [[ -n "${build_flag}" ]]; then
   if ! compose up -d --build "${selected_services[@]}"; then
-    if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+    if printf '%s\n' "${selected_services[@]}" | grep -Eq '^(llm_runtime_inference|llm_runtime_embeddings)$' && [[ "${resolved_accelerator}" == "cpu" ]]; then
       log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
-      log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
+      log_warn "CPU local runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
     fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"
   fi
 else
   if ! compose up -d "${selected_services[@]}"; then
-    if printf '%s\n' "${selected_services[@]}" | grep -qx 'llm_runtime' && [[ "${resolved_accelerator}" == "cpu" ]]; then
+    if printf '%s\n' "${selected_services[@]}" | grep -Eq '^(llm_runtime_inference|llm_runtime_embeddings)$' && [[ "${resolved_accelerator}" == "cpu" ]]; then
       log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
-      log_warn "CPU llm_runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
+      log_warn "CPU local runtime failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."
     fi
     log_warn "If the error includes 'parent snapshot ... does not exist', run moderate cleanup from ops/local-staging/README.md."
     die "Failed to start stack"

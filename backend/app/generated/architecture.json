@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-03-19T19:51:52+00:00",
+  "generated_at": "2026-03-25T16:05:22+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -48,11 +48,20 @@
       "criticality": "high"
     },
     {
-      "id": "llm_runtime",
-      "container": "llm_runtime",
-      "label": "LLM Runtime",
+      "id": "llm_runtime_inference",
+      "container": "llm_runtime_inference",
+      "label": "LLM Runtime Inference",
       "group": "runtime",
-      "description": "Hardware-adaptive local vLLM runtime backing LLM API service on CPU or GPU hosts.",
+      "description": "Hardware-adaptive local vLLM runtime backing LLM inference on CPU or GPU hosts.",
+      "public_exposed": false,
+      "criticality": "high"
+    },
+    {
+      "id": "llm_runtime_embeddings",
+      "container": "llm_runtime_embeddings",
+      "label": "LLM Runtime Embeddings",
+      "group": "runtime",
+      "description": "Hardware-adaptive local vLLM runtime backing embeddings on CPU or GPU hosts.",
       "public_exposed": false,
       "criticality": "high"
     },
@@ -257,11 +266,20 @@
       "direction": "outbound"
     },
     {
-      "id": "llm-llm_runtime",
+      "id": "llm-llm_runtime_embeddings",
       "from": "llm",
-      "to": "llm_runtime",
+      "to": "llm_runtime_embeddings",
       "protocol": "Internal HTTP",
-      "purpose": "Runtime model execution path",
+      "purpose": "Runtime embeddings execution path",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "llm-llm_runtime_inference",
+      "from": "llm",
+      "to": "llm_runtime_inference",
+      "protocol": "Internal HTTP",
+      "purpose": "Runtime text generation path",
       "kind": "internal",
       "direction": "outbound"
     }
@@ -305,27 +323,33 @@
         "width": 220,
         "height": 84
       },
-      "llm_runtime": {
+      "llm_runtime_inference": {
         "x": 846,
         "y": 198,
         "width": 220,
         "height": 84
       },
-      "llama_cpp": {
+      "llm_runtime_embeddings": {
         "x": 846,
         "y": 322,
         "width": 220,
         "height": 84
       },
-      "mcp_gateway": {
+      "llama_cpp": {
         "x": 846,
         "y": 446,
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "mcp_gateway": {
         "x": 846,
         "y": 570,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 694,
         "width": 220,
         "height": 84
       },
@@ -349,5 +373,5 @@
       }
     }
   },
-  "source_hash": "87173c2012ac7dcb37ecc89983e49e1d71672e3d28fcc49eb4c3a3f86651745e"
+  "source_hash": "0d3fcd3d1cb7a55a4d8de6d074b97bbc092c2a6799a73b27a20308886967463e"
 }

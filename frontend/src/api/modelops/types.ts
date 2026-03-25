@@ -189,7 +189,24 @@ export type ManagedModelTestRuntime = {
   matched_model_display_name?: string | null;
   match_source?: string | null;
   matched_value?: string | null;
+  loaded_managed_model_id?: string | null;
+  loaded_managed_model_name?: string | null;
+  loaded_runtime_model_id?: string | null;
+  loaded_local_path?: string | null;
+  loaded_source_id?: string | null;
+  load_state?: "empty" | "loading" | "reconciling" | "loaded" | "error" | string;
+  load_error?: string | null;
   advertised_model_ids?: string[];
+  advertised_models?: Array<{
+    id: string;
+    display_name: string;
+    capabilities: {
+      text: boolean;
+      image_input: boolean;
+      embeddings: boolean;
+    };
+    metadata?: Record<string, unknown>;
+  }>;
   message?: string | null;
 };
 

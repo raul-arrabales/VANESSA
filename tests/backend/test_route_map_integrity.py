@@ -55,6 +55,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/platform/providers",
         "/v1/platform/provider-families",
         "/v1/platform/providers/<provider_id>/validate",
+        "/v1/platform/providers/<provider_id>/loaded-model",
         "/v1/platform/providers/<provider_id>",
         "/v1/platform/deployments",
         "/v1/platform/activation-audit",

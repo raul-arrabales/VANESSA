@@ -44,6 +44,8 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/platform/providers` (superadmin)
 - `PUT /v1/platform/providers/{id}` (superadmin)
 - `DELETE /v1/platform/providers/{id}` (superadmin)
+- `POST /v1/platform/providers/{id}/loaded-model` (superadmin)
+- `DELETE /v1/platform/providers/{id}/loaded-model` (superadmin)
 - `GET /v1/platform/deployments` (superadmin)
 - `GET /v1/platform/activation-audit` (superadmin)
 - `POST /v1/platform/deployments` (superadmin)
@@ -71,7 +73,7 @@ For shared cloud providers, endpoint/auth stay on the provider instance via `sec
 
 Bootstrap defaults:
 
-- `local-default` is always seeded from `LLM_URL`, `LLM_RUNTIME_URL`, and `WEAVIATE_URL`.
+- `local-default` is always seeded from `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL`.
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - `sandbox_local` is seeded from `SANDBOX_URL` and bound as optional `sandbox_execution` into local deployment profiles when available.
@@ -83,6 +85,8 @@ Bootstrap defaults:
 - The runtime snapshot now serializes generic binding `resources`, `default_resource_id`, `default_resource`, and `resource_policy` for every capability binding.
 - Direct backend inference and agent-engine runtime selection both enforce active-binding membership: requested LLM model ids must be present in the active `llm_inference` binding and omitted requests fall back to the binding default.
 - Runtime-facing provider model ids are resolved per bound managed model. Cloud models resolve through `provider_model_id`; local models resolve by matching the provider `/models` inventory against managed model metadata.
+- Local model-bearing providers now also expose one backend-owned loaded-model slot per provider instance. For local `llm_inference` and `embeddings` providers, downloading a model into ModelOps does not make it testable by itself; a superadmin must assign that managed model into the provider slot so the runtime can advertise it through `/v1/models`.
+- `POST /v1/platform/providers/{id}/loaded-model` and `DELETE /v1/platform/providers/{id}/loaded-model` are the superadmin control-plane APIs for setting or clearing that local slot intent, and now immediately apply that change to the matching local runtime controller.
 - Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
@@ -114,7 +118,7 @@ Bootstrap defaults:
 - `DELETE /v1/modelops/models/{id}`
 - `GET /v1/modelops/models/{id}/usage`
 - `GET /v1/modelops/models/{id}/validations`
-- Superadmins can inspect compatible `llm_inference` runtime providers for a local LLM test without changing the active deployment profile. Local ModelOps tests execute only when the selected runtime is actually serving the chosen managed model.
+- Superadmins can inspect compatible local runtime providers for a ModelOps test without changing the active deployment profile. `GET /v1/modelops/models/{id}/test-runtimes` now reports the provider slot state, the currently loaded managed model, the runtime model id, and structured advertised runtime entries. Local ModelOps tests execute only when the selected runtime is actually serving the chosen managed model.
 - `GET /v1/modelops/credentials`
 - `POST /v1/modelops/credentials`
 - `DELETE /v1/modelops/credentials/{id}`

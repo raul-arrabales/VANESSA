@@ -21,7 +21,7 @@ VANESSA (Versatile AI Navigator for Enhanced Semantic Search & Automation) is a 
 - Agent orchestration service
 - Sandbox for controlled code execution
 - Optional MCP gateway for remote/general-purpose tool execution
-- LLM gateway and local runtime
+- LLM gateway and split local runtimes
 - Wake-word service
 - Weaviate vector store
 - PostgreSQL database

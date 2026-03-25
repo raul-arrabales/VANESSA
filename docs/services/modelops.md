@@ -83,8 +83,21 @@ Model activation is not the same as deployment binding.
 - ModelOps decides whether a model is active, validated, visible, and invokable.
 - `/control/platform` decides which provider/deployment binding should use which managed-model resources.
 - Deployment binding pickers should only show ModelOps-eligible models for the relevant capability.
+- For local model-bearing providers, there is an extra state between "downloaded in ModelOps" and "bound into a deployment": the model must be loaded into the provider's local runtime slot so the runtime advertises it through `/v1/models`.
 
 This separation is especially important for embeddings, where a provider binding may exist before an operator selects the bound model resource.
+
+Current local-superadmin flow:
+
+1. Discover or download the model into ModelOps.
+2. Register and validate the managed model.
+3. Assign that managed model to the local `llm_inference` or `embeddings` provider slot from Platform Control.
+4. Wait for the matching local runtime controller to load the assigned model and advertise it through `/v1/models`.
+5. Use `GET /v1/modelops/models/{id}/test-runtimes` and `POST /v1/modelops/models/{id}/test` to verify the runtime is actually serving it.
+6. Activate the model.
+7. Bind the active validated managed model into a deployment profile resource list and choose its default resource when appropriate.
+
+In this design, "downloaded" and "currently served by the runtime" are intentionally separate states.
 
 ## APIs
 
@@ -104,6 +117,7 @@ Canonical routes live under `/v1/modelops/models`:
 - `DELETE /v1/modelops/models/{id}`
 
 For local LLM validation flows, superadmins can now select a compatible `llm_inference` runtime just for the test action. This does not change the active deployment profile, and ModelOps records a failure instead of silently falling back when the chosen runtime is not actually serving the selected local artifact.
+For both local LLM and embeddings flows, `GET /v1/modelops/models/{id}/test-runtimes` now exposes structured advertised runtime entries plus local-slot diagnostics such as `loaded_managed_model_id`, `loaded_runtime_model_id`, and `load_state`. Internal identifier matching still accepts raw path/source identifiers when needed, but those are no longer the primary user-facing advertised choices.
 
 Runtime inference routes such as `/v1/models/generate` and `/v1/models/inference` remain product-facing, but they now resolve eligibility strictly through ModelOps.
 

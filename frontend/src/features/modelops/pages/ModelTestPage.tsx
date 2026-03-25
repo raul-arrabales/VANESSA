@@ -106,6 +106,7 @@ export default function ModelTestPage(): JSX.Element {
       ? t("modelOps.testing.runtimeMismatch")
       : "");
   const runtimeAdvertisedIdentifiers = diagnosticRuntime?.advertised_model_ids?.filter((value) => value.trim()) ?? [];
+  const runtimeAdvertisedModels = diagnosticRuntime?.advertised_models ?? [];
   const embeddingsRuntimeConfigTarget =
     testState.model.source_id
     || testState.model.artifact?.storage_path
@@ -152,6 +153,29 @@ export default function ModelTestPage(): JSX.Element {
                 {diagnosticRuntime.message}
                 {diagnosticRuntime.matched_model_id ? ` (${diagnosticRuntime.matched_model_id})` : ""}
               </p>
+              {diagnosticRuntime.loaded_managed_model_id ? (
+                <p className="status-text">
+                  {t("modelOps.testing.runtimeLoadedModel", {
+                    name: diagnosticRuntime.loaded_managed_model_name || diagnosticRuntime.loaded_managed_model_id,
+                    runtimeModelId: diagnosticRuntime.loaded_runtime_model_id || diagnosticRuntime.loaded_managed_model_id,
+                    state: diagnosticRuntime.load_state || "reconciling",
+                  })}
+                </p>
+              ) : (
+                <p className="status-text">{t("modelOps.testing.runtimeSlotEmpty")}</p>
+              )}
+              {diagnosticRuntime.load_error ? (
+                <p className="status-text">
+                  {t("modelOps.testing.runtimeLoadError", { error: diagnosticRuntime.load_error })}
+                </p>
+              ) : null}
+              {!diagnosticRuntime.matches_model && runtimeAdvertisedModels.length > 0 && (
+                <p className="status-text">
+                  {t("modelOps.testing.runtimeAdvertisedModels", {
+                    models: runtimeAdvertisedModels.map((entry) => entry.display_name || entry.id).join(", "),
+                  })}
+                </p>
+              )}
               {!diagnosticRuntime.matches_model && runtimeAdvertisedIdentifiers.length > 0 && (
                 <p className="status-text">
                   {t("modelOps.testing.runtimeAdvertisedIdentifiers", {

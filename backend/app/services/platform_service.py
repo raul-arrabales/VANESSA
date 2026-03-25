@@ -17,6 +17,7 @@ from .platform_adapters import (
     WeaviateVectorStoreAdapter,
     HttpMcpRuntimeAdapter,
     HttpSandboxExecutionAdapter,
+    http_json_request,
 )
 from .platform_types import (
     ALL_CAPABILITIES,
@@ -48,6 +49,20 @@ _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_
 _MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS}
 _VECTOR_SELECTION_EXPLICIT = "explicit"
 _VECTOR_SELECTION_DYNAMIC_NAMESPACE = "dynamic_namespace"
+_LOCAL_SLOT_STATE_EMPTY = "empty"
+_LOCAL_SLOT_STATE_LOADING = "loading"
+_LOCAL_SLOT_STATE_RECONCILING = "reconciling"
+_LOCAL_SLOT_STATE_LOADED = "loaded"
+_LOCAL_SLOT_STATE_ERROR = "error"
+_LOCAL_SLOT_CONFIG_KEYS = {
+    "loaded_managed_model_id",
+    "loaded_managed_model_name",
+    "loaded_runtime_model_id",
+    "loaded_local_path",
+    "loaded_source_id",
+    "load_state",
+    "load_error",
+}
 
 
 def _known_capability_keys(database_url: str) -> set[str]:
@@ -81,6 +96,12 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     sandbox_url = str(getattr(config, "sandbox_url", "") or "").strip()
     mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
     llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
+    llm_local_upstream_model = str(
+        getattr(config, "llm_local_upstream_model", "") or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
+    ).strip() or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
+    llm_local_embeddings_upstream_model = str(
+        getattr(config, "llm_local_embeddings_upstream_model", "") or llm_local_upstream_model
+    ).strip() or llm_local_upstream_model
     platform_repo.ensure_capability(
         database_url,
         capability_key=CAPABILITY_LLM_INFERENCE,
@@ -202,7 +223,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         config_json={
             "models_path": "/v1/models",
             "chat_completion_path": "/v1/chat/completions",
-            "runtime_base_url": config.llm_runtime_url,
+            "runtime_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
+            "runtime_admin_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
             "canonical_local_model_id": "local-vllm-default",
             "local_fallback_model_id": "local-vllm-default",
             "request_timeout_seconds": llm_request_timeout_seconds,
@@ -232,6 +254,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             "models_path": "/v1/models",
             "embeddings_path": "/v1/embeddings",
             "input_type": "text",
+            "runtime_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
+            "runtime_admin_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
+            "forced_model_id": "local-vllm-embeddings-default",
             "request_timeout_seconds": llm_request_timeout_seconds,
         },
     )
@@ -578,7 +603,7 @@ def create_provider(
                 status_code=409,
             ) from exc
         raise
-    return _serialize_provider_row({**created, **(platform_repo.get_provider_instance(database_url, str(created["id"])) or {})})
+    return _serialize_provider_row({**(platform_repo.get_provider_instance(database_url, str(created["id"])) or {}), **created})
 
 
 def update_provider(
@@ -620,7 +645,169 @@ def update_provider(
         raise
     if updated is None:
         raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
-    return _serialize_provider_row({**updated, **(platform_repo.get_provider_instance(database_url, provider_instance_id) or {})})
+    return _serialize_provider_row({**(platform_repo.get_provider_instance(database_url, provider_instance_id) or {}), **updated})
+
+
+def assign_provider_loaded_model(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_instance_id: str,
+    managed_model_id: str,
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    provider_row = platform_repo.get_provider_instance(database_url, provider_instance_id)
+    if provider_row is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    if not _is_local_model_slot_provider(provider_row):
+        raise PlatformControlPlaneError(
+            "provider_slot_unsupported",
+            "Only local LLM and embeddings providers support loaded-model slots",
+            status_code=409,
+        )
+
+    normalized_model_id = managed_model_id.strip()
+    if not normalized_model_id:
+        raise PlatformControlPlaneError("managed_model_required", "managed_model_id is required", status_code=400)
+    model_row = get_model_by_id(database_url, normalized_model_id)
+    if model_row is None:
+        raise PlatformControlPlaneError("managed_model_not_found", "Managed model not found", status_code=404)
+
+    capability_key = str(provider_row.get("capability_key") or "").strip().lower()
+    expected_task_key = _TASK_KEY_LLM if capability_key == CAPABILITY_LLM_INFERENCE else _TASK_KEY_EMBEDDINGS
+    task_key = str(model_row.get("task_key") or "").strip().lower()
+    if task_key != expected_task_key:
+        raise PlatformControlPlaneError(
+            "managed_model_task_mismatch",
+            f"Provider requires a model with task_key={expected_task_key}",
+            status_code=409,
+            details={"provider_instance_id": provider_instance_id, "managed_model_id": normalized_model_id},
+        )
+    if str(model_row.get("backend_kind") or "").strip().lower() != "local":
+        raise PlatformControlPlaneError(
+            "managed_model_backend_mismatch",
+            "Local provider slots only support local managed models",
+            status_code=409,
+            details={"provider_instance_id": provider_instance_id, "managed_model_id": normalized_model_id},
+        )
+
+    runtime_model_id = _runtime_model_identifier(model_row)
+    if not runtime_model_id:
+        raise PlatformControlPlaneError(
+            "provider_resource_id_required",
+            "Selected local model must define a runtime identifier",
+            status_code=400,
+            details={"managed_model_id": normalized_model_id},
+        )
+
+    provider_config = dict(provider_row.get("config_json") or {})
+    updated_config = _config_with_local_slot(
+        provider_config,
+        loaded_managed_model_id=normalized_model_id,
+        loaded_managed_model_name=str(model_row.get("name") or normalized_model_id).strip() or normalized_model_id,
+        loaded_runtime_model_id=runtime_model_id,
+        loaded_local_path=str(model_row.get("local_path") or "").strip() or None,
+        loaded_source_id=str(model_row.get("source_id") or "").strip() or None,
+        load_state=_LOCAL_SLOT_STATE_LOADING,
+        load_error=None,
+    )
+
+    updated = _update_provider_local_slot(
+        database_url,
+        provider_row=provider_row,
+        config_json=updated_config,
+    )
+    runtime_state, status_code = _runtime_admin_load_model(
+        {**provider_row, "config_json": updated_config},
+        runtime_model_id=runtime_model_id,
+        local_path=str(model_row.get("local_path") or "").strip(),
+        managed_model_id=normalized_model_id,
+        display_name=str(model_row.get("name") or normalized_model_id).strip() or normalized_model_id,
+    )
+    if status_code >= 400 and not (status_code == 404 and runtime_state is None):
+        errored_config = _config_with_local_slot(
+            updated_config,
+            loaded_managed_model_id=normalized_model_id,
+            loaded_managed_model_name=str(model_row.get("name") or normalized_model_id).strip() or normalized_model_id,
+            loaded_runtime_model_id=runtime_model_id,
+            loaded_local_path=str(model_row.get("local_path") or "").strip() or None,
+            loaded_source_id=str(model_row.get("source_id") or "").strip() or None,
+            load_state=_LOCAL_SLOT_STATE_ERROR,
+            load_error=str((runtime_state or {}).get("message") or f"runtime_load_failed:{status_code}"),
+        )
+        updated = _update_provider_local_slot(
+            database_url,
+            provider_row={**provider_row, **updated},
+            config_json=errored_config,
+        )
+    elif isinstance(runtime_state, dict):
+        updated = _update_provider_local_slot(
+            database_url,
+            provider_row={**provider_row, **updated},
+            config_json=_config_with_local_slot(
+                updated_config,
+                loaded_managed_model_id=normalized_model_id,
+                loaded_managed_model_name=str(model_row.get("name") or normalized_model_id).strip() or normalized_model_id,
+                loaded_runtime_model_id=str(runtime_state.get("runtime_model_id") or runtime_model_id).strip() or runtime_model_id,
+                loaded_local_path=str(runtime_state.get("local_path") or model_row.get("local_path") or "").strip() or None,
+                loaded_source_id=str(model_row.get("source_id") or "").strip() or None,
+                load_state=str(runtime_state.get("load_state") or _LOCAL_SLOT_STATE_LOADING).strip().lower() or _LOCAL_SLOT_STATE_LOADING,
+                load_error=str(runtime_state.get("last_error") or "").strip() or None,
+            ),
+        )
+    return _serialize_provider_row({**(platform_repo.get_provider_instance(database_url, provider_instance_id) or {}), **updated})
+
+
+def clear_provider_loaded_model(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_instance_id: str,
+) -> dict[str, Any]:
+    ensure_platform_bootstrap_state(database_url, config)
+    provider_row = platform_repo.get_provider_instance(database_url, provider_instance_id)
+    if provider_row is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    if not _is_local_model_slot_provider(provider_row):
+        raise PlatformControlPlaneError(
+            "provider_slot_unsupported",
+            "Only local LLM and embeddings providers support loaded-model slots",
+            status_code=409,
+        )
+
+    provider_config = dict(provider_row.get("config_json") or {})
+    cleared_config = _config_with_local_slot(
+        provider_config,
+        loaded_managed_model_id=None,
+        loaded_managed_model_name=None,
+        loaded_runtime_model_id=None,
+        loaded_local_path=None,
+        loaded_source_id=None,
+        load_state=_LOCAL_SLOT_STATE_EMPTY,
+        load_error=None,
+    )
+    updated = _update_provider_local_slot(
+        database_url,
+        provider_row=provider_row,
+        config_json=cleared_config,
+    )
+    runtime_state, status_code = _runtime_admin_unload_model({**provider_row, "config_json": cleared_config})
+    if status_code >= 400 and not (status_code == 404 and runtime_state is None):
+        updated = _update_provider_local_slot(
+            database_url,
+            provider_row={**provider_row, **updated},
+            config_json=_config_with_local_slot(
+                provider_config,
+                loaded_managed_model_id=None,
+                loaded_managed_model_name=None,
+                loaded_runtime_model_id=None,
+                loaded_local_path=None,
+                loaded_source_id=None,
+                load_state=_LOCAL_SLOT_STATE_ERROR,
+                load_error=str((runtime_state or {}).get("message") or f"runtime_unload_failed:{status_code}"),
+            ),
+        )
+    return _serialize_provider_row({**(platform_repo.get_provider_instance(database_url, provider_instance_id) or {}), **updated})
 
 
 def delete_provider(database_url: str, *, config: AuthConfig, provider_instance_id: str) -> None:
@@ -1384,6 +1571,268 @@ def _provider_storage_config(config: dict[str, Any], secret_refs: dict[str, str]
     return stored
 
 
+def _local_slot_payload_from_config(config: dict[str, Any]) -> dict[str, Any]:
+    loaded_managed_model_id = str(config.get("loaded_managed_model_id") or "").strip() or None
+    loaded_managed_model_name = str(config.get("loaded_managed_model_name") or "").strip() or None
+    loaded_runtime_model_id = str(config.get("loaded_runtime_model_id") or "").strip() or None
+    loaded_local_path = str(config.get("loaded_local_path") or "").strip() or None
+    loaded_source_id = str(config.get("loaded_source_id") or "").strip() or None
+    load_error = str(config.get("load_error") or "").strip() or None
+    raw_state = str(config.get("load_state") or "").strip().lower()
+    if loaded_managed_model_id:
+        load_state = raw_state or _LOCAL_SLOT_STATE_RECONCILING
+    elif raw_state == _LOCAL_SLOT_STATE_ERROR:
+        load_state = _LOCAL_SLOT_STATE_ERROR
+    else:
+        load_state = _LOCAL_SLOT_STATE_EMPTY
+    return {
+        "loaded_managed_model_id": loaded_managed_model_id,
+        "loaded_managed_model_name": loaded_managed_model_name,
+        "loaded_runtime_model_id": loaded_runtime_model_id,
+        "loaded_local_path": loaded_local_path,
+        "loaded_source_id": loaded_source_id,
+        "load_state": load_state,
+        "load_error": load_error,
+    }
+
+
+def _config_with_local_slot(
+    config: dict[str, Any],
+    *,
+    loaded_managed_model_id: str | None,
+    loaded_managed_model_name: str | None,
+    loaded_runtime_model_id: str | None,
+    loaded_local_path: str | None,
+    loaded_source_id: str | None,
+    load_state: str,
+    load_error: str | None = None,
+) -> dict[str, Any]:
+    updated = {
+        key: value
+        for key, value in dict(config).items()
+        if key not in _LOCAL_SLOT_CONFIG_KEYS
+    }
+    if loaded_managed_model_id:
+        updated["loaded_managed_model_id"] = loaded_managed_model_id
+    if loaded_managed_model_name:
+        updated["loaded_managed_model_name"] = loaded_managed_model_name
+    if loaded_runtime_model_id:
+        updated["loaded_runtime_model_id"] = loaded_runtime_model_id
+    if loaded_local_path:
+        updated["loaded_local_path"] = loaded_local_path
+    if loaded_source_id:
+        updated["loaded_source_id"] = loaded_source_id
+    updated["load_state"] = load_state
+    if load_error:
+        updated["load_error"] = load_error
+    return updated
+
+
+def _is_local_model_slot_provider(row: dict[str, Any]) -> bool:
+    capability_key = str(row.get("capability_key") or "").strip().lower()
+    provider_key = str(row.get("provider_key") or "").strip().lower()
+    return capability_key in _MODEL_BEARING_CAPABILITIES and provider_key not in _CLOUD_PROVIDER_KEYS
+
+
+def _runtime_admin_base_url(provider_row: dict[str, Any]) -> str | None:
+    config = provider_row.get("config_json") if isinstance(provider_row.get("config_json"), dict) else {}
+    runtime_admin_base_url = str(config.get("runtime_admin_base_url") or "").strip()
+    if runtime_admin_base_url:
+        return runtime_admin_base_url.rstrip("/")
+    runtime_base_url = str(config.get("runtime_base_url") or "").strip()
+    if runtime_base_url:
+        return runtime_base_url.rstrip("/").removesuffix("/v1")
+    return None
+
+
+def _runtime_admin_state(provider_row: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+    runtime_admin_base_url = _runtime_admin_base_url(provider_row)
+    if not runtime_admin_base_url:
+        return None, 404
+    payload, status_code = http_json_request(
+        f"{runtime_admin_base_url}/v1/admin/runtime-state",
+        method="GET",
+        timeout_seconds=5.0,
+    )
+    if isinstance(payload, dict) and isinstance(payload.get("detail"), dict):
+        detail = payload.get("detail")
+        return dict(detail), status_code
+    return (dict(payload) if isinstance(payload, dict) else None), status_code
+
+
+def _runtime_admin_load_model(
+    provider_row: dict[str, Any],
+    *,
+    runtime_model_id: str,
+    local_path: str,
+    managed_model_id: str,
+    display_name: str,
+) -> tuple[dict[str, Any] | None, int]:
+    runtime_admin_base_url = _runtime_admin_base_url(provider_row)
+    if not runtime_admin_base_url:
+        return None, 404
+    payload, status_code = http_json_request(
+        f"{runtime_admin_base_url}/v1/admin/load-model",
+        method="POST",
+        payload={
+            "runtime_model_id": runtime_model_id,
+            "local_path": local_path,
+            "managed_model_id": managed_model_id,
+            "display_name": display_name,
+        },
+        timeout_seconds=8.0,
+    )
+    if isinstance(payload, dict) and isinstance(payload.get("detail"), dict):
+        detail = payload.get("detail")
+        return dict(detail), status_code
+    return (dict(payload) if isinstance(payload, dict) else None), status_code
+
+
+def _runtime_admin_unload_model(provider_row: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+    runtime_admin_base_url = _runtime_admin_base_url(provider_row)
+    if not runtime_admin_base_url:
+        return None, 404
+    payload, status_code = http_json_request(
+        f"{runtime_admin_base_url}/v1/admin/unload-model",
+        method="POST",
+        timeout_seconds=8.0,
+    )
+    if isinstance(payload, dict) and isinstance(payload.get("detail"), dict):
+        detail = payload.get("detail")
+        return dict(detail), status_code
+    return (dict(payload) if isinstance(payload, dict) else None), status_code
+
+
+def _local_slot_with_runtime_state(slot: dict[str, Any], runtime_state: dict[str, Any] | None, status_code: int) -> dict[str, Any]:
+    resolved = dict(slot)
+    if not isinstance(runtime_state, dict):
+        if resolved.get("loaded_managed_model_id"):
+            resolved["load_state"] = _LOCAL_SLOT_STATE_ERROR
+            if not resolved.get("load_error"):
+                resolved["load_error"] = f"runtime_state_unavailable:{status_code}"
+        return resolved
+    runtime_model_id = str(runtime_state.get("runtime_model_id") or "").strip() or None
+    local_path = str(runtime_state.get("local_path") or "").strip() or None
+    last_error = str(runtime_state.get("last_error") or "").strip() or None
+    raw_state = str(runtime_state.get("load_state") or "").strip().lower()
+    if runtime_model_id:
+        resolved["loaded_runtime_model_id"] = runtime_model_id
+    if local_path:
+        resolved["loaded_local_path"] = local_path
+    if raw_state in {
+        _LOCAL_SLOT_STATE_EMPTY,
+        _LOCAL_SLOT_STATE_LOADING,
+        _LOCAL_SLOT_STATE_RECONCILING,
+        _LOCAL_SLOT_STATE_LOADED,
+        _LOCAL_SLOT_STATE_ERROR,
+    }:
+        resolved["load_state"] = raw_state
+    if last_error:
+        resolved["load_error"] = last_error
+    elif resolved.get("load_state") == _LOCAL_SLOT_STATE_LOADED:
+        resolved["load_error"] = None
+    return resolved
+
+
+def _update_provider_local_slot(
+    database_url: str,
+    *,
+    provider_row: dict[str, Any],
+    config_json: dict[str, Any],
+) -> dict[str, Any]:
+    updated = platform_repo.update_provider_instance(
+        database_url,
+        provider_instance_id=str(provider_row.get("id") or "").strip(),
+        slug=str(provider_row.get("slug") or "").strip(),
+        display_name=str(provider_row.get("display_name") or "").strip(),
+        description=str(provider_row.get("description") or "").strip(),
+        endpoint_url=str(provider_row.get("endpoint_url") or "").strip(),
+        healthcheck_url=str(provider_row.get("healthcheck_url") or "").strip() or None,
+        enabled=bool(provider_row.get("enabled")),
+        config_json=config_json,
+    )
+    if updated is None:
+        raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    return updated
+
+
+def _runtime_model_entries_for_capability(
+    capability_key: str,
+    payload: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    raw_items = payload.get("data")
+    if not isinstance(raw_items, list):
+        return []
+    normalized_capability = capability_key.strip().lower()
+    filtered: list[dict[str, Any]] = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        capabilities = item.get("capabilities") if isinstance(item.get("capabilities"), dict) else {}
+        supports_text = bool(capabilities.get("text"))
+        supports_embeddings = bool(capabilities.get("embeddings"))
+        include_item = False
+        if normalized_capability == CAPABILITY_LLM_INFERENCE:
+            include_item = supports_text
+        elif normalized_capability == CAPABILITY_EMBEDDINGS:
+            include_item = supports_embeddings
+        if include_item and str(item.get("id") or "").strip():
+            filtered.append(dict(item))
+    return filtered
+
+
+def _provider_runtime_inventory(provider_row: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
+    if not _is_local_model_slot_provider(provider_row):
+        return [], 200
+    binding = ProviderBinding.from_row(provider_row)
+    try:
+        adapter = _adapter_from_binding(binding)
+    except PlatformControlPlaneError:
+        return [], 500
+    list_models = getattr(adapter, "list_models", None)
+    if not callable(list_models):
+        return [], 200
+    try:
+        payload, status_code = list_models()
+    except PlatformControlPlaneError:
+        return [], 502
+    return _runtime_model_entries_for_capability(binding.capability_key, payload), status_code
+
+
+def _effective_local_slot(provider_row: dict[str, Any]) -> dict[str, Any]:
+    config = dict(provider_row.get("config_json") or {})
+    slot = _local_slot_payload_from_config(config)
+    if not _is_local_model_slot_provider(provider_row):
+        return slot
+    runtime_state, runtime_status = _runtime_admin_state(provider_row)
+    if runtime_state is not None:
+        slot = _local_slot_with_runtime_state(slot, runtime_state, runtime_status)
+    runtime_items, status_code = _provider_runtime_inventory(provider_row)
+    loaded_runtime_model_id = str(slot.get("loaded_runtime_model_id") or "").strip()
+    if not loaded_runtime_model_id:
+        return slot
+    available_ids = {
+        str(item.get("id") or "").strip()
+        for item in runtime_items
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+    if loaded_runtime_model_id in available_ids:
+        slot["load_state"] = _LOCAL_SLOT_STATE_LOADED
+        slot["load_error"] = None
+        return slot
+    if slot.get("load_state") == _LOCAL_SLOT_STATE_LOADING:
+        return slot
+    if 200 <= status_code < 300:
+        slot["load_state"] = _LOCAL_SLOT_STATE_RECONCILING
+        return slot
+    slot["load_state"] = _LOCAL_SLOT_STATE_ERROR
+    if not slot.get("load_error"):
+        slot["load_error"] = f"runtime_inventory_unavailable:{status_code}"
+    return slot
+
+
 def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBindingInput]) -> list[dict[str, Any]]:
     seen_capabilities: set[str] = set()
     resolved_bindings: list[dict[str, Any]] = []
@@ -1493,7 +1942,10 @@ def _list_adapter_resources(adapter: Any) -> tuple[list[dict[str, Any]], int]:
     list_models = getattr(adapter, "list_models", None)
     if callable(list_models):
         payload, status_code = list_models()
-        items = payload.get("data") if isinstance(payload, dict) and isinstance(payload.get("data"), list) else []
+        items = _runtime_model_entries_for_capability(
+            str(getattr(adapter.binding, "capability_key", "")).strip().lower(),
+            payload if isinstance(payload, dict) else None,
+        )
         return [
             {
                 "id": str(item.get("id") or "").strip(),
@@ -1934,7 +2386,13 @@ def _serialize_provider_family_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
-    config = dict(row.get("config_json") or {})
+    raw_config = dict(row.get("config_json") or {})
+    local_slot = _effective_local_slot({**row, "config_json": raw_config})
+    config = {
+        key: value
+        for key, value in raw_config.items()
+        if key not in _LOCAL_SLOT_CONFIG_KEYS
+    }
     secret_refs = config.pop("secret_refs", {})
     if not isinstance(secret_refs, dict):
         secret_refs = {}
@@ -1951,6 +2409,7 @@ def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
         "enabled": bool(row["enabled"]),
         "config": config,
         "secret_refs": dict(secret_refs),
+        **local_slot,
     }
 
 

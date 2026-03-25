@@ -27,7 +27,8 @@ llm_contract_ok() {
 }
 
 llm_runtime_ready_ok() {
-  llm_runtime_internal_http_ok "/health"
+  local service_name="$1"
+  llm_runtime_internal_http_ok "${service_name}" "/health"
 }
 
 llama_cpp_ready_ok() {
@@ -150,27 +151,47 @@ run_checks() {
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then
     if [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" && "${runtime_accelerator}" == "cpu" ]]; then
-      printf 'llm_runtime: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
-      failures=$((failures + 1))
-    elif llm_runtime_ready_ok; then
-      if [[ "${runtime_accelerator}" == "cpu" ]]; then
-        printf 'llm_runtime: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
-      else
-        printf 'llm_runtime: OK (accelerator=%s)\n' "${runtime_accelerator}"
-      fi
+      printf 'llm_runtime_inference: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+      printf 'llm_runtime_embeddings: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
+      failures=$((failures + 2))
     else
-      if [[ "${runtime_accelerator}" == "cpu" ]]; then
-        printf 'llm_runtime: FAIL (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
+      if llm_runtime_ready_ok "llm_runtime_inference"; then
+        if [[ "${runtime_accelerator}" == "cpu" ]]; then
+          printf 'llm_runtime_inference: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
+        else
+          printf 'llm_runtime_inference: OK (accelerator=%s)\n' "${runtime_accelerator}"
+        fi
       else
-        printf 'llm_runtime: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
+        if [[ "${runtime_accelerator}" == "cpu" ]]; then
+          printf 'llm_runtime_inference: FAIL (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
+        else
+          printf 'llm_runtime_inference: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
+        fi
+        failures=$((failures + 1))
       fi
-      failures=$((failures + 1))
+
+      if llm_runtime_ready_ok "llm_runtime_embeddings"; then
+        if [[ "${runtime_accelerator}" == "cpu" ]]; then
+          printf 'llm_runtime_embeddings: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
+        else
+          printf 'llm_runtime_embeddings: OK (accelerator=%s)\n' "${runtime_accelerator}"
+        fi
+      else
+        if [[ "${runtime_accelerator}" == "cpu" ]]; then
+          printf 'llm_runtime_embeddings: FAIL (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
+        else
+          printf 'llm_runtime_embeddings: FAIL (accelerator=%s)\n' "${runtime_accelerator}"
+        fi
+        failures=$((failures + 1))
+      fi
     fi
   else
     if [[ "${LLM_RUNTIME_CPU_SUPPORTED:-true}" == "false" && "${runtime_accelerator}" == "cpu" ]]; then
-      printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s, accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${llm_routing_mode}" "${runtime_accelerator}" "${runtime_cpu_variant}"
+      printf 'llm_runtime_inference: SKIP (LLM_ROUTING_MODE=%s, accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${llm_routing_mode}" "${runtime_accelerator}" "${runtime_cpu_variant}"
+      printf 'llm_runtime_embeddings: SKIP (LLM_ROUTING_MODE=%s, accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${llm_routing_mode}" "${runtime_accelerator}" "${runtime_cpu_variant}"
     else
-      printf 'llm_runtime: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
+      printf 'llm_runtime_inference: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
+      printf 'llm_runtime_embeddings: SKIP (LLM_ROUTING_MODE=%s)\n' "${llm_routing_mode}"
     fi
   fi
 

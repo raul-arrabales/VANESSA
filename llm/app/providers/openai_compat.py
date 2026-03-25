@@ -274,6 +274,10 @@ class OpenAICompatibleProvider:
         self._auth_header_value = auth_header_value
         self._provider_code_prefix = provider_code_prefix
 
+    @property
+    def base_url(self) -> str:
+        return self._base_url
+
     def generate(self, request: ResponseRequest, *, upstream_model: str) -> ProviderResult:
         payload: dict[str, Any] = {
             "model": upstream_model,
