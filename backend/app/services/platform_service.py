@@ -79,17 +79,83 @@ def _upsert_bootstrap_binding(
     default_resource_id: str | None,
     binding_config: dict[str, Any],
     resource_policy: dict[str, Any],
+    existing_binding: dict[str, Any] | None = None,
 ) -> None:
+    effective_resources = [
+        dict(resource)
+        for resource in resources
+        if isinstance(resource, dict)
+    ]
+    effective_default_resource_id = default_resource_id
+    if (
+        capability_key in _MODEL_BEARING_CAPABILITIES
+        and not effective_resources
+        and effective_default_resource_id is None
+        and isinstance(existing_binding, dict)
+    ):
+        effective_resources = [
+            dict(resource)
+            for resource in (existing_binding.get("resources") or [])
+            if isinstance(resource, dict)
+        ]
+        effective_default_resource_id = str(existing_binding.get("default_resource_id") or "").strip() or None
     platform_repo.upsert_deployment_binding(
         database_url,
         deployment_profile_id=deployment_profile_id,
         capability_key=capability_key,
         provider_instance_id=provider_instance_id,
-        resources=resources,
-        default_resource_id=default_resource_id,
+        resources=effective_resources,
+        default_resource_id=effective_default_resource_id,
         binding_config=binding_config,
         resource_policy=resource_policy,
     )
+
+
+def _existing_provider_rows_by_slug(database_url: str) -> dict[str, dict[str, Any]]:
+    return {
+        str(row.get("slug") or "").strip().lower(): dict(row)
+        for row in platform_repo.list_provider_instances(database_url)
+        if isinstance(row, dict) and str(row.get("slug") or "").strip()
+    }
+
+
+def _bootstrap_provider_config(
+    *,
+    existing_providers_by_slug: dict[str, dict[str, Any]],
+    slug: str,
+    provider_key: str,
+    capability_key: str,
+    config_json: dict[str, Any],
+) -> dict[str, Any]:
+    merged_config = dict(config_json)
+    normalized_slug = slug.strip().lower()
+    normalized_provider_key = provider_key.strip().lower()
+    normalized_capability = capability_key.strip().lower()
+    if normalized_capability not in _MODEL_BEARING_CAPABILITIES or normalized_provider_key in _CLOUD_PROVIDER_KEYS:
+        return merged_config
+    existing_provider = existing_providers_by_slug.get(normalized_slug)
+    if not isinstance(existing_provider, dict):
+        return merged_config
+    existing_config = dict(existing_provider.get("config_json") or {})
+    for key in _LOCAL_SLOT_CONFIG_KEYS:
+        if key in existing_config:
+            merged_config[key] = existing_config[key]
+    return merged_config
+
+
+def _existing_bindings_by_capability(
+    database_url: str,
+    *,
+    deployment_profile_id: str,
+) -> dict[str, dict[str, Any]]:
+    return {
+        str(binding.get("capability_key") or "").strip().lower(): dict(binding)
+        for binding in platform_repo.list_deployment_bindings(
+            database_url,
+            deployment_profile_id=deployment_profile_id,
+        )
+        if isinstance(binding, dict) and str(binding.get("capability_key") or "").strip()
+    }
 
 
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
@@ -102,6 +168,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     llm_local_embeddings_upstream_model = str(
         getattr(config, "llm_local_embeddings_upstream_model", "") or llm_local_upstream_model
     ).strip() or llm_local_upstream_model
+    existing_providers_by_slug = _existing_provider_rows_by_slug(database_url)
     platform_repo.ensure_capability(
         database_url,
         capability_key=CAPABILITY_LLM_INFERENCE,
@@ -220,15 +287,21 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         endpoint_url=config.llm_url,
         healthcheck_url=config.llm_url.rstrip("/") + "/health",
         enabled=True,
-        config_json={
-            "models_path": "/v1/models",
-            "chat_completion_path": "/v1/chat/completions",
-            "runtime_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
-            "runtime_admin_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
-            "canonical_local_model_id": "local-vllm-default",
-            "local_fallback_model_id": "local-vllm-default",
-            "request_timeout_seconds": llm_request_timeout_seconds,
-        },
+        config_json=_bootstrap_provider_config(
+            existing_providers_by_slug=existing_providers_by_slug,
+            slug="vllm-local-gateway",
+            provider_key="vllm_local",
+            capability_key=CAPABILITY_LLM_INFERENCE,
+            config_json={
+                "models_path": "/v1/models",
+                "chat_completion_path": "/v1/chat/completions",
+                "runtime_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
+                "runtime_admin_base_url": getattr(config, "llm_inference_runtime_url", config.llm_runtime_url),
+                "canonical_local_model_id": "local-vllm-default",
+                "local_fallback_model_id": "local-vllm-default",
+                "request_timeout_seconds": llm_request_timeout_seconds,
+            },
+        ),
     )
     weaviate_provider = platform_repo.ensure_provider_instance(
         database_url,
@@ -250,15 +323,21 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         endpoint_url=config.llm_url,
         healthcheck_url=config.llm_url.rstrip("/") + "/health",
         enabled=True,
-        config_json={
-            "models_path": "/v1/models",
-            "embeddings_path": "/v1/embeddings",
-            "input_type": "text",
-            "runtime_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
-            "runtime_admin_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
-            "forced_model_id": "local-vllm-embeddings-default",
-            "request_timeout_seconds": llm_request_timeout_seconds,
-        },
+        config_json=_bootstrap_provider_config(
+            existing_providers_by_slug=existing_providers_by_slug,
+            slug="vllm-embeddings-local",
+            provider_key="vllm_embeddings_local",
+            capability_key=CAPABILITY_EMBEDDINGS,
+            config_json={
+                "models_path": "/v1/models",
+                "embeddings_path": "/v1/embeddings",
+                "input_type": "text",
+                "runtime_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
+                "runtime_admin_base_url": getattr(config, "llm_embeddings_runtime_url", config.llm_runtime_url),
+                "forced_model_id": "local-vllm-embeddings-default",
+                "request_timeout_seconds": llm_request_timeout_seconds,
+            },
+        ),
     )
     sandbox_provider = None
     if sandbox_url:
@@ -286,15 +365,21 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         endpoint_url=(getattr(config, "llama_cpp_url", "") or "http://llama_cpp:8080"),
         healthcheck_url=None,
         enabled=bool(getattr(config, "llama_cpp_url", "").strip()),
-        config_json={
-            "models_path": "/v1/models",
-            "chat_completion_path": "/v1/chat/completions",
-            "request_format": "openai_chat",
-            "canonical_local_model_id": "local-llama-cpp-default",
-            "forced_model_id": "local-llama-cpp-default",
-            "local_fallback_model_id": "local-llama-cpp-default",
-            "request_timeout_seconds": llm_request_timeout_seconds,
-        },
+        config_json=_bootstrap_provider_config(
+            existing_providers_by_slug=existing_providers_by_slug,
+            slug="llama-cpp-local",
+            provider_key="llama_cpp_local",
+            capability_key=CAPABILITY_LLM_INFERENCE,
+            config_json={
+                "models_path": "/v1/models",
+                "chat_completion_path": "/v1/chat/completions",
+                "request_format": "openai_chat",
+                "canonical_local_model_id": "local-llama-cpp-default",
+                "forced_model_id": "local-llama-cpp-default",
+                "local_fallback_model_id": "local-llama-cpp-default",
+                "request_timeout_seconds": llm_request_timeout_seconds,
+            },
+        ),
     )
     qdrant_provider = None
     if getattr(config, "qdrant_url", "").strip():
@@ -340,6 +425,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         created_by_user_id=None,
         updated_by_user_id=None,
     )
+    default_bindings_by_capability = _existing_bindings_by_capability(
+        database_url,
+        deployment_profile_id=str(profile["id"]),
+    )
     _upsert_bootstrap_binding(
         database_url,
         deployment_profile_id=str(profile["id"]),
@@ -349,6 +438,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         default_resource_id=None,
         binding_config={},
         resource_policy={},
+        existing_binding=default_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE),
     )
     _upsert_bootstrap_binding(
         database_url,
@@ -359,6 +449,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         default_resource_id=None,
         binding_config={},
         resource_policy={},
+        existing_binding=default_bindings_by_capability.get(CAPABILITY_EMBEDDINGS),
     )
     _upsert_bootstrap_binding(
         database_url,
@@ -402,6 +493,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             created_by_user_id=None,
             updated_by_user_id=None,
         )
+        llama_bindings_by_capability = _existing_bindings_by_capability(
+            database_url,
+            deployment_profile_id=str(llama_profile["id"]),
+        )
         _upsert_bootstrap_binding(
             database_url,
             deployment_profile_id=str(llama_profile["id"]),
@@ -411,6 +506,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             default_resource_id=None,
             binding_config={},
             resource_policy={},
+            existing_binding=llama_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE),
         )
         _upsert_bootstrap_binding(
             database_url,
@@ -421,6 +517,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             default_resource_id=None,
             binding_config={},
             resource_policy={},
+            existing_binding=llama_bindings_by_capability.get(CAPABILITY_EMBEDDINGS),
         )
         _upsert_bootstrap_binding(
             database_url,
@@ -464,6 +561,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             created_by_user_id=None,
             updated_by_user_id=None,
         )
+        qdrant_bindings_by_capability = _existing_bindings_by_capability(
+            database_url,
+            deployment_profile_id=str(qdrant_profile["id"]),
+        )
         _upsert_bootstrap_binding(
             database_url,
             deployment_profile_id=str(qdrant_profile["id"]),
@@ -473,6 +574,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             default_resource_id=None,
             binding_config={},
             resource_policy={},
+            existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE),
         )
         _upsert_bootstrap_binding(
             database_url,
@@ -483,6 +585,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             default_resource_id=None,
             binding_config={},
             resource_policy={},
+            existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_EMBEDDINGS),
         )
         _upsert_bootstrap_binding(
             database_url,
