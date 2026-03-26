@@ -10,6 +10,7 @@ import {
   useRouteActionFeedback,
   withActionFeedbackState,
 } from "./ActionFeedbackProvider";
+import { withDeploymentSeedState } from "../features/platform-control/deploymentRouteState";
 
 function TriggerHarness(): JSX.Element {
   const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
@@ -28,7 +29,13 @@ function TriggerHarness(): JSX.Element {
 function RouteFeedbackHarness(): JSX.Element {
   const location = useLocation();
   useRouteActionFeedback(location.state);
-  return <p>route-ready</p>;
+  const deploymentSeed = (location.state as { deploymentSeed?: { display_name?: string } } | null)?.deploymentSeed;
+  return (
+    <>
+      <p>route-ready</p>
+      <p>{deploymentSeed?.display_name ?? "no-seed"}</p>
+    </>
+  );
 }
 
 async function renderFeedbackTest(ui: JSX.Element, route = "/", routeState?: unknown): Promise<void> {
@@ -91,10 +98,20 @@ describe("ActionFeedbackProvider", () => {
         <Route path="/providers" element={<RouteFeedbackHarness />} />
       </Routes>,
       "/providers",
-      withActionFeedbackState({
-        kind: "success",
-        message: "Assigned a loaded model to vLLM embeddings local and started runtime loading.",
-      }),
+      withDeploymentSeedState(
+        {
+          id: "deployment-3",
+          slug: "staging-profile-copy",
+          display_name: "Staging Profile Copy",
+          description: "Cloned deployment",
+          is_active: false,
+          bindings: [],
+        },
+        withActionFeedbackState({
+          kind: "success",
+          message: "Assigned a loaded model to vLLM embeddings local and started runtime loading.",
+        }),
+      ),
     );
 
     expect(await screen.findByRole("dialog")).toBeVisible();
@@ -107,5 +124,6 @@ describe("ActionFeedbackProvider", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("route-ready")).toBeVisible();
+    expect(screen.getByText("Staging Profile Copy")).toBeVisible();
   });
 });

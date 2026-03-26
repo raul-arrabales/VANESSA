@@ -9,6 +9,9 @@ import * as platformApi from "../api/platform";
 import { deploymentsFixture, primePlatformControlMocks } from "../test/platformControlFixtures";
 
 let mockUser: AuthUser | null = null;
+const { navigateMock } = vi.hoisted(() => ({
+  navigateMock: vi.fn(),
+}));
 
 vi.mock("../auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -22,7 +25,7 @@ vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateMock,
   };
 });
 
@@ -42,6 +45,7 @@ vi.mock("../api/modelops", () => ({
 describe("PlatformDeploymentCreatePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigateMock.mockReset();
     mockUser = {
       id: 1,
       email: "root@example.com",
@@ -69,10 +73,13 @@ describe("PlatformDeploymentCreatePage", () => {
       screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "LLM inference" })),
       "provider-1",
     );
-    await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" })),
-      ["gpt-5", "gpt-4.1"],
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" }),
+      }),
     );
+    await userEvent.click(screen.getByLabelText("GPT-5"));
+    await userEvent.click(screen.getByLabelText("GPT-4.1"));
     await userEvent.selectOptions(
       screen.getByLabelText(await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "LLM inference" })),
       "gpt-4.1",
@@ -82,10 +89,12 @@ describe("PlatformDeploymentCreatePage", () => {
       screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "Embeddings" })),
       "provider-embeddings",
     );
-    await userEvent.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Embeddings" })),
-      ["text-embedding-3-small"],
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Embeddings" }),
+      }),
     );
+    await userEvent.click(screen.getByLabelText("text-embedding-3-small"));
     await userEvent.selectOptions(
       screen.getByLabelText(await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "Embeddings" })),
       "text-embedding-3-small",
@@ -143,5 +152,22 @@ describe("PlatformDeploymentCreatePage", () => {
         "token",
       );
     });
+
+    expect(navigateMock).toHaveBeenCalledWith(
+      "/control/platform/deployments/deployment-3",
+      expect.objectContaining({
+        state: expect.objectContaining({
+          actionFeedback: expect.objectContaining({
+            kind: "success",
+            message: "Created deployment profile Cloud Profile.",
+          }),
+          deploymentSeed: expect.objectContaining({
+            id: "deployment-3",
+            slug: "cloud-profile",
+            display_name: "Cloud Profile",
+          }),
+        }),
+      }),
+    );
   });
 });

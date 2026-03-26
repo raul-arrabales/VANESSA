@@ -5,6 +5,7 @@ import { createDeploymentProfile } from "../api/platform";
 import { useAuth } from "../auth/AuthProvider";
 import PlatformDeploymentForm from "../features/platform-control/components/PlatformDeploymentForm";
 import type { DeploymentFormState } from "../features/platform-control/deploymentEditor";
+import { withDeploymentSeedState } from "../features/platform-control/deploymentRouteState";
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
@@ -56,10 +57,13 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     try {
       const deployment = await createDeploymentProfile(mutationInput, token);
       navigate(`/control/platform/deployments/${deployment.id}`, {
-        state: withActionFeedbackState({
-          kind: "success",
-          message: t("platformControl.feedback.deploymentCreated", { name: deployment.display_name }),
-        }),
+        state: withDeploymentSeedState(
+          deployment,
+          withActionFeedbackState({
+            kind: "success",
+            message: t("platformControl.feedback.deploymentCreated", { name: deployment.display_name }),
+          }),
+        ),
       });
     } catch (error) {
       showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));

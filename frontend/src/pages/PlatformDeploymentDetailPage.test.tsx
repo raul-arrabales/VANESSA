@@ -101,12 +101,13 @@ describe("PlatformDeploymentDetailPage", () => {
   });
 
   it("clones a deployment profile from the detail page", async () => {
-    vi.mocked(platformApi.cloneDeploymentProfile).mockResolvedValue({
+    const clonedDeployment = {
       ...deploymentsFixture[1],
       id: "deployment-3",
       slug: "staging-profile-copy",
       display_name: "Staging Profile Copy",
-    });
+    };
+    vi.mocked(platformApi.cloneDeploymentProfile).mockResolvedValue(clonedDeployment);
 
     await renderWithAppProviders(
       <Routes>
@@ -132,6 +133,16 @@ describe("PlatformDeploymentDetailPage", () => {
         }),
         "token",
       );
+    });
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Cloned deployment profile Staging Profile Copy.")).toBeVisible();
+    expect(screen.queryByText(await t("platformControl.deployments.notFound"))).toBeNull();
+    expect(await screen.findByRole("table", {
+      name: await t("platformControl.deployments.tableAria", { name: "Staging Profile Copy" }),
+    })).toBeVisible();
+    await waitFor(() => {
+      expect(platformApi.listPlatformDeployments).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -269,5 +280,16 @@ describe("PlatformDeploymentDetailPage", () => {
     );
 
     expect(await screen.findByText(/No ModelOps-eligible Embeddings resources are currently available for binding\./i)).toBeVisible();
+  });
+
+  it("shows not found for a direct unknown deployment route without a seeded deployment", async () => {
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-missing" },
+    );
+
+    expect((await screen.findAllByText(await t("platformControl.deployments.notFound"))).length).toBeGreaterThan(0);
   });
 });

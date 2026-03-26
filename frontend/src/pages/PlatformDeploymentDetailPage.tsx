@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
@@ -14,6 +14,10 @@ import {
   type DeploymentCloneFormState,
   type DeploymentFormState,
 } from "../features/platform-control/deploymentEditor";
+import {
+  readDeploymentSeedFromState,
+  withDeploymentSeedState,
+} from "../features/platform-control/deploymentRouteState";
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
@@ -48,8 +52,11 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
   const [cloning, setCloning] = useState(false);
   const [activating, setActivating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const seedReloadedDeploymentIdRef = useRef<string>("");
 
-  const deployment = deployments.find((item) => item.id === deploymentId) ?? null;
+  const fetchedDeployment = deployments.find((item) => item.id === deploymentId) ?? null;
+  const seededDeployment = readDeploymentSeedFromState(location.state, deploymentId);
+  const deployment = fetchedDeployment ?? seededDeployment;
   const capabilityLabelByKey = useMemo(
     () => new Map(capabilities.map((capability) => [capability.capability, capability.display_name])),
     [capabilities],
@@ -78,6 +85,19 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
       setCloneForm(buildInitialCloneForm());
     }
   }, [buildInitialCloneForm, buildInitialForm, deployment]);
+
+  useEffect(() => {
+    if (!seededDeployment || fetchedDeployment) {
+      seedReloadedDeploymentIdRef.current = "";
+      return;
+    }
+    if (seedReloadedDeploymentIdRef.current === seededDeployment.id) {
+      return;
+    }
+
+    seedReloadedDeploymentIdRef.current = seededDeployment.id;
+    void reload();
+  }, [deploymentId, fetchedDeployment, reload, seededDeployment]);
 
   async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -127,10 +147,13 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
         token,
       );
       navigate(`/control/platform/deployments/${cloned.id}`, {
-        state: withActionFeedbackState({
-          kind: "success",
-          message: t("platformControl.feedback.deploymentCloned", { name: cloned.display_name }),
-        }),
+        state: withDeploymentSeedState(
+          cloned,
+          withActionFeedbackState({
+            kind: "success",
+            message: t("platformControl.feedback.deploymentCloned", { name: cloned.display_name }),
+          }),
+        ),
       });
     } catch (error) {
       showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
