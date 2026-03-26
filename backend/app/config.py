@@ -25,6 +25,7 @@ DEFAULT_LLAMA_CPP_URL = ""
 DEFAULT_QDRANT_URL = ""
 DEFAULT_PRODUCT_RAG_INDEX = "knowledge_base"
 DEFAULT_PRODUCT_RAG_TOP_K = 5
+DEFAULT_CONTEXT_SOURCE_ROOTS = "/context_sources"
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,7 @@ class AuthConfig:
     qdrant_url: str = DEFAULT_QDRANT_URL
     product_rag_index: str = DEFAULT_PRODUCT_RAG_INDEX
     product_rag_top_k: int = DEFAULT_PRODUCT_RAG_TOP_K
+    context_source_roots: tuple[str, ...] = (DEFAULT_CONTEXT_SOURCE_ROOTS,)
     runtime_profile_seed: str | None = None
     runtime_profile_force: str | None = None
     kws_detection_threshold: float = 0.5
@@ -154,6 +156,13 @@ def _get_runtime_profile_env(name: str) -> str | None:
     if normalized in RUNTIME_PROFILES:
         return normalized
     return None
+
+
+def _get_path_list_env(name: str, default: str) -> tuple[str, ...]:
+    value = os.getenv(name, default)
+    raw_items = [item.strip() for item in value.split(":")] if value else []
+    normalized = tuple(item for item in raw_items if item)
+    return normalized or tuple(item for item in default.split(":") if item)
 
 
 def get_auth_config() -> AuthConfig:
@@ -228,6 +237,7 @@ def get_auth_config() -> AuthConfig:
         qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
         product_rag_index=os.getenv("PRODUCT_RAG_INDEX", DEFAULT_PRODUCT_RAG_INDEX).strip() or DEFAULT_PRODUCT_RAG_INDEX,
         product_rag_top_k=_get_int_env("PRODUCT_RAG_TOP_K", DEFAULT_PRODUCT_RAG_TOP_K),
+        context_source_roots=_get_path_list_env("CONTEXT_SOURCE_ROOTS", DEFAULT_CONTEXT_SOURCE_ROOTS),
         runtime_profile_seed=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
         runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),

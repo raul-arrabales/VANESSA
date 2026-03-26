@@ -34,6 +34,7 @@ services:
         required: false
     volumes:
       - ../models/llm:/models/llm
+      - ../context_sources:/context_sources
 
   llm:
     build:

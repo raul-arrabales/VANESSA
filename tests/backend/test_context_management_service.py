@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from werkzeug.datastructures import FileStorage
@@ -299,3 +301,269 @@ def test_query_knowledge_base_uses_active_runtime_embeddings_and_vector_provider
 
     assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 1, "top_k": 3}
     assert payload["results"][0]["title"] == "Overview"
+
+
+def test_create_knowledge_source_validates_allowlisted_roots(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    root = tmp_path / "context_sources"
+    root.mkdir()
+    (root / "docs").mkdir()
+
+    monkeypatch.setattr(
+        context_management,
+        "_require_knowledge_base",
+        lambda _db, _knowledge_base_id: {"id": "kb-primary"},
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "create_knowledge_source",
+        lambda _db, **kwargs: {"id": "source-1", "knowledge_base_id": "kb-primary", **kwargs, "last_sync_status": "idle"},
+    )
+
+    created = context_management.create_knowledge_source(
+        "ignored",
+        config=SimpleNamespace(context_source_roots=(str(root),)),
+        knowledge_base_id="kb-primary",
+        payload={"display_name": "Docs folder", "relative_path": "docs"},
+        created_by_user_id=1,
+    )
+
+    assert created["relative_path"] == "docs"
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management.create_knowledge_source(
+            "ignored",
+            config=SimpleNamespace(context_source_roots=(str(root),)),
+            knowledge_base_id="kb-primary",
+            payload={"display_name": "Bad folder", "relative_path": "../outside"},
+            created_by_user_id=1,
+        )
+
+    assert exc_info.value.code == "invalid_source_relative_path"
+
+
+def test_sync_knowledge_source_reconciles_stable_documents_and_preserves_manual_documents(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = tmp_path / "context_sources"
+    source_dir = root / "product_docs"
+    source_dir.mkdir(parents=True)
+    managed_file = source_dir / "overview.txt"
+    managed_file.write_text("Alpha knowledge", encoding="utf-8")
+    (source_dir / "ignored.pdf").write_text("skip me", encoding="utf-8")
+
+    knowledge_base = {
+        "id": "kb-primary",
+        "slug": "product-docs",
+        "display_name": "Product Docs",
+        "description": "docs",
+        "index_name": "kb_product_docs",
+        "backing_provider_key": "weaviate_local",
+        "lifecycle_state": "active",
+        "sync_status": "ready",
+        "schema_json": {},
+    }
+    source = {
+        "id": "source-1",
+        "knowledge_base_id": "kb-primary",
+        "source_type": "local_directory",
+        "display_name": "Docs folder",
+        "relative_path": "product_docs",
+        "include_globs": [],
+        "exclude_globs": [],
+        "lifecycle_state": "active",
+        "last_sync_status": "idle",
+    }
+    documents: dict[str, dict[str, object]] = {
+        "manual-1": {
+            "id": "manual-1",
+            "knowledge_base_id": "kb-primary",
+            "title": "Manual Doc",
+            "source_type": "manual",
+            "source_name": "Manual",
+            "uri": None,
+            "text": "Manual text",
+            "metadata_json": {},
+            "chunk_count": 1,
+            "source_id": None,
+            "source_path": None,
+            "source_document_key": None,
+            "managed_by_source": False,
+        }
+    }
+    sync_runs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(context_management, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
+    monkeypatch.setattr(
+        context_management,
+        "_require_knowledge_source",
+        lambda _db, *, knowledge_base_id, source_id: source,
+    )
+    monkeypatch.setattr(context_management, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(
+        context_management,
+        "_mark_knowledge_base_sync_ready",
+        lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "ready"},
+    )
+    monkeypatch.setattr(
+        context_management,
+        "_mark_knowledge_base_sync_error",
+        lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "error"},
+    )
+    monkeypatch.setattr(context_management.context_repo, "mark_knowledge_source_syncing", lambda *_args, **_kwargs: source)
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "set_knowledge_source_sync_result",
+        lambda _db, *, last_sync_status, last_sync_error, **_kwargs: {
+            **source,
+            "last_sync_status": last_sync_status,
+            "last_sync_error": last_sync_error,
+        },
+    )
+    monkeypatch.setattr(context_management.context_repo, "get_document_by_source_key", lambda _db, *, source_document_key, **_kwargs: next(
+        (dict(item) for item in documents.values() if item.get("source_document_key") == source_document_key),
+        None,
+    ))
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "create_document",
+        lambda _db, **kwargs: documents.setdefault(
+            str(kwargs["document_id"]),
+            {
+                "id": kwargs["document_id"],
+                "knowledge_base_id": kwargs["knowledge_base_id"],
+                "title": kwargs["title"],
+                "source_type": kwargs["source_type"],
+                "source_name": kwargs["source_name"],
+                "uri": kwargs["uri"],
+                "text": kwargs["text"],
+                "metadata_json": kwargs["metadata_json"],
+                "chunk_count": kwargs["chunk_count"],
+                "source_id": kwargs["source_id"],
+                "source_path": kwargs["source_path"],
+                "source_document_key": kwargs["source_document_key"],
+                "managed_by_source": kwargs["managed_by_source"],
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "update_document",
+        lambda _db, *, document_id, **kwargs: documents.__setitem__(
+            document_id,
+            {
+                **documents[document_id],
+                "title": kwargs["title"],
+                "source_type": kwargs["source_type"],
+                "source_name": kwargs["source_name"],
+                "uri": kwargs["uri"],
+                "text": kwargs["text"],
+                "metadata_json": kwargs["metadata_json"],
+                "chunk_count": kwargs["chunk_count"],
+                "source_id": kwargs["source_id"],
+                "source_path": kwargs["source_path"],
+                "source_document_key": kwargs["source_document_key"],
+                "managed_by_source": kwargs["managed_by_source"],
+            },
+        ) or documents[document_id],
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "delete_document",
+        lambda _db, *, document_id, **_kwargs: documents.pop(document_id, None) is not None,
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "list_source_documents",
+        lambda _db, *, source_id, **_kwargs: [dict(item) for item in documents.values() if item.get("source_id") == source_id],
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "list_documents",
+        lambda _db, *, knowledge_base_id: [dict(item) for item in documents.values() if item.get("knowledge_base_id") == knowledge_base_id],
+    )
+    monkeypatch.setattr(context_management.context_repo, "set_knowledge_base_document_count", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management, "_upsert_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management, "_delete_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "create_sync_run",
+        lambda _db, *, knowledge_base_id, source_id, created_by_user_id: (
+            sync_runs.append(
+                {
+                    "id": f"run-{len(sync_runs) + 1}",
+                    "knowledge_base_id": knowledge_base_id,
+                    "source_id": source_id,
+                    "status": "syncing",
+                    "created_by_user_id": created_by_user_id,
+                }
+            )
+            or sync_runs[-1]
+        ),
+    )
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "finish_sync_run",
+        lambda _db, *, run_id, status, scanned_file_count, changed_file_count, deleted_file_count, created_document_count, updated_document_count, deleted_document_count, error_summary: next(
+            {
+                **run,
+                "status": status,
+                "scanned_file_count": scanned_file_count,
+                "changed_file_count": changed_file_count,
+                "deleted_file_count": deleted_file_count,
+                "created_document_count": created_document_count,
+                "updated_document_count": updated_document_count,
+                "deleted_document_count": deleted_document_count,
+                "error_summary": error_summary,
+            }
+            for run in sync_runs
+            if run["id"] == run_id
+        ),
+    )
+
+    first = context_management.sync_knowledge_source(
+        "ignored",
+        config=SimpleNamespace(context_source_roots=(str(root),)),
+        knowledge_base_id="kb-primary",
+        source_id="source-1",
+        updated_by_user_id=1,
+    )
+
+    managed_docs = [item for item in documents.values() if item.get("managed_by_source")]
+    assert len(managed_docs) == 1
+    assert first["sync_run"]["status"] == "ready"
+    assert first["sync_run"]["scanned_file_count"] == 1
+    assert first["sync_run"]["created_document_count"] == 1
+    assert first["sync_run"]["changed_file_count"] == 1
+
+    managed_file.write_text("Alpha knowledge updated", encoding="utf-8")
+
+    second = context_management.sync_knowledge_source(
+        "ignored",
+        config=SimpleNamespace(context_source_roots=(str(root),)),
+        knowledge_base_id="kb-primary",
+        source_id="source-1",
+        updated_by_user_id=1,
+    )
+
+    managed_docs = [item for item in documents.values() if item.get("managed_by_source")]
+    assert len(managed_docs) == 1
+    assert managed_docs[0]["text"] == "Alpha knowledge updated"
+    assert second["sync_run"]["updated_document_count"] == 1
+
+    managed_file.unlink()
+
+    third = context_management.sync_knowledge_source(
+        "ignored",
+        config=SimpleNamespace(context_source_roots=(str(root),)),
+        knowledge_base_id="kb-primary",
+        source_id="source-1",
+        updated_by_user_id=1,
+    )
+
+    managed_docs = [item for item in documents.values() if item.get("managed_by_source")]
+    manual_docs = [item for item in documents.values() if not item.get("managed_by_source")]
+    assert managed_docs == []
+    assert len(manual_docs) == 1
+    assert third["sync_run"]["deleted_document_count"] == 1
+    assert third["sync_run"]["deleted_file_count"] == 1

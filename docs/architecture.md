@@ -76,6 +76,7 @@ Context Management is the managed knowledge-base domain layered beside the GenAI
 
 - It owns reusable knowledge-base metadata, document source-of-truth, upload/manual document ingestion, and vector synchronization.
 - It also owns knowledge-base sync diagnostics, operator-triggered rebuilds, and retrieval QA against the active deployment runtime.
+- It now also owns repeatable `local_directory` knowledge sources and persisted source sync runs so operators can reconcile KB content from an allowlisted local source root instead of hand-managing every document.
 - PostgreSQL stores knowledge-base and document records; Weaviate remains the derived serving index for the current v1 implementation.
 - Deployment profiles still decide which `vector_store` provider is active and which managed knowledge bases are explicitly bound through binding `resources` plus `default_resource_id`.
 - Knowledge Chat now resolves only against knowledge bases bound to the active deployment profile rather than a fixed global retrieval index.

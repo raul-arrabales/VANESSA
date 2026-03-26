@@ -62,8 +62,45 @@ export type KnowledgeDocument = {
   text: string;
   metadata: Record<string, unknown>;
   chunk_count: number;
+  source_id?: string | null;
+  source_path?: string | null;
+  source_document_key?: string | null;
+  managed_by_source?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type KnowledgeSource = {
+  id: string;
+  knowledge_base_id: string;
+  source_type: string;
+  display_name: string;
+  relative_path: string;
+  include_globs: string[];
+  exclude_globs: string[];
+  lifecycle_state: "active" | "archived" | string;
+  last_sync_status: "idle" | "syncing" | "ready" | "error" | string;
+  last_sync_at?: string | null;
+  last_sync_error?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type KnowledgeSyncRun = {
+  id: string;
+  knowledge_base_id: string;
+  source_id?: string | null;
+  source_display_name?: string | null;
+  status: "syncing" | "ready" | "error" | string;
+  scanned_file_count: number;
+  changed_file_count: number;
+  deleted_file_count: number;
+  created_document_count: number;
+  updated_document_count: number;
+  deleted_document_count: number;
+  error_summary?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
 };
 
 function buildUrl(path: string): string {
@@ -176,6 +213,97 @@ export async function listKnowledgeBaseDocuments(knowledgeBaseId: string, token:
     { token },
   );
   return result.documents;
+}
+
+export async function listKnowledgeSources(knowledgeBaseId: string, token: string): Promise<KnowledgeSource[]> {
+  const result = await requestJson<{ sources: KnowledgeSource[] }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sources`,
+    { token },
+  );
+  return result.sources;
+}
+
+export async function createKnowledgeSource(
+  knowledgeBaseId: string,
+  payload: {
+    display_name: string;
+    relative_path: string;
+    include_globs?: string[];
+    exclude_globs?: string[];
+    lifecycle_state?: string;
+    source_type?: string;
+  },
+  token: string,
+): Promise<KnowledgeSource> {
+  const result = await requestJson<{ source: KnowledgeSource }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sources`,
+    {
+      method: "POST",
+      token,
+      body: payload,
+    },
+  );
+  return result.source;
+}
+
+export async function updateKnowledgeSource(
+  knowledgeBaseId: string,
+  sourceId: string,
+  payload: {
+    display_name: string;
+    relative_path: string;
+    include_globs?: string[];
+    exclude_globs?: string[];
+    lifecycle_state?: string;
+    source_type?: string;
+  },
+  token: string,
+): Promise<KnowledgeSource> {
+  const result = await requestJson<{ source: KnowledgeSource }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sources/${encodeURIComponent(sourceId)}`,
+    {
+      method: "PUT",
+      token,
+      body: payload,
+    },
+  );
+  return result.source;
+}
+
+export async function deleteKnowledgeSource(
+  knowledgeBaseId: string,
+  sourceId: string,
+  token: string,
+): Promise<void> {
+  await requestJson<{ deleted: boolean }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sources/${encodeURIComponent(sourceId)}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
+}
+
+export async function syncKnowledgeSource(
+  knowledgeBaseId: string,
+  sourceId: string,
+  token: string,
+): Promise<{ knowledge_base: KnowledgeBase; source: KnowledgeSource; sync_run: KnowledgeSyncRun }> {
+  return requestJson<{ knowledge_base: KnowledgeBase; source: KnowledgeSource; sync_run: KnowledgeSyncRun }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sources/${encodeURIComponent(sourceId)}/sync`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+}
+
+export async function listKnowledgeSyncRuns(knowledgeBaseId: string, token: string): Promise<KnowledgeSyncRun[]> {
+  const result = await requestJson<{ sync_runs: KnowledgeSyncRun[] }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/sync-runs`,
+    { token },
+  );
+  return result.sync_runs;
 }
 
 export async function createKnowledgeBaseDocument(

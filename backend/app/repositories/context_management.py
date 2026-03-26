@@ -326,6 +326,20 @@ def list_documents(database_url: str, *, knowledge_base_id: str) -> list[dict[st
     return [dict(row) for row in rows]
 
 
+def list_source_documents(database_url: str, *, knowledge_base_id: str, source_id: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM context_documents
+            WHERE knowledge_base_id = %s AND source_id = %s
+            ORDER BY source_document_key ASC, title ASC
+            """,
+            (knowledge_base_id.strip(), source_id.strip()),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_document(database_url: str, *, knowledge_base_id: str, document_id: str) -> dict[str, Any] | None:
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -337,6 +351,307 @@ def get_document(database_url: str, *, knowledge_base_id: str, document_id: str)
             (knowledge_base_id.strip(), document_id.strip()),
         ).fetchone()
     return dict(row) if row is not None else None
+
+
+def get_document_by_source_key(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_id: str,
+    source_document_key: str,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM context_documents
+            WHERE knowledge_base_id = %s
+              AND source_id = %s
+              AND source_document_key = %s
+            """,
+            (
+                knowledge_base_id.strip(),
+                source_id.strip(),
+                source_document_key.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def list_knowledge_sources(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM context_knowledge_sources
+            WHERE knowledge_base_id = %s
+            ORDER BY created_at ASC, display_name ASC
+            """,
+            (knowledge_base_id.strip(),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_knowledge_source(database_url: str, *, knowledge_base_id: str, source_id: str) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM context_knowledge_sources
+            WHERE knowledge_base_id = %s AND id = %s
+            """,
+            (knowledge_base_id.strip(), source_id.strip()),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def create_knowledge_source(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_type: str,
+    display_name: str,
+    relative_path: str,
+    include_globs: list[str],
+    exclude_globs: list[str],
+    lifecycle_state: str,
+    created_by_user_id: int | None,
+    updated_by_user_id: int | None,
+) -> dict[str, Any]:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            INSERT INTO context_knowledge_sources (
+                id,
+                knowledge_base_id,
+                source_type,
+                display_name,
+                relative_path,
+                include_globs,
+                exclude_globs,
+                lifecycle_state,
+                created_by_user_id,
+                updated_by_user_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s)
+            RETURNING *
+            """,
+            (
+                str(uuid4()),
+                knowledge_base_id.strip(),
+                source_type.strip().lower(),
+                display_name.strip(),
+                relative_path.strip(),
+                Jsonb(include_globs),
+                Jsonb(exclude_globs),
+                lifecycle_state.strip().lower(),
+                created_by_user_id,
+                updated_by_user_id,
+            ),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("failed_to_create_knowledge_source")
+    return dict(row)
+
+
+def update_knowledge_source(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_id: str,
+    display_name: str,
+    relative_path: str,
+    include_globs: list[str],
+    exclude_globs: list[str],
+    lifecycle_state: str,
+    updated_by_user_id: int | None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sources
+            SET
+              display_name = %s,
+              relative_path = %s,
+              include_globs = %s::jsonb,
+              exclude_globs = %s::jsonb,
+              lifecycle_state = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE knowledge_base_id = %s AND id = %s
+            RETURNING *
+            """,
+            (
+                display_name.strip(),
+                relative_path.strip(),
+                Jsonb(include_globs),
+                Jsonb(exclude_globs),
+                lifecycle_state.strip().lower(),
+                updated_by_user_id,
+                knowledge_base_id.strip(),
+                source_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def delete_knowledge_source(database_url: str, *, knowledge_base_id: str, source_id: str) -> bool:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            DELETE FROM context_knowledge_sources
+            WHERE knowledge_base_id = %s AND id = %s
+            RETURNING id
+            """,
+            (knowledge_base_id.strip(), source_id.strip()),
+        ).fetchone()
+    return row is not None
+
+
+def set_knowledge_source_sync_result(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_id: str,
+    last_sync_status: str,
+    last_sync_error: str | None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sources
+            SET
+              last_sync_status = %s,
+              last_sync_at = NOW(),
+              last_sync_error = %s,
+              updated_at = NOW()
+            WHERE knowledge_base_id = %s AND id = %s
+            RETURNING *
+            """,
+            (
+                last_sync_status.strip().lower(),
+                last_sync_error.strip() if isinstance(last_sync_error, str) and last_sync_error.strip() else None,
+                knowledge_base_id.strip(),
+                source_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def mark_knowledge_source_syncing(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_id: str,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sources
+            SET
+              last_sync_status = 'syncing',
+              last_sync_error = NULL,
+              updated_at = NOW()
+            WHERE knowledge_base_id = %s AND id = %s
+            RETURNING *
+            """,
+            (knowledge_base_id.strip(), source_id.strip()),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def create_sync_run(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    source_id: str | None,
+    created_by_user_id: int | None,
+) -> dict[str, Any]:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            INSERT INTO context_knowledge_sync_runs (
+                id,
+                knowledge_base_id,
+                source_id,
+                status,
+                created_by_user_id
+            )
+            VALUES (%s, %s, %s, 'syncing', %s)
+            RETURNING *
+            """,
+            (
+                str(uuid4()),
+                knowledge_base_id.strip(),
+                source_id.strip() if source_id else None,
+                created_by_user_id,
+            ),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("failed_to_create_sync_run")
+    return dict(row)
+
+
+def finish_sync_run(
+    database_url: str,
+    *,
+    run_id: str,
+    status: str,
+    scanned_file_count: int,
+    changed_file_count: int,
+    deleted_file_count: int,
+    created_document_count: int,
+    updated_document_count: int,
+    deleted_document_count: int,
+    error_summary: str | None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sync_runs
+            SET
+              status = %s,
+              scanned_file_count = %s,
+              changed_file_count = %s,
+              deleted_file_count = %s,
+              created_document_count = %s,
+              updated_document_count = %s,
+              deleted_document_count = %s,
+              error_summary = %s,
+              finished_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                status.strip().lower(),
+                scanned_file_count,
+                changed_file_count,
+                deleted_file_count,
+                created_document_count,
+                updated_document_count,
+                deleted_document_count,
+                error_summary.strip() if isinstance(error_summary, str) and error_summary.strip() else None,
+                run_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def list_sync_runs(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT
+              runs.*,
+              sources.display_name AS source_display_name
+            FROM context_knowledge_sync_runs runs
+            LEFT JOIN context_knowledge_sources sources ON sources.id = runs.source_id
+            WHERE knowledge_base_id = %s
+            ORDER BY runs.started_at DESC
+            """,
+            (knowledge_base_id.strip(),),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def create_document(
@@ -351,6 +666,10 @@ def create_document(
     text: str,
     metadata_json: dict[str, Any],
     chunk_count: int,
+    source_id: str | None = None,
+    source_path: str | None = None,
+    source_document_key: str | None = None,
+    managed_by_source: bool = False,
     created_by_user_id: int | None,
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
@@ -367,10 +686,14 @@ def create_document(
                 text,
                 metadata_json,
                 chunk_count,
+                source_id,
+                source_path,
+                source_document_key,
+                managed_by_source,
                 created_by_user_id,
                 updated_by_user_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s, %s)
             RETURNING *
             """,
             (
@@ -383,6 +706,10 @@ def create_document(
                 text,
                 Jsonb(metadata_json),
                 chunk_count,
+                source_id.strip() if source_id else None,
+                source_path.strip() if source_path else None,
+                source_document_key.strip() if source_document_key else None,
+                managed_by_source,
                 created_by_user_id,
                 updated_by_user_id,
             ),
@@ -404,6 +731,10 @@ def update_document(
     text: str,
     metadata_json: dict[str, Any],
     chunk_count: int,
+    source_id: str | None = None,
+    source_path: str | None = None,
+    source_document_key: str | None = None,
+    managed_by_source: bool | None = None,
     updated_by_user_id: int | None,
 ) -> dict[str, Any] | None:
     with get_connection(database_url) as connection:
@@ -418,6 +749,10 @@ def update_document(
               text = %s,
               metadata_json = %s::jsonb,
               chunk_count = %s,
+              source_id = %s,
+              source_path = %s,
+              source_document_key = %s,
+              managed_by_source = COALESCE(%s, managed_by_source),
               updated_by_user_id = %s,
               updated_at = NOW()
             WHERE knowledge_base_id = %s AND id = %s
@@ -431,6 +766,10 @@ def update_document(
                 text,
                 Jsonb(metadata_json),
                 chunk_count,
+                source_id.strip() if source_id else None,
+                source_path.strip() if source_path else None,
+                source_document_key.strip() if source_document_key else None,
+                managed_by_source,
                 updated_by_user_id,
                 knowledge_base_id.strip(),
                 document_id.strip(),

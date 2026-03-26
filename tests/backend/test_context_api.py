@@ -125,3 +125,91 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
 
     assert response.status_code == 200
     assert response.get_json()["retrieval"]["index"] == "kb_product_docs"
+
+
+def test_list_knowledge_sources_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-sources@example.com",
+        username="admin-sources",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "list_knowledge_sources",
+        lambda *_args, **_kwargs: [
+            {
+                "id": "source-1",
+                "knowledge_base_id": "kb-primary",
+                "source_type": "local_directory",
+                "display_name": "Docs folder",
+                "relative_path": "product_docs",
+                "include_globs": ["**/*.md"],
+                "exclude_globs": [],
+                "lifecycle_state": "active",
+                "last_sync_status": "ready",
+            }
+        ],
+    )
+
+    response = test_client.get("/v1/context/knowledge-bases/kb-primary/sources", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["sources"][0]["id"] == "source-1"
+
+
+def test_create_knowledge_source_route_requires_superadmin(client):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-create-source@example.com",
+        username="admin-create-source",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/sources",
+        headers=_auth(token),
+        json={"display_name": "Docs folder", "relative_path": "product_docs"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_sync_knowledge_source_route_returns_payload_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-sources@example.com",
+        username="superadmin-sources",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "sync_knowledge_source",
+        lambda *_args, **_kwargs: {
+            "knowledge_base": {"id": "kb-primary", "display_name": "Product Docs"},
+            "source": {"id": "source-1", "display_name": "Docs folder", "last_sync_status": "ready"},
+            "sync_run": {"id": "run-1", "status": "ready", "created_document_count": 2},
+        },
+    )
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/sources/source-1/sync",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["sync_run"]["id"] == "run-1"
