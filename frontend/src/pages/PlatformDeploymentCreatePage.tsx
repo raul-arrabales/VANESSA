@@ -8,11 +8,13 @@ import type { DeploymentFormState } from "../features/platform-control/deploymen
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
+import { useActionFeedback, withActionFeedbackState } from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformDeploymentCreatePage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
   const navigate = useNavigate();
+  const { showErrorFeedback } = useActionFeedback();
   const {
     errorMessage: loadErrorMessage,
     capabilities,
@@ -33,7 +35,6 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     t,
   });
   const [form, setForm] = useState<DeploymentFormState>(() => buildInitialForm());
-  const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -44,7 +45,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
 
     const { validationError, mutationInput } = validateAndBuildMutation(form);
     if (validationError) {
-      setErrorMessage(validationError);
+      showErrorFeedback(validationError, t("platformControl.feedback.deploymentSaveFailed"));
       return;
     }
     if (!mutationInput) {
@@ -52,14 +53,16 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     }
 
     setSaving(true);
-    setErrorMessage("");
     try {
       const deployment = await createDeploymentProfile(mutationInput, token);
       navigate(`/control/platform/deployments/${deployment.id}`, {
-        state: { feedbackMessage: t("platformControl.feedback.deploymentCreated", { name: deployment.display_name }) },
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("platformControl.feedback.deploymentCreated", { name: deployment.display_name }),
+        }),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentSaveFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -69,7 +72,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     <PlatformPageLayout
       title={t("platformControl.deployments.newTitle")}
       description={t("platformControl.deployments.newDescription")}
-      errorMessage={errorMessage || loadErrorMessage}
+      errorMessage={loadErrorMessage}
     >
       <article className="panel card-stack">
         <PlatformDeploymentForm

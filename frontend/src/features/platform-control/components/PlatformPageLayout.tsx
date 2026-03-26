@@ -7,7 +7,6 @@ type PlatformPageLayoutProps = {
   description: string;
   actions?: ReactNode;
   errorMessage?: string;
-  feedbackMessage?: string;
   children: ReactNode;
 };
 
@@ -22,7 +21,6 @@ export default function PlatformPageLayout({
   description,
   actions,
   errorMessage,
-  feedbackMessage,
   children,
 }: PlatformPageLayoutProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -54,7 +52,6 @@ export default function PlatformPageLayout({
       </article>
 
       {errorMessage ? <p className="status-text error-text">{`${t("platformControl.feedback.prefix")} ${errorMessage}`}</p> : null}
-      {feedbackMessage ? <p className="status-text">{feedbackMessage}</p> : null}
 
       {children}
     </section>

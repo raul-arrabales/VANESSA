@@ -103,11 +103,6 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
       setModeState(previousMode);
       setIsLocked(previousIsLocked);
       setSource(previousSource);
-      if (saveError instanceof ApiError) {
-        setError(saveError.message);
-      } else {
-        setError("runtimeMode.updateFailed");
-      }
       throw saveError;
     } finally {
       setIsSaving(false);

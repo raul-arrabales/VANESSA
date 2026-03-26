@@ -5,19 +5,14 @@ import PlatformPageLayout from "../features/platform-control/components/Platform
 import PlatformProvidersDirectory from "../features/platform-control/components/PlatformProvidersDirectory";
 import { usePlatformProvidersData } from "../features/platform-control/hooks/usePlatformProvidersData";
 import { useAuth } from "../auth/AuthProvider";
-
-function readLocationFeedback(state: unknown): string {
-  if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {
-    return state.feedbackMessage;
-  }
-  return "";
-}
+import { useRouteActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformProvidersPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
   const location = useLocation();
   const { errorMessage, providers, providerFamilies, deployments } = usePlatformProvidersData(token);
+  useRouteActionFeedback(location.state);
   const [search, setSearch] = useState("");
   const [capabilityFilter, setCapabilityFilter] = useState("");
   const [providerKeyFilter, setProviderKeyFilter] = useState("");
@@ -47,7 +42,6 @@ export default function PlatformProvidersPage(): JSX.Element {
       title={t("platformControl.providers.title")}
       description={t("platformControl.providers.pageDescription")}
       errorMessage={errorMessage}
-      feedbackMessage={readLocationFeedback(location.state)}
       actions={(
         <Link className="btn btn-primary" to="/control/platform/providers/new">
           {t("platformControl.actions.createProvider")}

@@ -14,6 +14,7 @@ import ChatMessageBody from "../components/ChatMessageBody";
 import { useStickyChatScroll } from "../hooks/useStickyChatScroll";
 import { listEnabledModels, type ModelCatalogItem } from "../api/modelops";
 import { useAuth } from "../auth/AuthProvider";
+import { useActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 function sortConversations(conversations: ChatConversationSummary[]): ChatConversationSummary[] {
   return [...conversations].sort((left, right) => {
@@ -54,6 +55,7 @@ function createTransientMessageId(prefix: string): string {
 
 export default function ChatbotPage(): JSX.Element {
   const { token, isAuthenticated } = useAuth();
+  const { showErrorFeedback } = useActionFeedback();
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -217,7 +219,7 @@ export default function ChatbotPage(): JSX.Element {
       setActiveConversation(created);
       setDraft("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to create conversation.");
+      showErrorFeedback(requestError, "Unable to create conversation.");
     } finally {
       setIsConversationBusy(false);
     }
@@ -236,7 +238,7 @@ export default function ChatbotPage(): JSX.Element {
         current && current.id === conversationId ? { ...current, ...updated } : current
       ));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to update conversation model.");
+      showErrorFeedback(requestError, "Unable to update conversation model.");
     }
   };
 
@@ -259,7 +261,7 @@ export default function ChatbotPage(): JSX.Element {
         current && current.id === updated.id ? { ...current, ...updated } : current
       ));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to rename conversation.");
+      showErrorFeedback(requestError, "Unable to rename conversation.");
     } finally {
       setIsConversationBusy(false);
     }
@@ -291,7 +293,7 @@ export default function ChatbotPage(): JSX.Element {
         setActiveConversation(null);
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to delete conversation.");
+      showErrorFeedback(requestError, "Unable to delete conversation.");
     } finally {
       setIsConversationBusy(false);
     }
@@ -378,7 +380,7 @@ export default function ChatbotPage(): JSX.Element {
         current && current.id === conversationId ? { ...current, messages: previousMessages } : current
       ));
       setDraft(prompt);
-      setError(requestError instanceof Error ? requestError.message : "Message request failed.");
+      showErrorFeedback(requestError, "Message request failed.");
     } finally {
       streamAbortRef.current = null;
       setIsSending(false);

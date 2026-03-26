@@ -3,27 +3,25 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../auth/authApi";
 import { useAuth } from "../auth/AuthProvider";
 import type { Role } from "../auth/types";
+import { useActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 const roleOptions: Role[] = ["user", "admin", "superadmin"];
 
 export default function RegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { register, user } = useAuth();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
 
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("user");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
 
   const canSetRole = useMemo(() => user?.role === "admin" || user?.role === "superadmin", [user]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
-    setError("");
-    setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
@@ -35,9 +33,9 @@ export default function RegisterPage(): JSX.Element {
       });
 
       if (created.is_active) {
-        setSuccessMessage(t("auth.register.successActive"));
+        showSuccessFeedback(t("auth.register.successActive"));
       } else {
-        setSuccessMessage(t("auth.register.successPending"));
+        showSuccessFeedback(t("auth.register.successPending"));
       }
 
       setEmail("");
@@ -46,9 +44,9 @@ export default function RegisterPage(): JSX.Element {
       setRole("user");
     } catch (submitError) {
       if (submitError instanceof ApiError) {
-        setError(submitError.message);
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       } else {
-        setError(t("auth.error.unknown"));
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       }
     } finally {
       setIsSubmitting(false);
@@ -109,8 +107,6 @@ export default function RegisterPage(): JSX.Element {
         )}
 
         {!canSetRole && <p className="status-text">{t("auth.register.pendingNote")}</p>}
-        {error && <p className="status-text error-text">{error}</p>}
-        {successMessage && <p className="status-text success-text">{successMessage}</p>}
 
         <div className="form-actions">
           <button className="btn btn-primary" type="submit" disabled={isSubmitting}>

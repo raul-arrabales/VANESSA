@@ -138,6 +138,28 @@ describe("PlatformProviderDetailPage", () => {
     });
   });
 
+  it("shows validation failures in the shared action-feedback dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(platformApi.validatePlatformProvider).mockRejectedValue(
+      new Error("Embeddings binding is missing a default resource"),
+    );
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-1" },
+    );
+
+    await user.click(screen.getByRole("button", { name: await t("platformControl.actions.validate") }));
+
+    await waitFor(() => {
+      expect(platformApi.validatePlatformProvider).toHaveBeenCalledWith("provider-1", "token");
+    });
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Embeddings binding is missing a default resource")).toBeVisible();
+  });
+
   it("opens the runtime load side panel immediately and keeps it non-dismissible while loading", async () => {
     const user = userEvent.setup();
     const loadPanelTitle = await t("platformControl.providers.loadPanelTitle");

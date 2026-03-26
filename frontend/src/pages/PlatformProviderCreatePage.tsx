@@ -7,14 +7,15 @@ import PlatformPageLayout from "../features/platform-control/components/Platform
 import PlatformProviderForm from "../features/platform-control/components/PlatformProviderForm";
 import { usePlatformProvidersData } from "../features/platform-control/hooks/usePlatformProvidersData";
 import { DEFAULT_PROVIDER_FORM, parseJsonObject } from "../features/platform-control/providerForm";
+import { useActionFeedback, withActionFeedbackState } from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformProviderCreatePage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
   const navigate = useNavigate();
+  const { showErrorFeedback } = useActionFeedback();
   const { errorMessage: loadErrorMessage, providerFamilies } = usePlatformProvidersData(token);
   const [form, setForm] = useState(DEFAULT_PROVIDER_FORM);
-  const [errorMessage, setErrorMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -24,7 +25,6 @@ export default function PlatformProviderCreatePage(): JSX.Element {
     }
 
     setSaving(true);
-    setErrorMessage("");
     try {
       const config = parseJsonObject(
         form.configText,
@@ -49,10 +49,13 @@ export default function PlatformProviderCreatePage(): JSX.Element {
         token,
       );
       navigate(`/control/platform/providers/${provider.id}`, {
-        state: { feedbackMessage: t("platformControl.feedback.providerCreated", { name: provider.display_name }) },
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("platformControl.feedback.providerCreated", { name: provider.display_name }),
+        }),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerSaveFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.providerSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -62,7 +65,7 @@ export default function PlatformProviderCreatePage(): JSX.Element {
     <PlatformPageLayout
       title={t("platformControl.providers.newTitle")}
       description={t("platformControl.providers.newDescription")}
-      errorMessage={errorMessage || loadErrorMessage}
+      errorMessage={loadErrorMessage}
     >
       <article className="panel card-stack">
         <PlatformProviderForm

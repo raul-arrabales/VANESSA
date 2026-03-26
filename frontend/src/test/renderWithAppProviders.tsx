@@ -4,9 +4,11 @@ import { ThemeProvider } from "../theme/ThemeProvider";
 import type { ReactElement } from "react";
 import { ensureTestI18n, testI18n } from "./testI18n";
 import TestRouter from "./TestRouter";
+import { ActionFeedbackProvider } from "../feedback/ActionFeedbackProvider";
 
 type AppRenderOptions = Omit<RenderOptions, "wrapper"> & {
   route?: string;
+  routeState?: unknown;
   language?: "en" | "es";
   withTheme?: boolean;
 };
@@ -17,6 +19,7 @@ export async function renderWithAppProviders(
 ): Promise<RenderResult> {
   const {
     route = "/",
+    routeState,
     language = "en",
     withTheme = false,
     ...renderOptions
@@ -30,8 +33,10 @@ export async function renderWithAppProviders(
 
   const content = (
     <I18nextProvider i18n={testI18n}>
-      <TestRouter route={route}>
-        {withTheme ? <ThemeProvider>{ui}</ThemeProvider> : ui}
+      <TestRouter route={route} routeState={routeState}>
+        <ActionFeedbackProvider>
+          {withTheme ? <ThemeProvider>{ui}</ThemeProvider> : ui}
+        </ActionFeedbackProvider>
       </TestRouter>
     </I18nextProvider>
   );

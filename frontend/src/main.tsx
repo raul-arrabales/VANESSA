@@ -7,6 +7,7 @@ import "./styles.css";
 import { AuthProvider } from "./auth/AuthProvider";
 import { RuntimeModeProvider } from "./runtime/RuntimeModeProvider";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import { ActionFeedbackProvider } from "./feedback/ActionFeedbackProvider";
 
 const rootElement = document.getElementById("root");
 
@@ -37,7 +38,9 @@ function renderApp(): void {
         <BrowserRouter>
           <AuthProvider>
             <RuntimeModeProvider>
-              <App />
+              <ActionFeedbackProvider>
+                <App />
+              </ActionFeedbackProvider>
             </RuntimeModeProvider>
           </AuthProvider>
         </BrowserRouter>

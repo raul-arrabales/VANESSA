@@ -488,6 +488,26 @@ a {
   flex-wrap: wrap;
 }
 
+.action-feedback-modal {
+  width: min(34rem, 100%);
+}
+
+.action-feedback-modal[data-kind="error"]::before {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--status-error) 84%, white) 0%, var(--status-error) 100%);
+}
+
+.action-feedback-modal[data-kind="success"]::before {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--status-success) 84%, white) 0%, var(--status-success) 100%);
+}
+
+.action-feedback-modal[data-kind="error"] .modal-title {
+  color: var(--status-error);
+}
+
+.action-feedback-modal[data-kind="success"] .modal-title {
+  color: var(--status-success);
+}
+
 @keyframes modal-enter {
   from {
     opacity: 0;

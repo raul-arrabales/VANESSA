@@ -4,12 +4,13 @@ import { MemoryRouter } from "react-router-dom";
 type TestRouterProps = {
   children: ReactNode;
   route?: string;
+  routeState?: unknown;
 };
 
-export default function TestRouter({ children, route = "/" }: TestRouterProps): JSX.Element {
+export default function TestRouter({ children, route = "/", routeState }: TestRouterProps): JSX.Element {
   return (
     <MemoryRouter
-      initialEntries={[route]}
+      initialEntries={[{ pathname: route, state: routeState }]}
       future={{
         v7_startTransition: true,
         v7_relativeSplatPath: true,

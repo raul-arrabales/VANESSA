@@ -1082,6 +1082,15 @@
       "toolValidated": "Herramienta {{name}} validada."
     }
   },
+  "actionFeedback": {
+    "dialog": {
+      "errorEyebrow": "Acción fallida",
+      "successEyebrow": "Acción completada",
+      "errorTitle": "Algo salió mal",
+      "successTitle": "Acción completada",
+      "close": "Cerrar"
+    }
+  },
   "runtimeMode": {
     "toggleLabel": "Modo de ejecución",
     "toggleTooltip": "Modo de ejecución actual: {{mode}}",
@@ -1090,6 +1099,7 @@
     "permissionDenied": "Solo los superadministradores pueden cambiar el modo de ejecución.",
     "lockedByEnvironment": "El modo de ejecución está bloqueado por la configuración del entorno en {{mode}}.",
     "updateFailed": "No se pudo actualizar el modo de ejecución.",
+    "updated": "Modo de ejecución actualizado a {{mode}}.",
     "offlineLabel": "Sin conexión",
     "confirmEnableOffline": "¿Cambiar al modo sin conexión para todos los usuarios? Las acciones que dependen de internet se bloquearán en todo el sistema.",
     "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?",

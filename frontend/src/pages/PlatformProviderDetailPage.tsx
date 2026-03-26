@@ -29,13 +29,11 @@ import {
   buildProviderLoadDisplayData,
   type StoredProviderLoadStatus,
 } from "../features/platform-control/providerLoad";
-
-function readLocationFeedback(state: unknown): string {
-  if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {
-    return state.feedbackMessage;
-  }
-  return "";
-}
+import {
+  useActionFeedback,
+  useRouteActionFeedback,
+  withActionFeedbackState,
+} from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformProviderDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -43,10 +41,10 @@ export default function PlatformProviderDetailPage(): JSX.Element {
   const { providerId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const { state, errorMessage: loadErrorMessage, capabilities, providers, providerFamilies, deployments, reload } = usePlatformProvidersData(token);
   const [form, setForm] = useState<ProviderFormState | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [validation, setValidation] = useState<PlatformProviderValidation | null>(null);
@@ -92,6 +90,7 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     () => buildProviderLoadDisplayData(provider, trackedLoad, loadPanelPhase, t),
     [loadPanelPhase, provider, t, trackedLoad],
   );
+  useRouteActionFeedback(location.state);
 
   useEffect(() => {
     if (provider) {
@@ -138,7 +137,6 @@ export default function PlatformProviderDetailPage(): JSX.Element {
 
     setSaving(true);
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       const config = parseJsonObject(
         form.configText,
@@ -162,10 +160,10 @@ export default function PlatformProviderDetailPage(): JSX.Element {
         },
         token,
       );
-      setFeedbackMessage(t("platformControl.feedback.providerUpdated", { name: form.displayName }));
+      showSuccessFeedback(t("platformControl.feedback.providerUpdated", { name: form.displayName }));
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerSaveFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.providerSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -178,13 +176,12 @@ export default function PlatformProviderDetailPage(): JSX.Element {
 
     setValidating(true);
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       const nextValidation = await validatePlatformProvider(provider.id, token);
       setValidation(nextValidation);
-      setFeedbackMessage(t("platformControl.feedback.validationSuccess", { slug: provider.slug }));
+      showSuccessFeedback(t("platformControl.feedback.validationSuccess", { slug: provider.slug }));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.validationFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.validationFailed"));
     } finally {
       setValidating(false);
     }
@@ -196,14 +193,16 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     }
 
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       await deletePlatformProvider(provider.id, token);
       navigate("/control/platform/providers", {
-        state: { feedbackMessage: t("platformControl.feedback.providerDeleted") },
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("platformControl.feedback.providerDeleted"),
+        }),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerDeleteFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.providerDeleteFailed"));
     }
   }
 
@@ -212,7 +211,6 @@ export default function PlatformProviderDetailPage(): JSX.Element {
       return;
     }
     setErrorMessage("");
-    setFeedbackMessage("");
     const nextTrackedLoad: StoredProviderLoadStatus = {
       providerId: provider.id,
       requestedModelId: slotModelId,
@@ -224,10 +222,11 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     try {
       const updatedProvider = await assignPlatformProviderLoadedModel(provider.id, slotModelId, token);
       setSlotModelId(updatedProvider.loaded_managed_model_id ?? slotModelId);
+      showSuccessFeedback(t("platformControl.feedback.providerLoadedModelAssigned", { name: updatedProvider.display_name }));
       await reload();
     } catch (error) {
       resetTrackedLoadState();
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerLoadedModelAssignFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.providerLoadedModelAssignFailed"));
     }
   }
 
@@ -236,26 +235,22 @@ export default function PlatformProviderDetailPage(): JSX.Element {
       return;
     }
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       const updatedProvider = await clearPlatformProviderLoadedModel(provider.id, token);
       setSlotModelId(updatedProvider.loaded_managed_model_id ?? "");
       resetTrackedLoadState();
-      setFeedbackMessage(t("platformControl.feedback.providerLoadedModelCleared", { name: updatedProvider.display_name }));
+      showSuccessFeedback(t("platformControl.feedback.providerLoadedModelCleared", { name: updatedProvider.display_name }));
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.providerLoadedModelClearFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.providerLoadedModelClearFailed"));
     }
   }
-
-  const combinedFeedback = feedbackMessage || readLocationFeedback(location.state);
 
   return (
     <PlatformPageLayout
       title={provider?.display_name ?? t("platformControl.providers.detailTitle")}
       description={provider ? t("platformControl.providers.detailDescription") : t("platformControl.providers.notFound")}
       errorMessage={errorMessage || loadErrorMessage}
-      feedbackMessage={combinedFeedback}
       actions={(
         <Link className="btn btn-secondary" to="/control/platform/providers">
           {t("platformControl.actions.viewProviders")}

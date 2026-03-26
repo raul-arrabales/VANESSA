@@ -1092,6 +1092,15 @@
       "toolValidated": "Validated tool {{name}}."
     }
   },
+  "actionFeedback": {
+    "dialog": {
+      "errorEyebrow": "Action failed",
+      "successEyebrow": "Action complete",
+      "errorTitle": "Something went wrong",
+      "successTitle": "Action completed",
+      "close": "Close"
+    }
+  },
   "runtimeMode": {
     "toggleLabel": "Runtime mode",
     "toggleTooltip": "Current runtime mode: {{mode}}",
@@ -1100,6 +1109,7 @@
     "permissionDenied": "Only superadmins can change runtime mode.",
     "lockedByEnvironment": "Runtime mode is locked by environment configuration at {{mode}}.",
     "updateFailed": "Unable to update runtime mode.",
+    "updated": "Runtime mode updated to {{mode}}.",
     "offlineLabel": "Offline",
     "confirmEnableOffline": "Switch to Offline mode for all users? Internet-dependent actions will be blocked system-wide.",
     "confirmEnableOnline": "Switch to Online mode for all users?",

@@ -18,6 +18,7 @@ import {
   validateCatalogTool,
 } from "../api/catalog";
 import { listEnabledModels, type ModelCatalogItem } from "../api/modelops";
+import { useActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 type LoadState = "idle" | "loading" | "success" | "error";
 type FormMode = "create" | "edit";
@@ -140,6 +141,7 @@ function buildToolForm(tool: CatalogTool): ToolFormState {
 export default function CatalogControlPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const [state, setState] = useState<LoadState>("idle");
   const [agents, setAgents] = useState<CatalogAgent[]>([]);
   const [tools, setTools] = useState<CatalogTool[]>([]);
@@ -152,7 +154,6 @@ export default function CatalogControlPage(): JSX.Element {
   const [validatingToolId, setValidatingToolId] = useState("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingTool, setSavingTool] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   async function loadCatalogState(): Promise<void> {
@@ -193,14 +194,12 @@ export default function CatalogControlPage(): JSX.Element {
       return;
     }
     setValidatingAgentId(agentId);
-    setFeedbackMessage("");
-    setErrorMessage("");
     try {
       const result = await validateCatalogAgent(agentId, token);
       setAgentValidationResults((current) => ({ ...current, [agentId]: result }));
-      setFeedbackMessage(t("catalogControl.feedback.agentValidated", { name: result.agent.spec.name }));
+      showSuccessFeedback(t("catalogControl.feedback.agentValidated", { name: result.agent.spec.name }));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("catalogControl.feedback.validationFailed"));
+      showErrorFeedback(error, t("catalogControl.feedback.validationFailed"));
     } finally {
       setValidatingAgentId("");
     }
@@ -211,14 +210,12 @@ export default function CatalogControlPage(): JSX.Element {
       return;
     }
     setValidatingToolId(toolId);
-    setFeedbackMessage("");
-    setErrorMessage("");
     try {
       const result = await validateCatalogTool(toolId, token);
       setToolValidationResults((current) => ({ ...current, [toolId]: result }));
-      setFeedbackMessage(t("catalogControl.feedback.toolValidated", { name: result.tool.spec.name }));
+      showSuccessFeedback(t("catalogControl.feedback.toolValidated", { name: result.tool.spec.name }));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("catalogControl.feedback.validationFailed"));
+      showErrorFeedback(error, t("catalogControl.feedback.validationFailed"));
     } finally {
       setValidatingToolId("");
     }
@@ -230,8 +227,6 @@ export default function CatalogControlPage(): JSX.Element {
       return;
     }
     setSavingAgent(true);
-    setFeedbackMessage("");
-    setErrorMessage("");
     try {
       const payload: CatalogAgentMutationInput = {
         id: agentForm.id || undefined,
@@ -250,13 +245,13 @@ export default function CatalogControlPage(): JSX.Element {
           : await updateCatalogAgent(agentForm.agentId, payload, token);
       setAgentForm(buildAgentForm(saved));
       await loadCatalogState();
-      setFeedbackMessage(
+      showSuccessFeedback(
         t(agentForm.mode === "create" ? "catalogControl.feedback.agentCreated" : "catalogControl.feedback.agentUpdated", {
           name: saved.spec.name,
         }),
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("catalogControl.feedback.saveFailed"));
+      showErrorFeedback(error, t("catalogControl.feedback.saveFailed"));
     } finally {
       setSavingAgent(false);
     }
@@ -268,8 +263,6 @@ export default function CatalogControlPage(): JSX.Element {
       return;
     }
     setSavingTool(true);
-    setFeedbackMessage("");
-    setErrorMessage("");
     try {
       const inputSchema = parseJsonObject(
         toolForm.inputSchemaText,
@@ -304,13 +297,13 @@ export default function CatalogControlPage(): JSX.Element {
           : await updateCatalogTool(toolForm.toolId, payload, token);
       setToolForm(buildToolForm(saved));
       await loadCatalogState();
-      setFeedbackMessage(
+      showSuccessFeedback(
         t(toolForm.mode === "create" ? "catalogControl.feedback.toolCreated" : "catalogControl.feedback.toolUpdated", {
           name: saved.spec.name,
         }),
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("catalogControl.feedback.saveFailed"));
+      showErrorFeedback(error, t("catalogControl.feedback.saveFailed"));
     } finally {
       setSavingTool(false);
     }
@@ -346,9 +339,7 @@ export default function CatalogControlPage(): JSX.Element {
             <span className="status-text">{t(`catalogControl.state.${state}`)}</span>
           </div>
         </div>
-
         {errorMessage ? <p className="status-text">{errorMessage}</p> : null}
-        {feedbackMessage ? <p className="status-text">{feedbackMessage}</p> : null}
       </article>
 
       <article className="panel card-stack">

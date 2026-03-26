@@ -160,6 +160,7 @@ describe("CatalogControlPage", () => {
     await waitFor(() => {
       expect(catalogApi.validateCatalogTool).toHaveBeenCalledWith("tool.web_search", "token");
     });
-    expect(await screen.findByText("MCP gateway does not expose tool 'web_search'.")).toBeVisible();
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("MCP gateway does not expose tool 'web_search'.")).toBeVisible();
   });
 });

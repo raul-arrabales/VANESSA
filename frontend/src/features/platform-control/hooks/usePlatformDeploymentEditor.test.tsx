@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import * as React from "react";
 import type { PlatformDeploymentProfile } from "../../../api/platform";
 import {
   capabilitiesFixture,

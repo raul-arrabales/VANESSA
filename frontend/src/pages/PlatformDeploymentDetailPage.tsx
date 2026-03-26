@@ -18,13 +18,11 @@ import PlatformPageLayout from "../features/platform-control/components/Platform
 import { usePlatformDeploymentEditor } from "../features/platform-control/hooks/usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "../features/platform-control/hooks/usePlatformDeploymentEditorData";
 import { summarizeBindingResources } from "../features/platform-control/platformTopology";
-
-function readLocationFeedback(state: unknown): string {
-  if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {
-    return state.feedbackMessage;
-  }
-  return "";
-}
+import {
+  useActionFeedback,
+  useRouteActionFeedback,
+  withActionFeedbackState,
+} from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformDeploymentDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -32,6 +30,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
   const { deploymentId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const {
     state,
     errorMessage: loadErrorMessage,
@@ -45,7 +44,6 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
   const [form, setForm] = useState<DeploymentFormState | null>(null);
   const [cloneForm, setCloneForm] = useState<DeploymentCloneFormState | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -72,6 +70,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     t,
   });
   const deploymentAudit = activationAudit.filter((entry) => entry.deployment_profile.id === deploymentId);
+  useRouteActionFeedback(location.state);
 
   useEffect(() => {
     if (deployment) {
@@ -88,23 +87,22 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
 
     const { validationError, mutationInput } = validateAndBuildMutation(form);
     if (validationError) {
-      setErrorMessage(validationError);
+      showErrorFeedback(validationError, t("platformControl.feedback.deploymentSaveFailed"));
       return;
     }
 
     setSaving(true);
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       await updateDeploymentProfile(
         deployment.id,
         mutationInput!,
         token,
       );
-      setFeedbackMessage(t("platformControl.feedback.deploymentUpdated", { name: form.displayName }));
+      showSuccessFeedback(t("platformControl.feedback.deploymentUpdated", { name: form.displayName }));
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentSaveFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
     } finally {
       setSaving(false);
     }
@@ -118,7 +116,6 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
 
     setCloning(true);
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       const cloned = await cloneDeploymentProfile(
         deployment.id,
@@ -130,10 +127,13 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
         token,
       );
       navigate(`/control/platform/deployments/${cloned.id}`, {
-        state: { feedbackMessage: t("platformControl.feedback.deploymentCloned", { name: cloned.display_name }) },
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("platformControl.feedback.deploymentCloned", { name: cloned.display_name }),
+        }),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentSaveFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
     } finally {
       setCloning(false);
     }
@@ -146,13 +146,12 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
 
     setActivating(true);
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       await activateDeploymentProfile(deployment.id, token);
-      setFeedbackMessage(t("platformControl.feedback.activationSuccess", { name: deployment.display_name }));
+      showSuccessFeedback(t("platformControl.feedback.activationSuccess", { name: deployment.display_name }));
       await reload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.activationFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.activationFailed"));
     } finally {
       setActivating(false);
     }
@@ -164,25 +163,24 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     }
 
     setErrorMessage("");
-    setFeedbackMessage("");
     try {
       await deleteDeploymentProfile(deployment.id, token);
       navigate("/control/platform/deployments", {
-        state: { feedbackMessage: t("platformControl.feedback.deploymentDeleted") },
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("platformControl.feedback.deploymentDeleted"),
+        }),
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : t("platformControl.feedback.deploymentDeleteFailed"));
+      showErrorFeedback(error, t("platformControl.feedback.deploymentDeleteFailed"));
     }
   }
-
-  const combinedFeedback = feedbackMessage || readLocationFeedback(location.state);
 
   return (
     <PlatformPageLayout
       title={deployment?.display_name ?? t("platformControl.deployments.detailTitle")}
       description={deployment ? t("platformControl.deployments.detailDescription") : t("platformControl.deployments.notFound")}
       errorMessage={errorMessage || loadErrorMessage}
-      feedbackMessage={combinedFeedback}
       actions={(
         <Link className="btn btn-secondary" to="/control/platform/deployments">
           {t("platformControl.actions.viewDeployments")}

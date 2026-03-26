@@ -7,6 +7,7 @@ import { getDefaultRouteForRole } from "./auth/roles";
 import { useRuntimeMode } from "./runtime/RuntimeModeProvider";
 import NotFoundPage from "./pages/NotFoundPage";
 import { appRoutes, getBreadcrumbRoutes, getNavRoutes, type AppRouteDefinition } from "./routes/appRoutes";
+import { useActionFeedback } from "./feedback/ActionFeedbackProvider";
 
 type RuntimeModeConfirmationDialogProps = {
   nextMode: "offline" | "online";
@@ -94,6 +95,7 @@ function RuntimeModeConfirmationDialog({
 function AppHeader(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, isAuthenticated, logout } = useAuth();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const {
     mode,
     isLocked: isRuntimeLocked,
@@ -130,7 +132,14 @@ function AppHeader(): JSX.Element {
 
     const nextMode = pendingRuntimeMode;
     setPendingRuntimeMode(null);
-    void setMode(nextMode);
+    void Promise.resolve(setMode(nextMode))
+      .then((updatedMode) => {
+        const resolvedMode = updatedMode ?? nextMode;
+        showSuccessFeedback(t("runtimeMode.updated", { mode: t(`runtimeMode.${resolvedMode}`) }));
+      })
+      .catch((saveError: unknown) => {
+        showErrorFeedback(saveError, t("runtimeMode.updateFailed"));
+      });
   };
 
   useEffect(() => {

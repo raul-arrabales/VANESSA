@@ -6,19 +6,14 @@ import PlatformDeploymentsDirectory from "../features/platform-control/component
 import PlatformPageLayout from "../features/platform-control/components/PlatformPageLayout";
 import { usePlatformOverview } from "../features/platform-control/hooks/usePlatformOverview";
 import { useAuth } from "../auth/AuthProvider";
-
-function readLocationFeedback(state: unknown): string {
-  if (state && typeof state === "object" && "feedbackMessage" in state && typeof state.feedbackMessage === "string") {
-    return state.feedbackMessage;
-  }
-  return "";
-}
+import { useRouteActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 export default function PlatformDeploymentsPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
   const location = useLocation();
   const { errorMessage, capabilities, deployments, activationAudit } = usePlatformOverview(token);
+  useRouteActionFeedback(location.state);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -40,7 +35,6 @@ export default function PlatformDeploymentsPage(): JSX.Element {
       title={t("platformControl.deployments.title")}
       description={t("platformControl.deployments.pageDescription")}
       errorMessage={errorMessage}
-      feedbackMessage={readLocationFeedback(location.state)}
       actions={(
         <Link className="btn btn-primary" to="/control/platform/deployments/new">
           {t("platformControl.actions.createDeployment")}

@@ -3,16 +3,17 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "../auth/authApi";
 import { useAuth } from "../auth/AuthProvider";
 import type { AuthUser } from "../auth/types";
+import { useActionFeedback } from "../feedback/ActionFeedbackProvider";
 
 export default function AdminApprovalsPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { user, activatePendingUser, listPendingUsers, updateUserRole } = useAuth();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
 
   const [pendingUsers, setPendingUsers] = useState<AuthUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionUserId, setActionUserId] = useState<number | null>(null);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const isSuperadmin = user?.role === "superadmin";
 
@@ -38,18 +39,16 @@ export default function AdminApprovalsPage(): JSX.Element {
   }, [loadPendingUsers]);
 
   const onActivate = async (targetUser: AuthUser): Promise<void> => {
-    setError("");
-    setSuccess("");
     setActionUserId(targetUser.id);
     try {
       const activated = await activatePendingUser(targetUser.id);
-      setSuccess(t("auth.approvals.success", { username: activated.username, role: activated.role }));
+      showSuccessFeedback(t("auth.approvals.success", { username: activated.username, role: activated.role }));
       await loadPendingUsers();
     } catch (submitError) {
       if (submitError instanceof ApiError) {
-        setError(submitError.message);
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       } else {
-        setError(t("auth.error.unknown"));
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       }
     } finally {
       setActionUserId(null);
@@ -57,18 +56,16 @@ export default function AdminApprovalsPage(): JSX.Element {
   };
 
   const onPromoteToAdmin = async (targetUser: AuthUser): Promise<void> => {
-    setError("");
-    setSuccess("");
     setActionUserId(targetUser.id);
     try {
       const updated = await updateUserRole(targetUser.id, "admin");
-      setSuccess(t("auth.approvals.promoteSuccess", { username: updated.username }));
+      showSuccessFeedback(t("auth.approvals.promoteSuccess", { username: updated.username }));
       await loadPendingUsers();
     } catch (submitError) {
       if (submitError instanceof ApiError) {
-        setError(submitError.message);
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       } else {
-        setError(t("auth.error.unknown"));
+        showErrorFeedback(submitError, t("auth.error.unknown"));
       }
     } finally {
       setActionUserId(null);
@@ -87,7 +84,6 @@ export default function AdminApprovalsPage(): JSX.Element {
       </div>
 
       {error && <p className="status-text error-text">{error}</p>}
-      {success && <p className="status-text success-text">{success}</p>}
 
       {isLoading ? (
         <p className="status-text">{t("auth.approvals.loading")}</p>
