@@ -1,47 +1,47 @@
+import { useState } from "react";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import * as React from "react";
-import PlatformDeploymentForm from "./PlatformDeploymentForm";
+import type { ManagedModel } from "../../../api/modelops";
+import type { PlatformCapability, PlatformProvider } from "../../../api/platform";
+import { buildDeploymentForm, type DeploymentFormState } from "../deploymentEditor";
 import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
 import { t } from "../../../test/translation";
-import type { DeploymentFormState } from "../deploymentEditor";
 import {
   capabilitiesFixture,
+  deploymentsFixture,
   embeddingsModelsFixture,
   llmModelsFixture,
   providersFixture,
 } from "../../../test/platformControlFixtures";
+import PlatformDeploymentForm from "./PlatformDeploymentForm";
 
-function buildFormState(overrides: Partial<DeploymentFormState> = {}): DeploymentFormState {
+function buildProvidersByCapability(capabilities: PlatformCapability[], providers: PlatformProvider[]): Record<string, PlatformProvider[]> {
+  return Object.fromEntries(
+    capabilities.map((capability) => [
+      capability.capability,
+      providers.filter((provider) => provider.capability === capability.capability),
+    ]),
+  );
+}
+
+function buildModelResourcesByCapability(): Record<string, ManagedModel[]> {
   return {
-    slug: "local-default",
-    displayName: "Local Default",
-    description: "",
-    providerIdsByCapability: {},
-    resourceIdsByCapability: {},
-    defaultResourceIdsByCapability: {},
-    resourcePolicyByCapability: {},
-    ...overrides,
+    llm_inference: llmModelsFixture,
+    embeddings: embeddingsModelsFixture,
+    vector_store: [],
   };
 }
 
-function FormHarness({ initialValue }: { initialValue?: Partial<DeploymentFormState> }): JSX.Element {
-  const [value, setValue] = React.useState<DeploymentFormState>(buildFormState(initialValue));
+function DeploymentFormHarness(): JSX.Element {
+  const [value, setValue] = useState<DeploymentFormState>(buildDeploymentForm(deploymentsFixture[0]));
 
   return (
     <PlatformDeploymentForm
       value={value}
       capabilities={capabilitiesFixture}
-      providersByCapability={{
-        llm_inference: [providersFixture[0]],
-        embeddings: [providersFixture[1]],
-        vector_store: [providersFixture[2]],
-      }}
-      modelResourcesByCapability={{
-        llm_inference: llmModelsFixture,
-        embeddings: embeddingsModelsFixture,
-      }}
+      providersByCapability={buildProvidersByCapability(capabilitiesFixture, providersFixture)}
+      modelResourcesByCapability={buildModelResourcesByCapability()}
       helperText="Editing deployment local-default."
       isSubmitting={false}
       submitLabel="Save deployment"
@@ -53,43 +53,37 @@ function FormHarness({ initialValue }: { initialValue?: Partial<DeploymentFormSt
 }
 
 describe("PlatformDeploymentForm", () => {
-  it("updates the selected provider and filters default resources to selected model resources", async () => {
-    const user = userEvent.setup();
+  it("renders the deployment identity row first with editable slug and display name fields", async () => {
+    await renderWithAppProviders(<DeploymentFormHarness />);
 
-    await renderWithAppProviders(<FormHarness />);
-
-    await user.selectOptions(
-      await screen.findByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "LLM inference" })),
-      "provider-1",
-    );
-    await user.selectOptions(
-      screen.getByLabelText(await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" })),
-      ["gpt-5"],
-    );
-
-    const providerSelect = screen.getByLabelText(
-      await t("platformControl.forms.deployment.providerForCapability", { capability: "LLM inference" }),
-    ) as HTMLSelectElement;
-    expect(providerSelect.value).toBe("provider-1");
-
-    const defaultSelect = screen.getByLabelText(
-      await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "LLM inference" }),
-    );
-    const defaultOptions = within(defaultSelect).getAllByRole("option");
-    expect(defaultOptions.map((option) => option.textContent)).toEqual(["Select an option", "GPT-5"]);
+    const identityRow = screen.getByTestId("deployment-identity-row");
+    expect(
+      within(identityRow).getByLabelText(await t("platformControl.forms.deployment.slug")),
+    ).toHaveValue("local-default");
+    expect(
+      within(identityRow).getByLabelText(await t("platformControl.forms.deployment.displayName")),
+    ).toHaveValue("Local Default");
   });
 
-  it("shows the vector namespace input only in dynamic namespace mode", async () => {
-    const user = userEvent.setup();
+  it("updates selected model resources and reassigns the default within the same binding row", async () => {
+    await renderWithAppProviders(<DeploymentFormHarness />);
 
-    await renderWithAppProviders(<FormHarness />);
+    const llmRow = screen.getByTestId("deployment-binding-row-llm_inference");
+    const resourceButton = within(llmRow).getByRole("button", {
+      name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" }),
+    });
+    const defaultSelect = within(llmRow).getByLabelText(
+      await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "LLM inference" }),
+    );
 
-    const selectionModeSelect = await screen.findByLabelText(await t("platformControl.forms.deployment.vectorSelectionMode"));
-    expect(screen.getByLabelText(await t("platformControl.forms.deployment.explicitResources"))).toBeVisible();
+    expect(defaultSelect).toHaveValue("gpt-5");
 
-    await user.selectOptions(selectionModeSelect, "dynamic_namespace");
+    await userEvent.click(resourceButton);
+    await userEvent.click(within(llmRow).getByLabelText("GPT-5"));
 
-    expect(screen.getByLabelText(await t("platformControl.forms.deployment.namespacePrefix"))).toBeVisible();
-    expect(screen.queryByLabelText(await t("platformControl.forms.deployment.explicitResources"))).not.toBeInTheDocument();
+    expect(defaultSelect).toHaveValue("gpt-4.1");
+    expect(within(llmRow).getByRole("button", {
+      name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" }),
+    })).toHaveTextContent("GPT-4.1");
   });
 });

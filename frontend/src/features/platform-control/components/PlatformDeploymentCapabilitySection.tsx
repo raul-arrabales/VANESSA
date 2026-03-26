@@ -1,5 +1,6 @@
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { DeploymentCapabilitySectionState } from "../deploymentFormSections";
+import type { DeploymentCapabilitySectionState, DeploymentModelCheckboxOption } from "../deploymentFormSections";
 
 type PlatformDeploymentCapabilitySectionProps = {
   section: DeploymentCapabilitySectionState;
@@ -23,6 +24,92 @@ type VectorCapabilityFieldsProps = {
   onNamespacePrefixChange: (namespacePrefix: string) => void;
 };
 
+type ModelResourcePickerProps = {
+  capabilityDisplayName: string;
+  selectedResourceIds: string[];
+  resourcePickerSummary: string;
+  options: DeploymentModelCheckboxOption[];
+  loadedModelEligibilityHint: string | null;
+  noEligibleResourcesHint: string | null;
+  onResourceChange: (resourceIds: string[]) => void;
+};
+
+function buildNextSelectedResourceIds(
+  options: DeploymentModelCheckboxOption[],
+  selectedResourceIds: string[],
+  resourceId: string,
+  checked: boolean,
+): string[] {
+  const selectedIds = new Set(selectedResourceIds);
+  if (checked) {
+    selectedIds.add(resourceId);
+  } else {
+    selectedIds.delete(resourceId);
+  }
+  return options.filter((option) => selectedIds.has(option.id)).map((option) => option.id);
+}
+
+function ModelResourcePicker({
+  capabilityDisplayName,
+  selectedResourceIds,
+  resourcePickerSummary,
+  options,
+  loadedModelEligibilityHint,
+  noEligibleResourcesHint,
+  onResourceChange,
+}: ModelResourcePickerProps): JSX.Element {
+  const { t } = useTranslation("common");
+  const [isOpen, setIsOpen] = useState(false);
+  const panelId = useId();
+  const pickerCountLabel = t("platformControl.forms.deployment.resourcePickerCount", {
+    count: selectedResourceIds.length,
+  });
+
+  return (
+    <div className="card-stack deployment-binding-field deployment-resource-picker">
+      <span className="field-label">{t("platformControl.forms.deployment.boundResources")}</span>
+      <button
+        type="button"
+        className="field-input deployment-resource-trigger"
+        aria-label={t("platformControl.forms.deployment.resourcesForCapability", {
+          capability: capabilityDisplayName,
+        })}
+        aria-controls={panelId}
+        aria-expanded={isOpen}
+        disabled={options.length === 0}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span className="deployment-resource-trigger-text">{resourcePickerSummary}</span>
+        <span className="deployment-resource-trigger-meta">{pickerCountLabel}</span>
+      </button>
+      {isOpen ? (
+        <div id={panelId} className="deployment-resource-panel">
+          {options.map((option) => (
+            <label key={option.id} className="deployment-resource-option">
+              <input
+                type="checkbox"
+                checked={option.selected}
+                onChange={(event) =>
+                  onResourceChange(
+                    buildNextSelectedResourceIds(options, selectedResourceIds, option.id, event.target.checked),
+                  )
+                }
+              />
+              <span>{option.name}</span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+      {loadedModelEligibilityHint ? (
+        <p className="status-text">{loadedModelEligibilityHint}</p>
+      ) : null}
+      {noEligibleResourcesHint ? (
+        <p className="status-text">{noEligibleResourcesHint}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function ModelCapabilityFields({
   section,
   onResourceChange,
@@ -32,41 +119,22 @@ function ModelCapabilityFields({
 
   return (
     <>
-      <label className="card-stack">
-        <span className="field-label">
-          {t("platformControl.forms.deployment.resourcesForCapability", {
-            capability: section.capability.display_name,
-          })}
-        </span>
+      <ModelResourcePicker
+        capabilityDisplayName={section.capability.display_name}
+        selectedResourceIds={section.selectedResourceIds}
+        resourcePickerSummary={section.resourcePickerSummary}
+        options={section.modelCheckboxOptions}
+        loadedModelEligibilityHint={section.loadedModelEligibilityHint}
+        noEligibleResourcesHint={section.noEligibleResourcesHint}
+        onResourceChange={onResourceChange}
+      />
+      <label className="card-stack deployment-binding-field">
+        <span className="field-label">{t("platformControl.forms.deployment.defaultResource")}</span>
         <select
           className="field-input"
-          multiple
-          value={section.selectedResourceIds}
-          onChange={(event) =>
-            onResourceChange(Array.from(event.target.selectedOptions, (option) => option.value))
-          }
-        >
-          {section.modelOptions.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {section.loadedModelEligibilityHint ? (
-        <p className="status-text">{section.loadedModelEligibilityHint}</p>
-      ) : null}
-      {section.noEligibleResourcesHint ? (
-        <p className="status-text">{section.noEligibleResourcesHint}</p>
-      ) : null}
-      <label className="card-stack">
-        <span className="field-label">
-          {t("platformControl.forms.deployment.defaultResourceForCapability", {
+          aria-label={t("platformControl.forms.deployment.defaultResourceForCapability", {
             capability: section.capability.display_name,
           })}
-        </span>
-        <select
-          className="field-input"
           value={section.defaultResourceId}
           disabled={section.modelOptions.length === 0}
           onChange={(event) => onDefaultResourceChange(event.target.value)}
@@ -93,19 +161,20 @@ function VectorCapabilityFields({
 
   return (
     <>
-      <label className="card-stack">
-        <span className="field-label">{t("platformControl.forms.deployment.vectorSelectionMode")}</span>
+      <label className="card-stack deployment-binding-field">
+        <span className="field-label">{t("platformControl.forms.deployment.selectionMode")}</span>
         <select
           className="field-input"
+          aria-label={t("platformControl.forms.deployment.vectorSelectionMode")}
           value={section.vectorSelectionMode}
           onChange={(event) => onVectorSelectionModeChange(event.target.value)}
         >
-          <option value="explicit">Explicit resources</option>
-          <option value="dynamic_namespace">Dynamic namespace</option>
+          <option value="explicit">{t("platformControl.forms.deployment.vectorSelectionModeExplicit")}</option>
+          <option value="dynamic_namespace">{t("platformControl.forms.deployment.vectorSelectionModeDynamic")}</option>
         </select>
       </label>
       {section.vectorSelectionMode === "dynamic_namespace" ? (
-        <label className="card-stack">
+        <label className="card-stack deployment-binding-field">
           <span className="field-label">{t("platformControl.forms.deployment.namespacePrefix")}</span>
           <input
             className="field-input"
@@ -114,7 +183,7 @@ function VectorCapabilityFields({
           />
         </label>
       ) : (
-        <label className="card-stack">
+        <label className="card-stack deployment-binding-field deployment-binding-field-wide">
           <span className="field-label">{t("platformControl.forms.deployment.explicitResources")}</span>
           <textarea
             className="field-input quote-admin-textarea"
@@ -143,17 +212,29 @@ export default function PlatformDeploymentCapabilitySection({
   onNamespacePrefixChange,
 }: PlatformDeploymentCapabilitySectionProps): JSX.Element {
   const { t } = useTranslation("common");
+  const rowTitleId = useId();
 
   return (
-    <div className="card-stack">
-      <label className="card-stack">
-        <span className="field-label">
-          {t("platformControl.forms.deployment.providerForCapability", {
-            capability: section.capability.display_name,
-          })}
-        </span>
+    <section
+      className="deployment-binding-row panel"
+      aria-labelledby={rowTitleId}
+      data-testid={`deployment-binding-row-${section.capabilityKey}`}
+    >
+      <div className="deployment-binding-heading">
+        <span className="field-label">{t("platformControl.forms.deployment.binding")}</span>
+        <h4 id={rowTitleId} className="deployment-binding-title">
+          {section.capability.display_name}
+        </h4>
+        <p className="status-text">{section.capability.description}</p>
+      </div>
+
+      <label className="card-stack deployment-binding-field">
+        <span className="field-label">{t("platformControl.forms.deployment.provider")}</span>
         <select
           className="field-input"
+          aria-label={t("platformControl.forms.deployment.providerForCapability", {
+            capability: section.capability.display_name,
+          })}
           value={section.selectedProviderId}
           onChange={(event) => onProviderChange(event.target.value)}
         >
@@ -165,6 +246,7 @@ export default function PlatformDeploymentCapabilitySection({
           ))}
         </select>
       </label>
+
       {section.capabilityMode === "model" ? (
         <ModelCapabilityFields
           section={section}
@@ -179,6 +261,6 @@ export default function PlatformDeploymentCapabilitySection({
           onNamespacePrefixChange={onNamespacePrefixChange}
         />
       ) : null}
-    </div>
+    </section>
   );
 }

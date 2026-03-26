@@ -103,23 +103,31 @@ export default function PlatformDeploymentForm({
 
   return (
     <form className="card-stack" onSubmit={onSubmit}>
-      <div className="form-grid">
-        <label className="card-stack">
-          <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
-          <input
-            className="field-input"
-            value={value.slug}
-            onChange={(event) => onChange({ ...value, slug: event.target.value })}
-          />
-        </label>
-        <label className="card-stack">
-          <span className="field-label">{t("platformControl.forms.deployment.displayName")}</span>
-          <input
-            className="field-input"
-            value={value.displayName}
-            onChange={(event) => onChange({ ...value, displayName: event.target.value })}
-          />
-        </label>
+      <div className="deployment-settings-layout">
+        <div className="deployment-identity-row panel" data-testid="deployment-identity-row">
+          <div className="deployment-binding-heading">
+            <span className="field-label">{t("platformControl.forms.deployment.deploymentIdentity")}</span>
+            <h4 className="deployment-binding-title">{t("platformControl.sections.settings")}</h4>
+            <p className="status-text">{t("platformControl.deployments.settingsDescription")}</p>
+          </div>
+          <label className="card-stack deployment-binding-field">
+            <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
+            <input
+              className="field-input"
+              value={value.slug}
+              onChange={(event) => onChange({ ...value, slug: event.target.value })}
+            />
+          </label>
+          <label className="card-stack deployment-binding-field">
+            <span className="field-label">{t("platformControl.forms.deployment.displayName")}</span>
+            <input
+              className="field-input"
+              value={value.displayName}
+              onChange={(event) => onChange({ ...value, displayName: event.target.value })}
+            />
+          </label>
+        </div>
+
         {capabilities.map((capability) => {
           const section = buildDeploymentCapabilitySectionState({
             capability,

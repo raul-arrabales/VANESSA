@@ -16,6 +16,12 @@ function translate(key: string, options: Record<string, unknown> = {}): string {
   if (key === "platformControl.forms.deployment.noEligibleResourcesHint") {
     return `No ModelOps-eligible ${String(options.capability ?? "")} resources are currently available for binding.`;
   }
+  if (key === "platformControl.forms.deployment.resourcePickerEmpty") {
+    return "Select resources";
+  }
+  if (key === "platformControl.forms.deployment.resourcePickerSummary") {
+    return `${String(options.first ?? "")} +${String(options.count ?? "")} more`;
+  }
   return key;
 }
 
@@ -97,7 +103,12 @@ describe("buildDeploymentCapabilitySectionState", () => {
 
     expect(state.capabilityMode).toBe("model");
     expect(state.selectedProvider?.id).toBe("provider-1");
+    expect(state.modelCheckboxOptions).toEqual([
+      { id: "gpt-5", name: "GPT-5", selected: true },
+      { id: "gpt-4.1", name: "GPT-4.1", selected: false },
+    ]);
     expect(state.availableDefaultResources.map((model) => model.id)).toEqual(["gpt-5"]);
+    expect(state.resourcePickerSummary).toBe("GPT-5");
     expect(state.loadedModelEligibilityHint).toBeNull();
     expect(state.noEligibleResourcesHint).toBeNull();
   });
@@ -125,6 +136,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
       t: translate,
     });
 
+    expect(state.resourcePickerSummary).toBe("Select resources");
     expect(state.loadedModelEligibilityHint).toContain("vLLM embeddings local currently has all-MiniLM-L6-v2 loaded");
     expect(state.noEligibleResourcesHint).toBeNull();
   });
@@ -150,6 +162,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
       t: translate,
     });
 
+    expect(state.resourcePickerSummary).toBe("Select resources");
     expect(state.loadedModelEligibilityHint).toBeNull();
     expect(state.noEligibleResourcesHint).toBe("No ModelOps-eligible Embeddings resources are currently available for binding.");
   });

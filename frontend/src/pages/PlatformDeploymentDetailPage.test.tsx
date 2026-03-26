@@ -135,6 +135,83 @@ describe("PlatformDeploymentDetailPage", () => {
     });
   });
 
+  it("renders one binding row per capability and saves the same deployment mutation shape", async () => {
+    vi.mocked(platformApi.updateDeploymentProfile).mockResolvedValue(deploymentsFixture[0]);
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-1" },
+    );
+
+    const llmRow = await screen.findByTestId("deployment-binding-row-llm_inference");
+    const embeddingsRow = screen.getByTestId("deployment-binding-row-embeddings");
+    const vectorRow = screen.getByTestId("deployment-binding-row-vector_store");
+
+    expect(
+      within(llmRow).getByLabelText(
+        await t("platformControl.forms.deployment.providerForCapability", { capability: "LLM inference" }),
+      ),
+    ).toBeVisible();
+    expect(
+      within(llmRow).getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" }),
+      }),
+    ).toBeVisible();
+    expect(
+      within(llmRow).getByLabelText(
+        await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "LLM inference" }),
+      ),
+    ).toBeVisible();
+    expect(
+      within(embeddingsRow).getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Embeddings" }),
+      }),
+    ).toBeVisible();
+    expect(
+      within(vectorRow).getByLabelText(await t("platformControl.forms.deployment.vectorSelectionMode")),
+    ).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.saveDeployment") }));
+
+    await waitFor(() => {
+      expect(platformApi.updateDeploymentProfile).toHaveBeenCalledWith(
+        "deployment-1",
+        expect.objectContaining({
+          slug: "local-default",
+          display_name: "Local Default",
+          bindings: expect.arrayContaining([
+            expect.objectContaining({
+              capability: "llm_inference",
+              provider_id: "provider-1",
+              default_resource_id: "gpt-5",
+              resources: expect.arrayContaining([
+                expect.objectContaining({ id: "gpt-5", managed_model_id: "gpt-5" }),
+                expect.objectContaining({ id: "gpt-4.1", managed_model_id: "gpt-4.1" }),
+              ]),
+            }),
+            expect.objectContaining({
+              capability: "embeddings",
+              provider_id: "provider-embeddings",
+              default_resource_id: "text-embedding-3-small",
+            }),
+            expect.objectContaining({
+              capability: "vector_store",
+              provider_id: "provider-2",
+              default_resource_id: null,
+              resource_policy: expect.objectContaining({
+                selection_mode: "dynamic_namespace",
+                namespace_prefix: "kb_",
+              }),
+            }),
+          ]),
+        }),
+        "token",
+      );
+    });
+  });
+
   it("explains when a selected provider has a loaded model that is not yet eligible for binding", async () => {
     vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(
       providersFixture.map((provider) =>
