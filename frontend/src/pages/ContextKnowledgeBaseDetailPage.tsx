@@ -1,0 +1,346 @@
+import { type FormEvent, useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+  deleteKnowledgeBase,
+  deleteKnowledgeBaseDocument,
+  getKnowledgeBase,
+  listKnowledgeBaseDocuments,
+  updateKnowledgeBase,
+  createKnowledgeBaseDocument,
+  updateKnowledgeBaseDocument,
+  uploadKnowledgeBaseDocuments,
+  type KnowledgeBase,
+  type KnowledgeDocument,
+} from "../api/context";
+import { useAuth } from "../auth/AuthProvider";
+import {
+  useActionFeedback,
+  useRouteActionFeedback,
+  withActionFeedbackState,
+} from "../feedback/ActionFeedbackProvider";
+
+type DocumentFormState = {
+  id: string | null;
+  title: string;
+  sourceName: string;
+  uri: string;
+  text: string;
+};
+
+const EMPTY_DOCUMENT_FORM: DocumentFormState = {
+  id: null,
+  title: "",
+  sourceName: "",
+  uri: "",
+  text: "",
+};
+
+export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
+  const { t } = useTranslation("common");
+  const { knowledgeBaseId = "" } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { token, user } = useAuth();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
+  const isSuperadmin = user?.role === "superadmin";
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase | null>(null);
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ slug: "", displayName: "", description: "", lifecycleState: "active" });
+  const [documentForm, setDocumentForm] = useState<DocumentFormState>(EMPTY_DOCUMENT_FORM);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+
+  useRouteActionFeedback(location.state);
+
+  useEffect(() => {
+    if (!token || !knowledgeBaseId) {
+      return;
+    }
+    const load = async (): Promise<void> => {
+      setLoading(true);
+      try {
+        const [knowledgeBasePayload, documentsPayload] = await Promise.all([
+          getKnowledgeBase(knowledgeBaseId, token),
+          listKnowledgeBaseDocuments(knowledgeBaseId, token),
+        ]);
+        setKnowledgeBase(knowledgeBasePayload);
+        setDocuments(documentsPayload);
+        setForm({
+          slug: knowledgeBasePayload.slug,
+          displayName: knowledgeBasePayload.display_name,
+          description: knowledgeBasePayload.description,
+          lifecycleState: knowledgeBasePayload.lifecycle_state,
+        });
+      } catch (requestError) {
+        showErrorFeedback(requestError, t("contextManagement.feedback.loadFailed"));
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [knowledgeBaseId, showErrorFeedback, t, token]);
+
+  async function reload(): Promise<void> {
+    if (!token || !knowledgeBaseId) {
+      return;
+    }
+    const [knowledgeBasePayload, documentsPayload] = await Promise.all([
+      getKnowledgeBase(knowledgeBaseId, token),
+      listKnowledgeBaseDocuments(knowledgeBaseId, token),
+    ]);
+    setKnowledgeBase(knowledgeBasePayload);
+    setDocuments(documentsPayload);
+  }
+
+  async function handleSaveKnowledgeBase(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!token || !knowledgeBase || !isSuperadmin) {
+      return;
+    }
+    try {
+      const updated = await updateKnowledgeBase(knowledgeBase.id, {
+        slug: form.slug,
+        display_name: form.displayName,
+        description: form.description,
+        lifecycle_state: form.lifecycleState,
+      }, token);
+      setKnowledgeBase(updated);
+      showSuccessFeedback(t("contextManagement.feedback.updated", { name: updated.display_name }));
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.updateFailed"));
+    }
+  }
+
+  async function handleSubmitDocument(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!token || !knowledgeBase || !isSuperadmin) {
+      return;
+    }
+    try {
+      if (documentForm.id) {
+        await updateKnowledgeBaseDocument(knowledgeBase.id, documentForm.id, {
+          title: documentForm.title,
+          source_type: "manual",
+          source_name: documentForm.sourceName || null,
+          uri: documentForm.uri || null,
+          text: documentForm.text,
+        }, token);
+        showSuccessFeedback(t("contextManagement.feedback.documentUpdated", { title: documentForm.title }));
+      } else {
+        await createKnowledgeBaseDocument(knowledgeBase.id, {
+          title: documentForm.title,
+          source_type: "manual",
+          source_name: documentForm.sourceName || null,
+          uri: documentForm.uri || null,
+          text: documentForm.text,
+        }, token);
+        showSuccessFeedback(t("contextManagement.feedback.documentCreated", { title: documentForm.title }));
+      }
+      setDocumentForm(EMPTY_DOCUMENT_FORM);
+      await reload();
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.documentSaveFailed"));
+    }
+  }
+
+  async function handleDeleteDocument(documentId: string): Promise<void> {
+    if (!token || !knowledgeBase || !isSuperadmin) {
+      return;
+    }
+    try {
+      await deleteKnowledgeBaseDocument(knowledgeBase.id, documentId, token);
+      showSuccessFeedback(t("contextManagement.feedback.documentDeleted"));
+      await reload();
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.documentDeleteFailed"));
+    }
+  }
+
+  async function handleUpload(): Promise<void> {
+    if (!token || !knowledgeBase || !isSuperadmin || uploadFiles.length === 0) {
+      return;
+    }
+    try {
+      await uploadKnowledgeBaseDocuments(knowledgeBase.id, uploadFiles, token);
+      setUploadFiles([]);
+      showSuccessFeedback(t("contextManagement.feedback.uploaded", { count: uploadFiles.length }));
+      await reload();
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.uploadFailed"));
+    }
+  }
+
+  async function handleDeleteKnowledgeBase(): Promise<void> {
+    if (!token || !knowledgeBase || !isSuperadmin) {
+      return;
+    }
+    try {
+      await deleteKnowledgeBase(knowledgeBase.id, token);
+      navigate("/control/context", {
+        state: withActionFeedbackState({
+          kind: "success",
+          message: t("contextManagement.feedback.deleted", { name: knowledgeBase.display_name }),
+        }),
+      });
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.deleteFailed"));
+    }
+  }
+
+  return (
+    <section className="card-stack">
+      <div className="platform-card-header panel">
+        <div className="card-stack">
+          <h2 className="section-title">{knowledgeBase?.display_name ?? t("contextManagement.detailTitle")}</h2>
+          <p className="status-text">{knowledgeBase?.description || t("contextManagement.detailDescription")}</p>
+        </div>
+        <Link className="btn btn-secondary" to="/control/context">
+          {t("contextManagement.actions.back")}
+        </Link>
+      </div>
+
+      {loading ? <section className="panel"><p className="status-text">{t("contextManagement.states.loading")}</p></section> : null}
+
+      {knowledgeBase ? (
+        <>
+          <section className="panel card-stack">
+            <div className="status-row">
+              <span className="platform-badge" data-tone={knowledgeBase.sync_status === "ready" ? "enabled" : "disabled"}>
+                {`${knowledgeBase.lifecycle_state} / ${knowledgeBase.sync_status}`}
+              </span>
+              <span className="status-text">{knowledgeBase.index_name}</span>
+            </div>
+            <form className="card-stack" onSubmit={(event) => void handleSaveKnowledgeBase(event)}>
+              <label className="card-stack">
+                <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
+                <input className="field-input" value={form.slug} disabled={!isSuperadmin} onChange={(event) => setForm((current) => ({ ...current, slug: event.currentTarget.value }))} />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("platformControl.forms.deployment.displayName")}</span>
+                <input className="field-input" value={form.displayName} disabled={!isSuperadmin} onChange={(event) => setForm((current) => ({ ...current, displayName: event.currentTarget.value }))} />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
+                <textarea className="field-input quote-admin-textarea" value={form.description} disabled={!isSuperadmin} onChange={(event) => setForm((current) => ({ ...current, description: event.currentTarget.value }))} />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("contextManagement.fields.lifecycleState")}</span>
+                <select className="field-input" value={form.lifecycleState} disabled={!isSuperadmin} onChange={(event) => setForm((current) => ({ ...current, lifecycleState: event.currentTarget.value }))}>
+                  <option value="active">active</option>
+                  <option value="archived">archived</option>
+                </select>
+              </label>
+              {isSuperadmin ? (
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary">{t("contextManagement.actions.save")}</button>
+                  <button type="button" className="btn btn-danger" onClick={() => void handleDeleteKnowledgeBase()}>
+                    {t("contextManagement.actions.delete")}
+                  </button>
+                </div>
+              ) : null}
+            </form>
+          </section>
+
+          <section className="panel card-stack">
+            <h3 className="section-title">{t("contextManagement.documentsTitle")}</h3>
+            {knowledgeBase.deployment_usage?.length ? (
+              <div className="card-stack">
+                <p className="status-text">{t("contextManagement.usageTitle")}</p>
+                {knowledgeBase.deployment_usage.map((usage) => (
+                  <p key={`${usage.deployment_profile.id}-${usage.capability}`} className="status-text">
+                    <strong>{usage.deployment_profile.display_name}</strong> ({usage.deployment_profile.slug}) - {usage.capability}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+
+            {isSuperadmin ? (
+              <>
+                <form className="card-stack" onSubmit={(event) => void handleSubmitDocument(event)}>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.fields.documentTitle")}</span>
+                    <input className="field-input" value={documentForm.title} onChange={(event) => setDocumentForm((current) => ({ ...current, title: event.currentTarget.value }))} />
+                  </label>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.fields.sourceName")}</span>
+                    <input className="field-input" value={documentForm.sourceName} onChange={(event) => setDocumentForm((current) => ({ ...current, sourceName: event.currentTarget.value }))} />
+                  </label>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.fields.uri")}</span>
+                    <input className="field-input" value={documentForm.uri} onChange={(event) => setDocumentForm((current) => ({ ...current, uri: event.currentTarget.value }))} />
+                  </label>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.fields.documentText")}</span>
+                    <textarea className="field-input quote-admin-textarea" value={documentForm.text} onChange={(event) => setDocumentForm((current) => ({ ...current, text: event.currentTarget.value }))} />
+                  </label>
+                  <div className="form-actions">
+                    <button type="submit" className="btn btn-primary">
+                      {documentForm.id ? t("contextManagement.actions.updateDocument") : t("contextManagement.actions.addDocument")}
+                    </button>
+                    {documentForm.id ? (
+                      <button type="button" className="btn btn-secondary" onClick={() => setDocumentForm(EMPTY_DOCUMENT_FORM)}>
+                        {t("platformControl.actions.cancel")}
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="card-stack">
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.fields.uploadFiles")}</span>
+                    <input
+                      className="field-input"
+                      type="file"
+                      multiple
+                      onChange={(event) => setUploadFiles(Array.from(event.currentTarget.files ?? []))}
+                    />
+                  </label>
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-secondary" disabled={uploadFiles.length === 0} onClick={() => void handleUpload()}>
+                      {t("contextManagement.actions.upload")}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {documents.length === 0 ? <p className="status-text">{t("contextManagement.states.noDocuments")}</p> : null}
+            {documents.map((document) => (
+              <article key={document.id} className="panel card-stack">
+                <div className="platform-card-header">
+                  <div className="card-stack">
+                    <h4 className="section-title">{document.title}</h4>
+                    <p className="status-text">{document.source_name || document.source_type}</p>
+                  </div>
+                  {isSuperadmin ? (
+                    <div className="form-actions">
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setDocumentForm({
+                          id: document.id,
+                          title: document.title,
+                          sourceName: document.source_name ?? "",
+                          uri: document.uri ?? "",
+                          text: document.text,
+                        })}
+                      >
+                        {t("contextManagement.actions.edit")}
+                      </button>
+                      <button type="button" className="btn btn-danger" onClick={() => void handleDeleteDocument(document.id)}>
+                        {t("contextManagement.actions.deleteDocument")}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                <p className="status-text">{document.uri}</p>
+                <pre className="status-text" style={{ whiteSpace: "pre-wrap" }}>{document.text}</pre>
+              </article>
+            ))}
+          </section>
+        </>
+      ) : null}
+    </section>
+  );
+}

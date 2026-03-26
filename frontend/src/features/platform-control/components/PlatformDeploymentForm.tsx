@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
 import type { PlatformCapability, PlatformProvider } from "../../../api/platform";
 import type { DeploymentFormState } from "../deploymentEditor";
@@ -11,6 +12,7 @@ type PlatformDeploymentFormProps = {
   capabilities: PlatformCapability[];
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
+  knowledgeBases: KnowledgeBase[];
   helperText: string;
   isSubmitting: boolean;
   submitLabel: string;
@@ -28,6 +30,7 @@ export default function PlatformDeploymentForm({
   capabilities,
   providersByCapability,
   modelResourcesByCapability,
+  knowledgeBases,
   helperText,
   isSubmitting,
   submitLabel,
@@ -134,6 +137,7 @@ export default function PlatformDeploymentForm({
             value,
             providersByCapability,
             modelResourcesByCapability,
+            knowledgeBases,
             t,
           });
 

@@ -27,6 +27,9 @@
     "platformDeployments": "Despliegues de plataforma",
     "platformDeploymentNew": "Nuevo perfil de despliegue",
     "platformDeploymentDetail": "Detalle del perfil de despliegue",
+    "context": "Gestion de contexto",
+    "contextNew": "Nueva base de conocimiento",
+    "contextDetail": "Detalle de base de conocimiento",
     "catalog": "Catalogo de agentes",
     "models": "Modelos",
     "modelsCatalog": "Catalogo de modelos",
@@ -246,6 +249,10 @@
         "title": "Control de plataforma",
         "description": "Revisa la topologia activa de GenAI y entra en la gestion de proveedores o despliegues desde un home de control enfocado."
       },
+      "context": {
+        "title": "Gestion de contexto",
+        "description": "Crea y administra bases de conocimiento reutilizables y los documentos que exponen para recuperacion."
+      },
       "catalog": {
         "title": "Catalogo de agentes y herramientas",
         "description": "Crea, publica y valida definiciones gestionadas de agentes y herramientas."
@@ -275,6 +282,7 @@
     },
     "fields": {
       "model": "Modelo",
+      "knowledgeBase": "Base de conocimiento",
       "message": "Mensaje",
       "placeholder": "Haz una pregunta sobre la base de conocimiento compartida"
     },
@@ -288,12 +296,79 @@
     "states": {
       "empty": "Aun no hay mensajes. Haz una pregunta para recuperar contexto con conocimiento.",
       "noModels": "No hay modelos habilitados",
+      "noKnowledgeBases": "No hay bases de conocimiento gestionadas vinculadas al despliegue activo.",
+      "knowledgeBaseRequired": "Selecciona una base de conocimiento antes de iniciar el chat.",
       "modelsError": "No se pudieron cargar los modelos.",
       "requestError": "La solicitud de chat de conocimiento fallo."
     },
     "aria": {
       "panel": "Panel de chat de conocimiento",
       "history": "Historial de conversaciones del chat de conocimiento"
+    }
+  },
+  "contextManagement": {
+    "title": "Gestion de contexto",
+    "description": "Administra bases de conocimiento reutilizables y organiza los documentos que exponen a la recuperacion.",
+    "createTitle": "Crear base de conocimiento",
+    "createDescription": "Crea una base de conocimiento gestionada respaldada por el proveedor local de Weaviate.",
+    "detailTitle": "Base de conocimiento",
+    "detailDescription": "Revisa metadatos, uso en despliegues y documentos de esta base de conocimiento gestionada.",
+    "documentsTitle": "Documentos",
+    "usageTitle": "Uso en despliegues",
+    "actions": {
+      "newKnowledgeBase": "Nueva base de conocimiento",
+      "create": "Crear base de conocimiento",
+      "manage": "Gestionar",
+      "back": "Volver a bases de conocimiento",
+      "save": "Guardar base de conocimiento",
+      "delete": "Eliminar base de conocimiento",
+      "addDocument": "Agregar documento",
+      "updateDocument": "Actualizar documento",
+      "deleteDocument": "Eliminar documento",
+      "edit": "Editar",
+      "upload": "Subir archivos"
+    },
+    "fields": {
+      "schema": "Schema JSON",
+      "lifecycleState": "Estado del ciclo de vida",
+      "documentTitle": "Titulo del documento",
+      "sourceName": "Nombre de la fuente",
+      "uri": "URI de la fuente",
+      "documentText": "Texto del documento",
+      "uploadFiles": "Subir archivos"
+    },
+    "columns": {
+      "name": "Base de conocimiento",
+      "index": "Indice",
+      "status": "Estado",
+      "documents": "Documentos",
+      "bindings": "Vinculaciones",
+      "actions": "Acciones"
+    },
+    "states": {
+      "loading": "Cargando bases de conocimiento...",
+      "empty": "Todavia no se han creado bases de conocimiento.",
+      "noDocuments": "Todavia no se han agregado documentos."
+    },
+    "feedback": {
+      "loadFailed": "No se pudieron cargar los datos de gestion de contexto.",
+      "createFailed": "No se pudo crear la base de conocimiento.",
+      "updateFailed": "No se pudo actualizar la base de conocimiento.",
+      "deleteFailed": "No se pudo eliminar la base de conocimiento.",
+      "created": "Base de conocimiento '{{name}}' creada.",
+      "updated": "Base de conocimiento '{{name}}' actualizada.",
+      "deleted": "Base de conocimiento '{{name}}' eliminada.",
+      "invalidSchema": "Schema JSON debe ser JSON valido.",
+      "documentCreated": "Documento '{{title}}' agregado.",
+      "documentUpdated": "Documento '{{title}}' actualizado.",
+      "documentDeleted": "Documento eliminado.",
+      "documentSaveFailed": "No se pudo guardar el documento.",
+      "documentDeleteFailed": "No se pudo eliminar el documento.",
+      "uploaded": "Se subieron {{count}} archivo(s).",
+      "uploadFailed": "No se pudieron subir los archivos."
+    },
+    "aria": {
+      "table": "Inventario de bases de conocimiento"
     }
   },
   "quoteOfTheDay": {

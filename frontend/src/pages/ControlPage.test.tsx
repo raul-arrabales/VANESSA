@@ -51,6 +51,7 @@ describe("ControlPage", () => {
 
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
     expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
+    expect(screen.getByRole("link", { name: await t("control.items.context.title") })).toHaveAttribute("href", "/control/context");
     expect(screen.queryByRole("link", { name: await t("control.items.platform.title") })).toBeNull();
   });
 

@@ -43,6 +43,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     deployments,
     activationAudit,
     eligibleModelsByCapability,
+    knowledgeBases,
     reload,
   } = usePlatformDeploymentEditorData(token);
   const [form, setForm] = useState<DeploymentFormState | null>(null);
@@ -73,6 +74,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     capabilities,
     providers,
     eligibleModelsByCapability,
+    knowledgeBases,
     deployment,
     t,
   });
@@ -293,6 +295,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 capabilities={requiredCapabilities}
                 providersByCapability={providersByCapability}
                 modelResourcesByCapability={modelResourcesByCapability}
+                knowledgeBases={knowledgeBases}
                 helperText={t("platformControl.deployments.editing", { slug: deployment.slug })}
                 isSubmitting={saving}
                 submitLabel={t("platformControl.actions.saveDeployment")}

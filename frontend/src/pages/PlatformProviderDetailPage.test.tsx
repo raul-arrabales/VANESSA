@@ -41,6 +41,10 @@ vi.mock("../api/modelops/models", () => ({
   listModelOpsModels: vi.fn(),
 }));
 
+vi.mock("../api/context", () => ({
+  listKnowledgeBases: vi.fn(),
+}));
+
 const localEmbeddingsModel = {
   ...embeddingsModelsFixture[0],
   id: "sentence-transformers--all-MiniLM-L6-v2",

@@ -187,6 +187,51 @@ def test_delete_provider_rejects_bound_instances(monkeypatch: pytest.MonkeyPatch
     assert exc_info.value.details["binding_count"] == 2
 
 
+def test_validate_non_model_resources_accepts_ready_active_knowledge_base(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        platform_service.context_repo,
+        "get_knowledge_base",
+        lambda _db, knowledge_base_id: {
+            "id": knowledge_base_id,
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "index_name": "kb_product_docs",
+            "backing_provider_key": "weaviate_local",
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+            "document_count": 4,
+        },
+    )
+
+    payload = platform_service._validate_non_model_resources(  # type: ignore[attr-defined]
+        database_url="ignored",
+        provider_row={"provider_key": "weaviate_local"},
+        capability_key="vector_store",
+        resources=[{"id": "kb-primary", "ref_type": "knowledge_base"}],
+        default_resource_id="kb-primary",
+        resource_policy={"selection_mode": "explicit"},
+    )
+
+    assert payload["default_resource_id"] == "kb-primary"
+    assert payload["resources"] == [
+        {
+            "id": "kb-primary",
+            "resource_kind": "knowledge_base",
+            "ref_type": "knowledge_base",
+            "knowledge_base_id": "kb-primary",
+            "provider_resource_id": "kb_product_docs",
+            "display_name": "Product Docs",
+            "metadata": {
+                "slug": "product-docs",
+                "index_name": "kb_product_docs",
+                "lifecycle_state": "active",
+                "sync_status": "ready",
+                "document_count": 4,
+            },
+        }
+    ]
+
+
 def test_serialize_provider_row_exposes_secret_refs_separately():
     payload = platform_service._serialize_provider_row(  # type: ignore[attr-defined]
         {
@@ -1341,6 +1386,7 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                             "resource_kind": "model",
                             "ref_type": "managed_model",
                             "managed_model_id": "local-embed",
+                            "knowledge_base_id": None,
                             "provider_resource_id": "local-vllm-embeddings-default",
                             "display_name": "Local Embed",
                             "metadata": {
@@ -1369,6 +1415,7 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                         "resource_kind": "model",
                         "ref_type": "managed_model",
                         "managed_model_id": "local-embed",
+                        "knowledge_base_id": None,
                         "provider_resource_id": "local-vllm-embeddings-default",
                         "display_name": "Local Embed",
                         "metadata": {

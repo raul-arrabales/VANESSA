@@ -1,3 +1,4 @@
+import type { KnowledgeBase } from "../../../api/context";
 import { useState } from "react";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -11,6 +12,7 @@ import {
   capabilitiesFixture,
   deploymentsFixture,
   embeddingsModelsFixture,
+  knowledgeBasesFixture,
   llmModelsFixture,
   providersFixture,
 } from "../../../test/platformControlFixtures";
@@ -33,6 +35,10 @@ function buildModelResourcesByCapability(): Record<string, ManagedModel[]> {
   };
 }
 
+function buildKnowledgeBases(): KnowledgeBase[] {
+  return knowledgeBasesFixture;
+}
+
 function DeploymentFormHarness(): JSX.Element {
   const [value, setValue] = useState<DeploymentFormState>(buildDeploymentForm(deploymentsFixture[0]));
 
@@ -42,6 +48,7 @@ function DeploymentFormHarness(): JSX.Element {
       capabilities={capabilitiesFixture}
       providersByCapability={buildProvidersByCapability(capabilitiesFixture, providersFixture)}
       modelResourcesByCapability={buildModelResourcesByCapability()}
+      knowledgeBases={buildKnowledgeBases()}
       helperText="Editing deployment local-default."
       isSubmitting={false}
       submitLabel="Save deployment"

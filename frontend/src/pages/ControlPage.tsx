@@ -40,6 +40,14 @@ export default function ControlPage(): JSX.Element {
       minimumRole: "admin",
     },
     {
+      id: "context",
+      title: t("control.items.context.title"),
+      description: t("control.items.context.description"),
+      to: "/control/context",
+      icon: "models",
+      minimumRole: "admin",
+    },
+    {
       id: "approvals",
       title: t("control.items.approvals.title"),
       description: t("control.items.approvals.description"),

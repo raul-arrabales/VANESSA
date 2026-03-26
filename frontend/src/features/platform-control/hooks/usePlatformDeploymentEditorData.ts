@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { listKnowledgeBases, type KnowledgeBase } from "../../../api/context";
 import { listModelOpsModels, type ManagedModel } from "../../../api/modelops";
 import {
   listPlatformActivationAudit,
@@ -21,6 +22,7 @@ type PlatformDeploymentEditorDataState = {
   deployments: PlatformDeploymentProfile[];
   activationAudit: PlatformActivationAuditEntry[];
   eligibleModelsByCapability: Record<string, ManagedModel[]>;
+  knowledgeBases: KnowledgeBase[];
   reload: () => Promise<void>;
 };
 
@@ -33,6 +35,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
   const [deployments, setDeployments] = useState<PlatformDeploymentProfile[]>([]);
   const [activationAudit, setActivationAudit] = useState<PlatformActivationAuditEntry[]>([]);
   const [eligibleModelsByCapability, setEligibleModelsByCapability] = useState<Record<string, ManagedModel[]>>({});
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
 
   const reload = useCallback(async (): Promise<void> => {
     if (!token) {
@@ -52,6 +55,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
         activationAuditPayload,
         llmModelsPayload,
         embeddingsModelsPayload,
+        knowledgeBasesPayload,
       ] = await Promise.all([
         listPlatformCapabilities(token),
         listPlatformProviders(token),
@@ -59,6 +63,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
         listPlatformActivationAudit(token),
         listModelOpsModels(token, { eligible: true, capability: "llm_inference" }),
         listModelOpsModels(token, { eligible: true, capability: "embeddings" }),
+        listKnowledgeBases(token, { eligible: true }),
       ]);
 
       setCapabilities(capabilitiesPayload);
@@ -69,6 +74,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
         llm_inference: llmModelsPayload,
         embeddings: embeddingsModelsPayload,
       });
+      setKnowledgeBases(knowledgeBasesPayload);
       setState("success");
     } catch (error) {
       setState("error");
@@ -88,6 +94,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
     deployments,
     activationAudit,
     eligibleModelsByCapability,
+    knowledgeBases,
     reload,
   };
 }

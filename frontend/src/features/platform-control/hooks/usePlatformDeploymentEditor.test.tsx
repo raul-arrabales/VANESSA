@@ -5,6 +5,7 @@ import {
   capabilitiesFixture,
   deploymentsFixture,
   embeddingsModelsFixture,
+  knowledgeBasesFixture,
   llmModelsFixture,
   providersFixture,
 } from "../../../test/platformControlFixtures";
@@ -45,6 +46,7 @@ function HookHarness({
       llm_inference: llmModelsFixture,
       embeddings: embeddingsModelsFixture,
     },
+    knowledgeBases: knowledgeBasesFixture,
     deployment,
     t: translate as never,
   });
@@ -120,12 +122,12 @@ describe("usePlatformDeploymentEditor", () => {
           ]),
         }),
         expect.objectContaining({
-          capability: "vector_store",
-          default_resource_id: null,
-          resources: expect.arrayContaining([
-            expect.objectContaining({ id: "kb_primary", resource_kind: "index" }),
-          ]),
-        }),
+              capability: "vector_store",
+              default_resource_id: null,
+              resources: expect.arrayContaining([
+                expect.objectContaining({ id: "kb_primary", resource_kind: "knowledge_base", ref_type: "knowledge_base" }),
+              ]),
+            }),
       ]),
     );
   });

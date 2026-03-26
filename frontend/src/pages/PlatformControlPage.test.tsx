@@ -38,6 +38,10 @@ vi.mock("../api/modelops", () => ({
   listModelOpsModels: vi.fn(),
 }));
 
+vi.mock("../api/context", () => ({
+  listKnowledgeBases: vi.fn(),
+}));
+
 async function renderPage(language: "en" | "es" = "en"): Promise<void> {
   await renderWithAppProviders(<PlatformControlPage />, { language });
 }

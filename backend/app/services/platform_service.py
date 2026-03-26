@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
+from ..repositories import context_management as context_repo
 from ..repositories.modelops import get_model as get_model_by_id
 from ..repositories import platform_control_plane as platform_repo
+from .context_management import build_knowledge_base_binding_resource
 from .platform_adapters import (
     EmbeddingsAdapter,
     LlmInferenceAdapter,
@@ -2159,7 +2161,13 @@ def _coerce_binding_resources(raw_resources: Any) -> list[dict[str, Any]]:
     for item in raw_resources:
         if not isinstance(item, dict):
             raise PlatformControlPlaneError("invalid_resource", "Each resource must be an object", status_code=400)
-        resource_id = str(item.get("id") or item.get("managed_model_id") or item.get("provider_resource_id") or "").strip()
+        resource_id = str(
+            item.get("id")
+            or item.get("managed_model_id")
+            or item.get("knowledge_base_id")
+            or item.get("provider_resource_id")
+            or ""
+        ).strip()
         if not resource_id:
             raise PlatformControlPlaneError("invalid_resource_id", "resource.id is required", status_code=400)
         metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
@@ -2169,6 +2177,7 @@ def _coerce_binding_resources(raw_resources: Any) -> list[dict[str, Any]]:
                 "resource_kind": str(item.get("resource_kind") or "").strip().lower(),
                 "ref_type": str(item.get("ref_type") or "").strip().lower(),
                 "managed_model_id": str(item.get("managed_model_id") or "").strip() or None,
+                "knowledge_base_id": str(item.get("knowledge_base_id") or "").strip() or None,
                 "provider_resource_id": str(item.get("provider_resource_id") or "").strip() or None,
                 "display_name": str(item.get("display_name") or "").strip() or None,
                 "metadata": dict(metadata),
@@ -2192,6 +2201,8 @@ def _validate_binding_resources(
     requires_models = normalized_capability in _MODEL_BEARING_CAPABILITIES
     if not requires_models:
         return _validate_non_model_resources(
+            database_url=database_url,
+            provider_row=provider_row,
             capability_key=normalized_capability,
             resources=normalized_resources,
             default_resource_id=normalized_default,
@@ -2235,6 +2246,8 @@ def _validate_binding_resources(
 
 def _validate_non_model_resources(
     *,
+    database_url: str,
+    provider_row: dict[str, Any],
     capability_key: str,
     resources: list[dict[str, Any]],
     default_resource_id: str | None,
@@ -2265,17 +2278,7 @@ def _validate_non_model_resources(
             )
         validated = []
         for resource in resources:
-            validated.append(
-                {
-                    "id": str(resource.get("id") or "").strip(),
-                    "resource_kind": str(resource.get("resource_kind") or "index").strip().lower() or "index",
-                    "ref_type": "provider_resource",
-                    "managed_model_id": None,
-                    "provider_resource_id": str(resource.get("provider_resource_id") or resource.get("id") or "").strip(),
-                    "display_name": str(resource.get("display_name") or resource.get("id") or "").strip(),
-                    "metadata": dict(resource.get("metadata") or {}),
-                }
-            )
+            validated.append(_validate_vector_binding_resource(database_url, provider_row=provider_row, resource=resource))
         return {"resources": validated, "default_resource_id": default_resource_id}
     if selection_mode == _VECTOR_SELECTION_DYNAMIC_NAMESPACE:
         namespace_prefix = str(resource_policy.get("namespace_prefix") or "").strip()
@@ -2298,6 +2301,62 @@ def _validate_non_model_resources(
         status_code=400,
         details={"selection_mode": selection_mode},
     )
+
+
+def _validate_vector_binding_resource(
+    database_url: str,
+    *,
+    provider_row: dict[str, Any],
+    resource: dict[str, Any],
+) -> dict[str, Any]:
+    ref_type = str(resource.get("ref_type") or "").strip().lower()
+    knowledge_base_id = str(resource.get("knowledge_base_id") or resource.get("id") or "").strip()
+    if ref_type == "knowledge_base" or knowledge_base_id and str(resource.get("knowledge_base_id") or "").strip():
+        knowledge_base = context_repo.get_knowledge_base(database_url, knowledge_base_id)
+        if knowledge_base is None:
+            raise PlatformControlPlaneError(
+                "resource_not_found",
+                "Knowledge base resource was not found",
+                status_code=404,
+                details={"knowledge_base_id": knowledge_base_id},
+            )
+        if str(knowledge_base.get("lifecycle_state") or "").strip().lower() != "active":
+            raise PlatformControlPlaneError(
+                "resource_not_active",
+                "Vector store bindings require an active knowledge base",
+                status_code=409,
+                details={"knowledge_base_id": knowledge_base_id},
+            )
+        if str(knowledge_base.get("sync_status") or "").strip().lower() != "ready":
+            raise PlatformControlPlaneError(
+                "resource_not_ready",
+                "Vector store bindings require a ready knowledge base",
+                status_code=409,
+                details={"knowledge_base_id": knowledge_base_id},
+            )
+        if str(knowledge_base.get("backing_provider_key") or "").strip().lower() != str(provider_row.get("provider_key") or "").strip().lower():
+            raise PlatformControlPlaneError(
+                "resource_provider_mismatch",
+                "Knowledge base backing provider must match the selected vector store provider",
+                status_code=400,
+                details={
+                    "knowledge_base_id": knowledge_base_id,
+                    "knowledge_base_provider_key": knowledge_base.get("backing_provider_key"),
+                    "provider_key": provider_row.get("provider_key"),
+                },
+            )
+        return build_knowledge_base_binding_resource(knowledge_base)
+
+    return {
+        "id": str(resource.get("id") or "").strip(),
+        "resource_kind": str(resource.get("resource_kind") or "index").strip().lower() or "index",
+        "ref_type": "provider_resource",
+        "managed_model_id": None,
+        "knowledge_base_id": None,
+        "provider_resource_id": str(resource.get("provider_resource_id") or resource.get("id") or "").strip(),
+        "display_name": str(resource.get("display_name") or resource.get("id") or "").strip(),
+        "metadata": dict(resource.get("metadata") or {}),
+    }
 
 
 def _normalize_binding_resources(resources: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2479,6 +2538,7 @@ def _serialize_binding_resource(resource: dict[str, Any]) -> dict[str, Any]:
         "resource_kind": str(resource.get("resource_kind") or "").strip() or None,
         "ref_type": str(resource.get("ref_type") or "").strip() or None,
         "managed_model_id": str(resource.get("managed_model_id") or "").strip() or None,
+        "knowledge_base_id": str(resource.get("knowledge_base_id") or "").strip() or None,
         "provider_resource_id": str(resource.get("provider_resource_id") or "").strip() or None,
         "display_name": resource.get("display_name") or metadata.get("name"),
         "metadata": dict(metadata),

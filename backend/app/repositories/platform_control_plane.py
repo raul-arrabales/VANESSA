@@ -837,10 +837,17 @@ def _replace_binding_resources(
     for index, resource in enumerate(resources):
         if not isinstance(resource, dict):
             continue
-        resource_id = str(resource.get("id") or resource.get("managed_model_id") or resource.get("provider_resource_id") or "").strip()
+        resource_id = str(
+            resource.get("id")
+            or resource.get("managed_model_id")
+            or resource.get("knowledge_base_id")
+            or resource.get("provider_resource_id")
+            or ""
+        ).strip()
         if not resource_id:
             continue
         managed_model_id = str(resource.get("managed_model_id") or "").strip() or None
+        knowledge_base_id = str(resource.get("knowledge_base_id") or "").strip() or None
         provider_resource_id = str(resource.get("provider_resource_id") or "").strip() or None
         connection.execute(
             """
@@ -850,13 +857,14 @@ def _replace_binding_resources(
                 resource_kind,
                 ref_type,
                 managed_model_id,
+                knowledge_base_id,
                 provider_resource_id,
                 display_name,
                 metadata_json,
                 is_default,
                 sort_order
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
             """,
             (
                 binding_id,
@@ -864,6 +872,7 @@ def _replace_binding_resources(
                 str(resource.get("resource_kind") or "").strip().lower(),
                 str(resource.get("ref_type") or "").strip().lower(),
                 managed_model_id,
+                knowledge_base_id,
                 provider_resource_id,
                 str(resource.get("display_name") or "").strip() or None,
                 Jsonb(resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}),
@@ -885,6 +894,7 @@ def _attach_resources(connection: Any, rows: list[dict[str, Any]]) -> list[dict[
           br.resource_kind,
           br.ref_type,
           br.managed_model_id,
+          br.knowledge_base_id,
           br.provider_resource_id,
           br.display_name,
           br.metadata_json,
@@ -897,9 +907,16 @@ def _attach_resources(connection: Any, rows: list[dict[str, Any]]) -> list[dict[
           m.provider_model_id AS model_provider_model_id,
           m.local_path AS model_local_path,
           m.source_id AS model_source_id,
-          m.availability AS model_availability
+          m.availability AS model_availability,
+          kb.slug AS knowledge_base_slug,
+          kb.display_name AS knowledge_base_display_name,
+          kb.index_name AS knowledge_base_index_name,
+          kb.lifecycle_state AS knowledge_base_lifecycle_state,
+          kb.sync_status AS knowledge_base_sync_status,
+          kb.document_count AS knowledge_base_document_count
         FROM platform_binding_resources br
         LEFT JOIN model_registry m ON m.model_id = br.managed_model_id
+        LEFT JOIN context_knowledge_bases kb ON kb.id = br.knowledge_base_id
         WHERE br.binding_id = ANY(%s)
         ORDER BY br.binding_id ASC, br.sort_order ASC, br.resource_id ASC
         """,
@@ -922,12 +939,23 @@ def _attach_resources(connection: Any, rows: list[dict[str, Any]]) -> list[dict[
                 "source_id": row.get("model_source_id") or metadata.get("source_id"),
                 "availability": row.get("model_availability") or metadata.get("availability"),
             }
+        if str(row.get("ref_type") or "").strip().lower() == "knowledge_base":
+            metadata = {
+                **metadata,
+                "slug": row.get("knowledge_base_slug") or metadata.get("slug"),
+                "name": row.get("knowledge_base_display_name") or metadata.get("name"),
+                "index_name": row.get("knowledge_base_index_name") or metadata.get("index_name"),
+                "lifecycle_state": row.get("knowledge_base_lifecycle_state") or metadata.get("lifecycle_state"),
+                "sync_status": row.get("knowledge_base_sync_status") or metadata.get("sync_status"),
+                "document_count": row.get("knowledge_base_document_count") if row.get("knowledge_base_document_count") is not None else metadata.get("document_count"),
+            }
         resources_by_binding.setdefault(binding_id, []).append(
             {
                 "id": str(row["resource_id"]),
                 "resource_kind": str(row.get("resource_kind") or "").strip().lower(),
                 "ref_type": str(row.get("ref_type") or "").strip().lower(),
                 "managed_model_id": str(row.get("managed_model_id") or "").strip() or None,
+                "knowledge_base_id": str(row.get("knowledge_base_id") or "").strip() or None,
                 "provider_resource_id": str(row.get("provider_resource_id") or "").strip() or None,
                 "display_name": row.get("display_name") or row.get("model_name"),
                 "metadata": metadata,

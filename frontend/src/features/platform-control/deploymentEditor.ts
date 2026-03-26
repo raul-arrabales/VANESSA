@@ -1,3 +1,4 @@
+import type { KnowledgeBase } from "../../api/context";
 import type { ManagedModel } from "../../api/modelops";
 import type {
   PlatformCapability,
@@ -137,44 +138,66 @@ export function validateDeploymentForm(
 export function buildDeploymentMutationInput(
   requiredCapabilities: PlatformCapability[],
   form: DeploymentFormState,
+  knowledgeBases: KnowledgeBase[],
 ): PlatformDeploymentMutationInput {
+  const knowledgeBasesById = new Map(knowledgeBases.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase]));
   return {
     slug: form.slug,
     display_name: form.displayName,
     description: form.description,
     bindings: requiredCapabilities.map((capability) => ({
-      capability: capability.capability,
-      provider_id: form.providerIdsByCapability[capability.capability],
-      resources: capability.capability === "vector_store"
-        ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
-            id: resourceId,
-            resource_kind: "index",
-            ref_type: "provider_resource",
-            provider_resource_id: resourceId,
-            display_name: resourceId,
-            metadata: {},
-          }))
-        : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
-            id: resourceId,
-            resource_kind: "model",
-            ref_type: "managed_model",
-            managed_model_id: resourceId,
-            display_name: resourceId,
-            metadata: {},
-          })),
-      default_resource_id: capabilitySupportsResources(capability.capability)
-        ? form.defaultResourceIdsByCapability[capability.capability] || null
-        : null,
-      resource_policy: capability.capability === "vector_store"
-        ? {
-            selection_mode:
-              String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
-            ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
-          }
-        : (capabilitySupportsResources(capability.capability)
-            ? form.resourcePolicyByCapability[capability.capability] ?? {}
-            : {}),
-      config: {},
-    })),
+        capability: capability.capability,
+        provider_id: form.providerIdsByCapability[capability.capability],
+        resources: capability.capability === "vector_store"
+          ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => {
+              const knowledgeBase = knowledgeBasesById.get(resourceId);
+              if (knowledgeBase) {
+                return {
+                  id: knowledgeBase.id,
+                  resource_kind: "knowledge_base",
+                  ref_type: "knowledge_base",
+                  knowledge_base_id: knowledgeBase.id,
+                  provider_resource_id: knowledgeBase.index_name,
+                  display_name: knowledgeBase.display_name,
+                  metadata: {
+                    slug: knowledgeBase.slug,
+                    index_name: knowledgeBase.index_name,
+                    lifecycle_state: knowledgeBase.lifecycle_state,
+                    sync_status: knowledgeBase.sync_status,
+                    document_count: knowledgeBase.document_count,
+                  },
+                };
+              }
+              return {
+                id: resourceId,
+                resource_kind: "index",
+                ref_type: "provider_resource",
+                provider_resource_id: resourceId,
+                display_name: resourceId,
+                metadata: {},
+              };
+            })
+          : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
+              id: resourceId,
+              resource_kind: "model",
+              ref_type: "managed_model",
+              managed_model_id: resourceId,
+              display_name: resourceId,
+              metadata: {},
+            })),
+        default_resource_id: capabilitySupportsResources(capability.capability)
+          ? form.defaultResourceIdsByCapability[capability.capability] || null
+          : null,
+        resource_policy: capability.capability === "vector_store"
+          ? {
+              selection_mode:
+                String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
+              ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
+            }
+          : (capabilitySupportsResources(capability.capability)
+              ? form.resourcePolicyByCapability[capability.capability] ?? {}
+              : {}),
+        config: {},
+      })),
   };
 }

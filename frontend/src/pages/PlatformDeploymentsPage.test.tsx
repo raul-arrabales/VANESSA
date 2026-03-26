@@ -29,6 +29,10 @@ vi.mock("../api/modelops", () => ({
   listModelOpsModels: vi.fn(),
 }));
 
+vi.mock("../api/context", () => ({
+  listKnowledgeBases: vi.fn(),
+}));
+
 describe("PlatformDeploymentsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();

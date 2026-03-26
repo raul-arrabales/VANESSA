@@ -18,6 +18,9 @@ const PlatformProviderDetailPage = lazy(() => import("../pages/PlatformProviderD
 const PlatformDeploymentsPage = lazy(() => import("../pages/PlatformDeploymentsPage"));
 const PlatformDeploymentCreatePage = lazy(() => import("../pages/PlatformDeploymentCreatePage"));
 const PlatformDeploymentDetailPage = lazy(() => import("../pages/PlatformDeploymentDetailPage"));
+const ContextKnowledgeBasesPage = lazy(() => import("../pages/ContextKnowledgeBasesPage"));
+const ContextKnowledgeBaseCreatePage = lazy(() => import("../pages/ContextKnowledgeBaseCreatePage"));
+const ContextKnowledgeBaseDetailPage = lazy(() => import("../pages/ContextKnowledgeBaseDetailPage"));
 const ModelOpsHomePage = lazy(() => import("../features/modelops/pages/ModelOpsHomePage"));
 const ModelCatalogPage = lazy(() => import("../features/modelops/pages/ModelCatalogPage"));
 const CloudModelRegisterPage = lazy(() => import("../features/modelops/pages/CloudModelRegisterPage"));
@@ -242,6 +245,39 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "superadmin",
     element: <PlatformDeploymentDetailPage />,
+  },
+  {
+    id: "control-context",
+    path: "/control/context",
+    titleKey: "nav.context",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBasesPage />,
+  },
+  {
+    id: "control-context-new",
+    path: "/control/context/new",
+    titleKey: "nav.contextNew",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "superadmin",
+    element: <ContextKnowledgeBaseCreatePage />,
+  },
+  {
+    id: "control-context-detail",
+    path: "/control/context/:knowledgeBaseId",
+    titleKey: "nav.contextDetail",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseDetailPage />,
   },
   {
     id: "control-models",

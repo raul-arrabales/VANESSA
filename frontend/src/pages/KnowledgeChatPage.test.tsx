@@ -11,6 +11,7 @@ const modelApiMocks = vi.hoisted(() => ({
 
 const knowledgeApiMocks = vi.hoisted(() => ({
   runKnowledgeChat: vi.fn(),
+  listKnowledgeChatKnowledgeBases: vi.fn(),
 }));
 
 let mockUser: AuthUser | null = null;
@@ -21,6 +22,7 @@ vi.mock("../api/modelops", () => ({
 
 vi.mock("../api/knowledge", () => ({
   runKnowledgeChat: knowledgeApiMocks.runKnowledgeChat,
+  listKnowledgeChatKnowledgeBases: knowledgeApiMocks.listKnowledgeChatKnowledgeBases,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -54,6 +56,19 @@ describe("KnowledgeChatPage", () => {
       role: "user",
       is_active: true,
     };
+    knowledgeApiMocks.listKnowledgeChatKnowledgeBases.mockResolvedValue({
+      knowledge_bases: [
+        {
+          id: "kb_primary",
+          display_name: "Product Docs",
+          index_name: "kb_product_docs",
+          is_default: true,
+        },
+      ],
+      default_knowledge_base_id: "kb_primary",
+      selection_required: false,
+      configuration_message: null,
+    });
   });
 
   it("sends knowledge-chat requests with prior context only", async () => {
@@ -71,6 +86,7 @@ describe("KnowledgeChatPage", () => {
       {
         prompt: "First question",
         model: "safe-small",
+        knowledge_base_id: "kb_primary",
         history: [],
       },
       "token",
@@ -96,6 +112,7 @@ describe("KnowledgeChatPage", () => {
     await renderKnowledgeChat();
 
     await screen.findByLabelText("Model");
+    expect(screen.getByLabelText("Knowledge base")).toHaveValue("kb_primary");
     await userEvent.type(screen.getByLabelText("Message"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 

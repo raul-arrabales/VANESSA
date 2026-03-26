@@ -70,6 +70,15 @@ ModelOps is the managed-model domain layered on top of the GenAI control plane.
 
 See [ModelOps service documentation](services/modelops.md) for the domain model, lifecycle rules, and canonical APIs.
 
+## Context Management Domain
+
+Context Management is the managed knowledge-base domain layered beside the GenAI control plane and ModelOps.
+
+- It owns reusable knowledge-base metadata, document source-of-truth, upload/manual document ingestion, and vector synchronization.
+- PostgreSQL stores knowledge-base and document records; Weaviate remains the derived serving index for the current v1 implementation.
+- Deployment profiles still decide which `vector_store` provider is active and which managed knowledge bases are explicitly bound through binding `resources` plus `default_resource_id`.
+- Knowledge Chat now resolves only against knowledge bases bound to the active deployment profile rather than a fixed global retrieval index.
+
 Current provider proof state:
 
 - `local-default` keeps `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
@@ -79,6 +88,7 @@ Current provider proof state:
 - When `MCP_GATEWAY_URL` is configured, deployment profiles also bind `mcp_runtime -> mcp_gateway_local`.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; provider instances hold endpoint/auth config while deployment bindings choose explicit managed-model resources.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
+- `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.
 - Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain optional and are enforced per execution when an agent references tools that need them.
 
 ## Tool Runtime Convergence

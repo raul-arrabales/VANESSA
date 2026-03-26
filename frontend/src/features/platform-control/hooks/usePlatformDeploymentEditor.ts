@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { TFunction } from "i18next";
+import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
 import type {
   PlatformCapability,
@@ -24,6 +25,7 @@ type UsePlatformDeploymentEditorParams = {
   capabilities: PlatformCapability[];
   providers: PlatformProvider[];
   eligibleModelsByCapability: Record<string, ManagedModel[]>;
+  knowledgeBases: KnowledgeBase[];
   t: TFunction<"common">;
   deployment?: PlatformDeploymentProfile | null;
 };
@@ -45,6 +47,7 @@ export function usePlatformDeploymentEditor({
   capabilities,
   providers,
   eligibleModelsByCapability,
+  knowledgeBases,
   t,
   deployment = null,
 }: UsePlatformDeploymentEditorParams): UsePlatformDeploymentEditorResult {
@@ -87,10 +90,10 @@ export function usePlatformDeploymentEditor({
 
       return {
         validationError,
-        mutationInput: validationError ? null : buildDeploymentMutationInput(requiredCapabilities, form),
+        mutationInput: validationError ? null : buildDeploymentMutationInput(requiredCapabilities, form, knowledgeBases),
       };
     },
-    [requiredCapabilities, t],
+    [knowledgeBases, requiredCapabilities, t],
   );
 
   return {

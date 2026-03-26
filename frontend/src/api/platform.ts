@@ -69,6 +69,7 @@ export type PlatformDeploymentBinding = {
     resource_kind?: string | null;
     ref_type?: string | null;
     managed_model_id?: string | null;
+    knowledge_base_id?: string | null;
     provider_resource_id?: string | null;
     display_name?: string | null;
     metadata?: Record<string, unknown>;
@@ -79,6 +80,7 @@ export type PlatformDeploymentBinding = {
     resource_kind?: string | null;
     ref_type?: string | null;
     managed_model_id?: string | null;
+    knowledge_base_id?: string | null;
     provider_resource_id?: string | null;
     display_name?: string | null;
     metadata?: Record<string, unknown>;
@@ -129,6 +131,7 @@ export type PlatformProviderValidation = {
       resource_kind?: string | null;
       ref_type?: string | null;
       managed_model_id?: string | null;
+      knowledge_base_id?: string | null;
       provider_resource_id?: string | null;
       display_name?: string | null;
       metadata?: Record<string, unknown>;

@@ -21,6 +21,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     capabilities,
     providers,
     eligibleModelsByCapability,
+    knowledgeBases,
   } = usePlatformDeploymentEditorData(token);
   const {
     requiredCapabilities,
@@ -33,6 +34,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
     capabilities,
     providers,
     eligibleModelsByCapability,
+    knowledgeBases,
     t,
   });
   const [form, setForm] = useState<DeploymentFormState>(() => buildInitialForm());
@@ -84,6 +86,7 @@ export default function PlatformDeploymentCreatePage(): JSX.Element {
           capabilities={requiredCapabilities}
           providersByCapability={providersByCapability}
           modelResourcesByCapability={modelResourcesByCapability}
+          knowledgeBases={knowledgeBases}
           helperText={t("platformControl.deployments.createHelp")}
           isSubmitting={saving}
           submitLabel={t("platformControl.actions.createDeployment")}

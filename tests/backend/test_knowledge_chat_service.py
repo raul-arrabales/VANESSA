@@ -43,7 +43,25 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
     monkeypatch.setattr(
         knowledge_chat_service,
         "get_active_platform_runtime",
-        lambda _db, _config: {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+        lambda _db, _config: {
+            "deployment_profile": {"slug": "local-default"},
+            "capabilities": {
+                "vector_store": {
+                    "resources": [
+                        {
+                            "id": "kb-primary",
+                            "ref_type": "knowledge_base",
+                            "knowledge_base_id": "kb-primary",
+                            "provider_resource_id": "kb_product_docs",
+                            "display_name": "Product Docs",
+                            "metadata": {"slug": "product-docs", "index_name": "kb_product_docs"},
+                        }
+                    ],
+                    "default_resource_id": "kb-primary",
+                    "resource_policy": {"selection_mode": "explicit"},
+                }
+            },
+        },
     )
     monkeypatch.setattr(knowledge_chat_service, "resolve_runtime_profile", lambda _db: "offline")
 
@@ -91,12 +109,14 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             request_id="req-1",
             prompt="How does retrieval work?",
             requested_model_id="safe-small",
+            requested_knowledge_base_id=None,
             history_payload=[{"role": "assistant", "content": "Previous answer"}],
             create_execution_fn=_create_execution,
         )
 
     assert status_code == 200
     assert payload["output"] == "retrieval answer"
+    assert payload["knowledge_base_id"] == "kb-primary"
     assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 1}
     assert payload["sources"] == [
         {
@@ -127,12 +147,30 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                     {"role": "assistant", "content": [{"type": "text", "text": "Previous answer"}]},
                     {"role": "user", "content": [{"type": "text", "text": "How does retrieval work?"}]},
                 ],
-                "retrieval": {"index": "knowledge_base", "top_k": 5},
+                "retrieval": {"index": "kb_product_docs", "top_k": 5},
             },
             "requested_by_user_id": 7,
             "requested_by_role": "user",
             "runtime_profile": "offline",
-            "platform_runtime": {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "vector_store": {
+                        "resources": [
+                            {
+                                "id": "kb-primary",
+                                "ref_type": "knowledge_base",
+                                "knowledge_base_id": "kb-primary",
+                                "provider_resource_id": "kb_product_docs",
+                                "display_name": "Product Docs",
+                                "metadata": {"slug": "product-docs", "index_name": "kb_product_docs"},
+                            }
+                        ],
+                        "default_resource_id": "kb-primary",
+                        "resource_policy": {"selection_mode": "explicit"},
+                    }
+                },
+            },
         }
     ]
 
@@ -147,7 +185,25 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
     monkeypatch.setattr(
         knowledge_chat_service,
         "get_active_platform_runtime",
-        lambda _db, _config: {"deployment_profile": {"slug": "local-default"}, "capabilities": {}},
+        lambda _db, _config: {
+            "deployment_profile": {"slug": "local-default"},
+            "capabilities": {
+                "vector_store": {
+                    "resources": [
+                        {
+                            "id": "kb-primary",
+                            "ref_type": "knowledge_base",
+                            "knowledge_base_id": "kb-primary",
+                            "provider_resource_id": "kb_product_docs",
+                            "display_name": "Product Docs",
+                            "metadata": {"slug": "product-docs", "index_name": "kb_product_docs"},
+                        }
+                    ],
+                    "default_resource_id": "kb-primary",
+                    "resource_policy": {"selection_mode": "explicit"},
+                }
+            },
+        },
     )
     monkeypatch.setattr(knowledge_chat_service, "resolve_runtime_profile", lambda _db: "offline")
 
@@ -159,6 +215,7 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
             request_id="req-2",
             prompt="hello",
             requested_model_id="safe-small",
+            requested_knowledge_base_id=None,
             history_payload=[],
             create_execution_fn=lambda **_kwargs: (
                 {
@@ -178,6 +235,45 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
     assert status_code == 200
     assert payload["sources"] == []
     assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 0}
+
+
+def test_list_knowledge_chat_knowledge_bases_reports_selection_state():
+    payload, status_code = knowledge_chat_service.list_knowledge_chat_knowledge_bases(
+        database_url="ignored",
+        config=_config(),
+        get_active_platform_runtime_fn=lambda _db, _config: {
+            "deployment_profile": {"slug": "local-default"},
+            "capabilities": {
+                "vector_store": {
+                    "resources": [
+                        {
+                            "id": "kb-primary",
+                            "ref_type": "knowledge_base",
+                            "knowledge_base_id": "kb-primary",
+                            "provider_resource_id": "kb_product_docs",
+                            "display_name": "Product Docs",
+                            "metadata": {"slug": "product-docs", "index_name": "kb_product_docs"},
+                        }
+                    ],
+                    "default_resource_id": "kb-primary",
+                    "resource_policy": {"selection_mode": "explicit"},
+                }
+            },
+        },
+    )
+
+    assert status_code == 200
+    assert payload["default_knowledge_base_id"] == "kb-primary"
+    assert payload["selection_required"] is False
+    assert payload["knowledge_bases"] == [
+        {
+            "id": "kb-primary",
+            "display_name": "Product Docs",
+            "slug": "product-docs",
+            "index_name": "kb_product_docs",
+            "is_default": True,
+        }
+    ]
 
 
 def test_ensure_knowledge_chat_agent_seeds_entity_and_share(monkeypatch: pytest.MonkeyPatch):

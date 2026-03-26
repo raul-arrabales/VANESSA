@@ -1,0 +1,223 @@
+import { ApiError } from "../auth/authApi";
+import { requestJson } from "./modelops/request";
+
+const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
+
+export type KnowledgeBase = {
+  id: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  index_name: string;
+  backing_provider_key: string;
+  lifecycle_state: "active" | "archived" | string;
+  sync_status: "ready" | "syncing" | "error" | string;
+  schema: Record<string, unknown>;
+  document_count: number;
+  binding_count?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+  deployment_usage?: Array<{
+    deployment_profile: {
+      id: string;
+      slug: string;
+      display_name: string;
+    };
+    capability: string;
+  }>;
+};
+
+export type KnowledgeDocument = {
+  id: string;
+  knowledge_base_id: string;
+  title: string;
+  source_type: string;
+  source_name?: string | null;
+  uri?: string | null;
+  text: string;
+  metadata: Record<string, unknown>;
+  chunk_count: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+function buildUrl(path: string): string {
+  return `${backendBaseUrl.replace(/\/$/, "")}${path}`;
+}
+
+export async function listKnowledgeBases(
+  token: string,
+  options: { eligible?: boolean; backingProviderKey?: string } = {},
+): Promise<KnowledgeBase[]> {
+  const params = new URLSearchParams();
+  if (options.eligible) {
+    params.set("eligible", "true");
+  }
+  if (options.backingProviderKey) {
+    params.set("backing_provider_key", options.backingProviderKey);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const result = await requestJson<{ knowledge_bases: KnowledgeBase[] }>(`/v1/context/knowledge-bases${suffix}`, { token });
+  return result.knowledge_bases;
+}
+
+export async function createKnowledgeBase(
+  payload: {
+    slug: string;
+    display_name: string;
+    description: string;
+    backing_provider_key?: string;
+    lifecycle_state?: string;
+    schema?: Record<string, unknown>;
+  },
+  token: string,
+): Promise<KnowledgeBase> {
+  const result = await requestJson<{ knowledge_base: KnowledgeBase }>("/v1/context/knowledge-bases", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return result.knowledge_base;
+}
+
+export async function getKnowledgeBase(knowledgeBaseId: string, token: string): Promise<KnowledgeBase> {
+  const result = await requestJson<{ knowledge_base: KnowledgeBase }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
+    { token },
+  );
+  return result.knowledge_base;
+}
+
+export async function updateKnowledgeBase(
+  knowledgeBaseId: string,
+  payload: {
+    slug: string;
+    display_name: string;
+    description: string;
+    lifecycle_state: string;
+  },
+  token: string,
+): Promise<KnowledgeBase> {
+  const result = await requestJson<{ knowledge_base: KnowledgeBase }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
+    {
+      method: "PUT",
+      token,
+      body: payload,
+    },
+  );
+  return result.knowledge_base;
+}
+
+export async function deleteKnowledgeBase(knowledgeBaseId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function listKnowledgeBaseDocuments(knowledgeBaseId: string, token: string): Promise<KnowledgeDocument[]> {
+  const result = await requestJson<{ documents: KnowledgeDocument[] }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents`,
+    { token },
+  );
+  return result.documents;
+}
+
+export async function createKnowledgeBaseDocument(
+  knowledgeBaseId: string,
+  payload: {
+    title: string;
+    source_type?: string;
+    source_name?: string | null;
+    uri?: string | null;
+    text: string;
+    metadata?: Record<string, unknown>;
+  },
+  token: string,
+): Promise<KnowledgeDocument> {
+  const result = await requestJson<{ document: KnowledgeDocument }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents`,
+    {
+      method: "POST",
+      token,
+      body: payload,
+    },
+  );
+  return result.document;
+}
+
+export async function updateKnowledgeBaseDocument(
+  knowledgeBaseId: string,
+  documentId: string,
+  payload: {
+    title: string;
+    source_type?: string;
+    source_name?: string | null;
+    uri?: string | null;
+    text: string;
+    metadata?: Record<string, unknown>;
+  },
+  token: string,
+): Promise<KnowledgeDocument> {
+  const result = await requestJson<{ document: KnowledgeDocument }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "PUT",
+      token,
+      body: payload,
+    },
+  );
+  return result.document;
+}
+
+export async function deleteKnowledgeBaseDocument(
+  knowledgeBaseId: string,
+  documentId: string,
+  token: string,
+): Promise<void> {
+  await requestJson<{ deleted: boolean }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: "DELETE",
+      token,
+    },
+  );
+}
+
+export async function uploadKnowledgeBaseDocuments(
+  knowledgeBaseId: string,
+  files: File[],
+  token: string,
+): Promise<{ documents: KnowledgeDocument[]; count: number }> {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append("files", file);
+  });
+  const response = await fetch(buildUrl(`/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/uploads`), {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+  const rawBody = await response.text();
+  let payload: Record<string, unknown> = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      if (!response.ok) {
+        throw new ApiError(`HTTP ${response.status}`, response.status);
+      }
+      throw new ApiError("Backend returned a non-JSON response", response.status, "invalid_response_format");
+    }
+  }
+  if (!response.ok) {
+    const message = String(payload.message ?? payload.error ?? `HTTP ${response.status}`);
+    const code = payload.error ? String(payload.error) : undefined;
+    throw new ApiError(message, response.status, code);
+  }
+  return payload as unknown as { documents: KnowledgeDocument[]; count: number };
+}

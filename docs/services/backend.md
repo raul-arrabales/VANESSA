@@ -9,6 +9,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - Orchestration with agent engine, vector store, and data layer
 - Authentication and authorization surface (present and future)
 - GenAI control plane for capability/provider/deployment-profile management
+- Context Management for reusable knowledge bases and document ingestion
 
 ## Current Voice Endpoints
 
@@ -60,6 +61,27 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/platform/vector/query` (superadmin)
 - `POST /v1/platform/vector/documents/delete` (superadmin)
 
+## Context Management
+
+- `GET /v1/context/knowledge-bases` (admin)
+- `POST /v1/context/knowledge-bases` (superadmin)
+- `GET /v1/context/knowledge-bases/{id}` (admin)
+- `PUT /v1/context/knowledge-bases/{id}` (superadmin)
+- `DELETE /v1/context/knowledge-bases/{id}` (superadmin)
+- `GET /v1/context/knowledge-bases/{id}/documents` (admin)
+- `POST /v1/context/knowledge-bases/{id}/documents` (superadmin)
+- `PUT /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
+- `DELETE /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/uploads` (superadmin)
+
+Context-management semantics:
+
+- Managed knowledge bases are global records, but deployments explicitly bind them as `vector_store` binding resources.
+- Current v1 support targets `weaviate_local` only.
+- Documents are stored in Postgres, chunked synchronously by backend, and upserted into the backing vector provider.
+- Deployment editors expose only knowledge bases that are both `active` and `ready`.
+- Managed vector binding resources now use `ref_type="knowledge_base"` plus `knowledge_base_id`, while still preserving `provider_resource_id=index_name` for runtime enforcement.
+
 Key terms:
 
 - `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
@@ -91,7 +113,8 @@ Bootstrap defaults:
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
-- `POST /v1/chat/knowledge` is the first product-facing RAG surface. It keeps frontend chat state browser-local, resolves the selected model through ModelOps eligibility, executes the fixed `agent.knowledge_chat` agent through backend-owned orchestration, and returns normalized `sources` plus `retrieval` metadata for citation rendering.
+- `GET /v1/chat/knowledge/bases` exposes the managed knowledge bases bound to the active deployment for user-facing Knowledge Chat selection.
+- `POST /v1/chat/knowledge` now resolves both the selected model and the selected managed knowledge base through backend-owned governance, then executes the fixed `agent.knowledge_chat` agent and returns normalized `sources` plus `retrieval` metadata for citation rendering.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.

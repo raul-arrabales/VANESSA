@@ -27,6 +27,9 @@
     "platformDeployments": "Platform deployments",
     "platformDeploymentNew": "New deployment profile",
     "platformDeploymentDetail": "Deployment profile detail",
+    "context": "Context management",
+    "contextNew": "New knowledge base",
+    "contextDetail": "Knowledge base detail",
     "catalog": "Agent catalog",
     "models": "Models",
     "modelsCatalog": "Model catalog",
@@ -246,6 +249,10 @@
         "title": "Platform control",
         "description": "Review the active GenAI topology and jump into provider or deployment management from a focused control-plane home."
       },
+      "context": {
+        "title": "Context management",
+        "description": "Create and manage reusable knowledge bases and the documents they expose for retrieval."
+      },
       "catalog": {
         "title": "Agent and tool catalog",
         "description": "Create, publish, and validate managed agent and tool definitions."
@@ -275,6 +282,7 @@
     },
     "fields": {
       "model": "Model",
+      "knowledgeBase": "Knowledge base",
       "message": "Message",
       "placeholder": "Ask a question about the shared knowledge base"
     },
@@ -288,12 +296,79 @@
     "states": {
       "empty": "No messages yet. Ask a question to retrieve knowledge-backed context.",
       "noModels": "No enabled models",
+      "noKnowledgeBases": "No managed knowledge bases are bound to the active deployment.",
+      "knowledgeBaseRequired": "Select a knowledge base before starting knowledge chat.",
       "modelsError": "Unable to load models.",
       "requestError": "Knowledge chat request failed."
     },
     "aria": {
       "panel": "Knowledge chat panel",
       "history": "Knowledge chat conversation history"
+    }
+  },
+  "contextManagement": {
+    "title": "Context management",
+    "description": "Manage reusable knowledge bases and curate the documents they expose through retrieval.",
+    "createTitle": "Create knowledge base",
+    "createDescription": "Create a managed knowledge base backed by the local Weaviate provider.",
+    "detailTitle": "Knowledge base",
+    "detailDescription": "Review metadata, deployment usage, and documents for this managed knowledge base.",
+    "documentsTitle": "Documents",
+    "usageTitle": "Deployment usage",
+    "actions": {
+      "newKnowledgeBase": "New knowledge base",
+      "create": "Create knowledge base",
+      "manage": "Manage",
+      "back": "Back to knowledge bases",
+      "save": "Save knowledge base",
+      "delete": "Delete knowledge base",
+      "addDocument": "Add document",
+      "updateDocument": "Update document",
+      "deleteDocument": "Delete document",
+      "edit": "Edit",
+      "upload": "Upload files"
+    },
+    "fields": {
+      "schema": "Schema JSON",
+      "lifecycleState": "Lifecycle state",
+      "documentTitle": "Document title",
+      "sourceName": "Source name",
+      "uri": "Source URI",
+      "documentText": "Document text",
+      "uploadFiles": "Upload files"
+    },
+    "columns": {
+      "name": "Knowledge base",
+      "index": "Index",
+      "status": "Status",
+      "documents": "Documents",
+      "bindings": "Bindings",
+      "actions": "Actions"
+    },
+    "states": {
+      "loading": "Loading knowledge bases...",
+      "empty": "No knowledge bases have been created yet.",
+      "noDocuments": "No documents have been added yet."
+    },
+    "feedback": {
+      "loadFailed": "Unable to load context management data.",
+      "createFailed": "Unable to create knowledge base.",
+      "updateFailed": "Unable to update knowledge base.",
+      "deleteFailed": "Unable to delete knowledge base.",
+      "created": "Knowledge base '{{name}}' created.",
+      "updated": "Knowledge base '{{name}}' updated.",
+      "deleted": "Knowledge base '{{name}}' deleted.",
+      "invalidSchema": "Schema JSON must be valid JSON.",
+      "documentCreated": "Document '{{title}}' added.",
+      "documentUpdated": "Document '{{title}}' updated.",
+      "documentDeleted": "Document deleted.",
+      "documentSaveFailed": "Unable to save document.",
+      "documentDeleteFailed": "Unable to delete document.",
+      "uploaded": "Uploaded {{count}} file(s).",
+      "uploadFailed": "Unable to upload files."
+    },
+    "aria": {
+      "table": "Knowledge base inventory"
     }
   },
   "quoteOfTheDay": {

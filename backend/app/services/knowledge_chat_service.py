@@ -7,6 +7,7 @@ from flask import g
 from ..config import AuthConfig
 from .agent_engine_client import AgentEngineClientError, create_execution
 from .chat_inference import coerce_chat_messages
+from .context_management import list_active_runtime_knowledge_bases, resolve_runtime_knowledge_base_selection
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
 from .modelops_common import ModelOpsError
 from .modelops_runtime import ensure_model_invokable
@@ -86,6 +87,7 @@ def run_knowledge_chat(
     request_id: str,
     prompt: str,
     requested_model_id: str,
+    requested_knowledge_base_id: str | None,
     history_payload: Any,
     create_execution_fn=None,
     get_active_platform_runtime_fn=None,
@@ -131,6 +133,17 @@ def run_knowledge_chat(
             "message": exc.message,
             "details": exc.details or None,
         }, exc.status_code
+    try:
+        selected_knowledge_base = resolve_runtime_knowledge_base_selection(
+            platform_runtime,
+            knowledge_base_id=requested_knowledge_base_id,
+        )
+    except PlatformControlPlaneError as exc:
+        return {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
 
     response_payload, execution_status = create_execution_impl(
         base_url=config.agent_engine_url.rstrip("/"),
@@ -142,7 +155,7 @@ def run_knowledge_chat(
             "model": str(resolved_model.get("id") or normalized_model),
             "messages": _build_execution_messages(normalized_prompt, history),
             "retrieval": {
-                "index": config.product_rag_index,
+                "index": str(selected_knowledge_base["index_name"]),
                 "top_k": config.product_rag_top_k,
             },
         },
@@ -159,7 +172,26 @@ def run_knowledge_chat(
         "response": execution_payload,
         "sources": sources,
         "retrieval": retrieval,
+        "knowledge_base_id": str(selected_knowledge_base["id"]),
     }, 200 if 200 <= execution_status < 300 else execution_status
+
+
+def list_knowledge_chat_knowledge_bases(
+    *,
+    database_url: str,
+    config: AuthConfig,
+    get_active_platform_runtime_fn=None,
+) -> tuple[dict[str, Any], int]:
+    get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
+    try:
+        platform_runtime = get_active_platform_runtime_impl(database_url, config)
+    except PlatformControlPlaneError as exc:
+        return {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or None,
+        }, exc.status_code
+    return list_active_runtime_knowledge_bases(platform_runtime), 200
 
 
 def map_knowledge_chat_engine_error(exc: AgentEngineClientError) -> tuple[dict[str, Any], int]:

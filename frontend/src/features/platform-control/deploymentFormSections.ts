@@ -1,4 +1,5 @@
 import type { ManagedModel } from "../../api/modelops";
+import type { KnowledgeBase } from "../../api/context";
 import type { PlatformCapability, PlatformProvider } from "../../api/platform";
 import type { DeploymentFormState } from "./deploymentEditor";
 import { getDeploymentCapabilityMode } from "./capabilities";
@@ -24,12 +25,14 @@ export type DeploymentCapabilitySectionState = {
   modelCheckboxOptions: DeploymentModelCheckboxOption[];
   selectedResourceIds: string[];
   availableDefaultResources: ManagedModel[];
+  vectorDefaultResources: KnowledgeBase[];
   defaultResourceId: string;
   resourcePickerSummary: string;
   loadedModelEligibilityHint: string | null;
   noEligibleResourcesHint: string | null;
   vectorSelectionMode: string;
   namespacePrefix: string;
+  vectorKnowledgeBases: KnowledgeBase[];
 };
 
 type BuildDeploymentCapabilitySectionStateParams = {
@@ -37,6 +40,7 @@ type BuildDeploymentCapabilitySectionStateParams = {
   value: DeploymentFormState;
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
+  knowledgeBases: KnowledgeBase[];
   t: Translate;
 };
 
@@ -44,16 +48,20 @@ function getModelDisplayName(model: ManagedModel): string {
   return model.name.trim() || model.id;
 }
 
+function getKnowledgeBaseDisplayName(knowledgeBase: KnowledgeBase): string {
+  return knowledgeBase.display_name.trim() || knowledgeBase.slug || knowledgeBase.id;
+}
+
 function buildResourcePickerSummary(
   selectedResourceIds: string[],
-  modelOptions: ManagedModel[],
+  resourceOptions: Array<{ id: string; name: string }>,
   t: Translate,
 ): string {
   if (selectedResourceIds.length === 0) {
     return t("platformControl.forms.deployment.resourcePickerEmpty");
   }
 
-  const namesById = new Map(modelOptions.map((model) => [model.id, getModelDisplayName(model)]));
+  const namesById = new Map(resourceOptions.map((resource) => [resource.id, resource.name]));
   const selectedNames = selectedResourceIds.map((resourceId) => namesById.get(resourceId) ?? resourceId);
 
   if (selectedNames.length <= 2) {
@@ -71,6 +79,7 @@ export function buildDeploymentCapabilitySectionState({
   value,
   providersByCapability,
   modelResourcesByCapability,
+  knowledgeBases,
   t,
 }: BuildDeploymentCapabilitySectionStateParams): DeploymentCapabilitySectionState {
   const capabilityKey = capability.capability;
@@ -85,7 +94,9 @@ export function buildDeploymentCapabilitySectionState({
     name: getModelDisplayName(model),
     selected: selectedResourceIds.includes(model.id),
   }));
+  const vectorKnowledgeBases = capabilityMode === "vector" ? knowledgeBases : [];
   const availableDefaultResources = modelOptions.filter((model) => selectedResourceIds.includes(model.id));
+  const vectorDefaultResources = vectorKnowledgeBases.filter((knowledgeBase) => selectedResourceIds.includes(knowledgeBase.id));
   const loadedManagedModelId = selectedProvider?.loaded_managed_model_id ?? null;
   const loadedManagedModelName = selectedProvider?.loaded_managed_model_name ?? loadedManagedModelId ?? "";
   const loadedModelIsEligible = loadedManagedModelId
@@ -109,7 +120,6 @@ export function buildDeploymentCapabilitySectionState({
       })
     : null;
   const vectorPolicy = value.resourcePolicyByCapability[capabilityKey] ?? {};
-
   return {
     capability,
     capabilityKey,
@@ -121,11 +131,29 @@ export function buildDeploymentCapabilitySectionState({
     modelCheckboxOptions,
     selectedResourceIds,
     availableDefaultResources,
+    vectorDefaultResources,
     defaultResourceId: value.defaultResourceIdsByCapability[capabilityKey] ?? "",
-    resourcePickerSummary: buildResourcePickerSummary(selectedResourceIds, modelOptions, t),
+    resourcePickerSummary: capabilityMode === "vector"
+      ? buildResourcePickerSummary(
+          selectedResourceIds,
+          vectorKnowledgeBases.map((knowledgeBase) => ({
+            id: knowledgeBase.id,
+            name: getKnowledgeBaseDisplayName(knowledgeBase),
+          })),
+          t,
+        )
+      : buildResourcePickerSummary(
+          selectedResourceIds,
+          modelOptions.map((model) => ({
+            id: model.id,
+            name: getModelDisplayName(model),
+          })),
+          t,
+        ),
     loadedModelEligibilityHint,
     noEligibleResourcesHint,
     vectorSelectionMode: String(vectorPolicy.selection_mode ?? "explicit"),
     namespacePrefix: String(vectorPolicy.namespace_prefix ?? ""),
+    vectorKnowledgeBases,
   };
 }

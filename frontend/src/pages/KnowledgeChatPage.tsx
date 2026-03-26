@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { runKnowledgeChat, type KnowledgeSource } from "../api/knowledge";
+import {
+  listKnowledgeChatKnowledgeBases,
+  runKnowledgeChat,
+  type KnowledgeChatKnowledgeBaseOption,
+  type KnowledgeSource,
+} from "../api/knowledge";
 import ChatMessageBody from "../components/ChatMessageBody";
 import { listEnabledModels, type ChatHistoryItem, type ModelCatalogItem } from "../api/modelops";
 import { useAuth } from "../auth/AuthProvider";
@@ -17,6 +22,7 @@ type Conversation = {
   id: string;
   title: string;
   modelId: string;
+  knowledgeBaseId?: string | null;
   messages: ConversationMessage[];
   createdAt: string;
   updatedAt: string;
@@ -32,12 +38,13 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function newConversation(initialModelId: string): Conversation {
+function newConversation(initialModelId: string, initialKnowledgeBaseId?: string | null): Conversation {
   const now = new Date().toISOString();
   return {
     id: makeId(),
     title: "New knowledge conversation",
     modelId: initialModelId,
+    knowledgeBaseId: initialKnowledgeBaseId ?? null,
     messages: [],
     createdAt: now,
     updatedAt: now,
@@ -76,6 +83,9 @@ export default function KnowledgeChatPage(): JSX.Element {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeChatKnowledgeBaseOption[]>([]);
+  const [defaultKnowledgeBaseId, setDefaultKnowledgeBaseId] = useState<string | null>(null);
+  const [knowledgeBaseConfigurationMessage, setKnowledgeBaseConfigurationMessage] = useState("");
 
   const storageKey = useMemo(() => {
     if (!user) {
@@ -89,16 +99,22 @@ export default function KnowledgeChatPage(): JSX.Element {
       return;
     }
 
-    const loadModels = async (): Promise<void> => {
+    const loadModelsAndKnowledgeBases = async (): Promise<void> => {
       try {
-        const enabledModels = await listEnabledModels(token);
+        const [enabledModels, knowledgeBaseOptions] = await Promise.all([
+          listEnabledModels(token),
+          listKnowledgeChatKnowledgeBases(token),
+        ]);
         setModels(Array.isArray(enabledModels) ? enabledModels : []);
+        setKnowledgeBases(Array.isArray(knowledgeBaseOptions.knowledge_bases) ? knowledgeBaseOptions.knowledge_bases : []);
+        setDefaultKnowledgeBaseId(knowledgeBaseOptions.default_knowledge_base_id ?? null);
+        setKnowledgeBaseConfigurationMessage(knowledgeBaseOptions.configuration_message ?? "");
       } catch (requestError) {
         setError(requestError instanceof Error ? requestError.message : t("knowledgeChat.states.modelsError"));
       }
     };
 
-    void loadModels();
+    void loadModelsAndKnowledgeBases();
   }, [isAuthenticated, t, token]);
 
   useEffect(() => {
@@ -135,7 +151,7 @@ export default function KnowledgeChatPage(): JSX.Element {
     }
 
     if (conversations.length === 0) {
-      const created = newConversation(models[0].id);
+      const created = newConversation(models[0].id, defaultKnowledgeBaseId ?? knowledgeBases[0]?.id ?? null);
       setConversations([created]);
       setActiveConversationId(created.id);
       return;
@@ -147,7 +163,7 @@ export default function KnowledgeChatPage(): JSX.Element {
       }
       return conversation;
     }));
-  }, [models, conversations.length]);
+  }, [conversations.length, defaultKnowledgeBaseId, knowledgeBases, models]);
 
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
@@ -164,7 +180,10 @@ export default function KnowledgeChatPage(): JSX.Element {
       return;
     }
     const modelId = activeConversation?.modelId || models[0]?.id || "";
-    const created = newConversation(modelId);
+    const created = newConversation(
+      modelId,
+      activeConversation?.knowledgeBaseId ?? defaultKnowledgeBaseId ?? knowledgeBases[0]?.id ?? null,
+    );
     setConversations((existing) => [created, ...existing]);
     setActiveConversationId(created.id);
     setError("");
@@ -184,8 +203,47 @@ export default function KnowledgeChatPage(): JSX.Element {
     }));
   };
 
+  const updateConversationKnowledgeBase = (conversationId: string, knowledgeBaseId: string): void => {
+    setConversations((existing) => existing.map((conversation) => {
+      if (conversation.id !== conversationId) {
+        return conversation;
+      }
+      return {
+        ...conversation,
+        knowledgeBaseId,
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  };
+
+  useEffect(() => {
+    if (!defaultKnowledgeBaseId && knowledgeBases.length !== 1) {
+      return;
+    }
+    const fallbackKnowledgeBaseId = defaultKnowledgeBaseId ?? knowledgeBases[0]?.id ?? null;
+    if (!fallbackKnowledgeBaseId) {
+      return;
+    }
+    setConversations((currentConversations) => currentConversations.map((conversation) => (
+      conversation.knowledgeBaseId
+        ? conversation
+        : {
+            ...conversation,
+            knowledgeBaseId: fallbackKnowledgeBaseId,
+          }
+    )));
+  }, [defaultKnowledgeBaseId, knowledgeBases]);
+
   const sendPrompt = async (): Promise<void> => {
     if (!token || !activeConversation || !activeConversation.modelId || !draft.trim()) {
+      return;
+    }
+    if (knowledgeBases.length === 0) {
+      setError(knowledgeBaseConfigurationMessage || t("knowledgeChat.states.noKnowledgeBases"));
+      return;
+    }
+    if (!activeConversation.knowledgeBaseId) {
+      setError(t("knowledgeChat.states.knowledgeBaseRequired"));
       return;
     }
 
@@ -220,6 +278,7 @@ export default function KnowledgeChatPage(): JSX.Element {
         {
           prompt: trimmedDraft,
           model: activeConversation.modelId,
+          knowledge_base_id: activeConversation.knowledgeBaseId,
           history,
         },
         token,
@@ -299,6 +358,31 @@ export default function KnowledgeChatPage(): JSX.Element {
           ))}
         </select>
 
+        {knowledgeBases.length > 0 ? (
+          <>
+            <label className="field-label" htmlFor="knowledge-base-picker">{t("knowledgeChat.fields.knowledgeBase")}</label>
+            <select
+              id="knowledge-base-picker"
+              className="field-input"
+              value={activeConversation?.knowledgeBaseId ?? ""}
+              onChange={(event) => {
+                if (activeConversation) {
+                  updateConversationKnowledgeBase(activeConversation.id, event.currentTarget.value);
+                }
+              }}
+              disabled={!activeConversation}
+            >
+              <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+              {knowledgeBases.map((knowledgeBase) => (
+                <option key={knowledgeBase.id} value={knowledgeBase.id}>{knowledgeBase.display_name}</option>
+              ))}
+            </select>
+          </>
+        ) : null}
+        {knowledgeBaseConfigurationMessage ? (
+          <p className="status-text">{knowledgeBaseConfigurationMessage}</p>
+        ) : null}
+
         <div className="chatbot-thread" aria-live="polite">
           {activeConversation?.messages.length
             ? activeConversation.messages.map((message) => (
@@ -351,7 +435,7 @@ export default function KnowledgeChatPage(): JSX.Element {
           type="button"
           className="btn btn-primary"
           onClick={() => void sendPrompt()}
-          disabled={!activeConversation?.modelId || !draft.trim() || isSending}
+          disabled={!activeConversation?.modelId || !draft.trim() || isSending || knowledgeBases.length === 0}
         >
           {isSending ? t("knowledgeChat.actions.sending") : t("knowledgeChat.actions.send")}
         </button>

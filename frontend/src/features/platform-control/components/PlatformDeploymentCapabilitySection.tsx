@@ -20,17 +20,17 @@ type ModelCapabilityFieldsProps = {
 type VectorCapabilityFieldsProps = {
   section: DeploymentCapabilitySectionState;
   onResourceChange: (resourceIds: string[]) => void;
+  onDefaultResourceChange: (resourceId: string) => void;
   onVectorSelectionModeChange: (selectionMode: string) => void;
   onNamespacePrefixChange: (namespacePrefix: string) => void;
 };
 
-type ModelResourcePickerProps = {
+type ResourcePickerProps = {
   capabilityDisplayName: string;
   selectedResourceIds: string[];
   resourcePickerSummary: string;
   options: DeploymentModelCheckboxOption[];
-  loadedModelEligibilityHint: string | null;
-  noEligibleResourcesHint: string | null;
+  helperHints?: string[];
   onResourceChange: (resourceIds: string[]) => void;
 };
 
@@ -49,15 +49,14 @@ function buildNextSelectedResourceIds(
   return options.filter((option) => selectedIds.has(option.id)).map((option) => option.id);
 }
 
-function ModelResourcePicker({
+function ResourcePicker({
   capabilityDisplayName,
   selectedResourceIds,
   resourcePickerSummary,
   options,
-  loadedModelEligibilityHint,
-  noEligibleResourcesHint,
+  helperHints = [],
   onResourceChange,
-}: ModelResourcePickerProps): JSX.Element {
+}: ResourcePickerProps): JSX.Element {
   const { t } = useTranslation("common");
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
@@ -100,12 +99,9 @@ function ModelResourcePicker({
           ))}
         </div>
       ) : null}
-      {loadedModelEligibilityHint ? (
-        <p className="status-text">{loadedModelEligibilityHint}</p>
-      ) : null}
-      {noEligibleResourcesHint ? (
-        <p className="status-text">{noEligibleResourcesHint}</p>
-      ) : null}
+      {helperHints.map((hint) => (
+        <p key={hint} className="status-text">{hint}</p>
+      ))}
     </div>
   );
 }
@@ -119,13 +115,15 @@ function ModelCapabilityFields({
 
   return (
     <>
-      <ModelResourcePicker
+      <ResourcePicker
         capabilityDisplayName={section.capability.display_name}
         selectedResourceIds={section.selectedResourceIds}
         resourcePickerSummary={section.resourcePickerSummary}
         options={section.modelCheckboxOptions}
-        loadedModelEligibilityHint={section.loadedModelEligibilityHint}
-        noEligibleResourcesHint={section.noEligibleResourcesHint}
+        helperHints={[
+          section.loadedModelEligibilityHint,
+          section.noEligibleResourcesHint,
+        ].filter((hint): hint is string => Boolean(hint))}
         onResourceChange={onResourceChange}
       />
       <label className="card-stack deployment-binding-field">
@@ -154,10 +152,16 @@ function ModelCapabilityFields({
 function VectorCapabilityFields({
   section,
   onResourceChange,
+  onDefaultResourceChange,
   onVectorSelectionModeChange,
   onNamespacePrefixChange,
 }: VectorCapabilityFieldsProps): JSX.Element {
   const { t } = useTranslation("common");
+  const knowledgeBaseOptions = section.vectorKnowledgeBases.map((knowledgeBase) => ({
+    id: knowledgeBase.id,
+    name: knowledgeBase.display_name,
+    selected: section.selectedResourceIds.includes(knowledgeBase.id),
+  }));
 
   return (
     <>
@@ -183,21 +187,34 @@ function VectorCapabilityFields({
           />
         </label>
       ) : (
-        <label className="card-stack deployment-binding-field deployment-binding-field-wide">
-          <span className="field-label">{t("platformControl.forms.deployment.explicitResources")}</span>
-          <textarea
-            className="field-input quote-admin-textarea"
-            value={section.selectedResourceIds.join("\n")}
-            onChange={(event) =>
-              onResourceChange(
-                event.target.value
-                  .split("\n")
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              )
-            }
+        <>
+          <ResourcePicker
+            capabilityDisplayName={section.capability.display_name}
+            selectedResourceIds={section.selectedResourceIds}
+            resourcePickerSummary={section.resourcePickerSummary}
+            options={knowledgeBaseOptions}
+            onResourceChange={onResourceChange}
           />
-        </label>
+          <label className="card-stack deployment-binding-field">
+            <span className="field-label">{t("platformControl.forms.deployment.defaultResource")}</span>
+            <select
+              className="field-input"
+              aria-label={t("platformControl.forms.deployment.defaultResourceForCapability", {
+                capability: section.capability.display_name,
+              })}
+              value={section.defaultResourceId}
+              disabled={section.vectorDefaultResources.length === 0}
+              onChange={(event) => onDefaultResourceChange(event.target.value)}
+            >
+              <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+              {section.vectorDefaultResources.map((knowledgeBase) => (
+                <option key={knowledgeBase.id} value={knowledgeBase.id}>
+                  {knowledgeBase.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
     </>
   );
@@ -257,6 +274,7 @@ export default function PlatformDeploymentCapabilitySection({
         <VectorCapabilityFields
           section={section}
           onResourceChange={onResourceChange}
+          onDefaultResourceChange={onDefaultResourceChange}
           onVectorSelectionModeChange={onVectorSelectionModeChange}
           onNamespacePrefixChange={onNamespacePrefixChange}
         />

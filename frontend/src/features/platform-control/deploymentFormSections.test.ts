@@ -1,3 +1,4 @@
+import type { KnowledgeBase } from "../../api/context";
 import { describe, expect, it } from "vitest";
 import type { ManagedModel } from "../../api/modelops";
 import type { PlatformCapability, PlatformProvider } from "../../api/platform";
@@ -84,6 +85,22 @@ function buildFormState(overrides: Partial<DeploymentFormState> = {}): Deploymen
   };
 }
 
+function buildKnowledgeBase(overrides: Partial<KnowledgeBase> = {}): KnowledgeBase {
+  return {
+    id: "kb_primary",
+    slug: "product-docs",
+    display_name: "Product Docs",
+    description: "docs",
+    index_name: "kb_product_docs",
+    backing_provider_key: "weaviate_local",
+    lifecycle_state: "active",
+    sync_status: "ready",
+    schema: {},
+    document_count: 3,
+    ...overrides,
+  };
+}
+
 describe("buildDeploymentCapabilitySectionState", () => {
   it("builds model capability state with eligible resources and filtered default options", () => {
     const capability = buildCapability();
@@ -98,6 +115,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
       modelResourcesByCapability: {
         llm_inference: [buildModel(), buildModel({ id: "gpt-4.1", name: "GPT-4.1" })],
       },
+      knowledgeBases: [],
       t: translate,
     });
 
@@ -133,6 +151,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
         ],
       },
       modelResourcesByCapability: { embeddings: [] },
+      knowledgeBases: [],
       t: translate,
     });
 
@@ -159,6 +178,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
         ],
       },
       modelResourcesByCapability: { embeddings: [] },
+      knowledgeBases: [],
       t: translate,
     });
 
@@ -176,6 +196,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
       }),
       providersByCapability: { vector_store: [buildProvider({ id: "provider-2", capability: "vector_store" })] },
       modelResourcesByCapability: {},
+      knowledgeBases: [buildKnowledgeBase()],
       t: translate,
     });
     const dynamicState = buildDeploymentCapabilitySectionState({
@@ -190,12 +211,14 @@ describe("buildDeploymentCapabilitySectionState", () => {
       }),
       providersByCapability: { vector_store: [buildProvider({ id: "provider-2", capability: "vector_store" })] },
       modelResourcesByCapability: {},
+      knowledgeBases: [buildKnowledgeBase()],
       t: translate,
     });
 
     expect(explicitState.capabilityMode).toBe("vector");
     expect(explicitState.vectorSelectionMode).toBe("explicit");
     expect(explicitState.selectedResourceIds).toEqual(["kb_primary"]);
+    expect(explicitState.vectorDefaultResources.map((knowledgeBase) => knowledgeBase.id)).toEqual(["kb_primary"]);
     expect(dynamicState.vectorSelectionMode).toBe("dynamic_namespace");
     expect(dynamicState.namespacePrefix).toBe("kb_");
   });

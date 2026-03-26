@@ -41,6 +41,7 @@ def test_run_auth_schema_migration_invokes_registry_migration(monkeypatch):
     monkeypatch.setattr(db, "run_registry_schema_migration", lambda _db: call_order.append("registry"))
     monkeypatch.setattr(db, "run_model_management_schema_migration", lambda _db: call_order.append("model_management"))
     monkeypatch.setattr(db, "run_platform_control_plane_schema_migration", lambda _db: call_order.append("platform"))
+    monkeypatch.setattr(db, "run_context_management_schema_migration", lambda _db: call_order.append("context"))
     monkeypatch.setattr(db, "run_modelops_schema_migration", lambda _db: call_order.append("modelops"))
     monkeypatch.setattr(db, "run_modelops_testing_schema_migration", lambda _db: call_order.append("modelops_testing"))
     monkeypatch.setattr(db, "run_quotes_schema_migration", lambda _db: call_order.append("quotes"))
@@ -52,6 +53,7 @@ def test_run_auth_schema_migration_invokes_registry_migration(monkeypatch):
         "registry",
         "model_management",
         "platform",
+        "context",
         "modelops",
         "modelops_testing",
         "quotes",
@@ -93,6 +95,38 @@ def test_run_platform_control_plane_schema_migration_executes_base_and_additive_
     db.run_platform_control_plane_schema_migration("postgresql://ignored")
 
     assert executed_sql == ["-- migration 006", "-- migration 011"]
+
+
+def test_run_context_management_schema_migration_executes_context_sql(monkeypatch):
+    executed_sql: list[str] = []
+
+    class _RecordingCursor(_FakeCursor):
+        def execute(self, query, _params=None):
+            executed_sql.append(str(query))
+            return None
+
+    class _RecordingConnection(_FakeConnection):
+        def cursor(self):
+            return _RecordingCursor()
+
+    @contextmanager
+    def _recording_get_connection(_database_url: str) -> Iterator[_RecordingConnection]:
+        yield _RecordingConnection()
+
+    original_read_text = Path.read_text
+
+    def _fake_read_text(self: Path, encoding: str = "utf-8") -> str:
+        del encoding
+        if self.name == "012_context_management.sql":
+            return "-- migration 012"
+        return original_read_text(self, encoding="utf-8")
+
+    monkeypatch.setattr(db, "get_connection", _recording_get_connection)
+    monkeypatch.setattr(Path, "read_text", _fake_read_text)
+
+    db.run_context_management_schema_migration("postgresql://ignored")
+
+    assert executed_sql == ["-- migration 012"]
 
 
 def test_platform_binding_resources_migration_guards_legacy_copy_when_table_absent():

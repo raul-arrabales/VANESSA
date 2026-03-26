@@ -1,6 +1,8 @@
 import { vi } from "vitest";
+import type { KnowledgeBase } from "../api/context";
 import type { ManagedModel } from "../api/modelops";
 import type { PlatformDeploymentProfile } from "../api/platform";
+import * as contextApi from "../api/context";
 import * as modelsApi from "../api/modelops";
 import * as platformApi from "../api/platform";
 
@@ -160,6 +162,35 @@ export const embeddingsModelsFixture: ManagedModel[] = [
     lifecycle_state: "active",
     is_validation_current: true,
     last_validation_status: "success",
+  },
+];
+
+export const knowledgeBasesFixture: KnowledgeBase[] = [
+  {
+    id: "kb_primary",
+    slug: "product-docs",
+    display_name: "Product Docs",
+    description: "Primary product documentation knowledge base.",
+    index_name: "kb_product_docs",
+    backing_provider_key: "weaviate_local",
+    lifecycle_state: "active",
+    sync_status: "ready",
+    schema: {},
+    document_count: 12,
+    binding_count: 1,
+  },
+  {
+    id: "kb_support",
+    slug: "support-notes",
+    display_name: "Support Notes",
+    description: "Support issue and troubleshooting notes.",
+    index_name: "kb_support_notes",
+    backing_provider_key: "weaviate_local",
+    lifecycle_state: "active",
+    sync_status: "ready",
+    schema: {},
+    document_count: 4,
+    binding_count: 0,
   },
 ];
 
@@ -387,6 +418,7 @@ export function primePlatformControlMocks(): void {
   vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(providersFixture);
   vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue(deploymentsFixture);
   vi.mocked(platformApi.listPlatformActivationAudit).mockResolvedValue(activationAuditFixture);
+  vi.mocked(contextApi.listKnowledgeBases).mockResolvedValue(knowledgeBasesFixture);
   vi.mocked(modelsApi.listModelOpsModels).mockImplementation(async (_token, options) => {
     if (options?.capability === "llm_inference") {
       return llmModelsFixture;

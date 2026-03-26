@@ -42,6 +42,10 @@ vi.mock("../api/modelops", () => ({
   listModelOpsModels: vi.fn(),
 }));
 
+vi.mock("../api/context", () => ({
+  listKnowledgeBases: vi.fn(),
+}));
+
 describe("PlatformDeploymentCreatePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,10 +108,12 @@ describe("PlatformDeploymentCreatePage", () => {
       screen.getByLabelText(await t("platformControl.forms.deployment.providerForCapability", { capability: "Vector store" })),
       "provider-2",
     );
-    await userEvent.type(
-      screen.getByLabelText(await t("platformControl.forms.deployment.explicitResources")),
-      "kb_primary",
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Vector store" }),
+      }),
     );
+    await userEvent.click(screen.getByLabelText("Product Docs"));
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.createDeployment") }));
 
@@ -142,8 +148,10 @@ describe("PlatformDeploymentCreatePage", () => {
               resources: expect.arrayContaining([
                 expect.objectContaining({
                   id: "kb_primary",
-                  resource_kind: "index",
-                  ref_type: "provider_resource",
+                  resource_kind: "knowledge_base",
+                  ref_type: "knowledge_base",
+                  knowledge_base_id: "kb_primary",
+                  provider_resource_id: "kb_product_docs",
                 }),
               ]),
             }),

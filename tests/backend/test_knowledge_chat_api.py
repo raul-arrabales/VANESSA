@@ -67,6 +67,46 @@ def test_knowledge_chat_route_returns_service_payload(client, monkeypatch: pytes
     assert response.get_json()["output"] == "answer"
 
 
+def test_knowledge_chat_bases_route_returns_configuration_payload(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="u4@example.com",
+        username="u4",
+        password_hash=hash_password("u4-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "u4-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        chat_routes,
+        "list_knowledge_chat_knowledge_bases",
+        lambda **_kwargs: (
+            {
+                "knowledge_bases": [
+                    {
+                        "id": "kb-primary",
+                        "display_name": "Product Docs",
+                        "slug": "product-docs",
+                        "index_name": "kb_product_docs",
+                        "is_default": True,
+                    }
+                ],
+                "default_knowledge_base_id": "kb-primary",
+                "selection_required": False,
+                "configuration_message": None,
+            },
+            200,
+        ),
+    )
+
+    response = test_client.get("/v1/chat/knowledge/bases", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["default_knowledge_base_id"] == "kb-primary"
+
+
 def test_knowledge_chat_route_returns_json_on_unexpected_failure(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     user = users.create_user(

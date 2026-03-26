@@ -21,7 +21,11 @@ from ..services.chat_conversations import (
     stream_plain_message,
     update_plain_conversation,
 )
-from ..services.knowledge_chat_service import map_knowledge_chat_engine_error, run_knowledge_chat
+from ..services.knowledge_chat_service import (
+    list_knowledge_chat_knowledge_bases,
+    map_knowledge_chat_engine_error,
+    run_knowledge_chat,
+)
 
 bp = Blueprint("chat", __name__)
 
@@ -205,6 +209,7 @@ def knowledge_chat_route():
             request_id=_request_id(),
             prompt=payload.get("prompt", ""),
             requested_model_id=payload.get("model", ""),
+            requested_knowledge_base_id=payload.get("knowledge_base_id"),
             history_payload=payload.get("history", []),
         )
     except AgentEngineClientError as exc:
@@ -217,4 +222,21 @@ def knowledge_chat_route():
             "message": "Knowledge chat request failed.",
         }), 500
 
+    return jsonify(response_payload), status_code
+
+
+@bp.get("/v1/chat/knowledge/bases")
+@require_role("user")
+def knowledge_chat_knowledge_bases_route():
+    try:
+        response_payload, status_code = list_knowledge_chat_knowledge_bases(
+            database_url=_database_url(),
+            config=_config(),
+        )
+    except Exception as exc:  # pragma: no cover - guarded by route behavior tests
+        current_app.logger.exception("Knowledge chat knowledge-base lookup failed: %s", exc)
+        return jsonify({
+            "error": "knowledge_chat_configuration_failed",
+            "message": "Knowledge chat configuration could not be loaded.",
+        }), 500
     return jsonify(response_payload), status_code
