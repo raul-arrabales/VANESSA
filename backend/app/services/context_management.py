@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import io
 import json
 import re
 from pathlib import Path
@@ -13,7 +14,7 @@ from ..repositories import platform_control_plane as platform_repo
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 _SUPPORTED_SCHEMA_PROPERTY_TYPES = {"text", "number", "int", "boolean"}
-_SUPPORTED_UPLOAD_EXTENSIONS = {".txt", ".md", ".json", ".jsonl"}
+_SUPPORTED_UPLOAD_EXTENSIONS = {".txt", ".md", ".json", ".jsonl", ".pdf"}
 _SUPPORTED_BACKING_PROVIDER_KEYS = {"weaviate_local"}
 _KB_LIFECYCLE_STATES = {"active", "archived"}
 _KB_SYNC_STATES = {"ready", "syncing", "error"}
@@ -1183,44 +1184,24 @@ def _iter_source_files(
 
 
 def _parse_source_documents(file_path: Path, *, relative_path: str, source: dict[str, Any]) -> list[dict[str, Any]]:
-    raw_bytes = file_path.read_bytes()
-    if len(raw_bytes) > _MAX_FILE_SIZE_BYTES:
-        raise PlatformControlPlaneError(
-            "source_file_too_large",
-            f"Source files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
-            status_code=400,
-            details={"relative_path": relative_path},
-        )
-    text = raw_bytes.decode("utf-8")
-    suffix = file_path.suffix.lower()
-    if suffix in {".txt", ".md"}:
-        documents = [{
-            "title": file_path.stem or relative_path,
-            "source_type": "local_directory",
-            "source_name": str(source.get("display_name") or "").strip() or relative_path,
-            "uri": None,
-            "text": text.strip(),
-            "metadata": {},
-        }]
-    elif suffix == ".json":
-        documents = _documents_from_json_payload(json.loads(text), filename=relative_path)
-    elif suffix == ".jsonl":
-        documents: list[dict[str, Any]] = []
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            normalized = line.strip()
-            if not normalized:
-                continue
-            try:
-                parsed_line = json.loads(normalized)
-            except json.JSONDecodeError as exc:
-                raise PlatformControlPlaneError(
-                    "invalid_source_json",
-                    f"{relative_path} contains invalid JSON on line {line_number}",
-                    status_code=400,
-                ) from exc
-            documents.extend(_documents_from_json_payload(parsed_line, filename=relative_path))
-    else:
-        return []
+    raw_bytes = _read_ingestion_bytes(
+        file_path.read_bytes,
+        filename=relative_path,
+        too_large_code="source_file_too_large",
+        too_large_message=f"Source files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
+        read_error_code="invalid_source_file",
+        read_error_message="Source file could not be read",
+        details_key="relative_path",
+    )
+    documents = _parse_ingestion_documents(
+        relative_path,
+        raw_bytes,
+        default_source_type="local_directory",
+        default_source_name=str(source.get("display_name") or "").strip() or relative_path,
+        invalid_json_code="invalid_source_json",
+        invalid_pdf_code="invalid_source_pdf",
+        details_key="relative_path",
+    )
     return [
         {
             **document,
@@ -1622,39 +1603,96 @@ def _chunk_document_id(document_id: str, index: int) -> str:
 
 def _parse_upload_documents(file_storage: Any) -> list[dict[str, Any]]:
     filename = str(getattr(file_storage, "filename", "") or "").strip()
+    raw_bytes = _read_ingestion_bytes(
+        lambda: getattr(file_storage, "read")(),
+        filename=filename,
+        too_large_code="upload_limit_exceeded",
+        too_large_message=f"Uploaded files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
+        read_error_code="invalid_upload",
+        read_error_message="Uploaded file could not be read",
+        details_key="filename",
+    )
+    return _parse_ingestion_documents(
+        filename,
+        raw_bytes,
+        default_source_type="upload",
+        default_source_name=filename or None,
+        invalid_json_code="invalid_upload_json",
+        invalid_pdf_code="invalid_upload_pdf",
+        details_key="filename",
+    )
+
+
+def _read_ingestion_bytes(
+    read_bytes: Any,
+    *,
+    filename: str,
+    too_large_code: str,
+    too_large_message: str,
+    read_error_code: str,
+    read_error_message: str,
+    details_key: str,
+) -> bytes:
+    try:
+        raw_bytes = read_bytes()
+    except Exception as exc:
+        raise PlatformControlPlaneError(
+            read_error_code,
+            read_error_message,
+            status_code=400,
+            details={details_key: filename},
+        ) from exc
+    if not isinstance(raw_bytes, (bytes, bytearray)):
+        raise PlatformControlPlaneError(
+            read_error_code,
+            read_error_message,
+            status_code=400,
+            details={details_key: filename},
+        )
+    if len(raw_bytes) > _MAX_FILE_SIZE_BYTES:
+        raise PlatformControlPlaneError(
+            too_large_code,
+            too_large_message,
+            status_code=400,
+            details={details_key: filename},
+        )
+    return bytes(raw_bytes)
+
+
+def _parse_ingestion_documents(
+    filename: str,
+    raw_bytes: bytes,
+    *,
+    default_source_type: str,
+    default_source_name: str | None,
+    invalid_json_code: str,
+    invalid_pdf_code: str,
+    details_key: str,
+) -> list[dict[str, Any]]:
     suffix = Path(filename).suffix.lower()
     if suffix not in _SUPPORTED_UPLOAD_EXTENSIONS:
         raise PlatformControlPlaneError(
             "unsupported_upload_type",
-            "Supported upload types are .txt, .md, .json, and .jsonl",
+            "Supported upload types are .txt, .md, .json, .jsonl, and .pdf",
             status_code=400,
-            details={"filename": filename},
+            details={details_key: filename},
         )
-    raw_bytes = file_storage.read()
-    if not isinstance(raw_bytes, (bytes, bytearray)):
-        raise PlatformControlPlaneError("invalid_upload", "Uploaded file could not be read", status_code=400)
-    if len(raw_bytes) > _MAX_FILE_SIZE_BYTES:
-        raise PlatformControlPlaneError(
-            "upload_limit_exceeded",
-            f"Uploaded files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
-            status_code=400,
-            details={"filename": filename},
-        )
-    text = raw_bytes.decode("utf-8")
     if suffix in {".txt", ".md"}:
+        text = raw_bytes.decode("utf-8")
         return [{
             "title": Path(filename).stem or "Uploaded document",
-            "source_type": "upload",
-            "source_name": filename or None,
+            "source_type": default_source_type,
+            "source_name": default_source_name,
+            "uri": None,
             "text": text.strip(),
             "metadata": {},
         }]
     if suffix == ".json":
-        parsed = json.loads(text)
+        parsed = json.loads(raw_bytes.decode("utf-8"))
         return _documents_from_json_payload(parsed, filename=filename)
     if suffix == ".jsonl":
-        documents = []
-        for line_number, line in enumerate(text.splitlines(), start=1):
+        documents: list[dict[str, Any]] = []
+        for line_number, line in enumerate(raw_bytes.decode("utf-8").splitlines(), start=1):
             normalized = line.strip()
             if not normalized:
                 continue
@@ -1662,13 +1700,96 @@ def _parse_upload_documents(file_storage: Any) -> list[dict[str, Any]]:
                 parsed_line = json.loads(normalized)
             except json.JSONDecodeError as exc:
                 raise PlatformControlPlaneError(
-                    "invalid_upload_json",
+                    invalid_json_code,
                     f"{filename} contains invalid JSON on line {line_number}",
                     status_code=400,
                 ) from exc
             documents.extend(_documents_from_json_payload(parsed_line, filename=filename))
         return documents
+    if suffix == ".pdf":
+        return [_extract_pdf_document(
+            filename,
+            raw_bytes,
+            default_source_type=default_source_type,
+            default_source_name=default_source_name,
+            invalid_pdf_code=invalid_pdf_code,
+            details_key=details_key,
+        )]
     raise PlatformControlPlaneError("unsupported_upload_type", "Unsupported upload type", status_code=400)
+
+
+def _extract_pdf_document(
+    filename: str,
+    raw_bytes: bytes,
+    *,
+    default_source_type: str,
+    default_source_name: str | None,
+    invalid_pdf_code: str,
+    details_key: str,
+) -> dict[str, Any]:
+    PdfReader, pdf_error_types = _get_pdf_reader_dependencies()
+    try:
+        reader = PdfReader(io.BytesIO(raw_bytes))
+    except pdf_error_types as exc:
+        raise PlatformControlPlaneError(
+            invalid_pdf_code,
+            f"{filename} could not be parsed as a PDF document",
+            status_code=400,
+            details={details_key: filename},
+        ) from exc
+    except Exception as exc:
+        raise PlatformControlPlaneError(
+            invalid_pdf_code,
+            f"{filename} could not be parsed as a PDF document",
+            status_code=400,
+            details={details_key: filename},
+        ) from exc
+    if bool(getattr(reader, "is_encrypted", False)):
+        raise PlatformControlPlaneError(
+            invalid_pdf_code,
+            f"{filename} is encrypted and cannot be imported",
+            status_code=400,
+            details={details_key: filename},
+        )
+    pages = list(getattr(reader, "pages", []))
+    page_count = len(pages)
+    extracted_pages: list[str] = []
+    for page in pages:
+        page_text = str(page.extract_text() or "").strip()
+        if page_text:
+            extracted_pages.append(page_text)
+    text = "\n\n".join(extracted_pages).strip()
+    if not text:
+        raise PlatformControlPlaneError(
+            invalid_pdf_code,
+            f"{filename} does not contain extractable text. Scanned-image PDFs require OCR, which is not supported yet.",
+            status_code=400,
+            details={details_key: filename},
+        )
+    return {
+        "title": Path(filename).stem or "Uploaded document",
+        "source_type": default_source_type,
+        "source_name": default_source_name,
+        "uri": None,
+        "text": text,
+        "metadata": {
+            "page_count": page_count,
+            "source_filename": Path(filename).name,
+        },
+    }
+
+
+def _get_pdf_reader_dependencies():
+    try:
+        from pypdf import PdfReader
+        from pypdf.errors import PdfReadError
+    except ModuleNotFoundError as exc:
+        raise PlatformControlPlaneError(
+            "pdf_parser_unavailable",
+            "PDF support is unavailable because the pypdf dependency is not installed.",
+            status_code=500,
+        ) from exc
+    return PdfReader, (PdfReadError,)
 
 
 def _documents_from_json_payload(payload: Any, *, filename: str) -> list[dict[str, Any]]:

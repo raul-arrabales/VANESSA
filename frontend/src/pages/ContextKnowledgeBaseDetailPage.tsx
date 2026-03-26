@@ -446,6 +446,7 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
               <div className="card-stack">
                 <h3 className="section-title">{t("contextManagement.sourcesTitle")}</h3>
                 <p className="status-text">{t("contextManagement.sourcesDescription")}</p>
+                <p className="status-text">{t("contextManagement.states.supportedFileTypes")}</p>
               </div>
             </div>
 
@@ -680,6 +681,7 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
                 <div className="card-stack">
                   <label className="card-stack">
                     <span className="field-label">{t("contextManagement.fields.uploadFiles")}</span>
+                    <span className="status-text">{t("contextManagement.states.supportedFileTypes")}</span>
                     <input
                       className="field-input"
                       type="file"

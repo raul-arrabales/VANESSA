@@ -378,6 +378,7 @@
       "noSyncRuns": "No source syncs have been recorded yet.",
       "eligible": "Eligible for deployment binding.",
       "ineligible": "Not currently eligible for deployment binding.",
+      "supportedFileTypes": "Supported file types: .txt, .md, .json, .jsonl, .pdf.",
       "documentManagedBySource": "Managed by {{source}} ({{path}})",
       "documentManagedReadOnly": "This document is source-managed and can only be changed through its source sync.",
       "fullKnowledgeBaseResync": "Knowledge base resync",

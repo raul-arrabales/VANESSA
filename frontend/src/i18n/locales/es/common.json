@@ -378,6 +378,7 @@
       "noSyncRuns": "Todavia no se registraron sincronizaciones de fuentes.",
       "eligible": "Disponible para vincularse a despliegues.",
       "ineligible": "Actualmente no es apta para vincularse a despliegues.",
+      "supportedFileTypes": "Tipos de archivo compatibles: .txt, .md, .json, .jsonl, .pdf.",
       "documentManagedBySource": "Gestionado por {{source}} ({{path}})",
       "documentManagedReadOnly": "Este documento esta gestionado por una fuente y solo puede cambiarse mediante su sincronizacion.",
       "fullKnowledgeBaseResync": "Resincronizacion de la base de conocimiento",

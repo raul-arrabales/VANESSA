@@ -214,6 +214,7 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     expect(screen.getByRole("heading", { name: "Sources" })).toBeVisible();
     expect(screen.getAllByText("Docs folder").length).toBeGreaterThan(0);
     expect(screen.getByText(/Managed by Docs folder/)).toBeVisible();
+    expect(screen.getAllByText(/\.pdf/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Sync history" })).toBeVisible();
     expect(screen.getByText(/Scanned 1 file/)).toBeVisible();
 

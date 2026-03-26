@@ -90,6 +90,7 @@ Context-management semantics:
 - Managed `local_directory` knowledge sources live under allowlisted backend-visible roots configured by `CONTEXT_SOURCE_ROOTS`.
 - Source sync is deterministic: document identity is derived from `source_id + source_path + logical position`, so re-sync updates or deletes existing source-managed documents instead of duplicating them.
 - Source sync runs are persisted with file/document counters and error summaries for operator-facing history.
+- Current managed ingestion supports `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files. PDF handling uses `pypdf`, creates one logical document per PDF, and fails clearly for encrypted or scanned/image-only PDFs because OCR is not part of this slice.
 - Knowledge-base detail payloads now include sync diagnostics such as `last_sync_at`, `last_sync_error`, `last_sync_summary`, and `eligible_for_binding`.
 - Operators can run a synchronous resync to rebuild one managed knowledge base from stored documents.
 - Operators can also create/update/delete directory-backed sources and run `Sync now` against one source without rebuilding the whole knowledge base.

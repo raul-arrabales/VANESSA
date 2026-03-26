@@ -99,6 +99,7 @@ Platform control plane semantics:
 - Managed knowledge-base detail responses now include sync diagnostics and binding eligibility, and operators can trigger a synchronous KB resync or a retrieval QA query from the context-management surface.
 - Managed knowledge bases now also support repeatable `local_directory` content sources under allowlisted backend-visible roots from `CONTEXT_SOURCE_ROOTS`.
 - Source sync is synchronous in the current slice, but each run is persisted in `context_knowledge_sync_runs` with file/document counters and error summaries for operator review.
+- Managed knowledge-base ingestion now accepts `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files. PDF import uses `pypdf`, creates one logical document per PDF, and intentionally fails for encrypted or scanned/image-only PDFs because OCR is not included yet.
 - Source-managed documents now carry provenance (`source_id`, `source_path`, `source_document_key`) and are treated as read-only from the manual document editor.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
