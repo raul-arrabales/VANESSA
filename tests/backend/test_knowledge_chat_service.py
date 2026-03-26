@@ -13,7 +13,7 @@ if str(BACKEND_PATH) not in sys.path:
 
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
-from app.services import knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
+from app.services import context_management, knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
 
 
 def _config(**overrides) -> AuthConfig:
@@ -34,6 +34,11 @@ def _config(**overrides) -> AuthConfig:
 
 
 def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "get_knowledge_bases",
+        lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
+    )
     monkeypatch.setattr(
         knowledge_chat_service,
         "resolve_model_for_inference",
@@ -177,6 +182,11 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
 
 def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
+        context_management.context_repo,
+        "get_knowledge_bases",
+        lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
+    )
+    monkeypatch.setattr(
         knowledge_chat_service,
         "resolve_model_for_inference",
         lambda _db, *, user_id, requested_model_id, **_kwargs: {"id": requested_model_id},
@@ -237,7 +247,12 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
     assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 0}
 
 
-def test_list_knowledge_chat_knowledge_bases_reports_selection_state():
+def test_list_knowledge_chat_knowledge_bases_reports_selection_state(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        context_management.context_repo,
+        "get_knowledge_bases",
+        lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
+    )
     payload, status_code = knowledge_chat_service.list_knowledge_chat_knowledge_bases(
         database_url="ignored",
         config=_config(),
@@ -272,6 +287,9 @@ def test_list_knowledge_chat_knowledge_bases_reports_selection_state():
             "slug": "product-docs",
             "index_name": "kb_product_docs",
             "is_default": True,
+            "is_eligible": True,
+            "lifecycle_state": "active",
+            "sync_status": "ready",
         }
     ]
 

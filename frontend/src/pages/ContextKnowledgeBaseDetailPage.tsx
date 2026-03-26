@@ -6,12 +6,15 @@ import {
   deleteKnowledgeBaseDocument,
   getKnowledgeBase,
   listKnowledgeBaseDocuments,
+  queryKnowledgeBase,
+  resyncKnowledgeBase,
   updateKnowledgeBase,
   createKnowledgeBaseDocument,
   updateKnowledgeBaseDocument,
   uploadKnowledgeBaseDocuments,
   type KnowledgeBase,
   type KnowledgeDocument,
+  type KnowledgeBaseQueryResult,
 } from "../api/context";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -50,6 +53,12 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
   const [form, setForm] = useState({ slug: "", displayName: "", description: "", lifecycleState: "active" });
   const [documentForm, setDocumentForm] = useState<DocumentFormState>(EMPTY_DOCUMENT_FORM);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [retrievalQuery, setRetrievalQuery] = useState("");
+  const [retrievalTopK, setRetrievalTopK] = useState("5");
+  const [retrievalResults, setRetrievalResults] = useState<KnowledgeBaseQueryResult[]>([]);
+  const [retrievalResultCount, setRetrievalResultCount] = useState<number | null>(null);
+  const [isResyncing, setIsResyncing] = useState(false);
+  const [isQuerying, setIsQuerying] = useState(false);
 
   useRouteActionFeedback(location.state);
 
@@ -188,6 +197,47 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
     }
   }
 
+  async function handleResyncKnowledgeBase(): Promise<void> {
+    if (!token || !knowledgeBase || !isSuperadmin || isResyncing) {
+      return;
+    }
+    setIsResyncing(true);
+    try {
+      const refreshed = await resyncKnowledgeBase(knowledgeBase.id, token);
+      setKnowledgeBase(refreshed);
+      await reload();
+      showSuccessFeedback(t("contextManagement.feedback.resynced", { name: refreshed.display_name }));
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.resyncFailed"));
+    } finally {
+      setIsResyncing(false);
+    }
+  }
+
+  async function handleTestRetrieval(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!token || !knowledgeBase || isQuerying) {
+      return;
+    }
+    setIsQuerying(true);
+    try {
+      const response = await queryKnowledgeBase(
+        knowledgeBase.id,
+        {
+          query_text: retrievalQuery,
+          top_k: Number.parseInt(retrievalTopK, 10) || 5,
+        },
+        token,
+      );
+      setRetrievalResults(response.results);
+      setRetrievalResultCount(response.retrieval.result_count);
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.queryFailed"));
+    } finally {
+      setIsQuerying(false);
+    }
+  }
+
   return (
     <section className="card-stack">
       <div className="platform-card-header panel">
@@ -211,6 +261,36 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
               </span>
               <span className="status-text">{knowledgeBase.index_name}</span>
             </div>
+            <div className="card-stack">
+              <p className="status-text">
+                {knowledgeBase.eligible_for_binding
+                  ? t("contextManagement.states.eligible")
+                  : t("contextManagement.states.ineligible")}
+              </p>
+              {knowledgeBase.last_sync_summary ? <p className="status-text">{knowledgeBase.last_sync_summary}</p> : null}
+              {knowledgeBase.last_sync_at ? (
+                <p className="status-text">
+                  {t("contextManagement.fields.lastSyncAt")}: {knowledgeBase.last_sync_at}
+                </p>
+              ) : null}
+              {knowledgeBase.last_sync_error ? (
+                <p className="status-text error-text">
+                  {t("contextManagement.fields.lastSyncError")}: {knowledgeBase.last_sync_error}
+                </p>
+              ) : null}
+            </div>
+            {isSuperadmin ? (
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={isResyncing}
+                  onClick={() => void handleResyncKnowledgeBase()}
+                >
+                  {isResyncing ? t("contextManagement.actions.resyncing") : t("contextManagement.actions.resync")}
+                </button>
+              </div>
+            ) : null}
             <form className="card-stack" onSubmit={(event) => void handleSaveKnowledgeBase(event)}>
               <label className="card-stack">
                 <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
@@ -240,6 +320,65 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
                 </div>
               ) : null}
             </form>
+          </section>
+
+          <section className="panel card-stack">
+            <div className="platform-card-header">
+              <div className="card-stack">
+                <h3 className="section-title">{t("contextManagement.queryTitle")}</h3>
+                <p className="status-text">{t("contextManagement.queryDescription")}</p>
+              </div>
+            </div>
+            <form className="card-stack" onSubmit={(event) => void handleTestRetrieval(event)}>
+              <label className="card-stack">
+                <span className="field-label">{t("contextManagement.fields.queryText")}</span>
+                <textarea
+                  className="field-input quote-admin-textarea"
+                  value={retrievalQuery}
+                  onChange={(event) => setRetrievalQuery(event.currentTarget.value)}
+                />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("contextManagement.fields.topK")}</span>
+                <input
+                  className="field-input"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={retrievalTopK}
+                  onChange={(event) => setRetrievalTopK(event.currentTarget.value)}
+                />
+              </label>
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary" disabled={isQuerying || !retrievalQuery.trim()}>
+                  {isQuerying ? t("contextManagement.actions.querying") : t("contextManagement.actions.testRetrieval")}
+                </button>
+              </div>
+            </form>
+            {retrievalResultCount !== null ? (
+              <p className="status-text">
+                {t("contextManagement.states.queryResultCount", { count: retrievalResultCount })}
+              </p>
+            ) : null}
+            {retrievalResults.length === 0 && retrievalResultCount !== null ? (
+              <p className="status-text">{t("contextManagement.states.noQueryResults")}</p>
+            ) : null}
+            {retrievalResults.map((result) => (
+              <article key={result.id} className="panel card-stack">
+                <div className="platform-card-header">
+                  <div className="card-stack">
+                    <h4 className="section-title">{result.title || result.id}</h4>
+                    <p className="status-text">
+                      {result.score != null && result.score_kind
+                        ? `${result.score_kind}: ${result.score}`
+                        : result.source_type ?? ""}
+                    </p>
+                  </div>
+                </div>
+                {result.uri ? <p className="status-text">{result.uri}</p> : null}
+                <p className="status-text">{result.snippet}</p>
+              </article>
+            ))}
           </section>
 
           <section className="panel card-stack">

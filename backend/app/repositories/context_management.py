@@ -203,6 +203,69 @@ def set_knowledge_base_sync_status(
     return dict(row) if row is not None else None
 
 
+def mark_knowledge_base_syncing(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    updated_by_user_id: int | None,
+    last_sync_summary: str | None = None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_bases
+            SET
+              sync_status = 'syncing',
+              last_sync_error = NULL,
+              last_sync_summary = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                last_sync_summary.strip() if isinstance(last_sync_summary, str) and last_sync_summary.strip() else None,
+                updated_by_user_id,
+                knowledge_base_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def set_knowledge_base_sync_result(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    sync_status: str,
+    last_sync_error: str | None,
+    last_sync_summary: str | None,
+    updated_by_user_id: int | None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_bases
+            SET
+              sync_status = %s,
+              last_sync_at = NOW(),
+              last_sync_error = %s,
+              last_sync_summary = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                sync_status.strip().lower(),
+                last_sync_error.strip() if isinstance(last_sync_error, str) and last_sync_error.strip() else None,
+                last_sync_summary.strip() if isinstance(last_sync_summary, str) and last_sync_summary.strip() else None,
+                updated_by_user_id,
+                knowledge_base_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
 def delete_knowledge_base(database_url: str, knowledge_base_id: str) -> bool:
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -411,6 +474,35 @@ def set_knowledge_base_document_count(
                 document_count,
                 updated_by_user_id,
                 knowledge_base_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def set_document_chunk_count(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    document_id: str,
+    chunk_count: int,
+    updated_by_user_id: int | None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_documents
+            SET
+              chunk_count = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE knowledge_base_id = %s AND id = %s
+            RETURNING *
+            """,
+            (
+                chunk_count,
+                updated_by_user_id,
+                knowledge_base_id.strip(),
+                document_id.strip(),
             ),
         ).fetchone()
     return dict(row) if row is not None else None

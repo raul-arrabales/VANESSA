@@ -76,3 +76,52 @@ def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatc
 
     assert response.status_code == 200
     assert response.get_json()["knowledge_bases"][0]["id"] == "kb-primary"
+
+
+def test_resync_knowledge_base_route_requires_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin@example.com",
+        username="admin",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    response = test_client.post("/v1/context/knowledge-bases/kb-primary/resync", headers=_auth(token))
+
+    assert response.status_code == 403
+
+
+def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-query@example.com",
+        username="admin-query",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "query_knowledge_base",
+        lambda *_args, **_kwargs: {
+            "knowledge_base_id": "kb-primary",
+            "retrieval": {"index": "kb_product_docs", "result_count": 1, "top_k": 5},
+            "results": [{"id": "doc-1", "title": "Architecture Overview", "snippet": "Hello"}],
+        },
+    )
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/query",
+        headers=_auth(token),
+        json={"query_text": "hello", "top_k": 5},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["retrieval"]["index"] == "kb_product_docs"

@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
@@ -15,7 +16,7 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
-vi.mock("../api/context", () => ({
+const contextApiMocks = vi.hoisted(() => ({
   getKnowledgeBase: vi.fn(async () => ({
     id: "kb-primary",
     slug: "product-docs",
@@ -25,6 +26,10 @@ vi.mock("../api/context", () => ({
     backing_provider_key: "weaviate_local",
     lifecycle_state: "active",
     sync_status: "ready",
+    eligible_for_binding: true,
+    last_sync_at: "2026-03-26T20:00:00+00:00",
+    last_sync_error: null,
+    last_sync_summary: "Managed knowledge base index is ready.",
     schema: {},
     document_count: 1,
     deployment_usage: [
@@ -51,6 +56,39 @@ vi.mock("../api/context", () => ({
       chunk_count: 1,
     },
   ]),
+  queryKnowledgeBase: vi.fn(async () => ({
+    knowledge_base_id: "kb-primary",
+    retrieval: { index: "kb_product_docs", result_count: 1, top_k: 5 },
+    results: [
+      {
+        id: "doc-1",
+        title: "Architecture Overview",
+        snippet: "Retrieved snippet",
+        uri: "https://example.com/overview",
+        source_type: "manual",
+        metadata: {},
+        score: 0.91,
+        score_kind: "similarity",
+      },
+    ],
+  })),
+  resyncKnowledgeBase: vi.fn(async () => ({
+    id: "kb-primary",
+    slug: "product-docs",
+    display_name: "Product Docs",
+    description: "docs",
+    index_name: "kb_product_docs",
+    backing_provider_key: "weaviate_local",
+    lifecycle_state: "active",
+    sync_status: "ready",
+    eligible_for_binding: true,
+    last_sync_at: "2026-03-26T21:00:00+00:00",
+    last_sync_error: null,
+    last_sync_summary: "Resynced 1 document(s) and 1 chunk(s).",
+    schema: {},
+    document_count: 1,
+    deployment_usage: [],
+  })),
   updateKnowledgeBase: vi.fn(),
   createKnowledgeBaseDocument: vi.fn(),
   updateKnowledgeBaseDocument: vi.fn(),
@@ -58,6 +96,8 @@ vi.mock("../api/context", () => ({
   uploadKnowledgeBaseDocuments: vi.fn(),
   deleteKnowledgeBase: vi.fn(),
 }));
+
+vi.mock("../api/context", () => contextApiMocks);
 
 describe("ContextKnowledgeBaseDetailPage", () => {
   beforeEach(() => {
@@ -71,7 +111,7 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     };
   });
 
-  it("renders knowledge-base metadata and documents", async () => {
+  it("renders knowledge-base metadata, sync diagnostics, and retrieval results", async () => {
     await renderWithAppProviders(
       <Routes>
         <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
@@ -82,5 +122,38 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText(/Local Default/)).toBeVisible();
+    expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
+
+    await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    expect(await screen.findByText("Retrieved snippet")).toBeVisible();
+    expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
+      "kb-primary",
+      { query_text: "How does retrieval work?", top_k: 5 },
+      "token",
+    );
+  });
+
+  it("lets superadmins resync the knowledge base", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
+      </Routes>,
+      { route: "/control/context/kb-primary" },
+    );
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Resync knowledge base" }));
+
+    await waitFor(() => expect(contextApiMocks.resyncKnowledgeBase).toHaveBeenCalledWith("kb-primary", "token"));
   });
 });

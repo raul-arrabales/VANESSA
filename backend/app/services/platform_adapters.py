@@ -304,6 +304,10 @@ class VectorStoreAdapter(ABC):
     def ensure_index(self, *, index_name: str, schema: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
 
+    @abstractmethod
+    def delete_index(self, *, index_name: str) -> dict[str, Any]:
+        raise NotImplementedError
+
 
 class SandboxExecutionAdapter(ABC):
     def __init__(self, binding: ProviderBinding):
@@ -730,6 +734,24 @@ class WeaviateVectorStoreAdapter(VectorStoreAdapter):
             }
         }
 
+    def delete_index(self, *, index_name: str) -> dict[str, Any]:
+        class_name = _coerce_weaviate_class_name(index_name)
+        payload, status_code = http_json_request(self._schema_class_url(class_name), method="DELETE")
+        if status_code not in {200, 204, 404, 422}:
+            _raise_platform_provider_error(
+                code="vector_index_delete_failed",
+                message="Unable to delete vector index",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        return {
+            "index": {
+                "name": index_name,
+                "provider": self.binding.provider_slug,
+                "deleted": status_code not in {404, 422},
+            }
+        }
+
     def upsert(self, *, index_name: str, documents: list[dict[str, Any]]) -> dict[str, Any]:
         self.ensure_index(index_name=index_name, schema={})
         class_name = _coerce_weaviate_class_name(index_name)
@@ -938,6 +960,24 @@ class QdrantVectorStoreAdapter(VectorStoreAdapter):
                 "provider": self.binding.provider_slug,
                 "status": "ready",
                 "created": True,
+            }
+        }
+
+    def delete_index(self, *, index_name: str) -> dict[str, Any]:
+        collection_name = _coerce_qdrant_collection_name(index_name)
+        payload, status_code = http_json_request(self._collection_url(collection_name), method="DELETE")
+        if status_code not in {200, 202, 204, 404}:
+            _raise_platform_provider_error(
+                code="vector_index_delete_failed",
+                message="Unable to delete vector index",
+                status_code=status_code,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
+        return {
+            "index": {
+                "name": index_name,
+                "provider": self.binding.provider_slug,
+                "deleted": status_code != 404,
             }
         }
 

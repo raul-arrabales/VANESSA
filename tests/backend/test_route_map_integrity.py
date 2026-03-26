@@ -52,6 +52,8 @@ def test_expected_routes_are_registered() -> None:
         "/v1/chat/knowledge/bases",
         "/v1/context/knowledge-bases",
         "/v1/context/knowledge-bases/<knowledge_base_id>",
+        "/v1/context/knowledge-bases/<knowledge_base_id>/resync",
+        "/v1/context/knowledge-bases/<knowledge_base_id>/query",
         "/v1/context/knowledge-bases/<knowledge_base_id>/documents",
         "/v1/context/knowledge-bases/<knowledge_base_id>/documents/<document_id>",
         "/v1/context/knowledge-bases/<knowledge_base_id>/uploads",

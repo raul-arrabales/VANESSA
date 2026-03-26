@@ -69,6 +69,8 @@ Platform control plane endpoints:
 - `GET /v1/context/knowledge-bases/{id}` (admin)
 - `PUT /v1/context/knowledge-bases/{id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/query` (admin)
 - `GET /v1/context/knowledge-bases/{id}/documents` (admin)
 - `POST /v1/context/knowledge-bases/{id}/documents` (superadmin)
 - `PUT /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
@@ -88,6 +90,7 @@ Platform control plane semantics:
 - `MCP_GATEWAY_URL` enables the optional local MCP gateway provider instance and binds it as `mcp_runtime`.
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Managed knowledge bases are now a backend-owned context-management domain. They live in Postgres, sync into the current `weaviate_local` provider, and are bound into deployments as explicit `vector_store` resources.
+- Managed knowledge-base detail responses now include sync diagnostics and binding eligibility, and operators can trigger a synchronous KB resync or a retrieval QA query from the context-management surface.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
 - Agent executions may also use optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` bindings for LLM-driven tool execution.

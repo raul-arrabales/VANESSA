@@ -297,6 +297,7 @@
       "empty": "No messages yet. Ask a question to retrieve knowledge-backed context.",
       "noModels": "No enabled models",
       "noKnowledgeBases": "No managed knowledge bases are bound to the active deployment.",
+      "knowledgeBaseUnavailable": "The selected knowledge base is no longer available in the active deployment.",
       "knowledgeBaseRequired": "Select a knowledge base before starting knowledge chat.",
       "modelsError": "Unable to load models.",
       "requestError": "Knowledge chat request failed."
@@ -313,6 +314,8 @@
     "createDescription": "Create a managed knowledge base backed by the local Weaviate provider.",
     "detailTitle": "Knowledge base",
     "detailDescription": "Review metadata, deployment usage, and documents for this managed knowledge base.",
+    "queryTitle": "Test retrieval",
+    "queryDescription": "Run a retrieval query through the active deployment runtime before binding this knowledge base into product flows.",
     "documentsTitle": "Documents",
     "usageTitle": "Deployment usage",
     "actions": {
@@ -326,16 +329,24 @@
       "updateDocument": "Update document",
       "deleteDocument": "Delete document",
       "edit": "Edit",
-      "upload": "Upload files"
+      "upload": "Upload files",
+      "resync": "Resync knowledge base",
+      "resyncing": "Resyncing...",
+      "testRetrieval": "Test retrieval",
+      "querying": "Searching..."
     },
     "fields": {
       "schema": "Schema JSON",
       "lifecycleState": "Lifecycle state",
+      "lastSyncAt": "Last sync",
+      "lastSyncError": "Last sync error",
       "documentTitle": "Document title",
       "sourceName": "Source name",
       "uri": "Source URI",
       "documentText": "Document text",
-      "uploadFiles": "Upload files"
+      "uploadFiles": "Upload files",
+      "queryText": "Retrieval query",
+      "topK": "Top K"
     },
     "columns": {
       "name": "Knowledge base",
@@ -348,7 +359,11 @@
     "states": {
       "loading": "Loading knowledge bases...",
       "empty": "No knowledge bases have been created yet.",
-      "noDocuments": "No documents have been added yet."
+      "noDocuments": "No documents have been added yet.",
+      "eligible": "Eligible for deployment binding.",
+      "ineligible": "Not currently eligible for deployment binding.",
+      "queryResultCount": "{{count}} retrieval result(s)",
+      "noQueryResults": "No retrieval results matched this query."
     },
     "feedback": {
       "loadFailed": "Unable to load context management data.",
@@ -365,7 +380,10 @@
       "documentSaveFailed": "Unable to save document.",
       "documentDeleteFailed": "Unable to delete document.",
       "uploaded": "Uploaded {{count}} file(s).",
-      "uploadFailed": "Unable to upload files."
+      "uploadFailed": "Unable to upload files.",
+      "resynced": "Knowledge base '{{name}}' resynced.",
+      "resyncFailed": "Unable to resync the knowledge base.",
+      "queryFailed": "Unable to run the retrieval test."
     },
     "aria": {
       "table": "Knowledge base inventory"

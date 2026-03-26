@@ -75,6 +75,7 @@ See [ModelOps service documentation](services/modelops.md) for the domain model,
 Context Management is the managed knowledge-base domain layered beside the GenAI control plane and ModelOps.
 
 - It owns reusable knowledge-base metadata, document source-of-truth, upload/manual document ingestion, and vector synchronization.
+- It also owns knowledge-base sync diagnostics, operator-triggered rebuilds, and retrieval QA against the active deployment runtime.
 - PostgreSQL stores knowledge-base and document records; Weaviate remains the derived serving index for the current v1 implementation.
 - Deployment profiles still decide which `vector_store` provider is active and which managed knowledge bases are explicitly bound through binding `resources` plus `default_resource_id`.
 - Knowledge Chat now resolves only against knowledge bases bound to the active deployment profile rather than a fixed global retrieval index.

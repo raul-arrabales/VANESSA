@@ -12,6 +12,8 @@ from ..services.context_management import (
     get_knowledge_base_detail,
     list_knowledge_base_documents,
     list_knowledge_bases,
+    query_knowledge_base,
+    resync_knowledge_base,
     update_knowledge_base,
     update_knowledge_base_document,
     upload_knowledge_base_documents,
@@ -110,6 +112,39 @@ def delete_knowledge_base_route(knowledge_base_id: str):
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"deleted": True, "knowledge_base_id": knowledge_base_id}), 200
+
+
+@bp.post("/v1/context/knowledge-bases/<knowledge_base_id>/resync")
+@require_role("superadmin")
+def resync_knowledge_base_route(knowledge_base_id: str):
+    try:
+        knowledge_base = resync_knowledge_base(
+            _database_url(),
+            config=_config(),
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=int(g.current_user["id"]),
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"knowledge_base": knowledge_base}), 200
+
+
+@bp.post("/v1/context/knowledge-bases/<knowledge_base_id>/query")
+@require_role("admin")
+def query_knowledge_base_route(knowledge_base_id: str):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+    try:
+        response_payload = query_knowledge_base(
+            _database_url(),
+            config=_config(),
+            knowledge_base_id=knowledge_base_id,
+            payload=payload,
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(response_payload), 200
 
 
 @bp.get("/v1/context/knowledge-bases/<knowledge_base_id>/documents")

@@ -68,6 +68,8 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `GET /v1/context/knowledge-bases/{id}` (admin)
 - `PUT /v1/context/knowledge-bases/{id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/query` (admin)
 - `GET /v1/context/knowledge-bases/{id}/documents` (admin)
 - `POST /v1/context/knowledge-bases/{id}/documents` (superadmin)
 - `PUT /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
@@ -79,7 +81,11 @@ Context-management semantics:
 - Managed knowledge bases are global records, but deployments explicitly bind them as `vector_store` binding resources.
 - Current v1 support targets `weaviate_local` only.
 - Documents are stored in Postgres, chunked synchronously by backend, and upserted into the backing vector provider.
+- Knowledge-base detail payloads now include sync diagnostics such as `last_sync_at`, `last_sync_error`, `last_sync_summary`, and `eligible_for_binding`.
+- Operators can run a synchronous resync to rebuild one managed knowledge base from stored documents.
+- Operators can also run a retrieval test against one managed knowledge base through the active deployment embeddings/vector runtime without going through full Knowledge Chat.
 - Deployment editors expose only knowledge bases that are both `active` and `ready`.
+- Knowledge Chat also filters runtime-selectable knowledge bases to `active` + `ready` records at request time, so archived or unhealthy bindings are not silently reused.
 - Managed vector binding resources now use `ref_type="knowledge_base"` plus `knowledge_base_id`, while still preserving `provider_resource_id=index_name` for runtime enforcement.
 
 Key terms:

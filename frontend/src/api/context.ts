@@ -14,6 +14,10 @@ export type KnowledgeBase = {
   sync_status: "ready" | "syncing" | "error" | string;
   schema: Record<string, unknown>;
   document_count: number;
+  eligible_for_binding: boolean;
+  last_sync_at?: string | null;
+  last_sync_error?: string | null;
+  last_sync_summary?: string | null;
   binding_count?: number;
   created_at?: string | null;
   updated_at?: string | null;
@@ -25,6 +29,27 @@ export type KnowledgeBase = {
     };
     capability: string;
   }>;
+};
+
+export type KnowledgeBaseQueryResult = {
+  id: string;
+  title: string;
+  snippet: string;
+  uri?: string | null;
+  source_type?: string | null;
+  metadata: Record<string, unknown>;
+  score?: number | null;
+  score_kind?: string | null;
+};
+
+export type KnowledgeBaseQueryResponse = {
+  knowledge_base_id: string;
+  retrieval: {
+    index: string;
+    result_count: number;
+    top_k: number;
+  };
+  results: KnowledgeBaseQueryResult[];
 };
 
 export type KnowledgeDocument = {
@@ -114,6 +139,35 @@ export async function deleteKnowledgeBase(knowledgeBaseId: string, token: string
     method: "DELETE",
     token,
   });
+}
+
+export async function resyncKnowledgeBase(knowledgeBaseId: string, token: string): Promise<KnowledgeBase> {
+  const result = await requestJson<{ knowledge_base: KnowledgeBase }>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/resync`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+  return result.knowledge_base;
+}
+
+export async function queryKnowledgeBase(
+  knowledgeBaseId: string,
+  payload: {
+    query_text: string;
+    top_k?: number;
+  },
+  token: string,
+): Promise<KnowledgeBaseQueryResponse> {
+  return requestJson<KnowledgeBaseQueryResponse>(
+    `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/query`,
+    {
+      method: "POST",
+      token,
+      body: payload,
+    },
+  );
 }
 
 export async function listKnowledgeBaseDocuments(knowledgeBaseId: string, token: string): Promise<KnowledgeDocument[]> {

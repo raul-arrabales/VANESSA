@@ -95,6 +95,7 @@ function buildKnowledgeBase(overrides: Partial<KnowledgeBase> = {}): KnowledgeBa
     backing_provider_key: "weaviate_local",
     lifecycle_state: "active",
     sync_status: "ready",
+    eligible_for_binding: true,
     schema: {},
     document_count: 3,
     ...overrides,

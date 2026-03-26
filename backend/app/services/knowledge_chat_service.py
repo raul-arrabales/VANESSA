@@ -136,6 +136,7 @@ def run_knowledge_chat(
     try:
         selected_knowledge_base = resolve_runtime_knowledge_base_selection(
             platform_runtime,
+            database_url=database_url,
             knowledge_base_id=requested_knowledge_base_id,
         )
     except PlatformControlPlaneError as exc:
@@ -191,7 +192,7 @@ def list_knowledge_chat_knowledge_bases(
             "message": exc.message,
             "details": exc.details or None,
         }, exc.status_code
-    return list_active_runtime_knowledge_bases(platform_runtime), 200
+    return list_active_runtime_knowledge_bases(platform_runtime, database_url=database_url), 200
 
 
 def map_knowledge_chat_engine_error(exc: AgentEngineClientError) -> tuple[dict[str, Any], int]:

@@ -234,6 +234,24 @@ export default function KnowledgeChatPage(): JSX.Element {
     )));
   }, [defaultKnowledgeBaseId, knowledgeBases]);
 
+  useEffect(() => {
+    const allowedKnowledgeBaseIds = new Set(knowledgeBases.map((knowledgeBase) => knowledgeBase.id));
+    const fallbackKnowledgeBaseId = defaultKnowledgeBaseId ?? (knowledgeBases.length === 1 ? knowledgeBases[0]?.id ?? null : null);
+    setConversations((currentConversations) => currentConversations.map((conversation) => {
+      if (!conversation.knowledgeBaseId) {
+        return conversation;
+      }
+      if (allowedKnowledgeBaseIds.has(conversation.knowledgeBaseId)) {
+        return conversation;
+      }
+      return {
+        ...conversation,
+        knowledgeBaseId: fallbackKnowledgeBaseId,
+        updatedAt: new Date().toISOString(),
+      };
+    }));
+  }, [defaultKnowledgeBaseId, knowledgeBases]);
+
   const sendPrompt = async (): Promise<void> => {
     if (!token || !activeConversation || !activeConversation.modelId || !draft.trim()) {
       return;
@@ -244,6 +262,10 @@ export default function KnowledgeChatPage(): JSX.Element {
     }
     if (!activeConversation.knowledgeBaseId) {
       setError(t("knowledgeChat.states.knowledgeBaseRequired"));
+      return;
+    }
+    if (!knowledgeBases.some((knowledgeBase) => knowledgeBase.id === activeConversation.knowledgeBaseId)) {
+      setError(knowledgeBaseConfigurationMessage || t("knowledgeChat.states.knowledgeBaseUnavailable"));
       return;
     }
 

@@ -76,20 +76,30 @@ def create_knowledge_base(
         created_by_user_id=created_by_user_id,
         updated_by_user_id=created_by_user_id,
     )
+    context_repo.mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=str(knowledge_base["id"]),
+        updated_by_user_id=created_by_user_id,
+        last_sync_summary="Preparing managed knowledge base index.",
+    )
     try:
         _ensure_knowledge_base_index(database_url, config, knowledge_base)
     except Exception:
-        context_repo.set_knowledge_base_sync_status(
+        context_repo.set_knowledge_base_sync_result(
             database_url,
             knowledge_base_id=str(knowledge_base["id"]),
             sync_status="error",
+            last_sync_error="Unable to prepare the backing vector index.",
+            last_sync_summary="Knowledge base initialization failed.",
             updated_by_user_id=created_by_user_id,
         )
         raise
-    refreshed = context_repo.set_knowledge_base_sync_status(
+    refreshed = context_repo.set_knowledge_base_sync_result(
         database_url,
         knowledge_base_id=str(knowledge_base["id"]),
         sync_status="ready",
+        last_sync_error=None,
+        last_sync_summary="Managed knowledge base index is ready.",
         updated_by_user_id=created_by_user_id,
     )
     return _serialize_knowledge_base(refreshed or knowledge_base)
@@ -104,6 +114,21 @@ def update_knowledge_base(
 ) -> dict[str, Any]:
     existing = _require_knowledge_base(database_url, knowledge_base_id)
     normalized = _normalize_knowledge_base_payload(payload, is_create=False, existing=existing)
+    if (
+        normalized["lifecycle_state"] == "archived"
+        and str(existing.get("lifecycle_state") or "").strip().lower() != "archived"
+    ):
+        binding_count = context_repo.count_deployment_bindings_for_knowledge_base(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+        )
+        if binding_count > 0:
+            raise PlatformControlPlaneError(
+                "knowledge_base_in_use",
+                "Knowledge base is still bound to one or more deployments",
+                status_code=409,
+                details={"binding_count": binding_count, "knowledge_base_id": knowledge_base_id},
+            )
     updated = context_repo.update_knowledge_base(
         database_url,
         knowledge_base_id=knowledge_base_id,
@@ -163,6 +188,12 @@ def create_knowledge_base_document(
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=created_by_user_id,
+        summary="Indexing knowledge-base document.",
+    )
     document_id = str(uuid4())
     normalized = _normalize_document_payload(payload)
     chunks = _chunk_document_text(normalized["text"])
@@ -185,8 +216,20 @@ def create_knowledge_base_document(
     except Exception:
         context_repo.delete_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id)
         _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=created_by_user_id)
+        _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=created_by_user_id,
+            summary="Document indexing failed.",
+        )
         raise
     _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=created_by_user_id)
+    _mark_knowledge_base_sync_ready(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=created_by_user_id,
+        summary="Knowledge-base document indexed successfully.",
+    )
     return _serialize_document(document)
 
 
@@ -203,27 +246,48 @@ def update_knowledge_base_document(
     existing = context_repo.get_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id)
     if existing is None:
         raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
-    normalized = _normalize_document_payload(payload, existing=existing)
-    chunks = _chunk_document_text(normalized["text"])
-    _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
-    updated = context_repo.update_document(
+    _mark_knowledge_base_syncing(
         database_url,
         knowledge_base_id=knowledge_base_id,
-        document_id=document_id,
-        title=normalized["title"],
-        source_type=normalized["source_type"],
-        source_name=normalized["source_name"],
-        uri=normalized["uri"],
-        text=normalized["text"],
-        metadata_json=normalized["metadata"],
-        chunk_count=len(chunks),
         updated_by_user_id=updated_by_user_id,
+        summary="Re-indexing knowledge-base document.",
     )
-    if updated is None:
-        raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
-    _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=updated, chunks=chunks)
-    _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
-    return _serialize_document(updated)
+    normalized = _normalize_document_payload(payload, existing=existing)
+    chunks = _chunk_document_text(normalized["text"])
+    try:
+        _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
+        updated = context_repo.update_document(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+            title=normalized["title"],
+            source_type=normalized["source_type"],
+            source_name=normalized["source_name"],
+            uri=normalized["uri"],
+            text=normalized["text"],
+            metadata_json=normalized["metadata"],
+            chunk_count=len(chunks),
+            updated_by_user_id=updated_by_user_id,
+        )
+        if updated is None:
+            raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
+        _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=updated, chunks=chunks)
+        _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
+        _mark_knowledge_base_sync_ready(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary="Knowledge-base document re-indexed successfully.",
+        )
+        return _serialize_document(updated)
+    except Exception:
+        _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary="Document re-index failed.",
+        )
+        raise
 
 
 def delete_knowledge_base_document(
@@ -238,10 +302,31 @@ def delete_knowledge_base_document(
     document = context_repo.get_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id)
     if document is None:
         raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
-    _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=document)
-    if not context_repo.delete_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id):
-        raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
-    _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary="Removing knowledge-base document from the vector index.",
+    )
+    try:
+        _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=document)
+        if not context_repo.delete_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id):
+            raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
+        _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
+        _mark_knowledge_base_sync_ready(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary="Knowledge-base document deleted and index updated.",
+        )
+    except Exception:
+        _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary="Document deletion sync failed.",
+        )
+        raise
 
 
 def upload_knowledge_base_documents(
@@ -283,6 +368,125 @@ def upload_knowledge_base_documents(
     return {"documents": created_documents, "count": len(created_documents)}
 
 
+def resync_knowledge_base(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    updated_by_user_id: int | None,
+) -> dict[str, Any]:
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    documents = context_repo.list_documents(database_url, knowledge_base_id=knowledge_base_id)
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary="Rebuilding vector index from stored documents.",
+    )
+    try:
+        adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
+        adapter.delete_index(index_name=str(knowledge_base["index_name"]))
+        adapter.ensure_index(
+            index_name=str(knowledge_base["index_name"]),
+            schema=dict(knowledge_base.get("schema_json") or {}),
+        )
+        total_chunks = 0
+        for document in documents:
+            chunks = _chunk_document_text(str(document.get("text") or ""))
+            total_chunks += len(chunks)
+            synced_document = document
+            if int(document.get("chunk_count") or 0) != len(chunks):
+                updated_document = context_repo.set_document_chunk_count(
+                    database_url,
+                    knowledge_base_id=knowledge_base_id,
+                    document_id=str(document["id"]),
+                    chunk_count=len(chunks),
+                    updated_by_user_id=updated_by_user_id,
+                )
+                if updated_document is not None:
+                    synced_document = updated_document
+            if chunks:
+                _upsert_document_chunks(
+                    database_url,
+                    config,
+                    knowledge_base=knowledge_base,
+                    document=synced_document,
+                    chunks=chunks,
+                )
+        _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
+        refreshed = _mark_knowledge_base_sync_ready(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary=f"Resynced {len(documents)} document(s) and {total_chunks} chunk(s).",
+        )
+        return _serialize_knowledge_base(refreshed or _require_knowledge_base(database_url, knowledge_base_id))
+    except Exception:
+        refreshed = _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary="Knowledge-base resync failed.",
+        )
+        if refreshed is not None:
+            knowledge_base = refreshed
+        raise
+
+
+def query_knowledge_base(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    from .embeddings_service import embed_text_inputs
+    from .platform_service import resolve_vector_store_adapter
+
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    if not _is_knowledge_base_eligible(knowledge_base):
+        raise PlatformControlPlaneError(
+            "knowledge_base_not_ready",
+            "Only active and ready knowledge bases can be queried.",
+            status_code=409,
+            details={"knowledge_base_id": knowledge_base_id},
+        )
+    query_text = str(payload.get("query_text") or "").strip()
+    if not query_text:
+        raise PlatformControlPlaneError("invalid_query_text", "query_text must be a non-empty string", status_code=400)
+    top_k = _normalize_query_top_k(payload.get("top_k"))
+    vector_adapter = resolve_vector_store_adapter(database_url, config)
+    if str(vector_adapter.binding.provider_key or "").strip().lower() != str(knowledge_base.get("backing_provider_key") or "").strip().lower():
+        raise PlatformControlPlaneError(
+            "knowledge_base_provider_mismatch",
+            "The active deployment vector store provider does not match this knowledge base.",
+            status_code=409,
+            details={
+                "knowledge_base_id": knowledge_base_id,
+                "knowledge_base_provider_key": knowledge_base.get("backing_provider_key"),
+                "active_provider_key": vector_adapter.binding.provider_key,
+            },
+        )
+    embedding_payload = embed_text_inputs(database_url, config, [query_text])
+    query_payload = vector_adapter.query(
+        index_name=str(knowledge_base["index_name"]),
+        query_text=None,
+        embedding=embedding_payload["embeddings"][0],
+        top_k=top_k,
+        filters={},
+    )
+    results = query_payload.get("results") if isinstance(query_payload.get("results"), list) else []
+    return {
+        "knowledge_base_id": str(knowledge_base["id"]),
+        "retrieval": {
+            "index": str(query_payload.get("index") or knowledge_base.get("index_name") or "").strip(),
+            "result_count": len(results),
+            "top_k": top_k,
+        },
+        "results": [_serialize_query_result(item) for item in results if isinstance(item, dict)],
+    }
+
+
 def build_knowledge_base_binding_resource(knowledge_base: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(knowledge_base.get("id") or "").strip(),
@@ -301,7 +505,11 @@ def build_knowledge_base_binding_resource(knowledge_base: dict[str, Any]) -> dic
     }
 
 
-def list_active_runtime_knowledge_bases(platform_runtime: dict[str, Any]) -> dict[str, Any]:
+def list_active_runtime_knowledge_bases(
+    platform_runtime: dict[str, Any],
+    *,
+    database_url: str | None = None,
+) -> dict[str, Any]:
     capabilities = platform_runtime.get("capabilities") if isinstance(platform_runtime.get("capabilities"), dict) else {}
     vector_store = capabilities.get(CAPABILITY_VECTOR_STORE) if isinstance(capabilities.get(CAPABILITY_VECTOR_STORE), dict) else {}
     resources = vector_store.get("resources") if isinstance(vector_store.get("resources"), list) else []
@@ -310,6 +518,21 @@ def list_active_runtime_knowledge_bases(platform_runtime: dict[str, Any]) -> dic
         for item in resources
         if isinstance(item, dict) and str(item.get("ref_type") or "").strip().lower() == "knowledge_base"
     ]
+    if database_url:
+        current_rows = {
+            str(row.get("id") or "").strip(): row
+            for row in context_repo.get_knowledge_bases(database_url, [str(item["id"]) for item in knowledge_bases])
+        }
+        knowledge_bases = [
+            {
+                **item,
+                "is_eligible": _is_knowledge_base_eligible(current_rows[item["id"]]),
+                "lifecycle_state": str(current_rows[item["id"]].get("lifecycle_state") or "").strip() or None,
+                "sync_status": str(current_rows[item["id"]].get("sync_status") or "").strip() or None,
+            }
+            for item in knowledge_bases
+            if item["id"] in current_rows and _is_knowledge_base_eligible(current_rows[item["id"]])
+        ]
     default_knowledge_base_id = next((item["id"] for item in knowledge_bases if item["is_default"]), None)
     if default_knowledge_base_id is None and len(knowledge_bases) == 1:
         default_knowledge_base_id = knowledge_bases[0]["id"]
@@ -333,9 +556,10 @@ def list_active_runtime_knowledge_bases(platform_runtime: dict[str, Any]) -> dic
 def resolve_runtime_knowledge_base_selection(
     platform_runtime: dict[str, Any],
     *,
+    database_url: str | None = None,
     knowledge_base_id: str | None,
 ) -> dict[str, Any]:
-    options = list_active_runtime_knowledge_bases(platform_runtime)
+    options = list_active_runtime_knowledge_bases(platform_runtime, database_url=database_url)
     knowledge_bases = options["knowledge_bases"]
     normalized_id = str(knowledge_base_id or "").strip() or None
     if not knowledge_bases:
@@ -602,6 +826,10 @@ def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
         "schema": dict(row.get("schema_json") or {}),
         "document_count": int(row.get("document_count") or 0),
         "binding_count": int(row.get("binding_count") or 0),
+        "eligible_for_binding": _is_knowledge_base_eligible(row),
+        "last_sync_at": row.get("last_sync_at").isoformat() if row.get("last_sync_at") else None,
+        "last_sync_error": str(row.get("last_sync_error") or "").strip() or None,
+        "last_sync_summary": str(row.get("last_sync_summary") or "").strip() or None,
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
     }
@@ -632,7 +860,97 @@ def _serialize_runtime_knowledge_base(resource: dict[str, Any], *, default_resou
         "slug": str(metadata.get("slug") or "").strip() or None,
         "index_name": str(resource.get("provider_resource_id") or metadata.get("index_name") or "").strip(),
         "is_default": knowledge_base_id == (default_resource_id or ""),
+        "is_eligible": True,
+        "lifecycle_state": str(metadata.get("lifecycle_state") or "").strip() or None,
+        "sync_status": str(metadata.get("sync_status") or "").strip() or None,
     }
+
+
+def _mark_knowledge_base_syncing(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    updated_by_user_id: int | None,
+    summary: str,
+) -> dict[str, Any] | None:
+    return context_repo.mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        last_sync_summary=summary,
+    )
+
+
+def _mark_knowledge_base_sync_ready(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    updated_by_user_id: int | None,
+    summary: str,
+) -> dict[str, Any] | None:
+    return context_repo.set_knowledge_base_sync_result(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        sync_status="ready",
+        last_sync_error=None,
+        last_sync_summary=summary,
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def _mark_knowledge_base_sync_error(
+    database_url: str,
+    *,
+    knowledge_base_id: str,
+    updated_by_user_id: int | None,
+    summary: str,
+) -> dict[str, Any] | None:
+    return context_repo.set_knowledge_base_sync_result(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        sync_status="error",
+        last_sync_error=summary,
+        last_sync_summary=summary,
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def _normalize_query_top_k(value: Any) -> int:
+    if value is None:
+        return 5
+    if isinstance(value, bool):
+        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400)
+    try:
+        top_k = int(value)
+    except (TypeError, ValueError) as exc:
+        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400) from exc
+    if top_k <= 0:
+        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400)
+    return top_k
+
+
+def _serialize_query_result(result: dict[str, Any]) -> dict[str, Any]:
+    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+    text = " ".join(str(result.get("text") or "").split())
+    snippet = text if len(text) <= 220 else text[:219].rstrip() + "…"
+    title = str(metadata.get("title") or result.get("id") or "").strip()
+    return {
+        "id": str(result.get("id") or "").strip(),
+        "title": title,
+        "snippet": snippet,
+        "uri": str(metadata.get("uri") or "").strip() or None,
+        "source_type": str(metadata.get("source_type") or "").strip() or None,
+        "metadata": metadata,
+        "score": result.get("score"),
+        "score_kind": result.get("score_kind"),
+    }
+
+
+def _is_knowledge_base_eligible(row: dict[str, Any]) -> bool:
+    return (
+        str(row.get("lifecycle_state") or "").strip().lower() == "active"
+        and str(row.get("sync_status") or "").strip().lower() == "ready"
+    )
 
 
 def _chunk_document_id(document_id: str, index: int) -> str:

@@ -119,6 +119,8 @@ def test_run_context_management_schema_migration_executes_context_sql(monkeypatc
         del encoding
         if self.name == "012_context_management.sql":
             return "-- migration 012"
+        if self.name == "013_context_management_ops.sql":
+            return "-- migration 013"
         return original_read_text(self, encoding="utf-8")
 
     monkeypatch.setattr(db, "get_connection", _recording_get_connection)
@@ -126,7 +128,7 @@ def test_run_context_management_schema_migration_executes_context_sql(monkeypatc
 
     db.run_context_management_schema_migration("postgresql://ignored")
 
-    assert executed_sql == ["-- migration 012"]
+    assert executed_sql == ["-- migration 012", "-- migration 013"]
 
 
 def test_platform_binding_resources_migration_guards_legacy_copy_when_table_absent():

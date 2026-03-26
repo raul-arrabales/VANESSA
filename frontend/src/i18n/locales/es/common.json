@@ -297,6 +297,7 @@
       "empty": "Aun no hay mensajes. Haz una pregunta para recuperar contexto con conocimiento.",
       "noModels": "No hay modelos habilitados",
       "noKnowledgeBases": "No hay bases de conocimiento gestionadas vinculadas al despliegue activo.",
+      "knowledgeBaseUnavailable": "La base de conocimiento seleccionada ya no esta disponible en el despliegue activo.",
       "knowledgeBaseRequired": "Selecciona una base de conocimiento antes de iniciar el chat.",
       "modelsError": "No se pudieron cargar los modelos.",
       "requestError": "La solicitud de chat de conocimiento fallo."
@@ -313,6 +314,8 @@
     "createDescription": "Crea una base de conocimiento gestionada respaldada por el proveedor local de Weaviate.",
     "detailTitle": "Base de conocimiento",
     "detailDescription": "Revisa metadatos, uso en despliegues y documentos de esta base de conocimiento gestionada.",
+    "queryTitle": "Probar recuperacion",
+    "queryDescription": "Ejecuta una consulta de recuperacion con el runtime del despliegue activo antes de vincular esta base de conocimiento a flujos del producto.",
     "documentsTitle": "Documentos",
     "usageTitle": "Uso en despliegues",
     "actions": {
@@ -326,16 +329,24 @@
       "updateDocument": "Actualizar documento",
       "deleteDocument": "Eliminar documento",
       "edit": "Editar",
-      "upload": "Subir archivos"
+      "upload": "Subir archivos",
+      "resync": "Resincronizar base de conocimiento",
+      "resyncing": "Resincronizando...",
+      "testRetrieval": "Probar recuperacion",
+      "querying": "Buscando..."
     },
     "fields": {
       "schema": "Schema JSON",
       "lifecycleState": "Estado del ciclo de vida",
+      "lastSyncAt": "Ultima sincronizacion",
+      "lastSyncError": "Ultimo error de sincronizacion",
       "documentTitle": "Titulo del documento",
       "sourceName": "Nombre de la fuente",
       "uri": "URI de la fuente",
       "documentText": "Texto del documento",
-      "uploadFiles": "Subir archivos"
+      "uploadFiles": "Subir archivos",
+      "queryText": "Consulta de recuperacion",
+      "topK": "Top K"
     },
     "columns": {
       "name": "Base de conocimiento",
@@ -348,7 +359,11 @@
     "states": {
       "loading": "Cargando bases de conocimiento...",
       "empty": "Todavia no se han creado bases de conocimiento.",
-      "noDocuments": "Todavia no se han agregado documentos."
+      "noDocuments": "Todavia no se han agregado documentos.",
+      "eligible": "Disponible para vincularse a despliegues.",
+      "ineligible": "Actualmente no es apta para vincularse a despliegues.",
+      "queryResultCount": "{{count}} resultado(s) de recuperacion",
+      "noQueryResults": "No hubo resultados de recuperacion para esta consulta."
     },
     "feedback": {
       "loadFailed": "No se pudieron cargar los datos de gestion de contexto.",
@@ -365,7 +380,10 @@
       "documentSaveFailed": "No se pudo guardar el documento.",
       "documentDeleteFailed": "No se pudo eliminar el documento.",
       "uploaded": "Se subieron {{count}} archivo(s).",
-      "uploadFailed": "No se pudieron subir los archivos."
+      "uploadFailed": "No se pudieron subir los archivos.",
+      "resynced": "La base de conocimiento '{{name}}' se resincronizo.",
+      "resyncFailed": "No se pudo resincronizar la base de conocimiento.",
+      "queryFailed": "No se pudo ejecutar la prueba de recuperacion."
     },
     "aria": {
       "table": "Inventario de bases de conocimiento"
