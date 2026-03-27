@@ -176,6 +176,7 @@ Respect these runtime boundaries when generating code or configuration.
 - `frontend/`
   - Browser UI, superadmin control surfaces, typed API clients.
   - Product AI work should land under `frontend/src/features/playgrounds`, `frontend/src/features/agent-builder`, `frontend/src/features/vanessa-core`, and `frontend/src/features/ai-shared`.
+  - Superadmin catalog administration should live under `frontend/src/features/catalog-admin` instead of flat `frontend/src/pages/*`.
 
 - `backend/`
   - Flask app, public/internal APIs, control plane, ModelOps, orchestration, service abstractions.

@@ -32,6 +32,14 @@ export default function ControlPage(): JSX.Element {
       minimumRole: "user",
     },
     {
+      id: "agent-builder",
+      title: t("control.items.agentBuilder.title"),
+      description: t("control.items.agentBuilder.description"),
+      to: "/control/agent-builder",
+      icon: "ai",
+      minimumRole: "user",
+    },
+    {
       id: "quotes",
       title: t("control.items.quotes.title"),
       description: t("control.items.quotes.description"),

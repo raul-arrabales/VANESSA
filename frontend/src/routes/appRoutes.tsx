@@ -9,7 +9,9 @@ import SettingsPage from "../pages/SettingsPage";
 const StyleGuidePage = lazy(() => import("../pages/StyleGuidePage"));
 const AdminApprovalsPage = lazy(() => import("../pages/AdminApprovalsPage"));
 const QuoteManagementPage = lazy(() => import("../pages/QuoteManagementPage"));
-const CatalogControlPage = lazy(() => import("../pages/CatalogControlPage"));
+const CatalogControlPage = lazy(() => import("../features/catalog-admin/pages/CatalogControlPage"));
+const AgentBuilderProjectsPage = lazy(() => import("../features/agent-builder/pages/AgentBuilderProjectsPage"));
+const AgentProjectDetailPage = lazy(() => import("../features/agent-builder/pages/AgentProjectDetailPage"));
 const BackendHealthPage = lazy(() => import("../pages/BackendHealthPage"));
 const PlatformControlPage = lazy(() => import("../features/platform-control/pages/PlatformControlPage"));
 const PlatformProvidersPage = lazy(() => import("../features/platform-control/pages/PlatformProvidersPage"));
@@ -146,6 +148,28 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "admin",
     element: <QuoteManagementPage />,
+  },
+  {
+    id: "control-agent-builder",
+    path: "/control/agent-builder",
+    titleKey: "nav.agentBuilder",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "user",
+    element: <AgentBuilderProjectsPage />,
+  },
+  {
+    id: "control-agent-builder-detail",
+    path: "/control/agent-builder/:projectId",
+    titleKey: "nav.agentProjectDetail",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "user",
+    element: <AgentProjectDetailPage />,
   },
   {
     id: "control-catalog",

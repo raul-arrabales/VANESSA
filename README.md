@@ -27,6 +27,7 @@ The product-facing AI surface is now split into explicit domains:
 
 - `frontend/src/features/playgrounds` for shared chat and knowledge playground workspaces
 - `frontend/src/features/agent-builder` for builder-facing agent authoring
+- `frontend/src/features/catalog-admin` for superadmin catalog administration
 - `frontend/src/features/vanessa-core` for first-party Vanessa behavior
 - `backend/app/api/http`, `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure` for product-domain backend work
 - `agent_engine/app/execution_pipeline`, `agent_engine/app/retrieval`, `agent_engine/app/tool_runtime`, and `agent_engine/app/policies` for composable execution stages
@@ -285,8 +286,8 @@ Backend also exposes a typed superadmin catalog for agent/tool lifecycle managem
 - `POST /v1/catalog/tools/{id}/validate`
 
 This catalog surface is now canonical for superadmin CRUD and validation of typed agent/tool
-definitions, while the generic `/v1/registry/*` endpoints remain as compatibility infrastructure.
-The frontend exposes the same workflow at `/control/catalog`.
+definitions, while the generic `/v1/registry/*` endpoints remain the lower-level runtime artifact surface.
+The frontend exposes the same workflows at `/control/catalog` for superadmin catalog administration and `/control/agent-builder` for builder-facing agent projects.
 - `POST /v1/platform/vector/indexes/ensure`
 - `POST /v1/platform/vector/documents/upsert`
 - `POST /v1/platform/vector/query`

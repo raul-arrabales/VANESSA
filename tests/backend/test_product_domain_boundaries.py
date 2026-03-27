@@ -5,18 +5,22 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_backend_bootstrap_registers_product_domains_without_legacy_chat_routes() -> None:
+def test_backend_bootstrap_registers_canonical_http_domains() -> None:
     bootstrap_source = (PROJECT_ROOT / "backend" / "app" / "bootstrap.py").read_text(encoding="utf-8")
-    routes_init_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "__init__.py").read_text(encoding="utf-8")
 
     assert "from .api.http.playgrounds import bp as playgrounds_bp" in bootstrap_source
     assert "from .api.http.agent_projects import bp as agent_projects_bp" in bootstrap_source
     assert "from .api.http.platform import bp as platform_bp" in bootstrap_source
     assert "from .api.http.context import bp as context_bp" in bootstrap_source
+    assert "from .api.http.catalog import bp as catalog_bp" in bootstrap_source
+    assert "from .api.http.registry import bp as registry_bp" in bootstrap_source
+    assert "from .api.http.registry_models import bp as registry_models_bp" in bootstrap_source
     assert "from .routes import chat" not in bootstrap_source
     assert "from .routes import platform as platform_routes" not in bootstrap_source
     assert "from .routes import context as context_routes" not in bootstrap_source
-    assert '"chat"' not in routes_init_source
+    assert "from .routes import catalog as catalog_routes" not in bootstrap_source
+    assert "from .routes import registry as registry_routes" not in bootstrap_source
+    assert "from .routes import registry_models as registry_models_routes" not in bootstrap_source
 
 
 def test_frontend_routes_point_to_feature_domain_pages() -> None:
@@ -35,8 +39,12 @@ def test_frontend_routes_point_to_feature_domain_pages() -> None:
     assert '../features/context-management/pages/ContextKnowledgeBasesPage' in routes_source
     assert '../features/context-management/pages/ContextKnowledgeBaseCreatePage' in routes_source
     assert '../features/context-management/pages/ContextKnowledgeBaseDetailPage' in routes_source
+    assert '../features/agent-builder/pages/AgentBuilderProjectsPage' in routes_source
+    assert '../features/agent-builder/pages/AgentProjectDetailPage' in routes_source
+    assert '../features/catalog-admin/pages/CatalogControlPage' in routes_source
     assert '../pages/PlatformControlPage' not in routes_source
     assert '../pages/ContextKnowledgeBasesPage' not in routes_source
+    assert '../pages/CatalogControlPage' not in routes_source
 
 
 def test_playgrounds_service_does_not_depend_on_legacy_chat_or_knowledge_orchestrators() -> None:
@@ -49,6 +57,19 @@ def test_playgrounds_service_does_not_depend_on_legacy_chat_or_knowledge_orchest
 def test_platform_and_context_routes_are_shims_to_api_http_modules() -> None:
     platform_route_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "platform.py").read_text(encoding="utf-8")
     context_route_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "context.py").read_text(encoding="utf-8")
+    catalog_route_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "catalog.py").read_text(encoding="utf-8")
+    registry_route_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "registry.py").read_text(encoding="utf-8")
+    registry_models_route_source = (PROJECT_ROOT / "backend" / "app" / "routes" / "registry_models.py").read_text(encoding="utf-8")
 
     assert "from ..api.http.platform import bp" in platform_route_source
     assert "from ..api.http.context import bp" in context_route_source
+    assert "from ..api.http.catalog import bp" in catalog_route_source
+    assert "from ..api.http.registry import bp" in registry_route_source
+    assert "from ..api.http.registry_models import bp" in registry_models_route_source
+
+
+def test_agent_projects_service_uses_application_catalog_contract() -> None:
+    source = (PROJECT_ROOT / "backend" / "app" / "application" / "agent_projects_service.py").read_text(encoding="utf-8")
+
+    assert "from .catalog_management_service import create_catalog_agent, update_catalog_agent" in source
+    assert "services.catalog_service" not in source

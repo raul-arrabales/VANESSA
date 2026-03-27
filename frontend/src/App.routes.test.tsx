@@ -168,6 +168,50 @@ vi.mock("./api/catalog", () => ({
   updateCatalogTool: vi.fn(),
   validateCatalogTool: vi.fn(),
 }));
+vi.mock("./api/agentProjects", () => ({
+  listAgentProjects: vi.fn(async () => [{
+    id: "proj-1",
+    owner_user_id: 1,
+    published_agent_id: null,
+    current_version: 1,
+    visibility: "private",
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    spec: {
+      name: "Support Agent",
+      description: "Handles support workflows.",
+      instructions: "Be helpful.",
+      default_model_ref: "gpt-4",
+      tool_refs: ["tool.web_search"],
+      workflow_definition: { entrypoint: "assistant" },
+      tool_policy: { allow_user_tools: false },
+      runtime_constraints: { internet_required: true, sandbox_required: false },
+    },
+  }]),
+  createAgentProject: vi.fn(),
+  getAgentProject: vi.fn(async () => ({
+    id: "proj-1",
+    owner_user_id: 1,
+    published_agent_id: null,
+    current_version: 1,
+    visibility: "private",
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    spec: {
+      name: "Support Agent",
+      description: "Handles support workflows.",
+      instructions: "Be helpful.",
+      default_model_ref: "gpt-4",
+      tool_refs: ["tool.web_search"],
+      workflow_definition: { entrypoint: "assistant" },
+      tool_policy: { allow_user_tools: false },
+      runtime_constraints: { internet_required: true, sandbox_required: false },
+    },
+  })),
+  updateAgentProject: vi.fn(),
+  validateAgentProject: vi.fn(),
+  publishAgentProject: vi.fn(),
+}));
 vi.mock("./api/platform", () => ({
   listPlatformCapabilities: vi.fn(async () => [
     {
@@ -345,6 +389,20 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/control/catalog" });
 
     expect(await screen.findByRole("heading", { name: await t("catalogControl.title") })).toBeVisible();
+  });
+
+  it("renders the agent builder page for users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/control/agent-builder" });
+
+    expect(await screen.findByRole("heading", { name: await t("agentBuilder.title") })).toBeVisible();
   });
 
   it("blocks admin users from the platform control route", async () => {

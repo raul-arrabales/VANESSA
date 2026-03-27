@@ -12,7 +12,7 @@ from ..repositories.agent_projects import (
 )
 from ..repositories.model_access import find_model_definition
 from ..repositories.registry import find_registry_entity
-from ..services.catalog_service import create_catalog_agent, update_catalog_agent
+from .catalog_management_service import create_catalog_agent, update_catalog_agent
 
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
 
@@ -189,6 +189,31 @@ def publish_agent_project(
             "catalog_agent": published_agent,
             "published_at": datetime.now(timezone.utc).isoformat(),
         },
+    }
+
+
+def build_agent_project_preview(
+    database_url: str,
+    *,
+    project_id: str,
+    actor_user_id: int,
+    actor_role: str,
+) -> dict[str, Any]:
+    project = get_agent_project_detail(
+        database_url,
+        project_id=project_id,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+    )
+    spec = dict(project["spec"])
+    return {
+        "project_id": project["id"],
+        "assistant_ref": str(project.get("published_agent_id") or f"agent.project.{project['id']}"),
+        "playground_kind": "chat",
+        "default_model_ref": spec.get("default_model_ref"),
+        "tool_refs": list(spec.get("tool_refs", [])),
+        "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
+        "workflow_definition": dict(spec.get("workflow_definition") or {}),
     }
 
 

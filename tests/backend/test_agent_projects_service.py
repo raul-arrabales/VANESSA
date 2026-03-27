@@ -80,3 +80,24 @@ def test_publish_agent_project_compiles_catalog_payload_and_persists_published_a
     assert create_calls[0]["owner_user_id"] == 10
     assert create_calls[0]["payload"]["tool_refs"] == ["tool.web_search"]
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
+
+
+def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypatch):
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: _project_row())
+
+    payload = agent_projects_service.build_agent_project_preview(
+        "postgresql://ignored",
+        project_id="proj-1",
+        actor_user_id=10,
+        actor_role="user",
+    )
+
+    assert payload == {
+        "project_id": "proj-1",
+        "assistant_ref": "agent.project.proj-1",
+        "playground_kind": "chat",
+        "default_model_ref": "safe-small",
+        "tool_refs": ["tool.web_search"],
+        "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+        "workflow_definition": {"entrypoint": "assistant"},
+    }

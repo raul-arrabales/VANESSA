@@ -14,7 +14,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 ## HTTP Ownership
 
 - Canonical backend HTTP domains now register from `backend/app/api/http`.
-- `playgrounds`, `agent-projects`, `platform`, and `context` are the current domain-owned HTTP modules.
+- `playgrounds`, `agent-projects`, `platform`, `context`, `catalog`, `registry`, and `registry_models` are the current domain-owned HTTP modules.
 - Legacy `backend/app/routes/*` modules may remain as thin shims for import compatibility, but bootstrap registration should point at `api/http` modules instead of flat route files.
 
 ## Current Voice Endpoints
@@ -42,6 +42,8 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `GET /v1/catalog/tools/{id}` (superadmin)
 - `PUT /v1/catalog/tools/{id}` (superadmin)
 - `POST /v1/catalog/tools/{id}/validate` (superadmin)
+
+Catalog orchestration now resolves through the application-layer catalog-management service, while the generic registry surface remains the lower-level runtime artifact store behind those typed catalog DTOs.
 
 ## Product AI Endpoints
 
@@ -75,6 +77,7 @@ Agent-project semantics:
 
 - This is the builder-facing authoring surface for `workflow_definition`, `tool_policy`, validation, and publish flows.
 - Runtime `catalog` entities remain the admin/runtime surface; publish compiles agent projects into catalog-managed artifacts.
+- The frontend builder workspace now lives under `/control/agent-builder`, while superadmin catalog administration remains at `/control/catalog`.
 
 ## Platform Control Plane
 

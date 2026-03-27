@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from app.routes import executions as executions_routes  # noqa: E402
-from app.routes import registry as registry_routes  # noqa: E402
-from app.routes import registry_models as registry_models_routes  # noqa: E402
+from app.api.http import registry as registry_routes  # noqa: E402
+from app.api.http import registry_models as registry_models_routes  # noqa: E402
 from app.routes import runtime as runtime_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services import runtime_profile_service  # noqa: E402
@@ -26,17 +26,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(executions_routes, "_database_url", lambda: "ignored")
     monkeypatch.setattr(executions_routes, "_config", lambda: config)
 
-    def _create_entity_with_version(
-        _database_url: str,
-        *,
-        entity_type: str,
-        entity_id: str,
-        owner_user_id: int,
-        visibility: str,
-        spec: dict[str, Any],
-        version: str,
-        publish: bool,
-    ) -> dict[str, Any]:
+    def _create_entity_with_version(*, entity_type: str, entity_id: str, owner_user_id: int, visibility: str, spec: dict[str, Any], version: str, publish: bool) -> dict[str, Any]:
         item = {
             "entity_id": entity_id,
             "entity_type": entity_type,
@@ -52,27 +42,19 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
             "version": {"entity_id": entity_id, "version": version, "spec_json": spec},
         }
 
-    def _list_entities(_database_url: str, *, entity_type: str) -> list[dict[str, Any]]:
+    def _list_entities(*, entity_type: str) -> list[dict[str, Any]]:
         return [item for item in registry_items.values() if item["entity_type"] == entity_type]
 
-    def _get_entity(_database_url: str, *, entity_type: str, entity_id: str) -> dict[str, Any] | None:
+    def _get_entity(*, entity_type: str, entity_id: str) -> dict[str, Any] | None:
         return registry_items.get(f"{entity_type}:{entity_id}")
 
-    def _get_entity_versions(_database_url: str, *, entity_id: str) -> list[dict[str, Any]]:
+    def _get_entity_versions(*, entity_id: str) -> list[dict[str, Any]]:
         for item in registry_items.values():
             if item["entity_id"] == entity_id:
                 return [{"entity_id": entity_id, "version": item["current_version"], "spec_json": item["current_spec"]}]
         return []
 
-    def _create_entity_version(
-        _database_url: str,
-        *,
-        entity_type: str,
-        entity_id: str,
-        version: str,
-        spec: dict[str, Any],
-        publish: bool,
-    ) -> dict[str, Any]:
+    def _create_entity_version(*, entity_type: str, entity_id: str, version: str, spec: dict[str, Any], publish: bool) -> dict[str, Any]:
         item = registry_items[f"{entity_type}:{entity_id}"]
         item["current_version"] = version
         item["current_spec"] = spec
@@ -82,15 +64,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
             "version": {"entity_id": entity_id, "version": version, "spec_json": spec},
         }
 
-    def _grant_share(
-        _database_url: str,
-        *,
-        current_user: dict[str, Any],
-        entity: dict[str, Any],
-        grantee_type: str,
-        grantee_id: str | None,
-        permission: str,
-    ) -> dict[str, Any]:
+    def _grant_share(*, current_user: dict[str, Any], entity: dict[str, Any], grantee_type: str, grantee_id: str | None, permission: str) -> dict[str, Any]:
         share = {
             "entity_id": entity["entity_id"],
             "grantee_type": grantee_type,
@@ -101,20 +75,64 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
         shares_by_entity.setdefault(entity["entity_id"], []).append(share)
         return share
 
-    monkeypatch.setattr(registry_routes, "create_entity_with_version", _create_entity_with_version)
-    monkeypatch.setattr(registry_models_routes, "create_entity_with_version", _create_entity_with_version)
-    monkeypatch.setattr(registry_routes, "list_entities", _list_entities)
-    monkeypatch.setattr(registry_models_routes, "list_entities", _list_entities)
-    monkeypatch.setattr(registry_routes, "get_entity", _get_entity)
-    monkeypatch.setattr(registry_models_routes, "get_entity", _get_entity)
-    monkeypatch.setattr(registry_routes, "get_entity_versions", _get_entity_versions)
-    monkeypatch.setattr(registry_models_routes, "get_entity_versions", _get_entity_versions)
-    monkeypatch.setattr(registry_routes, "create_entity_version", _create_entity_version)
-    monkeypatch.setattr(registry_models_routes, "create_entity_version", _create_entity_version)
-    monkeypatch.setattr(registry_routes, "grant_share", _grant_share)
-    monkeypatch.setattr(registry_models_routes, "grant_share", _grant_share)
-    monkeypatch.setattr(registry_routes, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
-    monkeypatch.setattr(registry_models_routes, "get_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
+    monkeypatch.setattr(registry_routes, "create_registry_entity_request", lambda _db, *, entity_type, payload, owner_user_id: _create_entity_with_version(
+        entity_type=entity_type.rstrip("s"),
+        entity_id=payload["id"],
+        owner_user_id=owner_user_id,
+        visibility=payload["visibility"],
+        spec=payload["spec"],
+        version=payload["version"],
+        publish=payload["publish"],
+    ))
+    monkeypatch.setattr(registry_routes, "list_registry_entities", lambda _db, *, entity_type: _list_entities(entity_type=entity_type.rstrip("s")))
+    monkeypatch.setattr(registry_routes, "get_registry_entity_detail", lambda _db, *, entity_type, entity_id: {
+        "entity": _get_entity(entity_type=entity_type.rstrip("s"), entity_id=entity_id),
+        "versions": _get_entity_versions(entity_id=entity_id),
+    })
+    monkeypatch.setattr(registry_routes, "create_registry_entity_version_request", lambda _db, *, entity_type, entity_id, payload, current_user: _create_entity_version(
+        entity_type=entity_type.rstrip("s"),
+        entity_id=entity_id,
+        version=payload["version"],
+        spec=payload.get("spec", {}),
+        publish=payload.get("publish", False),
+    ))
+    monkeypatch.setattr(registry_routes, "share_registry_entity_request", lambda _db, *, entity_type, entity_id, payload, current_user: _grant_share(
+        current_user=current_user,
+        entity=_get_entity(entity_type=entity_type.rstrip("s"), entity_id=entity_id),
+        grantee_type=payload["grantee_type"],
+        grantee_id=payload.get("grantee_id"),
+        permission=payload["permission"],
+    ))
+    monkeypatch.setattr(registry_routes, "list_registry_entity_shares", lambda _db, *, entity_type, entity_id: shares_by_entity.get(entity_id, []))
+    monkeypatch.setattr(registry_models_routes, "list_registry_model_entities", lambda _db: _list_entities(entity_type="model"))
+    monkeypatch.setattr(registry_models_routes, "get_registry_model_detail", lambda _db, *, entity_id: {
+        "entity": _get_entity(entity_type="model", entity_id=entity_id),
+        "versions": _get_entity_versions(entity_id=entity_id),
+    })
+    monkeypatch.setattr(registry_models_routes, "create_registry_model_request", lambda _db, *, payload, owner_user_id: _create_entity_with_version(
+        entity_type="model",
+        entity_id=payload["id"],
+        owner_user_id=owner_user_id,
+        visibility=payload["visibility"],
+        spec=payload["spec"],
+        version=payload["version"],
+        publish=payload["publish"],
+    ))
+    monkeypatch.setattr(registry_models_routes, "create_registry_model_version_request", lambda _db, *, entity_id, payload, current_user: _create_entity_version(
+        entity_type="model",
+        entity_id=entity_id,
+        version=payload["version"],
+        spec=payload.get("spec", {}),
+        publish=payload.get("publish", False),
+    ))
+    monkeypatch.setattr(registry_models_routes, "share_registry_model_request", lambda _db, *, entity_id, payload, current_user: _grant_share(
+        current_user=current_user,
+        entity=_get_entity(entity_type="model", entity_id=entity_id),
+        grantee_type=payload["grantee_type"],
+        grantee_id=payload.get("grantee_id"),
+        permission=payload["permission"],
+    ))
+    monkeypatch.setattr(registry_models_routes, "list_registry_model_shares", lambda _db, *, entity_id: shares_by_entity.get(entity_id, []))
 
     monkeypatch.setattr(
         runtime_routes,

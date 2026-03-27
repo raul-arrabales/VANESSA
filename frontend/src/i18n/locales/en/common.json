@@ -30,6 +30,8 @@
     "context": "Context management",
     "contextNew": "New knowledge base",
     "contextDetail": "Knowledge base detail",
+    "agentBuilder": "Agent builder",
+    "agentProjectDetail": "Agent project detail",
     "catalog": "Agent catalog",
     "models": "Models",
     "modelsCatalog": "Model catalog",
@@ -232,6 +234,10 @@
       "ai": {
         "title": "Vanessa AI",
         "description": "Open the AI workspace and continue your conversations."
+      },
+      "agentBuilder": {
+        "title": "Agent builder",
+        "description": "Author reusable agent projects, validate their runtime constraints, and prepare them for publishing."
       },
       "approvals": {
         "title": "User approvals",
@@ -1222,6 +1228,82 @@
       "toolUpdated": "Updated tool {{name}}.",
       "agentValidated": "Validated agent {{name}}.",
       "toolValidated": "Validated tool {{name}}."
+    }
+  },
+  "agentBuilder": {
+    "title": "Agent builder",
+    "description": "Author builder-facing agent projects without coupling the workspace to raw catalog or registry forms.",
+    "detailTitle": "Agent project",
+    "detailDescription": "Edit this project, validate its runtime constraints, and publish it into the runtime catalog when ready.",
+    "projectsTitle": "Projects",
+    "projectsDescription": "Review and continue your saved agent projects.",
+    "previewTitle": "Preview seam",
+    "previewDescription": "This internal preview contract is ready for future playground and Vanessa-core integrations.",
+    "validationTitle": "Validation",
+    "publishTitle": "Publish result",
+    "fields": {
+      "id": "Project ID",
+      "visibility": "Visibility",
+      "name": "Name",
+      "description": "Description",
+      "instructions": "Instructions",
+      "defaultModelRef": "Default model ref",
+      "toolRefs": "Tool refs",
+      "workflowDefinition": "Workflow definition",
+      "toolPolicy": "Tool policy",
+      "internetRequired": "Internet required",
+      "sandboxRequired": "Sandbox required"
+    },
+    "actions": {
+      "create": "Create project",
+      "creating": "Creating...",
+      "manage": "Manage",
+      "save": "Save project",
+      "saving": "Saving...",
+      "validate": "Validate",
+      "validating": "Validating...",
+      "publish": "Publish",
+      "publishing": "Publishing...",
+      "back": "Back to projects"
+    },
+    "columns": {
+      "name": "Project",
+      "visibility": "Visibility",
+      "version": "Version",
+      "published": "Published agent",
+      "actions": "Actions"
+    },
+    "states": {
+      "loading": "Loading agent projects...",
+      "empty": "No agent projects created yet.",
+      "notPublished": "Not published"
+    },
+    "validation": {
+      "valid": "Valid",
+      "invalid": "Invalid"
+    },
+    "preview": {
+      "assistantRef": "Assistant ref",
+      "playgroundKind": "Playground kind",
+      "defaultModelRef": "Default model ref",
+      "toolRefs": "Tool refs",
+      "none": "None"
+    },
+    "feedback": {
+      "loadFailed": "Unable to load agent builder data.",
+      "createFailed": "Unable to create the agent project.",
+      "updateFailed": "Unable to save the agent project.",
+      "validateFailed": "Unable to validate the agent project.",
+      "publishFailed": "Unable to publish the agent project.",
+      "invalidWorkflowDefinition": "Workflow definition must be valid JSON.",
+      "invalidToolPolicy": "Tool policy must be valid JSON.",
+      "created": "Created agent project {{name}}.",
+      "updated": "Saved agent project {{name}}.",
+      "validated": "Validated agent project {{name}}.",
+      "published": "Published agent project {{name}}."
+    },
+    "aria": {
+      "table": "Agent projects table"
     }
   },
   "actionFeedback": {

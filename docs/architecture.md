@@ -138,6 +138,7 @@ The product-facing AI surface now has its own domain split, separate from the co
   - First-party Vanessa behavior is intended to plug into shared execution seams instead of branching generic execution code.
 
 Frontend work now lands under `frontend/src/features/*`, backend product APIs under `backend/app/api/http`, and engine execution seams under `agent_engine/app/execution_pipeline`.
+Admin builder/catalog work follows the same rule, with builder-facing authoring under `frontend/src/features/agent-builder`, catalog administration under `frontend/src/features/catalog-admin`, and the canonical backend HTTP owners under `backend/app/api/http/catalog.py`, `backend/app/api/http/registry.py`, and `backend/app/api/http/registry_models.py`.
 
 ## Source of Truth
 

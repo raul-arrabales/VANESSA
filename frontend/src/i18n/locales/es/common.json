@@ -30,6 +30,8 @@
     "context": "Gestion de contexto",
     "contextNew": "Nueva base de conocimiento",
     "contextDetail": "Detalle de base de conocimiento",
+    "agentBuilder": "Constructor de agentes",
+    "agentProjectDetail": "Detalle de proyecto de agente",
     "catalog": "Catalogo de agentes",
     "models": "Modelos",
     "modelsCatalog": "Catalogo de modelos",
@@ -232,6 +234,10 @@
       "ai": {
         "title": "Vanessa AI",
         "description": "Abre el espacio de IA y continua tus conversaciones."
+      },
+      "agentBuilder": {
+        "title": "Constructor de agentes",
+        "description": "Crea proyectos de agentes reutilizables, valida sus restricciones y preparalos para publicarlos."
       },
       "approvals": {
         "title": "Aprobaciones de usuarios",
@@ -1212,6 +1218,82 @@
       "toolUpdated": "Herramienta {{name}} actualizada.",
       "agentValidated": "Agente {{name}} validado.",
       "toolValidated": "Herramienta {{name}} validada."
+    }
+  },
+  "agentBuilder": {
+    "title": "Constructor de agentes",
+    "description": "Define proyectos de agentes del dominio builder sin acoplar la interfaz a formularios crudos del catalogo o registry.",
+    "detailTitle": "Proyecto de agente",
+    "detailDescription": "Edita este proyecto, valida sus restricciones de ejecucion y publicalo al catalogo cuando este listo.",
+    "projectsTitle": "Proyectos",
+    "projectsDescription": "Revisa y continua tus proyectos de agentes guardados.",
+    "previewTitle": "Costura de preview",
+    "previewDescription": "Este contrato interno de preview queda listo para futuras integraciones con playgrounds y Vanessa-core.",
+    "validationTitle": "Validacion",
+    "publishTitle": "Resultado de publicacion",
+    "fields": {
+      "id": "ID del proyecto",
+      "visibility": "Visibilidad",
+      "name": "Nombre",
+      "description": "Descripcion",
+      "instructions": "Instrucciones",
+      "defaultModelRef": "Referencia de modelo por defecto",
+      "toolRefs": "Referencias de herramientas",
+      "workflowDefinition": "Definicion de workflow",
+      "toolPolicy": "Politica de herramientas",
+      "internetRequired": "Internet requerido",
+      "sandboxRequired": "Sandbox requerido"
+    },
+    "actions": {
+      "create": "Crear proyecto",
+      "creating": "Creando...",
+      "manage": "Gestionar",
+      "save": "Guardar proyecto",
+      "saving": "Guardando...",
+      "validate": "Validar",
+      "validating": "Validando...",
+      "publish": "Publicar",
+      "publishing": "Publicando...",
+      "back": "Volver a proyectos"
+    },
+    "columns": {
+      "name": "Proyecto",
+      "visibility": "Visibilidad",
+      "version": "Version",
+      "published": "Agente publicado",
+      "actions": "Acciones"
+    },
+    "states": {
+      "loading": "Cargando proyectos de agentes...",
+      "empty": "Todavia no hay proyectos de agentes.",
+      "notPublished": "No publicado"
+    },
+    "validation": {
+      "valid": "Valido",
+      "invalid": "Invalido"
+    },
+    "preview": {
+      "assistantRef": "Referencia de asistente",
+      "playgroundKind": "Tipo de playground",
+      "defaultModelRef": "Modelo por defecto",
+      "toolRefs": "Herramientas",
+      "none": "Ninguno"
+    },
+    "feedback": {
+      "loadFailed": "No se pudieron cargar los datos del constructor de agentes.",
+      "createFailed": "No se pudo crear el proyecto de agente.",
+      "updateFailed": "No se pudo guardar el proyecto de agente.",
+      "validateFailed": "No se pudo validar el proyecto de agente.",
+      "publishFailed": "No se pudo publicar el proyecto de agente.",
+      "invalidWorkflowDefinition": "La definicion de workflow debe ser JSON valido.",
+      "invalidToolPolicy": "La politica de herramientas debe ser JSON valido.",
+      "created": "Proyecto de agente {{name}} creado.",
+      "updated": "Proyecto de agente {{name}} guardado.",
+      "validated": "Proyecto de agente {{name}} validado.",
+      "published": "Proyecto de agente {{name}} publicado."
+    },
+    "aria": {
+      "table": "Tabla de proyectos de agentes"
     }
   },
   "actionFeedback": {

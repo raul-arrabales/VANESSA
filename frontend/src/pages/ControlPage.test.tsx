@@ -36,6 +36,7 @@ describe("ControlPage", () => {
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.quotes.title") })).toBeNull();
     expect(screen.getByRole("link", { name: await t("control.items.models.title") })).toHaveAttribute("href", "/control/models");
+    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
   });
 
   it("shows the quotes control for admin users", async () => {
@@ -50,6 +51,7 @@ describe("ControlPage", () => {
     await renderPage();
 
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
+    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
     expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
     expect(screen.getByRole("link", { name: await t("control.items.context.title") })).toHaveAttribute("href", "/control/context");
     expect(screen.queryByRole("link", { name: await t("control.items.platform.title") })).toBeNull();
@@ -67,6 +69,7 @@ describe("ControlPage", () => {
     await renderPage();
 
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
+    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
     expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
     expect(screen.getByRole("link", { name: await t("control.items.catalog.title") })).toHaveAttribute("href", "/control/catalog");
   });
