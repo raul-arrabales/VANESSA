@@ -1,0 +1,400 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from ..config import AuthConfig
+from ..repositories import context_management as context_repo
+from .context_management_ingestion import (
+    _iter_source_files,
+    _parse_source_documents,
+    _source_document_changed,
+    _source_document_id,
+    _source_document_key,
+)
+from .context_management_serialization import _normalize_knowledge_source_payload, _serialize_knowledge_base, _serialize_knowledge_source, _serialize_sync_run
+from .context_management_shared import (
+    _chunk_document_text,
+    _delete_document_chunks,
+    _mark_knowledge_base_sync_error,
+    _mark_knowledge_base_sync_ready,
+    _mark_knowledge_base_syncing,
+    _refresh_document_count,
+    _require_knowledge_base,
+    _require_knowledge_source,
+    _resolve_source_directory,
+    _upsert_document_chunks,
+)
+from .context_management_types import SourceSyncSummary
+from .platform_types import PlatformControlPlaneError
+
+
+def list_knowledge_sources(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:
+    _require_knowledge_base(database_url, knowledge_base_id)
+    return [_serialize_knowledge_source(row) for row in context_repo.list_knowledge_sources(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+    )]
+
+
+def create_knowledge_source(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    payload: dict[str, Any],
+    created_by_user_id: int | None,
+) -> dict[str, Any]:
+    _require_knowledge_base(database_url, knowledge_base_id)
+    normalized = _normalize_knowledge_source_payload(payload)
+    _resolve_source_directory(config, normalized["relative_path"], require_exists=True)
+    source = context_repo.create_knowledge_source(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_type=normalized["source_type"],
+        display_name=normalized["display_name"],
+        relative_path=normalized["relative_path"],
+        include_globs=normalized["include_globs"],
+        exclude_globs=normalized["exclude_globs"],
+        lifecycle_state=normalized["lifecycle_state"],
+        created_by_user_id=created_by_user_id,
+        updated_by_user_id=created_by_user_id,
+    )
+    return _serialize_knowledge_source(source)
+
+
+def update_knowledge_source(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    source_id: str,
+    payload: dict[str, Any],
+    updated_by_user_id: int | None,
+) -> dict[str, Any]:
+    existing = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
+    normalized = _normalize_knowledge_source_payload(payload, existing=existing)
+    _resolve_source_directory(config, normalized["relative_path"], require_exists=True)
+    updated = context_repo.update_knowledge_source(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=source_id,
+        display_name=normalized["display_name"],
+        relative_path=normalized["relative_path"],
+        include_globs=normalized["include_globs"],
+        exclude_globs=normalized["exclude_globs"],
+        lifecycle_state=normalized["lifecycle_state"],
+        updated_by_user_id=updated_by_user_id,
+    )
+    if updated is None:
+        raise PlatformControlPlaneError("knowledge_source_not_found", "Knowledge source not found", status_code=404)
+    return _serialize_knowledge_source(updated)
+
+
+def delete_knowledge_source(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    source_id: str,
+    updated_by_user_id: int | None,
+) -> None:
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    source = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
+    source_documents = context_repo.list_source_documents(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=source_id,
+    )
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary=f"Removing managed source '{source['display_name']}' and its indexed documents.",
+    )
+    try:
+        for document in source_documents:
+            _delete_document_chunks(
+                database_url,
+                config,
+                knowledge_base=knowledge_base,
+                document=document,
+            )
+            context_repo.delete_document(
+                database_url,
+                knowledge_base_id=knowledge_base_id,
+                document_id=str(document["id"]),
+            )
+        if not context_repo.delete_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id):
+            raise PlatformControlPlaneError("knowledge_source_not_found", "Knowledge source not found", status_code=404)
+        _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
+        _mark_knowledge_base_sync_ready(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary=f"Removed managed source '{source['display_name']}' and {len(source_documents)} sourced document(s).",
+        )
+    except Exception:
+        _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary=f"Removing managed source '{source['display_name']}' failed.",
+        )
+        raise
+
+
+def list_knowledge_base_sync_runs(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:
+    _require_knowledge_base(database_url, knowledge_base_id)
+    return [_serialize_sync_run(row) for row in context_repo.list_sync_runs(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+    )]
+
+
+def sync_knowledge_source(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base_id: str,
+    source_id: str,
+    updated_by_user_id: int | None,
+) -> dict[str, Any]:
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    source = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
+    if str(source.get("lifecycle_state") or "").strip().lower() != "active":
+        raise PlatformControlPlaneError(
+            "knowledge_source_inactive",
+            "Only active knowledge sources can be synced.",
+            status_code=409,
+            details={"source_id": source_id, "lifecycle_state": source.get("lifecycle_state")},
+        )
+    _, source_directory = _resolve_source_directory(config, str(source.get("relative_path") or "").strip(), require_exists=True)
+    run = context_repo.create_sync_run(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=source_id,
+        created_by_user_id=updated_by_user_id,
+    )
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary=f"Syncing managed source '{source['display_name']}'.",
+    )
+    context_repo.mark_knowledge_source_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=source_id,
+    )
+    try:
+        result = _sync_knowledge_source_documents(
+            database_url,
+            config,
+            knowledge_base=knowledge_base,
+            source=source,
+            source_directory=source_directory,
+            updated_by_user_id=updated_by_user_id,
+        )
+        finished_run = context_repo.finish_sync_run(
+            database_url,
+            run_id=str(run["id"]),
+            status="ready",
+            scanned_file_count=result["scanned_file_count"],
+            changed_file_count=result["changed_file_count"],
+            deleted_file_count=result["deleted_file_count"],
+            created_document_count=result["created_document_count"],
+            updated_document_count=result["updated_document_count"],
+            deleted_document_count=result["deleted_document_count"],
+            error_summary=None,
+        )
+        refreshed_source = context_repo.set_knowledge_source_sync_result(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            source_id=source_id,
+            last_sync_status="ready",
+            last_sync_error=None,
+        )
+        refreshed_kb = _mark_knowledge_base_sync_ready(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary=(
+                f"Source '{source['display_name']}' synced "
+                f"{result['created_document_count']} created, "
+                f"{result['updated_document_count']} updated, "
+                f"{result['deleted_document_count']} deleted document(s)."
+            ),
+        )
+        return {
+            "knowledge_base": _serialize_knowledge_base(refreshed_kb or knowledge_base),
+            "source": _serialize_knowledge_source(refreshed_source or source),
+            "sync_run": _serialize_sync_run(finished_run or run),
+        }
+    except Exception as exc:
+        message = str(exc).strip() or "Knowledge source sync failed."
+        finished_run = context_repo.finish_sync_run(
+            database_url,
+            run_id=str(run["id"]),
+            status="error",
+            scanned_file_count=0,
+            changed_file_count=0,
+            deleted_file_count=0,
+            created_document_count=0,
+            updated_document_count=0,
+            deleted_document_count=0,
+            error_summary=message,
+        )
+        refreshed_source = context_repo.set_knowledge_source_sync_result(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            source_id=source_id,
+            last_sync_status="error",
+            last_sync_error=message,
+        )
+        _mark_knowledge_base_sync_error(
+            database_url,
+            knowledge_base_id=knowledge_base_id,
+            updated_by_user_id=updated_by_user_id,
+            summary=f"Source '{source['display_name']}' sync failed.",
+        )
+        if isinstance(exc, PlatformControlPlaneError):
+            raise
+        raise PlatformControlPlaneError(
+            "knowledge_source_sync_failed",
+            message,
+            status_code=500,
+            details={
+                "source_id": source_id,
+                "knowledge_base_id": knowledge_base_id,
+                "sync_run_id": str((finished_run or run).get("id") or "").strip(),
+                "last_sync_status": str((refreshed_source or source).get("last_sync_status") or "").strip() or "error",
+            },
+        ) from exc
+
+
+def _sync_knowledge_source_documents(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    knowledge_base: dict[str, Any],
+    source: dict[str, Any],
+    source_directory: Path,
+    updated_by_user_id: int | None,
+) -> SourceSyncSummary:
+    scanned_file_count = 0
+    created_document_count = 0
+    updated_document_count = 0
+    deleted_document_count = 0
+    changed_paths: set[str] = set()
+    deleted_paths: set[str] = set()
+    seen_keys: set[str] = set()
+    source_id = str(source["id"])
+    include_globs = list(source.get("include_globs") or [])
+    exclude_globs = list(source.get("exclude_globs") or [])
+
+    for file_path, relative_path in _iter_source_files(
+        source_directory,
+        include_globs=include_globs,
+        exclude_globs=exclude_globs,
+    ):
+        scanned_file_count += 1
+        parsed_documents = _parse_source_documents(file_path, relative_path=relative_path, source=source)
+        for position, parsed_document in enumerate(parsed_documents):
+            source_document_key = _source_document_key(relative_path, position)
+            seen_keys.add(source_document_key)
+            existing = context_repo.get_document_by_source_key(
+                database_url,
+                knowledge_base_id=str(knowledge_base["id"]),
+                source_id=source_id,
+                source_document_key=source_document_key,
+            )
+            chunks = _chunk_document_text(parsed_document["text"])
+            if existing is None:
+                document = context_repo.create_document(
+                    database_url,
+                    document_id=_source_document_id(source_id, source_document_key),
+                    knowledge_base_id=str(knowledge_base["id"]),
+                    title=parsed_document["title"],
+                    source_type=parsed_document["source_type"],
+                    source_name=parsed_document["source_name"],
+                    uri=parsed_document["uri"],
+                    text=parsed_document["text"],
+                    metadata_json=parsed_document["metadata"],
+                    chunk_count=len(chunks),
+                    source_id=source_id,
+                    source_path=relative_path,
+                    source_document_key=source_document_key,
+                    managed_by_source=True,
+                    created_by_user_id=updated_by_user_id,
+                    updated_by_user_id=updated_by_user_id,
+                )
+                _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=document, chunks=chunks)
+                created_document_count += 1
+                changed_paths.add(relative_path)
+                continue
+            if not _source_document_changed(
+                existing,
+                parsed_document=parsed_document,
+                chunk_count=len(chunks),
+                source_path=relative_path,
+                source_document_key=source_document_key,
+            ):
+                continue
+            _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
+            updated = context_repo.update_document(
+                database_url,
+                knowledge_base_id=str(knowledge_base["id"]),
+                document_id=str(existing["id"]),
+                title=parsed_document["title"],
+                source_type=parsed_document["source_type"],
+                source_name=parsed_document["source_name"],
+                uri=parsed_document["uri"],
+                text=parsed_document["text"],
+                metadata_json=parsed_document["metadata"],
+                chunk_count=len(chunks),
+                source_id=source_id,
+                source_path=relative_path,
+                source_document_key=source_document_key,
+                managed_by_source=True,
+                updated_by_user_id=updated_by_user_id,
+            )
+            if updated is None:
+                raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
+            _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=updated, chunks=chunks)
+            updated_document_count += 1
+            changed_paths.add(relative_path)
+
+    existing_documents = context_repo.list_source_documents(
+        database_url,
+        knowledge_base_id=str(knowledge_base["id"]),
+        source_id=source_id,
+    )
+    for document in existing_documents:
+        source_document_key = str(document.get("source_document_key") or "").strip()
+        if source_document_key in seen_keys:
+            continue
+        _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=document)
+        context_repo.delete_document(
+            database_url,
+            knowledge_base_id=str(knowledge_base["id"]),
+            document_id=str(document["id"]),
+        )
+        deleted_document_count += 1
+        source_path = str(document.get("source_path") or "").strip()
+        if source_path:
+            deleted_paths.add(source_path)
+
+    _refresh_document_count(
+        database_url,
+        knowledge_base_id=str(knowledge_base["id"]),
+        updated_by_user_id=updated_by_user_id,
+    )
+    return {
+        "scanned_file_count": scanned_file_count,
+        "changed_file_count": len(changed_paths),
+        "deleted_file_count": len(deleted_paths),
+        "created_document_count": created_document_count,
+        "updated_document_count": updated_document_count,
+        "deleted_document_count": deleted_document_count,
+    }

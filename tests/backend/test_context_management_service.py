@@ -7,7 +7,12 @@ from types import SimpleNamespace
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from app.services import context_management  # noqa: E402
+from app.services import (
+    context_management,
+    context_management_documents,
+    context_management_ingestion,
+    context_management_sources,
+)  # noqa: E402
 from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 
 
@@ -32,7 +37,7 @@ def test_parse_upload_documents_supports_text_and_jsonl():
             self.pages = [_FakePdfPage("Page one"), _FakePdfPage("Page two")]
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(context_management, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
+    monkeypatch.setattr(context_management_ingestion, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
 
     try:
         parsed_text = context_management._parse_upload_documents(text_file)  # type: ignore[attr-defined]
@@ -82,7 +87,7 @@ def test_parse_upload_documents_rejects_encrypted_or_textless_pdf(monkeypatch: p
             self.is_encrypted = marker == "%PDF-encrypted"
             self.pages = [_FakePdfPage("")] if marker == "%PDF-empty" else [_FakePdfPage("hello")]
 
-    monkeypatch.setattr(context_management, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
+    monkeypatch.setattr(context_management_ingestion, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
 
     with pytest.raises(PlatformControlPlaneError) as encrypted_exc:
         context_management._parse_upload_documents(encrypted_file)  # type: ignore[attr-defined]
@@ -190,7 +195,7 @@ def test_resync_knowledge_base_rebuilds_documents_and_updates_sync_state(monkeyp
             "chunk_count": chunk_count,
         },
     )
-    monkeypatch.setattr(context_management, "_refresh_document_count", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_refresh_document_count", lambda *_args, **_kwargs: None)
 
     class _Adapter:
         def delete_index(self, *, index_name: str):
@@ -199,11 +204,18 @@ def test_resync_knowledge_base_rebuilds_documents_and_updates_sync_state(monkeyp
         def ensure_index(self, *, index_name: str, schema: dict[str, object]):
             return {"index": {"name": index_name, "status": "ready", "schema": schema}}
 
-        def upsert(self, *, index_name: str, documents: list[dict[str, object]]):
-            upserted_chunks.append((index_name, len(documents)))
-            return {"index": index_name, "count": len(documents)}
-
-    monkeypatch.setattr(context_management, "_resolve_knowledge_base_vector_adapter", lambda *_args, **_kwargs: _Adapter())
+    monkeypatch.setattr(
+        context_management_documents,
+        "_resolve_knowledge_base_vector_adapter",
+        lambda *_args, **_kwargs: _Adapter(),
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_upsert_document_chunks",
+        lambda _db, _config, *, knowledge_base, document, chunks: upserted_chunks.append(
+            (str(knowledge_base["index_name"]), len(chunks))
+        ),
+    )
 
     payload = context_management.resync_knowledge_base(
         "ignored",
@@ -371,7 +383,7 @@ def test_create_knowledge_source_validates_allowlisted_roots(monkeypatch: pytest
     (root / "docs").mkdir()
 
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_require_knowledge_base",
         lambda _db, _knowledge_base_id: {"id": "kb-primary"},
     )
@@ -454,20 +466,20 @@ def test_sync_knowledge_source_reconciles_stable_documents_and_preserves_manual_
     }
     sync_runs: list[dict[str, object]] = []
 
-    monkeypatch.setattr(context_management, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_require_knowledge_source",
         lambda _db, *, knowledge_base_id, source_id: source,
     )
-    monkeypatch.setattr(context_management, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_mark_knowledge_base_sync_ready",
         lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "ready"},
     )
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_mark_knowledge_base_sync_error",
         lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "error"},
     )
@@ -544,8 +556,8 @@ def test_sync_knowledge_source_reconciles_stable_documents_and_preserves_manual_
         lambda _db, *, knowledge_base_id: [dict(item) for item in documents.values() if item.get("knowledge_base_id") == knowledge_base_id],
     )
     monkeypatch.setattr(context_management.context_repo, "set_knowledge_base_document_count", lambda *_args, **_kwargs: knowledge_base)
-    monkeypatch.setattr(context_management, "_upsert_document_chunks", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(context_management, "_delete_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_upsert_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_delete_document_chunks", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         context_management.context_repo,
         "create_sync_run",
@@ -678,21 +690,21 @@ def test_sync_knowledge_source_reconciles_pdf_documents(monkeypatch: pytest.Monk
             else:
                 self.pages = [_FakePdfPage("Initial PDF text")]
 
-    monkeypatch.setattr(context_management, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
-    monkeypatch.setattr(context_management, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
+    monkeypatch.setattr(context_management_ingestion, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_require_knowledge_source",
         lambda _db, *, knowledge_base_id, source_id: source,
     )
-    monkeypatch.setattr(context_management, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_mark_knowledge_base_sync_ready",
         lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "ready"},
     )
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_mark_knowledge_base_sync_error",
         lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "error"},
     )
@@ -769,8 +781,8 @@ def test_sync_knowledge_source_reconciles_pdf_documents(monkeypatch: pytest.Monk
         lambda _db, *, knowledge_base_id: [dict(item) for item in documents.values() if item.get("knowledge_base_id") == knowledge_base_id],
     )
     monkeypatch.setattr(context_management.context_repo, "set_knowledge_base_document_count", lambda *_args, **_kwargs: knowledge_base)
-    monkeypatch.setattr(context_management, "_upsert_document_chunks", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(context_management, "_delete_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_upsert_document_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_delete_document_chunks", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         context_management.context_repo,
         "create_sync_run",
@@ -887,16 +899,16 @@ def test_sync_knowledge_source_records_pdf_failure_summary(monkeypatch: pytest.M
             self.is_encrypted = True
             self.pages = []
 
-    monkeypatch.setattr(context_management, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
-    monkeypatch.setattr(context_management, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
+    monkeypatch.setattr(context_management_ingestion, "_get_pdf_reader_dependencies", lambda: (_FakePdfReader, (RuntimeError,)))
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_base", lambda _db, _knowledge_base_id: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_require_knowledge_source",
         lambda _db, *, knowledge_base_id, source_id: source,
     )
-    monkeypatch.setattr(context_management, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: knowledge_base)
     monkeypatch.setattr(
-        context_management,
+        context_management_sources,
         "_mark_knowledge_base_sync_error",
         lambda *_args, summary, **_kwargs: {**knowledge_base, "last_sync_summary": summary, "sync_status": "error"},
     )
