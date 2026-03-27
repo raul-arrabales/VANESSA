@@ -1,14 +1,14 @@
 import { lazy, type JSX } from "react";
 import { matchPath } from "react-router-dom";
 import type { Role } from "../auth/types";
-import ControlPage from "../pages/ControlPage";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import SettingsPage from "../pages/SettingsPage";
 const StyleGuidePage = lazy(() => import("../pages/StyleGuidePage"));
-const AdminApprovalsPage = lazy(() => import("../pages/AdminApprovalsPage"));
-const QuoteManagementPage = lazy(() => import("../pages/QuoteManagementPage"));
+const ControlShellPage = lazy(() => import("../features/control-shell/pages/ControlShellPage"));
+const AdminApprovalsPage = lazy(() => import("../features/admin-approvals/pages/AdminApprovalsPage"));
+const QuoteManagementPage = lazy(() => import("../features/quote-management/pages/QuoteManagementPage"));
 const CatalogControlPage = lazy(() => import("../features/catalog-admin/pages/CatalogControlPage"));
 const AgentBuilderProjectsPage = lazy(() => import("../features/agent-builder/pages/AgentBuilderProjectsPage"));
 const AgentProjectDetailPage = lazy(() => import("../features/agent-builder/pages/AgentProjectDetailPage"));
@@ -125,7 +125,7 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
-    element: <ControlPage />,
+    element: <ControlShellPage />,
   },
   {
     id: "control-approvals",

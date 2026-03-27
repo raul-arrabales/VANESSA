@@ -12,6 +12,8 @@ describe("app route registry", () => {
       "/control",
       "/control/approvals",
       "/control/quotes",
+      "/control/agent-builder",
+      "/control/agent-builder/:projectId",
       "/control/catalog",
       "/control/system-health",
       "/control/platform",

@@ -23,7 +23,6 @@ vi.mock("./AuthProvider", () => ({
     logout: vi.fn(),
     refreshMe: vi.fn(),
     register: vi.fn(),
-    activatePendingUser: vi.fn(),
   }),
 }));
 
