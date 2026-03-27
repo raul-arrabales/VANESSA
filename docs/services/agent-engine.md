@@ -26,13 +26,22 @@ Tool/runtime convergence now adds two optional runtime capabilities to that same
 
 Execution flow summary:
 
-1. Load the agent spec and referenced `tool_refs`.
-2. Resolve and validate tool specs from the registry.
-3. Enforce runtime-profile rules such as blocking online-only tools in `offline`.
-4. Convert allowed tools into OpenAI-compatible tool definitions.
-5. Call the active `llm_inference` provider with those tool definitions attached.
-6. If the model returns tool calls, dispatch them through the active `mcp_runtime` or `sandbox_execution` provider.
-7. Append tool results back into the message stream and continue for up to three rounds.
+1. Normalize execution input into `ConversationState` and optional `RetrievalRequest`.
+2. Resolve the agent spec and enforce execute permissions.
+3. Validate runtime dependencies and resolve allowed tools.
+4. Execute retrieval planning against the active `embeddings` and `vector_store` bindings when requested.
+5. Call the active `llm_inference` provider with normalized messages and tool definitions.
+6. Dispatch tool calls through the active `mcp_runtime` or `sandbox_execution` provider.
+7. Assemble `ExecutionResult` and persist execution state transitions.
+
+The code is now split into explicit seams:
+
+- `agent_engine/app/execution_pipeline` for DTOs and stage orchestration
+- `agent_engine/app/retrieval` for retrieval normalization and execution
+- `agent_engine/app/tool_runtime` for transport-specific tool dispatch
+- `agent_engine/app/policies` for policy and agent-resolution stages
+
+These seams are intended to support future Vanessa-specific planner, memory/retrieval, response policy, and tool strategy modules without branching the generic execution flow.
 
 Current canonical built-in tools:
 

@@ -29,9 +29,9 @@ const LocalArtifactsPage = lazy(() => import("../features/modelops/pages/LocalAr
 const ModelAccessManagementPage = lazy(() => import("../features/modelops/pages/ModelAccessManagementPage"));
 const ModelTestPage = lazy(() => import("../features/modelops/pages/ModelTestPage"));
 const ModelDetailPage = lazy(() => import("../features/modelops/pages/ModelDetailPage"));
-const AiPage = lazy(() => import("../pages/AiPage"));
-const ChatbotPage = lazy(() => import("../pages/ChatbotPage"));
-const KnowledgeChatPage = lazy(() => import("../pages/KnowledgeChatPage"));
+const AiPage = lazy(() => import("../features/playgrounds/pages/PlaygroundsHomePage"));
+const ChatbotPage = lazy(() => import("../features/playgrounds/pages/ChatPlaygroundPage"));
+const KnowledgeChatPage = lazy(() => import("../features/playgrounds/pages/KnowledgePlaygroundPage"));
 
 export type AppRouteSection = "public" | "settings" | "control" | "ai";
 export type AppRouteNavGroup = "primary" | "userMenu";

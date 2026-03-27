@@ -104,7 +104,7 @@ Platform control plane semantics:
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
 - Agent executions may also use optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` bindings for LLM-driven tool execution.
-- Product-facing knowledge chat now lives on `GET /v1/chat/knowledge/bases` plus `POST /v1/chat/knowledge`; backend resolves the selected model and selected deployment-bound managed knowledge base through governance, injects the matching retrieval index, and routes the request through the fixed `agent.knowledge_chat` agent before returning normalized citations and snippets.
+- Product-facing chat and knowledge experiences now live under `/v1/playgrounds/*`; backend persists canonical playground sessions, resolves deployment-bound model and knowledge selections through governance, and routes knowledge requests through the fixed `agent.knowledge_chat` agent before returning normalized citations and retrieval metadata.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
 - Local `vllm_local` and `vllm_embeddings_local` provider slots are now live runtime controls: assigning or clearing a loaded model persists slot intent and immediately calls the matching local runtime controller.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
@@ -117,7 +117,10 @@ Platform control plane semantics:
 
 Model governance and runtime endpoints (canonical in Release N):
 
-- `POST /v1/chat/knowledge`
+- `GET /v1/playgrounds/options`
+- `POST /v1/playgrounds/sessions`
+- `POST /v1/playgrounds/sessions/{id}/messages`
+- `POST /v1/agent-projects`
 - `GET /v1/models/catalog`
 - `POST /v1/models/catalog`
 - `GET /v1/models/discovery/huggingface`

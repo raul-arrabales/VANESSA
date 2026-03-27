@@ -4,10 +4,15 @@ CREATE TABLE IF NOT EXISTS chat_conversations (
     conversation_kind TEXT NOT NULL DEFAULT 'plain',
     title TEXT NOT NULL,
     title_source TEXT NOT NULL DEFAULT 'auto',
+    assistant_ref TEXT,
     model_id TEXT,
+    knowledge_base_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS assistant_ref TEXT;
+ALTER TABLE chat_conversations ADD COLUMN IF NOT EXISTS knowledge_base_id TEXT;
 
 DO $$
 BEGIN

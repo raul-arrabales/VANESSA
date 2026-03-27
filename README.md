@@ -23,6 +23,16 @@ The backend also owns a GenAI control plane that distinguishes:
 - `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`
 - `deployment profiles` that bind capabilities to active providers
 
+The product-facing AI surface is now split into explicit domains:
+
+- `frontend/src/features/playgrounds` for shared chat and knowledge playground workspaces
+- `frontend/src/features/agent-builder` for builder-facing agent authoring
+- `frontend/src/features/vanessa-core` for first-party Vanessa behavior
+- `backend/app/api/http`, `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure` for product-domain backend work
+- `agent_engine/app/execution_pipeline`, `agent_engine/app/retrieval`, `agent_engine/app/tool_runtime`, and `agent_engine/app/policies` for composable execution stages
+
+Canonical product APIs now live under `/v1/playgrounds/*` and `/v1/agent-projects/*`.
+
 ## Documentation Site
 
 Project documentation is published to GitHub Pages:

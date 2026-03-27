@@ -18,6 +18,10 @@ const chatApiMocks = vi.hoisted(() => ({
   deleteChatConversation: vi.fn(),
   streamChatMessage: vi.fn(),
 }));
+const feedbackMocks = vi.hoisted(() => ({
+  showErrorFeedback: vi.fn(),
+  showSuccessFeedback: vi.fn(),
+}));
 const scrollIntoViewMock = vi.fn();
 const scrollToMock = vi.fn();
 
@@ -55,6 +59,13 @@ vi.mock("../auth/AuthProvider", () => ({
     activatePendingUser: vi.fn(),
     listPendingUsers: vi.fn(),
     updateUserRole: vi.fn(),
+  }),
+}));
+
+vi.mock("../feedback/ActionFeedbackProvider", () => ({
+  useActionFeedback: () => ({
+    showErrorFeedback: feedbackMocks.showErrorFeedback,
+    showSuccessFeedback: feedbackMocks.showSuccessFeedback,
   }),
 }));
 
@@ -150,6 +161,8 @@ function setThreadMetrics(
 describe("ChatbotPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    feedbackMocks.showErrorFeedback.mockReset();
+    feedbackMocks.showSuccessFeedback.mockReset();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       value: scrollIntoViewMock,
@@ -543,7 +556,7 @@ describe("ChatbotPage", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue("Broken prompt"));
     expect(screen.queryByRole("heading", { name: "hello" })).toBeNull();
-    expect(screen.getByText("Stream failed")).toBeVisible();
+    expect(feedbackMocks.showErrorFeedback).toHaveBeenCalledWith(expect.any(Error), "Message request failed.");
   });
 
   it("disables conversation controls while a stream is active", async () => {

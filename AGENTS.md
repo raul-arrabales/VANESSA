@@ -175,12 +175,15 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `frontend/`
   - Browser UI, superadmin control surfaces, typed API clients.
+  - Product AI work should land under `frontend/src/features/playgrounds`, `frontend/src/features/agent-builder`, `frontend/src/features/vanessa-core`, and `frontend/src/features/ai-shared`.
 
 - `backend/`
   - Flask app, public/internal APIs, control plane, ModelOps, orchestration, service abstractions.
+  - Product-facing APIs should land under `backend/app/api/http`, with domain logic split across `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure`.
 
 - `agent_engine/`
   - Agent workflow execution, tool loops, runtime-client logic.
+  - New execution work should land in `agent_engine/app/execution_pipeline`, `agent_engine/app/retrieval`, `agent_engine/app/tool_runtime`, and `agent_engine/app/policies`.
 
 - `sandbox/`
   - Sandbox runtime and execution policy logic.
@@ -424,6 +427,7 @@ Keep these current repo truths in mind:
 - Model-bearing bindings are multi-model and require an explicit default.
 - `agent_engine` executes against backend-provided `platform_runtime`.
 - Tool execution currently converges around registry tool specs plus runtime transports selected through platform capabilities.
+- Product-facing AI interaction is standardized on `/v1/playgrounds/*`, while end-user agent authoring now lives under `/v1/agent-projects/*`.
 
 ---
 

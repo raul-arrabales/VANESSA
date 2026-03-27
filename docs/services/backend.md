@@ -37,6 +37,39 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `PUT /v1/catalog/tools/{id}` (superadmin)
 - `POST /v1/catalog/tools/{id}/validate` (superadmin)
 
+## Product AI Endpoints
+
+### Playgrounds
+
+- `GET /v1/playgrounds/sessions` (authenticated)
+- `POST /v1/playgrounds/sessions` (authenticated)
+- `GET /v1/playgrounds/sessions/{id}` (authenticated)
+- `PATCH /v1/playgrounds/sessions/{id}` (authenticated)
+- `DELETE /v1/playgrounds/sessions/{id}` (authenticated)
+- `POST /v1/playgrounds/sessions/{id}/messages` (authenticated)
+- `POST /v1/playgrounds/sessions/{id}/messages/stream` (authenticated)
+- `GET /v1/playgrounds/options` (authenticated)
+
+Playground semantics:
+
+- `playground_kind=chat` and `playground_kind=knowledge` are variants of the same canonical session model.
+- Session payloads carry `assistant_ref`, `model_selection`, `knowledge_binding`, persisted `messages`, and timestamps.
+- Knowledge playground sessions are backend-owned and persisted; browser-only local storage is no longer the source of truth for user conversations.
+
+### Agent Projects
+
+- `GET /v1/agent-projects` (authenticated)
+- `POST /v1/agent-projects` (authenticated)
+- `GET /v1/agent-projects/{id}` (authenticated)
+- `PUT /v1/agent-projects/{id}` (authenticated)
+- `POST /v1/agent-projects/{id}/validate` (authenticated)
+- `POST /v1/agent-projects/{id}/publish` (authenticated)
+
+Agent-project semantics:
+
+- This is the builder-facing authoring surface for `workflow_definition`, `tool_policy`, validation, and publish flows.
+- Runtime `catalog` entities remain the admin/runtime surface; publish compiles agent projects into catalog-managed artifacts.
+
 ## Platform Control Plane
 
 - `GET /v1/platform/capabilities` (authenticated)
@@ -130,8 +163,8 @@ Bootstrap defaults:
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
 - Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
-- `GET /v1/chat/knowledge/bases` exposes the managed knowledge bases bound to the active deployment for user-facing Knowledge Chat selection.
-- `POST /v1/chat/knowledge` now resolves both the selected model and the selected managed knowledge base through backend-owned governance, then executes the fixed `agent.knowledge_chat` agent and returns normalized `sources` plus `retrieval` metadata for citation rendering.
+- `GET /v1/playgrounds/options` exposes runtime-allowed models, assistants, and deployment-bound knowledge bases for user-facing playground selection.
+- `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
@@ -142,8 +175,6 @@ Bootstrap defaults:
   still resolve from the registry while operators work with typed DTOs instead of opaque spec blobs.
 
 ## ModelOps Endpoints
-
-- `POST /v1/chat/knowledge`
 - `GET /v1/modelops/models`
 - `POST /v1/modelops/models`
 - `GET /v1/modelops/models/{id}`

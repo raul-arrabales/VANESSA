@@ -93,6 +93,8 @@ def run_knowledge_chat(
     get_active_platform_runtime_fn=None,
     resolve_runtime_profile_fn=None,
     ensure_knowledge_chat_agent_fn=None,
+    actor_user_id: int | None = None,
+    actor_user_role: str | None = None,
 ) -> tuple[dict[str, Any], int]:
     normalized_prompt = str(prompt).strip()
     normalized_model = str(requested_model_id).strip()
@@ -105,8 +107,8 @@ def run_knowledge_chat(
     get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
     resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
     ensure_knowledge_chat_agent_impl = ensure_knowledge_chat_agent_fn or ensure_knowledge_chat_agent
-    user_id = int(g.current_user["id"])
-    user_role = str(g.current_user.get("role", "user"))
+    user_id = int(actor_user_id) if actor_user_id is not None else int(g.current_user["id"])
+    user_role = str(actor_user_role or g.current_user.get("role", "user"))
 
     history = coerce_chat_messages(history_payload)
     try:

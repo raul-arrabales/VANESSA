@@ -1,28 +1,29 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PlaygroundSessionDetail, PlaygroundSessionSummary } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import KnowledgeChatPage from "./KnowledgeChatPage";
 
-const modelApiMocks = vi.hoisted(() => ({
-  listEnabledModels: vi.fn(),
-}));
-
-const knowledgeApiMocks = vi.hoisted(() => ({
-  runKnowledgeChat: vi.fn(),
-  listKnowledgeChatKnowledgeBases: vi.fn(),
+const playgroundApiMocks = vi.hoisted(() => ({
+  getPlaygroundOptions: vi.fn(),
+  listPlaygroundSessions: vi.fn(),
+  createPlaygroundSession: vi.fn(),
+  getPlaygroundSession: vi.fn(),
+  updatePlaygroundSession: vi.fn(),
+  sendPlaygroundMessage: vi.fn(),
 }));
 
 let mockUser: AuthUser | null = null;
 
-vi.mock("../api/modelops", () => ({
-  listEnabledModels: modelApiMocks.listEnabledModels,
-}));
-
-vi.mock("../api/knowledge", () => ({
-  runKnowledgeChat: knowledgeApiMocks.runKnowledgeChat,
-  listKnowledgeChatKnowledgeBases: knowledgeApiMocks.listKnowledgeChatKnowledgeBases,
+vi.mock("../api/playgrounds", () => ({
+  getPlaygroundOptions: playgroundApiMocks.getPlaygroundOptions,
+  listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
+  createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
+  getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
+  updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
+  sendPlaygroundMessage: playgroundApiMocks.sendPlaygroundMessage,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -45,6 +46,30 @@ async function renderKnowledgeChat(): Promise<void> {
   await renderWithAppProviders(<KnowledgeChatPage />);
 }
 
+function summary(overrides: Partial<PlaygroundSessionSummary> = {}): PlaygroundSessionSummary {
+  return {
+    id: "sess-1",
+    playground_kind: "knowledge",
+    assistant_ref: "agent.knowledge_chat",
+    title: "Knowledge session",
+    title_source: "auto",
+    model_selection: { model_id: "safe-small" },
+    knowledge_binding: { knowledge_base_id: "kb_primary" },
+    message_count: 0,
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    ...overrides,
+  };
+}
+
+function detail(overrides: Partial<PlaygroundSessionDetail> = {}): PlaygroundSessionDetail {
+  return {
+    ...summary(overrides),
+    messages: [],
+    ...overrides,
+  };
+}
+
 describe("KnowledgeChatPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,7 +81,9 @@ describe("KnowledgeChatPage", () => {
       role: "user",
       is_active: true,
     };
-    knowledgeApiMocks.listKnowledgeChatKnowledgeBases.mockResolvedValue({
+    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+      assistants: [],
+      models: [{ id: "safe-small", display_name: "Safe Small" }],
       knowledge_bases: [
         {
           id: "kb_primary",
@@ -69,43 +96,60 @@ describe("KnowledgeChatPage", () => {
       selection_required: false,
       configuration_message: null,
     });
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([summary()]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(detail());
   });
 
-  it("sends knowledge-chat requests with prior context only", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
-    knowledgeApiMocks.runKnowledgeChat.mockResolvedValue({ output: "answer", sources: [], retrieval: { index: "knowledge_base", result_count: 0 } });
+  it("sends knowledge-playground requests through backend sessions", async () => {
+    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+      session: detail({
+        message_count: 2,
+        messages: [
+          { id: "m1", role: "user", content: "First question", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+          { id: "m2", role: "assistant", content: "answer", metadata: { sources: [] }, createdAt: "2026-03-18T11:00:01Z" },
+        ],
+      }),
+      messages: [],
+      output: "answer",
+      retrieval: { index: "knowledge_base", result_count: 0 },
+      sources: [],
+    });
 
     await renderKnowledgeChat();
 
     await screen.findByLabelText("Model");
     await userEvent.type(screen.getByLabelText("Message"), "First question");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
-    await waitFor(() => expect(knowledgeApiMocks.runKnowledgeChat).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
 
-    expect(knowledgeApiMocks.runKnowledgeChat).toHaveBeenLastCalledWith(
-      {
-        prompt: "First question",
-        model: "safe-small",
-        knowledge_base_id: "kb_primary",
-        history: [],
-      },
-      "token",
-    );
+    expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-1", { prompt: "First question" }, "token");
   });
 
-  it("renders citations and keeps storage isolated from plain chat", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
-    knowledgeApiMocks.runKnowledgeChat.mockResolvedValue({
+  it("renders citations from persisted assistant metadata", async () => {
+    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+      session: detail({
+        message_count: 2,
+        messages: [
+          { id: "m1", role: "user", content: "How does retrieval work?", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+          {
+            id: "m2",
+            role: "assistant",
+            content: "knowledge answer",
+            metadata: {
+              sources: [
+                {
+                  id: "doc-1",
+                  title: "Architecture Overview",
+                  snippet: "Retrieval uses the shared knowledge corpus.",
+                },
+              ],
+            },
+            createdAt: "2026-03-18T11:00:01Z",
+          },
+        ],
+      }),
+      messages: [],
       output: "knowledge answer",
-      sources: [
-        {
-          id: "doc-1",
-          title: "Architecture Overview",
-          snippet: "Retrieval uses the shared knowledge corpus.",
-          uri: null,
-          metadata: {},
-        },
-      ],
       retrieval: { index: "knowledge_base", result_count: 1 },
     });
 
@@ -118,15 +162,25 @@ describe("KnowledgeChatPage", () => {
 
     expect(await screen.findByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Retrieval uses the shared knowledge corpus.")).toBeVisible();
-    expect(window.localStorage.getItem("vanessa:knowledge-chat:10")).toContain("knowledge answer");
-    expect(window.localStorage.getItem("vanessa:chat:10")).toBeNull();
   });
 
-  it("renders assistant markdown in knowledge chat replies", async () => {
-    modelApiMocks.listEnabledModels.mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
-    knowledgeApiMocks.runKnowledgeChat.mockResolvedValue({
+  it("renders assistant markdown in knowledge playground replies", async () => {
+    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+      session: detail({
+        message_count: 2,
+        messages: [
+          { id: "m1", role: "user", content: "Summarize the docs", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+          {
+            id: "m2",
+            role: "assistant",
+            content: "### Findings\n\n- First item\n- Second item",
+            metadata: { sources: [] },
+            createdAt: "2026-03-18T11:00:01Z",
+          },
+        ],
+      }),
+      messages: [],
       output: "### Findings\n\n- First item\n- Second item",
-      sources: [],
       retrieval: { index: "knowledge_base", result_count: 0 },
     });
 

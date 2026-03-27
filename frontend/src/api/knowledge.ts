@@ -1,7 +1,9 @@
-import { ApiError } from "../auth/authApi";
 import type { ChatHistoryItem } from "./modelops/types";
-
-const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
+import {
+  createPlaygroundSession,
+  getPlaygroundOptions,
+  sendPlaygroundMessage,
+} from "./playgrounds";
 
 export type KnowledgeSource = {
   id: string;
@@ -40,10 +42,6 @@ export type KnowledgeChatKnowledgeBaseOptions = {
   configuration_message?: string | null;
 };
 
-function buildUrl(path: string): string {
-  return `${backendBaseUrl.replace(/\/$/, "")}${path}`;
-}
-
 export async function runKnowledgeChat(
   payload: {
     prompt: string;
@@ -53,64 +51,34 @@ export async function runKnowledgeChat(
   },
   token: string,
 ): Promise<KnowledgeChatResult> {
-  const response = await fetch(buildUrl("/v1/chat/knowledge"), {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+  const session = await createPlaygroundSession(
+    {
+      playground_kind: "knowledge",
+      model_selection: { model_id: payload.model },
+      knowledge_binding: { knowledge_base_id: payload.knowledge_base_id ?? null },
     },
-    body: JSON.stringify(payload),
-  });
-
-  const rawBody = await response.text();
-  let parsed: Record<string, unknown> = {};
-  if (rawBody) {
-    try {
-      parsed = JSON.parse(rawBody) as Record<string, unknown>;
-    } catch {
-      if (response.ok) {
-        throw new Error("Knowledge chat returned an invalid response.");
-      }
-    }
-  }
-
-  if (!response.ok) {
-    const message = rawBody && Object.keys(parsed).length > 0
-      ? String(parsed.message ?? parsed.error ?? `HTTP ${response.status}`)
-      : `Knowledge chat request failed: HTTP ${response.status}`;
-    const code = parsed.error ? String(parsed.error) : undefined;
-    throw new ApiError(message, response.status, code);
-  }
-
-  return parsed as unknown as KnowledgeChatResult;
+    token,
+  );
+  const result = await sendPlaygroundMessage(
+    session.id,
+    { prompt: payload.prompt },
+    token,
+  );
+  return {
+    output: result.output,
+    response: result.response,
+    sources: (result.sources as KnowledgeSource[] | undefined) ?? [],
+    retrieval: result.retrieval ?? { index: "knowledge_base", result_count: 0 },
+    knowledge_base_id: result.session.knowledge_binding.knowledge_base_id,
+  };
 }
 
 export async function listKnowledgeChatKnowledgeBases(token: string): Promise<KnowledgeChatKnowledgeBaseOptions> {
-  const response = await fetch(buildUrl("/v1/chat/knowledge/bases"), {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  const rawBody = await response.text();
-  let parsed: Record<string, unknown> = {};
-  if (rawBody) {
-    try {
-      parsed = JSON.parse(rawBody) as Record<string, unknown>;
-    } catch {
-      if (response.ok) {
-        throw new Error("Knowledge chat configuration returned an invalid response.");
-      }
-    }
-  }
-  if (!response.ok) {
-    const message = rawBody && Object.keys(parsed).length > 0
-      ? String(parsed.message ?? parsed.error ?? `HTTP ${response.status}`)
-      : `Knowledge chat configuration failed: HTTP ${response.status}`;
-    const code = parsed.error ? String(parsed.error) : undefined;
-    throw new ApiError(message, response.status, code);
-  }
-  return parsed as unknown as KnowledgeChatKnowledgeBaseOptions;
+  const options = await getPlaygroundOptions(token);
+  return {
+    knowledge_bases: options.knowledge_bases,
+    default_knowledge_base_id: options.default_knowledge_base_id,
+    selection_required: options.selection_required,
+    configuration_message: options.configuration_message,
+  };
 }

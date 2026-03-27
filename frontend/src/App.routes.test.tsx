@@ -113,8 +113,50 @@ vi.mock("./api/modelops/access", () => ({
   listModelAssignments: vi.fn(async () => [{ scope: "superadmin", model_ids: ["gpt-4"] }]),
   updateModelAssignment: vi.fn(),
 }));
-vi.mock("./api/knowledge", () => ({
-  runKnowledgeChat: vi.fn(),
+vi.mock("./api/playgrounds", () => ({
+  getPlaygroundOptions: vi.fn(async () => ({
+    assistants: [],
+    models: [{ id: "gpt-4", display_name: "GPT-4" }],
+    knowledge_bases: [{ id: "kb-primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: true }],
+    default_knowledge_base_id: "kb-primary",
+    selection_required: false,
+    configuration_message: null,
+  })),
+  listPlaygroundSessions: vi.fn(async (kind: string) => (
+    kind === "knowledge"
+      ? [{ id: "sess-1", playground_kind: "knowledge", assistant_ref: "agent.knowledge_chat", title: "Knowledge session", title_source: "auto", model_selection: { model_id: "gpt-4" }, knowledge_binding: { knowledge_base_id: "kb-primary" }, message_count: 0, created_at: "2026-03-18T11:00:00Z", updated_at: "2026-03-18T11:00:00Z" }]
+      : [{ id: "sess-chat", playground_kind: "chat", assistant_ref: "assistant.playground.chat", title: "Chat session", title_source: "auto", model_selection: { model_id: "gpt-4" }, knowledge_binding: { knowledge_base_id: null }, message_count: 0, created_at: "2026-03-18T11:00:00Z", updated_at: "2026-03-18T11:00:00Z" }]
+  )),
+  createPlaygroundSession: vi.fn(async (payload: { playground_kind: string }) => ({
+    id: payload.playground_kind === "knowledge" ? "sess-1" : "sess-chat",
+    playground_kind: payload.playground_kind,
+    assistant_ref: payload.playground_kind === "knowledge" ? "agent.knowledge_chat" : "assistant.playground.chat",
+    title: payload.playground_kind === "knowledge" ? "Knowledge session" : "Chat session",
+    title_source: "auto",
+    model_selection: { model_id: "gpt-4" },
+    knowledge_binding: { knowledge_base_id: payload.playground_kind === "knowledge" ? "kb-primary" : null },
+    message_count: 0,
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    messages: [],
+  })),
+  getPlaygroundSession: vi.fn(async (_sessionId: string, kind: string) => ({
+    id: kind === "knowledge" ? "sess-1" : "sess-chat",
+    playground_kind: kind,
+    assistant_ref: kind === "knowledge" ? "agent.knowledge_chat" : "assistant.playground.chat",
+    title: kind === "knowledge" ? "Knowledge session" : "Chat session",
+    title_source: "auto",
+    model_selection: { model_id: "gpt-4" },
+    knowledge_binding: { knowledge_base_id: kind === "knowledge" ? "kb-primary" : null },
+    message_count: 0,
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    messages: [],
+  })),
+  updatePlaygroundSession: vi.fn(),
+  deletePlaygroundSession: vi.fn(),
+  sendPlaygroundMessage: vi.fn(),
+  streamPlaygroundMessage: vi.fn(),
 }));
 vi.mock("./api/catalog", () => ({
   listCatalogAgents: vi.fn(async () => []),
@@ -386,7 +428,7 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/ai/knowledge" });
 
-    expect(await screen.findByRole("heading", { name: await t("knowledgeChat.title") })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Knowledge playground" })).toBeVisible();
   });
 
   it("always shows Home as the first breadcrumb link", async () => {

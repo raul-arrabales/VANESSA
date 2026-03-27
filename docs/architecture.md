@@ -120,6 +120,25 @@ Tool execution is LLM-driven. Agent engine passes tool definitions to the active
 - Keep services modular so they can evolve independently.
 - Keep infrastructure provider binding separate from user-facing model governance.
 
+## Product AI Domains
+
+The product-facing AI surface now has its own domain split, separate from the control plane and ModelOps:
+
+- `playgrounds`
+  - Canonical user-facing workspace for both plain chat and knowledge-grounded chat.
+  - Backend persists one session model with `playground_kind`, `assistant_ref`, `model_selection`, `knowledge_binding`, and `messages`.
+  - Public API lives under `/v1/playgrounds/*`.
+
+- `agent-projects`
+  - Builder-facing authoring domain for end-user agents and workflow definitions.
+  - Publish compiles project specs into catalog-managed runtime artifacts instead of exposing raw registry entities directly.
+  - Public API lives under `/v1/agent-projects/*`.
+
+- `vanessa-core`
+  - First-party Vanessa behavior is intended to plug into shared execution seams instead of branching generic execution code.
+
+Frontend work now lands under `frontend/src/features/*`, backend product APIs under `backend/app/api/http`, and engine execution seams under `agent_engine/app/execution_pipeline`.
+
 ## Source of Truth
 
 Container responsibilities are defined in [`AGENTS.md`](https://github.com/raul-arrabales/VANESSA/blob/main/AGENTS.md).

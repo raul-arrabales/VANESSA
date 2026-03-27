@@ -9,6 +9,7 @@ import psycopg
 from ..db import get_connection
 
 PLAIN_CONVERSATION_KIND = "plain"
+KNOWLEDGE_CONVERSATION_KIND = "knowledge"
 _UNSET = object()
 
 
@@ -20,7 +21,9 @@ def _conversation_select_sql() -> str:
             c.conversation_kind,
             c.title,
             c.title_source,
+            c.assistant_ref,
             c.model_id,
+            c.knowledge_base_id,
             c.created_at,
             c.updated_at,
             COALESCE((
@@ -96,7 +99,9 @@ def create_conversation(
     owner_user_id: int,
     title: str,
     title_source: str,
+    assistant_ref: str | None,
     model_id: str | None,
+    knowledge_base_id: str | None,
     conversation_kind: str = PLAIN_CONVERSATION_KIND,
 ) -> dict[str, Any]:
     conversation_id = str(uuid4())
@@ -111,11 +116,13 @@ def create_conversation(
                     conversation_kind,
                     title,
                     title_source,
+                    assistant_ref,
                     model_id,
+                    knowledge_base_id,
                     created_at,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     conversation_id,
@@ -123,7 +130,9 @@ def create_conversation(
                     conversation_kind,
                     title,
                     title_source,
+                    assistant_ref,
                     model_id,
+                    knowledge_base_id,
                     now,
                     now,
                 ),
@@ -146,7 +155,9 @@ def update_conversation(
     conversation_id: str,
     title: object = _UNSET,
     title_source: object = _UNSET,
+    assistant_ref: object = _UNSET,
     model_id: object = _UNSET,
+    knowledge_base_id: object = _UNSET,
     conversation_kind: str = PLAIN_CONVERSATION_KIND,
 ) -> dict[str, Any] | None:
     assignments: list[str] = []
@@ -158,9 +169,15 @@ def update_conversation(
     if title_source is not _UNSET:
         assignments.append("title_source = %s")
         params.append(title_source)
+    if assistant_ref is not _UNSET:
+        assignments.append("assistant_ref = %s")
+        params.append(assistant_ref)
     if model_id is not _UNSET:
         assignments.append("model_id = %s")
         params.append(model_id)
+    if knowledge_base_id is not _UNSET:
+        assignments.append("knowledge_base_id = %s")
+        params.append(knowledge_base_id)
 
     if not assignments:
         return get_conversation(
