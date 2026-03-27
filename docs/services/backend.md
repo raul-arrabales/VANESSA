@@ -11,6 +11,12 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - GenAI control plane for capability/provider/deployment-profile management
 - Context Management for reusable knowledge bases and document ingestion
 
+## HTTP Ownership
+
+- Canonical backend HTTP domains now register from `backend/app/api/http`.
+- `playgrounds`, `agent-projects`, `platform`, and `context` are the current domain-owned HTTP modules.
+- Legacy `backend/app/routes/*` modules may remain as thin shims for import compatibility, but bootstrap registration should point at `api/http` modules instead of flat route files.
+
 ## Current Voice Endpoints
 
 - `POST /voice/wake-events`
@@ -94,6 +100,8 @@ Agent-project semantics:
 - `POST /v1/platform/vector/query` (superadmin)
 - `POST /v1/platform/vector/documents/delete` (superadmin)
 
+Platform-control request parsing and response shaping are now owned by the application-layer platform-control service behind the canonical `api/http` module.
+
 ## Context Management
 
 - `GET /v1/context/knowledge-bases` (admin)
@@ -114,6 +122,8 @@ Agent-project semantics:
 - `PUT /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}/documents/{document_id}` (superadmin)
 - `POST /v1/context/knowledge-bases/{id}/uploads` (superadmin)
+
+Context-management request parsing and response shaping are now owned by the application-layer context-management service behind the canonical `api/http` module.
 
 Context-management semantics:
 

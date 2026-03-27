@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.routes import context as context_routes  # noqa: E402
+from app.api.http import context as context_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 

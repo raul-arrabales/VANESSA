@@ -118,16 +118,16 @@ def register_system_routes(app: Flask) -> None:
 
 def register_http_blueprints(app: Flask) -> None:
     from .api.http.agent_projects import bp as agent_projects_bp
+    from .api.http.context import bp as context_bp
     from .api.http.playgrounds import bp as playgrounds_bp
+    from .api.http.platform import bp as platform_bp
     from .routes import auth as auth_routes
     from .routes import auth_legacy_routes
     from .routes import catalog as catalog_routes
     from .routes import content as content_routes
-    from .routes import context as context_routes
     from .routes import executions as executions_routes
     from .routes import model_inference_v1 as model_inference_v1_routes
     from .routes import modelops as modelops_routes
-    from .routes import platform as platform_routes
     from .routes import policy as policy_routes
     from .routes import quotes_v1 as quotes_v1_routes
     from .routes import registry as registry_routes
@@ -148,9 +148,9 @@ def register_http_blueprints(app: Flask) -> None:
     app.register_blueprint(executions_routes.bp)
     app.register_blueprint(modelops_routes.bp)
     app.register_blueprint(model_inference_v1_routes.bp)
-    app.register_blueprint(platform_routes.bp)
+    app.register_blueprint(platform_bp)
     app.register_blueprint(catalog_routes.bp)
-    app.register_blueprint(context_routes.bp)
+    app.register_blueprint(context_bp)
     app.register_blueprint(agent_projects_bp)
     app.register_blueprint(playgrounds_bp)
     app.register_blueprint(voice_legacy_routes.bp)
