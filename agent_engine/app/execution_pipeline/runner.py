@@ -5,10 +5,10 @@ from typing import Any
 from uuid import uuid4
 
 from ..policies.runtime_policy import (
-    require_agent_execute_permission_stage,
-    resolve_agent_spec_stage,
-    resolve_agent_tools_stage,
-    validate_runtime_and_dependencies_stage,
+    require_agent_execute_permission_stage as require_agent_execute_permission,
+    resolve_agent_spec_stage as resolve_agent_spec,
+    resolve_agent_tools_stage as resolve_agent_tools,
+    validate_runtime_and_dependencies_stage as validate_runtime_and_dependencies,
 )
 from ..repositories import executions as executions_repo
 from ..retrieval.runtime import (
@@ -19,7 +19,11 @@ from ..retrieval.runtime import (
 )
 from ..schemas.agent_executions import AgentExecutionRecord
 from ..services.policy_runtime_gate import ExecutionBlockedError, resolve_runtime_profile
-from ..services.runtime_client import LlmRuntimeClientError, build_llm_runtime_client
+from ..services.runtime_client import (
+    EmbeddingsRuntimeClientError,
+    LlmRuntimeClientError,
+    build_llm_runtime_client,
+)
 from ..tool_runtime.dispatch import (
     build_tool_definition,
     invoke_tool_call,
@@ -264,17 +268,17 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
     )
 
     try:
-        agent_entity = resolve_agent_spec_stage(agent_id=agent_id)
-        require_agent_execute_permission_stage(
+        agent_entity = resolve_agent_spec(agent_id=agent_id)
+        require_agent_execute_permission(
             user_id=requested_by_user_id,
             user_role=requested_by_role,
             agent_id=agent_id,
         )
-        agent_version, model_ref = validate_runtime_and_dependencies_stage(
+        agent_version, model_ref = validate_runtime_and_dependencies(
             agent_entity=agent_entity,
             runtime_profile=runtime_profile,
         )
-        agent_tools = resolve_agent_tools_stage(agent_entity=agent_entity, runtime_profile=runtime_profile)
+        agent_tools = resolve_agent_tools(agent_entity=agent_entity, runtime_profile=runtime_profile)
         requested_model_override = str(normalized_input.get("model", "")).strip() or None
         running_model_ref = requested_model_override or model_ref
         running_started_at = _iso_now()

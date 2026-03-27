@@ -41,6 +41,8 @@ The code is now split into explicit seams:
 - `agent_engine/app/tool_runtime` for transport-specific tool dispatch
 - `agent_engine/app/policies` for policy and agent-resolution stages
 
+The canonical HTTP entrypoint now resolves directly through `execution_pipeline.runner`; `services/execution_service.py` is kept only as a lightweight compatibility shim while older imports are phased out.
+
 These seams are intended to support future Vanessa-specific planner, memory/retrieval, response policy, and tool strategy modules without branching the generic execution flow.
 
 Current canonical built-in tools:

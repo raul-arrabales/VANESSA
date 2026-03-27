@@ -12,7 +12,9 @@ if str(PROJECT_ROOT) not in sys.path:
 if str(PROJECT_ROOT / "tests") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "tests"))
 
-from agent_engine.app.services import execution_service
+from agent_engine.app.execution_pipeline import runner as execution_service
+from agent_engine.app.retrieval import runtime as retrieval_runtime
+from agent_engine.app.tool_runtime import dispatch as tool_dispatch
 from agent_engine.app.services.policy_runtime_gate import ExecutionBlockedError
 from contract_fixtures import load_contract_fixture
 
@@ -323,7 +325,7 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -339,7 +341,7 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
         )(),
     )
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_vector_store_runtime_client",
         lambda _runtime: type(
             "FakeVectorClient",
@@ -462,7 +464,7 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -478,7 +480,7 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
         )(),
     )
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_vector_store_runtime_client",
         lambda _runtime: type(
             "FakeQdrantClient",
@@ -581,7 +583,7 @@ def test_execution_with_unsupported_embeddings_model_returns_actionable_503(
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -644,7 +646,7 @@ def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypat
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -660,7 +662,7 @@ def test_execution_with_retrieval_derives_query_from_last_user_message(monkeypat
         )(),
     )
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_vector_store_runtime_client",
         lambda _runtime: type(
             "FakeVectorClient",
@@ -734,7 +736,7 @@ def test_execution_with_explicit_retrieval_query_overrides_prompt(monkeypatch: p
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -750,7 +752,7 @@ def test_execution_with_explicit_retrieval_query_overrides_prompt(monkeypatch: p
         )(),
     )
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_vector_store_runtime_client",
         lambda _runtime: type(
             "FakeVectorClient",
@@ -819,7 +821,7 @@ def test_execution_with_zero_hit_retrieval_keeps_original_messages(monkeypatch: 
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_embeddings_runtime_client",
         lambda _runtime: type(
             "FakeEmbeddingsClient",
@@ -835,7 +837,7 @@ def test_execution_with_zero_hit_retrieval_keeps_original_messages(monkeypatch: 
         )(),
     )
     monkeypatch.setattr(
-        execution_service,
+        retrieval_runtime,
         "build_vector_store_runtime_client",
         lambda _runtime: type(
             "FakeVectorClient",
@@ -982,7 +984,7 @@ def test_execution_runs_mcp_tool_calls_before_final_model_response(monkeypatch: 
             }
 
     monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeLlmClient())
-    monkeypatch.setattr(execution_service, "build_mcp_tool_runtime_client", lambda _runtime: FakeMcpClient())
+    monkeypatch.setattr(tool_dispatch, "build_mcp_tool_runtime_client", lambda _runtime: FakeMcpClient())
     monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
 
     payload, status = execution_service.create_execution(
@@ -1073,7 +1075,7 @@ def test_execution_runs_sandbox_tool_calls_in_offline_profile(monkeypatch: pytes
             return {"status_code": 200, "stdout": "", "stderr": "", "result": 4, "error": None}
 
     monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeLlmClient())
-    monkeypatch.setattr(execution_service, "build_sandbox_tool_runtime_client", lambda _runtime: FakeSandboxClient())
+    monkeypatch.setattr(tool_dispatch, "build_sandbox_tool_runtime_client", lambda _runtime: FakeSandboxClient())
     monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
 
     payload, status = execution_service.create_execution(

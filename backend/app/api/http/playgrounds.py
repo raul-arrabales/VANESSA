@@ -6,6 +6,7 @@ from uuid import uuid4
 from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
 
 from ...application.playgrounds_service import (
+    PlaygroundChatExecutionError,
     PlaygroundSessionNotFoundError,
     PlaygroundSessionValidationError,
     create_playground_session,
@@ -150,6 +151,9 @@ def post_playground_message_route(session_id: str):
         return _json_error(404, "session_not_found", "Playground session not found")
     except PlaygroundSessionValidationError as exc:
         return _json_error(400, exc.code, exc.message)
+    except PlaygroundChatExecutionError as exc:
+        payload = exc.payload if isinstance(exc.payload, dict) else {}
+        return jsonify({"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc))}), exc.status_code
     except AgentEngineClientError as exc:
         return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
     except Exception as exc:  # pragma: no cover
@@ -178,6 +182,11 @@ def post_playground_message_stream_route(session_id: str):
         return _json_error(404, "session_not_found", "Playground session not found")
     except PlaygroundSessionValidationError as exc:
         return _json_error(400, exc.code, exc.message)
+    except PlaygroundChatExecutionError as exc:
+        payload = exc.payload if isinstance(exc.payload, dict) else {}
+        return jsonify({"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc))}), exc.status_code
+    except AgentEngineClientError as exc:
+        return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
 
     def _response_stream():
         for event in stream:

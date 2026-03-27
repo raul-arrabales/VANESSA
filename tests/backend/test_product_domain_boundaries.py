@@ -21,3 +21,10 @@ def test_frontend_routes_point_to_feature_domain_pages() -> None:
     assert '../features/playgrounds/pages/PlaygroundsHomePage' in routes_source
     assert '../features/playgrounds/pages/ChatPlaygroundPage' in routes_source
     assert '../features/playgrounds/pages/KnowledgePlaygroundPage' in routes_source
+
+
+def test_playgrounds_service_does_not_depend_on_legacy_chat_or_knowledge_orchestrators() -> None:
+    service_source = (PROJECT_ROOT / "backend" / "app" / "application" / "playgrounds_service.py").read_text(encoding="utf-8")
+
+    assert "chat_conversations" not in service_source
+    assert "knowledge_chat_service" not in service_source

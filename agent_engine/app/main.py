@@ -7,13 +7,13 @@ from urllib.parse import urlparse
 
 try:  # pragma: no cover - import path varies by invocation style
     from .config import get_config
+    from .execution_pipeline.runner import create_execution, get_execution
     from .repositories.executions import ensure_schema
-    from .services.execution_service import create_execution, get_execution
     from .services.policy_runtime_gate import ExecutionBlockedError
 except ImportError:  # pragma: no cover
     from agent_engine.app.config import get_config
+    from agent_engine.app.execution_pipeline.runner import create_execution, get_execution
     from agent_engine.app.repositories.executions import ensure_schema
-    from agent_engine.app.services.execution_service import create_execution, get_execution
     from agent_engine.app.services.policy_runtime_gate import ExecutionBlockedError
 
 
