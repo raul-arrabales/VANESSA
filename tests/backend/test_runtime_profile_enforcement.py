@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.routes import modelops as modelops_routes  # noqa: E402
+from app.api.http import modelops as modelops_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.connectivity_policy import ConnectivityPolicyError, assert_internet_allowed  # noqa: E402
 from app.services.hf_discovery import discover_hf_models, get_hf_model_details  # noqa: E402

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from app.routes import modelops as modelops_routes  # noqa: E402
+from app.api.http import modelops as modelops_routes  # noqa: E402
 from app.services import chat_inference  # noqa: E402
 from app.services.modelops_common import ModelOpsError  # noqa: E402
 from app.security import hash_password  # noqa: E402

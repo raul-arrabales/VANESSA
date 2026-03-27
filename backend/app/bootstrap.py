@@ -120,6 +120,7 @@ def register_http_blueprints(app: Flask) -> None:
     from .api.http.agent_projects import bp as agent_projects_bp
     from .api.http.catalog import bp as catalog_bp
     from .api.http.context import bp as context_bp
+    from .api.http.modelops import bp as modelops_bp
     from .api.http.playgrounds import bp as playgrounds_bp
     from .api.http.platform import bp as platform_bp
     from .api.http.registry import bp as registry_bp
@@ -129,7 +130,6 @@ def register_http_blueprints(app: Flask) -> None:
     from .routes import content as content_routes
     from .routes import executions as executions_routes
     from .routes import model_inference_v1 as model_inference_v1_routes
-    from .routes import modelops as modelops_routes
     from .routes import policy as policy_routes
     from .routes import quotes_v1 as quotes_v1_routes
     from .routes import runtime as runtime_routes
@@ -146,7 +146,7 @@ def register_http_blueprints(app: Flask) -> None:
     app.register_blueprint(quotes_v1_routes.bp)
     app.register_blueprint(runtime_routes.bp)
     app.register_blueprint(executions_routes.bp)
-    app.register_blueprint(modelops_routes.bp)
+    app.register_blueprint(modelops_bp)
     app.register_blueprint(model_inference_v1_routes.bp)
     app.register_blueprint(platform_bp)
     app.register_blueprint(catalog_bp)

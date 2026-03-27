@@ -1,1 +1,15 @@
-__all__ = ["agent_projects", "catalog", "context", "platform", "playgrounds", "registry", "registry_models"]
+__all__ = [
+    "agent_projects",
+    "catalog",
+    "context",
+    "modelops",
+    "modelops_access",
+    "modelops_common",
+    "modelops_credentials",
+    "modelops_local",
+    "modelops_models",
+    "platform",
+    "playgrounds",
+    "registry",
+    "registry_models",
+]

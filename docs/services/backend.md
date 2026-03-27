@@ -14,7 +14,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 ## HTTP Ownership
 
 - Canonical backend HTTP domains now register from `backend/app/api/http`.
-- `playgrounds`, `agent-projects`, `platform`, `context`, `catalog`, `registry`, and `registry_models` are the current domain-owned HTTP modules.
+- `playgrounds`, `agent-projects`, `platform`, `context`, `catalog`, `registry`, `registry_models`, and `modelops` are the current domain-owned HTTP modules.
 - Legacy `backend/app/routes/*` modules may remain as thin shims for import compatibility, but bootstrap registration should point at `api/http` modules instead of flat route files.
 
 ## Current Voice Endpoints
@@ -217,6 +217,12 @@ Bootstrap defaults:
 - `GET /v1/modelops/downloads/{id}`
 - `POST /v1/models/inference`
 - `POST /v1/models/generate`
+
+ModelOps ownership notes:
+
+- Canonical HTTP registration now resolves through `backend/app/api/http/modelops.py` plus focused submodules for models, credentials, access, and local/discovery/download flows.
+- Request coercion and orchestration now flow through application services under `backend/app/application/modelops_*_service.py`.
+- Legacy `backend/app/routes/modelops*.py` modules are import shims only and should not regain orchestration logic.
 
 ## Agent Execution Proxy
 

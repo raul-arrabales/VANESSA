@@ -181,6 +181,7 @@ Respect these runtime boundaries when generating code or configuration.
 - `backend/`
   - Flask app, public/internal APIs, control plane, ModelOps, orchestration, service abstractions.
   - Product-facing APIs should land under `backend/app/api/http`, with domain logic split across `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure`.
+  - ModelOps HTTP ownership should also live under `backend/app/api/http`, with request shaping and orchestration under `backend/app/application/modelops_*_service.py` rather than flat `backend/app/routes/modelops*.py` modules.
 
 - `agent_engine/`
   - Agent workflow execution, tool loops, runtime-client logic.
