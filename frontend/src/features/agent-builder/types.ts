@@ -1,4 +1,5 @@
 import type { AgentProject, AgentProjectMutationInput, AgentProjectVisibility } from "../../api/agentProjects";
+import type { PreviewableAssistantExperience } from "../ai-shared/assistantExperience";
 
 export type AgentProjectFormState = {
   id: string;
@@ -14,17 +15,7 @@ export type AgentProjectFormState = {
   sandboxRequired: boolean;
 };
 
-export type AgentProjectPreview = {
-  assistantRef: string;
-  playgroundKind: "chat";
-  defaultModelRef: string | null;
-  toolRefs: string[];
-  runtimeConstraints: {
-    internet_required: boolean;
-    sandbox_required: boolean;
-  };
-  workflowDefinition: Record<string, unknown>;
-};
+export type AgentProjectPreview = PreviewableAssistantExperience;
 
 export const DEFAULT_AGENT_PROJECT_FORM: AgentProjectFormState = {
   id: "",
@@ -115,17 +106,17 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
   }
 
   return {
-    assistantRef: `agent.project.${projectId || "draft"}`,
-    playgroundKind: "chat",
-    defaultModelRef: form.defaultModelRef.trim() || null,
-    toolRefs: form.toolRefsText
+    assistant_ref: `agent.project.${projectId || "draft"}`,
+    playground_kind: "chat",
+    default_model_ref: form.defaultModelRef.trim() || null,
+    tool_refs: form.toolRefsText
       .split(/\r?\n|,/)
       .map((item) => item.trim())
       .filter(Boolean),
-    runtimeConstraints: {
+    runtime_constraints: {
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,
     },
-    workflowDefinition,
+    workflow_definition: workflowDefinition,
   };
 }

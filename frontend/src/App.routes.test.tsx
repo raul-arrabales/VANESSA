@@ -486,6 +486,35 @@ describe("App superadmin models route", () => {
     expect(await screen.findByRole("heading", { name: "Knowledge playground" })).toBeVisible();
   });
 
+  it("renders the Vanessa Core page for authenticated users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/ai/vanessa" });
+
+    expect(await screen.findByRole("heading", { name: "Vanessa Core" })).toBeVisible();
+    expect(screen.getByText("Work with Vanessa as a first-party assistant inside the shared AI workspace.")).toBeVisible();
+  });
+
+  it("shows the Vanessa destination on the AI landing page", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(<App />, { route: "/ai" });
+
+    expect(await screen.findByRole("link", { name: "Vanessa Core" })).toHaveAttribute("href", "/ai/vanessa");
+  });
+
   it("always shows Home as the first breadcrumb link", async () => {
     mockUser = {
       id: 1,

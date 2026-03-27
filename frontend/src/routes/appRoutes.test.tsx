@@ -36,6 +36,7 @@ describe("app route registry", () => {
       "/control/models/:modelId",
       "/ai",
       "/ai/chat",
+      "/ai/vanessa",
       "/ai/knowledge",
     ]);
   });

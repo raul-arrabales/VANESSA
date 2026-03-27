@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { buildAgentProjectPreview, type AgentProjectFormState, type AgentProjectPreview } from "../types";
+import type { PreviewableAssistantExperience } from "../../ai-shared/assistantExperience";
+import { buildAgentProjectPreview, type AgentProjectFormState } from "../types";
 
-export function useAgentProjectPreview(projectId: string, form: AgentProjectFormState): AgentProjectPreview {
+export function useAgentProjectPreview(projectId: string, form: AgentProjectFormState): PreviewableAssistantExperience {
   return useMemo(() => buildAgentProjectPreview(projectId, form), [form, projectId]);
 }

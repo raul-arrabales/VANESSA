@@ -12,6 +12,13 @@ export default function PlaygroundsHomePage(): JSX.Element {
         ariaLabel={t("ai.aria")}
         items={[
           {
+            id: "vanessa",
+            title: t("ai.vanessa.title"),
+            description: t("ai.vanessa.description"),
+            to: "/ai/vanessa",
+            icon: "ai",
+          },
+          {
             id: "chat",
             title: t("ai.chat.title"),
             description: t("ai.chat.description"),

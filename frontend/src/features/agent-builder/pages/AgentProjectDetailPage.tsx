@@ -42,10 +42,10 @@ export default function AgentProjectDetailPage(): JSX.Element {
       <article className="panel card-stack">
         <h3 className="section-title">{t("agentBuilder.previewTitle")}</h3>
         <p className="status-text">{t("agentBuilder.previewDescription")}</p>
-        <p className="status-text">{t("agentBuilder.preview.assistantRef")}: {preview.assistantRef}</p>
-        <p className="status-text">{t("agentBuilder.preview.playgroundKind")}: {preview.playgroundKind}</p>
-        <p className="status-text">{t("agentBuilder.preview.defaultModelRef")}: {preview.defaultModelRef ?? t("agentBuilder.preview.none")}</p>
-        <p className="status-text">{t("agentBuilder.preview.toolRefs")}: {preview.toolRefs.join(", ") || t("agentBuilder.preview.none")}</p>
+        <p className="status-text">{t("agentBuilder.preview.assistant_ref")}: {preview.assistant_ref}</p>
+        <p className="status-text">{t("agentBuilder.preview.playground_kind")}: {preview.playground_kind}</p>
+        <p className="status-text">{t("agentBuilder.preview.default_model_ref")}: {preview.default_model_ref ?? t("agentBuilder.preview.none")}</p>
+        <p className="status-text">{t("agentBuilder.preview.tool_refs")}: {preview.tool_refs.join(", ") || t("agentBuilder.preview.none")}</p>
       </article>
 
       {detail.validation ? (

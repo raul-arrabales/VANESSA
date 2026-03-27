@@ -48,6 +48,11 @@ def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases
     )
 
     assert payload["assistants"][0]["assistant_ref"] == "assistant.playground.chat"
+    assert {assistant["assistant_ref"] for assistant in payload["assistants"]} >= {
+        "assistant.playground.chat",
+        "assistant.vanessa.core",
+        "agent.knowledge_chat",
+    }
     assert payload["models"][1]["display_name"] == "Safe Large"
     assert payload["default_knowledge_base_id"] == "kb-primary"
 

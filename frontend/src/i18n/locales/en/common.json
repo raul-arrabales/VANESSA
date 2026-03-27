@@ -12,6 +12,7 @@
     "controlPanel": "Control Panel",
     "ai": "Vanessa AI",
     "chat": "Chat",
+    "vanessa": "Vanessa Core",
     "knowledge": "Knowledge Chat",
     "login": "Login",
     "register": "Register",
@@ -56,6 +57,7 @@
       "catalog": "Agent catalog",
       "ai": "Vanessa AI",
       "chat": "Chatbot",
+      "vanessa": "Vanessa Core",
       "knowledge": "Knowledge Chat",
       "design": "Design",
       "models": "Models",
@@ -272,6 +274,10 @@
     "chat": {
       "title": "Chat workspace",
       "description": "Start or continue a model-backed conversation in the Vanessa AI console."
+    },
+    "vanessa": {
+      "title": "Vanessa Core",
+      "description": "Work with Vanessa as a first-party assistant through the shared playground workspace."
     },
     "knowledge": {
       "title": "Knowledge chat",
@@ -1283,10 +1289,10 @@
       "invalid": "Invalid"
     },
     "preview": {
-      "assistantRef": "Assistant ref",
-      "playgroundKind": "Playground kind",
-      "defaultModelRef": "Default model ref",
-      "toolRefs": "Tool refs",
+      "assistant_ref": "Assistant ref",
+      "playground_kind": "Playground kind",
+      "default_model_ref": "Default model ref",
+      "tool_refs": "Tool refs",
       "none": "None"
     },
     "feedback": {

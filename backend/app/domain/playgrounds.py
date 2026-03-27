@@ -6,6 +6,8 @@ from ..services.knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
 
 CHAT_PLAYGROUND_KIND: Final[str] = "chat"
 KNOWLEDGE_PLAYGROUND_KIND: Final[str] = "knowledge"
+CHAT_PLAYGROUND_ASSISTANT_REF: Final[str] = "assistant.playground.chat"
+VANESSA_CORE_ASSISTANT_REF: Final[str] = "assistant.vanessa.core"
 
 PLAYGROUND_KIND_TO_CONVERSATION_KIND: Final[dict[str, str]] = {
     CHAT_PLAYGROUND_KIND: "plain",
@@ -18,9 +20,17 @@ CONVERSATION_KIND_TO_PLAYGROUND_KIND: Final[dict[str, str]] = {
 
 PLAYGROUND_ASSISTANTS: Final[list[dict[str, object]]] = [
     {
-        "assistant_ref": "assistant.playground.chat",
+        "assistant_ref": CHAT_PLAYGROUND_ASSISTANT_REF,
         "display_name": "Chat Assistant",
         "description": "General-purpose chat playground using your allowed models.",
+        "playground_kind": CHAT_PLAYGROUND_KIND,
+        "agent_id": None,
+        "knowledge_required": False,
+    },
+    {
+        "assistant_ref": VANESSA_CORE_ASSISTANT_REF,
+        "display_name": "Vanessa Core",
+        "description": "First-party Vanessa assistant running through the shared chat playground experience.",
         "playground_kind": CHAT_PLAYGROUND_KIND,
         "agent_id": None,
         "knowledge_required": False,
@@ -36,7 +46,7 @@ PLAYGROUND_ASSISTANTS: Final[list[dict[str, object]]] = [
 ]
 
 _DEFAULT_ASSISTANT_REF_BY_KIND: Final[dict[str, str]] = {
-    CHAT_PLAYGROUND_KIND: "assistant.playground.chat",
+    CHAT_PLAYGROUND_KIND: CHAT_PLAYGROUND_ASSISTANT_REF,
     KNOWLEDGE_PLAYGROUND_KIND: KNOWLEDGE_CHAT_AGENT_ID,
 }
 

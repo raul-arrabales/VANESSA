@@ -34,6 +34,7 @@ const ModelDetailPage = lazy(() => import("../features/modelops/pages/ModelDetai
 const AiPage = lazy(() => import("../features/playgrounds/pages/PlaygroundsHomePage"));
 const ChatbotPage = lazy(() => import("../features/playgrounds/pages/ChatPlaygroundPage"));
 const KnowledgeChatPage = lazy(() => import("../features/playgrounds/pages/KnowledgePlaygroundPage"));
+const VanessaCorePage = lazy(() => import("../features/vanessa-core/pages/VanessaCorePage"));
 
 export type AppRouteSection = "public" | "settings" | "control" | "ai";
 export type AppRouteNavGroup = "primary" | "userMenu";
@@ -408,6 +409,16 @@ export const appRoutes: AppRouteDefinition[] = [
     showInBreadcrumbs: true,
     requiresAuth: true,
     element: <ChatbotPage />,
+  },
+  {
+    id: "ai-vanessa",
+    path: "/ai/vanessa",
+    titleKey: "nav.vanessa",
+    section: "ai",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <VanessaCorePage />,
   },
   {
     id: "ai-knowledge",
