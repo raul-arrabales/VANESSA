@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.routes import executions as executions_routes  # noqa: E402
+from app.api.http import executions as executions_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.agent_engine_client import AgentEngineClientError  # noqa: E402
 from app.services.platform_types import PlatformControlPlaneError  # noqa: E402

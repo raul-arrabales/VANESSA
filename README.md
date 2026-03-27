@@ -34,6 +34,7 @@ The product-facing AI surface is now split into explicit domains:
 
 Canonical product APIs now live under `/v1/playgrounds/*` and `/v1/agent-projects/*`.
 Backend-owned admin and governance surfaces, including ModelOps, now also follow the canonical `backend/app/api/http` plus `backend/app/application` ownership pattern instead of flat route orchestration.
+Remaining backend operational surfaces such as runtime profile, agent executions, policy rules, quote management, and public content now follow that same canonical ownership pattern as well.
 
 ## Documentation Site
 

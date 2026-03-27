@@ -14,7 +14,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 ## HTTP Ownership
 
 - Canonical backend HTTP domains now register from `backend/app/api/http`.
-- `playgrounds`, `agent-projects`, `platform`, `context`, `catalog`, `registry`, `registry_models`, and `modelops` are the current domain-owned HTTP modules.
+- `playgrounds`, `agent-projects`, `platform`, `context`, `catalog`, `registry`, `registry_models`, `modelops`, `runtime`, `executions`, `policy`, `quotes`, and `content` are the current domain-owned HTTP modules.
 - Legacy `backend/app/routes/*` modules may remain as thin shims for import compatibility, but bootstrap registration should point at `api/http` modules instead of flat route files.
 
 ## Current Voice Endpoints
@@ -239,11 +239,27 @@ ModelOps ownership notes:
   - `AGENT_EXECUTION_FALLBACK`
 - `AGENT_EXECUTION_FALLBACK=true` applies only to engine transport failures and returns
   deterministic `503 EXEC_UPSTREAM_UNAVAILABLE`; backend does not run local execution.
+- Canonical HTTP registration now resolves through `backend/app/api/http/executions.py`.
+- Request validation, upstream fallback mapping, and response shaping now flow through `backend/app/application/execution_management_service.py`.
 
 ## Policy Rule Management
 
 - `POST /v1/policy/rules` (superadmin)
 - `GET /v1/policy/rules` (superadmin)
+- Canonical HTTP registration now resolves through `backend/app/api/http/policy.py`.
+- Payload validation and list/create orchestration now flow through `backend/app/application/policy_management_service.py`.
+
+## Quote and Content Endpoints
+
+- `GET /v1/quotes/summary` (admin)
+- `GET /v1/quotes` (admin)
+- `GET /v1/quotes/{id}` (admin)
+- `POST /v1/quotes` (admin)
+- `PUT /v1/quotes/{id}` (admin)
+- `GET /v1/content/quote-of-the-day` (public)
+- Canonical HTTP registration now resolves through `backend/app/api/http/quotes.py` and `backend/app/api/http/content.py`.
+- Quote request parsing, pagination/filter normalization, and error mapping now flow through `backend/app/application/quote_management_service_app.py`.
+- `content` remains intentionally thin and continues to delegate quote-of-the-day resolution directly to the quote service.
 
 Canonical service notes: [`backend/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/backend/README.md).
 Execution contract details: [`docs/services/agent_execution_contract.md`](./agent_execution_contract.md).

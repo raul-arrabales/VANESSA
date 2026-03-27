@@ -119,33 +119,33 @@ def register_system_routes(app: Flask) -> None:
 def register_http_blueprints(app: Flask) -> None:
     from .api.http.agent_projects import bp as agent_projects_bp
     from .api.http.catalog import bp as catalog_bp
+    from .api.http.content import bp as content_bp
     from .api.http.context import bp as context_bp
+    from .api.http.executions import bp as executions_bp
     from .api.http.modelops import bp as modelops_bp
+    from .api.http.policy import bp as policy_bp
     from .api.http.playgrounds import bp as playgrounds_bp
     from .api.http.platform import bp as platform_bp
+    from .api.http.quotes import bp as quotes_bp
     from .api.http.registry import bp as registry_bp
     from .api.http.registry_models import bp as registry_models_bp
+    from .api.http.runtime import bp as runtime_bp
     from .routes import auth as auth_routes
     from .routes import auth_legacy_routes
-    from .routes import content as content_routes
-    from .routes import executions as executions_routes
     from .routes import model_inference_v1 as model_inference_v1_routes
-    from .routes import policy as policy_routes
-    from .routes import quotes_v1 as quotes_v1_routes
-    from .routes import runtime as runtime_routes
     from .routes import system as system_routes
     from .routes import voice_legacy_routes
 
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(auth_legacy_routes.bp)
-    app.register_blueprint(content_routes.bp)
+    app.register_blueprint(content_bp)
     app.register_blueprint(system_routes.bp)
     app.register_blueprint(registry_models_bp)
     app.register_blueprint(registry_bp)
-    app.register_blueprint(policy_routes.bp)
-    app.register_blueprint(quotes_v1_routes.bp)
-    app.register_blueprint(runtime_routes.bp)
-    app.register_blueprint(executions_routes.bp)
+    app.register_blueprint(policy_bp)
+    app.register_blueprint(quotes_bp)
+    app.register_blueprint(runtime_bp)
+    app.register_blueprint(executions_bp)
     app.register_blueprint(modelops_bp)
     app.register_blueprint(model_inference_v1_routes.bp)
     app.register_blueprint(platform_bp)

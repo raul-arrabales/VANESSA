@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.routes import quotes_v1 as quotes_routes  # noqa: E402
+from app.api.http import quotes as quotes_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.quote_management import QuoteListResult, QuoteRecord, QuoteSummary  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402

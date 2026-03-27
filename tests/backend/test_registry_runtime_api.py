@@ -4,10 +4,10 @@ from typing import Any
 
 import pytest
 
-from app.routes import executions as executions_routes  # noqa: E402
+from app.api.http import executions as executions_routes  # noqa: E402
 from app.api.http import registry as registry_routes  # noqa: E402
 from app.api.http import registry_models as registry_models_routes  # noqa: E402
-from app.routes import runtime as runtime_routes  # noqa: E402
+from app.api.http import runtime as runtime_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services import runtime_profile_service  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402

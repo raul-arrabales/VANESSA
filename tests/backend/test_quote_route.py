@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.routes import content as content_routes
+from app.api.http import content as content_routes
 
 
 @pytest.fixture()

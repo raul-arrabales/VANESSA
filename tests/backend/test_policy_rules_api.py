@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from app.routes import policy as policy_routes  # noqa: E402
+from app.api.http import policy as policy_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
