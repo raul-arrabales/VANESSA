@@ -1,0 +1,91 @@
+import type { PlaygroundWorkspaceConfig } from "./types";
+
+export const chatPlaygroundConfig: PlaygroundWorkspaceConfig = {
+  playgroundKind: "chat",
+  title: "Chat",
+  panelAriaLabel: "Chat panel",
+  introText: "Choose a model and continue any prior conversation.",
+  loadingText: "Loading conversations...",
+  emptyStateText: "No messages yet. Start chatting to build context memory.",
+  newSessionLabel: "New chat",
+  emptySessionTitle: "New conversation",
+  draftPlaceholder: "Type your message",
+  selectors: {
+    model: true,
+    knowledgeBase: false,
+    assistant: false,
+  },
+  messaging: {
+    mode: "stream",
+    submitLabel: "Send",
+    busyLabel: "Streaming...",
+  },
+  actions: {
+    rename: true,
+    delete: true,
+  },
+  prompts: {
+    rename: "Rename conversation",
+    deleteConfirm: "Delete this conversation?",
+  },
+  feedback: {
+    createError: "Unable to create conversation.",
+    updateModelError: "Unable to update conversation model.",
+    updateKnowledgeBaseError: "Unable to update conversation knowledge base.",
+    updateAssistantError: "Unable to update conversation assistant.",
+    renameError: "Unable to rename conversation.",
+    deleteError: "Unable to delete conversation.",
+    sendError: "Message request failed.",
+    optionsError: "Unable to load playground options.",
+    sessionsError: "Unable to load conversations.",
+    sessionError: "Unable to load conversation.",
+    missingModel: "Model is required.",
+    missingKnowledgeBase: "Knowledge base is required.",
+  },
+  defaultAssistantRef: "assistant.playground.chat",
+};
+
+export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
+  playgroundKind: "knowledge",
+  title: "Knowledge playground",
+  panelAriaLabel: "Knowledge playground",
+  introText: "Ground answers in a bound knowledge base and continue prior sessions.",
+  loadingText: "Loading knowledge playground...",
+  emptyStateText: "No messages yet. Ask the knowledge playground to search the active corpus.",
+  newSessionLabel: "New knowledge chat",
+  emptySessionTitle: "Knowledge playground",
+  draftPlaceholder: "Ask about the knowledge base",
+  selectors: {
+    model: true,
+    knowledgeBase: true,
+    assistant: false,
+  },
+  messaging: {
+    mode: "request",
+    submitLabel: "Ask knowledge chat",
+    busyLabel: "Asking...",
+  },
+  actions: {
+    rename: true,
+    delete: true,
+  },
+  prompts: {
+    rename: "Rename knowledge session",
+    deleteConfirm: "Delete this knowledge session?",
+  },
+  feedback: {
+    createError: "Unable to create knowledge session.",
+    updateModelError: "Unable to update knowledge session model.",
+    updateKnowledgeBaseError: "Unable to update knowledge base selection.",
+    updateAssistantError: "Unable to update knowledge assistant.",
+    renameError: "Unable to rename knowledge session.",
+    deleteError: "Unable to delete knowledge session.",
+    sendError: "Unable to run knowledge chat.",
+    optionsError: "Unable to load knowledge playground options.",
+    sessionsError: "Unable to load knowledge sessions.",
+    sessionError: "Unable to load knowledge session.",
+    missingModel: "Model is required.",
+    missingKnowledgeBase: "Knowledge base is required.",
+  },
+  defaultAssistantRef: "agent.knowledge_chat",
+};

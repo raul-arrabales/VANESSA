@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlaygroundSessionDetail, PlaygroundSessionSummary } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
+import KnowledgePlaygroundPage from "../features/playgrounds/pages/KnowledgePlaygroundPage";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
-import KnowledgeChatPage from "./KnowledgeChatPage";
 
 const playgroundApiMocks = vi.hoisted(() => ({
   getPlaygroundOptions: vi.fn(),
@@ -13,6 +13,7 @@ const playgroundApiMocks = vi.hoisted(() => ({
   getPlaygroundSession: vi.fn(),
   updatePlaygroundSession: vi.fn(),
   sendPlaygroundMessage: vi.fn(),
+  deletePlaygroundSession: vi.fn(),
 }));
 
 let mockUser: AuthUser | null = null;
@@ -23,7 +24,9 @@ vi.mock("../api/playgrounds", () => ({
   createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
   getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
   updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
+  deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
   sendPlaygroundMessage: playgroundApiMocks.sendPlaygroundMessage,
+  streamPlaygroundMessage: vi.fn(),
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -43,7 +46,7 @@ vi.mock("../auth/AuthProvider", () => ({
 }));
 
 async function renderKnowledgeChat(): Promise<void> {
-  await renderWithAppProviders(<KnowledgeChatPage />);
+  await renderWithAppProviders(<KnowledgePlaygroundPage />);
 }
 
 function summary(overrides: Partial<PlaygroundSessionSummary> = {}): PlaygroundSessionSummary {
@@ -70,7 +73,7 @@ function detail(overrides: Partial<PlaygroundSessionDetail> = {}): PlaygroundSes
   };
 }
 
-describe("KnowledgeChatPage", () => {
+describe("KnowledgePlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
@@ -82,7 +85,16 @@ describe("KnowledgeChatPage", () => {
       is_active: true,
     };
     playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
-      assistants: [],
+      assistants: [
+        {
+          assistant_ref: "agent.knowledge_chat",
+          display_name: "Knowledge Assistant",
+          description: "Knowledge grounded",
+          playground_kind: "knowledge",
+          agent_id: "agent.knowledge_chat",
+          knowledge_required: true,
+        },
+      ],
       models: [{ id: "safe-small", display_name: "Safe Small" }],
       knowledge_bases: [
         {
@@ -123,6 +135,36 @@ describe("KnowledgeChatPage", () => {
     await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
 
     expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-1", { prompt: "First question" }, "token");
+  });
+
+  it("updates the knowledge-base selector through the canonical session API", async () => {
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValue(
+      summary({
+        knowledge_binding: { knowledge_base_id: "kb_secondary" },
+      }),
+    );
+    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+      assistants: [],
+      models: [{ id: "safe-small", display_name: "Safe Small" }],
+      knowledge_bases: [
+        { id: "kb_primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: true },
+        { id: "kb_secondary", display_name: "Policies", index_name: "kb_policies", is_default: false },
+      ],
+      default_knowledge_base_id: "kb_primary",
+      selection_required: false,
+      configuration_message: null,
+    });
+
+    await renderKnowledgeChat();
+
+    await screen.findByLabelText("Knowledge base");
+    await userEvent.selectOptions(screen.getByLabelText("Knowledge base"), "kb_secondary");
+
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
+      "sess-1",
+      { knowledge_binding: { knowledge_base_id: "kb_secondary" } },
+      "token",
+    ));
   });
 
   it("renders citations from persisted assistant metadata", async () => {

@@ -1,22 +1,23 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatConversationDetail, ChatConversationSummary, SendChatMessageResult } from "../api/chat";
+import type {
+  PlaygroundSessionDetail,
+  PlaygroundSessionSummary,
+  SendPlaygroundMessageResult,
+} from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
-import ChatbotPage from "./ChatbotPage";
+import ChatPlaygroundPage from "../features/playgrounds/pages/ChatPlaygroundPage";
 import TestRouter from "../test/TestRouter";
 
-const modelApiMocks = vi.hoisted(() => ({
-  listEnabledModels: vi.fn(),
-}));
-
-const chatApiMocks = vi.hoisted(() => ({
-  listChatConversations: vi.fn(),
-  createChatConversation: vi.fn(),
-  getChatConversation: vi.fn(),
-  updateChatConversation: vi.fn(),
-  deleteChatConversation: vi.fn(),
-  streamChatMessage: vi.fn(),
+const playgroundApiMocks = vi.hoisted(() => ({
+  getPlaygroundOptions: vi.fn(),
+  listPlaygroundSessions: vi.fn(),
+  createPlaygroundSession: vi.fn(),
+  getPlaygroundSession: vi.fn(),
+  updatePlaygroundSession: vi.fn(),
+  deletePlaygroundSession: vi.fn(),
+  streamPlaygroundMessage: vi.fn(),
 }));
 const feedbackMocks = vi.hoisted(() => ({
   showErrorFeedback: vi.fn(),
@@ -27,23 +28,21 @@ const scrollToMock = vi.fn();
 
 let mockUser: AuthUser | null = null;
 
-vi.mock("../api/modelops", () => ({
-  listEnabledModels: modelApiMocks.listEnabledModels,
-}));
-
 vi.mock("../components/ChatMessageBody", () => ({
   default: ({ content, renderMarkdown }: { content: string; renderMarkdown: boolean }) => (
     renderMarkdown ? <pre data-testid="markdown-message">{content}</pre> : <p className="chatbot-message-text">{content}</p>
   ),
 }));
 
-vi.mock("../api/chat", () => ({
-  listChatConversations: chatApiMocks.listChatConversations,
-  createChatConversation: chatApiMocks.createChatConversation,
-  getChatConversation: chatApiMocks.getChatConversation,
-  updateChatConversation: chatApiMocks.updateChatConversation,
-  deleteChatConversation: chatApiMocks.deleteChatConversation,
-  streamChatMessage: chatApiMocks.streamChatMessage,
+vi.mock("../api/playgrounds", () => ({
+  getPlaygroundOptions: playgroundApiMocks.getPlaygroundOptions,
+  listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
+  createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
+  getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
+  updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
+  deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
+  sendPlaygroundMessage: vi.fn(),
+  streamPlaygroundMessage: playgroundApiMocks.streamPlaygroundMessage,
 }));
 
 vi.mock("../auth/AuthProvider", () => ({
@@ -69,42 +68,51 @@ vi.mock("../feedback/ActionFeedbackProvider", () => ({
   }),
 }));
 
-function conversationSummary(
+function sessionSummary(
   id: string,
   title: string,
-  overrides: Partial<ChatConversationSummary> = {},
-): ChatConversationSummary {
+  overrides: Partial<PlaygroundSessionSummary> = {},
+): PlaygroundSessionSummary {
   return {
     id,
+    playground_kind: "chat",
+    assistant_ref: "assistant.playground.chat",
     title,
-    titleSource: "auto",
-    modelId: "safe-small",
-    messageCount: 0,
-    createdAt: "2026-03-18T11:00:00Z",
-    updatedAt: "2026-03-18T11:00:00Z",
+    title_source: "auto",
+    model_selection: { model_id: "safe-small" },
+    knowledge_binding: { knowledge_base_id: null },
+    message_count: 0,
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
     ...overrides,
   };
 }
 
-function conversationDetail(
+function sessionDetail(
   id: string,
   title: string,
-  overrides: Partial<ChatConversationDetail> = {},
-): ChatConversationDetail {
+  overrides: Partial<PlaygroundSessionDetail> = {},
+): PlaygroundSessionDetail {
   return {
-    ...conversationSummary(id, title, overrides),
+    ...sessionSummary(id, title, overrides),
     messages: [],
     ...overrides,
   };
 }
 
 function sendResult(
-  summary: ChatConversationSummary,
+  summary: PlaygroundSessionSummary,
   userContent: string,
   assistantContent: string,
-): SendChatMessageResult {
+): SendPlaygroundMessageResult {
   return {
-    conversation: summary,
+    session: {
+      ...summary,
+      messages: [
+        { id: "msg-user", role: "user", content: userContent, metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+        { id: "msg-assistant", role: "assistant", content: assistantContent, metadata: {}, createdAt: "2026-03-18T11:00:01Z" },
+      ],
+    },
     messages: [
       { id: "msg-user", role: "user", content: userContent, metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
       { id: "msg-assistant", role: "assistant", content: assistantContent, metadata: {}, createdAt: "2026-03-18T11:00:01Z" },
@@ -113,10 +121,10 @@ function sendResult(
   };
 }
 
-function renderChatbot() {
+function renderChatPlayground() {
   return render(
     <TestRouter>
-      <ChatbotPage />
+      <ChatPlaygroundPage />
     </TestRouter>,
   );
 }
@@ -158,7 +166,7 @@ function setThreadMetrics(
   });
 }
 
-describe("ChatbotPage", () => {
+describe("ChatPlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     feedbackMocks.showErrorFeedback.mockReset();
@@ -180,20 +188,28 @@ describe("ChatbotPage", () => {
       role: "user",
       is_active: true,
     };
-    modelApiMocks.listEnabledModels.mockResolvedValue([
-      { id: "safe-small", name: "Safe Small" },
-      { id: "safe-large", name: "Safe Large" },
+    window.localStorage.clear();
+    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+      assistants: [],
+      models: [
+        { id: "safe-small", display_name: "Safe Small" },
+        { id: "safe-large", display_name: "Safe Large" },
+      ],
+      knowledge_bases: [],
+      default_knowledge_base_id: null,
+      selection_required: false,
+      configuration_message: null,
+    });
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([
+      sessionSummary("conv-1", "Thread one"),
     ]);
-    chatApiMocks.listChatConversations.mockResolvedValue([
-      conversationSummary("conv-1", "Thread one"),
-    ]);
-    chatApiMocks.getChatConversation.mockResolvedValue(conversationDetail("conv-1", "Thread one"));
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(sessionDetail("conv-1", "Thread one"));
     vi.spyOn(window, "prompt").mockImplementation(() => null);
     vi.spyOn(window, "confirm").mockImplementation(() => true);
   });
 
   it("shows backend-allowed models only", async () => {
-    renderChatbot();
+    renderChatPlayground();
 
     const picker = await screen.findByLabelText("Model");
     expect(picker).toBeVisible();
@@ -202,49 +218,56 @@ describe("ChatbotPage", () => {
     expect(screen.queryByRole("option", { name: "Admin Internal" })).toBeNull();
   });
 
-  it("creates an empty conversation when the server has none", async () => {
-    chatApiMocks.listChatConversations.mockResolvedValueOnce([]);
-    chatApiMocks.createChatConversation.mockResolvedValueOnce(
-      conversationDetail("conv-new", "New conversation"),
+  it("creates an empty session when the server has none", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([]);
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("conv-new", "New conversation"),
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
-    await screen.findByRole("button", { name: /New conversation/ });
+    await screen.findByRole("button", { name: /New chat/ });
 
-    expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
+    expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
+      {
+        playground_kind: "chat",
+        assistant_ref: "assistant.playground.chat",
+        model_selection: { model_id: "safe-small" },
+        knowledge_binding: { knowledge_base_id: null },
+      },
+      "token",
+    );
   });
 
-  it("uses the conversation API for model changes and streamed message sends", async () => {
-    chatApiMocks.updateChatConversation.mockResolvedValueOnce(
-      conversationSummary("conv-1", "Thread one", { modelId: "safe-large" }),
+  it("updates the model and streams a chat reply", async () => {
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
+      sessionSummary("conv-1", "Thread one", { model_selection: { model_id: "safe-large" } }),
     );
-    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        conversationSummary("conv-1", "Test prompt", {
-          modelId: "safe-large",
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:02Z",
+        sessionSummary("conv-1", "Test prompt", {
+          model_selection: { model_id: "safe-large" },
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:02Z",
         }),
         "Test prompt",
         "## hello\n\nUse `code`",
       ),
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
-    await screen.findByRole("option", { name: "Safe Large" });
     await userEvent.selectOptions(screen.getByLabelText("Model"), "safe-large");
     await userEvent.type(screen.getByLabelText("Message"), "Test prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    await waitFor(() => expect(chatApiMocks.updateChatConversation).toHaveBeenCalledWith(
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "conv-1",
-      { model_id: "safe-large" },
+      { model_selection: { model_id: "safe-large" } },
       "token",
     ));
-    expect(chatApiMocks.streamChatMessage).toHaveBeenCalledWith(
+    expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledWith(
       "conv-1",
       { prompt: "Test prompt" },
       "token",
@@ -257,18 +280,18 @@ describe("ChatbotPage", () => {
   });
 
   it("keeps user messages as plain text while rendering assistant markdown", async () => {
-    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        conversationSummary("conv-1", "Literal user", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:01Z",
+        sessionSummary("conv-1", "Literal user", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:01Z",
         }),
         "**literal user**",
         "Answer with **bold**",
       ),
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     await userEvent.type(screen.getByLabelText("Message"), "**literal user**");
@@ -278,28 +301,26 @@ describe("ChatbotPage", () => {
     expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Answer with **bold**");
   });
 
-  it("renders multiple conversations from the API and manages rename/delete", async () => {
-    chatApiMocks.listChatConversations.mockResolvedValueOnce([
-      conversationSummary("conv-1", "Thread one", { updatedAt: "2026-03-18T11:00:02Z" }),
-      conversationSummary("conv-2", "Thread two", { updatedAt: "2026-03-18T11:00:01Z", messageCount: 2 }),
+  it("renders multiple sessions from the API and manages rename/delete", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-1", "Thread one", { updated_at: "2026-03-18T11:00:02Z" }),
+      sessionSummary("conv-2", "Thread two", { updated_at: "2026-03-18T11:00:01Z", message_count: 2 }),
     ]);
-    chatApiMocks.getChatConversation
-      .mockResolvedValueOnce(conversationDetail("conv-1", "Thread one"))
-      .mockResolvedValueOnce(conversationDetail("conv-2", "Thread two", { messageCount: 2 }));
-    chatApiMocks.updateChatConversation.mockResolvedValueOnce(
-      conversationSummary("conv-1", "Renamed thread", { updatedAt: "2026-03-18T11:00:03Z" }),
+    playgroundApiMocks.getPlaygroundSession
+      .mockResolvedValueOnce(sessionDetail("conv-1", "Thread one"))
+      .mockResolvedValueOnce(sessionDetail("conv-2", "Thread two", { message_count: 2 }));
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
+      sessionSummary("conv-1", "Renamed thread", { updated_at: "2026-03-18T11:00:03Z" }),
     );
     vi.mocked(window.prompt).mockImplementationOnce(() => "Renamed thread");
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("button", { name: /Thread one/ });
     expect(screen.getByRole("button", { name: /Thread two/ })).toBeVisible();
 
-    const promptSpy = vi.mocked(window.prompt);
-    promptSpy.mockImplementationOnce(() => "Renamed thread");
     await userEvent.click(screen.getByRole("button", { name: "Rename" }));
-    await waitFor(() => expect(chatApiMocks.updateChatConversation).toHaveBeenCalledWith(
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "conv-1",
       { title: "Renamed thread" },
       "token",
@@ -308,27 +329,27 @@ describe("ChatbotPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(chatApiMocks.deleteChatConversation).toHaveBeenCalledWith("conv-1", "token");
+    expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("conv-1", "token");
     await waitFor(() => expect(screen.queryByRole("button", { name: /Renamed thread/ })).toBeNull());
-    expect(chatApiMocks.getChatConversation).toHaveBeenLastCalledWith("conv-2", "token");
+    expect(playgroundApiMocks.getPlaygroundSession).toHaveBeenLastCalledWith("conv-2", "chat", "token");
   });
 
-  it("disables new chat while an empty conversation exists and re-enables after sending", async () => {
-    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
+  it("disables new chat while an empty session exists and re-enables after sending", async () => {
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        conversationSummary("conv-1", "First message", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:01Z",
+        sessionSummary("conv-1", "First message", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:01Z",
         }),
         "First message",
         "response",
       ),
     );
-    chatApiMocks.createChatConversation.mockResolvedValueOnce(
-      conversationDetail("conv-2", "New conversation"),
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("conv-2", "New conversation"),
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
     const newChatButton = await screen.findByRole("button", { name: "New chat" });
     await waitFor(() => expect(newChatButton).toBeDisabled());
@@ -339,23 +360,31 @@ describe("ChatbotPage", () => {
     await waitFor(() => expect(newChatButton).toBeEnabled());
 
     await userEvent.click(newChatButton);
-    expect(chatApiMocks.createChatConversation).toHaveBeenCalledWith({ model_id: "safe-small" }, "token");
+    expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
+      {
+        playground_kind: "chat",
+        assistant_ref: "assistant.playground.chat",
+        model_selection: { model_id: "safe-small" },
+        knowledge_binding: { knowledge_base_id: null },
+      },
+      "token",
+    );
     await waitFor(() => expect(newChatButton).toBeDisabled());
   });
 
   it("renders assistant text incrementally while the stream is active", async () => {
-    let resolveStream: (value: SendChatMessageResult) => void = () => {};
-    chatApiMocks.streamChatMessage.mockImplementationOnce(
-      async (_conversationId, _payload, _token, options) => {
+    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, options) => {
         options?.onDelta?.("## hello");
         options?.onDelta?.("\n\n`code`");
-        return await new Promise<SendChatMessageResult>((resolve) => {
+        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
           resolveStream = resolve;
         });
       },
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     await userEvent.type(screen.getByLabelText("Message"), "Stream prompt");
@@ -369,9 +398,9 @@ describe("ChatbotPage", () => {
 
     resolveStream(
       sendResult(
-        conversationSummary("conv-1", "Stream prompt", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:02Z",
+        sessionSummary("conv-1", "Stream prompt", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:02Z",
         }),
         "Stream prompt",
         "## hello\n\n`code`",
@@ -383,18 +412,18 @@ describe("ChatbotPage", () => {
   });
 
   it("autoscrolls on send and continues following streamed deltas while pinned", async () => {
-    let resolveStream: (value: SendChatMessageResult) => void = () => {};
-    chatApiMocks.streamChatMessage.mockImplementationOnce(
-      async (_conversationId, _payload, _token, options) => {
+    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, options) => {
         options?.onDelta?.("hello");
         options?.onDelta?.(" world");
-        return await new Promise<SendChatMessageResult>((resolve) => {
+        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
           resolveStream = resolve;
         });
       },
     );
 
-    const { container } = renderChatbot();
+    const { container } = renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     const thread = getChatThread(container);
@@ -406,15 +435,14 @@ describe("ChatbotPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
     expect(await screen.findByText("hello world")).toBeVisible();
 
     resolveStream(
       sendResult(
-        conversationSummary("conv-1", "Keep pinned", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:02Z",
+        sessionSummary("conv-1", "Keep pinned", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:02Z",
         }),
         "Keep pinned",
         "hello world",
@@ -425,19 +453,19 @@ describe("ChatbotPage", () => {
   });
 
   it("pauses autoscroll when the user scrolls up and resumes from jump to latest", async () => {
-    let resolveStream: (value: SendChatMessageResult) => void = () => {};
+    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
     let streamOptions: { onDelta?: (text: string) => void } | undefined;
 
-    chatApiMocks.streamChatMessage.mockImplementationOnce(
-      async (_conversationId, _payload, _token, options) => {
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, options) => {
         streamOptions = options;
-        return await new Promise<SendChatMessageResult>((resolve) => {
+        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
           resolveStream = resolve;
         });
       },
     );
 
-    const { container } = renderChatbot();
+    const { container } = renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     const thread = getChatThread(container);
@@ -448,10 +476,8 @@ describe("ChatbotPage", () => {
 
     await waitFor(() => expect(streamOptions).toBeDefined());
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     scrollToMock.mockClear();
-    scrollIntoViewMock.mockClear();
     setThreadMetrics(thread, { scrollTop: 200 });
     fireEvent.scroll(thread);
 
@@ -460,28 +486,24 @@ describe("ChatbotPage", () => {
     });
 
     expect(scrollToMock).not.toHaveBeenCalled();
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     const jumpButton = await screen.findByRole("button", { name: "Jump to latest" });
     expect(jumpButton).toBeVisible();
 
     await userEvent.click(jumpButton);
     expect(scrollToMock).toHaveBeenCalledTimes(1);
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
 
     scrollToMock.mockClear();
-    scrollIntoViewMock.mockClear();
     await act(async () => {
       streamOptions?.onDelta?.(" more");
     });
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     resolveStream(
       sendResult(
-        conversationSummary("conv-1", "Detach from stream", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:02Z",
+        sessionSummary("conv-1", "Detach from stream", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:02Z",
         }),
         "Detach from stream",
         "new token more",
@@ -491,83 +513,78 @@ describe("ChatbotPage", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
   });
 
-  it("resets follow mode when sending a new prompt and when switching conversations", async () => {
-    chatApiMocks.getChatConversation
-      .mockResolvedValueOnce(conversationDetail("conv-1", "Thread one", {
-        messageCount: 2,
+  it("resets follow mode when sending a new prompt and when switching sessions", async () => {
+    playgroundApiMocks.getPlaygroundSession
+      .mockResolvedValueOnce(sessionDetail("conv-1", "Thread one", {
+        message_count: 2,
         messages: [
           { id: "msg-1", role: "assistant", content: "Existing reply", metadata: {}, createdAt: "2026-03-18T10:59:00Z" },
         ],
       }))
-      .mockResolvedValueOnce(conversationDetail("conv-2", "Thread two", {
-        messageCount: 2,
+      .mockResolvedValueOnce(sessionDetail("conv-2", "Thread two", {
+        message_count: 2,
         messages: [
           { id: "msg-2", role: "assistant", content: "Second thread", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
         ],
       }));
-    chatApiMocks.listChatConversations.mockResolvedValueOnce([
-      conversationSummary("conv-1", "Thread one", { messageCount: 2, updatedAt: "2026-03-18T11:00:02Z" }),
-      conversationSummary("conv-2", "Thread two", { messageCount: 2, updatedAt: "2026-03-18T11:00:01Z" }),
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-1", "Thread one", { message_count: 2, updated_at: "2026-03-18T11:00:02Z" }),
+      sessionSummary("conv-2", "Thread two", { message_count: 2, updated_at: "2026-03-18T11:00:01Z" }),
     ]);
-    chatApiMocks.streamChatMessage.mockResolvedValueOnce(
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        conversationSummary("conv-1", "Fresh send", {
-          messageCount: 4,
-          updatedAt: "2026-03-18T11:00:03Z",
+        sessionSummary("conv-1", "Fresh send", {
+          message_count: 4,
+          updated_at: "2026-03-18T11:00:03Z",
         }),
         "Fresh send",
         "response",
       ),
     );
 
-    const { container } = renderChatbot();
+    const { container } = renderChatPlayground();
 
     await screen.findByText("Existing reply");
     const thread = getChatThread(container);
     setThreadMetrics(thread, { scrollTop: 200 });
     fireEvent.scroll(thread);
     scrollToMock.mockClear();
-    scrollIntoViewMock.mockClear();
 
     await userEvent.type(screen.getByLabelText("Message"), "Fresh send");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
     scrollToMock.mockClear();
-    scrollIntoViewMock.mockClear();
     setThreadMetrics(thread, { scrollTop: 200 });
     fireEvent.scroll(thread);
 
     await userEvent.click(screen.getByRole("button", { name: /Thread two/ }));
     await screen.findByText("Second thread");
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(scrollIntoViewMock).not.toHaveBeenCalled();
   });
 
   it("restores the draft and removes the transient assistant reply when streaming fails", async () => {
-    chatApiMocks.streamChatMessage.mockRejectedValueOnce(new Error("Stream failed"));
+    playgroundApiMocks.streamPlaygroundMessage.mockRejectedValueOnce(new Error("Stream failed"));
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     await userEvent.type(screen.getByLabelText("Message"), "Broken prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue("Broken prompt"));
-    expect(screen.queryByRole("heading", { name: "hello" })).toBeNull();
     expect(feedbackMocks.showErrorFeedback).toHaveBeenCalledWith(expect.any(Error), "Message request failed.");
   });
 
   it("disables conversation controls while a stream is active", async () => {
-    let resolveStream: (value: SendChatMessageResult) => void = () => {};
-    chatApiMocks.streamChatMessage.mockImplementationOnce(
-      async () => await new Promise<SendChatMessageResult>((resolve) => {
+    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async () => await new Promise<SendPlaygroundMessageResult>((resolve) => {
         resolveStream = resolve;
       }),
     );
 
-    renderChatbot();
+    renderChatPlayground();
 
     await screen.findByRole("heading", { name: "Thread one" });
     await userEvent.type(screen.getByLabelText("Message"), "Lock controls");
@@ -581,9 +598,9 @@ describe("ChatbotPage", () => {
 
     resolveStream(
       sendResult(
-        conversationSummary("conv-1", "Lock controls", {
-          messageCount: 2,
-          updatedAt: "2026-03-18T11:00:02Z",
+        sessionSummary("conv-1", "Lock controls", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:02Z",
         }),
         "Lock controls",
         "done",

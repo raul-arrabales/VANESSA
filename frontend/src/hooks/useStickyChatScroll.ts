@@ -53,7 +53,11 @@ export function useStickyChatScroll(
   const performScrollToBottom = useCallback((behavior: ScrollBehavior): void => {
     const thread = threadRef.current;
     if (thread) {
-      thread.scrollTo({ top: thread.scrollHeight, behavior });
+      if (typeof thread.scrollTo === "function") {
+        thread.scrollTo({ top: thread.scrollHeight, behavior });
+      } else {
+        thread.scrollTop = thread.scrollHeight;
+      }
     }
 
     isPinnedRef.current = true;
