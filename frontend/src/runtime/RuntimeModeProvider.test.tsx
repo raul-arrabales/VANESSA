@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../auth/authApi";
 import { RuntimeModeProvider, useRuntimeMode } from "./RuntimeModeProvider";
 
 const getRuntimeProfile = vi.fn();
@@ -94,5 +95,43 @@ describe("RuntimeModeProvider", () => {
 
     await waitFor(() => expect(screen.getByTestId("locked")).toHaveTextContent("true"));
     expect(screen.getByTestId("source")).toHaveTextContent("forced");
+  });
+
+  it("ignores late runtime profile failures after auth is cleared", async () => {
+    let rejectRequest: ((reason?: unknown) => void) | undefined;
+    getRuntimeProfile.mockImplementation(() => new Promise((_, reject) => {
+      rejectRequest = reject;
+    }));
+
+    const { rerender } = render(
+      <RuntimeModeProvider>
+        <RuntimeModeConsumer />
+      </RuntimeModeProvider>,
+    );
+
+    await waitFor(() => expect(getRuntimeProfile).toHaveBeenCalledWith("token"));
+
+    mockToken = "";
+    mockIsAuthenticated = false;
+
+    rerender(
+      <RuntimeModeProvider>
+        <RuntimeModeConsumer />
+      </RuntimeModeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mode")).toHaveTextContent("none");
+      expect(screen.getByTestId("is-loading")).toHaveTextContent("false");
+      expect(screen.getByTestId("error")).toHaveTextContent("");
+    });
+
+    rejectRequest?.(new ApiError("http://localhost:3000/", 500, "runtime_bootstrap_error"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mode")).toHaveTextContent("none");
+      expect(screen.getByTestId("is-loading")).toHaveTextContent("false");
+      expect(screen.getByTestId("error")).toHaveTextContent("");
+    });
   });
 });

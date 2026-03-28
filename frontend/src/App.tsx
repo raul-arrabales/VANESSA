@@ -107,6 +107,7 @@ function AppHeader(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingRuntimeMode, setPendingRuntimeMode] = useState<"offline" | "online" | null>(null);
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  const handledRuntimeLoadErrorRef = useRef<string>("");
   const menuId = useId();
 
   const displayName = isAuthenticated ? user?.username ?? user?.email ?? t("nav.guest") : t("nav.guest");
@@ -141,6 +142,23 @@ function AppHeader(): JSX.Element {
         showErrorFeedback(saveError, t("runtimeMode.updateFailed"));
       });
   };
+
+  useEffect(() => {
+    if (!runtimeError || !isAuthenticated) {
+      handledRuntimeLoadErrorRef.current = "";
+      return;
+    }
+
+    const message = runtimeError === "settings.runtime.error.load"
+      ? t("settings.runtime.error.load")
+      : runtimeError;
+    if (handledRuntimeLoadErrorRef.current === message) {
+      return;
+    }
+
+    handledRuntimeLoadErrorRef.current = message;
+    showErrorFeedback(message, t("settings.runtime.error.load"));
+  }, [isAuthenticated, runtimeError, showErrorFeedback, t]);
 
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent): void => {
@@ -254,7 +272,6 @@ function AppHeader(): JSX.Element {
             </div>
           )}
         </div>
-        {runtimeError && <p className="status-text">{runtimeError === "runtimeMode.updateFailed" ? t("runtimeMode.updateFailed") : runtimeError}</p>}
         {isRuntimeLocked && <p className="status-text">{t("runtimeMode.lockedByEnvironment", { mode: runtimeModeLabel })}</p>}
       </div>
       {pendingRuntimeMode && (

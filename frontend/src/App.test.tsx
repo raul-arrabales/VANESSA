@@ -9,6 +9,7 @@ import { t } from "./test/translation";
 let mockUser: AuthUser | null = null;
 const mockSetMode = vi.fn();
 let mockRuntimeLocked = false;
+let mockRuntimeError = "";
 
 vi.mock("./auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -30,7 +31,7 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
     source: mockRuntimeLocked ? "forced" : "database",
     isLoading: false,
     isSaving: false,
-    error: "",
+    error: mockRuntimeError,
     setMode: mockSetMode,
   }),
 }));
@@ -39,6 +40,7 @@ describe("App header", () => {
   beforeEach(() => {
     mockUser = null;
     mockRuntimeLocked = false;
+    mockRuntimeError = "";
     mockSetMode.mockReset();
     vi.restoreAllMocks();
   });
@@ -139,5 +141,32 @@ describe("App header", () => {
     await user.click(screen.getByRole("button", { name: await t("runtimeMode.dialog.confirmOnline") }));
 
     expect(mockSetMode).toHaveBeenCalledWith("online");
+  });
+
+  it("does not show runtime load errors inline for guests", async () => {
+    mockRuntimeError = "http://localhost:3000/";
+
+    const container = await renderApp();
+
+    expect(screen.getByRole("button", { name: await t("nav.guest") })).toBeVisible();
+    expect(container.querySelector(".app-header")).not.toHaveTextContent("http://localhost:3000/");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows authenticated runtime load errors in the action feedback modal instead of the header", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+    mockRuntimeError = "http://localhost:3000/";
+
+    const container = await renderApp();
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("http://localhost:3000/")).toBeVisible();
+    expect(container.querySelector(".app-header")).not.toHaveTextContent("http://localhost:3000/");
   });
 });

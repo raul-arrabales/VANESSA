@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -42,7 +41,7 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
-  const loadedTokenRef = useRef<string>("");
+  const [loadedToken, setLoadedToken] = useState<string>("");
 
   const applyRuntimeProfileState = useCallback((result: RuntimeProfileResult): void => {
     setModeState(result.profile);
@@ -51,37 +50,60 @@ export function RuntimeModeProvider({ children }: RuntimeModeProviderProps): JSX
   }, []);
 
   useEffect(() => {
+    let isCurrentRequest = true;
+
     if (!isAuthenticated || !token) {
-      loadedTokenRef.current = "";
+      setLoadedToken("");
       setModeState(null);
       setIsLocked(false);
       setSource(null);
       setError("");
       setIsLoading(false);
-      return;
+      return () => {
+        isCurrentRequest = false;
+      };
     }
 
-    if (loadedTokenRef.current === token) {
-      return;
+    if (loadedToken === token) {
+      return () => {
+        isCurrentRequest = false;
+      };
     }
 
-    loadedTokenRef.current = token;
     setIsLoading(true);
     setError("");
 
     getRuntimeProfile(token)
       .then((result) => {
+        if (!isCurrentRequest) {
+          return;
+        }
+
+        setLoadedToken(token);
         applyRuntimeProfileState(result);
       })
       .catch((loadError: unknown) => {
+        if (!isCurrentRequest) {
+          return;
+        }
+
+        setLoadedToken("");
         if (loadError instanceof ApiError) {
           setError(loadError.message);
           return;
         }
         setError("settings.runtime.error.load");
       })
-      .finally(() => setIsLoading(false));
-  }, [applyRuntimeProfileState, isAuthenticated, token]);
+      .finally(() => {
+        if (isCurrentRequest) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [applyRuntimeProfileState, isAuthenticated, loadedToken, token]);
 
   const setMode = useCallback(async (nextMode: RuntimeProfile): Promise<RuntimeProfile> => {
     if (!token) {
