@@ -65,10 +65,29 @@
     }
   },
   "theme": {
-    "toggle": {
-      "aria": "Alternar modo claro y oscuro",
-      "toDark": "Modo noche",
-      "toLight": "Modo dia"
+    "families": {
+      "default": {
+        "title": "Temas base",
+        "description": "La presentación estándar de VANESSA con presets de día y noche."
+      },
+      "retro": {
+        "title": "Terminal retro",
+        "description": "Una familia inspirada en terminales con color fosforo y detalles vintage moderados."
+      }
+    },
+    "presets": {
+      "defaultDay": {
+        "title": "Dia",
+        "description": "Un espacio claro y limpio afinado para lectura diurna."
+      },
+      "defaultNight": {
+        "title": "Noche",
+        "description": "Un espacio de baja luz con contraste frio y menos deslumbramiento."
+      },
+      "retroTerminal": {
+        "title": "Terminal retro",
+        "description": "Carácter de terminal de época VT con espaciado legible, controles prácticos y brillo equilibrado."
+      }
     }
   },
   "language": {
@@ -544,7 +563,9 @@
       },
       "theme": {
         "title": "Personalización del interfaz",
-        "description": "Alterna entre modo de día y de noche y editar los colores del tema",
+        "description": "Elige una familia y un preset de tema, y ajusta el preset activo en el editor de estilo.",
+        "selectorLabel": "Selección de tema",
+        "selectorHelp": "Elige la familia y el preset que deben definir la interfaz en esta sesión del navegador.",
         "styleEditor": "Editor de estilo del tema"
       }
     },

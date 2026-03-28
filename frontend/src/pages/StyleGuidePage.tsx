@@ -7,7 +7,14 @@ const radiusTokens = ["--radius-sm", "--radius-md", "--radius-lg"] as const;
 const shadowTokens = ["--shadow-1", "--shadow-2", "--shadow-3"] as const;
 
 export default function StyleGuidePage(): JSX.Element {
-  const { theme, colorOverrides, getEffectiveColors, applyColorOverrides, resetColorOverrides } = useTheme();
+  const {
+    theme,
+    themePreset,
+    colorOverrides,
+    getEffectiveColors,
+    applyColorOverrides,
+    resetColorOverrides,
+  } = useTheme();
   const activeThemeColors = useMemo<ThemeColors>(() => getEffectiveColors(theme), [getEffectiveColors, theme]);
 
   const [draftColors, setDraftColors] = useState<ThemeColors>(activeThemeColors);
@@ -40,7 +47,7 @@ export default function StyleGuidePage(): JSX.Element {
     <section className="style-guide card-stack">
       <article className="panel card-stack">
         <h2 className="section-title">Theme color editor</h2>
-        <p className="status-text">Update design token colors for the active {theme} theme and apply them instantly.</p>
+        <p className="status-text">Update design token colors for the active preset, {themePreset.id}, and apply them instantly.</p>
         <div className="token-grid token-grid-editor">
           {EDITABLE_COLOR_TOKENS.map((token) => (
             <label key={token} className="token-card token-card-editor">

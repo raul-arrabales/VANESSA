@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import type { AuthUser } from "../auth/types";
@@ -63,10 +64,28 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("heading", { name: "settings.profile.title" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "theme.presets.defaultDay.title theme.presets.defaultDay.description" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "theme.presets.defaultNight.title theme.presets.defaultNight.description" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "theme.presets.retroTerminal.title theme.presets.retroTerminal.description" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "settings.admin.title" })).toBeNull();
     expect(screen.queryByText("runtime-profile-section")).toBeNull();
     expect(screen.queryByRole("heading", { name: "settings.navigation.title" })).toBeNull();
     expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
+  });
+
+  it("lets users switch to the retro terminal preset from settings", async () => {
+    const user = userEvent.setup();
+
+    renderSettings("/settings");
+
+    const retroRadio = await screen.findByRole("radio", {
+      name: "theme.presets.retroTerminal.title theme.presets.retroTerminal.description",
+    });
+    await user.click(retroRadio);
+
+    expect(retroRadio).toBeChecked();
+    expect(document.documentElement.getAttribute("data-theme")).toBe("retro-terminal");
+    expect(document.documentElement.getAttribute("data-theme-family")).toBe("retro");
   });
 
   it("hides model and approvals controls for admins", async () => {
@@ -82,6 +101,7 @@ describe("SettingsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "theme.presets.retroTerminal.title theme.presets.retroTerminal.description" })).toBeVisible();
     expect(screen.getByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
     expect(screen.queryByText("runtime-profile-section")).toBeNull();
   });
@@ -99,6 +119,7 @@ describe("SettingsPage", () => {
 
     expect(await screen.findByRole("heading", { name: "settings.personalization.language.title" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "settings.personalization.theme.title" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "theme.presets.defaultDay.title theme.presets.defaultDay.description" })).toBeVisible();
     expect(await screen.findByRole("link", { name: "settings.personalization.theme.styleEditor" })).toHaveAttribute("href", "/settings/design");
     expect(screen.queryByText("runtime-profile-section")).toBeNull();
     expect(screen.queryByRole("heading", { name: "settings.superadmin.title" })).toBeNull();

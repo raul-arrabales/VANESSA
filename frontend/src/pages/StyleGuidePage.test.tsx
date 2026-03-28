@@ -9,8 +9,9 @@ function ThemeModeControls(): JSX.Element {
   return (
     <div>
       <p data-testid="active-theme">{theme}</p>
-      <button type="button" onClick={() => setTheme("light")}>switch-light</button>
-      <button type="button" onClick={() => setTheme("dark")}>switch-dark</button>
+      <button type="button" onClick={() => setTheme("default-day")}>switch-default-day</button>
+      <button type="button" onClick={() => setTheme("default-night")}>switch-default-night</button>
+      <button type="button" onClick={() => setTheme("retro-terminal")}>switch-retro-terminal</button>
     </div>
   );
 }
@@ -43,7 +44,7 @@ describe("StyleGuidePage theme editor", () => {
     await user.type(bgCanvasInput, "#123456");
     await user.click(screen.getByRole("button", { name: "Apply theme changes" }));
 
-    await user.click(screen.getByRole("button", { name: "switch-dark" }));
+    await user.click(screen.getByRole("button", { name: "switch-default-night" }));
     await waitFor(() => {
       expect(getTokenHexInput("--bg-canvas").value).toBe("#08111e");
     });
@@ -56,12 +57,12 @@ describe("StyleGuidePage theme editor", () => {
     await user.clear(lightInput);
     await user.type(lightInput, "#abcdef");
 
-    await user.click(screen.getByRole("button", { name: "switch-dark" }));
+    await user.click(screen.getByRole("button", { name: "switch-retro-terminal" }));
     await waitFor(() => {
-      expect(getTokenHexInput("--bg-canvas").value).toBe("#08111e");
+      expect(getTokenHexInput("--bg-canvas").value).toBe("#08140d");
     });
 
-    await user.click(screen.getByRole("button", { name: "switch-light" }));
+    await user.click(screen.getByRole("button", { name: "switch-default-day" }));
     await waitFor(() => {
       expect(getTokenHexInput("--bg-canvas").value).toBe("#ecf3fb");
     });
@@ -75,21 +76,32 @@ describe("StyleGuidePage theme editor", () => {
     await user.type(lightInput, "#111111");
     await user.click(screen.getByRole("button", { name: "Apply theme changes" }));
 
-    await user.click(screen.getByRole("button", { name: "switch-dark" }));
+    await user.click(screen.getByRole("button", { name: "switch-default-night" }));
     const darkInput = getTokenHexInput("--bg-canvas");
     await user.clear(darkInput);
     await user.type(darkInput, "#222222");
     await user.click(screen.getByRole("button", { name: "Apply theme changes" }));
 
-    await user.click(screen.getByRole("button", { name: "switch-light" }));
+    await user.click(screen.getByRole("button", { name: "switch-retro-terminal" }));
+    const retroInput = getTokenHexInput("--bg-canvas");
+    await user.clear(retroInput);
+    await user.type(retroInput, "#333333");
+    await user.click(screen.getByRole("button", { name: "Apply theme changes" }));
+
+    await user.click(screen.getByRole("button", { name: "switch-default-day" }));
     await user.click(screen.getByRole("button", { name: "Reset current theme" }));
     await waitFor(() => {
       expect(getTokenHexInput("--bg-canvas").value).toBe("#ecf3fb");
     });
 
-    await user.click(screen.getByRole("button", { name: "switch-dark" }));
+    await user.click(screen.getByRole("button", { name: "switch-default-night" }));
     await waitFor(() => {
       expect(getTokenHexInput("--bg-canvas").value).toBe("#222222");
+    });
+
+    await user.click(screen.getByRole("button", { name: "switch-retro-terminal" }));
+    await waitFor(() => {
+      expect(getTokenHexInput("--bg-canvas").value).toBe("#333333");
     });
   });
 });

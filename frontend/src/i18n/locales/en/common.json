@@ -65,10 +65,29 @@
     }
   },
   "theme": {
-    "toggle": {
-      "aria": "Toggle light and dark mode",
-      "toDark": "Night mode",
-      "toLight": "Day mode"
+    "families": {
+      "default": {
+        "title": "Core themes",
+        "description": "The standard VANESSA presentation with familiar day and night presets."
+      },
+      "retro": {
+        "title": "Retro terminal",
+        "description": "A terminal-inspired family with phosphor color cues and restrained vintage chrome."
+      }
+    },
+    "presets": {
+      "defaultDay": {
+        "title": "Day",
+        "description": "Bright, clean workspace tuned for daytime reading."
+      },
+      "defaultNight": {
+        "title": "Night",
+        "description": "Low-light workspace with cooler contrast and softer glare."
+      },
+      "retroTerminal": {
+        "title": "Retro terminal",
+        "description": "VT-era terminal character with readable spacing, practical controls, and balanced glow."
+      }
     }
   },
   "language": {
@@ -544,7 +563,9 @@
       },
       "theme": {
         "title": "Theme personalization",
-        "description": "Switch between day and night mode and choose theme colors.",
+        "description": "Choose a theme family and preset, then fine-tune the active preset in the style editor.",
+        "selectorLabel": "Theme selection",
+        "selectorHelp": "Pick the family and preset that should shape the interface for this browser session.",
         "styleEditor": "Theme style editor"
       }
     },

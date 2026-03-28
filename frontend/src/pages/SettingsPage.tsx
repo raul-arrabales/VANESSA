@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import ProfileSection from "../components/ProfileSection";
-import ThemeToggle from "../components/ThemeToggle";
+import ThemeSelector from "../components/ThemeSelector";
 
 export default function SettingsPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -20,8 +20,8 @@ export default function SettingsPage(): JSX.Element {
       <article className="panel card-stack">
         <h2 className="section-title">{t("settings.personalization.theme.title")}</h2>
         <p className="status-text">{t("settings.personalization.theme.description")}</p>
+        <ThemeSelector />
         <div className="button-row">
-          <ThemeToggle />
           <Link to="/settings/design" className="btn btn-secondary">
             {t("settings.personalization.theme.styleEditor")}
           </Link>

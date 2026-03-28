@@ -2,15 +2,20 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   EDITABLE_COLOR_TOKENS,
   THEME_COLOR_OVERRIDES_STORAGE_KEY,
+  THEME_FAMILIES,
+  THEME_PRESETS,
   THEME_STORAGE_KEY,
   type StoredColorOverrides,
   type ThemeColorOverrides,
   type ThemeContextValue,
-  type ThemeMode,
-  getThemeEffectiveColors,
+  type ThemeFamilyId,
+  type ThemeId,
   getInitialTheme,
   getStoredColorOverrides,
-  getToggledTheme,
+  getThemeEffectiveColors,
+  getThemeFamily,
+  getThemeFamilyPresets,
+  getThemePreset,
 } from "./theme";
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -20,16 +25,19 @@ type ThemeProviderProps = {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
-  const [theme, setThemeState] = useState<ThemeMode>(() => getInitialTheme());
+  const [theme, setThemeState] = useState<ThemeId>(() => getInitialTheme());
   const [allColorOverrides, setAllColorOverrides] = useState<StoredColorOverrides>(() => getStoredColorOverrides());
 
+  const themePreset = useMemo(() => getThemePreset(theme), [theme]);
+  const themeFamily = useMemo(() => getThemeFamily(themePreset.familyId), [themePreset.familyId]);
   const colorOverrides: ThemeColorOverrides = allColorOverrides[theme] ?? {};
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    document.documentElement.style.colorScheme = theme;
+    document.documentElement.setAttribute("data-theme-family", themePreset.familyId);
+    document.documentElement.style.colorScheme = themePreset.colorScheme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
+  }, [theme, themePreset.colorScheme, themePreset.familyId]);
 
   useEffect(() => {
     EDITABLE_COLOR_TOKENS.forEach((token) => {
@@ -49,15 +57,17 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
 
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
+    themePreset,
+    themeFamily,
+    themeFamilies: THEME_FAMILIES,
+    themePresets: THEME_PRESETS,
     colorOverrides,
     allColorOverrides,
-    setTheme: (mode: ThemeMode) => {
-      setThemeState(mode);
+    setTheme: (themeId: ThemeId) => {
+      setThemeState(themeId);
     },
-    toggleTheme: () => {
-      setThemeState((current) => getToggledTheme(current));
-    },
-    getEffectiveColors: (mode: ThemeMode) => getThemeEffectiveColors(mode, allColorOverrides),
+    getFamilyPresets: (familyId: ThemeFamilyId) => getThemeFamilyPresets(familyId),
+    getEffectiveColors: (themeId: ThemeId) => getThemeEffectiveColors(themeId, allColorOverrides),
     applyColorOverrides: (nextOverrides: ThemeColorOverrides) => {
       setAllColorOverrides((currentOverrides) => ({
         ...currentOverrides,
@@ -70,7 +80,7 @@ export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
         [theme]: {},
       }));
     },
-  }), [allColorOverrides, colorOverrides, theme]);
+  }), [allColorOverrides, colorOverrides, theme, themeFamily, themePreset]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
