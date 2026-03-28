@@ -55,9 +55,12 @@ describe("App header", () => {
 
     const trigger = container.querySelector(".user-menu-trigger");
     expect(trigger).not.toBeNull();
+    expect(screen.getByTestId("app-logo")).toBeVisible();
     expect(container.querySelector(".user-menu-icon")).not.toBeNull();
     expect(container.querySelector(".user-menu-label")).not.toBeNull();
+    expect(container.querySelector(".app-brand")).not.toBeNull();
     expect(screen.getByRole("button", { name: await t("nav.guest") })).toBeVisible();
+    expect(screen.getByRole("heading", { name: await t("app.title") })).toBeVisible();
   });
 
   it("disables runtime toggle for non-superadmin users", async () => {

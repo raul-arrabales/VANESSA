@@ -746,6 +746,75 @@ a {
   z-index: 40;
 }
 
+.app-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-brand-copy {
+  min-width: 0;
+}
+
+.app-logo {
+  flex: 0 0 auto;
+  width: clamp(3.2rem, 5vw, 4.25rem);
+  height: auto;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0.35rem 1rem color-mix(in oklab, var(--accent-primary) 18%, transparent));
+}
+
+.vanessa-logo__halo,
+.vanessa-logo__orbit,
+.vanessa-logo__vector,
+.vanessa-logo__core {
+  vector-effect: non-scaling-stroke;
+}
+
+.vanessa-logo__halo {
+  stroke: color-mix(in oklab, currentColor 36%, transparent);
+  stroke-width: 1.2;
+  fill: color-mix(in oklab, var(--bg-surface) 78%, transparent);
+}
+
+.vanessa-logo__orbit {
+  stroke: color-mix(in oklab, var(--accent-secondary) 70%, currentColor);
+  stroke-linecap: round;
+  stroke-width: 2.6;
+}
+
+.vanessa-logo__vector {
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.4;
+}
+
+.vanessa-logo__vector--accent {
+  stroke: var(--accent-secondary);
+  stroke-width: 2.5;
+}
+
+.vanessa-logo__core {
+  fill: currentColor;
+}
+
+[data-theme-family="retro"] .app-logo {
+  color: var(--accent-primary);
+  filter:
+    drop-shadow(0 0 0.25rem color-mix(in oklab, var(--accent-primary) 42%, transparent))
+    drop-shadow(0 0 1rem color-mix(in oklab, var(--accent-primary) 18%, transparent));
+}
+
+[data-theme-family="retro"] .vanessa-logo__halo {
+  fill: color-mix(in oklab, var(--bg-surface) 84%, transparent);
+}
+
+[data-theme-family="retro"] .vanessa-logo__orbit {
+  stroke: color-mix(in oklab, var(--accent-secondary) 58%, var(--accent-primary));
+}
+
 .eyebrow {
   margin: 0;
   text-transform: uppercase;
@@ -1563,6 +1632,10 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .app-brand {
+    gap: var(--space-3);
+  }
+
   .toolbar {
     justify-content: flex-start;
   }
@@ -1583,6 +1656,14 @@ a {
 }
 
 @media (max-width: 640px) {
+  .app-brand {
+    align-items: flex-start;
+  }
+
+  .app-logo {
+    width: 3.25rem;
+  }
+
   .deployment-identity-row,
   .deployment-binding-row {
     grid-template-columns: 1fr;

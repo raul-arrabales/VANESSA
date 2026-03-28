@@ -8,6 +8,7 @@ import { useRuntimeMode } from "./runtime/RuntimeModeProvider";
 import NotFoundPage from "./pages/NotFoundPage";
 import { appRoutes, getBreadcrumbRoutes, getNavRoutes, type AppRouteDefinition } from "./routes/appRoutes";
 import { useActionFeedback } from "./feedback/ActionFeedbackProvider";
+import VanessaLogo from "./components/VanessaLogo";
 
 type RuntimeModeConfirmationDialogProps = {
   nextMode: "offline" | "online";
@@ -184,10 +185,13 @@ function AppHeader(): JSX.Element {
 
   return (
     <header className="app-header panel">
-      <div>
-        <p className="eyebrow">{t("app.eyebrow")}</p>
-        <h1 className="app-title">{t("app.title")}</h1>
-        <p className="subtitle">{t("app.subtitle")}</p>
+      <div className="app-brand">
+        <VanessaLogo className="app-logo" />
+        <div className="app-brand-copy">
+          <p className="eyebrow">{t("app.eyebrow")}</p>
+          <h1 className="app-title">{t("app.title")}</h1>
+          <p className="subtitle">{t("app.subtitle")}</p>
+        </div>
       </div>
       <div className="toolbar" role="group" aria-label={t("app.controls") }>
         <nav className="nav-links" aria-label={t("nav.aria")}>
