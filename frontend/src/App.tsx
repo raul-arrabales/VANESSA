@@ -8,7 +8,7 @@ import { useRuntimeMode } from "./runtime/RuntimeModeProvider";
 import NotFoundPage from "./pages/NotFoundPage";
 import { appRoutes, getBreadcrumbRoutes, getNavRoutes, type AppRouteDefinition } from "./routes/appRoutes";
 import { useActionFeedback } from "./feedback/ActionFeedbackProvider";
-import VanessaLogo from "./components/VanessaLogo";
+import PhosphorDisplay, { buildBannerFrame } from "./components/PhosphorDisplay";
 
 type RuntimeModeConfirmationDialogProps = {
   nextMode: "offline" | "online";
@@ -186,11 +186,15 @@ function AppHeader(): JSX.Element {
   return (
     <header className="app-header panel">
       <div className="app-brand">
-        <VanessaLogo className="app-logo" />
-        <div className="app-brand-copy">
-          <p className="eyebrow">{t("app.eyebrow")}</p>
-          <h1 className="app-title">{t("app.title")}</h1>
-          <p className="subtitle">{t("app.subtitle")}</p>
+        <div className="app-brand-stack">
+          <h1 className="app-brand-title">
+            <PhosphorDisplay
+              className="app-brand-display"
+              label={t("app.title")}
+              frame={buildBannerFrame(t("app.title").toUpperCase())}
+              hoverMode="soft-glow"
+            />
+          </h1>
         </div>
       </div>
       <div className="toolbar" role="group" aria-label={t("app.controls") }>
