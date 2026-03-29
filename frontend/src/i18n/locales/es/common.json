@@ -240,17 +240,28 @@
       "description": "Has iniciado sesion como {{username}}. Abre tu panel de control, AI Playground o espacio Vanessa AI.",
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
-      "control": "Abrir panel de control",
-      "playgrounds": "Abrir AI Playground"
+      "control": "Panel de control",
+      "playgrounds": "AI Playground",
+      "agentBuilder": "Constructor de agentes"
     }
   },
   "control": {
     "title": "Panel de control de {{username}}",
     "description": "Usa tu superficie de control por rol para gestionar herramientas de cuenta, aprobaciones, modelos y operaciones.",
     "aria": "Destinos del panel de control",
+    "sections": {
+      "aiOperations": {
+        "title": "Operaciones de IA",
+        "aria": "Destinos de operaciones de IA"
+      },
+      "vanessaPlatform": {
+        "title": "Plataforma Vanessa",
+        "aria": "Destinos de la plataforma Vanessa"
+      }
+    },
     "items": {
       "models": {
-        "title": "Modelos",
+        "title": "Gestion de modelos",
         "description": "Gestiona credenciales de modelos, modelos registrados y capacidades permitidas."
       },
       "ai": {

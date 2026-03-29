@@ -289,7 +289,7 @@ Backend also exposes a typed superadmin catalog for agent/tool lifecycle managem
 
 This catalog surface is now canonical for superadmin CRUD and validation of typed agent/tool
 definitions, while the generic `/v1/registry/*` endpoints remain the lower-level runtime artifact surface.
-The frontend exposes the same workflows at `/control/catalog` for superadmin catalog administration and `/control/agent-builder` for builder-facing agent projects.
+The frontend exposes the same workflows at `/control/catalog` for superadmin catalog administration and `/agent-builder` for builder-facing agent projects.
 - `POST /v1/platform/vector/indexes/ensure`
 - `POST /v1/platform/vector/documents/upsert`
 - `POST /v1/platform/vector/query`

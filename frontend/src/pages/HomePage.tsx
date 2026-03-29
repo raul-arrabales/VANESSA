@@ -32,6 +32,7 @@ export default function HomePage(): JSX.Element {
       <div className="toolbar" role="group" aria-label={t("home.authenticated.actions") }>
         <Link to="/control" className="btn btn-secondary">{t("home.authenticated.control")}</Link>
         <Link to="/playgrounds" className="btn btn-secondary">{t("home.authenticated.playgrounds")}</Link>
+        <Link to="/agent-builder" className="btn btn-secondary">{t("home.authenticated.agentBuilder")}</Link>
       </div>
     </section>
   );

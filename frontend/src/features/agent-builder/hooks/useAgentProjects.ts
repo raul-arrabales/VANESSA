@@ -64,7 +64,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
         }),
         token,
       );
-      navigate(`/control/agent-builder/${project.id}`, {
+      navigate(`/agent-builder/${project.id}`, {
         state: withActionFeedbackState({
           kind: "success",
           message: t("agentBuilder.feedback.created", { name: project.spec.name }),

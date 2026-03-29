@@ -85,7 +85,7 @@ describe("Agent builder pages", () => {
     const user = userEvent.setup();
     vi.mocked(agentProjectsApi.listAgentProjects).mockResolvedValue([]);
 
-    await renderWithAppProviders(<AgentBuilderProjectsPage />, { route: "/control/agent-builder" });
+    await renderWithAppProviders(<AgentBuilderProjectsPage />, { route: "/agent-builder" });
 
     await user.type(screen.getByLabelText("Project ID"), "proj-1");
     await user.type(screen.getByLabelText("Name"), "Support Agent");
@@ -109,9 +109,9 @@ describe("Agent builder pages", () => {
 
     await renderWithAppProviders(
       <Routes>
-        <Route path="/control/agent-builder/:projectId" element={<AgentProjectDetailPage />} />
+        <Route path="/agent-builder/:projectId" element={<AgentProjectDetailPage />} />
       </Routes>,
-      { route: "/control/agent-builder/proj-1" },
+      { route: "/agent-builder/proj-1" },
     );
 
     await user.click(await screen.findByRole("button", { name: "Publish" }));

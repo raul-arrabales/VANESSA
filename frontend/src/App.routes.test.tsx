@@ -397,7 +397,7 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    await renderWithAppProviders(<App />, { route: "/control/agent-builder" });
+    await renderWithAppProviders(<App />, { route: "/agent-builder" });
 
     expect(await screen.findByRole("heading", { name: await t("agentBuilder.title") })).toBeVisible();
   });

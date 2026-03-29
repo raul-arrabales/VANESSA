@@ -92,6 +92,23 @@ describe("App header", () => {
     expect(screen.getByRole("link", { name: await t("nav.ai") })).toHaveAttribute("href", "/ai");
   });
 
+  it("shows Control Panel in the user menu for authenticated users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    const user = userEvent.setup();
+
+    await renderApp();
+    await user.click(screen.getByRole("button", { name: "user" }));
+
+    expect(screen.getByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
+  });
+
   it("enables runtime toggle for superadmin users", async () => {
     mockUser = {
       id: 1,

@@ -3,6 +3,7 @@ import type { ControlCardDefinition } from "./types";
 export const controlCardDefinitions: ControlCardDefinition[] = [
   {
     id: "models",
+    section: "aiOperations",
     titleKey: "control.items.models.title",
     descriptionKey: "control.items.models.description",
     to: "/control/models",
@@ -10,31 +11,8 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
     minimumRole: "user",
   },
   {
-    id: "ai",
-    titleKey: "control.items.ai.title",
-    descriptionKey: "control.items.ai.description",
-    to: "/ai",
-    icon: "ai",
-    minimumRole: "user",
-  },
-  {
-    id: "playgrounds",
-    titleKey: "control.items.playgrounds.title",
-    descriptionKey: "control.items.playgrounds.description",
-    to: "/playgrounds",
-    icon: "ai",
-    minimumRole: "user",
-  },
-  {
-    id: "agent-builder",
-    titleKey: "control.items.agentBuilder.title",
-    descriptionKey: "control.items.agentBuilder.description",
-    to: "/control/agent-builder",
-    icon: "ai",
-    minimumRole: "user",
-  },
-  {
     id: "quotes",
+    section: "vanessaPlatform",
     titleKey: "control.items.quotes.title",
     descriptionKey: "control.items.quotes.description",
     to: "/control/quotes",
@@ -43,6 +21,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
   },
   {
     id: "context",
+    section: "aiOperations",
     titleKey: "control.items.context.title",
     descriptionKey: "control.items.context.description",
     to: "/control/context",
@@ -51,6 +30,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
   },
   {
     id: "approvals",
+    section: "vanessaPlatform",
     titleKey: "control.items.approvals.title",
     descriptionKey: "control.items.approvals.description",
     to: "/control/approvals",
@@ -59,6 +39,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
   },
   {
     id: "system-health",
+    section: "vanessaPlatform",
     titleKey: "control.items.systemHealth.title",
     descriptionKey: "control.items.systemHealth.description",
     to: "/control/system-health",
@@ -67,6 +48,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
   },
   {
     id: "platform",
+    section: "aiOperations",
     titleKey: "control.items.platform.title",
     descriptionKey: "control.items.platform.description",
     to: "/control/platform",
@@ -75,6 +57,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
   },
   {
     id: "catalog",
+    section: "aiOperations",
     titleKey: "control.items.catalog.title",
     descriptionKey: "control.items.catalog.description",
     to: "/control/catalog",

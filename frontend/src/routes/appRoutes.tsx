@@ -37,7 +37,7 @@ const ChatbotPage = lazy(() => import("../features/playgrounds/pages/ChatPlaygro
 const KnowledgeChatPage = lazy(() => import("../features/playgrounds/pages/KnowledgePlaygroundPage"));
 const VanessaCorePage = lazy(() => import("../features/vanessa-core/pages/VanessaCorePage"));
 
-export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds";
+export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds" | "agentBuilder";
 export type AppRouteNavGroup = "primary" | "userMenu";
 export type AppRouteAudience = "guest" | "authenticated" | "all";
 
@@ -121,12 +121,13 @@ export const appRoutes: AppRouteDefinition[] = [
   {
     id: "control",
     path: "/control",
-    titleKey: "nav.control",
-    breadcrumbTitleKey: "nav.controlPanel",
+    titleKey: "nav.controlPanel",
     section: "control",
-    showInNav: false,
+    showInNav: true,
     showInBreadcrumbs: true,
     requiresAuth: true,
+    navGroup: "userMenu",
+    navAudience: "authenticated",
     element: <ControlShellPage />,
   },
   {
@@ -152,10 +153,10 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <QuoteManagementPage />,
   },
   {
-    id: "control-agent-builder",
-    path: "/control/agent-builder",
+    id: "agent-builder",
+    path: "/agent-builder",
     titleKey: "nav.agentBuilder",
-    section: "control",
+    section: "agentBuilder",
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
@@ -163,10 +164,10 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <AgentBuilderProjectsPage />,
   },
   {
-    id: "control-agent-builder-detail",
-    path: "/control/agent-builder/:projectId",
+    id: "agent-builder-detail",
+    path: "/agent-builder/:projectId",
     titleKey: "nav.agentProjectDetail",
-    section: "control",
+    section: "agentBuilder",
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,

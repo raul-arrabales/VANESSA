@@ -132,7 +132,7 @@ export function useAgentProjectEditor(): UseAgentProjectEditorResult {
   }
 
   function handleBack(): void {
-    navigate("/control/agent-builder");
+    navigate("/agent-builder");
   }
 
   return {

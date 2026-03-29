@@ -198,6 +198,15 @@ a {
   gap: var(--space-4);
 }
 
+.control-sections {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.control-section {
+  gap: var(--space-3);
+}
+
 .option-card-grid {
   margin: 0;
   padding: 0;

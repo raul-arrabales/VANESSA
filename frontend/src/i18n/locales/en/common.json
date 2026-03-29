@@ -240,17 +240,28 @@
       "description": "You are signed in as {{username}}. Open your control panel, AI Playground, or Vanessa AI workspace.",
       "actions": "Signed-in quick actions",
       "profile": "View profile",
-      "control": "Open control panel",
-      "playgrounds": "Open AI Playground"
+      "control": "Control Panel",
+      "playgrounds": "AI Playground",
+      "agentBuilder": "Agent Builder"
     }
   },
   "control": {
     "title": "Control panel for {{username}}",
     "description": "Use your role-based control surface to manage account tools, approvals, models, and operations.",
     "aria": "Control panel destinations",
+    "sections": {
+      "aiOperations": {
+        "title": "AI Operations",
+        "aria": "AI operations destinations"
+      },
+      "vanessaPlatform": {
+        "title": "Vanessa Platform",
+        "aria": "Vanessa platform destinations"
+      }
+    },
     "items": {
       "models": {
-        "title": "Models",
+        "title": "Models Management",
         "description": "Manage model credentials, registered models, and allowed capabilities."
       },
       "ai": {

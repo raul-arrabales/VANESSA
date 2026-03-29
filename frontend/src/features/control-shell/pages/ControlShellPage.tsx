@@ -3,6 +3,9 @@ import OptionCardGrid from "../../../components/OptionCardGrid";
 import { useAuth } from "../../../auth/AuthProvider";
 import { hasRequiredRole } from "../../../auth/roles";
 import { controlCardDefinitions } from "../controlItems";
+import type { ControlCardSection } from "../types";
+
+const controlSectionOrder: readonly ControlCardSection[] = ["aiOperations", "vanessaPlatform"] as const;
 
 export default function ControlShellPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -13,6 +16,7 @@ export default function ControlShellPage(): JSX.Element {
   const visibleItems = controlCardDefinitions
     .filter((item) => hasRequiredRole(currentRole, item.minimumRole))
     .map((item) => ({
+      section: item.section,
       id: item.id,
       title: t(item.titleKey),
       description: t(item.descriptionKey),
@@ -24,7 +28,23 @@ export default function ControlShellPage(): JSX.Element {
     <section className="panel card-stack">
       <h2 className="section-title">{t("control.title", { username: displayName })}</h2>
       <p className="status-text">{t("control.description")}</p>
-      <OptionCardGrid items={visibleItems} ariaLabel={t("control.aria")} />
+      <div className="control-sections">
+        {controlSectionOrder.map((section) => {
+          const sectionItems = visibleItems.filter((item) => item.section === section);
+          if (sectionItems.length === 0) {
+            return null;
+          }
+
+          return (
+            <section key={section} className="control-section card-stack" aria-labelledby={`control-section-${section}`}>
+              <h3 id={`control-section-${section}`} className="section-title">
+                {t(`control.sections.${section}.title`)}
+              </h3>
+              <OptionCardGrid items={sectionItems} ariaLabel={t(`control.sections.${section}.aria`)} />
+            </section>
+          );
+        })}
+      </div>
     </section>
   );
 }

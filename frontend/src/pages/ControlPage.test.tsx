@@ -33,12 +33,14 @@ describe("ControlPage", () => {
 
     await renderPage();
 
+    expect(screen.getByRole("heading", { name: await t("control.sections.aiOperations.title") })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: await t("control.sections.vanessaPlatform.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.quotes.title") })).toBeNull();
     expect(screen.getByRole("link", { name: await t("control.items.models.title") })).toHaveAttribute("href", "/control/models");
-    expect(screen.getByRole("link", { name: await t("control.items.ai.title") })).toHaveAttribute("href", "/ai");
-    expect(screen.getByRole("link", { name: await t("control.items.playgrounds.title") })).toHaveAttribute("href", "/playgrounds");
-    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
+    expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
   });
 
   it("shows the quotes control for admin users", async () => {
@@ -52,10 +54,12 @@ describe("ControlPage", () => {
 
     await renderPage();
 
+    expect(screen.getByRole("heading", { name: await t("control.sections.aiOperations.title") })).toBeVisible();
+    expect(screen.getByRole("heading", { name: await t("control.sections.vanessaPlatform.title") })).toBeVisible();
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
-    expect(screen.getByRole("link", { name: await t("control.items.ai.title") })).toHaveAttribute("href", "/ai");
-    expect(screen.getByRole("link", { name: await t("control.items.playgrounds.title") })).toHaveAttribute("href", "/playgrounds");
-    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
+    expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
     expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
     expect(screen.getByRole("link", { name: await t("control.items.context.title") })).toHaveAttribute("href", "/control/context");
     expect(screen.queryByRole("link", { name: await t("control.items.platform.title") })).toBeNull();
@@ -72,10 +76,13 @@ describe("ControlPage", () => {
 
     await renderPage();
 
+    expect(screen.getByRole("heading", { name: await t("control.sections.aiOperations.title") })).toBeVisible();
+    expect(screen.getByRole("heading", { name: await t("control.sections.vanessaPlatform.title") })).toBeVisible();
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
-    expect(screen.getByRole("link", { name: await t("control.items.ai.title") })).toHaveAttribute("href", "/ai");
-    expect(screen.getByRole("link", { name: await t("control.items.playgrounds.title") })).toHaveAttribute("href", "/playgrounds");
-    expect(screen.getByRole("link", { name: await t("control.items.agentBuilder.title") })).toHaveAttribute("href", "/control/agent-builder");
+    expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
+    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
+    expect(screen.getByRole("link", { name: await t("control.items.systemHealth.title") })).toHaveAttribute("href", "/control/system-health");
     expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
     expect(screen.getByRole("link", { name: await t("control.items.catalog.title") })).toHaveAttribute("href", "/control/catalog");
   });

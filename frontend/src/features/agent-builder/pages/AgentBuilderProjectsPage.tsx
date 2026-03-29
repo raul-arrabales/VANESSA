@@ -53,7 +53,7 @@ export default function AgentBuilderProjectsPage(): JSX.Element {
                     <td>{project.current_version}</td>
                     <td>{project.published_agent_id ?? t("agentBuilder.states.notPublished")}</td>
                     <td>
-                      <Link className="btn btn-secondary" to={`/control/agent-builder/${project.id}`}>
+                      <Link className="btn btn-secondary" to={`/agent-builder/${project.id}`}>
                         {t("agentBuilder.actions.manage")}
                       </Link>
                     </td>

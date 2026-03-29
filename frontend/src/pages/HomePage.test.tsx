@@ -247,7 +247,8 @@ describe("HomePage quote of the day", () => {
 
     expect(await screen.findByText("Unable to load the quote of the day right now.")).toBeVisible();
     expect(screen.queryByRole("link", { name: "View profile" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Open control panel" })).toHaveAttribute("href", "/control");
-    expect(screen.getByRole("link", { name: "Open AI Playground" })).toHaveAttribute("href", "/playgrounds");
+    expect(screen.getByRole("link", { name: "Control Panel" })).toHaveAttribute("href", "/control");
+    expect(screen.getByRole("link", { name: "AI Playground" })).toHaveAttribute("href", "/playgrounds");
+    expect(screen.getByRole("link", { name: "Agent Builder" })).toHaveAttribute("href", "/agent-builder");
   });
 });
