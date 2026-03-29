@@ -5,7 +5,7 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   playgroundKind: VANESSA_CORE_ASSISTANT_EXPERIENCE.playground_kind,
   title: "Vanessa Core",
   panelAriaLabel: "Vanessa Core workspace",
-  introText: "Work with Vanessa as a first-party assistant inside the shared AI workspace.",
+  introText: "Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.",
   loadingText: "Loading Vanessa Core...",
   emptyStateText: "No messages yet. Start a Vanessa conversation to build the thread.",
   newSessionLabel: "New Vanessa session",

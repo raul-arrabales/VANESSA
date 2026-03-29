@@ -126,6 +126,7 @@ The product-facing AI surface now has its own domain split, separate from the co
 
 - `playgrounds`
   - Canonical user-facing workspace for both plain chat and knowledge-grounded chat.
+  - Frontend entrypoints now live under the `AI Playground` section at `/playgrounds`, with dedicated `/playgrounds/chat` and `/playgrounds/knowledge` routes.
   - Backend persists one session model with `playground_kind`, `assistant_ref`, `model_selection`, `knowledge_binding`, and `messages`.
   - Public API lives under `/v1/playgrounds/*`.
 
@@ -136,6 +137,7 @@ The product-facing AI surface now has its own domain split, separate from the co
 
 - `vanessa-core`
   - First-party Vanessa behavior is intended to plug into shared execution seams instead of branching generic execution code.
+  - Frontend entrypoints now live under the `Vanessa AI` section at `/ai`, with `Vanessa Core` remaining at `/ai/vanessa`.
 
 Frontend work now lands under `frontend/src/features/*`, backend product APIs under `backend/app/api/http`, and engine execution seams under `agent_engine/app/execution_pipeline`.
 Admin builder/catalog work follows the same rule, with builder-facing authoring under `frontend/src/features/agent-builder`, catalog administration under `frontend/src/features/catalog-admin`, and the canonical backend HTTP owners under `backend/app/api/http/catalog.py`, `backend/app/api/http/registry.py`, and `backend/app/api/http/registry_models.py`.

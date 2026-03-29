@@ -35,9 +35,10 @@ describe("app route registry", () => {
       "/control/models/:modelId/test",
       "/control/models/:modelId",
       "/ai",
-      "/ai/chat",
       "/ai/vanessa",
-      "/ai/knowledge",
+      "/playgrounds",
+      "/playgrounds/chat",
+      "/playgrounds/knowledge",
     ]);
   });
 

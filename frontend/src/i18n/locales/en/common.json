@@ -11,7 +11,8 @@
     "control": "Control",
     "controlPanel": "Control Panel",
     "ai": "Vanessa AI",
-    "chat": "Chat",
+    "playgrounds": "AI Playground",
+    "chat": "Chat Workspace",
     "vanessa": "Vanessa Core",
     "knowledge": "Knowledge Chat",
     "login": "Login",
@@ -236,11 +237,11 @@
     },
     "authenticated": {
       "title": "Welcome back",
-      "description": "You are signed in as {{username}}. Open your profile, control panel, or Vanessa AI workspace.",
+      "description": "You are signed in as {{username}}. Open your control panel, AI Playground, or Vanessa AI workspace.",
       "actions": "Signed-in quick actions",
       "profile": "View profile",
       "control": "Open control panel",
-      "aiChat": "Open AI chat"
+      "playgrounds": "Open AI Playground"
     }
   },
   "control": {
@@ -254,7 +255,11 @@
       },
       "ai": {
         "title": "Vanessa AI",
-        "description": "Open the AI workspace and continue your conversations."
+        "description": "Open Vanessa-specific assistant experiences and future first-party capabilities."
+      },
+      "playgrounds": {
+        "title": "AI Playground",
+        "description": "Open generic chat and knowledge workspaces for model and retrieval exploration."
       },
       "agentBuilder": {
         "title": "Agent builder",
@@ -288,19 +293,24 @@
   },
   "ai": {
     "title": "Vanessa AI",
-    "description": "Open AI-powered workflows and keep your chat workspace organized under a dedicated section.",
+    "description": "Access Vanessa-specific assistant experiences as the first-party Vanessa surface evolves toward memory, personality, and deeper personalization.",
     "aria": "Vanessa AI destinations",
-    "chat": {
-      "title": "Chat workspace",
-      "description": "Start or continue a model-backed conversation in the Vanessa AI console."
-    },
     "vanessa": {
       "title": "Vanessa Core",
-      "description": "Work with Vanessa as a first-party assistant through the shared playground workspace."
+      "description": "Work with Vanessa as a first-party assistant inside the Vanessa AI workspace."
+    }
+  },
+  "playgrounds": {
+    "title": "AI Playground",
+    "description": "Use shared chat and knowledge-grounded workspaces to explore models and bound knowledge bases without entering Vanessa-specific assistant flows.",
+    "aria": "AI Playground destinations",
+    "chat": {
+      "title": "Chat Workspace",
+      "description": "Start or continue a model-backed conversation in the shared playground workspace."
     },
     "knowledge": {
-      "title": "Knowledge chat",
-      "description": "Ask questions against the shared knowledge corpus and review cited source snippets."
+      "title": "Knowledge Chat",
+      "description": "Ask questions against deployment-bound knowledge bases and review cited source snippets."
     }
   },
   "knowledgeChat": {

@@ -6,30 +6,23 @@ export default function PlaygroundsHomePage(): JSX.Element {
 
   return (
     <section className="panel card-stack">
-      <h2 className="section-title">{t("ai.title")}</h2>
-      <p className="status-text">{t("ai.description")}</p>
+      <h2 className="section-title">{t("playgrounds.title")}</h2>
+      <p className="status-text">{t("playgrounds.description")}</p>
       <OptionCardGrid
-        ariaLabel={t("ai.aria")}
+        ariaLabel={t("playgrounds.aria")}
         items={[
           {
-            id: "vanessa",
-            title: t("ai.vanessa.title"),
-            description: t("ai.vanessa.description"),
-            to: "/ai/vanessa",
-            icon: "ai",
-          },
-          {
             id: "chat",
-            title: t("ai.chat.title"),
-            description: t("ai.chat.description"),
-            to: "/ai/chat",
+            title: t("playgrounds.chat.title"),
+            description: t("playgrounds.chat.description"),
+            to: "/playgrounds/chat",
             icon: "ai",
           },
           {
             id: "knowledge",
-            title: t("ai.knowledge.title"),
-            description: t("ai.knowledge.description"),
-            to: "/ai/knowledge",
+            title: t("playgrounds.knowledge.title"),
+            description: t("playgrounds.knowledge.description"),
+            to: "/playgrounds/knowledge",
             icon: "ai",
           },
         ]}

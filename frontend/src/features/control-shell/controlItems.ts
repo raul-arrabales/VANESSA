@@ -18,6 +18,14 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
     minimumRole: "user",
   },
   {
+    id: "playgrounds",
+    titleKey: "control.items.playgrounds.title",
+    descriptionKey: "control.items.playgrounds.description",
+    to: "/playgrounds",
+    icon: "ai",
+    minimumRole: "user",
+  },
+  {
     id: "agent-builder",
     titleKey: "control.items.agentBuilder.title",
     descriptionKey: "control.items.agentBuilder.description",

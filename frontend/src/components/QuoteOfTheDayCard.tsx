@@ -87,7 +87,7 @@ export default function QuoteOfTheDayCard(): JSX.Element {
             <span aria-hidden="true">/</span>
             <span>{t(`quoteOfTheDay.tones.${quote.tone}`, quote.tone)}</span>
             <button
-              className="btn btn-secondary quote-card-refresh"
+              className="btn btn-ghost quote-card-refresh"
               type="button"
               onClick={() => void refreshQuote()}
               disabled={isRefreshing}

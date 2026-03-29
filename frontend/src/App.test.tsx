@@ -78,6 +78,20 @@ describe("App header", () => {
     expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
   });
 
+  it("shows Vanessa AI in the primary nav for authenticated users", async () => {
+    mockUser = {
+      id: 3,
+      email: "user@example.com",
+      username: "user",
+      role: "user",
+      is_active: true,
+    };
+
+    await renderApp();
+
+    expect(screen.getByRole("link", { name: await t("nav.ai") })).toHaveAttribute("href", "/ai");
+  });
+
   it("enables runtime toggle for superadmin users", async () => {
     mockUser = {
       id: 1,

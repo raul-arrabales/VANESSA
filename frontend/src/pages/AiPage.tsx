@@ -1,1 +1,1 @@
-export { default } from "../features/playgrounds/pages/PlaygroundsHomePage";
+export { default } from "../features/vanessa-core/pages/VanessaAiHomePage";

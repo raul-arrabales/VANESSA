@@ -31,12 +31,13 @@ const LocalArtifactsPage = lazy(() => import("../features/modelops/pages/LocalAr
 const ModelAccessManagementPage = lazy(() => import("../features/modelops/pages/ModelAccessManagementPage"));
 const ModelTestPage = lazy(() => import("../features/modelops/pages/ModelTestPage"));
 const ModelDetailPage = lazy(() => import("../features/modelops/pages/ModelDetailPage"));
-const AiPage = lazy(() => import("../features/playgrounds/pages/PlaygroundsHomePage"));
+const AiPage = lazy(() => import("../features/vanessa-core/pages/VanessaAiHomePage"));
+const PlaygroundsPage = lazy(() => import("../features/playgrounds/pages/PlaygroundsHomePage"));
 const ChatbotPage = lazy(() => import("../features/playgrounds/pages/ChatPlaygroundPage"));
 const KnowledgeChatPage = lazy(() => import("../features/playgrounds/pages/KnowledgePlaygroundPage"));
 const VanessaCorePage = lazy(() => import("../features/vanessa-core/pages/VanessaCorePage"));
 
-export type AppRouteSection = "public" | "settings" | "control" | "ai";
+export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds";
 export type AppRouteNavGroup = "primary" | "userMenu";
 export type AppRouteAudience = "guest" | "authenticated" | "all";
 
@@ -401,16 +402,6 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <AiPage />,
   },
   {
-    id: "ai-chat",
-    path: "/ai/chat",
-    titleKey: "nav.chat",
-    section: "ai",
-    showInNav: false,
-    showInBreadcrumbs: true,
-    requiresAuth: true,
-    element: <ChatbotPage />,
-  },
-  {
     id: "ai-vanessa",
     path: "/ai/vanessa",
     titleKey: "nav.vanessa",
@@ -421,10 +412,30 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <VanessaCorePage />,
   },
   {
-    id: "ai-knowledge",
-    path: "/ai/knowledge",
+    id: "playgrounds",
+    path: "/playgrounds",
+    titleKey: "nav.playgrounds",
+    section: "playgrounds",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <PlaygroundsPage />,
+  },
+  {
+    id: "playgrounds-chat",
+    path: "/playgrounds/chat",
+    titleKey: "nav.chat",
+    section: "playgrounds",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    element: <ChatbotPage />,
+  },
+  {
+    id: "playgrounds-knowledge",
+    path: "/playgrounds/knowledge",
     titleKey: "nav.knowledge",
-    section: "ai",
+    section: "playgrounds",
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,

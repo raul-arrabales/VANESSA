@@ -11,7 +11,8 @@
     "control": "Control",
     "controlPanel": "Panel de control",
     "ai": "Vanessa AI",
-    "chat": "Chat",
+    "playgrounds": "AI Playground",
+    "chat": "Espacio de chat",
     "vanessa": "Vanessa Core",
     "knowledge": "Chat de conocimiento",
     "login": "Iniciar sesion",
@@ -236,11 +237,11 @@
     },
     "authenticated": {
       "title": "Bienvenido de nuevo",
-      "description": "Has iniciado sesion como {{username}}. Abre tu perfil, panel de control o espacio Vanessa AI.",
+      "description": "Has iniciado sesion como {{username}}. Abre tu panel de control, AI Playground o espacio Vanessa AI.",
       "actions": "Acciones rapidas con sesion iniciada",
       "profile": "Ver perfil",
       "control": "Abrir panel de control",
-      "aiChat": "Abrir chat de IA"
+      "playgrounds": "Abrir AI Playground"
     }
   },
   "control": {
@@ -254,7 +255,11 @@
       },
       "ai": {
         "title": "Vanessa AI",
-        "description": "Abre el espacio de IA y continua tus conversaciones."
+        "description": "Abre experiencias de asistente centradas en Vanessa y futuras capacidades propias."
+      },
+      "playgrounds": {
+        "title": "AI Playground",
+        "description": "Abre workspaces genericos de chat y conocimiento para explorar modelos y recuperacion."
       },
       "agentBuilder": {
         "title": "Constructor de agentes",
@@ -288,19 +293,24 @@
   },
   "ai": {
     "title": "Vanessa AI",
-    "description": "Abre flujos impulsados por IA y mantien tu espacio de chat organizado en una seccion dedicada.",
+    "description": "Accede a experiencias de asistente especificas de Vanessa mientras esta superficie evoluciona hacia memoria, personalidad y una personalizacion mas profunda.",
     "aria": "Destinos de Vanessa AI",
-    "chat": {
-      "title": "Espacio de chat",
-      "description": "Inicia o continua una conversacion con modelos dentro de la consola Vanessa AI."
-    },
     "vanessa": {
       "title": "Vanessa Core",
-      "description": "Trabaja con Vanessa como asistente de primera clase dentro del workspace compartido."
+      "description": "Trabaja con Vanessa como asistente de primera clase dentro del espacio Vanessa AI."
+    }
+  },
+  "playgrounds": {
+    "title": "AI Playground",
+    "description": "Usa workspaces compartidos de chat y conocimiento para explorar modelos y bases de conocimiento vinculadas sin entrar en flujos especificos de Vanessa.",
+    "aria": "Destinos de AI Playground",
+    "chat": {
+      "title": "Espacio de chat",
+      "description": "Inicia o continua una conversacion con modelos dentro del workspace compartido."
     },
     "knowledge": {
       "title": "Chat de conocimiento",
-      "description": "Haz preguntas sobre el corpus compartido y revisa citas con fragmentos de soporte."
+      "description": "Haz preguntas sobre bases de conocimiento vinculadas al despliegue y revisa citas con fragmentos de soporte."
     }
   },
   "knowledgeChat": {

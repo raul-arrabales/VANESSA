@@ -25,10 +25,10 @@ The backend also owns a GenAI control plane that distinguishes:
 
 The product-facing AI surface is now split into explicit domains:
 
-- `frontend/src/features/playgrounds` for shared chat and knowledge playground workspaces
+- `frontend/src/features/playgrounds` for the user-facing `AI Playground` section and its shared chat and knowledge workspaces
 - `frontend/src/features/agent-builder` for builder-facing agent authoring
 - `frontend/src/features/catalog-admin` for superadmin catalog administration
-- `frontend/src/features/vanessa-core` for first-party Vanessa behavior
+- `frontend/src/features/vanessa-core` for first-party Vanessa behavior surfaced from the `Vanessa AI` section
 - `backend/app/api/http`, `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure` for product-domain backend work
 - `agent_engine/app/execution_pipeline`, `agent_engine/app/retrieval`, `agent_engine/app/tool_runtime`, and `agent_engine/app/policies` for composable execution stages
 
