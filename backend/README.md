@@ -54,7 +54,9 @@ Platform control plane endpoints:
 - `GET /v1/platform/deployments` (superadmin)
 - `GET /v1/platform/activation-audit` (superadmin)
 - `POST /v1/platform/deployments` (superadmin)
+- `PATCH /v1/platform/deployments/{id}` (superadmin)
 - `PUT /v1/platform/deployments/{id}` (superadmin)
+- `PUT /v1/platform/deployments/{id}/bindings/{capability}` (superadmin)
 - `POST /v1/platform/deployments/{id}/clone` (superadmin)
 - `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
@@ -91,6 +93,7 @@ Platform control plane semantics:
 - `capabilities` represent platform functions such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
 - `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
+- Deployment identity can now be updated independently from binding configuration, and each capability binding can be saved independently from the deployment detail page.
 - Existing `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
 - `LLM_REQUEST_TIMEOUT_SECONDS` sets the backend outbound timeout budget for active `llm_inference` and embeddings provider bindings; in local CPU staging it should exceed cold first-request latency.
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
@@ -102,7 +105,8 @@ Platform control plane semantics:
 - Schema creation can now start from reusable provider-specific schema profiles. Built-in Weaviate profiles seed plain document RAG, agent semantic memory, and agent episodic memory templates, and superadmins may save custom profiles for reuse.
 - Knowledge-base creation now also captures a vectorization strategy. In this slice, KBs either use `vanessa_embeddings` with a selected embeddings provider/model target or `self_provided` for externally supplied vectors.
 - Managed knowledge-base detail responses now include sync diagnostics and binding eligibility, and operators can trigger a synchronous KB resync or a retrieval QA query from the context-management surface.
-- Deployment binding and runtime retrieval now enforce both vector-store-provider compatibility and embeddings-target compatibility for `vanessa_embeddings` knowledge bases. `self_provided` KBs are excluded from the current text ingestion and text-query flows.
+- Deployment binding save is now provider-local: required capabilities still need a selected provider, but resources/defaults may be left empty until the capability is fully configured.
+- Deployment binding and runtime retrieval now enforce both vector-store-provider compatibility and embeddings-target compatibility for `vanessa_embeddings` knowledge bases. Save-time cross-capability mismatches are reported as deployment readiness issues instead of blocking edits. `self_provided` KBs are excluded from the current text ingestion and text-query flows.
 - Managed knowledge bases now also support repeatable `local_directory` content sources under allowlisted backend-visible roots from `CONTEXT_SOURCE_ROOTS`.
 - Source sync is synchronous in the current slice, but each run is persisted in `context_knowledge_sync_runs` with file/document counters and error summaries for operator review.
 - Managed knowledge-base ingestion now accepts `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files. PDF import uses `pypdf`, creates one logical document per PDF, and intentionally fails for encrypted or scanned/image-only PDFs because OCR is not included yet.
@@ -113,7 +117,8 @@ Platform control plane semantics:
 - Product-facing chat and knowledge experiences now live under `/v1/playgrounds/*`; backend persists canonical playground sessions, resolves deployment-bound model and knowledge selections through governance, and routes knowledge requests through the fixed `agent.knowledge_chat` agent before returning normalized citations and retrieval metadata.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
 - Local `vllm_local` and `vllm_embeddings_local` provider slots are now live runtime controls: assigning or clearing a loaded model persists slot intent and immediately calls the matching local runtime controller.
-- Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`.
+- Deployment list/detail payloads now include `configuration_status` for both the deployment and each binding so the UI can show partially configured or mismatched capability state directly from backend-owned readiness rules.
+- Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`. Partially configured deployments may now be activated; missing resources/defaults are surfaced as readiness warnings and still enforced at runtime when a capability is used.
 - Registry bootstrap also seeds canonical built-in tools:
   - `tool.web_search` -> MCP-backed `web_search`
   - `tool.python_exec` -> sandbox-backed Python execution

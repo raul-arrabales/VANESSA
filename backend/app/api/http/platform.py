@@ -22,7 +22,9 @@ from ...application.platform_control_service import (
     list_platform_providers,
     query_platform_vector_documents,
     update_platform_deployment,
+    update_platform_deployment_identity,
     update_platform_provider,
+    upsert_platform_deployment_binding,
     upsert_platform_vector_documents,
     validate_platform_provider,
 )
@@ -46,9 +48,11 @@ list_deployment_profiles = list_platform_deployments
 list_deployment_activation_audit = list_platform_activation_audit
 create_deployment_profile = create_platform_deployment
 update_deployment_profile = update_platform_deployment
+patch_deployment_profile = update_platform_deployment_identity
 clone_deployment_profile = clone_platform_deployment
 activate_deployment_profile = activate_platform_deployment
 delete_deployment_profile = delete_platform_deployment
+upsert_deployment_binding = upsert_platform_deployment_binding
 ensure_vector_index = ensure_platform_vector_index
 embed_platform_inputs = embed_platform_inputs_request
 upsert_vector_documents = upsert_platform_vector_documents
@@ -244,6 +248,43 @@ def update_platform_deployment_route(deployment_profile_id: str):
             _database_url(),
             config=_config(),
             deployment_profile_id=deployment_profile_id,
+            payload=request.get_json(silent=True),
+            updated_by_user_id=int(g.current_user["id"]),
+        )
+    except PlatformControlRequestError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"deployment_profile": deployment}), 200
+
+
+@bp.patch("/v1/platform/deployments/<deployment_profile_id>")
+@require_role("superadmin")
+def patch_platform_deployment_route(deployment_profile_id: str):
+    try:
+        deployment = patch_deployment_profile(
+            _database_url(),
+            config=_config(),
+            deployment_profile_id=deployment_profile_id,
+            payload=request.get_json(silent=True),
+            updated_by_user_id=int(g.current_user["id"]),
+        )
+    except PlatformControlRequestError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"deployment_profile": deployment}), 200
+
+
+@bp.put("/v1/platform/deployments/<deployment_profile_id>/bindings/<capability_key>")
+@require_role("superadmin")
+def upsert_platform_deployment_binding_route(deployment_profile_id: str, capability_key: str):
+    try:
+        deployment = upsert_deployment_binding(
+            _database_url(),
+            config=_config(),
+            deployment_profile_id=deployment_profile_id,
+            capability_key=capability_key,
             payload=request.get_json(silent=True),
             updated_by_user_id=int(g.current_user["id"]),
         )

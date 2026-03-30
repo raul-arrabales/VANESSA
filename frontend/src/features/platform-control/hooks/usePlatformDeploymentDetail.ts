@@ -5,10 +5,17 @@ import {
   activateDeploymentProfile,
   cloneDeploymentProfile,
   deleteDeploymentProfile,
-  updateDeploymentProfile,
+  patchDeploymentProfileIdentity,
+  upsertDeploymentBinding,
+  type PlatformDeploymentProfile,
 } from "../../../api/platform";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
-import type { DeploymentCloneFormState, DeploymentFormState } from "../deploymentEditor";
+import {
+  buildDeploymentBindingMutationInput,
+  buildDeploymentIdentityMutationInput,
+  type DeploymentCloneFormState,
+  type DeploymentFormState,
+} from "../deploymentEditor";
 import { readDeploymentSeedFromState, withDeploymentSeedState } from "../deploymentRouteState";
 import { usePlatformDeploymentEditor } from "./usePlatformDeploymentEditor";
 import { usePlatformDeploymentEditorData } from "./usePlatformDeploymentEditorData";
@@ -39,16 +46,19 @@ export function usePlatformDeploymentDetail({
   } = usePlatformDeploymentEditorData(token);
   const [form, setForm] = useState<DeploymentFormState | null>(null);
   const [cloneForm, setCloneForm] = useState<DeploymentCloneFormState | null>(null);
+  const [localDeployment, setLocalDeployment] = useState<PlatformDeploymentProfile | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [savingCapabilityKeys, setSavingCapabilityKeys] = useState<Record<string, boolean>>({});
   const [cloning, setCloning] = useState(false);
   const [activating, setActivating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const seedReloadedDeploymentIdRef = useRef<string>("");
+  const initializedDeploymentIdRef = useRef<string>("");
 
   const fetchedDeployment = deployments.find((item) => item.id === deploymentId) ?? null;
   const seededDeployment = readDeploymentSeedFromState(location.state, deploymentId);
-  const deployment = fetchedDeployment ?? seededDeployment;
+  const deployment = localDeployment ?? fetchedDeployment ?? seededDeployment;
   const capabilityLabelByKey = useMemo(
     () => new Map(capabilities.map((capability) => [capability.capability, capability.display_name])),
     [capabilities],
@@ -59,7 +69,6 @@ export function usePlatformDeploymentDetail({
     modelResourcesByCapability,
     buildInitialForm,
     buildInitialCloneForm,
-    validateAndBuildMutation,
   } = usePlatformDeploymentEditor({
     mode: "edit",
     capabilities,
@@ -74,11 +83,20 @@ export function usePlatformDeploymentDetail({
   useRouteActionFeedback(location.state);
 
   useEffect(() => {
-    if (deployment) {
+    if (!deployment) {
+      initializedDeploymentIdRef.current = "";
+      return;
+    }
+    if (initializedDeploymentIdRef.current !== deployment.id) {
+      initializedDeploymentIdRef.current = deployment.id;
       setForm(buildInitialForm());
       setCloneForm(buildInitialCloneForm());
     }
   }, [buildInitialCloneForm, buildInitialForm, deployment]);
+
+  useEffect(() => {
+    setLocalDeployment(null);
+  }, [deploymentId]);
 
   useEffect(() => {
     if (!seededDeployment || fetchedDeployment) {
@@ -93,27 +111,64 @@ export function usePlatformDeploymentDetail({
     void reload();
   }, [fetchedDeployment, reload, seededDeployment]);
 
-  async function handleSave(): Promise<void> {
+  async function handleSaveIdentity(): Promise<void> {
     if (!token || !deployment || !form) {
       return;
     }
 
-    const { validationError, mutationInput } = validateAndBuildMutation(form);
-    if (validationError) {
-      showErrorFeedback(validationError, t("platformControl.feedback.deploymentSaveFailed"));
-      return;
-    }
-
-    setSaving(true);
+    setSavingIdentity(true);
     setErrorMessage("");
     try {
-      await updateDeploymentProfile(deployment.id, mutationInput!, token);
+      const updated = await patchDeploymentProfileIdentity(
+        deployment.id,
+        buildDeploymentIdentityMutationInput(form),
+        token,
+      );
+      setLocalDeployment(updated);
       showSuccessFeedback(t("platformControl.feedback.deploymentUpdated", { name: form.displayName }));
-      await reload();
     } catch (error) {
       showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
     } finally {
-      setSaving(false);
+      setSavingIdentity(false);
+    }
+  }
+
+  async function handleSaveCapability(capabilityKey: string): Promise<void> {
+    if (!token || !deployment || !form) {
+      return;
+    }
+    const capability = requiredCapabilities.find((item) => item.capability === capabilityKey);
+    if (!capability) {
+      return;
+    }
+    if (!form.providerIdsByCapability[capabilityKey]) {
+      showErrorFeedback(
+        t("platformControl.feedback.capabilityProviderRequired", { capability: capability.display_name }),
+        t("platformControl.feedback.deploymentSaveFailed"),
+      );
+      return;
+    }
+
+    setSavingCapabilityKeys((current) => ({ ...current, [capabilityKey]: true }));
+    setErrorMessage("");
+    try {
+      const updated = await upsertDeploymentBinding(
+        deployment.id,
+        capabilityKey,
+        buildDeploymentBindingMutationInput(capability, form, knowledgeBases),
+        token,
+      );
+      setLocalDeployment(updated);
+      showSuccessFeedback(
+        t("platformControl.feedback.deploymentBindingUpdated", {
+          capability: capability.display_name,
+          name: updated.display_name,
+        }),
+      );
+    } catch (error) {
+      showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
+    } finally {
+      setSavingCapabilityKeys((current) => ({ ...current, [capabilityKey]: false }));
     }
   }
 
@@ -158,7 +213,8 @@ export function usePlatformDeploymentDetail({
     setActivating(true);
     setErrorMessage("");
     try {
-      await activateDeploymentProfile(deployment.id, token);
+      const updated = await activateDeploymentProfile(deployment.id, token);
+      setLocalDeployment(updated);
       showSuccessFeedback(t("platformControl.feedback.activationSuccess", { name: deployment.display_name }));
       await reload();
     } catch (error) {
@@ -206,7 +262,8 @@ export function usePlatformDeploymentDetail({
     providers,
     providersByCapability,
     requiredCapabilities,
-    saving,
+    savingCapabilityKeys,
+    savingIdentity,
     setCloneForm,
     setConfirmDelete,
     setForm,
@@ -214,7 +271,8 @@ export function usePlatformDeploymentDetail({
     handleActivate,
     handleClone,
     handleDelete,
-    handleSave,
+    handleSaveCapability,
+    handleSaveIdentity,
     resetForm: () => deployment ? setForm(buildInitialForm()) : undefined,
   };
 }

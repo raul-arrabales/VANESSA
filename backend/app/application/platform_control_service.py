@@ -18,7 +18,9 @@ from ..services.platform_service import (
     list_provider_families as _list_provider_families,
     list_providers as _list_providers,
     update_deployment_profile as _update_deployment_profile,
+    update_deployment_profile_identity as _update_deployment_profile_identity,
     update_provider as _update_provider,
+    upsert_deployment_profile_binding as _upsert_deployment_profile_binding,
     validate_provider as _validate_provider,
 )
 from ..services.vector_store_service import (
@@ -132,6 +134,42 @@ def update_platform_deployment(
         database_url,
         config=config,
         deployment_profile_id=deployment_profile_id,
+        payload=_require_json_object(payload),
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def update_platform_deployment_identity(
+    database_url: str,
+    *,
+    config,
+    deployment_profile_id: str,
+    payload: Any,
+    updated_by_user_id: int,
+):
+    return _update_deployment_profile_identity(
+        database_url,
+        config=config,
+        deployment_profile_id=deployment_profile_id,
+        payload=_require_json_object(payload),
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def upsert_platform_deployment_binding(
+    database_url: str,
+    *,
+    config,
+    deployment_profile_id: str,
+    capability_key: str,
+    payload: Any,
+    updated_by_user_id: int,
+):
+    return _upsert_deployment_profile_binding(
+        database_url,
+        config=config,
+        deployment_profile_id=deployment_profile_id,
+        capability_key=capability_key,
         payload=_require_json_object(payload),
         updated_by_user_id=updated_by_user_id,
     )

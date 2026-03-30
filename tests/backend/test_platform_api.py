@@ -96,6 +96,8 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     delete_provider = test_client.delete("/v1/platform/providers/provider-1", headers=_auth(token))
     deployments = test_client.get("/v1/platform/deployments", headers=_auth(token))
     update_deployment = test_client.put("/v1/platform/deployments/deployment-1", headers=_auth(token), json={})
+    patch_deployment = test_client.patch("/v1/platform/deployments/deployment-1", headers=_auth(token), json={})
+    update_binding = test_client.put("/v1/platform/deployments/deployment-1/bindings/embeddings", headers=_auth(token), json={})
     clone_deployment = test_client.post("/v1/platform/deployments/deployment-1/clone", headers=_auth(token), json={})
     activate = test_client.post("/v1/platform/deployments/deployment-1/activate", headers=_auth(token))
     delete_deployment = test_client.delete("/v1/platform/deployments/deployment-1", headers=_auth(token))
@@ -127,6 +129,8 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     assert delete_provider.status_code == 403
     assert deployments.status_code == 403
     assert update_deployment.status_code == 403
+    assert patch_deployment.status_code == 403
+    assert update_binding.status_code == 403
     assert clone_deployment.status_code == 403
     assert activate.status_code == 403
     assert delete_deployment.status_code == 403
@@ -322,6 +326,68 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     )
     monkeypatch.setattr(
         platform_routes,
+        "patch_deployment_profile",
+        lambda _db, *, config, deployment_profile_id, payload, updated_by_user_id: {
+            "id": deployment_profile_id,
+            "slug": payload["slug"],
+            "display_name": payload["display_name"],
+            "description": payload.get("description", ""),
+            "is_active": False,
+            "bindings": [],
+            "configuration_status": {
+                "is_ready": False,
+                "incomplete_capabilities": ["embeddings"],
+                "summary": "Embeddings is not fully configured.",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
+        "upsert_deployment_binding",
+        lambda _db, *, config, deployment_profile_id, capability_key, payload, updated_by_user_id: {
+            "id": deployment_profile_id,
+            "slug": "staging-profile",
+            "display_name": "Staging Profile",
+            "description": "",
+            "is_active": False,
+            "bindings": [
+                {
+                    "capability": capability_key,
+                    "provider": {
+                        "id": payload["provider_id"],
+                        "slug": "vllm-embeddings-local",
+                        "provider_key": "vllm_embeddings_local",
+                        "display_name": "vLLM embeddings local",
+                        "endpoint_url": "http://llm:8000",
+                        "enabled": True,
+                        "adapter_kind": "openai_compatible_embeddings",
+                    },
+                    "resources": payload.get("resources", []),
+                    "default_resource_id": payload.get("default_resource_id"),
+                    "default_resource": None,
+                    "resource_policy": payload.get("resource_policy", {}),
+                    "config": payload.get("config", {}),
+                    "configuration_status": {
+                        "is_ready": False,
+                        "issues": [
+                            {
+                                "code": "resources_missing",
+                                "message": "At least one model resource must be bound.",
+                            }
+                        ],
+                        "summary": "At least one model resource must be bound.",
+                    },
+                }
+            ],
+            "configuration_status": {
+                "is_ready": False,
+                "incomplete_capabilities": [capability_key],
+                "summary": "Embeddings is not fully configured." if capability_key == "embeddings" else "Deployment is incomplete.",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        platform_routes,
         "clone_deployment_profile",
         lambda _db, *, config, source_deployment_profile_id, payload, created_by_user_id: {
             "id": "deployment-3",
@@ -454,6 +520,25 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "bindings": [],
         },
     )
+    patch_deployment_response = test_client.patch(
+        "/v1/platform/deployments/deployment-2",
+        headers=_auth(token),
+        json={
+            "slug": "staging-profile",
+            "display_name": "Staging Profile",
+        },
+    )
+    update_binding_response = test_client.put(
+        "/v1/platform/deployments/deployment-2/bindings/embeddings",
+        headers=_auth(token),
+        json={
+            "provider_id": "provider-embeddings",
+            "resources": [],
+            "default_resource_id": None,
+            "resource_policy": {},
+            "config": {},
+        },
+    )
     clone_deployment_response = test_client.post(
         "/v1/platform/deployments/deployment-1/clone",
         headers=_auth(token),
@@ -519,6 +604,10 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     assert create_response.get_json()["deployment_profile"]["slug"] == "staging-profile"
     assert update_deployment_response.status_code == 200
     assert update_deployment_response.get_json()["deployment_profile"]["slug"] == "staging-profile"
+    assert patch_deployment_response.status_code == 200
+    assert patch_deployment_response.get_json()["deployment_profile"]["slug"] == "staging-profile"
+    assert update_binding_response.status_code == 200
+    assert update_binding_response.get_json()["deployment_profile"]["bindings"][0]["capability"] == "embeddings"
     assert clone_deployment_response.status_code == 201
     assert clone_deployment_response.get_json()["deployment_profile"]["slug"] == "cloned-profile"
     assert activate_response.status_code == 200

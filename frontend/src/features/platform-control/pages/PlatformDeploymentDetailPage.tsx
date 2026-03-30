@@ -26,14 +26,16 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     handleActivate,
     handleClone,
     handleDelete,
-    handleSave,
+    handleSaveCapability,
+    handleSaveIdentity,
     knowledgeBases,
     loadErrorMessage,
     modelResourcesByCapability,
     providersByCapability,
     requiredCapabilities,
     resetForm,
-    saving,
+    savingCapabilityKeys,
+    savingIdentity,
     setCloneForm,
     setConfirmDelete,
     setForm,
@@ -81,19 +83,27 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 providersByCapability={providersByCapability}
                 modelResourcesByCapability={modelResourcesByCapability}
                 knowledgeBases={knowledgeBases}
+                bindingStatusByCapability={Object.fromEntries(
+                  deployment.bindings.map((binding) => [binding.capability, binding.configuration_status]),
+                )}
                 helperText={t("platformControl.deployments.editing", { slug: deployment.slug })}
-                isSubmitting={saving}
-                submitLabel={t("platformControl.actions.saveDeployment")}
-                submitBusyLabel={t("platformControl.actions.saving")}
+                identityAction={{
+                  label: t("platformControl.actions.saveDeploymentIdentity"),
+                  busyLabel: t("platformControl.actions.saving"),
+                  isSubmitting: savingIdentity,
+                  onClick: () => void handleSaveIdentity(),
+                }}
+                capabilityAction={{
+                  label: t("platformControl.actions.saveBinding"),
+                  busyLabel: t("platformControl.actions.saving"),
+                  savingByCapability: savingCapabilityKeys,
+                  onClick: (capability) => void handleSaveCapability(capability),
+                }}
                 secondaryAction={{
                   label: t("platformControl.actions.reset"),
                   onClick: resetForm,
                 }}
                 onChange={setForm}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void handleSave();
-                }}
               />
             </article>
           ) : null}

@@ -33,6 +33,14 @@ export type DeploymentCapabilitySectionState = {
   vectorSelectionMode: string;
   namespacePrefix: string;
   vectorKnowledgeBases: KnowledgeBase[];
+  configurationStatus?: {
+    is_ready: boolean;
+    issues: Array<{
+      code: string;
+      message: string;
+    }>;
+    summary: string;
+  } | null;
 };
 
 type BuildDeploymentCapabilitySectionStateParams = {
@@ -41,6 +49,17 @@ type BuildDeploymentCapabilitySectionStateParams = {
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
   knowledgeBases: KnowledgeBase[];
+  bindingStatusByCapability?: Record<
+    string,
+    {
+      is_ready: boolean;
+      issues: Array<{
+        code: string;
+        message: string;
+      }>;
+      summary: string;
+    } | undefined
+  >;
   t: Translate;
 };
 
@@ -80,6 +99,7 @@ export function buildDeploymentCapabilitySectionState({
   providersByCapability,
   modelResourcesByCapability,
   knowledgeBases,
+  bindingStatusByCapability = {},
   t,
 }: BuildDeploymentCapabilitySectionStateParams): DeploymentCapabilitySectionState {
   const capabilityKey = capability.capability;
@@ -155,5 +175,6 @@ export function buildDeploymentCapabilitySectionState({
     vectorSelectionMode: String(vectorPolicy.selection_mode ?? "explicit"),
     namespacePrefix: String(vectorPolicy.namespace_prefix ?? ""),
     vectorKnowledgeBases,
+    configurationStatus: bindingStatusByCapability[capabilityKey] ?? null,
   };
 }

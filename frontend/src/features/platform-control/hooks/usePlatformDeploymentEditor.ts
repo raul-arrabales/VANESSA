@@ -82,10 +82,6 @@ export function usePlatformDeploymentEditor({
     (form: DeploymentFormState) => {
       const validationError = validateDeploymentForm(requiredCapabilities, form, {
         bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
-        resourceRequiredMessage: (capabilityDisplayName) =>
-          t("platformControl.feedback.resourceRequired", { capability: capabilityDisplayName }),
-        defaultResourceRequiredMessage: (capabilityDisplayName) =>
-          t("platformControl.feedback.defaultResourceRequired", { capability: capabilityDisplayName }),
       });
 
       return {

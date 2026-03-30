@@ -578,6 +578,39 @@ def update_deployment_profile(
     return get_deployment_profile(database_url, deployment_profile_id.strip())
 
 
+def update_deployment_profile_identity(
+    database_url: str,
+    *,
+    deployment_profile_id: str,
+    slug: str,
+    display_name: str,
+    description: str,
+    updated_by_user_id: int,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        profile_row = connection.execute(
+            """
+            UPDATE platform_deployment_profiles
+            SET
+              slug = %s,
+              display_name = %s,
+              description = %s,
+              updated_by_user_id = %s,
+              updated_at = NOW()
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                slug.strip().lower(),
+                display_name.strip(),
+                description.strip(),
+                updated_by_user_id,
+                deployment_profile_id.strip(),
+            ),
+        ).fetchone()
+    return dict(profile_row) if profile_row is not None else None
+
+
 def delete_deployment_profile(database_url: str, deployment_profile_id: str) -> bool:
     with get_connection(database_url) as connection:
         row = connection.execute(

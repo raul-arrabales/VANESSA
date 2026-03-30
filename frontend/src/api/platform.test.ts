@@ -13,6 +13,8 @@ import {
   listPlatformProviderFamilies,
   listPlatformDeployments,
   listPlatformProviders,
+  patchDeploymentProfileIdentity,
+  upsertDeploymentBinding,
   updateDeploymentProfile,
   updatePlatformProvider,
   validatePlatformProvider,
@@ -231,6 +233,27 @@ describe("platform api", () => {
       },
       "token",
     );
+    await patchDeploymentProfileIdentity(
+      "deployment-1",
+      {
+        slug: "profile-a",
+        display_name: "Profile A",
+        description: "",
+      },
+      "token",
+    );
+    await upsertDeploymentBinding(
+      "deployment-1",
+      "embeddings",
+      {
+        provider_id: "provider-embeddings",
+        resources: [],
+        default_resource_id: null,
+        resource_policy: {},
+        config: {},
+      },
+      "token",
+    );
     await cloneDeploymentProfile(
       "deployment-1",
       {
@@ -279,11 +302,21 @@ describe("platform api", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       8,
+      "/api/v1/platform/deployments/deployment-1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      9,
+      "/api/v1/platform/deployments/deployment-1/bindings/embeddings",
+      expect.objectContaining({ method: "PUT" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      10,
       "/api/v1/platform/deployments/deployment-1/clone",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      9,
+      11,
       "/api/v1/platform/deployments/deployment-1",
       expect.objectContaining({ method: "DELETE" }),
     );

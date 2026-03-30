@@ -31,6 +31,16 @@ export default function PlatformDeploymentOverviewSection({
           {deployment.is_active ? t("platformControl.badges.active") : t("platformControl.badges.inactive")}
         </span>
       </div>
+      {deployment.configuration_status ? (
+        <div className="status-row">
+          <span className="platform-badge" data-tone={deployment.configuration_status.is_ready ? "enabled" : "inactive"}>
+            {deployment.configuration_status.is_ready
+              ? t("platformControl.badges.ready")
+              : t("platformControl.badges.incomplete")}
+          </span>
+          <p className="status-text">{deployment.configuration_status.summary}</p>
+        </div>
+      ) : null}
       <p className="status-text">{deployment.description || t("platformControl.deployments.noDescription")}</p>
       <div className="health-table-wrap">
         <table className="health-table" aria-label={t("platformControl.deployments.tableAria", { name: deployment.display_name })}>
@@ -58,9 +68,17 @@ export default function PlatformDeploymentOverviewSection({
                 <td>{summarizeBindingResources(binding, t("platformControl.summary.none"))}</td>
                 <td>{binding.provider.adapter_kind}</td>
                 <td>
-                  <span className="platform-badge" data-tone={binding.provider.enabled ? "enabled" : "disabled"}>
-                    {binding.provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled")}
+                  <span
+                    className="platform-badge"
+                    data-tone={binding.configuration_status?.is_ready ? "enabled" : "inactive"}
+                  >
+                    {binding.configuration_status?.is_ready
+                      ? t("platformControl.badges.ready")
+                      : t("platformControl.badges.incomplete")}
                   </span>
+                  <div className="platform-inline-meta">
+                    <span className="status-text">{binding.configuration_status?.summary ?? t("platformControl.summary.none")}</span>
+                  </div>
                 </td>
               </tr>
             ))}

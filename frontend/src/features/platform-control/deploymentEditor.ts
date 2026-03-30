@@ -2,6 +2,8 @@ import type { KnowledgeBase } from "../../api/context";
 import type { ManagedModel } from "../../api/modelops";
 import type {
   PlatformCapability,
+  PlatformDeploymentBindingMutationInput,
+  PlatformDeploymentIdentityMutationInput,
   PlatformDeploymentMutationInput,
   PlatformDeploymentProfile,
   PlatformProvider,
@@ -89,32 +91,11 @@ export function validateDeploymentForm(
   form: DeploymentFormState,
   options: {
     bindingRequiredMessage: string;
-    resourceRequiredMessage: (capabilityDisplayName: string) => string;
-    defaultResourceRequiredMessage: (capabilityDisplayName: string) => string;
   },
 ): string | null {
   const missingBinding = requiredCapabilities.find((capability) => !form.providerIdsByCapability[capability.capability]);
   if (missingBinding) {
     return options.bindingRequiredMessage;
-  }
-
-  const missingServedModel = requiredCapabilities.find(
-    (capability) =>
-      capabilityRequiresModelResource(capability.capability) &&
-      (form.resourceIdsByCapability[capability.capability]?.length ?? 0) === 0,
-  );
-  if (missingServedModel) {
-    return options.resourceRequiredMessage(missingServedModel.display_name);
-  }
-
-  const missingDefaultServedModel = requiredCapabilities.find(
-    (capability) =>
-      capabilityRequiresModelResource(capability.capability) &&
-      (form.resourceIdsByCapability[capability.capability]?.length ?? 0) > 0 &&
-      !form.defaultResourceIdsByCapability[capability.capability],
-  );
-  if (missingDefaultServedModel) {
-    return options.defaultResourceRequiredMessage(missingDefaultServedModel.display_name);
   }
 
   const invalidVectorBinding = requiredCapabilities.find((capability) => {
@@ -126,13 +107,85 @@ export function validateDeploymentForm(
     if (selectionMode === "dynamic_namespace") {
       return !String(policy.namespace_prefix ?? "").trim();
     }
-    return (form.resourceIdsByCapability[capability.capability]?.length ?? 0) === 0;
+    return false;
   });
   if (invalidVectorBinding) {
-    return options.resourceRequiredMessage(invalidVectorBinding.display_name);
+    return `${invalidVectorBinding.display_name} requires a namespace prefix for dynamic namespace mode.`;
   }
 
   return null;
+}
+
+export function buildDeploymentIdentityMutationInput(
+  form: DeploymentFormState,
+): PlatformDeploymentIdentityMutationInput {
+  return {
+    slug: form.slug,
+    display_name: form.displayName,
+    description: form.description,
+  };
+}
+
+
+export function buildDeploymentBindingMutationInput(
+  capability: PlatformCapability,
+  form: DeploymentFormState,
+  knowledgeBases: KnowledgeBase[],
+): PlatformDeploymentBindingMutationInput {
+  const knowledgeBasesById = new Map(knowledgeBases.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase]));
+  return {
+    provider_id: form.providerIdsByCapability[capability.capability],
+    resources: capability.capability === "vector_store"
+      ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => {
+          const knowledgeBase = knowledgeBasesById.get(resourceId);
+          if (knowledgeBase) {
+            return {
+              id: knowledgeBase.id,
+              resource_kind: "knowledge_base",
+              ref_type: "knowledge_base",
+              knowledge_base_id: knowledgeBase.id,
+              provider_resource_id: knowledgeBase.index_name,
+              display_name: knowledgeBase.display_name,
+              metadata: {
+                slug: knowledgeBase.slug,
+                index_name: knowledgeBase.index_name,
+                lifecycle_state: knowledgeBase.lifecycle_state,
+                sync_status: knowledgeBase.sync_status,
+                document_count: knowledgeBase.document_count,
+              },
+            };
+          }
+          return {
+            id: resourceId,
+            resource_kind: "index",
+            ref_type: "provider_resource",
+            provider_resource_id: resourceId,
+            display_name: resourceId,
+            metadata: {},
+          };
+        })
+      : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
+          id: resourceId,
+          resource_kind: "model",
+          ref_type: "managed_model",
+          managed_model_id: resourceId,
+          display_name: resourceId,
+          metadata: {},
+        })),
+    default_resource_id: capabilitySupportsResources(capability.capability)
+      ? form.defaultResourceIdsByCapability[capability.capability] || null
+      : null,
+    resource_policy: capability.capability === "vector_store"
+      ? {
+          selection_mode:
+            String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
+          ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
+        }
+      : (capabilitySupportsResources(capability.capability)
+          ? form.resourcePolicyByCapability[capability.capability] ?? {}
+          : {}),
+    config: {},
+  };
 }
 
 export function buildDeploymentMutationInput(
@@ -140,64 +193,11 @@ export function buildDeploymentMutationInput(
   form: DeploymentFormState,
   knowledgeBases: KnowledgeBase[],
 ): PlatformDeploymentMutationInput {
-  const knowledgeBasesById = new Map(knowledgeBases.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase]));
   return {
-    slug: form.slug,
-    display_name: form.displayName,
-    description: form.description,
+    ...buildDeploymentIdentityMutationInput(form),
     bindings: requiredCapabilities.map((capability) => ({
-        capability: capability.capability,
-        provider_id: form.providerIdsByCapability[capability.capability],
-        resources: capability.capability === "vector_store"
-          ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => {
-              const knowledgeBase = knowledgeBasesById.get(resourceId);
-              if (knowledgeBase) {
-                return {
-                  id: knowledgeBase.id,
-                  resource_kind: "knowledge_base",
-                  ref_type: "knowledge_base",
-                  knowledge_base_id: knowledgeBase.id,
-                  provider_resource_id: knowledgeBase.index_name,
-                  display_name: knowledgeBase.display_name,
-                  metadata: {
-                    slug: knowledgeBase.slug,
-                    index_name: knowledgeBase.index_name,
-                    lifecycle_state: knowledgeBase.lifecycle_state,
-                    sync_status: knowledgeBase.sync_status,
-                    document_count: knowledgeBase.document_count,
-                  },
-                };
-              }
-              return {
-                id: resourceId,
-                resource_kind: "index",
-                ref_type: "provider_resource",
-                provider_resource_id: resourceId,
-                display_name: resourceId,
-                metadata: {},
-              };
-            })
-          : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
-              id: resourceId,
-              resource_kind: "model",
-              ref_type: "managed_model",
-              managed_model_id: resourceId,
-              display_name: resourceId,
-              metadata: {},
-            })),
-        default_resource_id: capabilitySupportsResources(capability.capability)
-          ? form.defaultResourceIdsByCapability[capability.capability] || null
-          : null,
-        resource_policy: capability.capability === "vector_store"
-          ? {
-              selection_mode:
-                String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
-              ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
-            }
-          : (capabilitySupportsResources(capability.capability)
-              ? form.resourcePolicyByCapability[capability.capability] ?? {}
-              : {}),
-        config: {},
-      })),
+      capability: capability.capability,
+      ...buildDeploymentBindingMutationInput(capability, form, knowledgeBases),
+    })),
   };
 }

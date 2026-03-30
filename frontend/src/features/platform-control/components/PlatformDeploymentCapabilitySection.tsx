@@ -9,6 +9,12 @@ type PlatformDeploymentCapabilitySectionProps = {
   onDefaultResourceChange: (resourceId: string) => void;
   onVectorSelectionModeChange: (selectionMode: string) => void;
   onNamespacePrefixChange: (namespacePrefix: string) => void;
+  saveAction?: {
+    label: string;
+    busyLabel: string;
+    isSaving: boolean;
+    onSave: () => void;
+  };
 };
 
 type ModelCapabilityFieldsProps = {
@@ -227,6 +233,7 @@ export default function PlatformDeploymentCapabilitySection({
   onDefaultResourceChange,
   onVectorSelectionModeChange,
   onNamespacePrefixChange,
+  saveAction,
 }: PlatformDeploymentCapabilitySectionProps): JSX.Element {
   const { t } = useTranslation("common");
   const rowTitleId = useId();
@@ -243,6 +250,16 @@ export default function PlatformDeploymentCapabilitySection({
           {section.capability.display_name}
         </h4>
         <p className="status-text">{section.capability.description}</p>
+        {section.configurationStatus ? (
+          <>
+            <span className="platform-badge" data-tone={section.configurationStatus.is_ready ? "enabled" : "inactive"}>
+              {section.configurationStatus.is_ready
+                ? t("platformControl.badges.ready")
+                : t("platformControl.badges.incomplete")}
+            </span>
+            <p className="status-text">{section.configurationStatus.summary}</p>
+          </>
+        ) : null}
       </div>
 
       <label className="card-stack deployment-binding-field">
@@ -278,6 +295,19 @@ export default function PlatformDeploymentCapabilitySection({
           onVectorSelectionModeChange={onVectorSelectionModeChange}
           onNamespacePrefixChange={onNamespacePrefixChange}
         />
+      ) : null}
+
+      {saveAction ? (
+        <div className="platform-inline-meta">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={saveAction.onSave}
+            disabled={saveAction.isSaving}
+          >
+            {saveAction.isSaving ? saveAction.busyLabel : saveAction.label}
+          </button>
+        </div>
       ) : null}
     </section>
   );

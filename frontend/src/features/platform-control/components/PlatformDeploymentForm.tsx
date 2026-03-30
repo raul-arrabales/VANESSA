@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
-import type { PlatformCapability, PlatformProvider } from "../../../api/platform";
+import type { PlatformCapability, PlatformDeploymentBinding, PlatformProvider } from "../../../api/platform";
 import type { DeploymentFormState } from "../deploymentEditor";
 import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
 import PlatformDeploymentCapabilitySection from "./PlatformDeploymentCapabilitySection";
@@ -14,15 +14,28 @@ type PlatformDeploymentFormProps = {
   modelResourcesByCapability: Record<string, ManagedModel[]>;
   knowledgeBases: KnowledgeBase[];
   helperText: string;
-  isSubmitting: boolean;
-  submitLabel: string;
-  submitBusyLabel: string;
+  bindingStatusByCapability?: Record<string, PlatformDeploymentBinding["configuration_status"] | undefined>;
+  identityAction?: {
+    label: string;
+    busyLabel: string;
+    isSubmitting: boolean;
+    onClick: () => void;
+  };
+  capabilityAction?: {
+    label: string;
+    busyLabel: string;
+    savingByCapability: Record<string, boolean>;
+    onClick: (capability: string) => void;
+  };
+  isSubmitting?: boolean;
+  submitLabel?: string;
+  submitBusyLabel?: string;
   secondaryAction?: {
     label: string;
     onClick: () => void;
   };
   onChange: (value: DeploymentFormState) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
 };
 
 export default function PlatformDeploymentForm({
@@ -32,6 +45,9 @@ export default function PlatformDeploymentForm({
   modelResourcesByCapability,
   knowledgeBases,
   helperText,
+  bindingStatusByCapability = {},
+  identityAction,
+  capabilityAction,
   isSubmitting,
   submitLabel,
   submitBusyLabel,
@@ -112,6 +128,18 @@ export default function PlatformDeploymentForm({
             <span className="field-label">{t("platformControl.forms.deployment.deploymentIdentity")}</span>
             <h4 className="deployment-binding-title">{t("platformControl.sections.settings")}</h4>
             <p className="status-text">{t("platformControl.deployments.settingsDescription")}</p>
+            {identityAction ? (
+              <div className="platform-inline-meta">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={identityAction.onClick}
+                  disabled={identityAction.isSubmitting}
+                >
+                  {identityAction.isSubmitting ? identityAction.busyLabel : identityAction.label}
+                </button>
+              </div>
+            ) : null}
           </div>
           <label className="card-stack deployment-binding-field">
             <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
@@ -138,6 +166,7 @@ export default function PlatformDeploymentForm({
             providersByCapability,
             modelResourcesByCapability,
             knowledgeBases,
+            bindingStatusByCapability,
             t,
           });
 
@@ -150,6 +179,12 @@ export default function PlatformDeploymentForm({
               onDefaultResourceChange={(resourceId) => updateCapabilityDefaultResource(section.capabilityKey, resourceId)}
               onVectorSelectionModeChange={(selectionMode) => updateVectorSelectionMode(section.capabilityKey, selectionMode)}
               onNamespacePrefixChange={(namespacePrefix) => updateVectorNamespacePrefix(section.capabilityKey, namespacePrefix)}
+              saveAction={capabilityAction ? {
+                label: capabilityAction.label,
+                busyLabel: capabilityAction.busyLabel,
+                isSaving: Boolean(capabilityAction.savingByCapability[section.capabilityKey]),
+                onSave: () => capabilityAction.onClick(section.capabilityKey),
+              } : undefined}
             />
           );
         })}
@@ -170,9 +205,11 @@ export default function PlatformDeploymentForm({
               {secondaryAction.label}
             </button>
           ) : null}
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-            {isSubmitting ? submitBusyLabel : submitLabel}
-          </button>
+          {submitLabel && submitBusyLabel && onSubmit ? (
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? submitBusyLabel : submitLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </form>

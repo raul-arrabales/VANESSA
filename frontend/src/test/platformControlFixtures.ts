@@ -253,6 +253,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
     display_name: "Local Default",
     description: "Default local profile.",
     is_active: true,
+    configuration_status: {
+      is_ready: true,
+      incomplete_capabilities: [],
+      summary: "All required capabilities are configured.",
+    },
     bindings: [
       {
         capability: "llm_inference",
@@ -297,6 +302,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         },
         resource_policy: {},
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
       {
         capability: "embeddings",
@@ -332,6 +342,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         },
         resource_policy: {},
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
       {
         capability: "vector_store",
@@ -349,6 +364,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         default_resource: null,
         resource_policy: { selection_mode: "dynamic_namespace", namespace_prefix: "kb_" },
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
     ],
   },
@@ -358,6 +378,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
     display_name: "Staging Profile",
     description: "Alternate profile.",
     is_active: false,
+    configuration_status: {
+      is_ready: true,
+      incomplete_capabilities: [],
+      summary: "All required capabilities are configured.",
+    },
     bindings: [
       {
         capability: "llm_inference",
@@ -393,6 +418,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         },
         resource_policy: {},
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
       {
         capability: "embeddings",
@@ -428,6 +458,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         },
         resource_policy: {},
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
       {
         capability: "vector_store",
@@ -445,6 +480,11 @@ export const deploymentsFixture: PlatformDeploymentProfile[] = [
         default_resource: null,
         resource_policy: { selection_mode: "dynamic_namespace", namespace_prefix: "kb_" },
         config: {},
+        configuration_status: {
+          is_ready: true,
+          issues: [],
+          summary: "Ready.",
+        },
       },
     ],
   },

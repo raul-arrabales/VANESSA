@@ -19,7 +19,7 @@ def _is_cloud_provider_row(provider_row: dict[str, Any]) -> bool:
 
 
 def _build_model_binding_resource(model_row: dict[str, Any], *, provider_resource_id: str) -> dict[str, Any]:
-    managed_model_id = str(model_row.get("id") or model_row.get("model_id") or "").strip()
+    managed_model_id = str(model_row.get("model_id") or model_row.get("id") or "").strip()
     return {
         "id": managed_model_id,
         "resource_kind": "model",

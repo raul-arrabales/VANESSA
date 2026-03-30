@@ -8,6 +8,136 @@ from app.services import platform_adapters, platform_service  # noqa: E402
 from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
 
 
+def _db_shaped_embeddings_model_row() -> dict[str, object]:
+    return {
+        "id": 5,
+        "model_id": "sentence-transformers--all-MiniLM-L6-v2",
+        "name": "MiniLM Embeddings",
+        "provider": "huggingface",
+        "provider_model_id": "local-vllm-embeddings-default",
+        "source_id": "hf/sentence-transformers/all-MiniLM-L6-v2",
+        "backend_kind": "local",
+        "availability": "offline_ready",
+        "task_key": "embeddings",
+        "lifecycle_state": "active",
+        "is_validation_current": True,
+        "last_validation_status": "success",
+        "local_path": "/models/all-MiniLM-L6-v2",
+    }
+
+
+def _provider_rows_by_id() -> dict[str, dict[str, object]]:
+    return {
+        "provider-llm": {
+            "id": "provider-llm",
+            "slug": "vllm-local-gateway",
+            "provider_key": "vllm_local",
+            "capability_key": "llm_inference",
+            "display_name": "vLLM local gateway",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "adapter_kind": "openai_compatible_llm",
+        },
+        "provider-embeddings": {
+            "id": "provider-embeddings",
+            "slug": "vllm-embeddings-local",
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "display_name": "vLLM embeddings local",
+            "description": "desc",
+            "endpoint_url": "http://llm:8000",
+            "healthcheck_url": "http://llm:8000/health",
+            "enabled": True,
+            "adapter_kind": "openai_compatible_embeddings",
+        },
+        "provider-vector": {
+            "id": "provider-vector",
+            "slug": "weaviate-local",
+            "provider_key": "weaviate_local",
+            "capability_key": "vector_store",
+            "display_name": "Weaviate local",
+            "description": "desc",
+            "endpoint_url": "http://weaviate:8080",
+            "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+            "enabled": True,
+            "adapter_kind": "weaviate_http",
+        },
+    }
+
+
+def _resolved_binding_row(
+    providers_by_id: dict[str, dict[str, object]],
+    binding: dict[str, object],
+) -> dict[str, object]:
+    provider = providers_by_id[str(binding["provider_instance_id"])]
+    resources = [dict(item) for item in binding.get("resources") or [] if isinstance(item, dict)]
+    default_resource_id = str(binding.get("default_resource_id") or "").strip() or None
+    return {
+        "id": f"{binding['capability_key']}-binding-id",
+        "capability_key": binding["capability_key"],
+        "provider_instance_id": binding["provider_instance_id"],
+        "provider_slug": provider["slug"],
+        "provider_key": provider["provider_key"],
+        "provider_display_name": provider["display_name"],
+        "provider_description": provider["description"],
+        "endpoint_url": provider["endpoint_url"],
+        "healthcheck_url": provider["healthcheck_url"],
+        "enabled": provider["enabled"],
+        "adapter_kind": provider["adapter_kind"],
+        "binding_config": dict(binding.get("binding_config") or {}),
+        "resource_policy": dict(binding.get("resource_policy") or {}),
+        "resources": resources,
+        "default_resource_id": default_resource_id,
+        "default_resource": next(
+            (dict(item) for item in resources if str(item.get("id") or "").strip() == default_resource_id),
+            None,
+        ),
+    }
+
+
+def _deployment_payload_with_embeddings_resource(model_id: str) -> dict[str, object]:
+    return {
+        "slug": "profile-a",
+        "display_name": "Profile A",
+        "description": "",
+        "bindings": [
+            {"capability": "llm_inference", "provider_id": "provider-llm"},
+            {
+                "capability": "embeddings",
+                "provider_id": "provider-embeddings",
+                "resources": [
+                    {
+                        "id": model_id,
+                        "resource_kind": "model",
+                        "ref_type": "managed_model",
+                        "managed_model_id": model_id,
+                        "display_name": "MiniLM Embeddings",
+                        "metadata": {},
+                    }
+                ],
+                "default_resource_id": model_id,
+            },
+            {
+                "capability": "vector_store",
+                "provider_id": "provider-vector",
+                "resource_policy": {"selection_mode": "explicit"},
+            },
+        ],
+    }
+
+
+def test_build_model_binding_resource_uses_public_model_id():
+    resource = platform_service._build_model_binding_resource(  # type: ignore[attr-defined]
+        _db_shaped_embeddings_model_row(),
+        provider_resource_id="local-vllm-embeddings-default",
+    )
+
+    assert resource["id"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert resource["managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+
+
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -67,61 +197,342 @@ def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypa
     assert exc_info.value.code == "provider_capability_mismatch"
 
 
-def test_create_deployment_profile_requires_resource_for_embeddings(monkeypatch: pytest.MonkeyPatch):
+def test_create_deployment_profile_allows_empty_resources_for_required_bindings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
-    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"embeddings"})
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store"})
     monkeypatch.setattr(
         platform_service.platform_repo,
         "get_provider_instance",
         lambda _db, provider_id: {
             "id": provider_id,
-            "provider_key": "vllm_embeddings_local",
-            "capability_key": "embeddings",
+            "provider_key": "weaviate_local" if provider_id == "provider-vector" else "vllm_embeddings_local",
+            "capability_key": "vector_store" if provider_id == "provider-vector" else ("llm_inference" if provider_id == "provider-llm" else "embeddings"),
         },
     )
-
-    with pytest.raises(PlatformControlPlaneError) as exc_info:
-        platform_service.create_deployment_profile(
-            "ignored",
-            config=object(),  # type: ignore[arg-type]
-            payload={
-                "slug": "profile-a",
-                "display_name": "Profile A",
-                "bindings": [
-                    {"capability": "embeddings", "provider_id": "provider-1"},
-                ],
-            },
-            created_by_user_id=1,
-        )
-
-    assert exc_info.value.code == "resource_required"
-
-
-def test_activate_deployment_profile_requires_all_required_capabilities(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
         platform_service.platform_repo,
-        "get_deployment_profile",
-        lambda _db, deployment_profile_id: {"id": deployment_profile_id, "slug": "profile-a"},
+        "create_deployment_profile",
+        lambda _db, **kwargs: {
+            "id": "deployment-1",
+            "slug": kwargs["slug"],
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "is_active": False,
+        },
     )
     monkeypatch.setattr(
         platform_service.platform_repo,
         "list_deployment_bindings",
         lambda _db, *, deployment_profile_id: [
-            {"capability_key": "llm_inference", "provider_instance_id": "provider-1", "enabled": True},
+            {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-llm",
+                "provider_slug": "vllm-local-gateway",
+                "provider_key": "vllm_local",
+                "provider_display_name": "vLLM local gateway",
+                "endpoint_url": "http://llm:8000",
+                "enabled": True,
+                "adapter_kind": "openai_compatible_llm",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {},
+            },
+            {
+                "capability_key": "embeddings",
+                "provider_instance_id": "provider-embeddings",
+                "provider_slug": "vllm-embeddings-local",
+                "provider_key": "vllm_embeddings_local",
+                "provider_display_name": "vLLM embeddings local",
+                "endpoint_url": "http://llm:8000",
+                "enabled": True,
+                "adapter_kind": "openai_compatible_embeddings",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {},
+            },
+            {
+                "capability_key": "vector_store",
+                "provider_instance_id": "provider-vector",
+                "provider_slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "provider_display_name": "Weaviate local",
+                "endpoint_url": "http://weaviate:8080",
+                "enabled": True,
+                "adapter_kind": "weaviate_http",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {"selection_mode": "explicit"},
+            },
         ],
     )
 
-    with pytest.raises(PlatformControlPlaneError) as exc_info:
-        platform_service.activate_deployment_profile(
+    deployment = platform_service.create_deployment_profile(
+        "ignored",
+        config=object(),  # type: ignore[arg-type]
+        payload={
+            "slug": "profile-a",
+            "display_name": "Profile A",
+            "bindings": [
+                {"capability": "llm_inference", "provider_id": "provider-llm"},
+                {"capability": "embeddings", "provider_id": "provider-embeddings"},
+                {"capability": "vector_store", "provider_id": "provider-vector", "resource_policy": {"selection_mode": "explicit"}},
+            ],
+        },
+        created_by_user_id=1,
+    )
+
+    assert deployment["configuration_status"]["is_ready"] is False
+    assert deployment["configuration_status"]["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+
+
+@pytest.mark.parametrize("save_mode", ["create", "update", "upsert"])
+def test_model_bearing_deployment_save_paths_use_public_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+    save_mode: str,
+):
+    model_row = _db_shaped_embeddings_model_row()
+    model_id = str(model_row["model_id"])
+    providers_by_id = _provider_rows_by_id()
+    stored_bindings: list[dict[str, object]] = [
+        _resolved_binding_row(
+            providers_by_id,
+            {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-llm",
+                "resources": [],
+                "default_resource_id": None,
+                "binding_config": {},
+                "resource_policy": {},
+            },
+        ),
+        _resolved_binding_row(
+            providers_by_id,
+            {
+                "capability_key": "vector_store",
+                "provider_instance_id": "provider-vector",
+                "resources": [],
+                "default_resource_id": None,
+                "binding_config": {},
+                "resource_policy": {"selection_mode": "explicit"},
+            },
+        ),
+    ]
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service,
+        "_known_capability_keys",
+        lambda _db: {"llm_inference", "embeddings", "vector_store"},
+    )
+    monkeypatch.setattr(
+        platform_service._platform_bindings_module,  # type: ignore[attr-defined]
+        "get_model_by_id",
+        lambda _db, managed_model_id: dict(model_row) if managed_model_id == model_id else None,
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_id: dict(providers_by_id[provider_id]),
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_bindings",
+        lambda _db, *, deployment_profile_id: [dict(item) for item in stored_bindings],
+    )
+
+    def _set_stored_bindings_from_resolved(bindings: list[dict[str, object]]) -> None:
+        stored_bindings[:] = [_resolved_binding_row(providers_by_id, binding) for binding in bindings]
+
+    if save_mode == "create":
+        def _create_deployment_profile(_db, **kwargs):
+            captured["bindings"] = kwargs["bindings"]
+            _set_stored_bindings_from_resolved(kwargs["bindings"])
+            return {
+                "id": "deployment-1",
+                "slug": kwargs["slug"],
+                "display_name": kwargs["display_name"],
+                "description": kwargs["description"],
+                "is_active": False,
+            }
+
+        monkeypatch.setattr(platform_service.platform_repo, "create_deployment_profile", _create_deployment_profile)
+        deployment = platform_service.create_deployment_profile(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            payload=_deployment_payload_with_embeddings_resource(model_id),
+            created_by_user_id=1,
+        )
+    elif save_mode == "update":
+        monkeypatch.setattr(
+            platform_service.platform_repo,
+            "get_deployment_profile",
+            lambda _db, deployment_profile_id: {
+                "id": deployment_profile_id,
+                "slug": "profile-a",
+                "display_name": "Profile A",
+                "description": "",
+                "is_active": False,
+            },
+        )
+
+        def _update_deployment_profile(_db, **kwargs):
+            captured["bindings"] = kwargs["bindings"]
+            _set_stored_bindings_from_resolved(kwargs["bindings"])
+            return {
+                "id": kwargs["deployment_profile_id"],
+                "slug": kwargs["slug"],
+                "display_name": kwargs["display_name"],
+                "description": kwargs["description"],
+                "is_active": False,
+            }
+
+        monkeypatch.setattr(platform_service.platform_repo, "update_deployment_profile", _update_deployment_profile)
+        deployment = platform_service.update_deployment_profile(
             "ignored",
             config=object(),  # type: ignore[arg-type]
             deployment_profile_id="deployment-1",
-            activated_by_user_id=1,
+            payload=_deployment_payload_with_embeddings_resource(model_id),
+            updated_by_user_id=1,
+        )
+    else:
+        monkeypatch.setattr(
+            platform_service.platform_repo,
+            "get_deployment_profile",
+            lambda _db, deployment_profile_id: {
+                "id": deployment_profile_id,
+                "slug": "profile-a",
+                "display_name": "Profile A",
+                "description": "",
+                "is_active": False,
+            },
         )
 
-    assert exc_info.value.code == "deployment_profile_incomplete"
-    assert exc_info.value.details["missing_capabilities"] == ["embeddings", "vector_store"]
+        def _upsert_deployment_binding(
+            _db,
+            *,
+            deployment_profile_id,
+            capability_key,
+            provider_instance_id,
+            resources,
+            default_resource_id,
+            binding_config,
+            resource_policy,
+        ):
+            captured["resources"] = [dict(item) for item in resources]
+            captured["default_resource_id"] = default_resource_id
+            embeddings_binding = _resolved_binding_row(
+                providers_by_id,
+                {
+                    "capability_key": capability_key,
+                    "provider_instance_id": provider_instance_id,
+                    "resources": [dict(item) for item in resources],
+                    "default_resource_id": default_resource_id,
+                    "binding_config": dict(binding_config),
+                    "resource_policy": dict(resource_policy),
+                },
+            )
+            stored_bindings[:] = [
+                item for item in stored_bindings if str(item.get("capability_key")) != capability_key
+            ] + [embeddings_binding]
+            return dict(embeddings_binding)
+
+        monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", _upsert_deployment_binding)
+        monkeypatch.setattr(
+            platform_service.platform_repo,
+            "update_deployment_profile_identity",
+            lambda _db, **kwargs: {
+                "id": kwargs["deployment_profile_id"],
+                "slug": kwargs["slug"],
+                "display_name": kwargs["display_name"],
+                "description": kwargs["description"],
+                "is_active": False,
+            },
+        )
+        deployment = platform_service.upsert_deployment_profile_binding(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            deployment_profile_id="deployment-1",
+            capability_key="embeddings",
+            payload={
+                "provider_id": "provider-embeddings",
+                "resources": [
+                    {
+                        "id": model_id,
+                        "resource_kind": "model",
+                        "ref_type": "managed_model",
+                        "managed_model_id": model_id,
+                        "display_name": "MiniLM Embeddings",
+                        "metadata": {},
+                    }
+                ],
+                "default_resource_id": model_id,
+            },
+            updated_by_user_id=1,
+        )
+
+    binding = next(item for item in deployment["bindings"] if item["capability"] == "embeddings")
+    assert binding["default_resource_id"] == model_id
+    assert binding["resources"][0]["id"] == model_id
+    assert binding["resources"][0]["managed_model_id"] == model_id
+
+    if save_mode == "upsert":
+        assert captured["default_resource_id"] == model_id
+        assert captured["resources"][0]["id"] == model_id
+        assert captured["resources"][0]["managed_model_id"] == model_id
+    else:
+        embeddings_binding = next(
+            item for item in captured["bindings"] if str(item["capability_key"]) == "embeddings"
+        )
+        assert embeddings_binding["default_resource_id"] == model_id
+        assert embeddings_binding["resources"][0]["id"] == model_id
+        assert embeddings_binding["resources"][0]["managed_model_id"] == model_id
+
+
+def test_activate_deployment_profile_allows_incomplete_required_capabilities(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_deployment_profile",
+        lambda _db, deployment_profile_id: {
+            "id": deployment_profile_id,
+            "slug": "profile-a",
+            "display_name": "Profile A",
+            "description": "",
+            "is_active": True,
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_bindings",
+        lambda _db, *, deployment_profile_id: [
+            {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-1",
+                "provider_slug": "vllm-local-gateway",
+                "provider_key": "vllm_local",
+                "provider_display_name": "vLLM local gateway",
+                "endpoint_url": "http://llm:8000",
+                "enabled": True,
+                "adapter_kind": "openai_compatible_llm",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {},
+            },
+        ],
+    )
+    monkeypatch.setattr(platform_service, "_validate_provider_binding", lambda _binding: {"health": {"reachable": True, "status_code": 200}})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *_args, **_kwargs: None)
+
+    deployment = platform_service.activate_deployment_profile(
+        "ignored",
+        config=object(),  # type: ignore[arg-type]
+        deployment_profile_id="deployment-1",
+        activated_by_user_id=1,
+    )
+
+    assert deployment["configuration_status"]["is_ready"] is False
+    assert deployment["configuration_status"]["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
 
 
 def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeypatch: pytest.MonkeyPatch):
@@ -270,102 +681,6 @@ def test_validate_non_model_resources_rejects_provider_instance_mismatch(monkeyp
         "knowledge_base_provider_key": "weaviate_local",
         "provider_key": "qdrant_local",
     }
-
-
-def test_resolve_deployment_bindings_rejects_knowledge_base_embeddings_mismatch(monkeypatch: pytest.MonkeyPatch):
-    bindings_globals = platform_service._resolve_deployment_bindings.__globals__  # type: ignore[attr-defined]
-    providers = {
-        "vector-provider": {"id": "vector-provider", "capability_key": "vector_store", "provider_key": "weaviate_local"},
-        "embedding-provider": {"id": "embedding-provider", "capability_key": "embeddings", "provider_key": "openai_compatible_cloud_embeddings"},
-    }
-    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_id: providers.get(provider_id))
-    monkeypatch.setitem(
-        bindings_globals,
-        "_validate_binding_resources",
-        lambda *_args, resources, default_resource_id, **_kwargs: {
-            "resources": resources,
-            "default_resource_id": default_resource_id,
-        },
-    )
-    monkeypatch.setattr(
-        platform_service.context_repo,
-        "get_knowledge_base",
-        lambda _db, knowledge_base_id: {
-            "id": knowledge_base_id,
-            "vectorization_mode": "vanessa_embeddings",
-            "embedding_provider_instance_id": "embedding-provider",
-            "embedding_resource_id": "text-embedding-3-small",
-        },
-    )
-
-    with pytest.raises(PlatformControlPlaneError) as exc_info:
-        platform_service._resolve_deployment_bindings(  # type: ignore[attr-defined]
-            "ignored",
-            [
-                DeploymentBindingInput(
-                    capability_key="embeddings",
-                    provider_instance_id="embedding-provider",
-                    resources=[{"id": "managed-model-1", "provider_resource_id": "text-embedding-3-large"}],
-                    default_resource_id="managed-model-1",
-                ),
-                DeploymentBindingInput(
-                    capability_key="vector_store",
-                    provider_instance_id="vector-provider",
-                    resources=[{"id": "kb-primary", "knowledge_base_id": "kb-primary"}],
-                    default_resource_id="kb-primary",
-                ),
-            ],
-        )
-
-    assert exc_info.value.code == "resource_embeddings_resource_mismatch"
-
-
-def test_resolve_deployment_bindings_rejects_self_provided_knowledge_base(monkeypatch: pytest.MonkeyPatch):
-    bindings_globals = platform_service._resolve_deployment_bindings.__globals__  # type: ignore[attr-defined]
-    providers = {
-        "vector-provider": {"id": "vector-provider", "capability_key": "vector_store", "provider_key": "weaviate_local"},
-        "embedding-provider": {"id": "embedding-provider", "capability_key": "embeddings", "provider_key": "openai_compatible_cloud_embeddings"},
-    }
-    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_id: providers.get(provider_id))
-    monkeypatch.setitem(
-        bindings_globals,
-        "_validate_binding_resources",
-        lambda *_args, resources, default_resource_id, **_kwargs: {
-            "resources": resources,
-            "default_resource_id": default_resource_id,
-        },
-    )
-    monkeypatch.setattr(
-        platform_service.context_repo,
-        "get_knowledge_base",
-        lambda _db, knowledge_base_id: {
-            "id": knowledge_base_id,
-            "vectorization_mode": "self_provided",
-            "embedding_provider_instance_id": None,
-            "embedding_resource_id": None,
-        },
-    )
-
-    with pytest.raises(PlatformControlPlaneError) as exc_info:
-        platform_service._resolve_deployment_bindings(  # type: ignore[attr-defined]
-            "ignored",
-            [
-                DeploymentBindingInput(
-                    capability_key="embeddings",
-                    provider_instance_id="embedding-provider",
-                    resources=[{"id": "managed-model-1", "provider_resource_id": "text-embedding-3-small"}],
-                    default_resource_id="managed-model-1",
-                ),
-                DeploymentBindingInput(
-                    capability_key="vector_store",
-                    provider_instance_id="vector-provider",
-                    resources=[{"id": "kb-primary", "knowledge_base_id": "kb-primary"}],
-                    default_resource_id="kb-primary",
-                ),
-            ],
-        )
-
-    assert exc_info.value.code == "resource_vectorization_unsupported"
 
 
 def test_serialize_provider_row_exposes_secret_refs_separately():

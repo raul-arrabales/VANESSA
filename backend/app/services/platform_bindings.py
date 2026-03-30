@@ -39,6 +39,7 @@ from .platform_types import (
     DeploymentProfileCreateInput,
     PlatformControlPlaneError,
     ProviderBinding,
+    REQUIRED_CAPABILITIES,
 )
 
 
@@ -59,36 +60,41 @@ def _coerce_create_input(database_url: str, payload: dict[str, Any]) -> Deployme
     if not isinstance(raw_bindings, list) or not raw_bindings:
         raise PlatformControlPlaneError("invalid_bindings", "bindings must be a non-empty array", status_code=400)
 
-    bindings: list[DeploymentBindingInput] = []
-    for item in raw_bindings:
-        if not isinstance(item, dict):
-            raise PlatformControlPlaneError("invalid_binding", "Each binding must be an object", status_code=400)
-        capability_key = str(item.get("capability", "")).strip().lower()
-        provider_instance_id = str(item.get("provider_id", "")).strip()
-        if capability_key not in _known_capability_keys(database_url):
-            raise PlatformControlPlaneError("invalid_capability", "Unsupported capability", status_code=400)
-        if not provider_instance_id:
-            raise PlatformControlPlaneError("invalid_provider_id", "provider_id is required", status_code=400)
-        binding_config = item.get("config") if isinstance(item.get("config"), dict) else {}
-        resource_policy = item.get("resource_policy") if isinstance(item.get("resource_policy"), dict) else {}
-        resources = _coerce_binding_resources(item.get("resources"))
-        default_resource_id = str(item.get("default_resource_id", "")).strip() or None
-        bindings.append(
-            DeploymentBindingInput(
-                capability_key=capability_key,
-                provider_instance_id=provider_instance_id,
-                resources=resources,
-                default_resource_id=default_resource_id,
-                binding_config=dict(binding_config),
-                resource_policy=dict(resource_policy),
-            )
-        )
+    bindings = [_coerce_binding_input(database_url, item=item) for item in raw_bindings]
 
     return DeploymentProfileCreateInput(
         slug=slug,
         display_name=display_name,
         description=description,
         bindings=bindings,
+    )
+
+
+def _coerce_binding_input(
+    database_url: str,
+    *,
+    item: dict[str, Any],
+    capability_key: str | None = None,
+) -> DeploymentBindingInput:
+    if not isinstance(item, dict):
+        raise PlatformControlPlaneError("invalid_binding", "Each binding must be an object", status_code=400)
+    normalized_capability_key = str(capability_key or item.get("capability", "")).strip().lower()
+    provider_instance_id = str(item.get("provider_id", "")).strip()
+    if normalized_capability_key not in _known_capability_keys(database_url):
+        raise PlatformControlPlaneError("invalid_capability", "Unsupported capability", status_code=400)
+    if not provider_instance_id:
+        raise PlatformControlPlaneError("invalid_provider_id", "provider_id is required", status_code=400)
+    binding_config = item.get("config") if isinstance(item.get("config"), dict) else {}
+    resource_policy = item.get("resource_policy") if isinstance(item.get("resource_policy"), dict) else {}
+    resources = _coerce_binding_resources(item.get("resources"))
+    default_resource_id = str(item.get("default_resource_id", "")).strip() or None
+    return DeploymentBindingInput(
+        capability_key=normalized_capability_key,
+        provider_instance_id=provider_instance_id,
+        resources=resources,
+        default_resource_id=default_resource_id,
+        binding_config=dict(binding_config),
+        resource_policy=dict(resource_policy),
     )
 
 
@@ -215,8 +221,19 @@ def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBin
             }
         )
         seen_capabilities.add(binding.capability_key)
-    _validate_knowledge_base_vectorization_bindings(database_url, resolved_bindings=resolved_bindings)
     return resolved_bindings
+
+
+def _require_complete_provider_binding_set(resolved_bindings: list[dict[str, Any]]) -> None:
+    bound_capabilities = {str(item.get("capability_key") or "").strip().lower() for item in resolved_bindings}
+    missing_capabilities = sorted(REQUIRED_CAPABILITIES - bound_capabilities)
+    if missing_capabilities:
+        raise PlatformControlPlaneError(
+            "deployment_profile_incomplete",
+            "Deployment profile is missing required capability bindings",
+            status_code=400,
+            details={"missing_capabilities": missing_capabilities},
+        )
 
 
 def _validate_knowledge_base_vectorization_bindings(
@@ -295,6 +312,8 @@ def _validate_deployment_profile_bindings(
 ) -> list[dict[str, Any]]:
     del database_url, config
     failures: list[dict[str, Any]] = []
+    non_blocking_binding_errors = {"default_resource_required"}
+    non_blocking_resource_errors = {"resource_required"}
     for binding in bindings:
         provider_binding = ProviderBinding.from_row(binding)
         validation = _validate_provider_binding(provider_binding)
@@ -313,6 +332,11 @@ def _validate_deployment_profile_bindings(
         embeddings_reachable = validation.get("embeddings_reachable")
         binding_error = str(validation.get("binding_error") or "").strip() or None
         resource_errors = validation.get("resource_errors")
+        blocking_resource_errors = [
+            item
+            for item in resource_errors
+            if isinstance(item, dict) and str(item.get("code") or "").strip() not in non_blocking_resource_errors
+        ] if isinstance(resource_errors, list) else []
         capability = str(binding.get("capability_key", "")).strip().lower()
         failed = (
             not reachable
@@ -320,8 +344,8 @@ def _validate_deployment_profile_bindings(
             or (capability == CAPABILITY_EMBEDDINGS and embeddings_reachable is False)
             or (capability == CAPABILITY_SANDBOX_EXECUTION and validation.get("execute_reachable") is False)
             or (capability == CAPABILITY_MCP_RUNTIME and validation.get("invoke_reachable") is False)
-            or bool(binding_error)
-            or (isinstance(resource_errors, list) and len(resource_errors) > 0)
+            or bool(binding_error and binding_error not in non_blocking_binding_errors)
+            or bool(blocking_resource_errors)
         )
         if failed:
             failures.append({"provider": result.get("provider"), "validation": validation})
@@ -395,8 +419,8 @@ def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
         if not binding.default_resource_id:
             return {
                 "health": health,
-                "embeddings_reachable": False,
-                "embeddings_status_code": 409,
+                "embeddings_reachable": None,
+                "embeddings_status_code": None,
                 "binding_error": "default_resource_required",
                 "resources_reachable": 200 <= resources_status < 300,
                 "resources_status_code": resources_status,
@@ -499,25 +523,19 @@ def _validate_binding_resources(
             default_resource_id=normalized_default,
             resource_policy=resource_policy,
         )
-    if not normalized_resources:
-        raise PlatformControlPlaneError(
-            "resource_required",
-            f"{normalized_capability} bindings require at least one bound model resource",
-            status_code=400,
-        )
-    if not normalized_default:
-        raise PlatformControlPlaneError(
-            "default_resource_required",
-            "default_resource_id is required when model resources are present",
-            status_code=400,
-        )
-    if normalized_default not in {str(resource.get("id") or "").strip() for resource in normalized_resources}:
+    if normalized_default and normalized_default not in {str(resource.get("id") or "").strip() for resource in normalized_resources}:
         raise PlatformControlPlaneError(
             "default_resource_not_bound",
             "default_resource_id must be present in resources",
             status_code=400,
             details={"default_resource_id": normalized_default},
         )
+
+    if not normalized_resources:
+        return {
+            "resources": [],
+            "default_resource_id": None,
+        }
 
     validated_resources: list[dict[str, Any]] = []
     for resource in normalized_resources:
@@ -554,12 +572,6 @@ def _validate_non_model_resources(
         return {"resources": [], "default_resource_id": None}
     selection_mode = str(resource_policy.get("selection_mode") or _VECTOR_SELECTION_EXPLICIT).strip().lower()
     if selection_mode == _VECTOR_SELECTION_EXPLICIT:
-        if not resources:
-            raise PlatformControlPlaneError(
-                "resource_required",
-                "Vector store bindings in explicit mode require at least one bound resource",
-                status_code=400,
-            )
         if default_resource_id and default_resource_id not in {str(resource.get("id") or "").strip() for resource in resources}:
             raise PlatformControlPlaneError(
                 "default_resource_not_bound",
@@ -567,6 +579,8 @@ def _validate_non_model_resources(
                 status_code=400,
                 details={"default_resource_id": default_resource_id},
             )
+        if not resources:
+            return {"resources": [], "default_resource_id": None}
         validated = []
         for resource in resources:
             validated.append(_validate_vector_binding_resource(database_url, provider_row=provider_row, resource=resource))

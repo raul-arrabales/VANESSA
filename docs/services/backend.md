@@ -92,7 +92,9 @@ Agent-project semantics:
 - `GET /v1/platform/deployments` (superadmin)
 - `GET /v1/platform/activation-audit` (superadmin)
 - `POST /v1/platform/deployments` (superadmin)
+- `PATCH /v1/platform/deployments/{id}` (superadmin)
 - `PUT /v1/platform/deployments/{id}` (superadmin)
+- `PUT /v1/platform/deployments/{id}/bindings/{capability}` (superadmin)
 - `POST /v1/platform/deployments/{id}/clone` (superadmin)
 - `DELETE /v1/platform/deployments/{id}` (superadmin)
 - `POST /v1/platform/deployments/{id}/activate` (superadmin)
@@ -148,7 +150,11 @@ Context-management semantics:
 - Operators can also create/update/delete directory-backed sources and run `Sync now` against one source without rebuilding the whole knowledge base.
 - Operators can also run a retrieval test against one managed knowledge base through the active deployment embeddings/vector runtime without going through full Knowledge Chat.
 - Deployment editors expose only knowledge bases that are both `active` and `ready`.
+- Deployment save semantics are now capability-local. Superadmins may save `embeddings`, `llm_inference`, and `vector_store` bindings independently through `PUT /v1/platform/deployments/{id}/bindings/{capability}`.
+- Deployment identity (`slug`, `display_name`, `description`) can now be updated separately through `PATCH /v1/platform/deployments/{id}`.
+- Required deployment capabilities still require a selected provider, but model and vector resources may be left empty until the capability is fully configured.
 - Deployment binding validation now requires the knowledge base backing provider instance to exactly match the selected deployment `vector_store` provider instance.
+- Cross-capability KB/embeddings compatibility is now surfaced as deployment readiness metadata instead of blocking save. Runtime retrieval and ingestion paths still reject incomplete or mismatched configurations when the capability is actually used.
 - Deployment binding and runtime retrieval validation now also require `vanessa_embeddings` KBs to match the deployment `embeddings` provider instance plus its default embeddings resource.
 - `self_provided` KBs are intentionally excluded from the current text-ingestion and text-query runtime flows until explicit vector upload/query flows land.
 - Knowledge Chat also filters runtime-selectable knowledge bases to `active` + `ready` records at request time, so archived or unhealthy bindings are not silently reused.
@@ -174,9 +180,10 @@ Bootstrap defaults:
 - `mcp_gateway_local` is seeded only when `MCP_GATEWAY_URL` is configured and bound as optional `mcp_runtime` into local deployment profiles when available.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
-- Model-bearing deployment bindings now require one or more model resources plus a default resource for both `llm_inference` and `embeddings`.
+- Model-bearing deployment bindings now require a selected provider, but may be saved temporarily with zero resources and no default until the capability is fully configured.
 - Deployment bindings may reference only ModelOps models that are already `active`, `is_validation_current=true`, and `last_validation_status=success`.
 - The runtime snapshot now serializes generic binding `resources`, `default_resource_id`, `default_resource`, and `resource_policy` for every capability binding.
+- Deployment list/detail responses now include `configuration_status` for both the deployment and each binding so the UI can show partial or mismatched configuration without inventing its own readiness rules.
 - Direct backend inference and agent-engine runtime selection both enforce active-binding membership: requested LLM model ids must be present in the active `llm_inference` binding and omitted requests fall back to the binding default.
 - Runtime-facing provider model ids are resolved per bound managed model. Cloud models resolve through `provider_model_id`; local models resolve by matching the provider `/models` inventory against managed model metadata.
 - Local model-bearing providers now also expose one backend-owned loaded-model slot per provider instance. For local `llm_inference` and `embeddings` providers, downloading a model into ModelOps does not make it testable by itself; a superadmin must assign that managed model into the provider slot so the runtime can advertise it through `/v1/models`.
@@ -189,7 +196,7 @@ Bootstrap defaults:
 - `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
-- Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible.
+- Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible, but incomplete resource/default configuration is reported through readiness metadata instead of blocking activation.
 - Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
 - Tool definitions remain registry entities. Backend bootstraps `tool.web_search` and `tool.python_exec`, and registry validation constrains tool specs to `transport in {"mcp", "sandbox_http"}` with `connection_profile_ref == "default"` in this first convergence phase.
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.

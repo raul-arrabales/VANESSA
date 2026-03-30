@@ -3,7 +3,7 @@ import { ApiError } from "../auth/authApi";
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   token?: string;
 };
@@ -87,6 +87,14 @@ export type PlatformDeploymentBinding = {
   } | null;
   resource_policy?: Record<string, unknown>;
   config: Record<string, unknown>;
+  configuration_status?: {
+    is_ready: boolean;
+    issues: Array<{
+      code: string;
+      message: string;
+    }>;
+    summary: string;
+  };
 };
 
 export type PlatformDeploymentProfile = {
@@ -96,6 +104,11 @@ export type PlatformDeploymentProfile = {
   description: string;
   is_active: boolean;
   bindings: PlatformDeploymentBinding[];
+  configuration_status?: {
+    is_ready: boolean;
+    incomplete_capabilities: string[];
+    summary: string;
+  };
 };
 
 export type PlatformActivationAuditEntry = {
@@ -178,6 +191,28 @@ export type PlatformDeploymentMutationInput = {
     resource_policy?: Record<string, unknown>;
     config?: Record<string, unknown>;
   }>;
+};
+
+export type PlatformDeploymentIdentityMutationInput = Pick<
+  PlatformDeploymentMutationInput,
+  "slug" | "display_name" | "description"
+>;
+
+export type PlatformDeploymentBindingMutationInput = {
+  provider_id: string;
+  resources?: Array<{
+    id: string;
+    resource_kind?: string | null;
+    ref_type?: string | null;
+    managed_model_id?: string | null;
+    knowledge_base_id?: string | null;
+    provider_resource_id?: string | null;
+    display_name?: string | null;
+    metadata?: Record<string, unknown>;
+  }>;
+  default_resource_id?: string | null;
+  resource_policy?: Record<string, unknown>;
+  config?: Record<string, unknown>;
 };
 
 function buildUrl(path: string): string {
@@ -353,6 +388,39 @@ export async function updateDeploymentProfile(
 ): Promise<PlatformDeploymentProfile> {
   const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
     `/v1/platform/deployments/${encodeURIComponent(deploymentId)}`,
+    {
+      method: "PUT",
+      token,
+      body: input,
+    },
+  );
+  return result.deployment_profile;
+}
+
+export async function patchDeploymentProfileIdentity(
+  deploymentId: string,
+  input: PlatformDeploymentIdentityMutationInput,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
+    `/v1/platform/deployments/${encodeURIComponent(deploymentId)}`,
+    {
+      method: "PATCH",
+      token,
+      body: input,
+    },
+  );
+  return result.deployment_profile;
+}
+
+export async function upsertDeploymentBinding(
+  deploymentId: string,
+  capability: string,
+  input: PlatformDeploymentBindingMutationInput,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
+    `/v1/platform/deployments/${encodeURIComponent(deploymentId)}/bindings/${encodeURIComponent(capability)}`,
     {
       method: "PUT",
       token,
