@@ -788,7 +788,7 @@ def list_sync_runs(database_url: str, *, knowledge_base_id: str) -> list[dict[st
               sources.display_name AS source_display_name
             FROM context_knowledge_sync_runs runs
             LEFT JOIN context_knowledge_sources sources ON sources.id = runs.source_id
-            WHERE knowledge_base_id = %s
+            WHERE runs.knowledge_base_id = %s
             ORDER BY runs.started_at DESC
             """,
             (knowledge_base_id.strip(),),

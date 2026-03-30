@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import platform_adapters, platform_service  # noqa: E402
+from app.services import platform_adapters, platform_bootstrap, platform_service  # noqa: E402
 from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
 
 
@@ -136,6 +136,46 @@ def test_build_model_binding_resource_uses_public_model_id():
 
     assert resource["id"] == "sentence-transformers--all-MiniLM-L6-v2"
     assert resource["managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+
+
+def test_runtime_identifier_for_resource_ignores_string_none_provider_resource_id():
+    runtime_identifier = platform_service._runtime_identifier_for_resource(  # type: ignore[attr-defined]
+        {
+            "provider_resource_id": "None",
+            "metadata": {"local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2"},
+        }
+    )
+
+    assert runtime_identifier == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"
+
+
+def test_default_resource_runtime_identifier_ignores_string_none_provider_resource_id():
+    binding = platform_service.ProviderBinding(
+        capability_key="embeddings",
+        provider_instance_id="provider-embeddings",
+        provider_slug="vllm-embeddings-local",
+        provider_key="vllm_embeddings_local",
+        provider_display_name="vLLM embeddings local",
+        provider_description="desc",
+        endpoint_url="http://llm:8000",
+        healthcheck_url="http://llm:8000/health",
+        enabled=True,
+        adapter_kind="openai_compatible_embeddings",
+        config={"embeddings_path": "/v1/embeddings"},
+        binding_config={},
+        deployment_profile_id="deployment-1",
+        deployment_profile_slug="local-default",
+        deployment_profile_display_name="Local Default",
+        default_resource={
+            "provider_resource_id": "None",
+            "metadata": {"local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2"},
+        },
+    )
+
+    assert (
+        platform_adapters._default_resource_runtime_identifier(binding)
+        == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"
+    )
 
 
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
@@ -995,6 +1035,104 @@ def test_assign_provider_loaded_model_persists_local_slot(monkeypatch: pytest.Mo
     assert payload["load_state"] == "loading"
 
 
+def test_reconcile_provider_local_slot_reloads_persisted_model_when_runtime_is_empty(monkeypatch: pytest.MonkeyPatch):
+    provider_row = {
+        "id": "provider-embeddings",
+        "slug": "vllm-embeddings-local",
+        "provider_key": "vllm_embeddings_local",
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+        "display_name": "vLLM embeddings local",
+        "description": "desc",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": True,
+        "config_json": {
+            "runtime_admin_base_url": "http://llm_runtime_embeddings:8000",
+            "loaded_managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_managed_model_name": "all-MiniLM-L6-v2",
+            "loaded_runtime_model_id": "None",
+            "loaded_local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "load_state": "loading",
+        },
+    }
+    load_calls: list[dict[str, str]] = []
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_state",
+        lambda _row: (
+            {
+                "capability": "embeddings",
+                "load_state": "empty",
+                "runtime_model_id": None,
+                "local_path": None,
+                "managed_model_id": None,
+                "display_name": None,
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_load_model",
+        lambda _row, *, runtime_model_id, local_path, managed_model_id, display_name: (
+            load_calls.append(
+                {
+                    "runtime_model_id": runtime_model_id,
+                    "local_path": local_path,
+                    "managed_model_id": managed_model_id,
+                    "display_name": display_name,
+                }
+            )
+            or {
+                "capability": "embeddings",
+                "load_state": "loading",
+                "runtime_model_id": runtime_model_id,
+                "local_path": local_path,
+                "managed_model_id": managed_model_id,
+                "display_name": display_name,
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+
+    def _update_provider_instance(_db, **kwargs):
+        return {
+            "id": kwargs["provider_instance_id"],
+            "slug": kwargs["slug"],
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "endpoint_url": kwargs["endpoint_url"],
+            "healthcheck_url": kwargs["healthcheck_url"],
+            "enabled": kwargs["enabled"],
+            "config_json": dict(kwargs["config_json"]),
+        }
+
+    monkeypatch.setattr(platform_service.platform_repo, "update_provider_instance", _update_provider_instance)
+
+    reconciled = platform_service._platform_local_slots_module.reconcile_provider_local_slot(
+        "ignored",
+        provider_row=provider_row,
+    )
+
+    assert load_calls == [
+        {
+            "runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "display_name": "all-MiniLM-L6-v2",
+        }
+    ]
+    assert reconciled["config_json"]["load_state"] == "loading"
+    assert reconciled["config_json"]["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
+
+
 def test_clear_provider_loaded_model_resets_local_slot(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -1171,6 +1309,70 @@ def test_openai_adapter_uses_models_endpoint_for_health_when_no_healthcheck(monk
 
     assert health["reachable"] is True
     assert seen_urls == ["http://llama_cpp:8080/v1/models"]
+
+
+def test_openai_embeddings_adapter_lists_normalized_embeddings_resources(monkeypatch: pytest.MonkeyPatch):
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del url, method, payload, headers, timeout_seconds
+        return {
+            "object": "list",
+            "data": [
+                {
+                    "id": "text-only-model",
+                    "name": "Text Only",
+                    "owned_by": "local_vllm",
+                    "capabilities": {"text": True, "image_input": False, "embeddings": False},
+                },
+                {
+                    "id": "local-vllm-embeddings-default",
+                    "name": "Local Embeddings",
+                    "owned_by": "local_vllm",
+                    "source_id": "hf/local-embeddings",
+                    "capabilities": {"text": False, "image_input": False, "embeddings": True},
+                },
+            ],
+        }, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleEmbeddingsAdapter(
+        platform_service.ProviderBinding(
+            capability_key="embeddings",
+            provider_instance_id="provider-1",
+            provider_slug="vllm-embeddings-local",
+            provider_key="vllm_embeddings_local",
+            provider_display_name="vLLM embeddings local",
+            provider_description="desc",
+            endpoint_url="http://llm:8000",
+            healthcheck_url="http://llm:8000/health",
+            enabled=True,
+            adapter_kind="openai_compatible_embeddings",
+            config={"models_path": "/v1/models"},
+            binding_config={},
+            deployment_profile_id="deployment-1",
+            deployment_profile_slug="local-default",
+            deployment_profile_display_name="Local Default",
+        )
+    )
+
+    resources, status_code = adapter.list_resources()
+
+    assert status_code == 200
+    assert resources == [
+        {
+            "id": "local-vllm-embeddings-default",
+            "resource_kind": "model",
+            "ref_type": "provider_resource",
+            "managed_model_id": None,
+            "provider_resource_id": "local-vllm-embeddings-default",
+            "display_name": "local-vllm-embeddings-default",
+            "metadata": {
+                "name": "Local Embeddings",
+                "provider_model_id": "local-vllm-embeddings-default",
+                "source_id": "hf/local-embeddings",
+                "owned_by": "local_vllm",
+            },
+        }
+    ]
 
 
 def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.MonkeyPatch):
@@ -1401,6 +1603,41 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
     assert ("local-llama-cpp-id", "vector_store", "weaviate-local-id") in binding_calls
 
 
+def test_ensure_platform_bootstrap_state_reconciles_local_provider_slots(monkeypatch: pytest.MonkeyPatch):
+    reconciled_provider_ids: list[str] = []
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
+    monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id", "slug": kwargs["slug"]})
+    monkeypatch.setattr(
+        platform_bootstrap,
+        "reconcile_local_provider_slots",
+        lambda _db, *, provider_rows: reconciled_provider_ids.extend(str(item.get("id")) for item in provider_rows) or provider_rows,
+    )
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_deployment_profile", lambda _db, *, slug, **kwargs: {"id": f"{slug}-id"})
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+        qdrant_url="",
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert reconciled_provider_ids == [
+        "vllm-local-gateway-id",
+        "vllm-embeddings-local-id",
+        "llama-cpp-local-id",
+    ]
+
+
 def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_configured(monkeypatch: pytest.MonkeyPatch):
     created_profiles: list[str] = []
 
@@ -1498,6 +1735,7 @@ def test_list_providers_preserves_loaded_model_slot_during_bootstrap(
     monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_bootstrap, "reconcile_local_provider_slots", lambda _db, *, provider_rows: provider_rows)
     monkeypatch.setattr(
         platform_service,
         "_effective_local_slot",
@@ -1595,6 +1833,7 @@ def test_list_deployment_profiles_preserves_model_resources_during_bootstrap(
 ):
     monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_bootstrap, "reconcile_local_provider_slots", lambda _db, *, provider_rows: provider_rows)
 
     providers_by_slug: dict[str, dict[str, object]] = {}
 

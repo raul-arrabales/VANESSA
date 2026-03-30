@@ -19,6 +19,7 @@ from .platform_service_types import (
     _QDRANT_DEPLOYMENT_SLUG,
     _VECTOR_SELECTION_DYNAMIC_NAMESPACE,
 )
+from .platform_local_slots import reconcile_local_provider_slots
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_LLM_INFERENCE,
@@ -266,6 +267,22 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             enabled=True,
             config_json={"invoke_path": "/v1/tools/invoke", "list_tools_path": "/v1/tools", "healthcheck_tool_name": "web_search"},
         )
+
+    reconciled_providers = {
+        str(item.get("slug") or "").strip(): item
+        for item in reconcile_local_provider_slots(
+            database_url,
+            provider_rows=[
+                provider
+                for provider in [vllm_provider, embeddings_provider, llama_cpp_provider]
+                if isinstance(provider, dict)
+            ],
+        )
+        if isinstance(item, dict) and str(item.get("slug") or "").strip()
+    }
+    vllm_provider = reconciled_providers.get("vllm-local-gateway", vllm_provider)
+    embeddings_provider = reconciled_providers.get("vllm-embeddings-local", embeddings_provider)
+    llama_cpp_provider = reconciled_providers.get("llama-cpp-local", llama_cpp_provider)
 
     profile = platform_repo.ensure_deployment_profile(database_url, slug=_BOOTSTRAP_DEPLOYMENT_SLUG, display_name=_BOOTSTRAP_DEPLOYMENT_NAME, description=_BOOTSTRAP_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
     default_bindings_by_capability = _existing_bindings_by_capability(database_url, deployment_profile_id=str(profile["id"]))

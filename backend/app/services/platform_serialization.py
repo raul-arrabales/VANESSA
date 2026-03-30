@@ -7,9 +7,18 @@ from .platform_service_types import _CLOUD_PROVIDER_KEYS, _LOCAL_SLOT_CONFIG_KEY
 from .platform_types import ProviderBinding
 
 
+def _normalized_optional_identifier(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"none", "null"}:
+        return None
+    return normalized
+
+
 def _runtime_model_identifier(model_row: dict[str, Any]) -> str:
-    provider_model_id = str(model_row.get("provider_model_id", "")).strip()
-    local_path = str(model_row.get("local_path", "")).strip()
+    provider_model_id = _normalized_optional_identifier(model_row.get("provider_model_id"))
+    local_path = _normalized_optional_identifier(model_row.get("local_path"))
     return provider_model_id or local_path
 
 
@@ -41,13 +50,13 @@ def _build_model_binding_resource(model_row: dict[str, Any], *, provider_resourc
 
 
 def _runtime_identifier_for_resource(resource: dict[str, Any]) -> str:
-    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    provider_resource_id = _normalized_optional_identifier(resource.get("provider_resource_id"))
     if provider_resource_id:
         return provider_resource_id
     metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
-    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
-    local_path = str(metadata.get("local_path", "")).strip()
-    source_id = str(metadata.get("source_id", "")).strip()
+    provider_model_id = _normalized_optional_identifier(metadata.get("provider_model_id"))
+    local_path = _normalized_optional_identifier(metadata.get("local_path"))
+    source_id = _normalized_optional_identifier(metadata.get("source_id"))
     return provider_model_id or local_path or source_id
 
 
@@ -57,9 +66,9 @@ def _serialize_binding_resource(resource: dict[str, Any]) -> dict[str, Any]:
         "id": str(resource.get("id") or "").strip(),
         "resource_kind": str(resource.get("resource_kind") or "").strip() or None,
         "ref_type": str(resource.get("ref_type") or "").strip() or None,
-        "managed_model_id": str(resource.get("managed_model_id") or "").strip() or None,
-        "knowledge_base_id": str(resource.get("knowledge_base_id") or "").strip() or None,
-        "provider_resource_id": str(resource.get("provider_resource_id") or "").strip() or None,
+        "managed_model_id": _normalized_optional_identifier(resource.get("managed_model_id")),
+        "knowledge_base_id": _normalized_optional_identifier(resource.get("knowledge_base_id")),
+        "provider_resource_id": _normalized_optional_identifier(resource.get("provider_resource_id")),
         "display_name": resource.get("display_name") or metadata.get("name"),
         "metadata": dict(metadata),
         "name": metadata.get("name"),

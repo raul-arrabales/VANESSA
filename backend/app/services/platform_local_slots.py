@@ -278,6 +278,103 @@ def _effective_local_slot(provider_row: dict[str, Any]) -> dict[str, Any]:
     return slot
 
 
+def _slot_config_from_state(config: dict[str, Any], slot: dict[str, Any]) -> dict[str, Any]:
+    return _config_with_local_slot(
+        config,
+        loaded_managed_model_id=_normalized_optional_slot_string(slot.get("loaded_managed_model_id")),
+        loaded_managed_model_name=_normalized_optional_slot_string(slot.get("loaded_managed_model_name")),
+        loaded_runtime_model_id=_normalized_optional_slot_string(slot.get("loaded_runtime_model_id")),
+        loaded_local_path=_normalized_optional_slot_string(slot.get("loaded_local_path")),
+        loaded_source_id=_normalized_optional_slot_string(slot.get("loaded_source_id")),
+        load_state=str(slot.get("load_state") or _LOCAL_SLOT_STATE_EMPTY).strip().lower() or _LOCAL_SLOT_STATE_EMPTY,
+        load_error=_normalized_optional_slot_string(slot.get("load_error")),
+    )
+
+
+def reconcile_provider_local_slot(
+    database_url: str,
+    *,
+    provider_row: ProviderRow,
+) -> ProviderRow:
+    if not _is_local_model_slot_provider(provider_row):
+        return provider_row
+
+    provider_config = dict(provider_row.get("config_json") or {})
+    slot = _local_slot_payload_from_config(provider_config)
+    managed_model_id = _normalized_optional_slot_string(slot.get("loaded_managed_model_id"))
+    local_path = _normalized_optional_slot_string(slot.get("loaded_local_path"))
+    runtime_model_id = _normalized_optional_slot_string(slot.get("loaded_runtime_model_id")) or local_path
+    display_name = _normalized_optional_slot_string(slot.get("loaded_managed_model_name"))
+
+    runtime_state, runtime_status = _runtime_admin_state(provider_row)
+    resolved_slot = _local_slot_with_runtime_state(slot, runtime_state, runtime_status)
+
+    runtime_state_model_id = (
+        _normalized_optional_slot_string(runtime_state.get("runtime_model_id"))
+        if isinstance(runtime_state, dict)
+        else None
+    )
+    runtime_load_state = (
+        str(runtime_state.get("load_state") or "").strip().lower()
+        if isinstance(runtime_state, dict)
+        else ""
+    )
+    runtime_aligned = (
+        runtime_model_id is not None
+        and runtime_state_model_id == runtime_model_id
+        and runtime_load_state in {
+            _LOCAL_SLOT_STATE_LOADING,
+            _LOCAL_SLOT_STATE_RECONCILING,
+            _LOCAL_SLOT_STATE_LOADED,
+        }
+    )
+
+    if managed_model_id and runtime_model_id and local_path and not runtime_aligned:
+        runtime_state, runtime_status = _runtime_admin_load_model(
+            provider_row,
+            runtime_model_id=runtime_model_id,
+            local_path=local_path,
+            managed_model_id=managed_model_id,
+            display_name=display_name or managed_model_id,
+        )
+        if runtime_status >= 400 and not (runtime_status == 404 and runtime_state is None):
+            resolved_slot = {
+                **resolved_slot,
+                "load_state": _LOCAL_SLOT_STATE_ERROR,
+                "load_error": str((runtime_state or {}).get("message") or f"runtime_load_failed:{runtime_status}"),
+            }
+        elif isinstance(runtime_state, dict):
+            resolved_slot = _local_slot_with_runtime_state(slot, runtime_state, runtime_status)
+
+    updated_config = _slot_config_from_state(provider_config, resolved_slot)
+    if updated_config == provider_config:
+        return provider_row
+
+    return _update_provider_local_slot(
+        database_url,
+        provider_row=provider_row,
+        config_json=updated_config,
+    )
+
+
+def reconcile_local_provider_slots(
+    database_url: str,
+    *,
+    provider_rows: list[ProviderRow],
+) -> list[ProviderRow]:
+    reconciled: list[ProviderRow] = []
+    for provider_row in provider_rows:
+        if not isinstance(provider_row, dict):
+            continue
+        reconciled.append(
+            reconcile_provider_local_slot(
+                database_url,
+                provider_row=provider_row,
+            )
+        )
+    return reconciled
+
+
 def assign_provider_loaded_model(
     database_url: str,
     *,

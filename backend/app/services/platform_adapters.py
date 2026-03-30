@@ -141,15 +141,24 @@ def _openai_compatible_headers(binding: ProviderBinding) -> dict[str, str]:
     return headers
 
 
+def _normalized_optional_identifier(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"none", "null"}:
+        return None
+    return normalized
+
+
 def _default_resource_runtime_identifier(binding: ProviderBinding) -> str:
     resource = binding.default_resource or {}
-    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    provider_resource_id = _normalized_optional_identifier(resource.get("provider_resource_id"))
     if provider_resource_id:
         return provider_resource_id
     metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
-    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
-    local_path = str(metadata.get("local_path", "")).strip()
-    source_id = str(metadata.get("source_id", "")).strip()
+    provider_model_id = _normalized_optional_identifier(metadata.get("provider_model_id"))
+    local_path = _normalized_optional_identifier(metadata.get("local_path"))
+    source_id = _normalized_optional_identifier(metadata.get("source_id"))
     return provider_model_id or local_path or source_id
 
 
@@ -160,6 +169,15 @@ def _normalize_model_resource(item: dict[str, Any]) -> dict[str, Any]:
         "provider_model_id": str(item.get("id", "")).strip() or None,
         "source_id": str(item.get("source_id", "")).strip() or None,
         "owned_by": item.get("owned_by"),
+    }
+    return {
+        "id": resource_id,
+        "resource_kind": "model",
+        "ref_type": "provider_resource",
+        "managed_model_id": None,
+        "provider_resource_id": resource_id or None,
+        "display_name": item.get("id") or item.get("name"),
+        "metadata": {key: value for key, value in metadata.items() if value not in {None, ""}},
     }
 
 
@@ -186,15 +204,6 @@ def _filter_models_payload_by_capability(
         if include_item:
             filtered.append(dict(item))
     return {**payload, "data": filtered}
-    return {
-        "id": resource_id,
-        "resource_kind": "model",
-        "ref_type": "provider_resource",
-        "managed_model_id": None,
-        "provider_resource_id": resource_id or None,
-        "display_name": item.get("id") or item.get("name"),
-        "metadata": {key: value for key, value in metadata.items() if value not in {None, ""}},
-    }
 
 
 class LlmInferenceAdapter(ABC):

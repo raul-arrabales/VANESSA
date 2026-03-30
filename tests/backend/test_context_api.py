@@ -459,3 +459,44 @@ def test_sync_knowledge_source_route_returns_payload_for_superadmin(client, monk
 
     assert response.status_code == 200
     assert response.get_json()["sync_run"]["id"] == "run-1"
+
+
+def test_list_knowledge_base_sync_runs_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-sync-runs@example.com",
+        username="admin-sync-runs",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "list_knowledge_base_sync_runs",
+        lambda *_args, **_kwargs: [
+            {
+                "id": "run-1",
+                "knowledge_base_id": "kb-primary",
+                "source_id": "source-1",
+                "source_display_name": "Docs folder",
+                "status": "ready",
+                "scanned_file_count": 5,
+                "changed_file_count": 1,
+                "deleted_file_count": 0,
+                "created_document_count": 2,
+                "updated_document_count": 1,
+                "deleted_document_count": 0,
+                "error_summary": None,
+                "started_at": "2026-03-30T10:00:00+00:00",
+                "finished_at": "2026-03-30T10:01:00+00:00",
+            }
+        ],
+    )
+
+    response = test_client.get("/v1/context/knowledge-bases/kb-primary/sync-runs", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["sync_runs"][0]["source_display_name"] == "Docs folder"
