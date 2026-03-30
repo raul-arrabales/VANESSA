@@ -282,7 +282,11 @@ def resync_knowledge_base(
             updated_by_user_id=updated_by_user_id,
             summary=f"Resynced {len(documents)} document(s) and {total_chunks} chunk(s).",
         )
-        return _serialize_knowledge_base(refreshed or _require_knowledge_base(database_url, knowledge_base_id))
+        return _serialize_knowledge_base(
+            context_repo.get_knowledge_base(database_url, knowledge_base_id)
+            or refreshed
+            or _require_knowledge_base(database_url, knowledge_base_id)
+        )
     except Exception:
         _mark_knowledge_base_sync_error(
             database_url,

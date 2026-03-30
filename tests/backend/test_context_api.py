@@ -62,7 +62,15 @@ def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatc
                 "display_name": "Product Docs",
                 "description": "docs",
                 "index_name": "kb_product_docs",
+                "backing_provider_instance_id": "provider-2",
                 "backing_provider_key": "weaviate_local",
+                "backing_provider": {
+                    "id": "provider-2",
+                    "display_name": "Weaviate local",
+                    "provider_key": "weaviate_local",
+                    "enabled": True,
+                    "capability": "vector_store",
+                },
                 "lifecycle_state": "active",
                 "sync_status": "ready",
                 "schema": {},
@@ -76,6 +84,69 @@ def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatc
 
     assert response.status_code == 200
     assert response.get_json()["knowledge_bases"][0]["id"] == "kb-primary"
+
+
+def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-create@example.com",
+        username="superadmin-create",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _create_knowledge_base(_db, *, config, payload, created_by_user_id):
+        captured["config"] = config
+        captured["payload"] = payload
+        captured["created_by_user_id"] = created_by_user_id
+        return {
+            "id": "kb-primary",
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "description": "docs",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "backing_provider": {
+                "id": "provider-2",
+                "display_name": "Weaviate local",
+                "provider_key": "weaviate_local",
+                "enabled": True,
+                "capability": "vector_store",
+            },
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+            "schema": {},
+            "document_count": 0,
+            "binding_count": 0,
+        }
+
+    monkeypatch.setattr(context_routes, "create_knowledge_base", _create_knowledge_base)
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases",
+        headers=_auth(token),
+        json={
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "description": "docs",
+            "backing_provider_instance_id": "provider-2",
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["created_by_user_id"] == superadmin["id"]
+    assert captured["payload"] == {
+        "slug": "product-docs",
+        "display_name": "Product Docs",
+        "description": "docs",
+        "backing_provider_instance_id": "provider-2",
+    }
+    assert response.get_json()["knowledge_base"]["backing_provider_instance_id"] == "provider-2"
 
 
 def test_resync_knowledge_base_route_requires_superadmin(client, monkeypatch: pytest.MonkeyPatch):

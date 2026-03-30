@@ -14,11 +14,13 @@ def list_knowledge_bases(
     *,
     eligible_only: bool = False,
     backing_provider_key: str | None = None,
+    backing_provider_instance_id: str | None = None,
 ) -> list[dict[str, Any]]:
     return [_serialize_knowledge_base(row) for row in context_repo.list_knowledge_bases(
         database_url,
         eligible_only=eligible_only,
         backing_provider_key=backing_provider_key,
+        backing_provider_instance_id=backing_provider_instance_id,
     )]
 
 
@@ -48,14 +50,14 @@ def create_knowledge_base(
     payload: dict[str, Any],
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
-    normalized = _normalize_knowledge_base_payload(payload, is_create=True)
+    normalized = _normalize_knowledge_base_payload(database_url, payload, is_create=True)
     knowledge_base = context_repo.create_knowledge_base(
         database_url,
         slug=normalized["slug"],
         display_name=normalized["display_name"],
         description=normalized["description"],
         index_name=normalized["index_name"],
-        backing_provider_key=normalized["backing_provider_key"],
+        backing_provider_instance_id=str(normalized["backing_provider_instance_id"]),
         lifecycle_state=normalized["lifecycle_state"],
         sync_status="syncing",
         schema_json=normalized["schema"],
@@ -88,7 +90,9 @@ def create_knowledge_base(
         last_sync_summary="Managed knowledge base index is ready.",
         updated_by_user_id=created_by_user_id,
     )
-    return _serialize_knowledge_base(refreshed or knowledge_base)
+    return _serialize_knowledge_base(
+        context_repo.get_knowledge_base(database_url, str((refreshed or knowledge_base)["id"])) or refreshed or knowledge_base
+    )
 
 
 def update_knowledge_base(
@@ -99,7 +103,7 @@ def update_knowledge_base(
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     existing = _require_knowledge_base(database_url, knowledge_base_id)
-    normalized = _normalize_knowledge_base_payload(payload, is_create=False, existing=existing)
+    normalized = _normalize_knowledge_base_payload(database_url, payload, is_create=False, existing=existing)
     if (
         normalized["lifecycle_state"] == "archived"
         and str(existing.get("lifecycle_state") or "").strip().lower() != "archived"
@@ -127,7 +131,7 @@ def update_knowledge_base(
     )
     if updated is None:
         raise PlatformControlPlaneError("knowledge_base_not_found", "Knowledge base not found", status_code=404)
-    return _serialize_knowledge_base(updated)
+    return _serialize_knowledge_base(context_repo.get_knowledge_base(database_url, knowledge_base_id) or updated)
 
 
 def delete_knowledge_base(

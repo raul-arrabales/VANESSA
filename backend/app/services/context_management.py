@@ -78,7 +78,6 @@ from .context_management_sources import (
     update_knowledge_source,
 )
 from .context_management_types import (
-    _DEFAULT_BACKING_PROVIDER_KEY,
     _DEFAULT_CHUNK_SIZE,
     _KB_LIFECYCLE_STATES,
     _KB_SYNC_STATES,
@@ -88,7 +87,6 @@ from .context_management_types import (
     _SOURCE_LIFECYCLE_STATES,
     _SOURCE_SYNC_STATES,
     _SOURCE_TYPES,
-    _SUPPORTED_BACKING_PROVIDER_KEYS,
     _SUPPORTED_SCHEMA_PROPERTY_TYPES,
     _SUPPORTED_UPLOAD_EXTENSIONS,
 )

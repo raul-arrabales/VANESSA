@@ -145,3 +145,20 @@ def test_platform_binding_resources_migration_guards_legacy_copy_when_table_abse
 
     assert "to_regclass('public.platform_binding_served_models') IS NOT NULL" in migration_sql
     assert "DROP TABLE IF EXISTS platform_binding_served_models;" in migration_sql
+
+
+def test_context_management_migration_tracks_backing_provider_instances():
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "012_context_management.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    assert "backing_provider_instance_id UUID" in migration_sql
+    assert "ALTER COLUMN backing_provider_instance_id SET NOT NULL" in migration_sql
+    assert "Unable to backfill context_knowledge_bases.backing_provider_instance_id" in migration_sql
+    assert "i.id AS provider_instance_id" in migration_sql
+    assert "MAX(i.id)" not in migration_sql

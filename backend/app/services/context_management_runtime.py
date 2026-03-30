@@ -35,13 +35,15 @@ def query_knowledge_base(
         raise PlatformControlPlaneError("invalid_query_text", "query_text must be a non-empty string", status_code=400)
     top_k = _normalize_query_top_k(payload.get("top_k"))
     vector_adapter = resolve_vector_store_adapter(database_url, config)
-    if str(vector_adapter.binding.provider_key or "").strip().lower() != str(knowledge_base.get("backing_provider_key") or "").strip().lower():
+    if str(vector_adapter.binding.provider_instance_id or "").strip() != str(knowledge_base.get("backing_provider_instance_id") or "").strip():
         raise PlatformControlPlaneError(
             "knowledge_base_provider_mismatch",
             "The active deployment vector store provider does not match this knowledge base.",
             status_code=409,
             details={
                 "knowledge_base_id": knowledge_base_id,
+                "knowledge_base_provider_instance_id": knowledge_base.get("backing_provider_instance_id"),
+                "active_provider_instance_id": vector_adapter.binding.provider_instance_id,
                 "knowledge_base_provider_key": knowledge_base.get("backing_provider_key"),
                 "active_provider_key": vector_adapter.binding.provider_key,
             },

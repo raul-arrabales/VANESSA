@@ -9,7 +9,16 @@ export type KnowledgeBase = {
   display_name: string;
   description: string;
   index_name: string;
+  backing_provider_instance_id?: string | null;
   backing_provider_key: string;
+  backing_provider?: {
+    id: string;
+    slug?: string | null;
+    provider_key?: string | null;
+    display_name?: string | null;
+    enabled?: boolean | null;
+    capability?: string | null;
+  } | null;
   lifecycle_state: "active" | "archived" | string;
   sync_status: "ready" | "syncing" | "error" | string;
   schema: Record<string, unknown>;
@@ -109,7 +118,7 @@ function buildUrl(path: string): string {
 
 export async function listKnowledgeBases(
   token: string,
-  options: { eligible?: boolean; backingProviderKey?: string } = {},
+  options: { eligible?: boolean; backingProviderKey?: string; backingProviderInstanceId?: string } = {},
 ): Promise<KnowledgeBase[]> {
   const params = new URLSearchParams();
   if (options.eligible) {
@@ -117,6 +126,9 @@ export async function listKnowledgeBases(
   }
   if (options.backingProviderKey) {
     params.set("backing_provider_key", options.backingProviderKey);
+  }
+  if (options.backingProviderInstanceId) {
+    params.set("backing_provider_instance_id", options.backingProviderInstanceId);
   }
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const result = await requestJson<{ knowledge_bases: KnowledgeBase[] }>(`/v1/context/knowledge-bases${suffix}`, { token });
@@ -128,7 +140,7 @@ export async function createKnowledgeBase(
     slug: string;
     display_name: string;
     description: string;
-    backing_provider_key?: string;
+    backing_provider_instance_id: string;
     lifecycle_state?: string;
     schema?: Record<string, unknown>;
   },

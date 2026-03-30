@@ -30,13 +30,11 @@ class SourceSyncSummary(TypedDict):
 
 _SUPPORTED_SCHEMA_PROPERTY_TYPES = {"text", "number", "int", "boolean"}
 _SUPPORTED_UPLOAD_EXTENSIONS = {".txt", ".md", ".json", ".jsonl", ".pdf"}
-_SUPPORTED_BACKING_PROVIDER_KEYS = {"weaviate_local"}
 _KB_LIFECYCLE_STATES = {"active", "archived"}
 _KB_SYNC_STATES = {"ready", "syncing", "error"}
 _SOURCE_TYPES = {"local_directory"}
 _SOURCE_LIFECYCLE_STATES = {"active", "archived"}
 _SOURCE_SYNC_STATES = {"idle", "syncing", "ready", "error"}
-_DEFAULT_BACKING_PROVIDER_KEY = "weaviate_local"
 _DEFAULT_CHUNK_SIZE = 1000
 _MAX_FILE_SIZE_BYTES = 1_000_000
 _MAX_UPLOAD_FILES = 10

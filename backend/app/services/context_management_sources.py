@@ -227,7 +227,9 @@ def sync_knowledge_source(
             ),
         )
         return {
-            "knowledge_base": _serialize_knowledge_base(refreshed_kb or knowledge_base),
+            "knowledge_base": _serialize_knowledge_base(
+                context_repo.get_knowledge_base(database_url, knowledge_base_id) or refreshed_kb or knowledge_base
+            ),
             "source": _serialize_knowledge_source(refreshed_source or source),
             "sync_run": _serialize_sync_run(finished_run or run),
         }

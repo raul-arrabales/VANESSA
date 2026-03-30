@@ -71,11 +71,13 @@ def _json_error(status: int, code: str, message: str, *, details: dict | None = 
 def list_knowledge_bases_route():
     eligible_only = request.args.get("eligible", "").strip().lower() == "true"
     backing_provider_key = request.args.get("backing_provider_key", "").strip() or None
+    backing_provider_instance_id = request.args.get("backing_provider_instance_id", "").strip() or None
     try:
         knowledge_bases = list_knowledge_bases(
             _database_url(),
             eligible_only=eligible_only,
             backing_provider_key=backing_provider_key,
+            backing_provider_instance_id=backing_provider_instance_id,
         )
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)

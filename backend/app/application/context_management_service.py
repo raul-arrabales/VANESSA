@@ -43,11 +43,13 @@ def list_context_knowledge_bases(
     *,
     eligible_only: bool,
     backing_provider_key: str | None,
+    backing_provider_instance_id: str | None,
 ):
     return _list_knowledge_bases(
         database_url,
         eligible_only=eligible_only,
         backing_provider_key=backing_provider_key,
+        backing_provider_instance_id=backing_provider_instance_id,
     )
 
 

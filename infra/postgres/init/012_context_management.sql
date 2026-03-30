@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS context_knowledge_bases (
     display_name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     index_name TEXT NOT NULL UNIQUE,
-    backing_provider_key TEXT NOT NULL,
+    backing_provider_instance_id UUID NOT NULL REFERENCES platform_provider_instances(id) ON DELETE RESTRICT,
     lifecycle_state TEXT NOT NULL DEFAULT 'active',
     sync_status TEXT NOT NULL DEFAULT 'ready',
     schema_json JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -24,7 +24,7 @@ ALTER TABLE context_knowledge_bases
 ALTER TABLE context_knowledge_bases
     ADD COLUMN IF NOT EXISTS index_name TEXT;
 ALTER TABLE context_knowledge_bases
-    ADD COLUMN IF NOT EXISTS backing_provider_key TEXT;
+    ADD COLUMN IF NOT EXISTS backing_provider_instance_id UUID REFERENCES platform_provider_instances(id) ON DELETE RESTRICT;
 ALTER TABLE context_knowledge_bases
     ADD COLUMN IF NOT EXISTS lifecycle_state TEXT NOT NULL DEFAULT 'active';
 ALTER TABLE context_knowledge_bases
@@ -68,8 +68,59 @@ BEGIN
 END
 $$;
 
-CREATE INDEX IF NOT EXISTS context_knowledge_bases_backing_provider_key_idx
-    ON context_knowledge_bases (backing_provider_key);
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'context_knowledge_bases'
+          AND column_name = 'backing_provider_key'
+    ) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM (
+                SELECT kb.id
+                FROM context_knowledge_bases kb
+                LEFT JOIN platform_provider_instances i ON i.provider_key = kb.backing_provider_key
+                LEFT JOIN platform_provider_families f ON f.provider_key = i.provider_key
+                WHERE kb.backing_provider_instance_id IS NULL
+                GROUP BY kb.id
+                HAVING COUNT(*) FILTER (WHERE f.capability_key = 'vector_store') <> 1
+            ) unresolved
+        ) THEN
+            RAISE EXCEPTION
+                'Unable to backfill context_knowledge_bases.backing_provider_instance_id because one or more rows have zero or multiple matching vector-store provider instances.';
+        END IF;
+
+        UPDATE context_knowledge_bases kb
+        SET backing_provider_instance_id = resolved.provider_instance_id
+        FROM (
+            SELECT
+                kb_inner.id AS knowledge_base_id,
+                i.id AS provider_instance_id
+            FROM context_knowledge_bases kb_inner
+            JOIN platform_provider_instances i ON i.provider_key = kb_inner.backing_provider_key
+            JOIN platform_provider_families f ON f.provider_key = i.provider_key
+            WHERE kb_inner.backing_provider_instance_id IS NULL
+              AND f.capability_key = 'vector_store'
+        ) resolved
+        WHERE kb.id = resolved.knowledge_base_id
+          AND kb.backing_provider_instance_id IS NULL;
+    END IF;
+END
+$$;
+
+ALTER TABLE context_knowledge_bases
+    ALTER COLUMN backing_provider_instance_id SET NOT NULL;
+
+DROP INDEX IF EXISTS context_knowledge_bases_backing_provider_key_idx;
+
+ALTER TABLE context_knowledge_bases
+    DROP COLUMN IF EXISTS backing_provider_key;
+
+CREATE INDEX IF NOT EXISTS context_knowledge_bases_backing_provider_instance_idx
+    ON context_knowledge_bases (backing_provider_instance_id);
 
 CREATE TABLE IF NOT EXISTS context_documents (
     id UUID PRIMARY KEY,

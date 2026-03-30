@@ -186,27 +186,40 @@ def _resolve_knowledge_base_vector_adapter(database_url: str, config: AuthConfig
     from . import platform_service
 
     platform_service.ensure_platform_bootstrap_state(database_url, config)
-    provider_key = str(knowledge_base.get("backing_provider_key") or "").strip().lower()
-    provider_row = next(
-        (
-            row for row in platform_repo.list_provider_instances(database_url)
-            if str(row.get("capability_key") or "").strip().lower() == CAPABILITY_VECTOR_STORE
-            and str(row.get("provider_key") or "").strip().lower() == provider_key
-            and bool(row.get("enabled", True))
-        ),
-        None,
-    )
+    provider_instance_id = str(knowledge_base.get("backing_provider_instance_id") or "").strip()
+    if not provider_instance_id:
+        raise PlatformControlPlaneError(
+            "vector_provider_not_found",
+            "Backing vector provider is not configured",
+            status_code=409,
+            details={"knowledge_base_id": knowledge_base.get("id")},
+        )
+    provider_row = platform_repo.get_provider_instance(database_url, provider_instance_id)
     if provider_row is None:
         raise PlatformControlPlaneError(
             "vector_provider_not_found",
             "Backing vector provider is not configured",
             status_code=409,
-            details={"provider_key": provider_key},
+            details={"provider_instance_id": provider_instance_id},
+        )
+    if str(provider_row.get("capability_key") or "").strip().lower() != CAPABILITY_VECTOR_STORE:
+        raise PlatformControlPlaneError(
+            "vector_provider_invalid",
+            "Backing provider is not a vector store provider",
+            status_code=409,
+            details={"provider_instance_id": provider_instance_id},
+        )
+    if not bool(provider_row.get("enabled", True)):
+        raise PlatformControlPlaneError(
+            "vector_provider_disabled",
+            "Backing vector provider is disabled",
+            status_code=409,
+            details={"provider_instance_id": provider_instance_id},
         )
     return platform_service.resolve_vector_store_adapter(
         database_url,
         config,
-        provider_instance_id=str(provider_row["id"]),
+        provider_instance_id=provider_instance_id,
     )
 
 

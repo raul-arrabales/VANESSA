@@ -13,22 +13,34 @@ def list_knowledge_bases(
     *,
     eligible_only: bool = False,
     backing_provider_key: str | None = None,
+    backing_provider_instance_id: str | None = None,
 ) -> list[dict[str, Any]]:
     filters: list[str] = []
     params: list[Any] = []
     if eligible_only:
         filters.append("kb.lifecycle_state = 'active' AND kb.sync_status = 'ready'")
     if backing_provider_key:
-        filters.append("kb.backing_provider_key = %s")
+        filters.append("provider.provider_key = %s")
         params.append(backing_provider_key.strip().lower())
+    if backing_provider_instance_id:
+        filters.append("kb.backing_provider_instance_id = %s")
+        params.append(backing_provider_instance_id.strip())
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
     with get_connection(database_url) as connection:
         rows = connection.execute(
             f"""
             SELECT
               kb.*,
+              provider.id AS backing_provider_instance_id,
+              provider.slug AS backing_provider_slug,
+              provider.provider_key AS backing_provider_key,
+              provider.display_name AS backing_provider_display_name,
+              provider.enabled AS backing_provider_enabled,
+              family.capability_key AS backing_provider_capability,
               COALESCE(usage.binding_count, 0) AS binding_count
             FROM context_knowledge_bases kb
+            LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
+            LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
             LEFT JOIN (
               SELECT
                 knowledge_base_id,
@@ -51,8 +63,16 @@ def get_knowledge_base(database_url: str, knowledge_base_id: str) -> dict[str, A
             """
             SELECT
               kb.*,
+              provider.id AS backing_provider_instance_id,
+              provider.slug AS backing_provider_slug,
+              provider.provider_key AS backing_provider_key,
+              provider.display_name AS backing_provider_display_name,
+              provider.enabled AS backing_provider_enabled,
+              family.capability_key AS backing_provider_capability,
               COALESCE(usage.binding_count, 0) AS binding_count
             FROM context_knowledge_bases kb
+            LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
+            LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
             LEFT JOIN (
               SELECT
                 knowledge_base_id,
@@ -75,10 +95,20 @@ def get_knowledge_bases(database_url: str, knowledge_base_ids: list[str]) -> lis
     with get_connection(database_url) as connection:
         rows = connection.execute(
             """
-            SELECT *
+            SELECT
+              kb.*,
+              provider.id AS backing_provider_instance_id,
+              provider.slug AS backing_provider_slug,
+              provider.provider_key AS backing_provider_key,
+              provider.display_name AS backing_provider_display_name,
+              provider.enabled AS backing_provider_enabled,
+              family.capability_key AS backing_provider_capability
             FROM context_knowledge_bases
-            WHERE id = ANY(%s)
-            ORDER BY created_at ASC, slug ASC
+            kb
+            LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
+            LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
+            WHERE kb.id = ANY(%s)
+            ORDER BY kb.created_at ASC, kb.slug ASC
             """,
             (normalized_ids,),
         ).fetchall()
@@ -92,7 +122,7 @@ def create_knowledge_base(
     display_name: str,
     description: str,
     index_name: str,
-    backing_provider_key: str,
+    backing_provider_instance_id: str,
     lifecycle_state: str,
     sync_status: str,
     schema_json: dict[str, Any],
@@ -108,7 +138,7 @@ def create_knowledge_base(
                 display_name,
                 description,
                 index_name,
-                backing_provider_key,
+                backing_provider_instance_id,
                 lifecycle_state,
                 sync_status,
                 schema_json,
@@ -124,7 +154,7 @@ def create_knowledge_base(
                 display_name.strip(),
                 description.strip(),
                 index_name.strip(),
-                backing_provider_key.strip().lower(),
+                backing_provider_instance_id.strip(),
                 lifecycle_state.strip().lower(),
                 sync_status.strip().lower(),
                 Jsonb(schema_json),

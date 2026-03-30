@@ -196,6 +196,7 @@ def test_validate_non_model_resources_accepts_ready_active_knowledge_base(monkey
             "slug": "product-docs",
             "display_name": "Product Docs",
             "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
             "backing_provider_key": "weaviate_local",
             "lifecycle_state": "active",
             "sync_status": "ready",
@@ -205,7 +206,7 @@ def test_validate_non_model_resources_accepts_ready_active_knowledge_base(monkey
 
     payload = platform_service._validate_non_model_resources(  # type: ignore[attr-defined]
         database_url="ignored",
-        provider_row={"provider_key": "weaviate_local"},
+        provider_row={"id": "provider-2", "provider_key": "weaviate_local"},
         capability_key="vector_store",
         resources=[{"id": "kb-primary", "ref_type": "knowledge_base"}],
         default_resource_id="kb-primary",
@@ -224,12 +225,51 @@ def test_validate_non_model_resources_accepts_ready_active_knowledge_base(monkey
             "metadata": {
                 "slug": "product-docs",
                 "index_name": "kb_product_docs",
+                "backing_provider_instance_id": "provider-2",
+                "backing_provider_key": "weaviate_local",
                 "lifecycle_state": "active",
                 "sync_status": "ready",
                 "document_count": 4,
             },
         }
     ]
+
+
+def test_validate_non_model_resources_rejects_provider_instance_mismatch(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        platform_service.context_repo,
+        "get_knowledge_base",
+        lambda _db, knowledge_base_id: {
+            "id": knowledge_base_id,
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+            "document_count": 4,
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service._validate_non_model_resources(  # type: ignore[attr-defined]
+            database_url="ignored",
+            provider_row={"id": "provider-9", "provider_key": "qdrant_local"},
+            capability_key="vector_store",
+            resources=[{"id": "kb-primary", "ref_type": "knowledge_base"}],
+            default_resource_id="kb-primary",
+            resource_policy={"selection_mode": "explicit"},
+        )
+
+    assert exc_info.value.code == "resource_provider_mismatch"
+    assert exc_info.value.details == {
+        "knowledge_base_id": "kb-primary",
+        "knowledge_base_provider_instance_id": "provider-2",
+        "provider_instance_id": "provider-9",
+        "knowledge_base_provider_key": "weaviate_local",
+        "provider_key": "qdrant_local",
+    }
 
 
 def test_serialize_provider_row_exposes_secret_refs_separately():

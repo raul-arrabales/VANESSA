@@ -555,13 +555,15 @@ def _validate_vector_binding_resource(
                 status_code=409,
                 details={"knowledge_base_id": knowledge_base_id},
             )
-        if str(knowledge_base.get("backing_provider_key") or "").strip().lower() != str(provider_row.get("provider_key") or "").strip().lower():
+        if str(knowledge_base.get("backing_provider_instance_id") or "").strip() != str(provider_row.get("id") or "").strip():
             raise PlatformControlPlaneError(
                 "resource_provider_mismatch",
                 "Knowledge base backing provider must match the selected vector store provider",
                 status_code=400,
                 details={
                     "knowledge_base_id": knowledge_base_id,
+                    "knowledge_base_provider_instance_id": knowledge_base.get("backing_provider_instance_id"),
+                    "provider_instance_id": provider_row.get("id"),
                     "knowledge_base_provider_key": knowledge_base.get("backing_provider_key"),
                     "provider_key": provider_row.get("provider_key"),
                 },

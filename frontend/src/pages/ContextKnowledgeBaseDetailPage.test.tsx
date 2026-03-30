@@ -23,7 +23,16 @@ const contextApiMocks = vi.hoisted(() => ({
     display_name: "Product Docs",
     description: "docs",
     index_name: "kb_product_docs",
+    backing_provider_instance_id: "provider-2",
     backing_provider_key: "weaviate_local",
+    backing_provider: {
+      id: "provider-2",
+      slug: "weaviate-local",
+      provider_key: "weaviate_local",
+      display_name: "Weaviate local",
+      enabled: true,
+      capability: "vector_store",
+    },
     lifecycle_state: "active",
     sync_status: "ready",
     eligible_for_binding: true,
@@ -115,7 +124,16 @@ const contextApiMocks = vi.hoisted(() => ({
     display_name: "Product Docs",
     description: "docs",
     index_name: "kb_product_docs",
+    backing_provider_instance_id: "provider-2",
     backing_provider_key: "weaviate_local",
+    backing_provider: {
+      id: "provider-2",
+      slug: "weaviate-local",
+      provider_key: "weaviate_local",
+      display_name: "Weaviate local",
+      enabled: true,
+      capability: "vector_store",
+    },
     lifecycle_state: "active",
     sync_status: "ready",
     eligible_for_binding: true,
@@ -137,7 +155,16 @@ const contextApiMocks = vi.hoisted(() => ({
       display_name: "Product Docs",
       description: "docs",
       index_name: "kb_product_docs",
+      backing_provider_instance_id: "provider-2",
       backing_provider_key: "weaviate_local",
+      backing_provider: {
+        id: "provider-2",
+        slug: "weaviate-local",
+        provider_key: "weaviate_local",
+        display_name: "Weaviate local",
+        enabled: true,
+        capability: "vector_store",
+      },
       lifecycle_state: "active",
       sync_status: "ready",
       eligible_for_binding: true,
@@ -209,6 +236,7 @@ describe("ContextKnowledgeBaseDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
+    expect(screen.getByText(/Weaviate local/)).toBeVisible();
     expect(screen.getByText(/Local Default/)).toBeVisible();
     expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Sources" })).toBeVisible();

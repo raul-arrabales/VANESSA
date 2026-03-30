@@ -46,6 +46,12 @@ export function KnowledgeBaseOverviewSection({
         <span className="status-text">{knowledgeBase.index_name}</span>
       </div>
       <div className="card-stack">
+        {knowledgeBase.backing_provider ? (
+          <p className="status-text">
+            {t("contextManagement.fields.provider")}: {knowledgeBase.backing_provider.display_name ?? knowledgeBase.backing_provider.id}
+            {knowledgeBase.backing_provider.provider_key ? ` (${knowledgeBase.backing_provider.provider_key})` : ""}
+          </p>
+        ) : null}
         <p className="status-text">
           {knowledgeBase.eligible_for_binding
             ? t("contextManagement.states.eligible")

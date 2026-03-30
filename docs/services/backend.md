@@ -131,7 +131,7 @@ Context-management request parsing and response shaping are now owned by the app
 Context-management semantics:
 
 - Managed knowledge bases are global records, but deployments explicitly bind them as `vector_store` binding resources.
-- Current v1 support targets `weaviate_local` only.
+- Each managed knowledge base is created against one configured `vector_store` provider instance.
 - Documents are stored in Postgres, chunked synchronously by backend, and upserted into the backing vector provider.
 - Managed `local_directory` knowledge sources live under allowlisted backend-visible roots configured by `CONTEXT_SOURCE_ROOTS`.
 - Source sync is deterministic: document identity is derived from `source_id + source_path + logical position`, so re-sync updates or deletes existing source-managed documents instead of duplicating them.
@@ -142,6 +142,7 @@ Context-management semantics:
 - Operators can also create/update/delete directory-backed sources and run `Sync now` against one source without rebuilding the whole knowledge base.
 - Operators can also run a retrieval test against one managed knowledge base through the active deployment embeddings/vector runtime without going through full Knowledge Chat.
 - Deployment editors expose only knowledge bases that are both `active` and `ready`.
+- Deployment binding validation now requires the knowledge base backing provider instance to exactly match the selected deployment `vector_store` provider instance.
 - Knowledge Chat also filters runtime-selectable knowledge bases to `active` + `ready` records at request time, so archived or unhealthy bindings are not silently reused.
 - Managed vector binding resources now use `ref_type="knowledge_base"` plus `knowledge_base_id`, while still preserving `provider_resource_id=index_name` for runtime enforcement.
 

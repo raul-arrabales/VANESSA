@@ -8,11 +8,16 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     displayName,
     description,
     schemaText,
+    providerOptions,
+    selectedProviderId,
+    providerLoadError,
+    providersLoading,
     saving,
     setSlug,
     setDisplayName,
     setDescription,
     setSchemaText,
+    setSelectedProviderId,
     handleSubmit,
   } = useContextKnowledgeBaseCreate();
 
@@ -20,6 +25,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     <section className="panel card-stack">
       <h2 className="section-title">{t("contextManagement.createTitle")}</h2>
       <p className="status-text">{t("contextManagement.createDescription")}</p>
+      {providerLoadError ? <p className="status-text error-text">{providerLoadError}</p> : null}
       <form className="card-stack" onSubmit={(event) => void handleSubmit(event)}>
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.deployment.slug")}</span>
@@ -34,6 +40,22 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
           <textarea className="field-input quote-admin-textarea" value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
         </label>
         <label className="card-stack">
+          <span className="field-label">{t("contextManagement.fields.provider")}</span>
+          <select
+            className="field-input"
+            value={selectedProviderId}
+            disabled={providersLoading || saving}
+            onChange={(event) => setSelectedProviderId(event.currentTarget.value)}
+          >
+            <option value="">{t("contextManagement.states.selectProvider")}</option>
+            {providerOptions.map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {`${provider.display_name} (${provider.provider_key})`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="card-stack">
           <span className="field-label">{t("contextManagement.fields.schema")}</span>
           <textarea
             className="field-input quote-admin-textarea"
@@ -43,7 +65,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
           />
         </label>
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button type="submit" className="btn btn-primary" disabled={saving || providersLoading || !selectedProviderId}>
             {saving ? t("platformControl.actions.saving") : t("contextManagement.actions.create")}
           </button>
         </div>

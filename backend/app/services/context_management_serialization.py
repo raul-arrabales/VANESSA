@@ -3,19 +3,19 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..repositories import platform_control_plane as platform_repo
 from .context_management_shared import _is_knowledge_base_eligible, _normalize_source_relative_path
 from .context_management_types import (
-    _DEFAULT_BACKING_PROVIDER_KEY,
     _KB_LIFECYCLE_STATES,
     _SOURCE_LIFECYCLE_STATES,
     _SOURCE_TYPES,
-    _SUPPORTED_BACKING_PROVIDER_KEYS,
     _SUPPORTED_SCHEMA_PROPERTY_TYPES,
 )
-from .platform_types import PlatformControlPlaneError
+from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 
 def _normalize_knowledge_base_payload(
+    database_url: str,
     payload: dict[str, Any],
     *,
     is_create: bool,
@@ -25,20 +25,50 @@ def _normalize_knowledge_base_payload(
     display_name = str(payload.get("display_name", existing.get("display_name", "") if existing else "")).strip()
     description = str(payload.get("description", existing.get("description", "") if existing else "")).strip()
     lifecycle_state = str(payload.get("lifecycle_state", existing.get("lifecycle_state", "active") if existing else "active")).strip().lower()
-    backing_provider_key = str(
-        payload.get("backing_provider_key", existing.get("backing_provider_key", _DEFAULT_BACKING_PROVIDER_KEY) if existing else _DEFAULT_BACKING_PROVIDER_KEY)
-    ).strip().lower()
     schema = _normalize_schema(payload.get("schema", existing.get("schema_json", {}) if existing else {}))
+    if not is_create and ("backing_provider_instance_id" in payload or "backing_provider_key" in payload):
+        raise PlatformControlPlaneError(
+            "backing_provider_immutable",
+            "backing_provider_instance_id cannot be changed after creation",
+            status_code=400,
+        )
     if not slug:
         raise PlatformControlPlaneError("invalid_slug", "slug is required", status_code=400)
     if not display_name:
         raise PlatformControlPlaneError("invalid_display_name", "display_name is required", status_code=400)
     if lifecycle_state not in _KB_LIFECYCLE_STATES:
         raise PlatformControlPlaneError("invalid_lifecycle_state", "lifecycle_state is unsupported", status_code=400)
-    if backing_provider_key not in _SUPPORTED_BACKING_PROVIDER_KEYS:
+    backing_provider_instance_id = str(
+        payload.get(
+            "backing_provider_instance_id",
+            existing.get("backing_provider_instance_id", "") if existing else "",
+        )
+    ).strip()
+    if is_create and not backing_provider_instance_id:
         raise PlatformControlPlaneError(
-            "unsupported_backing_provider",
-            "Only weaviate_local is supported for managed knowledge bases",
+            "invalid_backing_provider_instance_id",
+            "backing_provider_instance_id is required",
+            status_code=400,
+        )
+    provider_row = None
+    if backing_provider_instance_id:
+        provider_row = platform_repo.get_provider_instance(database_url, backing_provider_instance_id)
+    if backing_provider_instance_id and provider_row is None:
+        raise PlatformControlPlaneError(
+            "backing_provider_not_found",
+            "Backing provider instance was not found",
+            status_code=400,
+        )
+    if provider_row is not None and str(provider_row.get("capability_key") or "").strip().lower() != CAPABILITY_VECTOR_STORE:
+        raise PlatformControlPlaneError(
+            "invalid_backing_provider_capability",
+            "Backing provider must be a vector store provider",
+            status_code=400,
+        )
+    if provider_row is not None and not bool(provider_row.get("enabled", True)):
+        raise PlatformControlPlaneError(
+            "invalid_backing_provider_disabled",
+            "Backing provider must be enabled",
             status_code=400,
         )
     return {
@@ -46,7 +76,12 @@ def _normalize_knowledge_base_payload(
         "display_name": display_name,
         "description": description,
         "lifecycle_state": lifecycle_state,
-        "backing_provider_key": backing_provider_key,
+        "backing_provider_instance_id": backing_provider_instance_id or None,
+        "backing_provider_key": str(
+            (provider_row or existing or {}).get("backing_provider_key")
+            or (provider_row or {}).get("provider_key")
+            or ""
+        ).strip().lower(),
         "schema": schema,
         "index_name": str(existing.get("index_name") or "").strip() if existing else _default_index_name(slug),
     }
@@ -161,13 +196,28 @@ def _normalize_glob_list(value: Any, *, field_name: str) -> list[str]:
 
 
 def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
+    provider_instance_id = str(row.get("backing_provider_instance_id") or "").strip() or None
+    provider_key = str(row.get("backing_provider_key") or "").strip() or None
     return {
         "id": str(row.get("id") or "").strip(),
         "slug": str(row.get("slug") or "").strip(),
         "display_name": str(row.get("display_name") or "").strip(),
         "description": str(row.get("description") or "").strip(),
         "index_name": str(row.get("index_name") or "").strip(),
-        "backing_provider_key": str(row.get("backing_provider_key") or "").strip(),
+        "backing_provider_instance_id": provider_instance_id,
+        "backing_provider_key": provider_key,
+        "backing_provider": (
+            {
+                "id": provider_instance_id,
+                "slug": str(row.get("backing_provider_slug") or "").strip() or None,
+                "provider_key": provider_key,
+                "display_name": str(row.get("backing_provider_display_name") or "").strip() or None,
+                "enabled": row.get("backing_provider_enabled") if row.get("backing_provider_enabled") is not None else None,
+                "capability": str(row.get("backing_provider_capability") or "").strip() or None,
+            }
+            if provider_instance_id
+            else None
+        ),
         "lifecycle_state": str(row.get("lifecycle_state") or "").strip(),
         "sync_status": str(row.get("sync_status") or "").strip(),
         "schema": dict(row.get("schema_json") or {}),
@@ -265,6 +315,8 @@ def build_knowledge_base_binding_resource(knowledge_base: dict[str, Any]) -> dic
         "metadata": {
             "slug": str(knowledge_base.get("slug") or "").strip(),
             "index_name": str(knowledge_base.get("index_name") or "").strip(),
+            "backing_provider_instance_id": str(knowledge_base.get("backing_provider_instance_id") or "").strip() or None,
+            "backing_provider_key": str(knowledge_base.get("backing_provider_key") or "").strip() or None,
             "lifecycle_state": str(knowledge_base.get("lifecycle_state") or "").strip(),
             "sync_status": str(knowledge_base.get("sync_status") or "").strip(),
             "document_count": int(knowledge_base.get("document_count") or 0),

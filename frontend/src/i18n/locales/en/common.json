@@ -363,7 +363,7 @@
     "title": "Context management",
     "description": "Manage reusable knowledge bases and curate the documents they expose through retrieval.",
     "createTitle": "Create knowledge base",
-    "createDescription": "Create a managed knowledge base backed by the local Weaviate provider.",
+    "createDescription": "Create a managed knowledge base and choose which vector-store provider instance will back it.",
     "detailTitle": "Knowledge base",
     "detailDescription": "Review metadata, deployment usage, and documents for this managed knowledge base.",
     "queryTitle": "Test retrieval",
@@ -397,6 +397,7 @@
       "querying": "Searching..."
     },
     "fields": {
+      "provider": "Backing provider",
       "schema": "Schema JSON",
       "lifecycleState": "Lifecycle state",
       "lastSyncAt": "Last sync",
@@ -424,6 +425,7 @@
     },
     "states": {
       "loading": "Loading knowledge bases...",
+      "selectProvider": "Select a vector-store provider",
       "empty": "No knowledge bases have been created yet.",
       "noDocuments": "No documents have been added yet.",
       "noSources": "No managed sources have been configured yet.",
@@ -440,6 +442,8 @@
     },
     "feedback": {
       "loadFailed": "Unable to load context management data.",
+      "providerLoadFailed": "Unable to load vector-store providers.",
+      "providerRequired": "Select a vector-store provider before creating the knowledge base.",
       "createFailed": "Unable to create knowledge base.",
       "updateFailed": "Unable to update knowledge base.",
       "deleteFailed": "Unable to delete knowledge base.",
