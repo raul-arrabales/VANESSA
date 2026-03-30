@@ -522,7 +522,7 @@
     },
     "sourceBrowser": {
       "title": "Browse source directories",
-      "description": "Choose an existing directory under an allowlisted source root, or keep typing the relative path manually.",
+      "description": "Click a directory to select it and open it. Use current directory when you are ready to confirm and close.",
       "root": "Source root",
       "currentPath": "Current directory: {{path}}",
       "rootDirectory": "Root directory",

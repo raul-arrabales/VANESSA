@@ -48,6 +48,7 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
             onOpenDirectoryBrowser={detail.handleOpenSourceDirectoryBrowser}
             onCloseDirectoryBrowser={detail.handleCloseSourceDirectoryBrowser}
             onBrowseDirectories={detail.handleBrowseSourceDirectories}
+            onSelectAndBrowseDirectory={detail.handleSelectAndBrowseSourceDirectory}
             onUseCurrentDirectory={detail.handleUseCurrentSourceDirectory}
             onSubmit={detail.handleSubmitSource}
             onDelete={detail.handleDeleteSource}

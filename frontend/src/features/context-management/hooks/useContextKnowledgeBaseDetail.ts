@@ -68,6 +68,7 @@ type UseContextKnowledgeBaseDetailResult = ContextKnowledgeBaseDetailState & {
   handleOpenSourceDirectoryBrowser: () => Promise<void>;
   handleCloseSourceDirectoryBrowser: () => void;
   handleBrowseSourceDirectories: (rootId: string | null, relativePath: string | null) => Promise<void>;
+  handleSelectAndBrowseSourceDirectory: (rootId: string | null, relativePath: string) => Promise<void>;
   handleUseCurrentSourceDirectory: () => void;
   handleTestRetrieval: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -352,6 +353,11 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     setSourceDirectoryBrowserOpen(false);
   }
 
+  async function handleSelectAndBrowseSourceDirectory(rootId: string | null, relativePath: string): Promise<void> {
+    setSourceForm((current) => ({ ...current, relativePath }));
+    await handleBrowseSourceDirectories(rootId, relativePath);
+  }
+
   function handleUseCurrentSourceDirectory(): void {
     const currentRelativePath = sourceDirectoryBrowserPayload?.current_relative_path ?? "";
     if (!currentRelativePath) {
@@ -444,6 +450,7 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     handleOpenSourceDirectoryBrowser,
     handleCloseSourceDirectoryBrowser,
     handleBrowseSourceDirectories,
+    handleSelectAndBrowseSourceDirectory,
     handleUseCurrentSourceDirectory,
     handleTestRetrieval,
   };

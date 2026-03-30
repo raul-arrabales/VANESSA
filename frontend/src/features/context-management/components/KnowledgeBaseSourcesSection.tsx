@@ -17,6 +17,7 @@ type Props = {
   onOpenDirectoryBrowser: () => Promise<void>;
   onCloseDirectoryBrowser: () => void;
   onBrowseDirectories: (rootId: string | null, relativePath: string | null) => Promise<void>;
+  onSelectAndBrowseDirectory: (rootId: string | null, relativePath: string) => Promise<void>;
   onUseCurrentDirectory: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDelete: (sourceId: string) => Promise<void>;
@@ -33,6 +34,7 @@ export function KnowledgeBaseSourcesSection({
   onOpenDirectoryBrowser,
   onCloseDirectoryBrowser,
   onBrowseDirectories,
+  onSelectAndBrowseDirectory,
   onUseCurrentDirectory,
   onSubmit,
   onDelete,
@@ -140,7 +142,7 @@ export function KnowledgeBaseSourcesSection({
                       key={directory.relative_path}
                       type="button"
                       className="btn btn-secondary"
-                      onClick={() => void onBrowseDirectories(browserPayload?.selected_root_id ?? null, directory.relative_path)}
+                      onClick={() => void onSelectAndBrowseDirectory(browserPayload?.selected_root_id ?? null, directory.relative_path)}
                     >
                       {directory.relative_path}
                     </button>

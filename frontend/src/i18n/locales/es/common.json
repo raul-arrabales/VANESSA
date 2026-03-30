@@ -522,7 +522,7 @@
     },
     "sourceBrowser": {
       "title": "Explorar directorios de fuentes",
-      "description": "Elige un directorio existente bajo una raiz permitida, o sigue escribiendo la ruta relativa manualmente.",
+      "description": "Haz clic en un directorio para seleccionarlo y abrirlo. Usa el directorio actual cuando quieras confirmar y cerrar.",
       "root": "Raiz de fuentes",
       "currentPath": "Directorio actual: {{path}}",
       "rootDirectory": "Directorio raiz",

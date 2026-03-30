@@ -440,6 +440,10 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     await screen.findByRole("heading", { name: "Product Docs" });
     await userEvent.click(screen.getByRole("button", { name: "Browse" }));
     await userEvent.click(await screen.findByRole("button", { name: "product_docs" }));
+
+    expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+    expect(screen.getByText("Current directory: product_docs")).toBeVisible();
+
     await userEvent.click(screen.getByRole("button", { name: "Use current directory" }));
 
     expect(screen.getByDisplayValue("product_docs")).toBeVisible();
