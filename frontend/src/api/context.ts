@@ -21,7 +21,7 @@ export type KnowledgeBase = {
   } | null;
   lifecycle_state: "active" | "archived" | string;
   sync_status: "ready" | "syncing" | "error" | string;
-  schema: Record<string, unknown>;
+  schema: KnowledgeBaseSchema;
   document_count: number;
   eligible_for_binding: boolean;
   last_sync_at?: string | null;
@@ -38,6 +38,29 @@ export type KnowledgeBase = {
     };
     capability: string;
   }>;
+};
+
+export type KnowledgeBaseSchemaPropertyType = "text" | "number" | "int" | "boolean";
+
+export type KnowledgeBaseSchemaProperty = {
+  name: string;
+  data_type: KnowledgeBaseSchemaPropertyType;
+};
+
+export type KnowledgeBaseSchema = {
+  properties?: KnowledgeBaseSchemaProperty[];
+};
+
+export type KnowledgeBaseSchemaProfile = {
+  id: string;
+  slug: string;
+  display_name: string;
+  description: string;
+  provider_key: string;
+  is_system: boolean;
+  schema: KnowledgeBaseSchema;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type KnowledgeBaseQueryResult = {
@@ -142,7 +165,7 @@ export async function createKnowledgeBase(
     description: string;
     backing_provider_instance_id: string;
     lifecycle_state?: string;
-    schema?: Record<string, unknown>;
+    schema?: KnowledgeBaseSchema;
   },
   token: string,
 ): Promise<KnowledgeBase> {
@@ -152,6 +175,33 @@ export async function createKnowledgeBase(
     body: payload,
   });
   return result.knowledge_base;
+}
+
+export async function listKnowledgeBaseSchemaProfiles(providerKey: string, token: string): Promise<KnowledgeBaseSchemaProfile[]> {
+  const suffix = new URLSearchParams({ provider_key: providerKey }).toString();
+  const result = await requestJson<{ schema_profiles: KnowledgeBaseSchemaProfile[] }>(
+    `/v1/context/schema-profiles?${suffix}`,
+    { token },
+  );
+  return result.schema_profiles;
+}
+
+export async function createKnowledgeBaseSchemaProfile(
+  payload: {
+    slug: string;
+    display_name: string;
+    description: string;
+    provider_key: string;
+    schema: KnowledgeBaseSchema;
+  },
+  token: string,
+): Promise<KnowledgeBaseSchemaProfile> {
+  const result = await requestJson<{ schema_profile: KnowledgeBaseSchemaProfile }>("/v1/context/schema-profiles", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return result.schema_profile;
 }
 
 export async function getKnowledgeBase(knowledgeBaseId: string, token: string): Promise<KnowledgeBase> {

@@ -363,7 +363,7 @@
     "title": "Gestion de contexto",
     "description": "Administra bases de conocimiento reutilizables y organiza los documentos que exponen a la recuperacion.",
     "createTitle": "Crear base de conocimiento",
-    "createDescription": "Crea una base de conocimiento gestionada respaldada por el proveedor local de Weaviate.",
+    "createDescription": "Crea una base de conocimiento gestionada y elige que instancia de proveedor de vector store la respaldara.",
     "detailTitle": "Base de conocimiento",
     "detailDescription": "Revisa metadatos, uso en despliegues y documentos de esta base de conocimiento gestionada.",
     "queryTitle": "Probar recuperacion",
@@ -377,9 +377,13 @@
     "actions": {
       "newKnowledgeBase": "Nueva base de conocimiento",
       "create": "Crear base de conocimiento",
+      "addProperty": "Agregar propiedad",
+      "removeProperty": "Eliminar propiedad",
       "manage": "Gestionar",
       "back": "Volver a bases de conocimiento",
       "save": "Guardar base de conocimiento",
+      "saveSchemaProfile": "Guardar como perfil reutilizable",
+      "confirmSaveSchemaProfile": "Guardar perfil de esquema",
       "delete": "Eliminar base de conocimiento",
       "addSource": "Agregar fuente",
       "updateSource": "Actualizar fuente",
@@ -397,7 +401,8 @@
       "querying": "Buscando..."
     },
     "fields": {
-      "schema": "Schema JSON",
+      "provider": "Proveedor de respaldo",
+      "schema": "Esquema de la base de conocimiento",
       "lifecycleState": "Estado del ciclo de vida",
       "lastSyncAt": "Ultima sincronizacion",
       "lastSourceSyncAt": "Ultima sincronizacion de la fuente",
@@ -424,6 +429,12 @@
     },
     "states": {
       "loading": "Cargando bases de conocimiento...",
+      "selectProvider": "Selecciona un proveedor de vector store",
+      "selectSchemaProfile": "Selecciona un perfil de esquema",
+      "loadingSchemaProfiles": "Cargando perfiles de esquema...",
+      "noSchemaProfiles": "Todavia no hay perfiles de esquema reutilizables para este proveedor. Aun puedes definir uno abajo.",
+      "customSchemaDraft": "Estas editando un esquema personalizado derivado del perfil seleccionado.",
+      "weaviateSystemFields": "Weaviate agrega automaticamente campos del sistema como document_id, text y metadata_json. No los dupliques en el esquema personalizado.",
       "empty": "Todavia no se han creado bases de conocimiento.",
       "noDocuments": "Todavia no se han agregado documentos.",
       "noSources": "Todavia no se han configurado fuentes gestionadas.",
@@ -440,6 +451,10 @@
     },
     "feedback": {
       "loadFailed": "No se pudieron cargar los datos de gestion de contexto.",
+      "providerLoadFailed": "No se pudieron cargar los proveedores de vector store.",
+      "schemaProfilesLoadFailed": "No se pudieron cargar los perfiles de esquema reutilizables.",
+      "providerRequired": "Selecciona un proveedor de vector store antes de crear la base de conocimiento.",
+      "schemaProfileRequired": "Selecciona un perfil de esquema o cambia a JSON sin formato antes de crear la base de conocimiento.",
       "createFailed": "No se pudo crear la base de conocimiento.",
       "updateFailed": "No se pudo actualizar la base de conocimiento.",
       "deleteFailed": "No se pudo eliminar la base de conocimiento.",
@@ -447,6 +462,10 @@
       "updated": "Base de conocimiento '{{name}}' actualizada.",
       "deleted": "Base de conocimiento '{{name}}' eliminada.",
       "invalidSchema": "Schema JSON debe ser JSON valido.",
+      "schemaProfileSlugRequired": "El slug del perfil de esquema es obligatorio.",
+      "schemaProfileDisplayNameRequired": "El nombre visible del perfil de esquema es obligatorio.",
+      "schemaProfileCreated": "Perfil de esquema '{{name}}' guardado.",
+      "schemaProfileCreateFailed": "No se pudo guardar el perfil de esquema reutilizable.",
       "documentCreated": "Documento '{{title}}' agregado.",
       "documentUpdated": "Documento '{{title}}' actualizado.",
       "documentDeleted": "Documento eliminado.",
@@ -467,6 +486,18 @@
     },
     "aria": {
       "table": "Inventario de bases de conocimiento"
+    },
+    "schema": {
+      "description": "Elige un perfil de esquema especifico del proveedor, ajusta sus propiedades o cambia a JSON sin formato para edicion avanzada.",
+      "modeLabel": "Modo del editor de esquema",
+      "profileMode": "Constructor con perfiles",
+      "jsonMode": "JSON sin formato",
+      "profile": "Perfil de esquema",
+      "rawJson": "Schema JSON",
+      "propertyName": "Nombre de la propiedad",
+      "propertyType": "Tipo de propiedad",
+      "profileSlug": "Slug del perfil",
+      "profileDisplayName": "Nombre visible del perfil"
     }
   },
   "quoteOfTheDay": {

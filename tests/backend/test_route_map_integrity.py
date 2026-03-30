@@ -53,6 +53,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/agent-projects/<project_id>",
         "/v1/agent-projects/<project_id>/validate",
         "/v1/agent-projects/<project_id>/publish",
+        "/v1/context/schema-profiles",
         "/v1/context/knowledge-bases",
         "/v1/context/knowledge-bases/<knowledge_base_id>",
         "/v1/context/knowledge-bases/<knowledge_base_id>/resync",

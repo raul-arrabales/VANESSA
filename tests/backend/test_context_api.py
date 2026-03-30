@@ -40,6 +40,92 @@ def test_list_knowledge_bases_route_requires_admin(client):
     assert response.status_code == 403
 
 
+def test_list_schema_profiles_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-profiles@example.com",
+        username="admin-profiles",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "list_schema_profiles",
+        lambda *_args, **_kwargs: [
+            {
+                "id": "profile-1",
+                "slug": "plain-document-rag",
+                "display_name": "Plain document RAG",
+                "description": "General-purpose retrieval schema.",
+                "provider_key": "weaviate_local",
+                "is_system": True,
+                "schema": {"properties": [{"name": "title", "data_type": "text"}]},
+            }
+        ],
+    )
+
+    response = test_client.get("/v1/context/schema-profiles?provider_key=weaviate_local", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["schema_profiles"][0]["slug"] == "plain-document-rag"
+
+
+def test_create_schema_profile_route_returns_payload_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-profile@example.com",
+        username="superadmin-profile",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _create_schema_profile(_db, *, payload, created_by_user_id):
+        captured["payload"] = payload
+        captured["created_by_user_id"] = created_by_user_id
+        return {
+            "id": "profile-2",
+            "slug": "customer-memory",
+            "display_name": "Customer Memory",
+            "description": "Custom reusable memory schema.",
+            "provider_key": "weaviate_local",
+            "is_system": False,
+            "schema": {"properties": [{"name": "subject", "data_type": "text"}]},
+        }
+
+    monkeypatch.setattr(context_routes, "create_schema_profile", _create_schema_profile)
+
+    response = test_client.post(
+        "/v1/context/schema-profiles",
+        headers=_auth(token),
+        json={
+            "slug": "customer-memory",
+            "display_name": "Customer Memory",
+            "description": "Custom reusable memory schema.",
+            "provider_key": "weaviate_local",
+            "schema": {"properties": [{"name": "subject", "data_type": "text"}]},
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["created_by_user_id"] == superadmin["id"]
+    assert captured["payload"] == {
+        "slug": "customer-memory",
+        "display_name": "Customer Memory",
+        "description": "Custom reusable memory schema.",
+        "provider_key": "weaviate_local",
+        "schema": {"properties": [{"name": "subject", "data_type": "text"}]},
+    }
+    assert response.get_json()["schema_profile"]["provider_key"] == "weaviate_local"
+
+
 def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(

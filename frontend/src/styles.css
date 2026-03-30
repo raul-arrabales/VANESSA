@@ -1207,6 +1207,34 @@ a {
   font: inherit;
 }
 
+.context-schema-panel,
+.context-schema-save-panel {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-subtle) 78%, transparent);
+}
+
+.context-schema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.context-schema-mode-toggle,
+.context-schema-actions,
+.context-schema-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.context-schema-row > .card-stack {
+  flex: 1 1 14rem;
+}
+
 .code-inline,
 .code-block {
   font-family: var(--font-mono);

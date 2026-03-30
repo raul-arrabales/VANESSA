@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, TypedDict, TypeAlias
 
 KnowledgeBaseRecord: TypeAlias = dict[str, Any]
+KnowledgeSchemaProfileRecord: TypeAlias = dict[str, Any]
 KnowledgeDocumentRecord: TypeAlias = dict[str, Any]
 KnowledgeSourceRecord: TypeAlias = dict[str, Any]
 KnowledgeSyncRunRecord: TypeAlias = dict[str, Any]

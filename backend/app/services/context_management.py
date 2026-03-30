@@ -30,6 +30,7 @@ from .context_management_knowledge_bases import (
     list_knowledge_bases,
     update_knowledge_base,
 )
+from .context_management_schema_profiles import create_schema_profile, list_schema_profiles
 from .context_management_runtime import (
     list_active_runtime_knowledge_bases,
     query_knowledge_base,
@@ -43,11 +44,13 @@ from .context_management_serialization import (
     _normalize_knowledge_source_payload,
     _normalize_query_top_k,
     _normalize_schema,
+    _normalize_schema_profile_payload,
     _serialize_document,
     _serialize_knowledge_base,
     _serialize_knowledge_source,
     _serialize_query_result,
     _serialize_runtime_knowledge_base,
+    _serialize_schema_profile,
     _serialize_sync_run,
     build_knowledge_base_binding_resource,
 )
@@ -96,6 +99,7 @@ __all__ = [
     "context_repo",
     "create_knowledge_base",
     "create_knowledge_base_document",
+    "create_schema_profile",
     "create_knowledge_source",
     "delete_knowledge_base",
     "delete_knowledge_base_document",
@@ -105,6 +109,7 @@ __all__ = [
     "list_knowledge_base_documents",
     "list_knowledge_base_sync_runs",
     "list_knowledge_bases",
+    "list_schema_profiles",
     "list_knowledge_sources",
     "query_knowledge_base",
     "resolve_runtime_knowledge_base_selection",

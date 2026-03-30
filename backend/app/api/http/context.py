@@ -4,6 +4,7 @@ from flask import Blueprint, g, jsonify, request
 
 from ...application.context_management_service import (
     ContextManagementRequestError,
+    create_context_schema_profile,
     create_context_knowledge_base,
     create_context_knowledge_base_document,
     create_context_knowledge_source,
@@ -14,6 +15,7 @@ from ...application.context_management_service import (
     list_context_knowledge_base_documents,
     list_context_knowledge_base_sync_runs,
     list_context_knowledge_bases,
+    list_context_schema_profiles,
     list_context_knowledge_sources,
     query_context_knowledge_base,
     resync_context_knowledge_base,
@@ -32,6 +34,8 @@ bp = Blueprint("context", __name__)
 # Preserve the existing route-module monkeypatch seam while making this
 # module the canonical registered HTTP owner.
 list_knowledge_bases = list_context_knowledge_bases
+list_schema_profiles = list_context_schema_profiles
+create_schema_profile = create_context_schema_profile
 create_knowledge_base = create_context_knowledge_base
 get_knowledge_base_detail = get_context_knowledge_base_detail
 update_knowledge_base = update_context_knowledge_base
@@ -64,6 +68,35 @@ def _json_error(status: int, code: str, message: str, *, details: dict | None = 
     if details:
         payload["details"] = details
     return jsonify(payload), status
+
+
+@bp.get("/v1/context/schema-profiles")
+@require_role("admin")
+def list_schema_profiles_route():
+    provider_key = request.args.get("provider_key", "").strip()
+    if not provider_key:
+        return _json_error(400, "invalid_provider_key", "provider_key is required")
+    try:
+        schema_profiles = list_schema_profiles(_database_url(), provider_key=provider_key)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"schema_profiles": schema_profiles}), 200
+
+
+@bp.post("/v1/context/schema-profiles")
+@require_role("superadmin")
+def create_schema_profile_route():
+    try:
+        schema_profile = create_schema_profile(
+            _database_url(),
+            payload=request.get_json(silent=True),
+            created_by_user_id=int(g.current_user["id"]),
+        )
+    except ContextManagementRequestError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"schema_profile": schema_profile}), 201
 
 
 @bp.get("/v1/context/knowledge-bases")

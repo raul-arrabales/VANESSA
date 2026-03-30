@@ -57,6 +57,42 @@ def list_knowledge_bases(
     return [dict(row) for row in rows]
 
 
+def list_schema_profiles(database_url: str, *, provider_key: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM context_schema_profiles
+            WHERE provider_key = %s
+            ORDER BY is_system DESC, display_name ASC, slug ASC
+            """,
+            (provider_key.strip().lower(),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_schema_profile_by_provider_and_slug(
+    database_url: str,
+    *,
+    provider_key: str,
+    slug: str,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM context_schema_profiles
+            WHERE provider_key = %s
+              AND slug = %s
+            """,
+            (
+                provider_key.strip().lower(),
+                slug.strip().lower(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
 def get_knowledge_base(database_url: str, knowledge_base_id: str) -> dict[str, Any] | None:
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -113,6 +149,49 @@ def get_knowledge_bases(database_url: str, knowledge_base_ids: list[str]) -> lis
             (normalized_ids,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def create_schema_profile(
+    database_url: str,
+    *,
+    slug: str,
+    display_name: str,
+    description: str,
+    provider_key: str,
+    is_system: bool,
+    schema_json: dict[str, Any],
+    created_by_user_id: int | None,
+) -> dict[str, Any]:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            INSERT INTO context_schema_profiles (
+                id,
+                slug,
+                display_name,
+                description,
+                provider_key,
+                is_system,
+                schema_json,
+                created_by_user_id
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+            RETURNING *
+            """,
+            (
+                str(uuid4()),
+                slug.strip().lower(),
+                display_name.strip(),
+                description.strip(),
+                provider_key.strip().lower(),
+                is_system,
+                Jsonb(schema_json),
+                created_by_user_id,
+            ),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("failed_to_create_schema_profile")
+    return dict(row)
 
 
 def create_knowledge_base(

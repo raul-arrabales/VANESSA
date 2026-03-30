@@ -377,9 +377,13 @@
     "actions": {
       "newKnowledgeBase": "New knowledge base",
       "create": "Create knowledge base",
+      "addProperty": "Add property",
+      "removeProperty": "Remove property",
       "manage": "Manage",
       "back": "Back to knowledge bases",
       "save": "Save knowledge base",
+      "saveSchemaProfile": "Save as reusable profile",
+      "confirmSaveSchemaProfile": "Save schema profile",
       "delete": "Delete knowledge base",
       "addSource": "Add source",
       "updateSource": "Update source",
@@ -398,7 +402,7 @@
     },
     "fields": {
       "provider": "Backing provider",
-      "schema": "Schema JSON",
+      "schema": "Knowledge base schema",
       "lifecycleState": "Lifecycle state",
       "lastSyncAt": "Last sync",
       "lastSourceSyncAt": "Last source sync",
@@ -426,6 +430,11 @@
     "states": {
       "loading": "Loading knowledge bases...",
       "selectProvider": "Select a vector-store provider",
+      "selectSchemaProfile": "Select a schema profile",
+      "loadingSchemaProfiles": "Loading schema profiles...",
+      "noSchemaProfiles": "No reusable schema profiles are available for this provider yet. You can still define one below.",
+      "customSchemaDraft": "You are editing a custom schema derived from the selected profile.",
+      "weaviateSystemFields": "Weaviate automatically adds system fields such as document_id, text, and metadata_json. Do not duplicate them in the custom schema.",
       "empty": "No knowledge bases have been created yet.",
       "noDocuments": "No documents have been added yet.",
       "noSources": "No managed sources have been configured yet.",
@@ -443,7 +452,9 @@
     "feedback": {
       "loadFailed": "Unable to load context management data.",
       "providerLoadFailed": "Unable to load vector-store providers.",
+      "schemaProfilesLoadFailed": "Unable to load reusable schema profiles.",
       "providerRequired": "Select a vector-store provider before creating the knowledge base.",
+      "schemaProfileRequired": "Select a schema profile or switch to Raw JSON before creating the knowledge base.",
       "createFailed": "Unable to create knowledge base.",
       "updateFailed": "Unable to update knowledge base.",
       "deleteFailed": "Unable to delete knowledge base.",
@@ -451,6 +462,10 @@
       "updated": "Knowledge base '{{name}}' updated.",
       "deleted": "Knowledge base '{{name}}' deleted.",
       "invalidSchema": "Schema JSON must be valid JSON.",
+      "schemaProfileSlugRequired": "Schema profile slug is required.",
+      "schemaProfileDisplayNameRequired": "Schema profile display name is required.",
+      "schemaProfileCreated": "Schema profile '{{name}}' saved.",
+      "schemaProfileCreateFailed": "Unable to save the reusable schema profile.",
       "documentCreated": "Document '{{title}}' added.",
       "documentUpdated": "Document '{{title}}' updated.",
       "documentDeleted": "Document deleted.",
@@ -471,6 +486,18 @@
     },
     "aria": {
       "table": "Knowledge base inventory"
+    },
+    "schema": {
+      "description": "Choose a provider-specific schema profile, refine its properties, or switch to raw JSON for advanced editing.",
+      "modeLabel": "Schema editor mode",
+      "profileMode": "Profile Builder",
+      "jsonMode": "Raw JSON",
+      "profile": "Schema profile",
+      "rawJson": "Schema JSON",
+      "propertyName": "Property name",
+      "propertyType": "Property type",
+      "profileSlug": "Profile slug",
+      "profileDisplayName": "Profile display name"
     }
   },
   "quoteOfTheDay": {

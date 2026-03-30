@@ -64,6 +64,8 @@ Platform control plane endpoints:
 - `POST /v1/platform/vector/documents/upsert` (superadmin)
 - `POST /v1/platform/vector/query` (superadmin)
 - `POST /v1/platform/vector/documents/delete` (superadmin)
+- `GET /v1/context/schema-profiles` (admin)
+- `POST /v1/context/schema-profiles` (superadmin)
 - `GET /v1/context/knowledge-bases` (admin)
 - `POST /v1/context/knowledge-bases` (superadmin)
 - `GET /v1/context/knowledge-bases/{id}` (admin)
@@ -96,6 +98,7 @@ Platform control plane semantics:
 - `MCP_GATEWAY_URL` enables the optional local MCP gateway provider instance and binds it as `mcp_runtime`.
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Managed knowledge bases are now a backend-owned context-management domain. They live in Postgres, each target one configured `vector_store` provider instance, and are bound into deployments as explicit `vector_store` resources.
+- Schema creation can now start from reusable provider-specific schema profiles. Built-in Weaviate profiles seed plain document RAG, agent semantic memory, and agent episodic memory templates, and superadmins may save custom profiles for reuse.
 - Managed knowledge-base detail responses now include sync diagnostics and binding eligibility, and operators can trigger a synchronous KB resync or a retrieval QA query from the context-management surface.
 - Managed knowledge bases now also support repeatable `local_directory` content sources under allowlisted backend-visible roots from `CONTEXT_SOURCE_ROOTS`.
 - Source sync is synchronous in the current slice, but each run is persisted in `context_knowledge_sync_runs` with file/document counters and error summaries for operator review.

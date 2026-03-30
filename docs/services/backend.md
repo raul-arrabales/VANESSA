@@ -107,6 +107,8 @@ Platform-control request parsing and response shaping are now owned by the appli
 
 ## Context Management
 
+- `GET /v1/context/schema-profiles` (admin)
+- `POST /v1/context/schema-profiles` (superadmin)
 - `GET /v1/context/knowledge-bases` (admin)
 - `POST /v1/context/knowledge-bases` (superadmin)
 - `GET /v1/context/knowledge-bases/{id}` (admin)
@@ -132,6 +134,7 @@ Context-management semantics:
 
 - Managed knowledge bases are global records, but deployments explicitly bind them as `vector_store` binding resources.
 - Each managed knowledge base is created against one configured `vector_store` provider instance.
+- Schema authoring is provider-aware: reusable schema profiles are keyed by provider family, with built-in Weaviate templates plus superadmin-created custom profiles.
 - Documents are stored in Postgres, chunked synchronously by backend, and upserted into the backing vector provider.
 - Managed `local_directory` knowledge sources live under allowlisted backend-visible roots configured by `CONTEXT_SOURCE_ROOTS`.
 - Source sync is deterministic: document identity is derived from `source_id + source_path + logical position`, so re-sync updates or deletes existing source-managed documents instead of duplicating them.

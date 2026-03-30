@@ -87,6 +87,36 @@ def _normalize_knowledge_base_payload(
     }
 
 
+def _normalize_schema_profile_payload(database_url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    slug = str(payload.get("slug", "")).strip().lower()
+    display_name = str(payload.get("display_name", "")).strip()
+    description = str(payload.get("description", "")).strip()
+    provider_key = str(payload.get("provider_key", "")).strip().lower()
+    schema = _normalize_schema(payload.get("schema"))
+    if not slug:
+        raise PlatformControlPlaneError("invalid_slug", "slug is required", status_code=400)
+    if not display_name:
+        raise PlatformControlPlaneError("invalid_display_name", "display_name is required", status_code=400)
+    if not provider_key:
+        raise PlatformControlPlaneError("invalid_provider_key", "provider_key is required", status_code=400)
+    provider_family = platform_repo.get_provider_family(database_url, provider_key)
+    if provider_family is None:
+        raise PlatformControlPlaneError("provider_family_not_found", "Provider family not found", status_code=404)
+    if str(provider_family.get("capability_key") or "").strip().lower() != CAPABILITY_VECTOR_STORE:
+        raise PlatformControlPlaneError(
+            "invalid_schema_profile_provider_capability",
+            "Schema profiles can only target vector store provider families",
+            status_code=400,
+        )
+    return {
+        "slug": slug,
+        "display_name": display_name,
+        "description": description,
+        "provider_key": provider_key,
+        "schema": schema,
+    }
+
+
 def _normalize_document_payload(payload: dict[str, Any], *, existing: dict[str, Any] | None = None) -> dict[str, Any]:
     title = str(payload.get("title", existing.get("title", "") if existing else "")).strip()
     source_type = str(payload.get("source_type", existing.get("source_type", "manual") if existing else "manual")).strip().lower() or "manual"
@@ -227,6 +257,20 @@ def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
         "last_sync_at": row.get("last_sync_at").isoformat() if row.get("last_sync_at") else None,
         "last_sync_error": str(row.get("last_sync_error") or "").strip() or None,
         "last_sync_summary": str(row.get("last_sync_summary") or "").strip() or None,
+        "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
+        "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
+    }
+
+
+def _serialize_schema_profile(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or "").strip(),
+        "slug": str(row.get("slug") or "").strip(),
+        "display_name": str(row.get("display_name") or "").strip(),
+        "description": str(row.get("description") or "").strip(),
+        "provider_key": str(row.get("provider_key") or "").strip(),
+        "is_system": bool(row.get("is_system")),
+        "schema": dict(row.get("schema_json") or {}),
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
     }

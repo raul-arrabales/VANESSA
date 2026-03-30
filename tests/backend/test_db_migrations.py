@@ -162,3 +162,8 @@ def test_context_management_migration_tracks_backing_provider_instances():
     assert "Unable to backfill context_knowledge_bases.backing_provider_instance_id" in migration_sql
     assert "i.id AS provider_instance_id" in migration_sql
     assert "MAX(i.id)" not in migration_sql
+    assert "CREATE TABLE IF NOT EXISTS context_schema_profiles" in migration_sql
+    assert "context_schema_profiles_provider_slug_idx" in migration_sql
+    assert "plain-document-rag" in migration_sql
+    assert "agent-semantic-memory" in migration_sql
+    assert "agent-episodic-memory" in migration_sql
