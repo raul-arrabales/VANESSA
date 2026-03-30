@@ -1525,7 +1525,7 @@ def _build_weaviate_query_operation(
     query = (
         "{ Get { "
         f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id {score_field} }} }} '
-        "} } }"
+        "} }"
     )
     return {"query": query, "score_kind": score_kind}
 

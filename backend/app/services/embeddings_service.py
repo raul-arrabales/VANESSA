@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..repositories import platform_control_plane as platform_repo
+from . import platform_adapters
+from .platform_local_slots import recover_provider_local_slot_runtime
 from ..config import AuthConfig
 from .platform_service import resolve_embeddings_adapter
 from .platform_serialization import _runtime_identifier_for_resource
@@ -27,7 +30,52 @@ def embed_text_inputs_with_target(
     normalized_texts = _normalize_inputs(texts)
     adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
     payload, status_code = adapter.embed_texts(texts=normalized_texts, model=model)
+    provider_row = platform_repo.get_provider_instance(database_url, adapter.binding.provider_instance_id)
+    recovery_inspection: dict[str, Any] | None = None
+    recovery_attempted = False
+    should_force_recovery = status_code == 404 and platform_adapters._is_model_not_found(payload)  # type: ignore[attr-defined]
+    if isinstance(provider_row, dict):
+        _, recovery_attempted, recovery_inspection = recover_provider_local_slot_runtime(
+            database_url,
+            provider_row=provider_row,
+            force=should_force_recovery,
+        )
+        if recovery_attempted:
+            adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
+            payload, status_code = adapter.embed_texts(texts=normalized_texts, model=model)
+
     if payload is None or not 200 <= status_code < 300:
+        if _is_actionable_local_embeddings_runtime_failure(
+            provider_row=provider_row,
+            recovery_inspection=recovery_inspection,
+            payload=payload,
+            status_code=status_code,
+        ):
+            runtime_state = (
+                dict(recovery_inspection.get("runtime_state") or {})
+                if isinstance(recovery_inspection, dict)
+                else {}
+            )
+            raise PlatformControlPlaneError(
+                "embeddings_runtime_drift",
+                "Unable to generate embeddings because the local embeddings runtime is empty or out of sync with the configured provider slot.",
+                status_code=503,
+                details={
+                    "status_code": status_code,
+                    "provider": adapter.binding.provider_slug,
+                    "loaded_managed_model_id": recovery_inspection.get("slot", {}).get("loaded_managed_model_id")
+                    if isinstance(recovery_inspection, dict)
+                    else None,
+                    "expected_runtime_model_id": recovery_inspection.get("runtime_model_id")
+                    if isinstance(recovery_inspection, dict)
+                    else None,
+                    "runtime_inventory_ids": recovery_inspection.get("runtime_inventory_ids")
+                    if isinstance(recovery_inspection, dict)
+                    else [],
+                    "runtime_state": runtime_state,
+                    "recovery_attempted": recovery_attempted,
+                },
+            )
         raise PlatformControlPlaneError(
             "embeddings_request_failed",
             "Unable to generate embeddings",
@@ -83,3 +131,23 @@ def _normalize_inputs(texts: list[str]) -> list[str]:
     if not normalized:
         raise PlatformControlPlaneError("invalid_inputs", "inputs must be a non-empty array", status_code=400)
     return normalized
+
+
+def _is_actionable_local_embeddings_runtime_failure(
+    *,
+    provider_row: dict[str, Any] | None,
+    recovery_inspection: dict[str, Any] | None,
+    payload: dict[str, Any] | None,
+    status_code: int,
+) -> bool:
+    if not isinstance(provider_row, dict):
+        return False
+    if str(provider_row.get("provider_key") or "").strip().lower() != "vllm_embeddings_local":
+        return False
+    if not isinstance(recovery_inspection, dict):
+        return False
+    if not bool(recovery_inspection.get("has_persisted_intent")):
+        return False
+    if bool(recovery_inspection.get("runtime_empty")) or not bool(recovery_inspection.get("target_available")):
+        return True
+    return status_code == 404 and platform_adapters._is_model_not_found(payload)  # type: ignore[attr-defined]

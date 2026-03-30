@@ -42,6 +42,7 @@ python scripts/generate_architecture.py --write
   - Checks optional `mcp_gateway` when `MCP_GATEWAY_URL` is configured.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
   - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
+  - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
 - `logs.sh`
@@ -89,6 +90,7 @@ Supported launcher variables:
 - `LLM_LOCAL_UPSTREAM_MODEL` and `LLM_INFERENCE_LOCAL_MODEL_PATH` are fallback/debug startup defaults for the inference runtime.
 - `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` and `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` are opt-in fallback/debug startup defaults for the embeddings runtime and should normally be left blank so embeddings starts empty until Platform Control loads a model.
 - Keep runtime/provider env focused on endpoint topology and secrets; use Platform Control to choose deployment-bound resources and to assign the local loaded-model slot for local vLLM providers.
+- If `health.sh` reports `llm_runtime_embeddings_slot: FAIL`, the provider slot intent in Postgres is out of sync with the running split runtimes. Retrieval and KB embeddings queries will fail until that drift is corrected.
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
@@ -231,6 +233,7 @@ Local ModelOps note:
   6. activate the model
   7. bind it into the deployment profile resources
 - `./ops/local-staging/reconcile-local-model-slot.sh` remains available only as a fallback/debug tool to sync cold-start defaults into `infra/.env.local`; it is not required for the normal UI-driven workflow.
+- If the embeddings runtime comes back empty after a restart even though Platform Control still shows a loaded local embeddings slot, run `./ops/local-staging/reconcile-local-model-slot.sh`, then re-run `./ops/local-staging/health.sh` and confirm `llm_runtime_embeddings_slot: OK` before testing retrieval again.
 
 Platform-control troubleshooting note:
 
@@ -358,6 +361,12 @@ Use the targeted restart script when only one service changed:
   - If startup fails with exit code `132`, the host likely needs a different CPU build variant or does not meet the minimum supported ISA.
   - If you intentionally want to run without local vLLM on an unsupported CPU host:
     - set `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true`
+- `health.sh` reports `llm_runtime_embeddings_slot: FAIL` even though `llm_runtime_embeddings: OK`:
+  - This means the split embeddings runtime is healthy but is not advertising the embeddings model that the backend provider slot expects.
+  - Retrieval and knowledge-base query flows will fail with embeddings errors until the slot is reapplied.
+  - Run `./ops/local-staging/reconcile-local-model-slot.sh`.
+  - Restart or verify `llm_runtime_embeddings` and `llm`, then re-run `./ops/local-staging/health.sh`.
+  - Confirm both `llm_runtime_embeddings_slot: OK` and that `http://localhost:8000/v1/models` includes the expected embeddings model before retrying KB retrieval.
     - choose a routing mode that does not require local runtime
 - Model downloads fail from backend:
   - Confirm `HF_TOKEN` is set in `infra/.env.local` (recommended) or your compose env override when accessing gated Hugging Face repos.

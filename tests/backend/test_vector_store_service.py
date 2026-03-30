@@ -441,9 +441,13 @@ def test_weaviate_vector_store_adapter_query_supports_embedding_and_bm25(monkeyp
             }
         ],
     }
-    assert 'nearVector: { vector: [0.1,0.2] }' in str(requests[0]["payload"])
-    assert 'where: { path: ["category"], operator: Equal, valueText: "ops" }' in str(requests[0]["payload"])
-    assert 'bm25: { query: "hello", properties: ["text"] }' in str(requests[1]["payload"])
+    embedding_query = str((requests[0]["payload"] or {}).get("query"))
+    text_query = str((requests[1]["payload"] or {}).get("query"))
+    assert 'nearVector: { vector: [0.1,0.2] }' in embedding_query
+    assert 'where: { path: ["category"], operator: Equal, valueText: "ops" }' in embedding_query
+    assert embedding_query.count("{") == embedding_query.count("}")
+    assert 'bm25: { query: "hello", properties: ["text"] }' in text_query
+    assert text_query.count("{") == text_query.count("}")
 
 
 def test_weaviate_vector_store_adapter_delete_returns_deleted_ids(monkeypatch: pytest.MonkeyPatch):

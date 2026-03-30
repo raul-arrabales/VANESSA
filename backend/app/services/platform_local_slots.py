@@ -94,6 +94,24 @@ def _is_local_model_slot_provider(row: dict[str, Any]) -> bool:
     return capability_key in _MODEL_BEARING_CAPABILITIES and provider_key not in _CLOUD_PROVIDER_KEYS
 
 
+def _hydrate_provider_row_for_local_slot(
+    database_url: str,
+    *,
+    provider_row: ProviderRow,
+) -> ProviderRow:
+    if not isinstance(provider_row, dict):
+        return provider_row
+    capability_key = str(provider_row.get("capability_key") or "").strip().lower()
+    adapter_kind = str(provider_row.get("adapter_kind") or "").strip().lower()
+    if capability_key and adapter_kind:
+        return provider_row
+    provider_instance_id = str(provider_row.get("id") or "").strip()
+    if not provider_instance_id:
+        return provider_row
+    hydrated = platform_repo.get_provider_instance(database_url, provider_instance_id)
+    return hydrated if isinstance(hydrated, dict) else provider_row
+
+
 def _runtime_admin_base_url(provider_row: dict[str, Any]) -> str | None:
     config = provider_row.get("config_json") if isinstance(provider_row.get("config_json"), dict) else {}
     runtime_admin_base_url = str(config.get("runtime_admin_base_url") or "").strip()
@@ -291,11 +309,106 @@ def _slot_config_from_state(config: dict[str, Any], slot: dict[str, Any]) -> dic
     )
 
 
+def inspect_provider_local_slot_runtime(
+    database_url: str,
+    *,
+    provider_row: ProviderRow,
+) -> dict[str, Any]:
+    hydrated_provider_row = _hydrate_provider_row_for_local_slot(database_url, provider_row=provider_row)
+    config = dict(hydrated_provider_row.get("config_json") or {}) if isinstance(hydrated_provider_row, dict) else {}
+    slot = _local_slot_payload_from_config(config)
+    runtime_model_id = _normalized_optional_slot_string(slot.get("loaded_runtime_model_id")) or _normalized_optional_slot_string(
+        slot.get("loaded_local_path")
+    )
+    has_persisted_intent = bool(
+        slot.get("loaded_managed_model_id")
+        and runtime_model_id
+        and _normalized_optional_slot_string(slot.get("loaded_local_path"))
+    )
+    if not isinstance(hydrated_provider_row, dict) or not _is_local_model_slot_provider(hydrated_provider_row):
+        return {
+            "provider_row": hydrated_provider_row,
+            "slot": slot,
+            "runtime_model_id": runtime_model_id,
+            "has_persisted_intent": has_persisted_intent,
+            "runtime_state": None,
+            "runtime_state_status_code": 404,
+            "runtime_inventory": [],
+            "runtime_inventory_status_code": 404,
+            "runtime_inventory_ids": [],
+            "runtime_empty": False,
+            "target_available": False,
+            "is_drifted": False,
+        }
+
+    runtime_state, runtime_state_status_code = _runtime_admin_state(hydrated_provider_row)
+    runtime_inventory, runtime_inventory_status_code = _provider_runtime_inventory(hydrated_provider_row)
+    runtime_inventory_ids = [
+        str(item.get("id") or "").strip()
+        for item in runtime_inventory
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    ]
+    runtime_empty = 200 <= runtime_inventory_status_code < 300 and not runtime_inventory_ids
+    target_available = bool(runtime_model_id and runtime_model_id in set(runtime_inventory_ids))
+    runtime_state_load_state = (
+        str(runtime_state.get("load_state") or "").strip().lower()
+        if isinstance(runtime_state, dict)
+        else ""
+    )
+    is_drifted = bool(
+        has_persisted_intent
+        and (
+            runtime_empty
+            or (runtime_model_id and runtime_inventory_ids and not target_available)
+            or runtime_state_load_state in {_LOCAL_SLOT_STATE_EMPTY, _LOCAL_SLOT_STATE_ERROR}
+        )
+    )
+    return {
+        "provider_row": hydrated_provider_row,
+        "slot": slot,
+        "runtime_model_id": runtime_model_id,
+        "has_persisted_intent": has_persisted_intent,
+        "runtime_state": runtime_state,
+        "runtime_state_status_code": runtime_state_status_code,
+        "runtime_inventory": runtime_inventory,
+        "runtime_inventory_status_code": runtime_inventory_status_code,
+        "runtime_inventory_ids": runtime_inventory_ids,
+        "runtime_empty": runtime_empty,
+        "target_available": target_available,
+        "is_drifted": is_drifted,
+    }
+
+
+def recover_provider_local_slot_runtime(
+    database_url: str,
+    *,
+    provider_row: ProviderRow,
+    force: bool = False,
+) -> tuple[ProviderRow, bool, dict[str, Any]]:
+    inspection = inspect_provider_local_slot_runtime(database_url, provider_row=provider_row)
+    hydrated_provider_row = inspection["provider_row"]
+    if not isinstance(hydrated_provider_row, dict) or not _is_local_model_slot_provider(hydrated_provider_row):
+        return hydrated_provider_row, False, inspection
+    should_reconcile = bool(
+        inspection["has_persisted_intent"]
+        and (inspection["is_drifted"] or (force and not inspection["target_available"]))
+    )
+    if not should_reconcile:
+        return hydrated_provider_row, False, inspection
+    reconciled = reconcile_provider_local_slot(
+        database_url,
+        provider_row=hydrated_provider_row,
+    )
+    refreshed_inspection = inspect_provider_local_slot_runtime(database_url, provider_row=reconciled)
+    return refreshed_inspection["provider_row"], True, refreshed_inspection
+
+
 def reconcile_provider_local_slot(
     database_url: str,
     *,
     provider_row: ProviderRow,
 ) -> ProviderRow:
+    provider_row = _hydrate_provider_row_for_local_slot(database_url, provider_row=provider_row)
     if not _is_local_model_slot_provider(provider_row):
         return provider_row
 

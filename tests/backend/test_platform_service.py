@@ -1133,6 +1133,113 @@ def test_reconcile_provider_local_slot_reloads_persisted_model_when_runtime_is_e
     assert reconciled["config_json"]["loaded_managed_model_id"] == "sentence-transformers--all-MiniLM-L6-v2"
 
 
+def test_reconcile_provider_local_slot_hydrates_provider_rows_missing_capability_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    provider_row = {
+        "id": "provider-embeddings",
+        "slug": "vllm-embeddings-local",
+        "provider_key": "vllm_embeddings_local",
+        "display_name": "vLLM embeddings local",
+        "description": "desc",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": True,
+        "config_json": {
+            "runtime_admin_base_url": "http://llm_runtime_embeddings:8000",
+            "loaded_managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_managed_model_name": "all-MiniLM-L6-v2",
+            "loaded_runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "load_state": "loading",
+        },
+    }
+    hydrated_provider_row = {
+        **provider_row,
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+    }
+    load_calls: list[dict[str, str]] = []
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: hydrated_provider_row if provider_instance_id == "provider-embeddings" else None,
+    )
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_state",
+        lambda _row: (
+            {
+                "capability": "embeddings",
+                "load_state": "empty",
+                "runtime_model_id": None,
+                "local_path": None,
+                "managed_model_id": None,
+                "display_name": None,
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_load_model",
+        lambda _row, *, runtime_model_id, local_path, managed_model_id, display_name: (
+            load_calls.append(
+                {
+                    "runtime_model_id": runtime_model_id,
+                    "local_path": local_path,
+                    "managed_model_id": managed_model_id,
+                    "display_name": display_name,
+                }
+            )
+            or {
+                "capability": "embeddings",
+                "load_state": "loading",
+                "runtime_model_id": runtime_model_id,
+                "local_path": local_path,
+                "managed_model_id": managed_model_id,
+                "display_name": display_name,
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+
+    def _update_provider_instance(_db, **kwargs):
+        return {
+            "id": kwargs["provider_instance_id"],
+            "slug": kwargs["slug"],
+            "provider_key": "vllm_embeddings_local",
+            "capability_key": "embeddings",
+            "adapter_kind": "openai_compatible_embeddings",
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "endpoint_url": kwargs["endpoint_url"],
+            "healthcheck_url": kwargs["healthcheck_url"],
+            "enabled": kwargs["enabled"],
+            "config_json": dict(kwargs["config_json"]),
+        }
+
+    monkeypatch.setattr(platform_service.platform_repo, "update_provider_instance", _update_provider_instance)
+
+    reconciled = platform_service._platform_local_slots_module.reconcile_provider_local_slot(
+        "ignored",
+        provider_row=provider_row,
+    )
+
+    assert load_calls == [
+        {
+            "runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "display_name": "all-MiniLM-L6-v2",
+        }
+    ]
+    assert reconciled["config_json"]["load_state"] == "loading"
+
+
 def test_clear_provider_loaded_model_resets_local_slot(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -1555,6 +1662,7 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
     monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_instance_id: None)
 
     def _ensure_provider_instance(_db, **kwargs):
         return {"id": f"{kwargs['slug']}-id"}
@@ -1645,6 +1753,7 @@ def test_ensure_platform_bootstrap_state_skips_llama_cpp_profile_when_not_config
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
     monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_instance_id: None)
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id"})
     monkeypatch.setattr(
         platform_service.platform_repo,
@@ -1676,6 +1785,7 @@ def test_ensure_platform_bootstrap_state_seeds_qdrant_profile_when_configured(mo
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
     monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
     monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_instance_id: None)
     monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id"})
     monkeypatch.setattr(
         platform_service.platform_repo,

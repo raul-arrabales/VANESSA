@@ -49,6 +49,86 @@ runtime_profile_endpoint_ok() {
   [[ "${status}" == "200" || "${status}" == "401" ]]
 }
 
+embeddings_slot_target() {
+  compose exec -T postgres psql -U vanessa -d vanessa -At -F $'\t' -c "
+    SELECT
+      COALESCE(i.config_json->>'loaded_managed_model_id', ''),
+      COALESCE(i.config_json->>'loaded_runtime_model_id', ''),
+      COALESCE(i.config_json->>'loaded_local_path', '')
+    FROM platform_provider_instances i
+    WHERE i.provider_key = 'vllm_embeddings_local'
+    ORDER BY i.slug ASC
+    LIMIT 1
+  "
+}
+
+service_model_ids() {
+  local service_name="$1"
+  local capability_key="$2"
+  compose exec -T "${service_name}" python -c "
+import json
+import urllib.request
+
+payload = json.load(urllib.request.urlopen('http://127.0.0.1:8000/v1/models', timeout=3))
+items = payload.get('data') if isinstance(payload, dict) else []
+if not isinstance(items, list):
+    items = []
+for item in items:
+    if not isinstance(item, dict):
+        continue
+    capabilities = item.get('capabilities') if isinstance(item.get('capabilities'), dict) else {}
+    if '${capability_key}' == 'embeddings' and not bool(capabilities.get('embeddings')):
+        continue
+    if '${capability_key}' == 'llm_inference' and not bool(capabilities.get('text')):
+        continue
+    model_id = str(item.get('id') or '').strip()
+    if model_id:
+        print(model_id)
+" 2>/dev/null
+}
+
+embeddings_slot_runtime_alignment_ok() {
+  local slot_fields managed_model_id runtime_model_id local_path expected_runtime_model_id
+  slot_fields="$(embeddings_slot_target || true)"
+  IFS=$'\t' read -r managed_model_id runtime_model_id local_path <<< "${slot_fields}"
+
+  if [[ -z "${managed_model_id}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="no persisted slot intent"
+    return 0
+  fi
+
+  expected_runtime_model_id="${runtime_model_id:-${local_path}}"
+  if [[ -z "${expected_runtime_model_id}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot is missing a runtime model identifier"
+    return 1
+  fi
+
+  local runtime_model_ids
+  runtime_model_ids="$(service_model_ids "llm_runtime_embeddings" "embeddings" || true)"
+  if [[ -z "${runtime_model_ids}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot '${managed_model_id}' is not loaded into llm_runtime_embeddings"
+    return 1
+  fi
+  if ! printf '%s\n' "${runtime_model_ids}" | grep -Fxq "${expected_runtime_model_id}"; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="expected runtime model '${expected_runtime_model_id}' is missing from llm_runtime_embeddings"
+    return 1
+  fi
+
+  local llm_embeddings_model_ids
+  llm_embeddings_model_ids="$(service_model_ids "llm" "embeddings" || true)"
+  if [[ -z "${llm_embeddings_model_ids}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="llm does not advertise any embeddings-capable models"
+    return 1
+  fi
+  if ! printf '%s\n' "${llm_embeddings_model_ids}" | grep -Fxq "${expected_runtime_model_id}"; then
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="llm is not advertising the expected embeddings model '${expected_runtime_model_id}'"
+    return 1
+  fi
+
+  EMBEDDINGS_SLOT_ALIGNMENT_REASON="slot aligned"
+  return 0
+}
+
 tcp_ok() {
   local host="$1"
   local port="$2"
@@ -175,6 +255,16 @@ run_checks() {
           printf 'llm_runtime_embeddings: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
         else
           printf 'llm_runtime_embeddings: OK (accelerator=%s)\n' "${runtime_accelerator}"
+        fi
+        if embeddings_slot_runtime_alignment_ok; then
+          if [[ "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-}" == "no persisted slot intent" ]]; then
+            printf 'llm_runtime_embeddings_slot: OK (no persisted slot intent)\n'
+          else
+            printf 'llm_runtime_embeddings_slot: OK (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-slot aligned}"
+          fi
+        else
+          printf 'llm_runtime_embeddings_slot: FAIL (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-alignment check failed}"
+          failures=$((failures + 1))
         fi
       else
         if [[ "${runtime_accelerator}" == "cpu" ]]; then

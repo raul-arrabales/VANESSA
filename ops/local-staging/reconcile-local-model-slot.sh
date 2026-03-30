@@ -116,5 +116,5 @@ fi
 
 if [[ "${restart_services}" == true ]]; then
   log_info "Restarting llm_runtime_inference, llm_runtime_embeddings, and llm to apply the reconciled startup defaults"
-  compose up -d llm_runtime_inference llm_runtime_embeddings llm || die "Failed to restart split local runtimes and llm"
+  COMPOSE_ENV_FILE="${infra_env_file}" compose up -d llm_runtime_inference llm_runtime_embeddings llm || die "Failed to restart split local runtimes and llm"
 fi
