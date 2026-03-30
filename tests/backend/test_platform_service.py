@@ -489,6 +489,102 @@ def test_model_bearing_deployment_save_paths_use_public_model_id(
         assert embeddings_binding["resources"][0]["managed_model_id"] == model_id
 
 
+def test_resolve_deployment_bindings_keeps_cross_capability_kb_checks_out_of_save_time(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"embeddings", "vector_store"})
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_id: {
+            "id": provider_id,
+            "provider_key": "vllm_embeddings_local" if provider_id == "provider-embeddings" else "weaviate_local",
+            "capability_key": "embeddings" if provider_id == "provider-embeddings" else "vector_store",
+        },
+    )
+
+    seen_resources: list[tuple[str, list[dict[str, object]]]] = []
+
+    def _validate_binding_resources(
+        _database_url,
+        *,
+        provider_row,
+        capability_key,
+        resources,
+        default_resource_id,
+        resource_policy,
+    ):
+        seen_resources.append((capability_key, [dict(item) for item in resources]))
+        return {
+            "resources": [dict(item) for item in resources],
+            "default_resource_id": default_resource_id,
+        }
+
+    monkeypatch.setattr(
+        platform_service._platform_bindings_module,  # type: ignore[attr-defined]
+        "_validate_binding_resources",
+        _validate_binding_resources,
+    )
+
+    resolved = platform_service._resolve_deployment_bindings(  # type: ignore[attr-defined]
+        "ignored",
+        [
+            DeploymentBindingInput(
+                capability_key="embeddings",
+                provider_instance_id="provider-embeddings",
+                resources=[
+                    {
+                        "id": "embed-model",
+                        "resource_kind": "model",
+                        "ref_type": "managed_model",
+                        "managed_model_id": "embed-model",
+                    }
+                ],
+                default_resource_id="embed-model",
+            ),
+            DeploymentBindingInput(
+                capability_key="vector_store",
+                provider_instance_id="provider-vector",
+                resources=[
+                    {
+                        "id": "kb-primary",
+                        "resource_kind": "knowledge_base",
+                        "ref_type": "knowledge_base",
+                        "knowledge_base_id": "kb-primary",
+                    }
+                ],
+                default_resource_id="kb-primary",
+            ),
+        ],
+    )
+
+    assert [item["capability_key"] for item in resolved] == ["embeddings", "vector_store"]
+    assert seen_resources == [
+        (
+            "embeddings",
+            [
+                {
+                    "id": "embed-model",
+                    "resource_kind": "model",
+                    "ref_type": "managed_model",
+                    "managed_model_id": "embed-model",
+                }
+            ],
+        ),
+        (
+            "vector_store",
+            [
+                {
+                    "id": "kb-primary",
+                    "resource_kind": "knowledge_base",
+                    "ref_type": "knowledge_base",
+                    "knowledge_base_id": "kb-primary",
+                }
+            ],
+        ),
+    ]
+
+
 def test_activate_deployment_profile_allows_incomplete_required_capabilities(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
