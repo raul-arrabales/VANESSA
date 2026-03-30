@@ -52,7 +52,10 @@ export function KnowledgeBaseDocumentsSection({
               <input
                 className="field-input"
                 value={documentForm.title}
-                onChange={(event) => onDocumentFormChange((current) => ({ ...current, title: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  onDocumentFormChange((current) => ({ ...current, title: value }));
+                }}
               />
             </label>
             <label className="card-stack">
@@ -60,7 +63,10 @@ export function KnowledgeBaseDocumentsSection({
               <input
                 className="field-input"
                 value={documentForm.sourceName}
-                onChange={(event) => onDocumentFormChange((current) => ({ ...current, sourceName: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  onDocumentFormChange((current) => ({ ...current, sourceName: value }));
+                }}
               />
             </label>
             <label className="card-stack">
@@ -68,7 +74,10 @@ export function KnowledgeBaseDocumentsSection({
               <input
                 className="field-input"
                 value={documentForm.uri}
-                onChange={(event) => onDocumentFormChange((current) => ({ ...current, uri: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  onDocumentFormChange((current) => ({ ...current, uri: value }));
+                }}
               />
             </label>
             <label className="card-stack">
@@ -76,7 +85,10 @@ export function KnowledgeBaseDocumentsSection({
               <textarea
                 className="field-input quote-admin-textarea"
                 value={documentForm.text}
-                onChange={(event) => onDocumentFormChange((current) => ({ ...current, text: event.currentTarget.value }))}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  onDocumentFormChange((current) => ({ ...current, text: value }));
+                }}
               />
             </label>
             <div className="form-actions">

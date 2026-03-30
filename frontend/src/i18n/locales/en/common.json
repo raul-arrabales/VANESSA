@@ -410,7 +410,8 @@
       "resync": "Resync knowledge base",
       "resyncing": "Resyncing...",
       "testRetrieval": "Test retrieval",
-      "querying": "Searching..."
+      "querying": "Searching...",
+      "browse": "Browse"
     },
     "fields": {
       "provider": "Backing provider",
@@ -457,6 +458,7 @@
       "eligible": "Eligible for deployment binding.",
       "ineligible": "Not currently eligible for deployment binding.",
       "supportedFileTypes": "Supported file types: .txt, .md, .json, .jsonl, .pdf.",
+      "sourceRelativePathHelp": "Relative paths must stay under an allowlisted context source root. In local staging, that maps to the host-side context_sources/ directory.",
       "documentManagedBySource": "Managed by {{source}} ({{path}})",
       "documentManagedReadOnly": "This document is source-managed and can only be changed through its source sync.",
       "fullKnowledgeBaseResync": "Knowledge base resync",
@@ -493,6 +495,7 @@
       "sourceUpdated": "Source '{{name}}' updated.",
       "sourceDeleted": "Source deleted.",
       "sourceSaveFailed": "Unable to save source.",
+      "sourceDirectoriesLoadFailed": "Unable to load source directories.",
       "sourceDeleteFailed": "Unable to delete source.",
       "sourceSynced": "Source '{{name}}' synced.",
       "sourceSyncFailed": "Unable to sync the source.",
@@ -516,6 +519,17 @@
       "propertyType": "Property type",
       "profileSlug": "Profile slug",
       "profileDisplayName": "Profile display name"
+    },
+    "sourceBrowser": {
+      "title": "Browse source directories",
+      "description": "Choose an existing directory under an allowlisted source root, or keep typing the relative path manually.",
+      "root": "Source root",
+      "currentPath": "Current directory: {{path}}",
+      "rootDirectory": "Root directory",
+      "up": "Up one level",
+      "useCurrent": "Use current directory",
+      "loading": "Loading directories...",
+      "empty": "No child directories were found here."
     }
   },
   "quoteOfTheDay": {

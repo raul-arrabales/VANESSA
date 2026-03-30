@@ -16,6 +16,7 @@ from ...application.context_management_service import (
     list_context_knowledge_base_sync_runs,
     list_context_knowledge_bases,
     list_context_schema_profiles,
+    list_context_source_directories,
     list_context_vectorization_options,
     list_context_knowledge_sources,
     query_context_knowledge_base,
@@ -37,6 +38,7 @@ bp = Blueprint("context", __name__)
 list_knowledge_bases = list_context_knowledge_bases
 list_schema_profiles = list_context_schema_profiles
 create_schema_profile = create_context_schema_profile
+list_source_directories = list_context_source_directories
 list_vectorization_options = list_context_vectorization_options
 create_knowledge_base = create_context_knowledge_base
 get_knowledge_base_detail = get_context_knowledge_base_detail
@@ -120,6 +122,23 @@ def list_vectorization_options_route():
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(options), 200
+
+
+@bp.get("/v1/context/source-directories")
+@require_role("admin")
+def list_source_directories_route():
+    root_id = request.args.get("root_id", "").strip() or None
+    relative_path = request.args.get("relative_path", "")
+    try:
+        payload = list_source_directories(
+            _database_url(),
+            config=_config(),
+            root_id=root_id,
+            relative_path=relative_path,
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
 
 
 @bp.get("/v1/context/knowledge-bases")

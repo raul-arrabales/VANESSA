@@ -410,7 +410,8 @@
       "resync": "Resincronizar base de conocimiento",
       "resyncing": "Resincronizando...",
       "testRetrieval": "Probar recuperacion",
-      "querying": "Buscando..."
+      "querying": "Buscando...",
+      "browse": "Explorar"
     },
     "fields": {
       "provider": "Proveedor de respaldo",
@@ -457,6 +458,7 @@
       "eligible": "Disponible para vincularse a despliegues.",
       "ineligible": "Actualmente no es apta para vincularse a despliegues.",
       "supportedFileTypes": "Tipos de archivo compatibles: .txt, .md, .json, .jsonl, .pdf.",
+      "sourceRelativePathHelp": "Las rutas relativas deben permanecer bajo una raiz de fuentes permitida. En local staging, esto corresponde al directorio context_sources/ del host.",
       "documentManagedBySource": "Gestionado por {{source}} ({{path}})",
       "documentManagedReadOnly": "Este documento esta gestionado por una fuente y solo puede cambiarse mediante su sincronizacion.",
       "fullKnowledgeBaseResync": "Resincronizacion de la base de conocimiento",
@@ -493,6 +495,7 @@
       "sourceUpdated": "Fuente '{{name}}' actualizada.",
       "sourceDeleted": "Fuente eliminada.",
       "sourceSaveFailed": "No se pudo guardar la fuente.",
+      "sourceDirectoriesLoadFailed": "No se pudieron cargar los directorios de fuentes.",
       "sourceDeleteFailed": "No se pudo eliminar la fuente.",
       "sourceSynced": "La fuente '{{name}}' se sincronizo.",
       "sourceSyncFailed": "No se pudo sincronizar la fuente.",
@@ -516,6 +519,17 @@
       "propertyType": "Tipo de propiedad",
       "profileSlug": "Slug del perfil",
       "profileDisplayName": "Nombre visible del perfil"
+    },
+    "sourceBrowser": {
+      "title": "Explorar directorios de fuentes",
+      "description": "Elige un directorio existente bajo una raiz permitida, o sigue escribiendo la ruta relativa manualmente.",
+      "root": "Raiz de fuentes",
+      "currentPath": "Directorio actual: {{path}}",
+      "rootDirectory": "Directorio raiz",
+      "up": "Subir un nivel",
+      "useCurrent": "Usar directorio actual",
+      "loading": "Cargando directorios...",
+      "empty": "No se encontraron subdirectorios aqui."
     }
   },
   "quoteOfTheDay": {

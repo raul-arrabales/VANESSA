@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,34 @@ def _normalize_source_relative_path(value: str) -> str:
     return "/".join(parts)
 
 
+def _configured_source_roots(config: AuthConfig) -> list[dict[str, Any]]:
+    roots: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+    for raw_root in config.context_source_roots:
+        normalized = str(raw_root).strip()
+        if not normalized:
+            continue
+        path = Path(normalized).expanduser().resolve()
+        key = str(path)
+        if key in seen_paths:
+            continue
+        seen_paths.add(key)
+        roots.append(
+            {
+                "id": f"root-{hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]}",
+                "display_name": key,
+                "path": path,
+            }
+        )
+    if not roots:
+        raise PlatformControlPlaneError(
+            "context_source_roots_not_configured",
+            "No context source roots are configured.",
+            status_code=500,
+        )
+    return roots
+
+
 def _resolve_source_directory(
     config: AuthConfig,
     relative_path: str,
@@ -66,13 +95,7 @@ def _resolve_source_directory(
     normalized_relative_path = _normalize_source_relative_path(relative_path)
     if not normalized_relative_path:
         raise PlatformControlPlaneError("invalid_source_relative_path", "relative_path is required", status_code=400)
-    configured_roots = [Path(root).expanduser().resolve() for root in config.context_source_roots if str(root).strip()]
-    if not configured_roots:
-        raise PlatformControlPlaneError(
-            "context_source_roots_not_configured",
-            "No context source roots are configured.",
-            status_code=500,
-        )
+    configured_roots = [root["path"] for root in _configured_source_roots(config)]
     existing_candidates: list[Path] = []
     fallback_candidate: Path | None = None
     for root in configured_roots:

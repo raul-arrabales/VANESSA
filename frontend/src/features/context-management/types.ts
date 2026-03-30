@@ -31,14 +31,21 @@ export const EMPTY_DOCUMENT_FORM: DocumentFormState = {
   text: "",
 };
 
-export const EMPTY_SOURCE_FORM: SourceFormState = {
-  id: null,
-  displayName: "",
-  relativePath: "",
-  includeGlobs: "",
-  excludeGlobs: "",
-  lifecycleState: "active",
-};
+export const DEFAULT_SOURCE_INCLUDE_GLOBS = "**/*.{md,txt,pdf,json,jsonl}";
+export const DEFAULT_SOURCE_EXCLUDE_GLOBS = "**/.git/**\n**/node_modules/**\n**/venv/**\n**/*.log";
+
+export function createEmptySourceForm(): SourceFormState {
+  return {
+    id: null,
+    displayName: "",
+    relativePath: "",
+    includeGlobs: DEFAULT_SOURCE_INCLUDE_GLOBS,
+    excludeGlobs: DEFAULT_SOURCE_EXCLUDE_GLOBS,
+    lifecycleState: "active",
+  };
+}
+
+export const EMPTY_SOURCE_FORM: SourceFormState = createEmptySourceForm();
 
 export function parseGlobText(value: string): string[] {
   return value

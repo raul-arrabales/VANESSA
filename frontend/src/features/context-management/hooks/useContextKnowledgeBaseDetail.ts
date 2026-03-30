@@ -7,6 +7,7 @@ import {
   deleteKnowledgeBase,
   deleteKnowledgeBaseDocument,
   deleteKnowledgeSource,
+  getKnowledgeSourceDirectories,
   getKnowledgeBase,
   listKnowledgeBaseDocuments,
   listKnowledgeSources,
@@ -19,6 +20,7 @@ import {
   updateKnowledgeSource,
   uploadKnowledgeBaseDocuments,
 } from "../../../api/context";
+import type { KnowledgeSourceDirectoriesResponse } from "../../../api/context";
 import { useAuth } from "../../../auth/AuthProvider";
 import {
   useActionFeedback,
@@ -27,7 +29,7 @@ import {
 } from "../../../feedback/ActionFeedbackProvider";
 import {
   EMPTY_DOCUMENT_FORM,
-  EMPTY_SOURCE_FORM,
+  createEmptySourceForm,
   parseGlobText,
   type ContextKnowledgeBaseDetailState,
   type DocumentFormState,
@@ -58,6 +60,15 @@ type UseContextKnowledgeBaseDetailResult = ContextKnowledgeBaseDetailState & {
   handleSubmitSource: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   handleDeleteSource: (sourceId: string) => Promise<void>;
   handleSyncSource: (sourceId: string) => Promise<void>;
+  sourceDirectoryBrowser: {
+    open: boolean;
+    loading: boolean;
+    payload: KnowledgeSourceDirectoriesResponse | null;
+  };
+  handleOpenSourceDirectoryBrowser: () => Promise<void>;
+  handleCloseSourceDirectoryBrowser: () => void;
+  handleBrowseSourceDirectories: (rootId: string | null, relativePath: string | null) => Promise<void>;
+  handleUseCurrentSourceDirectory: () => void;
   handleTestRetrieval: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
@@ -81,7 +92,7 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     lifecycleState: "active",
   });
   const [documentForm, setDocumentForm] = useState<DocumentFormState>(EMPTY_DOCUMENT_FORM);
-  const [sourceForm, setSourceForm] = useState<SourceFormState>(EMPTY_SOURCE_FORM);
+  const [sourceForm, setSourceForm] = useState<SourceFormState>(createEmptySourceForm);
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [retrievalQuery, setRetrievalQuery] = useState("");
   const [retrievalTopK, setRetrievalTopK] = useState("5");
@@ -90,6 +101,9 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
   const [isResyncing, setIsResyncing] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+  const [sourceDirectoryBrowserOpen, setSourceDirectoryBrowserOpen] = useState(false);
+  const [sourceDirectoryBrowserLoading, setSourceDirectoryBrowserLoading] = useState(false);
+  const [sourceDirectoryBrowserPayload, setSourceDirectoryBrowserPayload] = useState<KnowledgeSourceDirectoriesResponse | null>(null);
 
   useRouteActionFeedback(location.state);
 
@@ -287,7 +301,9 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
         await createKnowledgeSource(knowledgeBase.id, payload, token);
         showSuccessFeedback(t("contextManagement.feedback.sourceCreated", { name: sourceForm.displayName }));
       }
-      setSourceForm(EMPTY_SOURCE_FORM);
+      setSourceForm(createEmptySourceForm());
+      setSourceDirectoryBrowserOpen(false);
+      setSourceDirectoryBrowserPayload(null);
       await reload();
     } catch (requestError) {
       showErrorFeedback(requestError, t("contextManagement.feedback.sourceSaveFailed"));
@@ -301,13 +317,48 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     try {
       await deleteKnowledgeSource(knowledgeBase.id, sourceId, token);
       if (sourceForm.id === sourceId) {
-        setSourceForm(EMPTY_SOURCE_FORM);
+        setSourceForm(createEmptySourceForm());
+        setSourceDirectoryBrowserOpen(false);
+        setSourceDirectoryBrowserPayload(null);
       }
       showSuccessFeedback(t("contextManagement.feedback.sourceDeleted"));
       await reload();
     } catch (requestError) {
       showErrorFeedback(requestError, t("contextManagement.feedback.sourceDeleteFailed"));
     }
+  }
+
+  async function handleBrowseSourceDirectories(rootId: string | null, relativePath: string | null): Promise<void> {
+    if (!token) {
+      return;
+    }
+    setSourceDirectoryBrowserLoading(true);
+    try {
+      const payload = await getKnowledgeSourceDirectories(token, { rootId, relativePath });
+      setSourceDirectoryBrowserPayload(payload);
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("contextManagement.feedback.sourceDirectoriesLoadFailed"));
+    } finally {
+      setSourceDirectoryBrowserLoading(false);
+    }
+  }
+
+  async function handleOpenSourceDirectoryBrowser(): Promise<void> {
+    setSourceDirectoryBrowserOpen(true);
+    await handleBrowseSourceDirectories(sourceDirectoryBrowserPayload?.selected_root_id ?? null, sourceForm.relativePath || null);
+  }
+
+  function handleCloseSourceDirectoryBrowser(): void {
+    setSourceDirectoryBrowserOpen(false);
+  }
+
+  function handleUseCurrentSourceDirectory(): void {
+    const currentRelativePath = sourceDirectoryBrowserPayload?.current_relative_path ?? "";
+    if (!currentRelativePath) {
+      return;
+    }
+    setSourceForm((current) => ({ ...current, relativePath: currentRelativePath }));
+    setSourceDirectoryBrowserOpen(false);
   }
 
   async function handleSyncSource(sourceId: string): Promise<void> {
@@ -361,6 +412,11 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     form,
     documentForm,
     sourceForm,
+    sourceDirectoryBrowser: {
+      open: sourceDirectoryBrowserOpen,
+      loading: sourceDirectoryBrowserLoading,
+      payload: sourceDirectoryBrowserPayload,
+    },
     uploadFiles,
     retrievalQuery,
     retrievalTopK,
@@ -385,6 +441,10 @@ export function useContextKnowledgeBaseDetail(): UseContextKnowledgeBaseDetailRe
     handleSubmitSource,
     handleDeleteSource,
     handleSyncSource,
+    handleOpenSourceDirectoryBrowser,
+    handleCloseSourceDirectoryBrowser,
+    handleBrowseSourceDirectories,
+    handleUseCurrentSourceDirectory,
     handleTestRetrieval,
   };
 }

@@ -101,7 +101,10 @@ export function KnowledgeBaseOverviewSection({
             className="field-input"
             value={form.slug}
             disabled={!isSuperadmin}
-            onChange={(event) => onFormChange((current) => ({ ...current, slug: event.currentTarget.value }))}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              onFormChange((current) => ({ ...current, slug: value }));
+            }}
           />
         </label>
         <label className="card-stack">
@@ -110,7 +113,10 @@ export function KnowledgeBaseOverviewSection({
             className="field-input"
             value={form.displayName}
             disabled={!isSuperadmin}
-            onChange={(event) => onFormChange((current) => ({ ...current, displayName: event.currentTarget.value }))}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              onFormChange((current) => ({ ...current, displayName: value }));
+            }}
           />
         </label>
         <label className="card-stack">
@@ -119,7 +125,10 @@ export function KnowledgeBaseOverviewSection({
             className="field-input quote-admin-textarea"
             value={form.description}
             disabled={!isSuperadmin}
-            onChange={(event) => onFormChange((current) => ({ ...current, description: event.currentTarget.value }))}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              onFormChange((current) => ({ ...current, description: value }));
+            }}
           />
         </label>
         <label className="card-stack">
@@ -128,7 +137,10 @@ export function KnowledgeBaseOverviewSection({
             className="field-input"
             value={form.lifecycleState}
             disabled={!isSuperadmin}
-            onChange={(event) => onFormChange((current) => ({ ...current, lifecycleState: event.currentTarget.value }))}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              onFormChange((current) => ({ ...current, lifecycleState: value }));
+            }}
           >
             <option value="active">active</option>
             <option value="archived">archived</option>

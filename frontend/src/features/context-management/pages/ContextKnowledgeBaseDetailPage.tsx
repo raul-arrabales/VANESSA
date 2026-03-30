@@ -41,9 +41,14 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
           <KnowledgeBaseSourcesSection
             sources={detail.sources}
             sourceForm={detail.sourceForm}
+            sourceDirectoryBrowser={detail.sourceDirectoryBrowser}
             isSuperadmin={detail.isSuperadmin}
             syncingSourceId={detail.syncingSourceId}
             onSourceFormChange={detail.setSourceForm}
+            onOpenDirectoryBrowser={detail.handleOpenSourceDirectoryBrowser}
+            onCloseDirectoryBrowser={detail.handleCloseSourceDirectoryBrowser}
+            onBrowseDirectories={detail.handleBrowseSourceDirectories}
+            onUseCurrentDirectory={detail.handleUseCurrentSourceDirectory}
             onSubmit={detail.handleSubmitSource}
             onDelete={detail.handleDeleteSource}
             onSync={detail.handleSyncSource}

@@ -175,6 +175,40 @@ def test_list_vectorization_options_route_returns_payload_for_admin(client, monk
     assert response.get_json()["supported_modes"][0]["mode"] == "vanessa_embeddings"
 
 
+def test_list_source_directories_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-source-dirs@example.com",
+        username="admin-source-dirs",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "list_source_directories",
+        lambda *_args, **_kwargs: {
+            "roots": [{"id": "root-1", "display_name": "/context_sources"}],
+            "selected_root_id": "root-1",
+            "current_relative_path": "product_docs",
+            "directories": [{"name": "guides", "relative_path": "product_docs/guides"}],
+            "parent_relative_path": "",
+        },
+    )
+
+    response = test_client.get(
+        "/v1/context/source-directories?root_id=root-1&relative_path=product_docs",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["selected_root_id"] == "root-1"
+    assert response.get_json()["directories"][0]["relative_path"] == "product_docs/guides"
+
+
 def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(

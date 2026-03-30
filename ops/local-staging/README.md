@@ -188,7 +188,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 6. Confirm downloaded model files are written under host directory `models/llm/`.
 7. If the model should be served locally, open Platform Control, assign it to the appropriate local provider slot, and wait for the page to report that the runtime finished loading it.
 7.1. To test managed knowledge-base directory sources, place sample `.txt`, `.md`, `.json`, or `.jsonl` files under host directory `context_sources/` before opening Context Management.
-7.2. In `/control/context`, create or open a knowledge base, add a managed source pointing at a relative path under `context_sources/`, and use `Sync now` to import and reconcile those files.
+7.2. In `/control/context`, create or open a knowledge base, add a managed source pointing at a relative path under `context_sources/`, or use the `Browse` button to pick that directory from the allowlisted source root, and use `Sync now` to import and reconcile those files.
 8. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
 9. Check API health directly (host-to-container): `http://localhost:5000/health`
 9.1. Check runtime profile directly: `http://localhost:5000/v1/runtime/profile`

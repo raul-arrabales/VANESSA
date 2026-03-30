@@ -106,6 +106,24 @@ export type KnowledgeBaseVectorizationOptions = {
   }>;
 };
 
+export type KnowledgeSourceDirectoryRoot = {
+  id: string;
+  display_name: string;
+};
+
+export type KnowledgeSourceDirectoryEntry = {
+  name: string;
+  relative_path: string;
+};
+
+export type KnowledgeSourceDirectoriesResponse = {
+  roots: KnowledgeSourceDirectoryRoot[];
+  selected_root_id: string;
+  current_relative_path: string;
+  directories: KnowledgeSourceDirectoryEntry[];
+  parent_relative_path?: string | null;
+};
+
 export type KnowledgeBaseQueryResult = {
   id: string;
   title: string;
@@ -339,6 +357,21 @@ export async function listKnowledgeSources(knowledgeBaseId: string, token: strin
     { token },
   );
   return result.sources;
+}
+
+export async function getKnowledgeSourceDirectories(
+  token: string,
+  options: { rootId?: string | null; relativePath?: string | null } = {},
+): Promise<KnowledgeSourceDirectoriesResponse> {
+  const params = new URLSearchParams();
+  if (options.rootId) {
+    params.set("root_id", options.rootId);
+  }
+  if (options.relativePath !== undefined && options.relativePath !== null) {
+    params.set("relative_path", options.relativePath);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return requestJson<KnowledgeSourceDirectoriesResponse>(`/v1/context/source-directories${suffix}`, { token });
 }
 
 export async function createKnowledgeSource(

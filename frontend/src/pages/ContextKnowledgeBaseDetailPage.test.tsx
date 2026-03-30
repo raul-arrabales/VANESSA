@@ -93,13 +93,23 @@ const contextApiMocks = vi.hoisted(() => ({
       display_name: "Docs folder",
       relative_path: "product_docs",
       include_globs: ["**/*.md"],
-      exclude_globs: [],
+      exclude_globs: [] as string[],
       lifecycle_state: "active",
       last_sync_status: "ready",
       last_sync_at: "2026-03-26T20:10:00+00:00",
       last_sync_error: null,
     },
   ]),
+  getKnowledgeSourceDirectories: vi.fn(async (_token: string, options?: { rootId?: string | null; relativePath?: string | null }) => ({
+    roots: [{ id: "root-1", display_name: "/context_sources" }],
+    selected_root_id: "root-1",
+    current_relative_path: options?.relativePath ?? "",
+    parent_relative_path: options?.relativePath === "product_docs" ? "" : null,
+    directories:
+      options?.relativePath === "product_docs"
+        ? [{ name: "guides", relative_path: "product_docs/guides" }]
+        : [{ name: "product_docs", relative_path: "product_docs" }],
+  })),
   listKnowledgeSyncRuns: vi.fn(async () => [
     {
       id: "run-1",
@@ -230,7 +240,7 @@ const contextApiMocks = vi.hoisted(() => ({
       display_name: "Docs folder",
       relative_path: "product_docs",
       include_globs: ["**/*.md"],
-      exclude_globs: [],
+      exclude_globs: [] as string[],
       lifecycle_state: "active",
       last_sync_status: "ready",
       last_sync_at: "2026-03-26T21:00:00+00:00",
@@ -349,5 +359,133 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
 
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
+  });
+
+  it("prefills new source globs for superadmins", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
+      </Routes>,
+      { route: "/control/context/kb-primary" },
+    );
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+
+    expect(screen.getByLabelText("Include globs")).toHaveValue("**/*.{md,txt,pdf,json,jsonl}");
+    expect(screen.getByLabelText("Exclude globs")).toHaveValue("**/.git/**\n**/node_modules/**\n**/venv/**\n**/*.log");
+  });
+
+  it("keeps stored glob values when editing an existing source", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+    contextApiMocks.listKnowledgeSources.mockImplementationOnce(async () => [
+      {
+        id: "source-1",
+        knowledge_base_id: "kb-primary",
+        source_type: "local_directory",
+        display_name: "Docs folder",
+        relative_path: "product_docs",
+        include_globs: ["**/*.txt"],
+        exclude_globs: ["**/*.tmp"],
+        lifecycle_state: "active",
+        last_sync_status: "ready",
+        last_sync_at: "2026-03-26T20:10:00+00:00",
+        last_sync_error: null,
+      },
+    ]);
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
+      </Routes>,
+      { route: "/control/context/kb-primary" },
+    );
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByLabelText("Include globs")).toHaveValue("**/*.txt");
+    expect(screen.getByLabelText("Exclude globs")).toHaveValue("**/*.tmp");
+  });
+
+  it("lets superadmins browse and select a source directory", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
+      </Routes>,
+      { route: "/control/context/kb-primary" },
+    );
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Browse" }));
+    await userEvent.click(await screen.findByRole("button", { name: "product_docs" }));
+    await userEvent.click(screen.getByRole("button", { name: "Use current directory" }));
+
+    expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+    expect(contextApiMocks.getKnowledgeSourceDirectories).toHaveBeenCalledWith("token", { rootId: null, relativePath: null });
+    expect(contextApiMocks.getKnowledgeSourceDirectories).toHaveBeenCalledWith("token", {
+      rootId: "root-1",
+      relativePath: "product_docs",
+    });
+  });
+
+  it("lets superadmins type into overview, source, and document forms without crashing", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
+      </Routes>,
+      { route: "/control/context/kb-primary" },
+    );
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+
+    const displayNameInputs = screen.getAllByDisplayValue("Product Docs");
+    await userEvent.clear(displayNameInputs[0]);
+    await userEvent.type(displayNameInputs[0], "Updated KB");
+
+    const textboxes = screen.getAllByRole("textbox");
+    const relativePathInput = textboxes[4];
+    await userEvent.type(relativePathInput, "product_docs");
+
+    const includeGlobsInput = screen.getByLabelText("Include globs");
+    await userEvent.clear(includeGlobsInput);
+    await userEvent.type(includeGlobsInput, "**/*.md");
+
+    const documentTitleInput = screen.getByRole("textbox", { name: "Document title" });
+    await userEvent.type(documentTitleInput, "Manual note");
+
+    expect(screen.getByDisplayValue("Updated KB")).toBeVisible();
+    expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+    expect(screen.getByDisplayValue("**/*.md")).toBeVisible();
+    expect(screen.getByDisplayValue("Manual note")).toBeVisible();
   });
 });

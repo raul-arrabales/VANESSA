@@ -14,9 +14,10 @@ from ..services.context_management import (
     list_knowledge_base_documents as _list_knowledge_base_documents,
     list_knowledge_base_sync_runs as _list_knowledge_base_sync_runs,
     list_knowledge_bases as _list_knowledge_bases,
+    list_source_directories as _list_source_directories,
     list_schema_profiles as _list_schema_profiles,
-    list_vectorization_options as _list_vectorization_options,
     list_knowledge_sources as _list_knowledge_sources,
+    list_vectorization_options as _list_vectorization_options,
     query_knowledge_base as _query_knowledge_base,
     resync_knowledge_base as _resync_knowledge_base,
     sync_knowledge_source as _sync_knowledge_source,
@@ -65,6 +66,14 @@ def list_context_vectorization_options(database_url: str, *, config, backing_pro
         database_url,
         config=config,
         backing_provider_instance_id=backing_provider_instance_id,
+    )
+
+
+def list_context_source_directories(database_url: str, *, config, root_id: str | None, relative_path: str | None):
+    return _list_source_directories(
+        config=config,
+        root_id=root_id,
+        relative_path=relative_path,
     )
 
 

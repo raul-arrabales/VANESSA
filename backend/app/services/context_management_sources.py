@@ -15,10 +15,12 @@ from .context_management_ingestion import (
 from .context_management_serialization import _normalize_knowledge_source_payload, _serialize_knowledge_base, _serialize_knowledge_source, _serialize_sync_run
 from .context_management_shared import (
     _chunk_document_text,
+    _configured_source_roots,
     _delete_document_chunks,
     _mark_knowledge_base_sync_error,
     _mark_knowledge_base_sync_ready,
     _mark_knowledge_base_syncing,
+    _normalize_source_relative_path,
     _refresh_document_count,
     _require_knowledge_base,
     _require_knowledge_source,
@@ -28,6 +30,101 @@ from .context_management_shared import (
 from .context_management_types import SourceSyncSummary
 from .context_management_vectorization import require_knowledge_base_text_ingestion_supported
 from .platform_types import PlatformControlPlaneError
+
+
+def _resolve_source_browser_root(
+    config: AuthConfig,
+    *,
+    root_id: str | None,
+    relative_path: str,
+) -> dict[str, Any]:
+    roots = _configured_source_roots(config)
+    if root_id:
+        for root in roots:
+            if str(root["id"]) == root_id:
+                return root
+        raise PlatformControlPlaneError("invalid_source_root", "Selected source root was not found.", status_code=400)
+    if relative_path:
+        matching_roots: list[dict[str, Any]] = []
+        for root in roots:
+            root_path = Path(root["path"])
+            candidate = (root_path / relative_path).resolve()
+            try:
+                candidate.relative_to(root_path)
+            except ValueError:
+                continue
+            if candidate.exists() and candidate.is_dir():
+                matching_roots.append(root)
+        if len(matching_roots) == 1:
+            return matching_roots[0]
+    return roots[0]
+
+
+def list_source_directories(
+    *,
+    config: AuthConfig,
+    root_id: str | None = None,
+    relative_path: str | None = None,
+) -> dict[str, Any]:
+    normalized_relative_path = _normalize_source_relative_path(relative_path or "")
+    roots = _configured_source_roots(config)
+    selected_root = _resolve_source_browser_root(
+        config,
+        root_id=root_id,
+        relative_path=normalized_relative_path,
+    )
+    root_path = Path(selected_root["path"])
+    current_directory = root_path
+    if normalized_relative_path:
+        current_directory = (root_path / normalized_relative_path).resolve()
+        try:
+            current_directory.relative_to(root_path)
+        except ValueError as exc:
+            raise PlatformControlPlaneError(
+                "invalid_source_relative_path",
+                "relative_path must stay within an allowlisted context source root.",
+                status_code=400,
+            ) from exc
+        if not current_directory.exists():
+            raise PlatformControlPlaneError(
+                "knowledge_source_path_not_found",
+                "Knowledge source directory was not found under the configured source roots.",
+                status_code=400,
+                details={"relative_path": normalized_relative_path},
+            )
+        if not current_directory.is_dir():
+            raise PlatformControlPlaneError(
+                "knowledge_source_not_directory",
+                "Knowledge source path must point to a directory.",
+                status_code=400,
+                details={"relative_path": normalized_relative_path},
+            )
+    directories = []
+    if current_directory.exists() and current_directory.is_dir():
+        directories = [
+            {
+                "name": child.name,
+                "relative_path": child.relative_to(root_path).as_posix(),
+            }
+            for child in sorted(current_directory.iterdir(), key=lambda item: item.name.lower())
+            if child.is_dir()
+        ]
+    parent_relative_path: str | None = None
+    if normalized_relative_path:
+        parent = current_directory.parent
+        if parent != current_directory:
+            try:
+                parent_relative = parent.relative_to(root_path).as_posix()
+            except ValueError:
+                parent_relative = ""
+            parent_relative_path = "" if parent_relative == "." else parent_relative
+    return {
+        "roots": [{"id": str(root["id"]), "display_name": str(root["display_name"])} for root in roots],
+        "selected_root_id": str(selected_root["id"]),
+        "current_relative_path": normalized_relative_path,
+        "directories": directories,
+        "parent_relative_path": parent_relative_path,
+    }
 
 
 def list_knowledge_sources(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:
