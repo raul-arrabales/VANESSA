@@ -4,11 +4,14 @@ import { useNavigate } from "react-router-dom";
 import {
   createKnowledgeBase,
   createKnowledgeBaseSchemaProfile,
+  getKnowledgeBaseVectorizationOptions,
   listKnowledgeBaseSchemaProfiles,
   type KnowledgeBaseSchema,
   type KnowledgeBaseSchemaProfile,
   type KnowledgeBaseSchemaProperty,
   type KnowledgeBaseSchemaPropertyType,
+  type KnowledgeBaseVectorizationMode,
+  type KnowledgeBaseVectorizationOptions,
 } from "../../../api/context";
 import { listPlatformProviders, type PlatformProvider } from "../../../api/platform";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -36,6 +39,16 @@ type UseContextKnowledgeBaseCreateResult = {
   providerOptions: PlatformProvider[];
   selectedProviderId: string;
   selectedProviderKey: string;
+  vectorizationOptions: KnowledgeBaseVectorizationOptions | null;
+  vectorizationLoadError: string;
+  vectorizationOptionsLoading: boolean;
+  selectedVectorizationMode: KnowledgeBaseVectorizationMode;
+  selectedEmbeddingProviderId: string;
+  selectedEmbeddingResourceId: string;
+  selectedEmbeddingProviderReady: boolean;
+  selectedEmbeddingProviderNeedsModel: boolean;
+  selectedEmbeddingProviderUnavailableReason: string | null;
+  selectedEmbeddingProviderDisplayName: string;
   selectedProfileId: string;
   selectedProfileDescription: string;
   providerLoadError: string;
@@ -55,6 +68,9 @@ type UseContextKnowledgeBaseCreateResult = {
   setDisplayName: (value: string) => void;
   setDescription: (value: string) => void;
   setSelectedProviderId: (value: string) => void;
+  setSelectedVectorizationMode: (value: KnowledgeBaseVectorizationMode) => void;
+  setSelectedEmbeddingProviderId: (value: string) => void;
+  setSelectedEmbeddingResourceId: (value: string) => void;
   setSchemaEditorMode: (value: SchemaEditorMode) => void;
   setSchemaText: (value: string) => void;
   setSelectedProfileId: (value: string) => void;
@@ -83,6 +99,12 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
   const [schemaProfiles, setSchemaProfiles] = useState<KnowledgeBaseSchemaProfile[]>([]);
   const [providerOptions, setProviderOptions] = useState<PlatformProvider[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [vectorizationOptions, setVectorizationOptions] = useState<KnowledgeBaseVectorizationOptions | null>(null);
+  const [vectorizationLoadError, setVectorizationLoadError] = useState("");
+  const [vectorizationOptionsLoading, setVectorizationOptionsLoading] = useState(false);
+  const [selectedVectorizationMode, setSelectedVectorizationMode] = useState<KnowledgeBaseVectorizationMode>("vanessa_embeddings");
+  const [selectedEmbeddingProviderId, setSelectedEmbeddingProviderId] = useState("");
+  const [selectedEmbeddingResourceId, setSelectedEmbeddingResourceId] = useState("");
   const [selectedProfileId, setSelectedProfileIdState] = useState("");
   const [schemaEditorMode, setSchemaEditorMode] = useState<SchemaEditorMode>("profile");
   const [providerLoadError, setProviderLoadError] = useState("");
@@ -105,6 +127,13 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     [enabledVectorProviders, selectedProviderId],
   );
   const selectedProviderKey = selectedProvider?.provider_key ?? "";
+  const selectedEmbeddingProvider = useMemo(
+    () => vectorizationOptions?.embedding_providers.find((provider) => provider.id === selectedEmbeddingProviderId) ?? null,
+    [selectedEmbeddingProviderId, vectorizationOptions],
+  );
+  const selectedEmbeddingProviderResources = selectedEmbeddingProvider?.resources ?? [];
+  const selectedEmbeddingProviderReady = Boolean(selectedEmbeddingProvider?.is_ready ?? selectedEmbeddingProviderResources.length > 0);
+  const selectedEmbeddingProviderNeedsModel = Boolean(selectedEmbeddingProviderId) && !selectedEmbeddingProviderReady;
   const selectedProfile = useMemo(
     () => schemaProfiles.find((profile) => profile.id === selectedProfileId) ?? null,
     [schemaProfiles, selectedProfileId],
@@ -169,6 +198,78 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     };
     void loadProfiles();
   }, [selectedProviderKey, t, token]);
+
+  useEffect(() => {
+    if (!token || !selectedProviderId) {
+      setVectorizationOptions(null);
+      setVectorizationLoadError("");
+      setVectorizationOptionsLoading(false);
+      setSelectedVectorizationMode("vanessa_embeddings");
+      setSelectedEmbeddingProviderId("");
+      setSelectedEmbeddingResourceId("");
+      return;
+    }
+    const loadVectorizationOptions = async (): Promise<void> => {
+      setVectorizationOptionsLoading(true);
+      setVectorizationLoadError("");
+      try {
+        const options = await getKnowledgeBaseVectorizationOptions(selectedProviderId, token);
+        setVectorizationOptions(options);
+      } catch (requestError) {
+        setVectorizationOptions(null);
+        setVectorizationLoadError(
+          requestError instanceof Error ? requestError.message : t("contextManagement.feedback.vectorizationOptionsLoadFailed"),
+        );
+      } finally {
+        setVectorizationOptionsLoading(false);
+      }
+    };
+    void loadVectorizationOptions();
+  }, [selectedProviderId, t, token]);
+
+  useEffect(() => {
+    const supportedModes = (vectorizationOptions?.supported_modes ?? [])
+      .map((item) => item.mode)
+      .filter((item): item is KnowledgeBaseVectorizationMode => item === "vanessa_embeddings" || item === "self_provided");
+    if (supportedModes.length === 0) {
+      setSelectedVectorizationMode("vanessa_embeddings");
+      return;
+    }
+    if (!supportedModes.includes(selectedVectorizationMode)) {
+      setSelectedVectorizationMode(supportedModes[0]);
+    }
+  }, [selectedVectorizationMode, vectorizationOptions]);
+
+  useEffect(() => {
+    const providers = vectorizationOptions?.embedding_providers ?? [];
+    if (providers.length === 0) {
+      setSelectedEmbeddingProviderId("");
+      setSelectedEmbeddingResourceId("");
+      return;
+    }
+    if (!providers.some((provider) => provider.id === selectedEmbeddingProviderId)) {
+      const nextProviderId = providers.length === 1 ? providers[0].id : "";
+      setSelectedEmbeddingProviderId(nextProviderId);
+      if (!nextProviderId) {
+        setSelectedEmbeddingResourceId("");
+      }
+    }
+  }, [selectedEmbeddingProviderId, vectorizationOptions]);
+
+  useEffect(() => {
+    if (!selectedEmbeddingProvider) {
+      setSelectedEmbeddingResourceId("");
+      return;
+    }
+    const resourceIds = new Set(selectedEmbeddingProviderResources.map((resource) => resource.id));
+    if (!resourceIds.has(selectedEmbeddingResourceId)) {
+      setSelectedEmbeddingResourceId(
+        selectedEmbeddingProvider.default_resource_id
+          || selectedEmbeddingProviderResources[0]?.id
+          || "",
+      );
+    }
+  }, [selectedEmbeddingProvider, selectedEmbeddingProviderResources, selectedEmbeddingResourceId]);
 
   useEffect(() => {
     if (selectedProfileId && !schemaProfiles.some((profile) => profile.id === selectedProfileId)) {
@@ -314,6 +415,14 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
       showErrorFeedback(t("contextManagement.feedback.schemaProfileRequired"), t("contextManagement.feedback.createFailed"));
       return;
     }
+    if (selectedVectorizationMode === "vanessa_embeddings" && !selectedEmbeddingProviderId) {
+      showErrorFeedback(t("contextManagement.feedback.embeddingProviderRequired"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
+    if (selectedVectorizationMode === "vanessa_embeddings" && !selectedEmbeddingResourceId) {
+      showErrorFeedback(t("contextManagement.feedback.embeddingResourceRequired"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
     let schema: KnowledgeBaseSchema | undefined;
     try {
       schema = parseSchemaText(schemaText);
@@ -330,6 +439,15 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
         backing_provider_instance_id: selectedProviderId,
         lifecycle_state: "active",
         schema,
+        vectorization: {
+          mode: selectedVectorizationMode,
+          ...(selectedVectorizationMode === "vanessa_embeddings"
+            ? {
+                embedding_provider_instance_id: selectedEmbeddingProviderId,
+                embedding_resource_id: selectedEmbeddingResourceId,
+              }
+            : {}),
+        },
       }, token);
       navigate(`/control/context/${knowledgeBase.id}`, {
         state: withActionFeedbackState({
@@ -356,6 +474,16 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     providerOptions: enabledVectorProviders,
     selectedProviderId,
     selectedProviderKey,
+    vectorizationOptions,
+    vectorizationLoadError,
+    vectorizationOptionsLoading,
+    selectedVectorizationMode,
+    selectedEmbeddingProviderId,
+    selectedEmbeddingResourceId,
+    selectedEmbeddingProviderReady,
+    selectedEmbeddingProviderNeedsModel,
+    selectedEmbeddingProviderUnavailableReason: selectedEmbeddingProvider?.unavailable_reason ?? null,
+    selectedEmbeddingProviderDisplayName: selectedEmbeddingProvider?.display_name ?? selectedEmbeddingProvider?.id ?? "",
     selectedProfileId,
     selectedProfileDescription,
     providerLoadError,
@@ -375,6 +503,9 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     setDisplayName,
     setDescription,
     setSelectedProviderId,
+    setSelectedVectorizationMode,
+    setSelectedEmbeddingProviderId,
+    setSelectedEmbeddingResourceId,
     setSchemaEditorMode,
     setSchemaText,
     setSelectedProfileId: selectSchemaProfile,

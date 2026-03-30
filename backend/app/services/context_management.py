@@ -36,6 +36,7 @@ from .context_management_runtime import (
     query_knowledge_base,
     resolve_runtime_knowledge_base_selection,
 )
+from .context_management_vectorization import list_vectorization_options
 from .context_management_serialization import (
     _default_index_name,
     _normalize_document_payload,
@@ -110,6 +111,7 @@ __all__ = [
     "list_knowledge_base_sync_runs",
     "list_knowledge_bases",
     "list_schema_profiles",
+    "list_vectorization_options",
     "list_knowledge_sources",
     "query_knowledge_base",
     "resolve_runtime_knowledge_base_selection",

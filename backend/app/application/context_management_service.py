@@ -15,6 +15,7 @@ from ..services.context_management import (
     list_knowledge_base_sync_runs as _list_knowledge_base_sync_runs,
     list_knowledge_bases as _list_knowledge_bases,
     list_schema_profiles as _list_schema_profiles,
+    list_vectorization_options as _list_vectorization_options,
     list_knowledge_sources as _list_knowledge_sources,
     query_knowledge_base as _query_knowledge_base,
     resync_knowledge_base as _resync_knowledge_base,
@@ -57,6 +58,14 @@ def list_context_knowledge_bases(
 
 def list_context_schema_profiles(database_url: str, *, provider_key: str):
     return _list_schema_profiles(database_url, provider_key=provider_key)
+
+
+def list_context_vectorization_options(database_url: str, *, config, backing_provider_instance_id: str):
+    return _list_vectorization_options(
+        database_url,
+        config=config,
+        backing_provider_instance_id=backing_provider_instance_id,
+    )
 
 
 def create_context_schema_profile(database_url: str, *, payload: Any, created_by_user_id: int):

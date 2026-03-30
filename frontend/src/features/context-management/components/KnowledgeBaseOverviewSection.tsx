@@ -53,6 +53,24 @@ export function KnowledgeBaseOverviewSection({
           </p>
         ) : null}
         <p className="status-text">
+          {t("contextManagement.advancedSettings.vectorizationMode")}: {" "}
+          {knowledgeBase.vectorization.mode === "self_provided"
+            ? t("contextManagement.advancedSettings.selfProvided")
+            : t("contextManagement.advancedSettings.vanessaEmbeddings")}
+        </p>
+        {knowledgeBase.vectorization.embedding_provider ? (
+          <p className="status-text">
+            {t("contextManagement.advancedSettings.embeddingProvider")}: {" "}
+            {knowledgeBase.vectorization.embedding_provider.display_name ?? knowledgeBase.vectorization.embedding_provider.id}
+          </p>
+        ) : null}
+        {knowledgeBase.vectorization.embedding_resource ? (
+          <p className="status-text">
+            {t("contextManagement.advancedSettings.embeddingModel")}: {" "}
+            {knowledgeBase.vectorization.embedding_resource.display_name ?? knowledgeBase.vectorization.embedding_resource.id}
+          </p>
+        ) : null}
+        <p className="status-text">
           {knowledgeBase.eligible_for_binding
             ? t("contextManagement.states.eligible")
             : t("contextManagement.states.ineligible")}

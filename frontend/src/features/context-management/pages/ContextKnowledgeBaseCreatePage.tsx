@@ -17,6 +17,16 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     selectedProviderId,
     selectedProfileId,
     selectedProfileDescription,
+    vectorizationOptions,
+    vectorizationLoadError,
+    vectorizationOptionsLoading,
+    selectedVectorizationMode,
+    selectedEmbeddingProviderId,
+    selectedEmbeddingResourceId,
+    selectedEmbeddingProviderReady,
+    selectedEmbeddingProviderNeedsModel,
+    selectedEmbeddingProviderUnavailableReason,
+    selectedEmbeddingProviderDisplayName,
     providerLoadError,
     profileLoadError,
     providersLoading,
@@ -37,6 +47,9 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     setSchemaText,
     setSelectedProfileId,
     setSelectedProviderId,
+    setSelectedVectorizationMode,
+    setSelectedEmbeddingProviderId,
+    setSelectedEmbeddingResourceId,
     setSaveProfileSlug,
     setSaveProfileDisplayName,
     setSaveProfileDescription,
@@ -82,6 +95,87 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
             ))}
           </select>
         </label>
+
+        {selectedProviderId ? (
+          <section className="panel card-stack" aria-labelledby="kb-advanced-settings-title">
+            <div className="card-stack">
+              <h3 id="kb-advanced-settings-title" className="section-title">
+                {t("contextManagement.advancedSettings.title")}
+              </h3>
+              <p className="status-text">{t("contextManagement.advancedSettings.description")}</p>
+            </div>
+            {vectorizationLoadError ? <p className="status-text error-text">{vectorizationLoadError}</p> : null}
+            {vectorizationOptionsLoading ? <p className="status-text">{t("contextManagement.states.loadingVectorizationOptions")}</p> : null}
+            {!vectorizationOptionsLoading && vectorizationOptions ? (
+              <div className="card-stack">
+                <label className="card-stack">
+                  <span className="field-label">{t("contextManagement.advancedSettings.vectorizationMode")}</span>
+                  <select
+                    className="field-input"
+                    value={selectedVectorizationMode}
+                    onChange={(event) => setSelectedVectorizationMode(event.currentTarget.value as "vanessa_embeddings" | "self_provided")}
+                  >
+                    {vectorizationOptions.supported_modes.map((mode) => (
+                      <option key={mode.mode} value={mode.mode}>
+                        {mode.mode === "self_provided"
+                          ? t("contextManagement.advancedSettings.selfProvided")
+                          : t("contextManagement.advancedSettings.vanessaEmbeddings")}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {selectedVectorizationMode === "vanessa_embeddings" ? (
+                  <div className="card-stack">
+                    <label className="card-stack">
+                      <span className="field-label">{t("contextManagement.advancedSettings.embeddingProvider")}</span>
+                      <select
+                        className="field-input"
+                        value={selectedEmbeddingProviderId}
+                        onChange={(event) => setSelectedEmbeddingProviderId(event.currentTarget.value)}
+                      >
+                        <option value="">{t("contextManagement.states.selectEmbeddingProvider")}</option>
+                        {vectorizationOptions.embedding_providers.map((provider) => (
+                          <option key={provider.id} value={provider.id}>
+                            {`${provider.display_name ?? provider.id} (${provider.provider_key ?? "embeddings"})`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="card-stack">
+                      <span className="field-label">{t("contextManagement.advancedSettings.embeddingModel")}</span>
+                      <select
+                        className="field-input"
+                        value={selectedEmbeddingResourceId}
+                        disabled={!selectedEmbeddingProviderId || !selectedEmbeddingProviderReady}
+                        onChange={(event) => setSelectedEmbeddingResourceId(event.currentTarget.value)}
+                      >
+                        <option value="">{t("contextManagement.states.selectEmbeddingResource")}</option>
+                        {(vectorizationOptions.embedding_providers.find((provider) => provider.id === selectedEmbeddingProviderId)?.resources ?? []).map((resource) => (
+                          <option key={resource.id} value={resource.id}>
+                            {resource.display_name ?? resource.id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedEmbeddingProviderNeedsModel && selectedEmbeddingProviderUnavailableReason === "no_embedding_resources" ? (
+                      <p className="status-text">
+                        {t("contextManagement.advancedSettings.embeddingProviderNotReady", {
+                          provider: selectedEmbeddingProviderDisplayName || t("contextManagement.advancedSettings.embeddingProvider"),
+                        })}
+                      </p>
+                    ) : null}
+                    {vectorizationOptions.supports_named_vectors ? (
+                      <p className="status-text">{t("contextManagement.advancedSettings.namedVectorsNote")}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="status-text">{t("contextManagement.advancedSettings.selfProvidedWarning")}</p>
+                )}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="context-schema-panel card-stack" aria-labelledby="schema-builder-title">
           <div className="context-schema-header">

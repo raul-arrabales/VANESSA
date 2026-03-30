@@ -36,6 +36,22 @@ vi.mock("../api/context", () => ({
       sync_status: "ready",
       eligible_for_binding: true,
       schema: {},
+      vectorization: {
+        mode: "vanessa_embeddings",
+        embedding_provider_instance_id: "embedding-provider-1",
+        embedding_resource_id: "text-embedding-3-small",
+        embedding_provider: {
+          id: "embedding-provider-1",
+          display_name: "Embeddings local",
+          provider_key: "openai_compatible_cloud_embeddings",
+        },
+        embedding_resource: {
+          id: "text-embedding-3-small",
+          display_name: "text-embedding-3-small",
+          provider_resource_id: "text-embedding-3-small",
+        },
+        supports_named_vectors: true,
+      },
       document_count: 3,
       binding_count: 1,
     },

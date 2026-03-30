@@ -3,6 +3,35 @@ import { requestJson } from "./modelops/request";
 
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
+export type KnowledgeBaseVectorizationMode = "vanessa_embeddings" | "self_provided";
+
+export type KnowledgeBaseEmbeddingProviderSummary = {
+  id: string;
+  slug?: string | null;
+  provider_key?: string | null;
+  display_name?: string | null;
+  enabled?: boolean | null;
+  capability?: string | null;
+  is_ready?: boolean;
+  unavailable_reason?: string | null;
+};
+
+export type KnowledgeBaseEmbeddingResourceSummary = {
+  id: string;
+  provider_resource_id?: string | null;
+  display_name?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type KnowledgeBaseVectorization = {
+  mode: KnowledgeBaseVectorizationMode | string;
+  embedding_provider_instance_id?: string | null;
+  embedding_resource_id?: string | null;
+  embedding_provider?: KnowledgeBaseEmbeddingProviderSummary | null;
+  embedding_resource?: KnowledgeBaseEmbeddingResourceSummary | null;
+  supports_named_vectors: boolean;
+};
+
 export type KnowledgeBase = {
   id: string;
   slug: string;
@@ -22,6 +51,7 @@ export type KnowledgeBase = {
   lifecycle_state: "active" | "archived" | string;
   sync_status: "ready" | "syncing" | "error" | string;
   schema: KnowledgeBaseSchema;
+  vectorization: KnowledgeBaseVectorization;
   document_count: number;
   eligible_for_binding: boolean;
   last_sync_at?: string | null;
@@ -61,6 +91,19 @@ export type KnowledgeBaseSchemaProfile = {
   schema: KnowledgeBaseSchema;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type KnowledgeBaseVectorizationOptions = {
+  backing_provider: KnowledgeBase["backing_provider"];
+  supports_named_vectors: boolean;
+  supported_modes: Array<{
+    mode: KnowledgeBaseVectorizationMode | string;
+    requires_embedding_target: boolean;
+  }>;
+  embedding_providers: Array<KnowledgeBaseEmbeddingProviderSummary & {
+    resources: KnowledgeBaseEmbeddingResourceSummary[];
+    default_resource_id?: string | null;
+  }>;
 };
 
 export type KnowledgeBaseQueryResult = {
@@ -166,6 +209,11 @@ export async function createKnowledgeBase(
     backing_provider_instance_id: string;
     lifecycle_state?: string;
     schema?: KnowledgeBaseSchema;
+    vectorization: {
+      mode: KnowledgeBaseVectorizationMode;
+      embedding_provider_instance_id?: string;
+      embedding_resource_id?: string;
+    };
   },
   token: string,
 ): Promise<KnowledgeBase> {
@@ -184,6 +232,14 @@ export async function listKnowledgeBaseSchemaProfiles(providerKey: string, token
     { token },
   );
   return result.schema_profiles;
+}
+
+export async function getKnowledgeBaseVectorizationOptions(
+  backingProviderInstanceId: string,
+  token: string,
+): Promise<KnowledgeBaseVectorizationOptions> {
+  const suffix = new URLSearchParams({ backing_provider_instance_id: backingProviderInstanceId }).toString();
+  return requestJson<KnowledgeBaseVectorizationOptions>(`/v1/context/vectorization-options?${suffix}`, { token });
 }
 
 export async function createKnowledgeBaseSchemaProfile(

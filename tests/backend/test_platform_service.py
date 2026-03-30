@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import platform_adapters, platform_service  # noqa: E402
-from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
+from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
 
 
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
@@ -270,6 +270,102 @@ def test_validate_non_model_resources_rejects_provider_instance_mismatch(monkeyp
         "knowledge_base_provider_key": "weaviate_local",
         "provider_key": "qdrant_local",
     }
+
+
+def test_resolve_deployment_bindings_rejects_knowledge_base_embeddings_mismatch(monkeypatch: pytest.MonkeyPatch):
+    bindings_globals = platform_service._resolve_deployment_bindings.__globals__  # type: ignore[attr-defined]
+    providers = {
+        "vector-provider": {"id": "vector-provider", "capability_key": "vector_store", "provider_key": "weaviate_local"},
+        "embedding-provider": {"id": "embedding-provider", "capability_key": "embeddings", "provider_key": "openai_compatible_cloud_embeddings"},
+    }
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_id: providers.get(provider_id))
+    monkeypatch.setitem(
+        bindings_globals,
+        "_validate_binding_resources",
+        lambda *_args, resources, default_resource_id, **_kwargs: {
+            "resources": resources,
+            "default_resource_id": default_resource_id,
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.context_repo,
+        "get_knowledge_base",
+        lambda _db, knowledge_base_id: {
+            "id": knowledge_base_id,
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider",
+            "embedding_resource_id": "text-embedding-3-small",
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service._resolve_deployment_bindings(  # type: ignore[attr-defined]
+            "ignored",
+            [
+                DeploymentBindingInput(
+                    capability_key="embeddings",
+                    provider_instance_id="embedding-provider",
+                    resources=[{"id": "managed-model-1", "provider_resource_id": "text-embedding-3-large"}],
+                    default_resource_id="managed-model-1",
+                ),
+                DeploymentBindingInput(
+                    capability_key="vector_store",
+                    provider_instance_id="vector-provider",
+                    resources=[{"id": "kb-primary", "knowledge_base_id": "kb-primary"}],
+                    default_resource_id="kb-primary",
+                ),
+            ],
+        )
+
+    assert exc_info.value.code == "resource_embeddings_resource_mismatch"
+
+
+def test_resolve_deployment_bindings_rejects_self_provided_knowledge_base(monkeypatch: pytest.MonkeyPatch):
+    bindings_globals = platform_service._resolve_deployment_bindings.__globals__  # type: ignore[attr-defined]
+    providers = {
+        "vector-provider": {"id": "vector-provider", "capability_key": "vector_store", "provider_key": "weaviate_local"},
+        "embedding-provider": {"id": "embedding-provider", "capability_key": "embeddings", "provider_key": "openai_compatible_cloud_embeddings"},
+    }
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_id: providers.get(provider_id))
+    monkeypatch.setitem(
+        bindings_globals,
+        "_validate_binding_resources",
+        lambda *_args, resources, default_resource_id, **_kwargs: {
+            "resources": resources,
+            "default_resource_id": default_resource_id,
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.context_repo,
+        "get_knowledge_base",
+        lambda _db, knowledge_base_id: {
+            "id": knowledge_base_id,
+            "vectorization_mode": "self_provided",
+            "embedding_provider_instance_id": None,
+            "embedding_resource_id": None,
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service._resolve_deployment_bindings(  # type: ignore[attr-defined]
+            "ignored",
+            [
+                DeploymentBindingInput(
+                    capability_key="embeddings",
+                    provider_instance_id="embedding-provider",
+                    resources=[{"id": "managed-model-1", "provider_resource_id": "text-embedding-3-small"}],
+                    default_resource_id="managed-model-1",
+                ),
+                DeploymentBindingInput(
+                    capability_key="vector_store",
+                    provider_instance_id="vector-provider",
+                    resources=[{"id": "kb-primary", "knowledge_base_id": "kb-primary"}],
+                    default_resource_id="kb-primary",
+                ),
+            ],
+        )
+
+    assert exc_info.value.code == "resource_vectorization_unsupported"
 
 
 def test_serialize_provider_row_exposes_secret_refs_separately():

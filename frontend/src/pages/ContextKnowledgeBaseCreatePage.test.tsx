@@ -32,6 +32,7 @@ vi.mock("../api/platform", () => ({
 
 vi.mock("../api/context", () => ({
   createKnowledgeBase: vi.fn(),
+  getKnowledgeBaseVectorizationOptions: vi.fn(),
   listKnowledgeBaseSchemaProfiles: vi.fn(),
   createKnowledgeBaseSchemaProfile: vi.fn(),
 }));
@@ -81,6 +82,38 @@ const WEAVIATE_PROFILES = [
   },
 ];
 
+const VECTORIZATION_OPTIONS = {
+  backing_provider: {
+    id: "provider-2",
+    slug: "weaviate-local",
+    provider_key: "weaviate_local",
+    display_name: "Weaviate local",
+    enabled: true,
+    capability: "vector_store",
+  },
+  supports_named_vectors: true,
+  supported_modes: [
+    { mode: "vanessa_embeddings" as const, requires_embedding_target: true },
+    { mode: "self_provided" as const, requires_embedding_target: false },
+  ],
+  embedding_providers: [
+    {
+      id: "embedding-provider-1",
+      slug: "embeddings-local",
+      provider_key: "openai_compatible_cloud_embeddings",
+      display_name: "Embeddings local",
+      enabled: true,
+      capability: "embeddings",
+      is_ready: true,
+      unavailable_reason: null,
+      default_resource_id: "text-embedding-3-small",
+      resources: [
+        { id: "text-embedding-3-small", display_name: "text-embedding-3-small", provider_resource_id: "text-embedding-3-small" },
+      ],
+    },
+  ],
+};
+
 describe("ContextKnowledgeBaseCreatePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -109,6 +142,7 @@ describe("ContextKnowledgeBaseCreatePage", () => {
       },
     ]);
     vi.mocked(contextApi.listKnowledgeBaseSchemaProfiles).mockResolvedValue(WEAVIATE_PROFILES);
+    vi.mocked(contextApi.getKnowledgeBaseVectorizationOptions).mockResolvedValue(VECTORIZATION_OPTIONS);
   });
 
   it("loads vector providers, loads schema profiles, and submits the selected profile schema", async () => {
@@ -132,6 +166,22 @@ describe("ContextKnowledgeBaseCreatePage", () => {
       sync_status: "ready",
       eligible_for_binding: true,
       schema: {},
+      vectorization: {
+        mode: "vanessa_embeddings",
+        embedding_provider_instance_id: "embedding-provider-1",
+        embedding_resource_id: "text-embedding-3-small",
+        embedding_provider: {
+          id: "embedding-provider-1",
+          display_name: "Embeddings local",
+          provider_key: "openai_compatible_cloud_embeddings",
+        },
+        embedding_resource: {
+          id: "text-embedding-3-small",
+          display_name: "text-embedding-3-small",
+          provider_resource_id: "text-embedding-3-small",
+        },
+        supports_named_vectors: true,
+      },
       document_count: 0,
     });
 
@@ -140,6 +190,7 @@ describe("ContextKnowledgeBaseCreatePage", () => {
     const providerSelect = await screen.findByLabelText("Backing provider");
     await waitFor(() => expect(providerSelect).toHaveValue("provider-2"));
     expect(contextApi.listKnowledgeBaseSchemaProfiles).toHaveBeenCalledWith("weaviate_local", "token");
+    expect(contextApi.getKnowledgeBaseVectorizationOptions).toHaveBeenCalledWith("provider-2", "token");
 
     await userEvent.type(screen.getByLabelText("Deployment slug"), "product-docs");
     await userEvent.type(screen.getByLabelText("Display name"), "Product Docs");
@@ -156,6 +207,11 @@ describe("ContextKnowledgeBaseCreatePage", () => {
           backing_provider_instance_id: "provider-2",
           schema: {
             properties: [{ name: "title", data_type: "text" }],
+          },
+          vectorization: {
+            mode: "vanessa_embeddings",
+            embedding_provider_instance_id: "embedding-provider-1",
+            embedding_resource_id: "text-embedding-3-small",
           },
         }),
         "token",
@@ -221,5 +277,90 @@ describe("ContextKnowledgeBaseCreatePage", () => {
         "token",
       );
     });
+  });
+
+  it("shows the self-provided warning and submits self_provided mode", async () => {
+    vi.mocked(contextApi.createKnowledgeBase).mockResolvedValue({
+      id: "kb-self-provided",
+      slug: "self-provided-kb",
+      display_name: "Self Provided KB",
+      description: "vectors",
+      index_name: "kb_self_provided_kb",
+      backing_provider_instance_id: "provider-2",
+      backing_provider_key: "weaviate_local",
+      backing_provider: {
+        id: "provider-2",
+        slug: "weaviate-local",
+        provider_key: "weaviate_local",
+        display_name: "Weaviate local",
+        enabled: true,
+        capability: "vector_store",
+      },
+      lifecycle_state: "active",
+      sync_status: "ready",
+      eligible_for_binding: true,
+      schema: {},
+      vectorization: {
+        mode: "self_provided",
+        supports_named_vectors: true,
+      },
+      document_count: 0,
+    });
+
+    await renderWithAppProviders(<ContextKnowledgeBaseCreatePage />);
+
+    await userEvent.type(screen.getByLabelText("Deployment slug"), "self-provided-kb");
+    await userEvent.type(screen.getByLabelText("Display name"), "Self Provided KB");
+    await userEvent.type(screen.getByLabelText("Description"), "vectors");
+    await userEvent.selectOptions(await screen.findByLabelText("Schema profile"), "profile-rag");
+    await userEvent.selectOptions(await screen.findByLabelText("Vectorization strategy"), "self_provided");
+
+    expect(await screen.findByText(/text ingestion and text-query retrieval flows are not available/i)).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Create knowledge base" }));
+
+    await waitFor(() => {
+      expect(contextApi.createKnowledgeBase).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vectorization: {
+            mode: "self_provided",
+          },
+        }),
+        "token",
+      );
+    });
+  });
+
+  it("shows a local embeddings provider with no models and explains why it cannot be selected fully yet", async () => {
+    vi.mocked(contextApi.getKnowledgeBaseVectorizationOptions).mockResolvedValue({
+      ...VECTORIZATION_OPTIONS,
+      embedding_providers: [
+        {
+          id: "embedding-provider-local",
+          slug: "vllm-embeddings-local",
+          provider_key: "vllm_embeddings_local",
+          display_name: "vLLM embeddings local",
+          enabled: true,
+          capability: "embeddings",
+          is_ready: false,
+          unavailable_reason: "no_embedding_resources",
+          default_resource_id: null,
+          resources: [],
+        },
+      ],
+    });
+
+    await renderWithAppProviders(<ContextKnowledgeBaseCreatePage />);
+
+    const providerSelect = await screen.findByLabelText("Embeddings provider");
+    expect(screen.getByRole("option", { name: /vLLM embeddings local/i })).toBeVisible();
+
+    await userEvent.selectOptions(providerSelect, "embedding-provider-local");
+
+    const resourceSelect = screen.getByLabelText("Embeddings model");
+    expect(resourceSelect).toBeDisabled();
+    expect(
+      screen.getByText(/Assign a loaded embeddings model in Platform Control before using it/i),
+    ).toBeVisible();
   });
 });

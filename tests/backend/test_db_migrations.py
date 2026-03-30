@@ -162,6 +162,12 @@ def test_context_management_migration_tracks_backing_provider_instances():
     assert "Unable to backfill context_knowledge_bases.backing_provider_instance_id" in migration_sql
     assert "i.id AS provider_instance_id" in migration_sql
     assert "MAX(i.id)" not in migration_sql
+    assert "vectorization_mode TEXT NOT NULL DEFAULT 'vanessa_embeddings'" in migration_sql
+    assert "embedding_provider_instance_id UUID" in migration_sql
+    assert "embedding_resource_id TEXT" in migration_sql
+    assert "context_knowledge_bases_vectorization_mode_check" in migration_sql
+    assert "Unable to backfill context_knowledge_bases vectorization fields" in migration_sql
+    assert "context_knowledge_bases_vectorization_mode_idx" in migration_sql
     assert "CREATE TABLE IF NOT EXISTS context_schema_profiles" in migration_sql
     assert "context_schema_profiles_provider_slug_idx" in migration_sql
     assert "plain-document-rag" in migration_sql

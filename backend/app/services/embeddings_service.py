@@ -4,13 +4,29 @@ from typing import Any
 
 from ..config import AuthConfig
 from .platform_service import resolve_embeddings_adapter
+from .platform_serialization import _runtime_identifier_for_resource
 from .platform_types import PlatformControlPlaneError
 
 
-def embed_text_inputs(database_url: str, config: AuthConfig, texts: list[str]) -> dict[str, Any]:
+def embed_text_inputs(
+    database_url: str,
+    config: AuthConfig,
+    texts: list[str],
+) -> dict[str, Any]:
+    return embed_text_inputs_with_target(database_url, config, texts)
+
+
+def embed_text_inputs_with_target(
+    database_url: str,
+    config: AuthConfig,
+    texts: list[str],
+    *,
+    provider_instance_id: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any]:
     normalized_texts = _normalize_inputs(texts)
-    adapter = resolve_embeddings_adapter(database_url, config)
-    payload, status_code = adapter.embed_texts(texts=normalized_texts)
+    adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
+    payload, status_code = adapter.embed_texts(texts=normalized_texts, model=model)
     if payload is None or not 200 <= status_code < 300:
         raise PlatformControlPlaneError(
             "embeddings_request_failed",
@@ -39,6 +55,7 @@ def embed_text_inputs(database_url: str, config: AuthConfig, texts: list[str]) -
             "deployment_profile_slug": adapter.binding.deployment_profile_slug,
             "default_resource_id": adapter.binding.default_resource_id,
         },
+        "resource_id": str(model or _runtime_identifier_for_resource(adapter.binding.default_resource or {})).strip() or None,
         "count": len(embeddings),
         "dimension": normalized_dimension,
         "embeddings": embeddings,

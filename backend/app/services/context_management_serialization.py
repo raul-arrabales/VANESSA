@@ -16,6 +16,7 @@ from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 def _normalize_knowledge_base_payload(
     database_url: str,
+    config: Any,
     payload: dict[str, Any],
     *,
     is_create: bool,
@@ -71,6 +72,16 @@ def _normalize_knowledge_base_payload(
             "Backing provider must be enabled",
             status_code=400,
         )
+    from .context_management_vectorization import normalize_knowledge_base_vectorization
+
+    vectorization = normalize_knowledge_base_vectorization(
+        database_url,
+        config=config,
+        payload=payload,
+        is_create=is_create,
+        existing=existing,
+        backing_provider=provider_row or existing,
+    )
     return {
         "slug": slug,
         "display_name": display_name,
@@ -84,6 +95,7 @@ def _normalize_knowledge_base_payload(
         ).strip().lower(),
         "schema": schema,
         "index_name": str(existing.get("index_name") or "").strip() if existing else _default_index_name(slug),
+        "vectorization": vectorization,
     }
 
 
@@ -226,6 +238,8 @@ def _normalize_glob_list(value: Any, *, field_name: str) -> list[str]:
 
 
 def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
+    from .context_management_vectorization import serialize_knowledge_base_vectorization
+
     provider_instance_id = str(row.get("backing_provider_instance_id") or "").strip() or None
     provider_key = str(row.get("backing_provider_key") or "").strip() or None
     return {
@@ -251,6 +265,7 @@ def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
         "lifecycle_state": str(row.get("lifecycle_state") or "").strip(),
         "sync_status": str(row.get("sync_status") or "").strip(),
         "schema": dict(row.get("schema_json") or {}),
+        "vectorization": serialize_knowledge_base_vectorization(row),
         "document_count": int(row.get("document_count") or 0),
         "binding_count": int(row.get("binding_count") or 0),
         "eligible_for_binding": _is_knowledge_base_eligible(row),

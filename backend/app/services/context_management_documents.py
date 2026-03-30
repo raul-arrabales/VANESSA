@@ -19,6 +19,7 @@ from .context_management_shared import (
     _upsert_document_chunks,
 )
 from .context_management_types import _MAX_UPLOAD_DOCUMENTS, _MAX_UPLOAD_FILES
+from .context_management_vectorization import require_knowledge_base_text_ingestion_supported
 from .platform_types import PlatformControlPlaneError
 
 
@@ -36,6 +37,7 @@ def create_knowledge_base_document(
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     _mark_knowledge_base_syncing(
         database_url,
         knowledge_base_id=knowledge_base_id,
@@ -91,6 +93,7 @@ def update_knowledge_base_document(
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     existing = context_repo.get_document(database_url, knowledge_base_id=knowledge_base_id, document_id=document_id)
     if existing is None:
         raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
@@ -199,7 +202,8 @@ def upload_knowledge_base_documents(
     files: list[Any],
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
-    _require_knowledge_base(database_url, knowledge_base_id)
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     if not files:
         raise PlatformControlPlaneError("invalid_upload", "At least one file is required", status_code=400)
     if len(files) > _MAX_UPLOAD_FILES:
@@ -238,6 +242,7 @@ def resync_knowledge_base(
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     documents = context_repo.list_documents(database_url, knowledge_base_id=knowledge_base_id)
     _mark_knowledge_base_syncing(
         database_url,

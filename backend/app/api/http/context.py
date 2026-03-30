@@ -16,6 +16,7 @@ from ...application.context_management_service import (
     list_context_knowledge_base_sync_runs,
     list_context_knowledge_bases,
     list_context_schema_profiles,
+    list_context_vectorization_options,
     list_context_knowledge_sources,
     query_context_knowledge_base,
     resync_context_knowledge_base,
@@ -36,6 +37,7 @@ bp = Blueprint("context", __name__)
 list_knowledge_bases = list_context_knowledge_bases
 list_schema_profiles = list_context_schema_profiles
 create_schema_profile = create_context_schema_profile
+list_vectorization_options = list_context_vectorization_options
 create_knowledge_base = create_context_knowledge_base
 get_knowledge_base_detail = get_context_knowledge_base_detail
 update_knowledge_base = update_context_knowledge_base
@@ -97,6 +99,27 @@ def create_schema_profile_route():
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"schema_profile": schema_profile}), 201
+
+
+@bp.get("/v1/context/vectorization-options")
+@require_role("admin")
+def list_vectorization_options_route():
+    backing_provider_instance_id = request.args.get("backing_provider_instance_id", "").strip()
+    if not backing_provider_instance_id:
+        return _json_error(
+            400,
+            "invalid_backing_provider_instance_id",
+            "backing_provider_instance_id is required",
+        )
+    try:
+        options = list_vectorization_options(
+            _database_url(),
+            config=_config(),
+            backing_provider_instance_id=backing_provider_instance_id,
+        )
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(options), 200
 
 
 @bp.get("/v1/context/knowledge-bases")

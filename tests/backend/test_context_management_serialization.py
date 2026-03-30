@@ -10,6 +10,7 @@ def test_normalize_knowledge_base_payload_requires_backing_provider_instance_id_
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
             "postgresql://ignored",
+            object(),
             {
                 "slug": "product-docs",
                 "display_name": "Product Docs",
@@ -27,6 +28,7 @@ def test_normalize_knowledge_base_payload_rejects_unknown_provider(monkeypatch: 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
             "postgresql://ignored",
+            object(),
             {
                 "slug": "product-docs",
                 "display_name": "Product Docs",
@@ -54,6 +56,7 @@ def test_normalize_knowledge_base_payload_rejects_non_vector_store_provider(monk
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
             "postgresql://ignored",
+            object(),
             {
                 "slug": "product-docs",
                 "display_name": "Product Docs",
@@ -81,6 +84,7 @@ def test_normalize_knowledge_base_payload_rejects_disabled_provider(monkeypatch:
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
             "postgresql://ignored",
+            object(),
             {
                 "slug": "product-docs",
                 "display_name": "Product Docs",
@@ -140,4 +144,65 @@ def test_serialize_schema_profile_returns_expected_shape():
         "schema": {"properties": [{"name": "title", "data_type": "text"}]},
         "created_at": None,
         "updated_at": None,
+    }
+
+
+def test_serialize_knowledge_base_includes_vectorization_summary():
+    payload = context_management_serialization._serialize_knowledge_base(  # type: ignore[attr-defined]
+        {
+            "id": "kb-primary",
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "description": "docs",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "backing_provider_slug": "weaviate-local",
+            "backing_provider_display_name": "Weaviate local",
+            "backing_provider_enabled": True,
+            "backing_provider_capability": "vector_store",
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_resource_id": "text-embedding-3-small",
+            "embedding_provider_slug": "embeddings-local",
+            "embedding_provider_key": "openai_compatible_cloud_embeddings",
+            "embedding_provider_display_name": "Embeddings local",
+            "embedding_provider_enabled": True,
+            "embedding_provider_capability": "embeddings",
+            "vectorization_json": {
+                "supports_named_vectors": True,
+                "embedding_resource": {
+                    "id": "text-embedding-3-small",
+                    "provider_resource_id": "text-embedding-3-small",
+                    "display_name": "text-embedding-3-small",
+                    "metadata": {"dimension": 1536},
+                },
+            },
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+            "schema_json": {},
+            "document_count": 0,
+            "binding_count": 0,
+        }
+    )
+
+    assert payload["vectorization"] == {
+        "mode": "vanessa_embeddings",
+        "embedding_provider_instance_id": "embedding-provider-1",
+        "embedding_resource_id": "text-embedding-3-small",
+        "embedding_provider": {
+            "id": "embedding-provider-1",
+            "slug": "embeddings-local",
+            "provider_key": "openai_compatible_cloud_embeddings",
+            "display_name": "Embeddings local",
+            "enabled": True,
+            "capability": "embeddings",
+        },
+        "embedding_resource": {
+            "id": "text-embedding-3-small",
+            "provider_resource_id": "text-embedding-3-small",
+            "display_name": "text-embedding-3-small",
+            "metadata": {"dimension": 1536},
+        },
+        "supports_named_vectors": True,
     }

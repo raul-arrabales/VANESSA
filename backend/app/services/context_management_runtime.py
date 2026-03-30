@@ -9,6 +9,10 @@ from .context_management_serialization import (
     _serialize_runtime_knowledge_base,
 )
 from .context_management_shared import _is_knowledge_base_eligible, _require_knowledge_base
+from .context_management_vectorization import (
+    embed_knowledge_base_texts,
+    validate_runtime_vectorization_compatibility,
+)
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 
@@ -19,8 +23,7 @@ def query_knowledge_base(
     knowledge_base_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    from .embeddings_service import embed_text_inputs
-    from .platform_service import resolve_vector_store_adapter
+    from .platform_service import resolve_embeddings_adapter, resolve_vector_store_adapter
 
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
     if not _is_knowledge_base_eligible(knowledge_base):
@@ -48,7 +51,17 @@ def query_knowledge_base(
                 "active_provider_key": vector_adapter.binding.provider_key,
             },
         )
-    embedding_payload = embed_text_inputs(database_url, config, [query_text])
+    active_embeddings_adapter = resolve_embeddings_adapter(database_url, config)
+    validate_runtime_vectorization_compatibility(
+        knowledge_base,
+        active_embeddings_binding=active_embeddings_adapter.binding,
+    )
+    embedding_payload = embed_knowledge_base_texts(
+        database_url,
+        config=config,
+        knowledge_base=knowledge_base,
+        texts=[query_text],
+    )
     query_payload = vector_adapter.query(
         index_name=str(knowledge_base["index_name"]),
         query_text=None,

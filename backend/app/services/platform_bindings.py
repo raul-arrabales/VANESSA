@@ -215,7 +215,77 @@ def _resolve_deployment_bindings(database_url: str, bindings: list[DeploymentBin
             }
         )
         seen_capabilities.add(binding.capability_key)
+    _validate_knowledge_base_vectorization_bindings(database_url, resolved_bindings=resolved_bindings)
     return resolved_bindings
+
+
+def _validate_knowledge_base_vectorization_bindings(
+    database_url: str,
+    *,
+    resolved_bindings: list[dict[str, Any]],
+) -> None:
+    embeddings_binding = next(
+        (item for item in resolved_bindings if str(item.get("capability_key") or "").strip().lower() == CAPABILITY_EMBEDDINGS),
+        None,
+    )
+    vector_binding = next(
+        (item for item in resolved_bindings if str(item.get("capability_key") or "").strip().lower() == CAPABILITY_VECTOR_STORE),
+        None,
+    )
+    if embeddings_binding is None or vector_binding is None:
+        return
+    embeddings_provider_instance_id = str(embeddings_binding.get("provider_instance_id") or "").strip()
+    default_resource = next(
+        (
+            resource
+            for resource in embeddings_binding.get("resources") or []
+            if isinstance(resource, dict)
+            and str(resource.get("id") or "").strip() == str(embeddings_binding.get("default_resource_id") or "").strip()
+        ),
+        None,
+    )
+    embeddings_resource_id = _runtime_identifier_for_resource(default_resource or {})
+    for resource in vector_binding.get("resources") or []:
+        if not isinstance(resource, dict):
+            continue
+        knowledge_base_id = str(resource.get("knowledge_base_id") or "").strip()
+        if not knowledge_base_id:
+            continue
+        knowledge_base = context_repo.get_knowledge_base(database_url, knowledge_base_id)
+        if knowledge_base is None:
+            continue
+        vectorization_mode = str(knowledge_base.get("vectorization_mode") or "").strip().lower()
+        if vectorization_mode == "self_provided":
+            raise PlatformControlPlaneError(
+                "resource_vectorization_unsupported",
+                "Self-provided-vector knowledge bases cannot be bound to deployments yet.",
+                status_code=400,
+                details={"knowledge_base_id": knowledge_base_id, "vectorization_mode": vectorization_mode},
+            )
+        knowledge_base_embedding_provider_id = str(knowledge_base.get("embedding_provider_instance_id") or "").strip()
+        knowledge_base_embedding_resource_id = str(knowledge_base.get("embedding_resource_id") or "").strip()
+        if knowledge_base_embedding_provider_id != embeddings_provider_instance_id:
+            raise PlatformControlPlaneError(
+                "resource_embeddings_provider_mismatch",
+                "Knowledge base embeddings provider must match the deployment embeddings provider.",
+                status_code=400,
+                details={
+                    "knowledge_base_id": knowledge_base_id,
+                    "knowledge_base_embedding_provider_instance_id": knowledge_base_embedding_provider_id or None,
+                    "deployment_embedding_provider_instance_id": embeddings_provider_instance_id or None,
+                },
+            )
+        if knowledge_base_embedding_resource_id != embeddings_resource_id:
+            raise PlatformControlPlaneError(
+                "resource_embeddings_resource_mismatch",
+                "Knowledge base embeddings resource must match the deployment default embeddings resource.",
+                status_code=400,
+                details={
+                    "knowledge_base_id": knowledge_base_id,
+                    "knowledge_base_embedding_resource_id": knowledge_base_embedding_resource_id or None,
+                    "deployment_embedding_resource_id": embeddings_resource_id or None,
+                },
+            )
 
 
 def _validate_deployment_profile_bindings(

@@ -37,10 +37,17 @@ def list_knowledge_bases(
               provider.display_name AS backing_provider_display_name,
               provider.enabled AS backing_provider_enabled,
               family.capability_key AS backing_provider_capability,
+              embedding_provider.slug AS embedding_provider_slug,
+              embedding_provider.provider_key AS embedding_provider_key,
+              embedding_provider.display_name AS embedding_provider_display_name,
+              embedding_provider.enabled AS embedding_provider_enabled,
+              embedding_family.capability_key AS embedding_provider_capability,
               COALESCE(usage.binding_count, 0) AS binding_count
             FROM context_knowledge_bases kb
             LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
             LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
+            LEFT JOIN platform_provider_instances embedding_provider ON embedding_provider.id = kb.embedding_provider_instance_id
+            LEFT JOIN platform_provider_families embedding_family ON embedding_family.provider_key = embedding_provider.provider_key
             LEFT JOIN (
               SELECT
                 knowledge_base_id,
@@ -105,10 +112,17 @@ def get_knowledge_base(database_url: str, knowledge_base_id: str) -> dict[str, A
               provider.display_name AS backing_provider_display_name,
               provider.enabled AS backing_provider_enabled,
               family.capability_key AS backing_provider_capability,
+              embedding_provider.slug AS embedding_provider_slug,
+              embedding_provider.provider_key AS embedding_provider_key,
+              embedding_provider.display_name AS embedding_provider_display_name,
+              embedding_provider.enabled AS embedding_provider_enabled,
+              embedding_family.capability_key AS embedding_provider_capability,
               COALESCE(usage.binding_count, 0) AS binding_count
             FROM context_knowledge_bases kb
             LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
             LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
+            LEFT JOIN platform_provider_instances embedding_provider ON embedding_provider.id = kb.embedding_provider_instance_id
+            LEFT JOIN platform_provider_families embedding_family ON embedding_family.provider_key = embedding_provider.provider_key
             LEFT JOIN (
               SELECT
                 knowledge_base_id,
@@ -138,11 +152,18 @@ def get_knowledge_bases(database_url: str, knowledge_base_ids: list[str]) -> lis
               provider.provider_key AS backing_provider_key,
               provider.display_name AS backing_provider_display_name,
               provider.enabled AS backing_provider_enabled,
-              family.capability_key AS backing_provider_capability
+              family.capability_key AS backing_provider_capability,
+              embedding_provider.slug AS embedding_provider_slug,
+              embedding_provider.provider_key AS embedding_provider_key,
+              embedding_provider.display_name AS embedding_provider_display_name,
+              embedding_provider.enabled AS embedding_provider_enabled,
+              embedding_family.capability_key AS embedding_provider_capability
             FROM context_knowledge_bases
             kb
             LEFT JOIN platform_provider_instances provider ON provider.id = kb.backing_provider_instance_id
             LEFT JOIN platform_provider_families family ON family.provider_key = provider.provider_key
+            LEFT JOIN platform_provider_instances embedding_provider ON embedding_provider.id = kb.embedding_provider_instance_id
+            LEFT JOIN platform_provider_families embedding_family ON embedding_family.provider_key = embedding_provider.provider_key
             WHERE kb.id = ANY(%s)
             ORDER BY kb.created_at ASC, kb.slug ASC
             """,
@@ -205,6 +226,10 @@ def create_knowledge_base(
     lifecycle_state: str,
     sync_status: str,
     schema_json: dict[str, Any],
+    vectorization_mode: str,
+    embedding_provider_instance_id: str | None,
+    embedding_resource_id: str | None,
+    vectorization_json: dict[str, Any],
     created_by_user_id: int | None,
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
@@ -221,10 +246,14 @@ def create_knowledge_base(
                 lifecycle_state,
                 sync_status,
                 schema_json,
+                vectorization_mode,
+                embedding_provider_instance_id,
+                embedding_resource_id,
+                vectorization_json,
                 created_by_user_id,
                 updated_by_user_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s)
             RETURNING *
             """,
             (
@@ -237,6 +266,10 @@ def create_knowledge_base(
                 lifecycle_state.strip().lower(),
                 sync_status.strip().lower(),
                 Jsonb(schema_json),
+                vectorization_mode.strip().lower(),
+                embedding_provider_instance_id.strip() if embedding_provider_instance_id else None,
+                embedding_resource_id.strip() if embedding_resource_id else None,
+                Jsonb(vectorization_json),
                 created_by_user_id,
                 updated_by_user_id,
             ),

@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS context_knowledge_bases (
     lifecycle_state TEXT NOT NULL DEFAULT 'active',
     sync_status TEXT NOT NULL DEFAULT 'ready',
     schema_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    vectorization_mode TEXT NOT NULL DEFAULT 'vanessa_embeddings',
+    embedding_provider_instance_id UUID REFERENCES platform_provider_instances(id) ON DELETE RESTRICT,
+    embedding_resource_id TEXT,
+    vectorization_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     document_count INTEGER NOT NULL DEFAULT 0,
     created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     updated_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
@@ -31,6 +35,14 @@ ALTER TABLE context_knowledge_bases
     ADD COLUMN IF NOT EXISTS sync_status TEXT NOT NULL DEFAULT 'ready';
 ALTER TABLE context_knowledge_bases
     ADD COLUMN IF NOT EXISTS schema_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE context_knowledge_bases
+    ADD COLUMN IF NOT EXISTS vectorization_mode TEXT NOT NULL DEFAULT 'vanessa_embeddings';
+ALTER TABLE context_knowledge_bases
+    ADD COLUMN IF NOT EXISTS embedding_provider_instance_id UUID REFERENCES platform_provider_instances(id) ON DELETE RESTRICT;
+ALTER TABLE context_knowledge_bases
+    ADD COLUMN IF NOT EXISTS embedding_resource_id TEXT;
+ALTER TABLE context_knowledge_bases
+    ADD COLUMN IF NOT EXISTS vectorization_json JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE context_knowledge_bases
     ADD COLUMN IF NOT EXISTS document_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE context_knowledge_bases
@@ -64,6 +76,19 @@ BEGIN
         ALTER TABLE context_knowledge_bases
         ADD CONSTRAINT context_knowledge_bases_sync_status_check
         CHECK (sync_status IN ('ready', 'syncing', 'error'));
+    END IF;
+END
+$$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'context_knowledge_bases_vectorization_mode_check'
+    ) THEN
+        ALTER TABLE context_knowledge_bases
+        ADD CONSTRAINT context_knowledge_bases_vectorization_mode_check
+        CHECK (vectorization_mode IN ('vanessa_embeddings', 'self_provided'));
     END IF;
 END
 $$;
@@ -111,8 +136,118 @@ BEGIN
 END
 $$;
 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'context_knowledge_bases_vectorization_target_check'
+    ) THEN
+        ALTER TABLE context_knowledge_bases
+        ADD CONSTRAINT context_knowledge_bases_vectorization_target_check
+        CHECK (
+            (vectorization_mode = 'vanessa_embeddings' AND embedding_provider_instance_id IS NOT NULL AND NULLIF(embedding_resource_id, '') IS NOT NULL)
+            OR (vectorization_mode = 'self_provided' AND embedding_provider_instance_id IS NULL AND embedding_resource_id IS NULL)
+        );
+    END IF;
+END
+$$;
+
 ALTER TABLE context_knowledge_bases
     ALTER COLUMN backing_provider_instance_id SET NOT NULL;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM context_knowledge_bases kb
+        WHERE kb.vectorization_mode IS NULL
+           OR kb.embedding_provider_instance_id IS NULL
+           OR NULLIF(kb.embedding_resource_id, '') IS NULL
+    ) THEN
+        IF EXISTS (
+            SELECT 1
+            FROM context_knowledge_bases kb
+            LEFT JOIN platform_active_deployment active ON active.singleton_key = 'active'
+            LEFT JOIN platform_deployment_bindings binding
+              ON binding.deployment_profile_id = active.deployment_profile_id
+             AND binding.capability_key = 'embeddings'
+            LEFT JOIN platform_binding_resources resource
+              ON resource.binding_id = binding.id
+             AND resource.is_default = TRUE
+            WHERE kb.vectorization_mode IS NULL
+               OR kb.embedding_provider_instance_id IS NULL
+               OR NULLIF(kb.embedding_resource_id, '') IS NULL
+            GROUP BY kb.id
+            HAVING COUNT(*) FILTER (
+                WHERE active.deployment_profile_id IS NOT NULL
+                  AND binding.id IS NOT NULL
+                  AND binding.provider_instance_id IS NOT NULL
+                  AND NULLIF(COALESCE(resource.provider_resource_id, resource.resource_id), '') IS NOT NULL
+            ) <> 1
+        ) THEN
+            RAISE EXCEPTION
+                'Unable to backfill context_knowledge_bases vectorization fields because the active deployment default embeddings target could not be resolved uniquely.';
+        END IF;
+
+        UPDATE context_knowledge_bases kb
+        SET
+            vectorization_mode = 'vanessa_embeddings',
+            embedding_provider_instance_id = resolved.embedding_provider_instance_id,
+            embedding_resource_id = resolved.embedding_resource_id,
+            vectorization_json = jsonb_strip_nulls(
+                jsonb_build_object(
+                    'supports_named_vectors',
+                    kb.backing_provider_instance_id IN (
+                        SELECT id
+                        FROM platform_provider_instances
+                        WHERE provider_key = 'weaviate_local'
+                    ),
+                    'named_vectors',
+                    '[]'::jsonb,
+                    'default_vector_space',
+                    jsonb_build_object(
+                        'name', 'default',
+                        'mode', 'vanessa_embeddings',
+                        'embedding_resource_id', resolved.embedding_resource_id
+                    ),
+                    'embedding_resource',
+                    jsonb_build_object(
+                        'id', resolved.embedding_resource_id,
+                        'provider_resource_id', resolved.embedding_resource_id,
+                        'display_name', resolved.embedding_resource_display_name,
+                        'metadata', resolved.embedding_resource_metadata
+                    )
+                )
+            )
+        FROM (
+            SELECT
+                kb_inner.id AS knowledge_base_id,
+                binding.provider_instance_id AS embedding_provider_instance_id,
+                COALESCE(NULLIF(resource.provider_resource_id, ''), resource.resource_id) AS embedding_resource_id,
+                COALESCE(NULLIF(resource.display_name, ''), resource.resource_id) AS embedding_resource_display_name,
+                COALESCE(resource.metadata_json, '{}'::jsonb) AS embedding_resource_metadata
+            FROM context_knowledge_bases kb_inner
+            JOIN platform_active_deployment active
+              ON active.singleton_key = 'active'
+            JOIN platform_deployment_bindings binding
+              ON binding.deployment_profile_id = active.deployment_profile_id
+             AND binding.capability_key = 'embeddings'
+            JOIN platform_binding_resources resource
+              ON resource.binding_id = binding.id
+             AND resource.is_default = TRUE
+            WHERE kb_inner.vectorization_mode IS NULL
+               OR kb_inner.embedding_provider_instance_id IS NULL
+               OR NULLIF(kb_inner.embedding_resource_id, '') IS NULL
+        ) resolved
+        WHERE kb.id = resolved.knowledge_base_id
+          AND (
+              kb.vectorization_mode IS NULL
+              OR kb.embedding_provider_instance_id IS NULL
+              OR NULLIF(kb.embedding_resource_id, '') IS NULL
+          );
+    END IF;
+END
+$$;
 
 DROP INDEX IF EXISTS context_knowledge_bases_backing_provider_key_idx;
 
@@ -121,6 +256,9 @@ ALTER TABLE context_knowledge_bases
 
 CREATE INDEX IF NOT EXISTS context_knowledge_bases_backing_provider_instance_idx
     ON context_knowledge_bases (backing_provider_instance_id);
+
+CREATE INDEX IF NOT EXISTS context_knowledge_bases_vectorization_mode_idx
+    ON context_knowledge_bases (vectorization_mode, embedding_provider_instance_id);
 
 CREATE TABLE IF NOT EXISTS context_schema_profiles (
     id UUID PRIMARY KEY,

@@ -50,7 +50,7 @@ def create_knowledge_base(
     payload: dict[str, Any],
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
-    normalized = _normalize_knowledge_base_payload(database_url, payload, is_create=True)
+    normalized = _normalize_knowledge_base_payload(database_url, config, payload, is_create=True)
     knowledge_base = context_repo.create_knowledge_base(
         database_url,
         slug=normalized["slug"],
@@ -61,6 +61,10 @@ def create_knowledge_base(
         lifecycle_state=normalized["lifecycle_state"],
         sync_status="syncing",
         schema_json=normalized["schema"],
+        vectorization_mode=normalized["vectorization"]["mode"],
+        embedding_provider_instance_id=normalized["vectorization"]["embedding_provider_instance_id"],
+        embedding_resource_id=normalized["vectorization"]["embedding_resource_id"],
+        vectorization_json=normalized["vectorization"]["vectorization_json"],
         created_by_user_id=created_by_user_id,
         updated_by_user_id=created_by_user_id,
     )
@@ -103,7 +107,7 @@ def update_knowledge_base(
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     existing = _require_knowledge_base(database_url, knowledge_base_id)
-    normalized = _normalize_knowledge_base_payload(database_url, payload, is_create=False, existing=existing)
+    normalized = _normalize_knowledge_base_payload(database_url, None, payload, is_create=False, existing=existing)
     if (
         normalized["lifecycle_state"] == "archived"
         and str(existing.get("lifecycle_state") or "").strip().lower() != "archived"

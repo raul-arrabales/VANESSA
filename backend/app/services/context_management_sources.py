@@ -26,6 +26,7 @@ from .context_management_shared import (
     _upsert_document_chunks,
 )
 from .context_management_types import SourceSyncSummary
+from .context_management_vectorization import require_knowledge_base_text_ingestion_supported
 from .platform_types import PlatformControlPlaneError
 
 
@@ -161,6 +162,7 @@ def sync_knowledge_source(
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     source = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
     if str(source.get("lifecycle_state") or "").strip().lower() != "active":
         raise PlatformControlPlaneError(

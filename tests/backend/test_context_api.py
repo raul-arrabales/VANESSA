@@ -126,6 +126,55 @@ def test_create_schema_profile_route_returns_payload_for_superadmin(client, monk
     assert response.get_json()["schema_profile"]["provider_key"] == "weaviate_local"
 
 
+def test_list_vectorization_options_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-vectorization@example.com",
+        username="admin-vectorization",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "list_vectorization_options",
+        lambda *_args, **_kwargs: {
+            "backing_provider": {
+                "id": "provider-2",
+                "display_name": "Weaviate local",
+                "provider_key": "weaviate_local",
+                "enabled": True,
+                "capability": "vector_store",
+            },
+            "supports_named_vectors": True,
+            "supported_modes": [
+                {"mode": "vanessa_embeddings", "requires_embedding_target": True},
+                {"mode": "self_provided", "requires_embedding_target": False},
+            ],
+            "embedding_providers": [
+                {
+                    "id": "embedding-provider-1",
+                    "display_name": "Embeddings local",
+                    "provider_key": "openai_compatible_cloud_embeddings",
+                    "resources": [{"id": "text-embedding-3-small", "display_name": "text-embedding-3-small"}],
+                    "default_resource_id": "text-embedding-3-small",
+                }
+            ],
+        },
+    )
+
+    response = test_client.get(
+        "/v1/context/vectorization-options?backing_provider_instance_id=provider-2",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["supported_modes"][0]["mode"] == "vanessa_embeddings"
+
+
 def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(
@@ -155,11 +204,26 @@ def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatc
                     "display_name": "Weaviate local",
                     "provider_key": "weaviate_local",
                     "enabled": True,
-                    "capability": "vector_store",
+                "capability": "vector_store",
                 },
                 "lifecycle_state": "active",
                 "sync_status": "ready",
                 "schema": {},
+                "vectorization": {
+                    "mode": "vanessa_embeddings",
+                    "embedding_provider_instance_id": "embedding-provider-1",
+                    "embedding_resource_id": "text-embedding-3-small",
+                    "embedding_provider": {
+                        "id": "embedding-provider-1",
+                        "display_name": "Embeddings local",
+                        "provider_key": "openai_compatible_cloud_embeddings",
+                    },
+                    "embedding_resource": {
+                        "id": "text-embedding-3-small",
+                        "display_name": "text-embedding-3-small",
+                    },
+                    "supports_named_vectors": True,
+                },
                 "document_count": 2,
                 "binding_count": 1,
             }
@@ -207,6 +271,21 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
             "lifecycle_state": "active",
             "sync_status": "ready",
             "schema": {},
+            "vectorization": {
+                "mode": "vanessa_embeddings",
+                "embedding_provider_instance_id": "embedding-provider-1",
+                "embedding_resource_id": "text-embedding-3-small",
+                "embedding_provider": {
+                    "id": "embedding-provider-1",
+                    "display_name": "Embeddings local",
+                    "provider_key": "openai_compatible_cloud_embeddings",
+                },
+                "embedding_resource": {
+                    "id": "text-embedding-3-small",
+                    "display_name": "text-embedding-3-small",
+                },
+                "supports_named_vectors": True,
+            },
             "document_count": 0,
             "binding_count": 0,
         }
@@ -221,6 +300,11 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
             "display_name": "Product Docs",
             "description": "docs",
             "backing_provider_instance_id": "provider-2",
+            "vectorization": {
+                "mode": "vanessa_embeddings",
+                "embedding_provider_instance_id": "embedding-provider-1",
+                "embedding_resource_id": "text-embedding-3-small",
+            },
         },
     )
 
@@ -231,6 +315,11 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
         "display_name": "Product Docs",
         "description": "docs",
         "backing_provider_instance_id": "provider-2",
+        "vectorization": {
+            "mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_resource_id": "text-embedding-3-small",
+        },
     }
     assert response.get_json()["knowledge_base"]["backing_provider_instance_id"] == "provider-2"
 

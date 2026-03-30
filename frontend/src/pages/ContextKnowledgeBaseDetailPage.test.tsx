@@ -40,6 +40,22 @@ const contextApiMocks = vi.hoisted(() => ({
     last_sync_error: null,
     last_sync_summary: "Managed knowledge base index is ready.",
     schema: {},
+    vectorization: {
+      mode: "vanessa_embeddings",
+      embedding_provider_instance_id: "embedding-provider-1",
+      embedding_resource_id: "text-embedding-3-small",
+      embedding_provider: {
+        id: "embedding-provider-1",
+        display_name: "Embeddings local",
+        provider_key: "openai_compatible_cloud_embeddings",
+      },
+      embedding_resource: {
+        id: "text-embedding-3-small",
+        display_name: "text-embedding-3-small",
+        provider_resource_id: "text-embedding-3-small",
+      },
+      supports_named_vectors: true,
+    },
     document_count: 1,
     deployment_usage: [
       {
@@ -141,6 +157,22 @@ const contextApiMocks = vi.hoisted(() => ({
     last_sync_error: null,
     last_sync_summary: "Resynced 1 document(s) and 1 chunk(s).",
     schema: {},
+    vectorization: {
+      mode: "vanessa_embeddings",
+      embedding_provider_instance_id: "embedding-provider-1",
+      embedding_resource_id: "text-embedding-3-small",
+      embedding_provider: {
+        id: "embedding-provider-1",
+        display_name: "Embeddings local",
+        provider_key: "openai_compatible_cloud_embeddings",
+      },
+      embedding_resource: {
+        id: "text-embedding-3-small",
+        display_name: "text-embedding-3-small",
+        provider_resource_id: "text-embedding-3-small",
+      },
+      supports_named_vectors: true,
+    },
     document_count: 1,
     deployment_usage: [],
   })),
@@ -172,6 +204,22 @@ const contextApiMocks = vi.hoisted(() => ({
       last_sync_error: null,
       last_sync_summary: "Source 'Docs folder' synced 1 created, 0 updated, 0 deleted document(s).",
       schema: {},
+      vectorization: {
+        mode: "vanessa_embeddings",
+        embedding_provider_instance_id: "embedding-provider-1",
+        embedding_resource_id: "text-embedding-3-small",
+        embedding_provider: {
+          id: "embedding-provider-1",
+          display_name: "Embeddings local",
+          provider_key: "openai_compatible_cloud_embeddings",
+        },
+        embedding_resource: {
+          id: "text-embedding-3-small",
+          display_name: "text-embedding-3-small",
+          provider_resource_id: "text-embedding-3-small",
+        },
+        supports_named_vectors: true,
+      },
       document_count: 1,
       deployment_usage: [],
     },
@@ -237,6 +285,8 @@ describe("ContextKnowledgeBaseDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText(/Weaviate local/)).toBeVisible();
+    expect(screen.getByText(/Embeddings local/)).toBeVisible();
+    expect(screen.getByText(/text-embedding-3-small/)).toBeVisible();
     expect(screen.getByText(/Local Default/)).toBeVisible();
     expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
     expect(screen.getByRole("heading", { name: "Sources" })).toBeVisible();

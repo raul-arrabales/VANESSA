@@ -33,6 +33,7 @@ _SUPPORTED_SCHEMA_PROPERTY_TYPES = {"text", "number", "int", "boolean"}
 _SUPPORTED_UPLOAD_EXTENSIONS = {".txt", ".md", ".json", ".jsonl", ".pdf"}
 _KB_LIFECYCLE_STATES = {"active", "archived"}
 _KB_SYNC_STATES = {"ready", "syncing", "error"}
+_KB_VECTORIZATION_MODES = {"vanessa_embeddings", "self_provided"}
 _SOURCE_TYPES = {"local_directory"}
 _SOURCE_LIFECYCLE_STATES = {"active", "archived"}
 _SOURCE_SYNC_STATES = {"idle", "syncing", "ready", "error"}

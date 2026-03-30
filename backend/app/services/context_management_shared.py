@@ -12,6 +12,10 @@ from .context_management_types import (
     KnowledgeSourceRecord,
     _DEFAULT_CHUNK_SIZE,
 )
+from .context_management_vectorization import (
+    embed_knowledge_base_texts,
+    require_knowledge_base_text_ingestion_supported,
+)
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 
@@ -126,12 +130,21 @@ def _upsert_document_chunks(
 ) -> None:
     if not chunks:
         raise PlatformControlPlaneError("invalid_document_text", "text is required", status_code=400)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
     adapter.ensure_index(index_name=str(knowledge_base["index_name"]), schema=dict(knowledge_base.get("schema_json") or {}))
+    embeddings_payload = embed_knowledge_base_texts(
+        database_url,
+        config=config,
+        knowledge_base=knowledge_base,
+        texts=chunks,
+    )
+    embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload.get("embeddings"), list) else []
     documents = [
         {
             "id": _chunk_document_id(str(document["id"]), index),
             "text": chunk,
+            "embedding": embeddings[index] if index < len(embeddings) else None,
             "metadata": {
                 "knowledge_base_id": str(knowledge_base["id"]),
                 "document_id": str(document["id"]),
