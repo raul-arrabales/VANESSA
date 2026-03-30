@@ -379,7 +379,9 @@ describe("ContextKnowledgeBaseDetailPage", () => {
 
     await screen.findByRole("heading", { name: "Product Docs" });
 
-    expect(screen.getByLabelText("Include globs")).toHaveValue("**/*.{md,txt,pdf,json,jsonl}");
+    expect(screen.getByLabelText("Include globs")).toHaveValue(
+      "*.md\n*.txt\n*.pdf\n*.json\n*.jsonl\n**/*.md\n**/*.txt\n**/*.pdf\n**/*.json\n**/*.jsonl",
+    );
     expect(screen.getByLabelText("Exclude globs")).toHaveValue("**/.git/**\n**/node_modules/**\n**/venv/**\n**/*.log");
   });
 

@@ -31,7 +31,7 @@ export const EMPTY_DOCUMENT_FORM: DocumentFormState = {
   text: "",
 };
 
-export const DEFAULT_SOURCE_INCLUDE_GLOBS = "**/*.{md,txt,pdf,json,jsonl}";
+export const DEFAULT_SOURCE_INCLUDE_GLOBS = "*.md\n*.txt\n*.pdf\n*.json\n*.jsonl\n**/*.md\n**/*.txt\n**/*.pdf\n**/*.json\n**/*.jsonl";
 export const DEFAULT_SOURCE_EXCLUDE_GLOBS = "**/.git/**\n**/node_modules/**\n**/venv/**\n**/*.log";
 
 export function createEmptySourceForm(): SourceFormState {
