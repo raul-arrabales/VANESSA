@@ -11,7 +11,7 @@ def _write_executable(path: Path, content: str) -> None:
     path.chmod(0o755)
 
 
-def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_empty(tmp_path: Path):
+def _make_fake_bin(tmp_path: Path) -> Path:
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
 
@@ -20,6 +20,7 @@ def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_em
         textwrap.dedent(
             """\
             #!/usr/bin/env python3
+            import json
             import os
             import sys
 
@@ -57,6 +58,24 @@ def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_em
                         if item:
                             print(item)
                     sys.exit(0)
+
+                if service_name == "llm_runtime_embeddings" and "/v1/admin/runtime-state" in joined:
+                    payload = os.environ.get("FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON", "")
+                    if payload:
+                        parsed = json.loads(payload)
+                        print(
+                            "\\t".join(
+                                [
+                                    str(parsed.get("load_state") or "").strip(),
+                                    str(parsed.get("runtime_model_id") or "").strip(),
+                                    str(parsed.get("managed_model_id") or "").strip(),
+                                    str(parsed.get("local_path") or "").strip(),
+                                    str(parsed.get("last_error") or "").strip(),
+                                ]
+                            )
+                        )
+                        sys.exit(0)
+                    sys.exit(1)
 
                 if service_name == "llm" and "/v1/models" in joined:
                     value = os.environ.get("FAKE_LLM_EMBEDDINGS_IDS", "")
@@ -104,6 +123,11 @@ def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_em
             """
         ),
     )
+    return fake_bin
+
+
+def _run_health(tmp_path: Path, **env_overrides: str) -> subprocess.CompletedProcess[str]:
+    fake_bin = _make_fake_bin(tmp_path)
 
     repo_root = Path(__file__).resolve().parents[2]
     env = {
@@ -115,11 +139,13 @@ def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_em
         "FAKE_SLOT_MANAGED_MODEL_ID": "sentence-transformers--all-MiniLM-L6-v2",
         "FAKE_SLOT_RUNTIME_MODEL_ID": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
         "FAKE_SLOT_LOCAL_PATH": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+        "FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON": '{"load_state":"empty","runtime_model_id":"","managed_model_id":"","local_path":"","last_error":""}',
         "FAKE_LLM_RUNTIME_EMBEDDINGS_IDS": "",
         "FAKE_LLM_EMBEDDINGS_IDS": "",
+        **env_overrides,
     }
 
-    result = subprocess.run(
+    return subprocess.run(
         ["bash", "ops/local-staging/health.sh"],
         cwd=repo_root,
         env=env,
@@ -128,8 +154,56 @@ def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_em
         check=False,
     )
 
+
+def test_health_script_fails_when_embeddings_slot_is_persisted_but_runtime_is_empty(tmp_path: Path):
+    result = _run_health(tmp_path)
+
     assert result.returncode == 3
     assert "llm_runtime_embeddings: OK" in result.stdout
     assert "llm_runtime_embeddings_slot: FAIL" in result.stdout
     assert "persisted slot 'sentence-transformers--all-MiniLM-L6-v2' is not loaded into llm_runtime_embeddings" in result.stdout
 
+
+def test_health_script_waits_when_embeddings_slot_is_loading(tmp_path: Path):
+    result = _run_health(
+        tmp_path,
+        FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON='{"load_state":"loading","runtime_model_id":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","managed_model_id":"sentence-transformers--all-MiniLM-L6-v2","local_path":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","last_error":""}',
+    )
+
+    assert result.returncode == 0
+    assert "llm_runtime_embeddings_slot: WAIT" in result.stdout
+    assert "persisted slot 'sentence-transformers--all-MiniLM-L6-v2' is loading in llm_runtime_embeddings" in result.stdout
+
+
+def test_health_script_waits_when_embeddings_slot_is_reconciling(tmp_path: Path):
+    result = _run_health(
+        tmp_path,
+        FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON='{"load_state":"reconciling","runtime_model_id":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","managed_model_id":"sentence-transformers--all-MiniLM-L6-v2","local_path":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","last_error":""}',
+    )
+
+    assert result.returncode == 0
+    assert "llm_runtime_embeddings_slot: WAIT" in result.stdout
+    assert "persisted slot 'sentence-transformers--all-MiniLM-L6-v2' is reconciling in llm_runtime_embeddings" in result.stdout
+
+
+def test_health_script_fails_when_runtime_reports_loaded_but_model_inventory_is_missing(tmp_path: Path):
+    result = _run_health(
+        tmp_path,
+        FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON='{"load_state":"loaded","runtime_model_id":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","managed_model_id":"sentence-transformers--all-MiniLM-L6-v2","local_path":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","last_error":""}',
+    )
+
+    assert result.returncode == 3
+    assert "llm_runtime_embeddings_slot: FAIL" in result.stdout
+    assert "persisted slot 'sentence-transformers--all-MiniLM-L6-v2' is not loaded into llm_runtime_embeddings" in result.stdout
+
+
+def test_health_script_fails_when_llm_is_missing_embeddings_advertisement_after_runtime_load(tmp_path: Path):
+    result = _run_health(
+        tmp_path,
+        FAKE_LLM_RUNTIME_EMBEDDINGS_RUNTIME_STATE_JSON='{"load_state":"loaded","runtime_model_id":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","managed_model_id":"sentence-transformers--all-MiniLM-L6-v2","local_path":"/models/llm/sentence-transformers--all-MiniLM-L6-v2","last_error":""}',
+        FAKE_LLM_RUNTIME_EMBEDDINGS_IDS="/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+    )
+
+    assert result.returncode == 3
+    assert "llm_runtime_embeddings_slot: FAIL" in result.stdout
+    assert "llm does not advertise any embeddings-capable models" in result.stdout

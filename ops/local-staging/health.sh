@@ -87,29 +87,84 @@ for item in items:
 " 2>/dev/null
 }
 
+runtime_admin_state_fields() {
+  local service_name="$1"
+  compose exec -T "${service_name}" python -c "
+import json
+import urllib.request
+
+payload = json.load(urllib.request.urlopen('http://127.0.0.1:8000/v1/admin/runtime-state', timeout=3))
+print('\t'.join([
+    str(payload.get('load_state') or '').strip(),
+    str(payload.get('runtime_model_id') or '').strip(),
+    str(payload.get('managed_model_id') or '').strip(),
+    str(payload.get('local_path') or '').strip(),
+    str(payload.get('last_error') or '').strip(),
+]))
+" 2>/dev/null
+}
+
 embeddings_slot_runtime_alignment_ok() {
   local slot_fields managed_model_id runtime_model_id local_path expected_runtime_model_id
   slot_fields="$(embeddings_slot_target || true)"
   IFS=$'\t' read -r managed_model_id runtime_model_id local_path <<< "${slot_fields}"
 
   if [[ -z "${managed_model_id}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="ok"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="no persisted slot intent"
     return 0
   fi
 
   expected_runtime_model_id="${runtime_model_id:-${local_path}}"
   if [[ -z "${expected_runtime_model_id}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot is missing a runtime model identifier"
     return 1
   fi
 
+  local runtime_state_fields runtime_load_state runtime_state_model_id runtime_state_managed_model_id runtime_state_local_path runtime_last_error
+  runtime_state_fields="$(runtime_admin_state_fields "llm_runtime_embeddings" || true)"
+  if [[ -z "${runtime_state_fields}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
+    EMBEDDINGS_SLOT_ALIGNMENT_REASON="runtime admin state is unavailable for llm_runtime_embeddings"
+    return 1
+  fi
+  IFS=$'\t' read -r runtime_load_state runtime_state_model_id runtime_state_managed_model_id runtime_state_local_path runtime_last_error <<< "${runtime_state_fields}"
+
+  case "${runtime_load_state}" in
+    loading|reconciling)
+      EMBEDDINGS_SLOT_ALIGNMENT_STATUS="wait"
+      EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot '${managed_model_id}' is ${runtime_load_state} in llm_runtime_embeddings (runtime model '${runtime_state_model_id:-${expected_runtime_model_id}}')"
+      return 0
+      ;;
+    error)
+      EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
+      EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot '${managed_model_id}' failed in llm_runtime_embeddings: ${runtime_last_error:-runtime error}"
+      return 1
+      ;;
+    loaded)
+      ;;
+    empty)
+      EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
+      EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot '${managed_model_id}' is not loaded into llm_runtime_embeddings"
+      return 1
+      ;;
+    *)
+      EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
+      EMBEDDINGS_SLOT_ALIGNMENT_REASON="unexpected runtime admin load_state '${runtime_load_state:-<empty>}' for llm_runtime_embeddings"
+      return 1
+      ;;
+  esac
+
   local runtime_model_ids
   runtime_model_ids="$(service_model_ids "llm_runtime_embeddings" "embeddings" || true)"
   if [[ -z "${runtime_model_ids}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="persisted slot '${managed_model_id}' is not loaded into llm_runtime_embeddings"
     return 1
   fi
   if ! printf '%s\n' "${runtime_model_ids}" | grep -Fxq "${expected_runtime_model_id}"; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="expected runtime model '${expected_runtime_model_id}' is missing from llm_runtime_embeddings"
     return 1
   fi
@@ -117,14 +172,17 @@ embeddings_slot_runtime_alignment_ok() {
   local llm_embeddings_model_ids
   llm_embeddings_model_ids="$(service_model_ids "llm" "embeddings" || true)"
   if [[ -z "${llm_embeddings_model_ids}" ]]; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="llm does not advertise any embeddings-capable models"
     return 1
   fi
   if ! printf '%s\n' "${llm_embeddings_model_ids}" | grep -Fxq "${expected_runtime_model_id}"; then
+    EMBEDDINGS_SLOT_ALIGNMENT_STATUS="fail"
     EMBEDDINGS_SLOT_ALIGNMENT_REASON="llm is not advertising the expected embeddings model '${expected_runtime_model_id}'"
     return 1
   fi
 
+  EMBEDDINGS_SLOT_ALIGNMENT_STATUS="ok"
   EMBEDDINGS_SLOT_ALIGNMENT_REASON="slot aligned"
   return 0
 }
@@ -257,11 +315,18 @@ run_checks() {
           printf 'llm_runtime_embeddings: OK (accelerator=%s)\n' "${runtime_accelerator}"
         fi
         if embeddings_slot_runtime_alignment_ok; then
-          if [[ "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-}" == "no persisted slot intent" ]]; then
-            printf 'llm_runtime_embeddings_slot: OK (no persisted slot intent)\n'
-          else
-            printf 'llm_runtime_embeddings_slot: OK (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-slot aligned}"
-          fi
+          case "${EMBEDDINGS_SLOT_ALIGNMENT_STATUS:-ok}" in
+            wait)
+              printf 'llm_runtime_embeddings_slot: WAIT (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-slot still converging}"
+              ;;
+            *)
+              if [[ "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-}" == "no persisted slot intent" ]]; then
+                printf 'llm_runtime_embeddings_slot: OK (no persisted slot intent)\n'
+              else
+                printf 'llm_runtime_embeddings_slot: OK (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-slot aligned}"
+              fi
+              ;;
+          esac
         else
           printf 'llm_runtime_embeddings_slot: FAIL (%s)\n' "${EMBEDDINGS_SLOT_ALIGNMENT_REASON:-alignment check failed}"
           failures=$((failures + 1))
