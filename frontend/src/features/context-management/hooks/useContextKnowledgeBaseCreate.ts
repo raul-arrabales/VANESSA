@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   createKnowledgeBase,
+  type KnowledgeBaseChunkingStrategy,
   createKnowledgeBaseSchemaProfile,
   getKnowledgeBaseVectorizationOptions,
   listKnowledgeBaseSchemaProfiles,
@@ -49,6 +50,9 @@ type UseContextKnowledgeBaseCreateResult = {
   selectedEmbeddingProviderNeedsModel: boolean;
   selectedEmbeddingProviderUnavailableReason: string | null;
   selectedEmbeddingProviderDisplayName: string;
+  selectedChunkingStrategy: KnowledgeBaseChunkingStrategy;
+  chunkLength: string;
+  chunkOverlap: string;
   selectedProfileId: string;
   selectedProfileDescription: string;
   providerLoadError: string;
@@ -71,6 +75,9 @@ type UseContextKnowledgeBaseCreateResult = {
   setSelectedVectorizationMode: (value: KnowledgeBaseVectorizationMode) => void;
   setSelectedEmbeddingProviderId: (value: string) => void;
   setSelectedEmbeddingResourceId: (value: string) => void;
+  setSelectedChunkingStrategy: (value: KnowledgeBaseChunkingStrategy) => void;
+  setChunkLength: (value: string) => void;
+  setChunkOverlap: (value: string) => void;
   setSchemaEditorMode: (value: SchemaEditorMode) => void;
   setSchemaText: (value: string) => void;
   setSelectedProfileId: (value: string) => void;
@@ -105,6 +112,9 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
   const [selectedVectorizationMode, setSelectedVectorizationMode] = useState<KnowledgeBaseVectorizationMode>("vanessa_embeddings");
   const [selectedEmbeddingProviderId, setSelectedEmbeddingProviderId] = useState("");
   const [selectedEmbeddingResourceId, setSelectedEmbeddingResourceId] = useState("");
+  const [selectedChunkingStrategy, setSelectedChunkingStrategy] = useState<KnowledgeBaseChunkingStrategy>("fixed_length");
+  const [chunkLength, setChunkLength] = useState("300");
+  const [chunkOverlap, setChunkOverlap] = useState("60");
   const [selectedProfileId, setSelectedProfileIdState] = useState("");
   const [schemaEditorMode, setSchemaEditorMode] = useState<SchemaEditorMode>("profile");
   const [providerLoadError, setProviderLoadError] = useState("");
@@ -423,6 +433,24 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
       showErrorFeedback(t("contextManagement.feedback.embeddingResourceRequired"), t("contextManagement.feedback.createFailed"));
       return;
     }
+    if (selectedChunkingStrategy !== "fixed_length") {
+      showErrorFeedback(t("contextManagement.feedback.chunkingStrategyRequired"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
+    const normalizedChunkLength = Number.parseInt(chunkLength, 10);
+    if (!Number.isInteger(normalizedChunkLength) || normalizedChunkLength <= 0) {
+      showErrorFeedback(t("contextManagement.feedback.chunkLengthInvalid"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
+    const normalizedChunkOverlap = Number.parseInt(chunkOverlap, 10);
+    if (!Number.isInteger(normalizedChunkOverlap) || normalizedChunkOverlap < 0) {
+      showErrorFeedback(t("contextManagement.feedback.chunkOverlapInvalid"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
+    if (normalizedChunkOverlap >= normalizedChunkLength) {
+      showErrorFeedback(t("contextManagement.feedback.chunkOverlapTooLarge"), t("contextManagement.feedback.createFailed"));
+      return;
+    }
     let schema: KnowledgeBaseSchema | undefined;
     try {
       schema = parseSchemaText(schemaText);
@@ -447,6 +475,14 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
                 embedding_resource_id: selectedEmbeddingResourceId,
               }
             : {}),
+        },
+        chunking: {
+          strategy: selectedChunkingStrategy,
+          config: {
+            unit: "tokens",
+            chunk_length: normalizedChunkLength,
+            chunk_overlap: normalizedChunkOverlap,
+          },
         },
       }, token);
       navigate(`/control/context/${knowledgeBase.id}`, {
@@ -484,6 +520,9 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     selectedEmbeddingProviderNeedsModel,
     selectedEmbeddingProviderUnavailableReason: selectedEmbeddingProvider?.unavailable_reason ?? null,
     selectedEmbeddingProviderDisplayName: selectedEmbeddingProvider?.display_name ?? selectedEmbeddingProvider?.id ?? "",
+    selectedChunkingStrategy,
+    chunkLength,
+    chunkOverlap,
     selectedProfileId,
     selectedProfileDescription,
     providerLoadError,
@@ -506,6 +545,9 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     setSelectedVectorizationMode,
     setSelectedEmbeddingProviderId,
     setSelectedEmbeddingResourceId,
+    setSelectedChunkingStrategy,
+    setChunkLength,
+    setChunkOverlap,
     setSchemaEditorMode,
     setSchemaText,
     setSelectedProfileId: selectSchemaProfile,

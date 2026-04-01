@@ -52,6 +52,14 @@ vi.mock("../api/context", () => ({
         },
         supports_named_vectors: true,
       },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 300,
+          chunk_overlap: 60,
+        },
+      },
       document_count: 3,
       binding_count: 1,
     },

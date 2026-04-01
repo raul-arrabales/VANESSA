@@ -4,6 +4,8 @@ import { requestJson } from "./modelops/request";
 const backendBaseUrl = (import.meta.env.VITE_BACKEND_BASE_URL as string | undefined)?.trim() || "/api";
 
 export type KnowledgeBaseVectorizationMode = "vanessa_embeddings" | "self_provided";
+export type KnowledgeBaseChunkingStrategy = "fixed_length";
+export type KnowledgeBaseChunkingUnit = "tokens";
 
 export type KnowledgeBaseEmbeddingProviderSummary = {
   id: string;
@@ -32,6 +34,15 @@ export type KnowledgeBaseVectorization = {
   supports_named_vectors: boolean;
 };
 
+export type KnowledgeBaseChunking = {
+  strategy: KnowledgeBaseChunkingStrategy | string;
+  config: {
+    unit: KnowledgeBaseChunkingUnit | string;
+    chunk_length: number;
+    chunk_overlap: number;
+  };
+};
+
 export type KnowledgeBase = {
   id: string;
   slug: string;
@@ -52,6 +63,7 @@ export type KnowledgeBase = {
   sync_status: "ready" | "syncing" | "error" | string;
   schema: KnowledgeBaseSchema;
   vectorization: KnowledgeBaseVectorization;
+  chunking: KnowledgeBaseChunking;
   document_count: number;
   eligible_for_binding: boolean;
   last_sync_at?: string | null;
@@ -231,6 +243,14 @@ export async function createKnowledgeBase(
       mode: KnowledgeBaseVectorizationMode;
       embedding_provider_instance_id?: string;
       embedding_resource_id?: string;
+    };
+    chunking: {
+      strategy: KnowledgeBaseChunkingStrategy;
+      config: {
+        unit: KnowledgeBaseChunkingUnit;
+        chunk_length: number;
+        chunk_overlap: number;
+      };
     };
   },
   token: string,

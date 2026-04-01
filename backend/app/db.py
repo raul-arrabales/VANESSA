@@ -429,6 +429,7 @@ def run_context_management_schema_migration(database_url: str) -> None:
                 "012_context_management.sql",
                 "013_context_management_ops.sql",
                 "014_context_management_sources.sql",
+                "016_context_management_chunking.sql",
             ):
                 migration_file = (
                     Path(__file__).resolve().parents[2]

@@ -139,7 +139,9 @@ Context-management semantics:
 - Each managed knowledge base is created against one configured `vector_store` provider instance.
 - Schema authoring is provider-aware: reusable schema profiles are keyed by provider family, with built-in Weaviate templates plus superadmin-created custom profiles.
 - Knowledge-base creation also persists a `vectorization` strategy. In the current slice, KBs either use `vanessa_embeddings` with an explicit embeddings provider/model target or `self_provided` for externally supplied vectors.
-- Documents are stored in Postgres, chunked synchronously by backend, and upserted into the backing vector provider.
+- Knowledge-base creation also persists a create-time `chunking` strategy. The current supported shape is `chunking.strategy="fixed_length"` with token-based `chunk_length` plus `chunk_overlap`, and this configuration is immutable after KB creation.
+- Documents are stored in Postgres, chunked synchronously by backend according to the persisted KB `chunking` config, and upserted into the backing vector provider.
+- Token-based chunking resolves the tokenizer from the KB embeddings target: local/HuggingFace-backed providers load a tokenizer from the managed model filesystem path, while `openai_compatible_cloud_embeddings` providers use `tiktoken` with model-aware encoding resolution and a `cl100k_base` fallback.
 - For Weaviate-backed KBs, the backend keeps collection creation on `vectorizer: none` and supplies vectors from VANESSA embeddings providers or external uploads rather than native Weaviate module vectorizers.
 - Managed `local_directory` knowledge sources live under allowlisted backend-visible roots configured by `CONTEXT_SOURCE_ROOTS`.
 - Source sync is deterministic: document identity is derived from `source_id + source_path + logical position`, so re-sync updates or deletes existing source-managed documents instead of duplicating them.

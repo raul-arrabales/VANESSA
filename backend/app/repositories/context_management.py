@@ -230,6 +230,8 @@ def create_knowledge_base(
     embedding_provider_instance_id: str | None,
     embedding_resource_id: str | None,
     vectorization_json: dict[str, Any],
+    chunking_strategy: str,
+    chunking_config_json: dict[str, Any],
     created_by_user_id: int | None,
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
@@ -250,10 +252,12 @@ def create_knowledge_base(
                 embedding_provider_instance_id,
                 embedding_resource_id,
                 vectorization_json,
+                chunking_strategy,
+                chunking_config_json,
                 created_by_user_id,
                 updated_by_user_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s, %s)
             RETURNING *
             """,
             (
@@ -270,6 +274,8 @@ def create_knowledge_base(
                 embedding_provider_instance_id.strip() if embedding_provider_instance_id else None,
                 embedding_resource_id.strip() if embedding_resource_id else None,
                 Jsonb(vectorization_json),
+                chunking_strategy.strip().lower(),
+                Jsonb(chunking_config_json),
                 created_by_user_id,
                 updated_by_user_id,
             ),

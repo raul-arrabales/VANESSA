@@ -258,6 +258,14 @@ def test_list_knowledge_bases_route_returns_payload_for_admin(client, monkeypatc
                     },
                     "supports_named_vectors": True,
                 },
+                "chunking": {
+                    "strategy": "fixed_length",
+                    "config": {
+                        "unit": "tokens",
+                        "chunk_length": 300,
+                        "chunk_overlap": 60,
+                    },
+                },
                 "document_count": 2,
                 "binding_count": 1,
             }
@@ -320,6 +328,14 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
                 },
                 "supports_named_vectors": True,
             },
+            "chunking": {
+                "strategy": "fixed_length",
+                "config": {
+                    "unit": "tokens",
+                    "chunk_length": 300,
+                    "chunk_overlap": 60,
+                },
+            },
             "document_count": 0,
             "binding_count": 0,
         }
@@ -339,6 +355,14 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
                 "embedding_provider_instance_id": "embedding-provider-1",
                 "embedding_resource_id": "text-embedding-3-small",
             },
+            "chunking": {
+                "strategy": "fixed_length",
+                "config": {
+                    "unit": "tokens",
+                    "chunk_length": 300,
+                    "chunk_overlap": 60,
+                },
+            },
         },
     )
 
@@ -353,6 +377,14 @@ def test_create_knowledge_base_route_returns_payload_for_superadmin(client, monk
             "mode": "vanessa_embeddings",
             "embedding_provider_instance_id": "embedding-provider-1",
             "embedding_resource_id": "text-embedding-3-small",
+        },
+        "chunking": {
+            "strategy": "fixed_length",
+            "config": {
+                "unit": "tokens",
+                "chunk_length": 300,
+                "chunk_overlap": 60,
+            },
         },
     }
     assert response.get_json()["knowledge_base"]["backing_provider_instance_id"] == "provider-2"

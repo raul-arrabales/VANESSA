@@ -6,6 +6,36 @@ from app.services import context_management_serialization
 from app.services.platform_types import PlatformControlPlaneError
 
 
+def _vector_store_provider() -> dict[str, object]:
+    return {
+        "id": "provider-2",
+        "provider_key": "weaviate_local",
+        "capability_key": "vector_store",
+        "enabled": True,
+    }
+
+
+def _patch_vectorization(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(context_management_serialization.platform_repo, "get_provider_instance", lambda *_args, **_kwargs: _vector_store_provider())
+    monkeypatch.setattr(
+        "app.services.context_management_vectorization.normalize_knowledge_base_vectorization",
+        lambda *_args, **_kwargs: {
+            "mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_resource_id": "text-embedding-3-small",
+            "vectorization_json": {
+                "supports_named_vectors": True,
+                "embedding_resource": {
+                    "id": "text-embedding-3-small",
+                    "provider_resource_id": "text-embedding-3-small",
+                    "display_name": "text-embedding-3-small",
+                    "metadata": {"dimension": 1536},
+                },
+            },
+        },
+    )
+
+
 def test_normalize_knowledge_base_payload_requires_backing_provider_instance_id_on_create():
     with pytest.raises(PlatformControlPlaneError) as exc_info:
         context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
@@ -178,6 +208,12 @@ def test_serialize_knowledge_base_includes_vectorization_summary():
                     "metadata": {"dimension": 1536},
                 },
             },
+            "chunking_strategy": "fixed_length",
+            "chunking_config_json": {
+                "unit": "tokens",
+                "chunk_length": 300,
+                "chunk_overlap": 60,
+            },
             "lifecycle_state": "active",
             "sync_status": "ready",
             "schema_json": {},
@@ -206,3 +242,135 @@ def test_serialize_knowledge_base_includes_vectorization_summary():
         },
         "supports_named_vectors": True,
     }
+    assert payload["chunking"] == {
+        "strategy": "fixed_length",
+        "config": {
+            "unit": "tokens",
+            "chunk_length": 300,
+            "chunk_overlap": 60,
+        },
+    }
+
+
+def test_normalize_knowledge_base_payload_accepts_chunking_on_create(monkeypatch: pytest.MonkeyPatch):
+    _patch_vectorization(monkeypatch)
+
+    payload = context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
+        "postgresql://ignored",
+        object(),
+        {
+            "slug": "product-docs",
+            "display_name": "Product Docs",
+            "description": "docs",
+            "backing_provider_instance_id": "provider-2",
+            "schema": {},
+            "vectorization": {
+                "mode": "vanessa_embeddings",
+                "embedding_provider_instance_id": "embedding-provider-1",
+                "embedding_resource_id": "text-embedding-3-small",
+            },
+            "chunking": {
+                "strategy": "fixed_length",
+                "config": {
+                    "unit": "tokens",
+                    "chunk_length": 300,
+                    "chunk_overlap": 60,
+                },
+            },
+        },
+        is_create=True,
+    )
+
+    assert payload["chunking"] == {
+        "strategy": "fixed_length",
+        "config": {
+            "unit": "tokens",
+            "chunk_length": 300,
+            "chunk_overlap": 60,
+        },
+    }
+
+
+def test_normalize_knowledge_base_payload_rejects_invalid_chunking_overlap(monkeypatch: pytest.MonkeyPatch):
+    _patch_vectorization(monkeypatch)
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
+            "postgresql://ignored",
+            object(),
+            {
+                "slug": "product-docs",
+                "display_name": "Product Docs",
+                "description": "docs",
+                "backing_provider_instance_id": "provider-2",
+                "schema": {},
+                "vectorization": {
+                    "mode": "vanessa_embeddings",
+                    "embedding_provider_instance_id": "embedding-provider-1",
+                    "embedding_resource_id": "text-embedding-3-small",
+                },
+                "chunking": {
+                    "strategy": "fixed_length",
+                    "config": {
+                        "unit": "tokens",
+                        "chunk_length": 300,
+                        "chunk_overlap": 300,
+                    },
+                },
+            },
+            is_create=True,
+        )
+
+    assert exc_info.value.code == "invalid_chunk_overlap"
+
+
+def test_normalize_knowledge_base_payload_rejects_chunking_updates(monkeypatch: pytest.MonkeyPatch):
+    _patch_vectorization(monkeypatch)
+    existing = {
+        "id": "kb-primary",
+        "slug": "product-docs",
+        "display_name": "Product Docs",
+        "description": "docs",
+        "index_name": "kb_product_docs",
+        "backing_provider_instance_id": "provider-2",
+        "backing_provider_key": "weaviate_local",
+        "schema_json": {},
+        "vectorization_mode": "vanessa_embeddings",
+        "embedding_provider_instance_id": "embedding-provider-1",
+        "embedding_resource_id": "text-embedding-3-small",
+        "vectorization_json": {
+            "supports_named_vectors": True,
+            "embedding_resource": {
+                "id": "text-embedding-3-small",
+                "provider_resource_id": "text-embedding-3-small",
+            },
+        },
+        "chunking_strategy": "fixed_length",
+        "chunking_config_json": {
+            "unit": "tokens",
+            "chunk_length": 300,
+            "chunk_overlap": 60,
+        },
+        "lifecycle_state": "active",
+    }
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
+            "postgresql://ignored",
+            object(),
+            {
+                "display_name": "Product Docs Updated",
+                "chunking": {
+                    "strategy": "fixed_length",
+                    "config": {
+                        "unit": "tokens",
+                        "chunk_length": 512,
+                        "chunk_overlap": 64,
+                    },
+                },
+            },
+            is_create=False,
+            existing=existing,
+        )
+
+    assert exc_info.value.code == "chunking_immutable"

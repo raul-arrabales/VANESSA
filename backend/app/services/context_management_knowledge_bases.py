@@ -65,6 +65,8 @@ def create_knowledge_base(
         embedding_provider_instance_id=normalized["vectorization"]["embedding_provider_instance_id"],
         embedding_resource_id=normalized["vectorization"]["embedding_resource_id"],
         vectorization_json=normalized["vectorization"]["vectorization_json"],
+        chunking_strategy=normalized["chunking"]["strategy"],
+        chunking_config_json=normalized["chunking"]["config"],
         created_by_user_id=created_by_user_id,
         updated_by_user_id=created_by_user_id,
     )

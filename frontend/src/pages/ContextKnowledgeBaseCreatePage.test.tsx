@@ -182,6 +182,14 @@ describe("ContextKnowledgeBaseCreatePage", () => {
         },
         supports_named_vectors: true,
       },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 300,
+          chunk_overlap: 60,
+        },
+      },
       document_count: 0,
     });
 
@@ -191,6 +199,9 @@ describe("ContextKnowledgeBaseCreatePage", () => {
     await waitFor(() => expect(providerSelect).toHaveValue("provider-2"));
     expect(contextApi.listKnowledgeBaseSchemaProfiles).toHaveBeenCalledWith("weaviate_local", "token");
     expect(contextApi.getKnowledgeBaseVectorizationOptions).toHaveBeenCalledWith("provider-2", "token");
+    expect(await screen.findByLabelText("Chunking strategy")).toHaveValue("fixed_length");
+    expect(screen.getByLabelText("Chunk length")).toHaveValue(300);
+    expect(screen.getByLabelText("Chunk overlap")).toHaveValue(60);
 
     await userEvent.type(screen.getByLabelText("Deployment slug"), "product-docs");
     await userEvent.type(screen.getByLabelText("Display name"), "Product Docs");
@@ -212,6 +223,14 @@ describe("ContextKnowledgeBaseCreatePage", () => {
             mode: "vanessa_embeddings",
             embedding_provider_instance_id: "embedding-provider-1",
             embedding_resource_id: "text-embedding-3-small",
+          },
+          chunking: {
+            strategy: "fixed_length",
+            config: {
+              unit: "tokens",
+              chunk_length: 300,
+              chunk_overlap: 60,
+            },
           },
         }),
         "token",
@@ -304,6 +323,14 @@ describe("ContextKnowledgeBaseCreatePage", () => {
         mode: "self_provided",
         supports_named_vectors: true,
       },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 300,
+          chunk_overlap: 60,
+        },
+      },
       document_count: 0,
     });
 
@@ -325,10 +352,35 @@ describe("ContextKnowledgeBaseCreatePage", () => {
           vectorization: {
             mode: "self_provided",
           },
+          chunking: {
+            strategy: "fixed_length",
+            config: {
+              unit: "tokens",
+              chunk_length: 300,
+              chunk_overlap: 60,
+            },
+          },
         }),
         "token",
       );
     });
+  });
+
+  it("validates chunk overlap before submitting", async () => {
+    await renderWithAppProviders(<ContextKnowledgeBaseCreatePage />);
+
+    await userEvent.type(screen.getByLabelText("Deployment slug"), "product-docs");
+    await userEvent.type(screen.getByLabelText("Display name"), "Product Docs");
+    await userEvent.type(screen.getByLabelText("Description"), "docs");
+    await userEvent.selectOptions(await screen.findByLabelText("Schema profile"), "profile-rag");
+    await userEvent.clear(screen.getByLabelText("Chunk overlap"));
+    await userEvent.type(screen.getByLabelText("Chunk overlap"), "300");
+    await userEvent.click(screen.getByRole("button", { name: "Create knowledge base" }));
+
+    await waitFor(() => {
+      expect(contextApi.createKnowledgeBase).not.toHaveBeenCalled();
+    });
+    expect(screen.getByText("Chunk overlap must be smaller than chunk length.")).toBeVisible();
   });
 
   it("shows a local embeddings provider with no models and explains why it cannot be selected fully yet", async () => {

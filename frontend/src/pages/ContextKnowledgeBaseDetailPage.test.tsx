@@ -61,6 +61,14 @@ const contextApiMocks = vi.hoisted(() => ({
       },
       supports_named_vectors: true,
     },
+    chunking: {
+      strategy: "fixed_length",
+      config: {
+        unit: "tokens",
+        chunk_length: 300,
+        chunk_overlap: 60,
+      },
+    },
     document_count: 2,
     deployment_usage: [
       {
@@ -203,6 +211,14 @@ const contextApiMocks = vi.hoisted(() => ({
       },
       supports_named_vectors: true,
     },
+    chunking: {
+      strategy: "fixed_length",
+      config: {
+        unit: "tokens",
+        chunk_length: 300,
+        chunk_overlap: 60,
+      },
+    },
     document_count: 2,
     deployment_usage: [],
   })),
@@ -249,6 +265,14 @@ const contextApiMocks = vi.hoisted(() => ({
           provider_resource_id: "text-embedding-3-small",
         },
         supports_named_vectors: true,
+      },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 300,
+          chunk_overlap: 60,
+        },
       },
       document_count: 2,
       deployment_usage: [],
@@ -328,6 +352,9 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByText(/Weaviate local/)).toBeVisible();
     expect(screen.getByText(/Embeddings local/)).toBeVisible();
     expect(screen.getByText(/text-embedding-3-small/)).toBeVisible();
+    expect(screen.getByText(/Fixed length/)).toBeVisible();
+    expect(screen.getByText(/Chunk length: 300/)).toBeVisible();
+    expect(screen.getByText(/Chunk overlap: 60/)).toBeVisible();
     expect(screen.getByText(/Local Default/)).toBeVisible();
     expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
   });

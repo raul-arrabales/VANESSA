@@ -123,6 +123,8 @@ def test_run_context_management_schema_migration_executes_context_sql(monkeypatc
             return "-- migration 013"
         if self.name == "014_context_management_sources.sql":
             return "-- migration 014"
+        if self.name == "016_context_management_chunking.sql":
+            return "-- migration 016"
         return original_read_text(self, encoding="utf-8")
 
     monkeypatch.setattr(db, "get_connection", _recording_get_connection)
@@ -130,7 +132,7 @@ def test_run_context_management_schema_migration_executes_context_sql(monkeypatc
 
     db.run_context_management_schema_migration("postgresql://ignored")
 
-    assert executed_sql == ["-- migration 012", "-- migration 013", "-- migration 014"]
+    assert executed_sql == ["-- migration 012", "-- migration 013", "-- migration 014", "-- migration 016"]
 
 
 def test_platform_binding_resources_migration_guards_legacy_copy_when_table_absent():
@@ -173,3 +175,22 @@ def test_context_management_migration_tracks_backing_provider_instances():
     assert "plain-document-rag" in migration_sql
     assert "agent-semantic-memory" in migration_sql
     assert "agent-episodic-memory" in migration_sql
+
+
+def test_context_management_chunking_migration_adds_strategy_and_config():
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "016_context_management_chunking.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    assert "chunking_strategy TEXT NOT NULL DEFAULT 'fixed_length'" in migration_sql
+    assert "chunking_config_json JSONB NOT NULL DEFAULT '{}'::jsonb" in migration_sql
+    assert "'chunk_length'" in migration_sql
+    assert "'chunk_overlap'" in migration_sql
+    assert "300" in migration_sql
+    assert "60" in migration_sql
+    assert "context_knowledge_bases_chunking_strategy_check" in migration_sql

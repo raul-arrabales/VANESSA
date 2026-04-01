@@ -202,6 +202,14 @@ export const knowledgeBasesFixture: KnowledgeBase[] = [
       },
       supports_named_vectors: true,
     },
+    chunking: {
+      strategy: "fixed_length",
+      config: {
+        unit: "tokens",
+        chunk_length: 300,
+        chunk_overlap: 60,
+      },
+    },
     document_count: 12,
     binding_count: 1,
   },
@@ -240,6 +248,14 @@ export const knowledgeBasesFixture: KnowledgeBase[] = [
         provider_resource_id: "text-embedding-3-small",
       },
       supports_named_vectors: true,
+    },
+    chunking: {
+      strategy: "fixed_length",
+      config: {
+        unit: "tokens",
+        chunk_length: 300,
+        chunk_overlap: 60,
+      },
     },
     document_count: 4,
     binding_count: 0,

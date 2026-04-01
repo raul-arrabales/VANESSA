@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from ..repositories import platform_control_plane as platform_repo
+from .context_management_chunking import normalize_knowledge_base_chunking, serialize_knowledge_base_chunking
 from .context_management_shared import _is_knowledge_base_eligible, _normalize_source_relative_path
 from .context_management_types import (
     _KB_LIFECYCLE_STATES,
@@ -82,6 +83,11 @@ def _normalize_knowledge_base_payload(
         existing=existing,
         backing_provider=provider_row or existing,
     )
+    chunking = normalize_knowledge_base_chunking(
+        payload,
+        is_create=is_create,
+        existing=existing,
+    )
     return {
         "slug": slug,
         "display_name": display_name,
@@ -96,6 +102,7 @@ def _normalize_knowledge_base_payload(
         "schema": schema,
         "index_name": str(existing.get("index_name") or "").strip() if existing else _default_index_name(slug),
         "vectorization": vectorization,
+        "chunking": chunking,
     }
 
 
@@ -266,6 +273,7 @@ def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
         "sync_status": str(row.get("sync_status") or "").strip(),
         "schema": dict(row.get("schema_json") or {}),
         "vectorization": serialize_knowledge_base_vectorization(row),
+        "chunking": serialize_knowledge_base_chunking(row),
         "document_count": int(row.get("document_count") or 0),
         "binding_count": int(row.get("binding_count") or 0),
         "eligible_for_binding": _is_knowledge_base_eligible(row),

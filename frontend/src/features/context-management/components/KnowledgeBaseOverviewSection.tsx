@@ -70,6 +70,24 @@ export function KnowledgeBaseOverviewSection({
           </p>
         ) : null}
         <p className="status-text">
+          {t("contextManagement.advancedSettings.chunkingStrategy")}: {" "}
+          {knowledgeBase.chunking.strategy === "fixed_length"
+            ? t("contextManagement.advancedSettings.fixedLength")
+            : knowledgeBase.chunking.strategy}
+        </p>
+        <p className="status-text">
+          {t("contextManagement.advancedSettings.chunkUnit")}: {" "}
+          {knowledgeBase.chunking.config.unit === "tokens"
+            ? t("contextManagement.advancedSettings.tokens")
+            : knowledgeBase.chunking.config.unit}
+        </p>
+        <p className="status-text">
+          {t("contextManagement.advancedSettings.chunkLength")}: {knowledgeBase.chunking.config.chunk_length}
+        </p>
+        <p className="status-text">
+          {t("contextManagement.advancedSettings.chunkOverlap")}: {knowledgeBase.chunking.config.chunk_overlap}
+        </p>
+        <p className="status-text">
           {knowledgeBase.eligible_for_binding
             ? t("contextManagement.states.eligible")
             : t("contextManagement.states.ineligible")}

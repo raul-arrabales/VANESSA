@@ -27,6 +27,9 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     selectedEmbeddingProviderNeedsModel,
     selectedEmbeddingProviderUnavailableReason,
     selectedEmbeddingProviderDisplayName,
+    selectedChunkingStrategy,
+    chunkLength,
+    chunkOverlap,
     providerLoadError,
     profileLoadError,
     providersLoading,
@@ -50,6 +53,9 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
     setSelectedVectorizationMode,
     setSelectedEmbeddingProviderId,
     setSelectedEmbeddingResourceId,
+    setSelectedChunkingStrategy,
+    setChunkLength,
+    setChunkOverlap,
     setSaveProfileSlug,
     setSaveProfileDisplayName,
     setSaveProfileDescription,
@@ -172,6 +178,47 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
                 ) : (
                   <p className="status-text">{t("contextManagement.advancedSettings.selfProvidedWarning")}</p>
                 )}
+
+                <div className="card-stack">
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.advancedSettings.chunkingStrategy")}</span>
+                    <select
+                      className="field-input"
+                      value={selectedChunkingStrategy}
+                      onChange={(event) => setSelectedChunkingStrategy(event.currentTarget.value as "fixed_length")}
+                    >
+                      <option value="fixed_length">{t("contextManagement.advancedSettings.fixedLength")}</option>
+                    </select>
+                  </label>
+                  <p className="status-text">{t("contextManagement.advancedSettings.chunkingDescription")}</p>
+                  <p className="status-text">
+                    {t("contextManagement.advancedSettings.chunkUnit")}: {t("contextManagement.advancedSettings.tokens")}
+                  </p>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.advancedSettings.chunkLength")}</span>
+                    <input
+                      className="field-input"
+                      inputMode="numeric"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={chunkLength}
+                      onChange={(event) => setChunkLength(event.currentTarget.value)}
+                    />
+                  </label>
+                  <label className="card-stack">
+                    <span className="field-label">{t("contextManagement.advancedSettings.chunkOverlap")}</span>
+                    <input
+                      className="field-input"
+                      inputMode="numeric"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={chunkOverlap}
+                      onChange={(event) => setChunkOverlap(event.currentTarget.value)}
+                    />
+                  </label>
+                </div>
               </div>
             ) : null}
           </section>

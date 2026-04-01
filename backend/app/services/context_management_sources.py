@@ -14,7 +14,7 @@ from .context_management_ingestion import (
 )
 from .context_management_serialization import _normalize_knowledge_source_payload, _serialize_knowledge_base, _serialize_knowledge_source, _serialize_sync_run
 from .context_management_shared import (
-    _chunk_document_text,
+    _chunk_knowledge_base_text,
     _configured_source_roots,
     _delete_document_chunks,
     _mark_knowledge_base_sync_error,
@@ -410,7 +410,11 @@ def _sync_knowledge_source_documents(
                 source_id=source_id,
                 source_document_key=source_document_key,
             )
-            chunks = _chunk_document_text(parsed_document["text"])
+            chunks = _chunk_knowledge_base_text(
+                database_url,
+                knowledge_base=knowledge_base,
+                text=parsed_document["text"],
+            )
             if existing is None:
                 document = context_repo.create_document(
                     database_url,

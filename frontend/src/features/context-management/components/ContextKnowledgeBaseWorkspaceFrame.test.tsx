@@ -21,6 +21,14 @@ const knowledgeBase = {
     mode: "vanessa_embeddings",
     supports_named_vectors: true,
   },
+  chunking: {
+    strategy: "fixed_length",
+    config: {
+      unit: "tokens",
+      chunk_length: 300,
+      chunk_overlap: 60,
+    },
+  },
   document_count: 0,
   deployment_usage: [],
 };

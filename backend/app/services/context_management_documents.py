@@ -8,7 +8,7 @@ from ..repositories import context_management as context_repo
 from .context_management_ingestion import _parse_upload_documents
 from .context_management_serialization import _normalize_document_payload, _serialize_document, _serialize_knowledge_base
 from .context_management_shared import (
-    _chunk_document_text,
+    _chunk_knowledge_base_text,
     _delete_document_chunks,
     _mark_knowledge_base_sync_error,
     _mark_knowledge_base_sync_ready,
@@ -46,7 +46,7 @@ def create_knowledge_base_document(
     )
     document_id = str(uuid4())
     normalized = _normalize_document_payload(payload)
-    chunks = _chunk_document_text(normalized["text"])
+    chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
     document = context_repo.create_document(
         database_url,
         document_id=document_id,
@@ -111,7 +111,7 @@ def update_knowledge_base_document(
         summary="Re-indexing knowledge-base document.",
     )
     normalized = _normalize_document_payload(payload, existing=existing)
-    chunks = _chunk_document_text(normalized["text"])
+    chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
     try:
         _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
         updated = context_repo.update_document(
@@ -259,7 +259,11 @@ def resync_knowledge_base(
         )
         total_chunks = 0
         for document in documents:
-            chunks = _chunk_document_text(str(document.get("text") or ""))
+            chunks = _chunk_knowledge_base_text(
+                database_url,
+                knowledge_base=knowledge_base,
+                text=str(document.get("text") or ""),
+            )
             total_chunks += len(chunks)
             synced_document = document
             if int(document.get("chunk_count") or 0) != len(chunks):

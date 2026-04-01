@@ -7,12 +7,11 @@ from typing import Any
 from ..config import AuthConfig
 from ..repositories import context_management as context_repo
 from ..repositories import platform_control_plane as platform_repo
+from .context_management_chunking import build_chunking_state, chunk_text, resolve_knowledge_base_tokenizer
 from .context_management_types import (
     KnowledgeBaseRecord,
     KnowledgeDocumentRecord,
     KnowledgeSourceRecord,
-    _DEFAULT_CHUNK_SIZE,
-    _DEFAULT_EMBEDDINGS_SAFE_CHUNK_SIZE,
 )
 from .context_management_vectorization import (
     embed_knowledge_base_texts,
@@ -22,28 +21,20 @@ from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 
 def _chunk_document_text(text: str) -> list[str]:
-    normalized = text.strip()
-    if not normalized:
-        return []
-    chunks: list[str] = []
-    paragraphs = [item.strip() for item in normalized.split("\n\n") if item.strip()]
-    current = ""
-    effective_chunk_size = min(_DEFAULT_CHUNK_SIZE, _DEFAULT_EMBEDDINGS_SAFE_CHUNK_SIZE)
-    for paragraph in paragraphs or [normalized]:
-        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
-        if len(candidate) <= effective_chunk_size:
-            current = candidate
-            continue
-        if current:
-            chunks.append(current)
-            current = ""
-        while len(paragraph) > effective_chunk_size:
-            chunks.append(paragraph[:effective_chunk_size].strip())
-            paragraph = paragraph[effective_chunk_size:].strip()
-        current = paragraph
-    if current:
-        chunks.append(current)
-    return [item for item in chunks if item]
+    raise RuntimeError("_chunk_document_text requires a knowledge-base-aware chunking context")
+
+
+def _chunk_knowledge_base_text(
+    database_url: str,
+    *,
+    knowledge_base: KnowledgeBaseRecord,
+    text: str,
+) -> list[str]:
+    return chunk_text(
+        text,
+        chunking=build_chunking_state(knowledge_base),
+        tokenizer=resolve_knowledge_base_tokenizer(database_url, knowledge_base=knowledge_base),
+    )
 
 
 def _normalize_source_relative_path(value: str) -> str:

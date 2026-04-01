@@ -58,6 +58,7 @@ from .context_management_serialization import (
 from .context_management_shared import (
     _chunk_document_id,
     _chunk_document_text,
+    _chunk_knowledge_base_text,
     _delete_document_chunks,
     _ensure_knowledge_base_index,
     _is_knowledge_base_eligible,
@@ -99,6 +100,9 @@ from .context_management_types import (
 __all__ = [
     "build_knowledge_base_binding_resource",
     "context_repo",
+    "_chunk_document_id",
+    "_chunk_document_text",
+    "_chunk_knowledge_base_text",
     "create_knowledge_base",
     "create_knowledge_base_document",
     "create_schema_profile",
