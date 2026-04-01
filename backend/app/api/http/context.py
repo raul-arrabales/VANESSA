@@ -192,6 +192,7 @@ def update_knowledge_base_route(knowledge_base_id: str):
     try:
         knowledge_base = update_knowledge_base(
             _database_url(),
+            config=_config(),
             knowledge_base_id=knowledge_base_id,
             payload=request.get_json(silent=True),
             updated_by_user_id=int(g.current_user["id"]),

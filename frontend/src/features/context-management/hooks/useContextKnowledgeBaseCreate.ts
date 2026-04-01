@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   createKnowledgeBase,
-  type KnowledgeBaseChunkingStrategy,
   createKnowledgeBaseSchemaProfile,
   getKnowledgeBaseVectorizationOptions,
   listKnowledgeBaseSchemaProfiles,
@@ -17,6 +16,14 @@ import {
 import { listPlatformProviders, type PlatformProvider } from "../../../api/platform";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
+import {
+  autoSeedChunkingFormState,
+  createDefaultChunkingFormState,
+  resolveSelectedEmbeddingChunkingConstraints,
+  type ChunkingFormState,
+  type ChunkingFormTouchedState,
+  validateChunkingFormState,
+} from "../chunkingForm";
 import {
   buildSchemaFromProperties,
   createDefaultSchemaProperty,
@@ -50,9 +57,9 @@ type UseContextKnowledgeBaseCreateResult = {
   selectedEmbeddingProviderNeedsModel: boolean;
   selectedEmbeddingProviderUnavailableReason: string | null;
   selectedEmbeddingProviderDisplayName: string;
-  selectedChunkingStrategy: KnowledgeBaseChunkingStrategy;
-  chunkLength: string;
-  chunkOverlap: string;
+  chunkingForm: ChunkingFormState;
+  selectedEmbeddingChunkingConstraints: NonNullable<KnowledgeBaseVectorizationOptions["embedding_providers"][number]["resources"][number]["chunking_constraints"]> | null;
+  chunkingInlineErrorMessage: string | null;
   selectedProfileId: string;
   selectedProfileDescription: string;
   providerLoadError: string;
@@ -75,9 +82,7 @@ type UseContextKnowledgeBaseCreateResult = {
   setSelectedVectorizationMode: (value: KnowledgeBaseVectorizationMode) => void;
   setSelectedEmbeddingProviderId: (value: string) => void;
   setSelectedEmbeddingResourceId: (value: string) => void;
-  setSelectedChunkingStrategy: (value: KnowledgeBaseChunkingStrategy) => void;
-  setChunkLength: (value: string) => void;
-  setChunkOverlap: (value: string) => void;
+  updateChunkingField: (field: keyof ChunkingFormState, value: string) => void;
   setSchemaEditorMode: (value: SchemaEditorMode) => void;
   setSchemaText: (value: string) => void;
   setSelectedProfileId: (value: string) => void;
@@ -112,9 +117,11 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
   const [selectedVectorizationMode, setSelectedVectorizationMode] = useState<KnowledgeBaseVectorizationMode>("vanessa_embeddings");
   const [selectedEmbeddingProviderId, setSelectedEmbeddingProviderId] = useState("");
   const [selectedEmbeddingResourceId, setSelectedEmbeddingResourceId] = useState("");
-  const [selectedChunkingStrategy, setSelectedChunkingStrategy] = useState<KnowledgeBaseChunkingStrategy>("fixed_length");
-  const [chunkLength, setChunkLength] = useState("300");
-  const [chunkOverlap, setChunkOverlap] = useState("60");
+  const [chunkingForm, setChunkingForm] = useState<ChunkingFormState>(createDefaultChunkingFormState());
+  const [chunkingTouched, setChunkingTouched] = useState<ChunkingFormTouchedState>({
+    chunkLengthTouched: false,
+    chunkOverlapTouched: false,
+  });
   const [selectedProfileId, setSelectedProfileIdState] = useState("");
   const [schemaEditorMode, setSchemaEditorMode] = useState<SchemaEditorMode>("profile");
   const [providerLoadError, setProviderLoadError] = useState("");
@@ -144,6 +151,23 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
   const selectedEmbeddingProviderResources = selectedEmbeddingProvider?.resources ?? [];
   const selectedEmbeddingProviderReady = Boolean(selectedEmbeddingProvider?.is_ready ?? selectedEmbeddingProviderResources.length > 0);
   const selectedEmbeddingProviderNeedsModel = Boolean(selectedEmbeddingProviderId) && !selectedEmbeddingProviderReady;
+  const selectedEmbeddingChunkingConstraints = resolveSelectedEmbeddingChunkingConstraints(
+    vectorizationOptions,
+    selectedEmbeddingProviderId,
+    selectedEmbeddingResourceId,
+  );
+  const selectedEmbeddingSafeChunkLengthMax = selectedEmbeddingChunkingConstraints?.safe_chunk_length_max ?? null;
+  const chunkingInlineErrorMessage = (() => {
+    const validation = validateChunkingFormState({
+      form: chunkingForm,
+      selectedVectorizationMode,
+      selectedEmbeddingSafeChunkLengthMax,
+    });
+    if (!validation.ok && validation.error.key === "contextManagement.feedback.chunkLengthExceedsModelLimit") {
+      return t(validation.error.key, validation.error.values);
+    }
+    return null;
+  })();
   const selectedProfile = useMemo(
     () => schemaProfiles.find((profile) => profile.id === selectedProfileId) ?? null,
     [schemaProfiles, selectedProfileId],
@@ -280,6 +304,23 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
       );
     }
   }, [selectedEmbeddingProvider, selectedEmbeddingProviderResources, selectedEmbeddingResourceId]);
+
+  useEffect(() => {
+    const nextForm = autoSeedChunkingFormState({
+      form: chunkingForm,
+      touched: chunkingTouched,
+      selectedVectorizationMode,
+      selectedEmbeddingSafeChunkLengthMax,
+    });
+    if (nextForm) {
+      setChunkingForm(nextForm);
+    }
+  }, [
+    chunkingForm,
+    chunkingTouched,
+    selectedEmbeddingSafeChunkLengthMax,
+    selectedVectorizationMode,
+  ]);
 
   useEffect(() => {
     if (selectedProfileId && !schemaProfiles.some((profile) => profile.id === selectedProfileId)) {
@@ -433,22 +474,16 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
       showErrorFeedback(t("contextManagement.feedback.embeddingResourceRequired"), t("contextManagement.feedback.createFailed"));
       return;
     }
-    if (selectedChunkingStrategy !== "fixed_length") {
-      showErrorFeedback(t("contextManagement.feedback.chunkingStrategyRequired"), t("contextManagement.feedback.createFailed"));
-      return;
-    }
-    const normalizedChunkLength = Number.parseInt(chunkLength, 10);
-    if (!Number.isInteger(normalizedChunkLength) || normalizedChunkLength <= 0) {
-      showErrorFeedback(t("contextManagement.feedback.chunkLengthInvalid"), t("contextManagement.feedback.createFailed"));
-      return;
-    }
-    const normalizedChunkOverlap = Number.parseInt(chunkOverlap, 10);
-    if (!Number.isInteger(normalizedChunkOverlap) || normalizedChunkOverlap < 0) {
-      showErrorFeedback(t("contextManagement.feedback.chunkOverlapInvalid"), t("contextManagement.feedback.createFailed"));
-      return;
-    }
-    if (normalizedChunkOverlap >= normalizedChunkLength) {
-      showErrorFeedback(t("contextManagement.feedback.chunkOverlapTooLarge"), t("contextManagement.feedback.createFailed"));
+    const chunkingValidation = validateChunkingFormState({
+      form: chunkingForm,
+      selectedVectorizationMode,
+      selectedEmbeddingSafeChunkLengthMax,
+    });
+    if (!chunkingValidation.ok) {
+      showErrorFeedback(
+        t(chunkingValidation.error.key, chunkingValidation.error.values),
+        t("contextManagement.feedback.createFailed"),
+      );
       return;
     }
     let schema: KnowledgeBaseSchema | undefined;
@@ -477,12 +512,7 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
             : {}),
         },
         chunking: {
-          strategy: selectedChunkingStrategy,
-          config: {
-            unit: "tokens",
-            chunk_length: normalizedChunkLength,
-            chunk_overlap: normalizedChunkOverlap,
-          },
+          ...chunkingValidation.normalizedChunking,
         },
       }, token);
       navigate(`/control/context/${knowledgeBase.id}`, {
@@ -520,9 +550,9 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     selectedEmbeddingProviderNeedsModel,
     selectedEmbeddingProviderUnavailableReason: selectedEmbeddingProvider?.unavailable_reason ?? null,
     selectedEmbeddingProviderDisplayName: selectedEmbeddingProvider?.display_name ?? selectedEmbeddingProvider?.id ?? "",
-    selectedChunkingStrategy,
-    chunkLength,
-    chunkOverlap,
+    chunkingForm,
+    selectedEmbeddingChunkingConstraints,
+    chunkingInlineErrorMessage,
     selectedProfileId,
     selectedProfileDescription,
     providerLoadError,
@@ -545,9 +575,15 @@ export function useContextKnowledgeBaseCreate(): UseContextKnowledgeBaseCreateRe
     setSelectedVectorizationMode,
     setSelectedEmbeddingProviderId,
     setSelectedEmbeddingResourceId,
-    setSelectedChunkingStrategy,
-    setChunkLength,
-    setChunkOverlap,
+    updateChunkingField: (field: keyof ChunkingFormState, value: string) => {
+      if (field === "chunkLength") {
+        setChunkingTouched((current) => ({ ...current, chunkLengthTouched: true }));
+      }
+      if (field === "chunkOverlap") {
+        setChunkingTouched((current) => ({ ...current, chunkOverlapTouched: true }));
+      }
+      setChunkingForm((current) => ({ ...current, [field]: value }));
+    },
     setSchemaEditorMode,
     setSchemaText,
     setSelectedProfileId: selectSchemaProfile,

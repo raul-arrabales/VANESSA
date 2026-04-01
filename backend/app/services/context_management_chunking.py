@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Protocol
 
 from ..repositories import modelops as modelops_repo
@@ -81,15 +80,34 @@ def normalize_knowledge_base_chunking(
     is_create: bool,
     existing: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    if not is_create and any(key in payload for key in {"chunking", "chunking_strategy", "chunking_config_json"}):
-        raise PlatformControlPlaneError(
-            "chunking_immutable",
-            "chunking cannot be changed after creation",
-            status_code=400,
-        )
-
     if not is_create:
-        return serialize_knowledge_base_chunking(existing or {})
+        has_chunking_update = any(key in payload for key in {"chunking", "chunking_strategy", "chunking_config_json"})
+        if not has_chunking_update:
+            return serialize_knowledge_base_chunking(existing or {})
+        if int((existing or {}).get("document_count") or 0) > 0:
+            raise PlatformControlPlaneError(
+                "chunking_immutable",
+                "chunking cannot be changed after documents have been ingested",
+                status_code=409,
+            )
+        raw_chunking = payload.get("chunking")
+        if not isinstance(raw_chunking, dict):
+            raise PlatformControlPlaneError(
+                "invalid_chunking",
+                "chunking is required",
+                status_code=400,
+            )
+        strategy = str(raw_chunking.get("strategy") or "").strip().lower()
+        if strategy not in SUPPORTED_CHUNKING_STRATEGIES:
+            raise PlatformControlPlaneError(
+                "invalid_chunking_strategy",
+                "chunking.strategy is unsupported",
+                status_code=400,
+            )
+        return {
+            "strategy": strategy,
+            "config": _normalize_fixed_length_chunking_config(raw_chunking.get("config")),
+        }
 
     raw_chunking = payload.get("chunking")
     if not isinstance(raw_chunking, dict):
@@ -302,7 +320,7 @@ def _resolve_local_filesystem_tokenizer(
     knowledge_base: dict[str, Any],
     database_url: str,
 ) -> TextTokenizer:
-    local_path = _local_tokenizer_path(provider_row=provider_row, knowledge_base=knowledge_base, database_url=database_url)
+    local_path = resolve_local_tokenizer_path(provider_row=provider_row, knowledge_base=knowledge_base, database_url=database_url)
     if local_path is None:
         raise PlatformControlPlaneError(
             "chunking_tokenizer_unavailable",
@@ -339,7 +357,7 @@ def _resolve_local_filesystem_tokenizer(
 
 
 def _cloud_tokenizer_model_name(knowledge_base: dict[str, Any]) -> str:
-    resource = _embedding_resource_payload(knowledge_base)
+    resource = embedding_resource_payload(knowledge_base)
     metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
     provider_resource_id = str(resource.get("provider_resource_id") or "").strip()
     provider_model_id = str(metadata.get("provider_model_id") or "").strip()
@@ -347,7 +365,7 @@ def _cloud_tokenizer_model_name(knowledge_base: dict[str, Any]) -> str:
     return provider_model_id or provider_resource_id or resource_id or "text-embedding-3-small"
 
 
-def _local_tokenizer_path(
+def resolve_local_tokenizer_path(
     *,
     provider_row: dict[str, Any],
     knowledge_base: dict[str, Any],
@@ -357,7 +375,7 @@ def _local_tokenizer_path(
     loaded_local_path = str(provider_config.get("loaded_local_path") or "").strip()
     if loaded_local_path:
         return loaded_local_path
-    resource = _embedding_resource_payload(knowledge_base)
+    resource = embedding_resource_payload(knowledge_base)
     metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
     metadata_local_path = str(metadata.get("local_path") or "").strip()
     if metadata_local_path:
@@ -372,7 +390,7 @@ def _local_tokenizer_path(
     return None
 
 
-def _embedding_resource_payload(knowledge_base: dict[str, Any]) -> dict[str, Any]:
+def embedding_resource_payload(knowledge_base: dict[str, Any]) -> dict[str, Any]:
     vectorization_json = dict(knowledge_base.get("vectorization_json") or {})
     raw_resource = vectorization_json.get("embedding_resource")
     if isinstance(raw_resource, dict):
@@ -383,3 +401,14 @@ def _embedding_resource_payload(knowledge_base: dict[str, Any]) -> dict[str, Any
         "provider_resource_id": embedding_resource_id,
         "metadata": {},
     }
+
+
+def embedding_model_display_name(knowledge_base: dict[str, Any]) -> str:
+    resource = embedding_resource_payload(knowledge_base)
+    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
+    return (
+        str(resource.get("display_name") or "").strip()
+        or str(metadata.get("name") or "").strip()
+        or str(resource.get("provider_resource_id") or "").strip()
+        or str(resource.get("id") or "").strip()
+    )

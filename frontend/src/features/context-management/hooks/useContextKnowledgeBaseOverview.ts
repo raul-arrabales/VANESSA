@@ -7,6 +7,11 @@ import {
   updateKnowledgeBase,
 } from "../../../api/context";
 import { withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
+import {
+  createChunkingFormStateFromKnowledgeBase,
+  createDefaultChunkingFormState,
+  validateChunkingFormState,
+} from "../chunkingForm";
 import type { KnowledgeBaseOverviewFormState } from "../types";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
@@ -28,6 +33,7 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     displayName: "",
     description: "",
     lifecycleState: "active",
+    chunking: createDefaultChunkingFormState(),
   });
   const [isResyncing, setIsResyncing] = useState(false);
 
@@ -40,6 +46,7 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
       displayName: workspace.knowledgeBase.display_name,
       description: workspace.knowledgeBase.description,
       lifecycleState: workspace.knowledgeBase.lifecycle_state,
+      chunking: createChunkingFormStateFromKnowledgeBase(workspace.knowledgeBase),
     });
   }, [workspace.knowledgeBase]);
 
@@ -48,6 +55,20 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin) {
       return;
     }
+    const canEditChunking = workspace.knowledgeBase.document_count === 0;
+    const chunkingValidation = validateChunkingFormState({
+      form: form.chunking,
+      selectedVectorizationMode: workspace.knowledgeBase.vectorization.mode === "self_provided" ? "self_provided" : "vanessa_embeddings",
+      selectedEmbeddingSafeChunkLengthMax: null,
+    });
+    if (canEditChunking && !chunkingValidation.ok) {
+      workspace.showErrorFeedback(
+        t(chunkingValidation.error.key, chunkingValidation.error.values),
+        t("contextManagement.feedback.updateFailed"),
+      );
+      return;
+    }
+    const normalizedChunking = chunkingValidation.ok ? chunkingValidation.normalizedChunking : null;
     try {
       const updated = await updateKnowledgeBase(
         workspace.knowledgeBase.id,
@@ -56,6 +77,11 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
           display_name: form.displayName,
           description: form.description,
           lifecycle_state: form.lifecycleState,
+          ...(canEditChunking && normalizedChunking
+            ? {
+                chunking: normalizedChunking,
+              }
+            : {}),
         },
         workspace.token,
       );

@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..repositories import platform_control_plane as platform_repo
+from .context_management_chunking_compatibility import (
+    resolve_embedding_resource_chunking_constraints,
+    serialize_embeddings_chunking_constraints,
+)
 from .platform_serialization import _runtime_identifier_for_resource
 from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
@@ -38,12 +42,16 @@ def _normalize_embedding_resource(resource: dict[str, Any]) -> dict[str, Any] | 
     resource_id = str(resource.get("provider_resource_id") or resource.get("id") or "").strip()
     if not resource_id:
         return None
-    return {
+    normalized = {
         "id": resource_id,
         "provider_resource_id": str(resource.get("provider_resource_id") or resource_id).strip() or resource_id,
         "display_name": str(resource.get("display_name") or metadata.get("name") or resource_id).strip() or resource_id,
         "metadata": dict(metadata),
     }
+    raw_chunking_constraints = resource.get("chunking_constraints")
+    if isinstance(raw_chunking_constraints, dict):
+        normalized["chunking_constraints"] = dict(raw_chunking_constraints)
+    return normalized
 
 
 def _vectorization_json_payload(
@@ -146,9 +154,29 @@ def list_vectorization_options(
         if not 200 <= status_code < 300:
             continue
         resources = [
-            normalized
-            for normalized in (_normalize_embedding_resource(item) for item in resources_payload if isinstance(item, dict))
+            {
+                **normalized,
+                **(
+                    {
+                        "chunking_constraints": serialized_constraints,
+                    }
+                    if serialized_constraints is not None
+                    else {}
+                ),
+            }
+            for item in resources_payload
+            if isinstance(item, dict)
+            for normalized in [_normalize_embedding_resource(item)]
             if normalized is not None
+            for serialized_constraints in [
+                serialize_embeddings_chunking_constraints(
+                    resolve_embedding_resource_chunking_constraints(
+                        database_url,
+                        provider_row=provider,
+                        resource=normalized,
+                    )
+                )
+            ]
         ]
         embedding_providers.append(_normalize_options_provider(database_url, provider, resources))
 

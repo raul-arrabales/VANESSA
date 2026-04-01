@@ -1,3 +1,5 @@
+import type { ChunkingFormState } from "./chunkingForm";
+
 export type DocumentFormState = {
   id: string | null;
   title: string;
@@ -20,6 +22,7 @@ export type KnowledgeBaseOverviewFormState = {
   displayName: string;
   description: string;
   lifecycleState: string;
+  chunking: ChunkingFormState;
 };
 
 export const EMPTY_DOCUMENT_FORM: DocumentFormState = {

@@ -415,4 +415,48 @@ describe("ContextKnowledgeBaseCreatePage", () => {
       screen.getByText(/Assign a loaded embeddings model in Platform Control before using it/i),
     ).toBeVisible();
   });
+
+  it("auto-seeds chunk length from the selected embeddings model safe maximum and blocks larger values", async () => {
+    vi.mocked(contextApi.getKnowledgeBaseVectorizationOptions).mockResolvedValue({
+      ...VECTORIZATION_OPTIONS,
+      embedding_providers: [
+        {
+          ...VECTORIZATION_OPTIONS.embedding_providers[0],
+          resources: [
+            {
+              id: "text-embedding-3-small",
+              display_name: "text-embedding-3-small",
+              provider_resource_id: "text-embedding-3-small",
+              chunking_constraints: {
+                max_input_tokens: 256,
+                special_tokens_per_input: 2,
+                safe_chunk_length_max: 254,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    await renderWithAppProviders(<ContextKnowledgeBaseCreatePage />);
+
+    expect(await screen.findByLabelText("Chunk length")).toHaveValue(254);
+    expect(screen.getByLabelText("Chunk overlap")).toHaveValue(60);
+    expect(screen.getByText(/supports up to 254 chunk tokens safely/i)).toBeVisible();
+
+    await userEvent.clear(screen.getByLabelText("Chunk length"));
+    await userEvent.type(screen.getByLabelText("Chunk length"), "300");
+
+    expect(screen.getByText("Chunk length 300 exceeds the selected embeddings model safe maximum of 254 tokens.")).toBeVisible();
+
+    await userEvent.type(screen.getByLabelText("Deployment slug"), "product-docs");
+    await userEvent.type(screen.getByLabelText("Display name"), "Product Docs");
+    await userEvent.type(screen.getByLabelText("Description"), "docs");
+    await userEvent.selectOptions(await screen.findByLabelText("Schema profile"), "profile-rag");
+    await userEvent.click(screen.getByRole("button", { name: "Create knowledge base" }));
+
+    await waitFor(() => {
+      expect(contextApi.createKnowledgeBase).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -294,6 +294,8 @@ def update_knowledge_base(
     description: str,
     lifecycle_state: str,
     sync_status: str,
+    chunking_strategy: str,
+    chunking_config_json: dict[str, Any],
     updated_by_user_id: int | None,
 ) -> dict[str, Any] | None:
     with get_connection(database_url) as connection:
@@ -306,6 +308,8 @@ def update_knowledge_base(
               description = %s,
               lifecycle_state = %s,
               sync_status = %s,
+              chunking_strategy = %s,
+              chunking_config_json = %s::jsonb,
               updated_by_user_id = %s,
               updated_at = NOW()
             WHERE id = %s
@@ -317,6 +321,8 @@ def update_knowledge_base(
                 description.strip(),
                 lifecycle_state.strip().lower(),
                 sync_status.strip().lower(),
+                chunking_strategy.strip().lower(),
+                Jsonb(chunking_config_json),
                 updated_by_user_id,
                 knowledge_base_id.strip(),
             ),

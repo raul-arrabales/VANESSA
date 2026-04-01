@@ -101,12 +101,14 @@ def get_context_knowledge_base_detail(database_url: str, *, knowledge_base_id: s
 def update_context_knowledge_base(
     database_url: str,
     *,
+    config,
     knowledge_base_id: str,
     payload: Any,
     updated_by_user_id: int,
 ):
     return _update_knowledge_base(
         database_url,
+        config=config,
         knowledge_base_id=knowledge_base_id,
         payload=_require_json_object(payload),
         updated_by_user_id=updated_by_user_id,

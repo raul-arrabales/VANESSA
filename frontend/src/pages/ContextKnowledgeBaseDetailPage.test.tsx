@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import type { AuthUser } from "../auth/types";
+import { ApiError } from "../auth/authApi";
 import ContextKnowledgeBaseDetailPage from "./ContextKnowledgeBaseDetailPage";
 import ContextKnowledgeBaseSourcesPage from "../features/context-management/pages/ContextKnowledgeBaseSourcesPage";
 import ContextKnowledgeBaseRetrievalPage from "../features/context-management/pages/ContextKnowledgeBaseRetrievalPage";
@@ -376,6 +377,142 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await waitFor(() => expect(contextApiMocks.resyncKnowledgeBase).toHaveBeenCalledWith("kb-primary", "token"));
   });
 
+  it("lets superadmins update chunking before any documents are ingested", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+    contextApiMocks.getKnowledgeBase.mockResolvedValueOnce({
+      id: "kb-empty",
+      slug: "draft-kb",
+      display_name: "Draft KB",
+      description: "draft",
+      index_name: "kb_draft_kb",
+      backing_provider_instance_id: "provider-2",
+      backing_provider_key: "weaviate_local",
+      backing_provider: {
+        id: "provider-2",
+        slug: "weaviate-local",
+        provider_key: "weaviate_local",
+        display_name: "Weaviate local",
+        enabled: true,
+        capability: "vector_store",
+      },
+      lifecycle_state: "active",
+      sync_status: "ready",
+      eligible_for_binding: true,
+      last_sync_at: "2026-03-26T20:00:00+00:00",
+      last_sync_error: null,
+      last_sync_summary: "Managed knowledge base index is ready.",
+      schema: {},
+      vectorization: {
+        mode: "vanessa_embeddings",
+        embedding_provider_instance_id: "embedding-provider-1",
+        embedding_resource_id: "text-embedding-3-small",
+        embedding_provider: {
+          id: "embedding-provider-1",
+          display_name: "Embeddings local",
+          provider_key: "openai_compatible_cloud_embeddings",
+        },
+        embedding_resource: {
+          id: "text-embedding-3-small",
+          display_name: "text-embedding-3-small",
+          provider_resource_id: "text-embedding-3-small",
+        },
+        supports_named_vectors: true,
+      },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 254,
+          chunk_overlap: 60,
+        },
+      },
+      document_count: 0,
+      deployment_usage: [],
+    });
+    contextApiMocks.updateKnowledgeBase.mockResolvedValueOnce({
+      id: "kb-empty",
+      slug: "draft-kb",
+      display_name: "Draft KB",
+      description: "draft",
+      index_name: "kb_draft_kb",
+      backing_provider_instance_id: "provider-2",
+      backing_provider_key: "weaviate_local",
+      backing_provider: {
+        id: "provider-2",
+        slug: "weaviate-local",
+        provider_key: "weaviate_local",
+        display_name: "Weaviate local",
+        enabled: true,
+        capability: "vector_store",
+      },
+      lifecycle_state: "active",
+      sync_status: "ready",
+      eligible_for_binding: true,
+      last_sync_at: null,
+      last_sync_error: null,
+      last_sync_summary: "Managed knowledge base index is ready.",
+      schema: {},
+      vectorization: {
+        mode: "vanessa_embeddings",
+        embedding_provider_instance_id: "embedding-provider-1",
+        embedding_resource_id: "text-embedding-3-small",
+        embedding_provider: {
+          id: "embedding-provider-1",
+          display_name: "Embeddings local",
+          provider_key: "openai_compatible_cloud_embeddings",
+        },
+        embedding_resource: {
+          id: "text-embedding-3-small",
+          display_name: "text-embedding-3-small",
+          provider_resource_id: "text-embedding-3-small",
+        },
+        supports_named_vectors: true,
+      },
+      chunking: {
+        strategy: "fixed_length",
+        config: {
+          unit: "tokens",
+          chunk_length: 200,
+          chunk_overlap: 40,
+        },
+      },
+      document_count: 0,
+      deployment_usage: [],
+    });
+
+    await renderContextWorkspace("/control/context/kb-primary");
+
+    expect(await screen.findByText(/has not ingested any documents yet/i)).toBeVisible();
+    await userEvent.clear(screen.getByLabelText("Chunk length"));
+    await userEvent.type(screen.getByLabelText("Chunk length"), "200");
+    await userEvent.clear(screen.getByLabelText("Chunk overlap"));
+    await userEvent.type(screen.getByLabelText("Chunk overlap"), "40");
+    await userEvent.click(screen.getByRole("button", { name: "Save knowledge base" }));
+
+    await waitFor(() => {
+      expect(contextApiMocks.updateKnowledgeBase).toHaveBeenCalledWith(
+        "kb-empty",
+        expect.objectContaining({
+          chunking: {
+            strategy: "fixed_length",
+            config: {
+              unit: "tokens",
+              chunk_length: 200,
+              chunk_overlap: 40,
+            },
+          },
+        }),
+        "token",
+      );
+    });
+  });
+
   it("renders the sources page and lets superadmins browse and sync sources", async () => {
     mockUser = {
       id: 1,
@@ -398,6 +535,31 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
+  });
+
+  it("shows the backend sync failure message when source sync is rejected", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+    contextApiMocks.syncKnowledgeSource.mockRejectedValueOnce(
+      new ApiError(
+        "Unable to sync source 'Patient Guides': chunk length 300 exceeds the safe maximum 254 tokens for embeddings model sentence-transformers/all-MiniLM-L6-v2 (model limit 256 including 2 special tokens). Update KB chunking to 254 or smaller and retry.",
+        409,
+        "knowledge_base_chunking_exceeds_embeddings_limit",
+        { safe_chunk_length_max: 254 },
+      ),
+    );
+
+    await renderContextWorkspace("/control/context/kb-primary/sources");
+
+    await screen.findByRole("heading", { name: "Sources" });
+    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+
+    expect(await screen.findByText(/chunk length 300 exceeds the safe maximum 254 tokens/i)).toBeVisible();
   });
 
   it("renders the retrieval page and runs retrieval queries", async () => {

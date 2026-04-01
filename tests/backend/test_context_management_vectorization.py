@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from app.services import context_management_chunking_compatibility
 from app.services import context_management_vectorization
 from app.services import platform_service
 from app.services.platform_types import PlatformControlPlaneError
@@ -116,6 +117,15 @@ def test_list_vectorization_options_returns_ready_embeddings_provider_with_adver
     )
     monkeypatch.setattr(
         context_management_vectorization,
+        "resolve_embedding_resource_chunking_constraints",
+        lambda *_args, **_kwargs: context_management_chunking_compatibility.EmbeddingsChunkingConstraints(
+            max_input_tokens=256,
+            special_tokens_per_input=2,
+            safe_chunk_length_max=254,
+        ),
+    )
+    monkeypatch.setattr(
+        context_management_vectorization,
         "_serialize_provider_summary",
         lambda row: {
             "id": str(row.get("id") or ""),
@@ -172,6 +182,11 @@ def test_list_vectorization_options_returns_ready_embeddings_provider_with_adver
                     "metadata": {
                         "provider_model_id": "local-vllm-embeddings-default",
                         "owned_by": "local_vllm",
+                    },
+                    "chunking_constraints": {
+                        "max_input_tokens": 256,
+                        "special_tokens_per_input": 2,
+                        "safe_chunk_length_max": 254,
                     },
                 }
             ],

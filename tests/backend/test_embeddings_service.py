@@ -191,3 +191,5 @@ def test_embed_text_inputs_with_target_surfaces_oversized_embedding_input_error(
     assert exc_info.value.code == "embeddings_input_too_large"
     assert "Reduce chunk size before retrying" in exc_info.value.message
     assert exc_info.value.status_code == 400
+    assert exc_info.value.details["max_input_tokens"] == 256
+    assert exc_info.value.details["requested_tokens"] == 338

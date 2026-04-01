@@ -352,6 +352,7 @@ def test_normalize_knowledge_base_payload_rejects_chunking_updates(monkeypatch: 
             "chunk_overlap": 60,
         },
         "lifecycle_state": "active",
+        "document_count": 2,
     }
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
@@ -374,3 +375,69 @@ def test_normalize_knowledge_base_payload_rejects_chunking_updates(monkeypatch: 
         )
 
     assert exc_info.value.code == "chunking_immutable"
+    assert exc_info.value.status_code == 409
+
+
+def test_normalize_knowledge_base_payload_allows_chunking_updates_when_no_documents(monkeypatch: pytest.MonkeyPatch):
+    _patch_vectorization(monkeypatch)
+    monkeypatch.setattr(
+        context_management_serialization,
+        "assert_knowledge_base_chunking_compatible",
+        lambda *_args, **_kwargs: None,
+    )
+    existing = {
+        "id": "kb-primary",
+        "slug": "product-docs",
+        "display_name": "Product Docs",
+        "description": "docs",
+        "index_name": "kb_product_docs",
+        "backing_provider_instance_id": "provider-2",
+        "backing_provider_key": "weaviate_local",
+        "schema_json": {},
+        "vectorization_mode": "vanessa_embeddings",
+        "embedding_provider_instance_id": "embedding-provider-1",
+        "embedding_resource_id": "text-embedding-3-small",
+        "vectorization_json": {
+            "supports_named_vectors": True,
+            "embedding_resource": {
+                "id": "text-embedding-3-small",
+                "provider_resource_id": "text-embedding-3-small",
+            },
+        },
+        "chunking_strategy": "fixed_length",
+        "chunking_config_json": {
+            "unit": "tokens",
+            "chunk_length": 300,
+            "chunk_overlap": 60,
+        },
+        "lifecycle_state": "active",
+        "document_count": 0,
+    }
+
+    payload = context_management_serialization._normalize_knowledge_base_payload(  # type: ignore[attr-defined]
+        "postgresql://ignored",
+        object(),
+        {
+            "display_name": "Product Docs Updated",
+            "chunking": {
+                "strategy": "fixed_length",
+                "config": {
+                    "unit": "tokens",
+                    "chunk_length": 254,
+                    "chunk_overlap": 60,
+                },
+            },
+        },
+        is_create=False,
+        existing=existing,
+    )
+
+    assert payload["display_name"] == "Product Docs Updated"
+    assert payload["chunking"] == {
+        "strategy": "fixed_length",
+        "config": {
+            "unit": "tokens",
+            "chunk_length": 254,
+            "chunk_overlap": 60,
+        },
+    }

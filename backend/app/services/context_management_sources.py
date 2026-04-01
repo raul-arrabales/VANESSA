@@ -21,6 +21,7 @@ from .context_management_shared import (
     _mark_knowledge_base_sync_ready,
     _mark_knowledge_base_syncing,
     _normalize_source_relative_path,
+    normalize_knowledge_source_sync_failure,
     _refresh_document_count,
     _require_knowledge_base,
     _require_knowledge_source,
@@ -333,7 +334,13 @@ def sync_knowledge_source(
             "sync_run": _serialize_sync_run(finished_run or run),
         }
     except Exception as exc:
-        message = str(exc).strip() or "Knowledge source sync failed."
+        normalized_failure = normalize_knowledge_source_sync_failure(
+            exc,
+            source_id=source_id,
+            source_display_name=str(source.get("display_name") or "").strip(),
+            knowledge_base_id=knowledge_base_id,
+            sync_run_id=str(run.get("id") or "").strip(),
+        )
         finished_run = context_repo.finish_sync_run(
             database_url,
             run_id=str(run["id"]),
@@ -344,14 +351,14 @@ def sync_knowledge_source(
             created_document_count=0,
             updated_document_count=0,
             deleted_document_count=0,
-            error_summary=message,
+            error_summary=normalized_failure.message,
         )
         refreshed_source = context_repo.set_knowledge_source_sync_result(
             database_url,
             knowledge_base_id=knowledge_base_id,
             source_id=source_id,
             last_sync_status="error",
-            last_sync_error=message,
+            last_sync_error=normalized_failure.message,
         )
         _mark_knowledge_base_sync_error(
             database_url,
@@ -359,15 +366,12 @@ def sync_knowledge_source(
             updated_by_user_id=updated_by_user_id,
             summary=f"Source '{source['display_name']}' sync failed.",
         )
-        if isinstance(exc, PlatformControlPlaneError):
-            raise
         raise PlatformControlPlaneError(
-            "knowledge_source_sync_failed",
-            message,
-            status_code=500,
+            normalized_failure.error.code,
+            normalized_failure.message,
+            status_code=normalized_failure.error.status_code,
             details={
-                "source_id": source_id,
-                "knowledge_base_id": knowledge_base_id,
+                **(normalized_failure.error.details if isinstance(normalized_failure.error.details, dict) else {}),
                 "sync_run_id": str((finished_run or run).get("id") or "").strip(),
                 "last_sync_status": str((refreshed_source or source).get("last_sync_status") or "").strip() or "error",
             },

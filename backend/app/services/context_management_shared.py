@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,12 @@ from typing import Any
 from ..config import AuthConfig
 from ..repositories import context_management as context_repo
 from ..repositories import platform_control_plane as platform_repo
-from .context_management_chunking import build_chunking_state, chunk_text, resolve_knowledge_base_tokenizer
+from .context_management_chunking import (
+    build_chunking_state,
+    chunk_text,
+    resolve_knowledge_base_tokenizer,
+)
+from .context_management_chunking_compatibility import assert_knowledge_base_chunking_compatible
 from .context_management_types import (
     KnowledgeBaseRecord,
     KnowledgeDocumentRecord,
@@ -18,6 +24,12 @@ from .context_management_vectorization import (
     require_knowledge_base_text_ingestion_supported,
 )
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
+
+
+@dataclass(frozen=True)
+class SourceSyncFailure:
+    error: PlatformControlPlaneError
+    message: str
 
 
 def _chunk_document_text(text: str) -> list[str]:
@@ -136,6 +148,51 @@ def _chunk_document_id(document_id: str, index: int) -> str:
     return f"{document_id}::chunk::{index}"
 
 
+def normalize_knowledge_source_sync_failure(
+    exc: Exception,
+    *,
+    source_id: str,
+    source_display_name: str,
+    knowledge_base_id: str,
+    sync_run_id: str,
+    fallback_message: str = "Knowledge source sync failed.",
+) -> SourceSyncFailure:
+    normalized_message = str(exc).strip() or fallback_message.strip() or "Knowledge source sync failed."
+    normalized_details = {
+        "source_id": source_id,
+        "source_display_name": source_display_name,
+        "knowledge_base_id": knowledge_base_id,
+        "sync_run_id": sync_run_id,
+    }
+    if isinstance(exc, PlatformControlPlaneError):
+        merged_details = {
+            **(exc.details if isinstance(exc.details, dict) else {}),
+            **normalized_details,
+        }
+        return SourceSyncFailure(
+            error=PlatformControlPlaneError(
+                exc.code,
+                normalized_message,
+                status_code=exc.status_code,
+                details=merged_details,
+            ),
+            message=normalized_message,
+        )
+    return SourceSyncFailure(
+        error=PlatformControlPlaneError(
+            "knowledge_source_sync_failed",
+            normalized_message,
+            status_code=500,
+            details={
+                **normalized_details,
+                "original_exception_type": exc.__class__.__name__,
+                "original_exception_message": str(exc).strip() or None,
+            },
+        ),
+        message=normalized_message,
+    )
+
+
 def _upsert_document_chunks(
     database_url: str,
     config: AuthConfig,
@@ -147,6 +204,24 @@ def _upsert_document_chunks(
     if not chunks:
         raise PlatformControlPlaneError("invalid_document_text", "text is required", status_code=400)
     require_knowledge_base_text_ingestion_supported(knowledge_base)
+    source_display_name = str(document.get("source_name") or "").strip() or None
+    source_id = str(document.get("source_id") or "").strip() or None
+    document_title = str(document.get("title") or "").strip() or None
+    error_prefix = "Unable to generate embeddings"
+    if source_display_name and str(document.get("source_type") or "").strip().lower() == "local_directory":
+        error_prefix = f"Unable to sync source '{source_display_name}'"
+    elif document_title:
+        error_prefix = f"Unable to index document '{document_title}'"
+    assert_knowledge_base_chunking_compatible(
+        database_url,
+        knowledge_base=knowledge_base,
+        error_prefix=error_prefix,
+        status_code=409,
+        details={
+            "source_id": source_id,
+            "source_display_name": source_display_name,
+        },
+    )
     adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
     adapter.ensure_index(index_name=str(knowledge_base["index_name"]), schema=dict(knowledge_base.get("schema_json") or {}))
     embeddings_payload = embed_knowledge_base_texts(

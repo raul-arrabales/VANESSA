@@ -30,11 +30,13 @@ export type RequestOptions = {
 export class ApiError extends Error {
   status: number;
   code?: string;
+  details?: Record<string, unknown>;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, details?: Record<string, unknown>) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -67,7 +69,10 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   if (!response.ok) {
     const message = String(payload.message ?? payload.error ?? `HTTP ${response.status}`);
     const code = payload.error ? String(payload.error) : undefined;
-    throw new ApiError(message, response.status, code);
+    const details = payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
+      ? payload.details as Record<string, unknown>
+      : undefined;
+    throw new ApiError(message, response.status, code, details);
   }
 
   return payload as T;

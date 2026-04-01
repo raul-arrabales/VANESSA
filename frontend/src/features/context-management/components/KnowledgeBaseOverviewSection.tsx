@@ -1,6 +1,7 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
+import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
 import type { KnowledgeBaseOverviewFormState } from "../types";
 
 type Props = {
@@ -163,6 +164,29 @@ export function KnowledgeBaseOverviewSection({
             <option value="archived">archived</option>
           </select>
         </label>
+        {knowledgeBase.document_count === 0 ? (
+          <KnowledgeBaseChunkingEditor
+            form={form.chunking}
+            editable={isSuperadmin}
+            showInputsWhenReadOnly={!isSuperadmin}
+            editabilityMessage="editable_before_ingest"
+            onChangeField={(field, value) => {
+              onFormChange((current) => ({
+                ...current,
+                chunking: {
+                  ...current.chunking,
+                  [field]: value,
+                },
+              }));
+            }}
+          />
+        ) : (
+          <KnowledgeBaseChunkingEditor
+            form={form.chunking}
+            editable={false}
+            editabilityMessage="locked_after_ingest"
+          />
+        )}
         {isSuperadmin ? (
           <div className="form-actions">
             <button type="submit" className="btn btn-primary">

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
 import sys
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
 from app.services import context_management_chunking
+from app.services import context_management_chunking_compatibility
 from app.services.context_management_chunking import (
     CHUNKING_STRATEGY_FIXED_LENGTH,
     CHUNKING_UNIT_TOKENS,
@@ -205,3 +208,54 @@ def test_resolve_knowledge_base_tokenizer_raises_when_local_path_cannot_be_resol
         )
 
     assert exc_info.value.code == "chunking_tokenizer_unavailable"
+
+
+def test_resolve_knowledge_base_chunking_constraints_uses_sentence_bert_max_length(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    model_path = tmp_path / "sentence-transformers-model"
+    model_path.mkdir()
+    (model_path / "sentence_bert_config.json").write_text(json.dumps({"max_seq_length": 256}), encoding="utf-8")
+    (model_path / "tokenizer_config.json").write_text(json.dumps({"model_max_length": 512}), encoding="utf-8")
+    (model_path / "config.json").write_text(json.dumps({"max_position_embeddings": 1024}), encoding="utf-8")
+
+    class _FakeAutoTokenizer:
+        @staticmethod
+        def from_pretrained(local_path: str, *, local_files_only: bool):
+            assert local_path == str(model_path)
+            assert local_files_only is True
+            return SimpleNamespace(num_special_tokens_to_add=lambda pair=False: 2 if pair is False else 3)
+
+    monkeypatch.setattr(
+        context_management_chunking_compatibility.platform_repo,
+        "get_provider_instance",
+        lambda *_args, **_kwargs: {
+            "id": "embedding-provider-1",
+            "provider_key": "vllm_embeddings_local",
+            "config_json": {"loaded_local_path": str(model_path)},
+        },
+    )
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=_FakeAutoTokenizer))
+
+    constraints = context_management_chunking_compatibility.resolve_knowledge_base_chunking_constraints(
+        "postgresql://ignored",
+        knowledge_base={
+            "id": "kb-primary",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_resource_id": "local-embedding-model",
+            "vectorization_json": {
+                "embedding_resource": {
+                    "id": "local-embedding-model",
+                    "provider_resource_id": "local-embedding-model",
+                    "display_name": "sentence-transformers/all-MiniLM-L6-v2",
+                    "metadata": {},
+                }
+            },
+        },
+    )
+
+    assert constraints is not None
+    assert constraints.max_input_tokens == 256
+    assert constraints.special_tokens_per_input == 2
+    assert constraints.safe_chunk_length_max == 254

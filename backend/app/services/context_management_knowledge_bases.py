@@ -104,12 +104,13 @@ def create_knowledge_base(
 def update_knowledge_base(
     database_url: str,
     *,
+    config: AuthConfig,
     knowledge_base_id: str,
     payload: dict[str, Any],
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
     existing = _require_knowledge_base(database_url, knowledge_base_id)
-    normalized = _normalize_knowledge_base_payload(database_url, None, payload, is_create=False, existing=existing)
+    normalized = _normalize_knowledge_base_payload(database_url, config, payload, is_create=False, existing=existing)
     if (
         normalized["lifecycle_state"] == "archived"
         and str(existing.get("lifecycle_state") or "").strip().lower() != "archived"
@@ -133,6 +134,8 @@ def update_knowledge_base(
         description=normalized["description"],
         lifecycle_state=normalized["lifecycle_state"],
         sync_status=str(existing.get("sync_status") or "ready"),
+        chunking_strategy=normalized["chunking"]["strategy"],
+        chunking_config_json=normalized["chunking"]["config"],
         updated_by_user_id=updated_by_user_id,
     )
     if updated is None:

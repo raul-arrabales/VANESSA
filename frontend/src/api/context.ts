@@ -23,6 +23,11 @@ export type KnowledgeBaseEmbeddingResourceSummary = {
   provider_resource_id?: string | null;
   display_name?: string | null;
   metadata?: Record<string, unknown>;
+  chunking_constraints?: {
+    max_input_tokens: number;
+    special_tokens_per_input: number;
+    safe_chunk_length_max: number;
+  };
 };
 
 export type KnowledgeBaseVectorization = {
@@ -313,6 +318,14 @@ export async function updateKnowledgeBase(
     display_name: string;
     description: string;
     lifecycle_state: string;
+    chunking?: {
+      strategy: KnowledgeBaseChunkingStrategy;
+      config: {
+        unit: KnowledgeBaseChunkingUnit;
+        chunk_length: number;
+        chunk_overlap: number;
+      };
+    };
   },
   token: string,
 ): Promise<KnowledgeBase> {
@@ -570,7 +583,10 @@ export async function uploadKnowledgeBaseDocuments(
   if (!response.ok) {
     const message = String(payload.message ?? payload.error ?? `HTTP ${response.status}`);
     const code = payload.error ? String(payload.error) : undefined;
-    throw new ApiError(message, response.status, code);
+    const details = payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
+      ? payload.details as Record<string, unknown>
+      : undefined;
+    throw new ApiError(message, response.status, code, details);
   }
   return payload as unknown as { documents: KnowledgeDocument[]; count: number };
 }

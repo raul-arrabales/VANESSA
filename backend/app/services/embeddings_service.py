@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..repositories import platform_control_plane as platform_repo
@@ -76,12 +77,17 @@ def embed_text_inputs_with_target(
                     "recovery_attempted": recovery_attempted,
                 },
             )
-        if _is_embeddings_input_too_large(payload, status_code):
+        oversized_input_details = _embeddings_input_too_large_details(payload, status_code)
+        if oversized_input_details is not None:
             raise PlatformControlPlaneError(
                 "embeddings_input_too_large",
                 "Unable to generate embeddings because at least one input exceeds the configured embeddings model context limit. Reduce chunk size before retrying.",
                 status_code=400,
-                details={"status_code": status_code, "provider": adapter.binding.provider_slug},
+                details={
+                    "status_code": status_code,
+                    "provider": adapter.binding.provider_slug,
+                    **oversized_input_details,
+                },
             )
         raise PlatformControlPlaneError(
             "embeddings_request_failed",
@@ -160,19 +166,31 @@ def _is_actionable_local_embeddings_runtime_failure(
     return status_code == 404 and platform_adapters._is_model_not_found(payload)  # type: ignore[attr-defined]
 
 
-def _is_embeddings_input_too_large(payload: dict[str, Any] | None, status_code: int) -> bool:
+def _embeddings_input_too_large_details(payload: dict[str, Any] | None, status_code: int) -> dict[str, Any] | None:
     if status_code != 400 or not isinstance(payload, dict):
-        return False
+        return None
     detail = payload.get("detail")
     if isinstance(detail, dict):
-        message = str(detail.get("message") or detail.get("error") or "").strip().lower()
+        raw_message = str(detail.get("message") or detail.get("error") or "").strip()
     else:
-        message = str(detail or payload.get("error") or payload.get("message") or "").strip().lower()
+        raw_message = str(detail or payload.get("error") or payload.get("message") or "").strip()
+    message = raw_message.lower()
     if not message:
-        return False
-    return (
+        return None
+    if not (
         "maximum context length" in message
         or "requested" in message and "tokens" in message and "embedding" in message
         or "reduce the length of the input" in message
         or "input too long" in message
+    ):
+        return None
+    parsed: dict[str, Any] = {"provider_message": raw_message}
+    match = re.search(
+        r"maximum context length is (?P<max_input_tokens>\d+) tokens.*?requested (?P<requested_tokens>\d+) tokens",
+        raw_message,
+        flags=re.IGNORECASE,
     )
+    if match:
+        parsed["max_input_tokens"] = int(match.group("max_input_tokens"))
+        parsed["requested_tokens"] = int(match.group("requested_tokens"))
+    return parsed

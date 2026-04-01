@@ -4,7 +4,11 @@ import re
 from typing import Any
 
 from ..repositories import platform_control_plane as platform_repo
-from .context_management_chunking import normalize_knowledge_base_chunking, serialize_knowledge_base_chunking
+from .context_management_chunking import (
+    normalize_knowledge_base_chunking,
+    serialize_knowledge_base_chunking,
+)
+from .context_management_chunking_compatibility import assert_knowledge_base_chunking_compatible
 from .context_management_shared import _is_knowledge_base_eligible, _normalize_source_relative_path
 from .context_management_types import (
     _KB_LIFECYCLE_STATES,
@@ -23,6 +27,7 @@ def _normalize_knowledge_base_payload(
     is_create: bool,
     existing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    has_chunking_update = any(key in payload for key in {"chunking", "chunking_strategy", "chunking_config_json"})
     slug = str(payload.get("slug", existing.get("slug", "") if existing else "")).strip().lower()
     display_name = str(payload.get("display_name", existing.get("display_name", "") if existing else "")).strip()
     description = str(payload.get("description", existing.get("description", "") if existing else "")).strip()
@@ -88,7 +93,7 @@ def _normalize_knowledge_base_payload(
         is_create=is_create,
         existing=existing,
     )
-    return {
+    normalized_payload = {
         "slug": slug,
         "display_name": display_name,
         "description": description,
@@ -104,6 +109,23 @@ def _normalize_knowledge_base_payload(
         "vectorization": vectorization,
         "chunking": chunking,
     }
+    if vectorization["mode"] == "vanessa_embeddings" and (is_create or has_chunking_update):
+        assert_knowledge_base_chunking_compatible(
+            database_url,
+            knowledge_base={
+                **(existing or {}),
+                **normalized_payload,
+                "vectorization_json": vectorization["vectorization_json"],
+                "vectorization_mode": vectorization["mode"],
+                "embedding_provider_instance_id": vectorization["embedding_provider_instance_id"],
+                "embedding_resource_id": vectorization["embedding_resource_id"],
+                "chunking_strategy": chunking["strategy"],
+                "chunking_config_json": chunking["config"],
+            },
+            error_prefix="Selected KB chunking is incompatible with the configured embeddings model",
+            status_code=400,
+        )
+    return normalized_payload
 
 
 def _normalize_schema_profile_payload(database_url: str, payload: dict[str, Any]) -> dict[str, Any]:
