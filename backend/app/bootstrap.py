@@ -26,6 +26,7 @@ def configure_request_context(app: Flask) -> None:
 
         g.current_user = None
         g.auth_error = None
+        g.backend_initialized = bool(app_module._ensure_backend_initialized())
 
         current_user, auth_error = auth_request_context.resolve_current_user_from_auth_header(
             request.headers.get("Authorization", ""),
@@ -41,6 +42,16 @@ def configure_request_context(app: Flask) -> None:
 def register_system_routes(app: Flask) -> None:
     @app.get("/health")
     def health():
+        ready = bool(getattr(g, "backend_initialized", False))
+        if not ready:
+            return jsonify(
+                {
+                    "status": "initializing",
+                    "service": "backend",
+                    "ready": False,
+                    "message": "Backend initialization is still in progress.",
+                }
+            ), 503
         return jsonify({"status": "ok", "service": "backend"}), 200
 
     @app.get("/system/health")

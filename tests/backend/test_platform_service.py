@@ -1240,6 +1240,62 @@ def test_reconcile_provider_local_slot_hydrates_provider_rows_missing_capability
     assert reconciled["config_json"]["load_state"] == "loading"
 
 
+def test_reconcile_provider_local_slot_does_not_reload_when_runtime_is_already_loading(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    provider_row = {
+        "id": "provider-embeddings",
+        "slug": "vllm-embeddings-local",
+        "provider_key": "vllm_embeddings_local",
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+        "display_name": "vLLM embeddings local",
+        "description": "desc",
+        "endpoint_url": "http://llm:8000",
+        "healthcheck_url": "http://llm:8000/health",
+        "enabled": True,
+        "config_json": {
+            "runtime_admin_base_url": "http://llm_runtime_embeddings:8000",
+            "loaded_managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_managed_model_name": "all-MiniLM-L6-v2",
+            "loaded_runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "loaded_source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "load_state": "loading",
+        },
+    }
+    load_calls: list[str] = []
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_state",
+        lambda _row: (
+            {
+                "capability": "embeddings",
+                "load_state": "loading",
+                "runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+                "display_name": "all-MiniLM-L6-v2",
+                "last_error": None,
+            },
+            200,
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service._platform_local_slots_module,
+        "_runtime_admin_load_model",
+        lambda *_args, **_kwargs: load_calls.append("called"),
+    )
+
+    reconciled = platform_service._platform_local_slots_module.reconcile_provider_local_slot(
+        "ignored",
+        provider_row=provider_row,
+    )
+
+    assert load_calls == []
+    assert reconciled == provider_row
+
+
 def test_clear_provider_loaded_model_resets_local_slot(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(

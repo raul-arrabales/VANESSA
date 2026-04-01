@@ -12,12 +12,14 @@ if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
 
 import app.app as backend_app_module  # noqa: E402
+import app.bootstrap as backend_bootstrap_module  # noqa: E402
 from app.app import app  # noqa: E402
 
 
 @pytest.fixture()
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
     app.config.update(TESTING=True)
+    monkeypatch.setattr(backend_app_module, "_ensure_backend_initialized", lambda: True)
     with app.test_client() as test_client:
         yield test_client
 
@@ -35,7 +37,7 @@ def test_system_architecture_json_success(client, tmp_path: Path, monkeypatch: p
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(backend_app_module, "_ARCHITECTURE_JSON_PATH", architecture_path)
+    monkeypatch.setattr(backend_bootstrap_module, "_ARCHITECTURE_JSON_PATH", architecture_path)
 
     response = client.get("/system/architecture")
 
@@ -48,7 +50,7 @@ def test_system_architecture_json_success(client, tmp_path: Path, monkeypatch: p
 def test_system_architecture_svg_success(client, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     svg_path = tmp_path / "architecture.svg"
     svg_path.write_text("<svg><title>arch</title></svg>\n", encoding="utf-8")
-    monkeypatch.setattr(backend_app_module, "_ARCHITECTURE_SVG_PATH", svg_path)
+    monkeypatch.setattr(backend_bootstrap_module, "_ARCHITECTURE_SVG_PATH", svg_path)
 
     response = client.get("/system/architecture.svg")
 
@@ -60,8 +62,8 @@ def test_system_architecture_svg_success(client, tmp_path: Path, monkeypatch: py
 def test_system_architecture_missing_artifacts_return_503(client, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     missing_json = tmp_path / "missing.json"
     missing_svg = tmp_path / "missing.svg"
-    monkeypatch.setattr(backend_app_module, "_ARCHITECTURE_JSON_PATH", missing_json)
-    monkeypatch.setattr(backend_app_module, "_ARCHITECTURE_SVG_PATH", missing_svg)
+    monkeypatch.setattr(backend_bootstrap_module, "_ARCHITECTURE_JSON_PATH", missing_json)
+    monkeypatch.setattr(backend_bootstrap_module, "_ARCHITECTURE_SVG_PATH", missing_svg)
 
     json_response = client.get("/system/architecture")
     svg_response = client.get("/system/architecture.svg")

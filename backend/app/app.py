@@ -6,12 +6,13 @@ from .bootstrap import configure_request_context, register_http_blueprints, regi
 from .config import AuthConfig, get_auth_config
 from .db import get_connection
 from .repositories.users import find_user_by_id
-from .services.auth_runtime import ensure_auth_initialized
+from .services.auth_runtime import ensure_auth_initialized, ensure_backend_initialized
 from .services.platform_service import get_active_capability_statuses
 from .services.system_health import http_json_ok as _system_http_json_ok
 from .services.system_health import postgres_ok as _system_postgres_ok
 
 _ensure_auth_initialized = ensure_auth_initialized
+_ensure_backend_initialized = ensure_backend_initialized
 _get_config = get_auth_config
 
 

@@ -8,8 +8,9 @@ from tests.backend.support.auth_harness import build_test_auth_config  # noqa: E
 
 
 @pytest.fixture()
-def client():
+def client(monkeypatch: pytest.MonkeyPatch):
     app.config.update(TESTING=True)
+    monkeypatch.setattr(backend_app_module, "_ensure_backend_initialized", lambda: True)
     with app.test_client() as test_client:
         yield test_client
 

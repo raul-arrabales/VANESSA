@@ -8,6 +8,7 @@ BACKEND_PATH = PROJECT_ROOT / "backend"
 if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
 
+import app.app as backend_app_module  # noqa: E402
 from app.app import app  # noqa: E402
 
 
@@ -16,6 +17,7 @@ def test_voice_wake_events_accepts_valid_event(monkeypatch):
 
     monkeypatch.setenv("KWS_DETECTION_THRESHOLD", "0.4")
     monkeypatch.setenv("KWS_COOLDOWN_MS", "0")
+    monkeypatch.setattr(backend_app_module, "_ensure_backend_initialized", lambda: True)
 
     with app.test_client() as client:
         response = client.post(
@@ -37,6 +39,7 @@ def test_voice_wake_events_accepts_valid_event(monkeypatch):
 def test_voice_health_shape(monkeypatch):
     app.config.update(TESTING=True)
     monkeypatch.setenv("KWS_URL", "http://kws:10400")
+    monkeypatch.setattr(backend_app_module, "_ensure_backend_initialized", lambda: True)
 
     with app.test_client() as client:
         response = client.get("/voice/health")

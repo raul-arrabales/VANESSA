@@ -9,11 +9,13 @@ from ..security import hash_password
 from . import auth_lifecycle
 from .knowledge_chat_bootstrap import ensure_knowledge_chat_agent
 from .model_download_worker import ensure_download_worker_started
+from .platform_bootstrap import ensure_platform_bootstrap_state
 from .runtime_profile_service import seed_runtime_profile_from_config
 from .tool_registry_bootstrap import ensure_builtin_tools
 
 _knowledge_chat_bootstrapped = False
 _builtin_tools_bootstrapped = False
+_platform_bootstrapped = False
 
 
 def get_config() -> AuthConfig:
@@ -52,6 +54,26 @@ def ensure_auth_initialized() -> bool:
             _builtin_tools_bootstrapped = ensure_builtin_tools(get_config().database_url)
         except Exception as exc:  # pragma: no cover - guarded by route behavior tests
             current_app.logger.warning("Builtin tool bootstrap unavailable: %s", exc)
+    return True
+
+
+def ensure_backend_initialized() -> bool:
+    global _platform_bootstrapped
+
+    if not ensure_auth_initialized():
+        return False
+    if _platform_bootstrapped:
+        return True
+
+    config = get_config()
+    try:
+        ensure_platform_bootstrap_state(config.database_url, config)
+    except Exception as exc:  # pragma: no cover - exercised through route-level behavior tests
+        current_app.logger.warning("Platform bootstrap initialization failed: %s", exc)
+        return False
+
+    _platform_bootstrapped = True
+    current_app.logger.info("Platform bootstrap initialization complete.")
     return True
 
 

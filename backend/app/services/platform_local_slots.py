@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..config import AuthConfig
@@ -20,6 +21,8 @@ from .platform_service_types import (
 from .platform_shared import _expected_task_key, _runtime_model_entries_for_capability
 from .platform_types import CAPABILITY_LLM_INFERENCE, PlatformControlPlaneError, ProviderBinding
 from .platform_adapters import http_json_request
+
+logger = logging.getLogger(__name__)
 
 
 def _normalized_optional_slot_string(value: Any) -> str | None:
@@ -443,6 +446,13 @@ def reconcile_provider_local_slot(
     )
 
     if managed_model_id and runtime_model_id and local_path and not runtime_aligned:
+        logger.info(
+            "Reconciling local provider slot for %s (%s): requesting runtime load for managed_model_id=%s runtime_model_id=%s",
+            str(provider_row.get("slug") or "").strip() or str(provider_row.get("id") or "").strip(),
+            str(provider_row.get("provider_key") or "").strip(),
+            managed_model_id,
+            runtime_model_id,
+        )
         runtime_state, runtime_status = _runtime_admin_load_model(
             provider_row,
             runtime_model_id=runtime_model_id,
@@ -451,6 +461,13 @@ def reconcile_provider_local_slot(
             display_name=display_name or managed_model_id,
         )
         if runtime_status >= 400 and not (runtime_status == 404 and runtime_state is None):
+            logger.warning(
+                "Local provider slot reconciliation failed for %s (%s): status=%s message=%s",
+                str(provider_row.get("slug") or "").strip() or str(provider_row.get("id") or "").strip(),
+                str(provider_row.get("provider_key") or "").strip(),
+                runtime_status,
+                str((runtime_state or {}).get("message") or f"runtime_load_failed:{runtime_status}"),
+            )
             resolved_slot = {
                 **resolved_slot,
                 "load_state": _LOCAL_SLOT_STATE_ERROR,

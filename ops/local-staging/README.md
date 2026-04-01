@@ -41,8 +41,9 @@ python scripts/generate_architecture.py --write
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
   - Checks optional `mcp_gateway` when `MCP_GATEWAY_URL` is configured.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
-  - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
-  - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
+- LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
+- When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
+- Backend readiness now includes backend-owned platform bootstrap, so local-staging startup should trigger persisted local-slot reconciliation during normal backend readiness checks instead of waiting for a later Platform Control page visit.
   - Flags: `--wait`, `--timeout <seconds>`
   - Exit codes: `0` healthy, `3` one or more checks failed
 - `logs.sh`
@@ -90,6 +91,7 @@ Supported launcher variables:
 - `LLM_LOCAL_UPSTREAM_MODEL` and `LLM_INFERENCE_LOCAL_MODEL_PATH` are fallback/debug startup defaults for the inference runtime.
 - `LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL` and `LLM_EMBEDDINGS_LOCAL_MODEL_PATH` are opt-in fallback/debug startup defaults for the embeddings runtime and should normally be left blank so embeddings starts empty until Platform Control loads a model.
 - Keep runtime/provider env focused on endpoint topology and secrets; use Platform Control to choose deployment-bound resources and to assign the local loaded-model slot for local vLLM providers.
+- When a persisted local slot already exists in Postgres, backend startup/readiness now attempts to reconcile that slot automatically on cold start.
 - If `health.sh` reports `llm_runtime_embeddings_slot: WAIT`, the embeddings runtime is still converging on the persisted control-plane slot. This can last several minutes on local staging while the model loads.
 - If `health.sh` reports `llm_runtime_embeddings_slot: FAIL`, the provider slot intent in Postgres is out of sync with the running split runtimes. Retrieval and KB embeddings queries will fail until that drift is corrected.
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)

@@ -100,6 +100,7 @@ def patch_auth_bootstrap(
     extra_patches: dict[str, Any] | None = None,
 ):
     monkeypatch.setattr(backend_app_module, "_ensure_auth_initialized", lambda: True)
+    monkeypatch.setattr(backend_app_module, "_ensure_backend_initialized", lambda: True)
     monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
     monkeypatch.setattr(backend_app_module, "find_user_by_id", user_store.find_by_id)
 
