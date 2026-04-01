@@ -1,25 +1,14 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
+import type { KnowledgeBaseOverviewFormState } from "../types";
 
 type Props = {
   knowledgeBase: KnowledgeBase;
-  form: {
-    slug: string;
-    displayName: string;
-    description: string;
-    lifecycleState: string;
-  };
+  form: KnowledgeBaseOverviewFormState;
   isSuperadmin: boolean;
   isResyncing: boolean;
-  onFormChange: Dispatch<
-    SetStateAction<{
-      slug: string;
-      displayName: string;
-      description: string;
-      lifecycleState: string;
-    }>
-  >;
+  onFormChange: Dispatch<SetStateAction<KnowledgeBaseOverviewFormState>>;
   onSave: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDelete: () => Promise<void>;
   onResync: () => Promise<void>;
@@ -51,6 +40,16 @@ export function KnowledgeBaseOverviewSection({
             {t("contextManagement.fields.provider")}: {knowledgeBase.backing_provider.display_name ?? knowledgeBase.backing_provider.id}
             {knowledgeBase.backing_provider.provider_key ? ` (${knowledgeBase.backing_provider.provider_key})` : ""}
           </p>
+        ) : null}
+        {knowledgeBase.deployment_usage?.length ? (
+          <div className="card-stack">
+            <p className="status-text">{t("contextManagement.usageTitle")}</p>
+            {knowledgeBase.deployment_usage.map((usage) => (
+              <p key={`${usage.deployment_profile.id}-${usage.capability}`} className="status-text">
+                <strong>{usage.deployment_profile.display_name}</strong> ({usage.deployment_profile.slug}) - {usage.capability}
+              </p>
+            ))}
+          </div>
         ) : null}
         <p className="status-text">
           {t("contextManagement.advancedSettings.vectorizationMode")}: {" "}

@@ -32,6 +32,11 @@
     "context": "Context management",
     "contextNew": "New knowledge base",
     "contextDetail": "Knowledge base detail",
+    "contextSources": "Manage sources",
+    "contextRetrieval": "Test retrieval",
+    "contextUpload": "Upload documents",
+    "contextDocuments": "Browse documents",
+    "contextDocumentView": "Document text",
     "agentBuilder": "Agent builder",
     "agentProjectDetail": "Agent project detail",
     "catalog": "Agent catalog",
@@ -360,6 +365,7 @@
     }
   },
   "contextManagement": {
+    "eyebrow": "Knowledge base workspace",
     "title": "Context management",
     "description": "Manage reusable knowledge bases and curate the documents they expose through retrieval.",
     "createTitle": "Create knowledge base",
@@ -370,10 +376,26 @@
     "queryDescription": "Run a retrieval query through the active deployment runtime before binding this knowledge base into product flows.",
     "sourcesTitle": "Sources",
     "sourcesDescription": "Manage repeatable content sources that reconcile documents into this knowledge base.",
+    "uploadTitle": "Upload documents",
+    "uploadDescription": "Create or edit manual documents and upload supported files into this knowledge base.",
+    "documentsBrowserTitle": "Browse documents",
+    "documentsBrowserDescription": "Review the documents currently stored in this knowledge base and open full text in a separate window.",
+    "documentViewTitle": "Document text",
+    "documentViewDescription": "Read the full text and source details for this knowledge-base document.",
+    "manualDocumentsTitle": "Manual documents",
+    "manualDocumentsDescription": "Manage manually curated documents separately from source-managed content.",
     "syncHistoryTitle": "Sync history",
     "syncHistoryDescription": "Review the recent source sync attempts and what changed in each run.",
     "documentsTitle": "Documents",
     "usageTitle": "Deployment usage",
+    "navigation": {
+      "aria": "Knowledge base sections",
+      "overview": "Overview",
+      "sources": "Manage Sources",
+      "retrieval": "Test Retrieval",
+      "upload": "Upload Documents",
+      "documents": "Browse Documents"
+    },
     "advancedSettings": {
       "title": "Advanced settings",
       "description": "Choose how this knowledge base will get vectors before you start ingesting documents.",
@@ -411,7 +433,9 @@
       "resyncing": "Resyncing...",
       "testRetrieval": "Test retrieval",
       "querying": "Searching...",
-      "browse": "Browse"
+      "browse": "Browse",
+      "openText": "Open text",
+      "backToDocuments": "Back to documents"
     },
     "fields": {
       "provider": "Backing provider",
@@ -426,11 +450,13 @@
       "excludeGlobs": "Exclude globs",
       "documentTitle": "Document title",
       "sourceName": "Source name",
+      "sourcePath": "Source path",
       "uri": "Source URI",
       "documentText": "Document text",
       "uploadFiles": "Upload files",
       "queryText": "Retrieval query",
-      "topK": "Top K"
+      "topK": "Top K",
+      "chunkCount": "Chunk count"
     },
     "columns": {
       "name": "Knowledge base",
@@ -453,6 +479,7 @@
       "weaviateSystemFields": "Weaviate automatically adds system fields such as document_id, text, and metadata_json. Do not duplicate them in the custom schema.",
       "empty": "No knowledge bases have been created yet.",
       "noDocuments": "No documents have been added yet.",
+      "noManualDocuments": "No manual documents are available yet.",
       "noSources": "No managed sources have been configured yet.",
       "noSyncRuns": "No source syncs have been recorded yet.",
       "eligible": "Eligible for deployment binding.",
@@ -461,6 +488,10 @@
       "sourceRelativePathHelp": "Relative paths must stay under an allowlisted context source root. In local staging, that maps to the host-side context_sources/ directory.",
       "documentManagedBySource": "Managed by {{source}} ({{path}})",
       "documentManagedReadOnly": "This document is source-managed and can only be changed through its source sync.",
+      "manualDocument": "Manual document",
+      "sourceManaged": "Source-managed",
+      "readOnlyUpload": "You can browse documents here, but only superadmins can create, edit, upload, or delete them.",
+      "documentNotFound": "The requested document could not be found in this knowledge base.",
       "fullKnowledgeBaseResync": "Knowledge base resync",
       "syncRunSummary": "Scanned {{scanned}} file(s), changed {{changed}}, deleted files {{deletedFiles}}, created documents {{createdDocs}}, updated documents {{updatedDocs}}, deleted documents {{deletedDocs}}.",
       "queryResultCount": "{{count}} retrieval result(s)",

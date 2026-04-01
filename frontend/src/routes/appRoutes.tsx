@@ -23,6 +23,11 @@ const PlatformDeploymentDetailPage = lazy(() => import("../features/platform-con
 const ContextKnowledgeBasesPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBasesPage"));
 const ContextKnowledgeBaseCreatePage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseCreatePage"));
 const ContextKnowledgeBaseDetailPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseDetailPage"));
+const ContextKnowledgeBaseSourcesPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseSourcesPage"));
+const ContextKnowledgeBaseRetrievalPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseRetrievalPage"));
+const ContextKnowledgeBaseUploadPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseUploadPage"));
+const ContextKnowledgeBaseDocumentsPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseDocumentsPage"));
+const ContextKnowledgeBaseDocumentViewPage = lazy(() => import("../features/context-management/pages/ContextKnowledgeBaseDocumentViewPage"));
 const ModelOpsHomePage = lazy(() => import("../features/modelops/pages/ModelOpsHomePage"));
 const ModelCatalogPage = lazy(() => import("../features/modelops/pages/ModelCatalogPage"));
 const CloudModelRegisterPage = lazy(() => import("../features/modelops/pages/CloudModelRegisterPage"));
@@ -305,6 +310,61 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "admin",
     element: <ContextKnowledgeBaseDetailPage />,
+  },
+  {
+    id: "control-context-sources",
+    path: "/control/context/:knowledgeBaseId/sources",
+    titleKey: "nav.contextSources",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseSourcesPage />,
+  },
+  {
+    id: "control-context-retrieval",
+    path: "/control/context/:knowledgeBaseId/retrieval",
+    titleKey: "nav.contextRetrieval",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseRetrievalPage />,
+  },
+  {
+    id: "control-context-upload",
+    path: "/control/context/:knowledgeBaseId/upload",
+    titleKey: "nav.contextUpload",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseUploadPage />,
+  },
+  {
+    id: "control-context-documents",
+    path: "/control/context/:knowledgeBaseId/documents",
+    titleKey: "nav.contextDocuments",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseDocumentsPage />,
+  },
+  {
+    id: "control-context-document-view",
+    path: "/control/context/:knowledgeBaseId/documents/:documentId/view",
+    titleKey: "nav.contextDocumentView",
+    section: "control",
+    showInNav: false,
+    showInBreadcrumbs: true,
+    requiresAuth: true,
+    minimumRole: "admin",
+    element: <ContextKnowledgeBaseDocumentViewPage />,
   },
   {
     id: "control-models",
