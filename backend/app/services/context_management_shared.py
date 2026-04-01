@@ -12,6 +12,7 @@ from .context_management_types import (
     KnowledgeDocumentRecord,
     KnowledgeSourceRecord,
     _DEFAULT_CHUNK_SIZE,
+    _DEFAULT_EMBEDDINGS_SAFE_CHUNK_SIZE,
 )
 from .context_management_vectorization import (
     embed_knowledge_base_texts,
@@ -27,17 +28,18 @@ def _chunk_document_text(text: str) -> list[str]:
     chunks: list[str] = []
     paragraphs = [item.strip() for item in normalized.split("\n\n") if item.strip()]
     current = ""
+    effective_chunk_size = min(_DEFAULT_CHUNK_SIZE, _DEFAULT_EMBEDDINGS_SAFE_CHUNK_SIZE)
     for paragraph in paragraphs or [normalized]:
         candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
-        if len(candidate) <= _DEFAULT_CHUNK_SIZE:
+        if len(candidate) <= effective_chunk_size:
             current = candidate
             continue
         if current:
             chunks.append(current)
             current = ""
-        while len(paragraph) > _DEFAULT_CHUNK_SIZE:
-            chunks.append(paragraph[:_DEFAULT_CHUNK_SIZE].strip())
-            paragraph = paragraph[_DEFAULT_CHUNK_SIZE :].strip()
+        while len(paragraph) > effective_chunk_size:
+            chunks.append(paragraph[:effective_chunk_size].strip())
+            paragraph = paragraph[effective_chunk_size:].strip()
         current = paragraph
     if current:
         chunks.append(current)

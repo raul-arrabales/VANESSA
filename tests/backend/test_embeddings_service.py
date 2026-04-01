@@ -135,3 +135,59 @@ def test_embed_text_inputs_with_target_surfaces_actionable_local_runtime_drift_e
     assert "local embeddings runtime is empty or out of sync" in exc_info.value.message
     assert exc_info.value.status_code == 503
 
+
+def test_embed_text_inputs_with_target_surfaces_oversized_embedding_input_error(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    adapter = _FakeEmbeddingsAdapter(
+        [
+            (
+                {
+                    "detail": "This model's maximum context length is 256 tokens. However, you requested 338 tokens in the input for embedding generation. Please reduce the length of the input."
+                },
+                400,
+            )
+        ]
+    )
+    provider_row = {
+        "id": "provider-embeddings",
+        "provider_key": "vllm_embeddings_local",
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+    }
+    monkeypatch.setattr(embeddings_service, "resolve_embeddings_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(
+        embeddings_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: provider_row if provider_instance_id == "provider-embeddings" else None,
+    )
+    monkeypatch.setattr(
+        embeddings_service,
+        "recover_provider_local_slot_runtime",
+        lambda _db, *, provider_row, force=False: (
+            provider_row,
+            False,
+            {
+                "has_persisted_intent": True,
+                "runtime_empty": False,
+                "target_available": True,
+                "slot": {"loaded_managed_model_id": "sentence-transformers--all-MiniLM-L6-v2"},
+                "runtime_model_id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                "runtime_inventory_ids": ["/models/llm/sentence-transformers--all-MiniLM-L6-v2"],
+                "runtime_state": {"load_state": "loaded"},
+            },
+        ),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        embeddings_service.embed_text_inputs_with_target(
+            "ignored",
+            object(),  # type: ignore[arg-type]
+            ["x" * 2000],
+            provider_instance_id="provider-embeddings",
+            model="/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+        )
+
+    assert exc_info.value.code == "embeddings_input_too_large"
+    assert "Reduce chunk size before retrying" in exc_info.value.message
+    assert exc_info.value.status_code == 400

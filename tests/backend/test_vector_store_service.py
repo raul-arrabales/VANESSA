@@ -363,6 +363,74 @@ def test_weaviate_vector_store_adapter_upsert_returns_normalized_documents(monke
     }
 
 
+def test_weaviate_vector_store_adapter_upsert_accepts_list_shaped_batch_response(monkeypatch: pytest.MonkeyPatch):
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        if url.endswith("/v1/schema/KnowledgeBase"):
+            return {"class": "KnowledgeBase"}, 200
+        if url.endswith("/v1/batch/objects"):
+            return [{"result": {"errors": None}}], 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.WeaviateVectorStoreAdapter(_binding())
+
+    payload = adapter.upsert(
+        index_name="knowledge_base",
+        documents=[{"id": "doc-1", "text": "hello", "metadata": {}, "embedding": [0.1, 0.2]}],
+    )
+
+    assert payload == {
+        "index": "knowledge_base",
+        "count": 1,
+        "documents": [{"id": "doc-1", "status": "upserted"}],
+    }
+
+
+def test_weaviate_vector_store_adapter_upsert_raises_on_list_shaped_batch_errors(monkeypatch: pytest.MonkeyPatch):
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        if url.endswith("/v1/schema/KnowledgeBase"):
+            return {"class": "KnowledgeBase"}, 200
+        if url.endswith("/v1/batch/objects"):
+            return [{"result": {"errors": [{"message": "vector write failed"}]}}], 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.WeaviateVectorStoreAdapter(_binding())
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        adapter.upsert(
+            index_name="knowledge_base",
+            documents=[{"id": "doc-1", "text": "hello", "metadata": {}, "embedding": [0.1, 0.2]}],
+        )
+
+    assert exc_info.value.code == "vector_upsert_failed"
+
+
+def test_weaviate_vector_store_adapter_upsert_raises_on_unexpected_batch_response_shape(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        if url.endswith("/v1/schema/KnowledgeBase"):
+            return {"class": "KnowledgeBase"}, 200
+        if url.endswith("/v1/batch/objects"):
+            return {"status": "ok"}, 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.WeaviateVectorStoreAdapter(_binding())
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        adapter.upsert(
+            index_name="knowledge_base",
+            documents=[{"id": "doc-1", "text": "hello", "metadata": {}, "embedding": [0.1, 0.2]}],
+        )
+
+    assert exc_info.value.code == "vector_upsert_failed"
+
+
 def test_weaviate_vector_store_adapter_query_supports_embedding_and_bm25(monkeypatch: pytest.MonkeyPatch):
     requests: list[dict[str, object]] = []
 

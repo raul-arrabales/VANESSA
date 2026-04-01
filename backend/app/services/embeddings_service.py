@@ -76,6 +76,13 @@ def embed_text_inputs_with_target(
                     "recovery_attempted": recovery_attempted,
                 },
             )
+        if _is_embeddings_input_too_large(payload, status_code):
+            raise PlatformControlPlaneError(
+                "embeddings_input_too_large",
+                "Unable to generate embeddings because at least one input exceeds the configured embeddings model context limit. Reduce chunk size before retrying.",
+                status_code=400,
+                details={"status_code": status_code, "provider": adapter.binding.provider_slug},
+            )
         raise PlatformControlPlaneError(
             "embeddings_request_failed",
             "Unable to generate embeddings",
@@ -151,3 +158,21 @@ def _is_actionable_local_embeddings_runtime_failure(
     if bool(recovery_inspection.get("runtime_empty")) or not bool(recovery_inspection.get("target_available")):
         return True
     return status_code == 404 and platform_adapters._is_model_not_found(payload)  # type: ignore[attr-defined]
+
+
+def _is_embeddings_input_too_large(payload: dict[str, Any] | None, status_code: int) -> bool:
+    if status_code != 400 or not isinstance(payload, dict):
+        return False
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        message = str(detail.get("message") or detail.get("error") or "").strip().lower()
+    else:
+        message = str(detail or payload.get("error") or payload.get("message") or "").strip().lower()
+    if not message:
+        return False
+    return (
+        "maximum context length" in message
+        or "requested" in message and "tokens" in message and "embedding" in message
+        or "reduce the length of the input" in message
+        or "input too long" in message
+    )

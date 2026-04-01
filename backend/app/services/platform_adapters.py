@@ -30,7 +30,7 @@ def http_json_request(
     payload: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
-) -> tuple[dict[str, Any] | None, int]:
+) -> tuple[Any, int]:
     request_headers = {"Accept": "application/json"}
     if headers:
         request_headers.update(headers)
@@ -783,6 +783,13 @@ class WeaviateVectorStoreAdapter(VectorStoreAdapter):
                 status_code=status_code,
                 details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
             )
+        if _extract_weaviate_batch_objects(payload) is None:
+            _raise_platform_provider_error(
+                code="vector_upsert_failed",
+                message="Vector document upsert returned an unexpected provider response",
+                status_code=502,
+                details={"index": index_name, "provider": self.binding.provider_slug, "upstream": payload},
+            )
         if _weaviate_batch_has_errors(payload):
             _raise_platform_provider_error(
                 code="vector_upsert_failed",
@@ -1485,15 +1492,22 @@ def _weaviate_already_exists(payload: dict[str, Any] | None) -> bool:
     return "already exists" in dumps(payload).lower()
 
 
-def _weaviate_batch_has_errors(payload: dict[str, Any]) -> bool:
-    if payload.get("errors") is False:
-        return False
+def _extract_weaviate_batch_objects(payload: Any) -> list[dict[str, Any]] | None:
+    if isinstance(payload, list):
+        return payload if all(isinstance(item, dict) for item in payload) else None
+    if not isinstance(payload, dict):
+        return None
     objects = payload.get("objects")
     if not isinstance(objects, list):
+        return None
+    return objects if all(isinstance(item, dict) for item in objects) else None
+
+
+def _weaviate_batch_has_errors(payload: Any) -> bool:
+    objects = _extract_weaviate_batch_objects(payload)
+    if objects is None:
         return False
     for item in objects:
-        if not isinstance(item, dict):
-            continue
         result = item.get("result")
         if isinstance(result, dict):
             errors = result.get("errors")
