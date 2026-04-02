@@ -43,6 +43,7 @@ def _upsert_bootstrap_binding(
 ) -> None:
     effective_resources = [dict(resource) for resource in resources if isinstance(resource, dict)]
     effective_default_resource_id = default_resource_id
+    effective_resource_policy = dict(resource_policy)
     if (
         capability_key in _MODEL_BEARING_CAPABILITIES
         and not effective_resources
@@ -55,6 +56,23 @@ def _upsert_bootstrap_binding(
             if isinstance(resource, dict)
         ]
         effective_default_resource_id = str(existing_binding.get("default_resource_id") or "").strip() or None
+    if capability_key == CAPABILITY_VECTOR_STORE and isinstance(existing_binding, dict):
+        existing_resources = [
+            dict(resource)
+            for resource in (existing_binding.get("resources") or [])
+            if isinstance(resource, dict)
+        ]
+        existing_default_resource_id = str(existing_binding.get("default_resource_id") or "").strip() or None
+        existing_resource_policy = (
+            dict(existing_binding.get("resource_policy") or {})
+            if isinstance(existing_binding.get("resource_policy"), dict)
+            else {}
+        )
+        if existing_resources or existing_default_resource_id is not None or existing_resource_policy:
+            if not effective_resources and effective_default_resource_id is None:
+                effective_resources = existing_resources
+                effective_default_resource_id = existing_default_resource_id
+            effective_resource_policy = existing_resource_policy
     platform_repo.upsert_deployment_binding(
         database_url,
         deployment_profile_id=deployment_profile_id,
@@ -63,7 +81,7 @@ def _upsert_bootstrap_binding(
         resources=effective_resources,
         default_resource_id=effective_default_resource_id,
         binding_config=binding_config,
-        resource_policy=resource_policy,
+        resource_policy=effective_resource_policy,
     )
 
 
@@ -288,7 +306,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     default_bindings_by_capability = _existing_bindings_by_capability(database_url, deployment_profile_id=str(profile["id"]))
     _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_LLM_INFERENCE, provider_instance_id=str(vllm_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=default_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE))
     _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_EMBEDDINGS, provider_instance_id=str(embeddings_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=default_bindings_by_capability.get(CAPABILITY_EMBEDDINGS))
-    _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE})
+    _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=default_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
     if sandbox_provider is not None and sandbox_provider.get("id"):
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
     if mcp_gateway_provider is not None:
@@ -299,7 +317,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         llama_bindings_by_capability = _existing_bindings_by_capability(database_url, deployment_profile_id=str(llama_profile["id"]))
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_LLM_INFERENCE, provider_instance_id=str(llama_cpp_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE))
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_EMBEDDINGS, provider_instance_id=str(embeddings_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_EMBEDDINGS))
-        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE})
+        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
         if sandbox_provider is not None and sandbox_provider.get("id"):
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:
@@ -310,7 +328,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         qdrant_bindings_by_capability = _existing_bindings_by_capability(database_url, deployment_profile_id=str(qdrant_profile["id"]))
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_LLM_INFERENCE, provider_instance_id=str(vllm_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_LLM_INFERENCE))
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_EMBEDDINGS, provider_instance_id=str(embeddings_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_EMBEDDINGS))
-        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(qdrant_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE})
+        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(qdrant_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
         if sandbox_provider is not None and sandbox_provider.get("id"):
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:

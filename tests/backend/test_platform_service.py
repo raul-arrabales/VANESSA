@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import platform_adapters, platform_bootstrap, platform_service  # noqa: E402
+from app.services import platform_adapters, platform_bootstrap, platform_deployment_status, platform_service  # noqa: E402
 from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
 
 
@@ -2141,6 +2141,193 @@ def test_list_deployment_profiles_preserves_model_resources_during_bootstrap(
 
     assert binding["default_resource_id"] == "model-1"
     assert binding["resources"][0]["managed_model_id"] == "model-1"
+
+
+@pytest.mark.parametrize(
+    ("existing_resources", "existing_default_resource_id", "existing_resource_policy"),
+    [
+        (
+            [
+                {
+                    "id": "kb-primary",
+                    "resource_kind": "knowledge_base",
+                    "ref_type": "knowledge_base",
+                    "knowledge_base_id": "kb-primary",
+                    "provider_resource_id": "kb_product_docs",
+                    "display_name": "Product Docs",
+                    "metadata": {"slug": "product-docs", "index_name": "kb_product_docs"},
+                    "is_default": True,
+                    "sort_order": 0,
+                }
+            ],
+            "kb-primary",
+            {"selection_mode": "explicit"},
+        ),
+        (
+            [],
+            None,
+            {"selection_mode": "dynamic_namespace", "namespace_prefix": "kb_"},
+        ),
+    ],
+)
+def test_list_deployment_profiles_preserves_vector_store_binding_during_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+    existing_resources: list[dict[str, object]],
+    existing_default_resource_id: str | None,
+    existing_resource_policy: dict[str, object],
+):
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_bootstrap, "reconcile_local_provider_slots", lambda _db, *, provider_rows: provider_rows)
+
+    providers_by_slug: dict[str, dict[str, object]] = {}
+
+    def _ensure_provider_instance(_db, **kwargs):
+        row = {
+            "id": providers_by_slug.get(kwargs["slug"], {}).get("id", f"{kwargs['slug']}-id"),
+            "slug": kwargs["slug"],
+            "provider_key": kwargs["provider_key"],
+            "capability_key": (
+                "vector_store"
+                if kwargs["provider_key"] in {"weaviate_local", "qdrant_local"}
+                else ("embeddings" if kwargs["provider_key"] == "vllm_embeddings_local" else "llm_inference")
+            ),
+            "adapter_kind": (
+                "weaviate_http"
+                if kwargs["provider_key"] == "weaviate_local"
+                else ("openai_compatible_embeddings" if kwargs["provider_key"] == "vllm_embeddings_local" else "openai_compatible_llm")
+            ),
+            "display_name": kwargs["display_name"],
+            "description": kwargs["description"],
+            "endpoint_url": kwargs["endpoint_url"],
+            "healthcheck_url": kwargs["healthcheck_url"],
+            "enabled": kwargs["enabled"],
+            "config_json": dict(kwargs["config_json"]),
+        }
+        providers_by_slug[kwargs["slug"]] = row
+        return dict(row)
+
+    bindings_by_profile: dict[str, list[dict[str, object]]] = {
+        "local-default-id": [
+            {
+                "id": "vector-store-binding-id",
+                "capability_key": "vector_store",
+                "provider_instance_id": "weaviate-local-id",
+                "provider_slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "provider_display_name": "Weaviate local",
+                "provider_description": "desc",
+                "endpoint_url": "http://weaviate:8080",
+                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "enabled": True,
+                "adapter_kind": "weaviate_http",
+                "binding_config": {},
+                "resource_policy": dict(existing_resource_policy),
+                "resources": [dict(item) for item in existing_resources],
+                "default_resource_id": existing_default_resource_id,
+                "default_resource": next(
+                    (
+                        dict(item)
+                        for item in existing_resources
+                        if str(item.get("id") or "").strip() == str(existing_default_resource_id or "").strip()
+                    ),
+                    None,
+                ),
+            }
+        ]
+    }
+
+    def _upsert_deployment_binding(
+        _db,
+        *,
+        deployment_profile_id,
+        capability_key,
+        provider_instance_id,
+        resources,
+        default_resource_id,
+        binding_config,
+        resource_policy,
+    ):
+        provider = next(
+            row for row in providers_by_slug.values() if row["id"] == provider_instance_id
+        )
+        binding_row = {
+            "id": f"{capability_key}-binding-id",
+            "capability_key": capability_key,
+            "provider_instance_id": provider_instance_id,
+            "provider_slug": provider["slug"],
+            "provider_key": provider["provider_key"],
+            "provider_display_name": provider["display_name"],
+            "provider_description": provider["description"],
+            "endpoint_url": provider["endpoint_url"],
+            "healthcheck_url": provider["healthcheck_url"],
+            "enabled": provider["enabled"],
+            "adapter_kind": provider["adapter_kind"],
+            "binding_config": dict(binding_config),
+            "resource_policy": dict(resource_policy),
+            "resources": [dict(item) for item in resources],
+            "default_resource_id": default_resource_id,
+            "default_resource": next(
+                (dict(item) for item in resources if str(item.get("id") or "").strip() == str(default_resource_id or "").strip()),
+                None,
+            ),
+        }
+        existing = bindings_by_profile.setdefault(deployment_profile_id, [])
+        for index, item in enumerate(existing):
+            if item["capability_key"] == capability_key:
+                existing[index] = binding_row
+                break
+        else:
+            existing.append(binding_row)
+        return dict(binding_row)
+
+    monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: list(providers_by_slug.values()))
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", _ensure_provider_instance)
+    monkeypatch.setattr(
+        platform_deployment_status.context_repo,
+        "get_knowledge_base",
+        lambda _db, knowledge_base_id: {
+            "id": knowledge_base_id,
+            "display_name": "Product Docs",
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "vllm-embeddings-local-id",
+            "embedding_resource_id": "local-vllm-embeddings-default",
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "ensure_deployment_profile",
+        lambda _db, *, slug, **kwargs: {"id": f"{slug}-id", "slug": slug, "display_name": slug, "description": "", "is_active": slug == "local-default"},
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_profiles",
+        lambda _db: [{"id": "local-default-id", "slug": "local-default", "display_name": "Local Default", "description": "", "is_active": True}],
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_bindings",
+        lambda _db, *, deployment_profile_id: [dict(item) for item in bindings_by_profile.get(deployment_profile_id, [])],
+    )
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", _upsert_deployment_binding)
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "local-default-id"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+        qdrant_url="",
+    )
+
+    deployments = platform_service.list_deployment_profiles("ignored", config)  # type: ignore[arg-type]
+    deployment = next(item for item in deployments if item["slug"] == "local-default")
+    binding = next(item for item in deployment["bindings"] if item["capability"] == "vector_store")
+
+    assert binding["resource_policy"] == existing_resource_policy
+    assert binding["default_resource_id"] == existing_default_resource_id
+    assert [resource["id"] for resource in binding["resources"]] == [resource["id"] for resource in existing_resources]
 
 
 def test_resolve_vector_store_adapter_supports_qdrant(monkeypatch: pytest.MonkeyPatch):

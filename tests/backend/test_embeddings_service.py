@@ -193,3 +193,55 @@ def test_embed_text_inputs_with_target_surfaces_oversized_embedding_input_error(
     assert exc_info.value.status_code == 400
     assert exc_info.value.details["max_input_tokens"] == 256
     assert exc_info.value.details["requested_tokens"] == 338
+    assert exc_info.value.details["resource_id"] == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"
+    assert exc_info.value.details["provider_message"].startswith("This model's maximum context length is 256 tokens.")
+
+
+def test_embed_text_inputs_with_target_preserves_upstream_error_message(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    adapter = _FakeEmbeddingsAdapter(
+        [
+            (
+                {
+                    "detail": {
+                        "code": "local_vllm_bad_request",
+                        "message": "The embeddings request payload is invalid for this runtime.",
+                    }
+                },
+                400,
+            )
+        ]
+    )
+    provider_row = {
+        "id": "provider-embeddings",
+        "provider_key": "vllm_embeddings_local",
+        "capability_key": "embeddings",
+        "adapter_kind": "openai_compatible_embeddings",
+    }
+    monkeypatch.setattr(embeddings_service, "resolve_embeddings_adapter", lambda *_args, **_kwargs: adapter)
+    monkeypatch.setattr(
+        embeddings_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: provider_row if provider_instance_id == "provider-embeddings" else None,
+    )
+    monkeypatch.setattr(
+        embeddings_service,
+        "recover_provider_local_slot_runtime",
+        lambda _db, *, provider_row, force=False: (provider_row, False, None),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        embeddings_service.embed_text_inputs_with_target(
+            "ignored",
+            object(),  # type: ignore[arg-type]
+            ["hello world"],
+            provider_instance_id="provider-embeddings",
+            model="/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+        )
+
+    assert exc_info.value.code == "embeddings_request_failed"
+    assert exc_info.value.status_code == 400
+    assert str(exc_info.value) == "The embeddings request payload is invalid for this runtime."
+    assert exc_info.value.details["upstream_message"] == "The embeddings request payload is invalid for this runtime."
+    assert exc_info.value.details["resource_id"] == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"

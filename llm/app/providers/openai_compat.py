@@ -204,6 +204,15 @@ def _extract_error_details(body: dict[str, Any]) -> tuple[int | None, str | None
         message = str(body.get("message", "")).strip() or "Upstream request failed"
         return status_code, message
 
+    detail = body.get("detail")
+    if isinstance(detail, dict):
+        message = str(detail.get("message", "") or detail.get("error", "")).strip() or "Upstream request failed"
+        raw_code = detail.get("code")
+        status_code = raw_code if isinstance(raw_code, int) else None
+        return status_code, message
+    if isinstance(detail, str) and detail.strip():
+        return None, detail.strip()
+
     err = body.get("error")
     if isinstance(err, dict):
         message = str(err.get("message", "")).strip() or "Upstream request failed"
@@ -335,11 +344,9 @@ class OpenAICompatibleProvider:
             except ValueError:
                 parsed_error = {}
             if isinstance(parsed_error, dict):
-                err = parsed_error.get("error")
-                if isinstance(err, dict):
-                    message = str(err.get("message", "")).strip() or message
-                elif isinstance(err, str) and err.strip():
-                    message = err.strip()
+                _, extracted_message = _extract_error_details(parsed_error)
+                if extracted_message:
+                    message = extracted_message
             status = int(error.code)
             if status in {401, 403}:
                 raise ProviderError(
@@ -441,11 +448,9 @@ class OpenAICompatibleProvider:
             except ValueError:
                 parsed_error = {}
             if isinstance(parsed_error, dict):
-                err = parsed_error.get("error")
-                if isinstance(err, dict):
-                    message = str(err.get("message", "")).strip() or message
-                elif isinstance(err, str) and err.strip():
-                    message = err.strip()
+                _, extracted_message = _extract_error_details(parsed_error)
+                if extracted_message:
+                    message = extracted_message
             status = int(error.code)
             if status in {401, 403}:
                 raise ProviderError(
@@ -513,11 +518,9 @@ class OpenAICompatibleProvider:
             except ValueError:
                 parsed_error = {}
             if isinstance(parsed_error, dict):
-                err = parsed_error.get("error")
-                if isinstance(err, dict):
-                    message = str(err.get("message", "")).strip() or message
-                elif isinstance(err, str) and err.strip():
-                    message = err.strip()
+                _, extracted_message = _extract_error_details(parsed_error)
+                if extracted_message:
+                    message = extracted_message
             status = int(error.code)
             if status in {401, 403}:
                 raise ProviderError(

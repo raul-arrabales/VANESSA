@@ -72,6 +72,49 @@ def test_chunk_text_uses_strict_sliding_windows_with_overlap():
     ]
 
 
+class _RoundTripDriftTokenizer:
+    def encode(self, text: str) -> list[int]:
+        token_ids: list[int] = []
+        for token in text.split():
+            if token.startswith("t") and token[1:].isdigit():
+                token_ids.append(int(token[1:]))
+                continue
+            if token == "expand-2":
+                token_ids.extend([2, 200])
+                continue
+            raise AssertionError(f"Unexpected token: {token}")
+        return token_ids
+
+    def decode(self, token_ids: list[int]) -> str:
+        parts: list[str] = []
+        for token_id in token_ids:
+            if token_id == 2:
+                parts.append("expand-2")
+            elif token_id == 200:
+                parts.append("tail-2")
+            else:
+                parts.append(f"t{token_id}")
+        return " ".join(parts)
+
+
+def test_chunk_text_shrinks_decoded_windows_until_they_round_trip_within_limit():
+    tokenizer = _RoundTripDriftTokenizer()
+
+    chunks = context_management_chunking.chunk_text(
+        "t0 t1 t2 t3 t4",
+        chunking=_fixed_length_chunking(chunk_length=3, chunk_overlap=1),
+        tokenizer=tokenizer,
+    )
+
+    assert chunks == [
+        "t0 t1",
+        "t1 expand-2",
+        "expand-2 t3",
+        "t3 t4",
+    ]
+    assert [len(tokenizer.encode(chunk)) for chunk in chunks] == [2, 3, 3, 2]
+
+
 def test_chunk_text_strips_empty_input():
     chunks = context_management_chunking.chunk_text(
         "   ",

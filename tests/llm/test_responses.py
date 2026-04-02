@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import types
 from pathlib import Path
+from urllib.error import HTTPError
 
 import pytest
 from fastapi import HTTPException
@@ -184,6 +185,46 @@ def test_embeddings_maps_openai_error_payloads_even_when_upstream_returns_200(mo
     assert exc_info.value.status_code == 400
     assert exc_info.value.code == "local_vllm_bad_request"
     assert exc_info.value.message == "The model does not support Embeddings API"
+
+
+def test_embeddings_preserve_fastapi_detail_messages_from_upstream_http_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = OpenAICompatibleProvider(
+        base_url="http://example.test/v1",
+        timeout_seconds=5,
+        auth_header_value=None,
+        provider_code_prefix="local_vllm",
+    )
+
+    class _FakeHTTPError(HTTPError):
+        def __init__(self) -> None:
+            super().__init__(
+                url="http://example.test/v1/embeddings",
+                code=400,
+                msg="Bad Request",
+                hdrs=None,
+                fp=None,
+            )
+
+        def read(self) -> bytes:
+            return (
+                b'{"detail":{"code":"local_vllm_bad_request","message":"This model\'s maximum context length is '
+                b'256 tokens. However, you requested 258 tokens in the input for embedding generation."}}'
+            )
+
+    def _raise_http_error(*_args, **_kwargs):
+        raise _FakeHTTPError()
+
+    monkeypatch.setattr("app.providers.openai_compat.urlopen", _raise_http_error)
+
+    with pytest.raises(ProviderError) as exc_info:
+        provider.embed(
+            EmbeddingRequest(model="local-vllm-embeddings-default", input=["hello"]),
+            upstream_model="/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.code == "local_vllm_bad_request"
+    assert "maximum context length is 256 tokens" in exc_info.value.message
 
 
 def test_chat_completion_normalizes_provider_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:

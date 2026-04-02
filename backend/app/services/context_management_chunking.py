@@ -282,18 +282,39 @@ def _chunk_fixed_length_tokens(
     token_ids = tokenizer.encode(text)
     if not token_ids:
         return []
-    step = config.chunk_length - config.chunk_overlap
     chunks: list[str] = []
-    for start in range(0, len(token_ids), step):
-        window = token_ids[start : start + config.chunk_length]
-        if not window:
+    start = 0
+    while start < len(token_ids):
+        decoded, accepted_end = _fit_decoded_chunk_to_token_limit(
+            token_ids,
+            start=start,
+            max_chunk_length=config.chunk_length,
+            tokenizer=tokenizer,
+        )
+        if not decoded or accepted_end <= start:
+            start += 1
+            continue
+        chunks.append(decoded)
+        if accepted_end >= len(token_ids):
             break
-        decoded = tokenizer.decode(window).strip()
-        if decoded:
-            chunks.append(decoded)
-        if start + config.chunk_length >= len(token_ids):
-            break
+        start = max(accepted_end - config.chunk_overlap, start + 1)
     return chunks
+
+
+def _fit_decoded_chunk_to_token_limit(
+    token_ids: list[int],
+    *,
+    start: int,
+    max_chunk_length: int,
+    tokenizer: TextTokenizer,
+) -> tuple[str, int]:
+    accepted_end = min(start + max_chunk_length, len(token_ids))
+    while accepted_end > start:
+        decoded = tokenizer.decode(token_ids[start:accepted_end]).strip()
+        if decoded and len(tokenizer.encode(decoded)) <= max_chunk_length:
+            return decoded, accepted_end
+        accepted_end -= 1
+    return "", start
 
 
 def _resolve_openai_compatible_cloud_tokenizer(knowledge_base: dict[str, Any]) -> TextTokenizer:

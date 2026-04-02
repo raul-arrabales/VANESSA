@@ -30,6 +30,7 @@ def embed_text_inputs_with_target(
 ) -> dict[str, Any]:
     normalized_texts = _normalize_inputs(texts)
     adapter = resolve_embeddings_adapter(database_url, config, provider_instance_id=provider_instance_id)
+    resource_id = str(model or _runtime_identifier_for_resource(adapter.binding.default_resource or {})).strip() or None
     payload, status_code = adapter.embed_texts(texts=normalized_texts, model=model)
     provider_row = platform_repo.get_provider_instance(database_url, adapter.binding.provider_instance_id)
     recovery_inspection: dict[str, Any] | None = None
@@ -46,6 +47,7 @@ def embed_text_inputs_with_target(
             payload, status_code = adapter.embed_texts(texts=normalized_texts, model=model)
 
     if payload is None or not 200 <= status_code < 300:
+        upstream_message = _upstream_embeddings_error_message(payload)
         if _is_actionable_local_embeddings_runtime_failure(
             provider_row=provider_row,
             recovery_inspection=recovery_inspection,
@@ -64,6 +66,7 @@ def embed_text_inputs_with_target(
                 details={
                     "status_code": status_code,
                     "provider": adapter.binding.provider_slug,
+                    "resource_id": resource_id,
                     "loaded_managed_model_id": recovery_inspection.get("slot", {}).get("loaded_managed_model_id")
                     if isinstance(recovery_inspection, dict)
                     else None,
@@ -86,14 +89,21 @@ def embed_text_inputs_with_target(
                 details={
                     "status_code": status_code,
                     "provider": adapter.binding.provider_slug,
+                    "resource_id": resource_id,
                     **oversized_input_details,
                 },
             )
+        normalized_status = status_code if status_code >= 400 else 502
         raise PlatformControlPlaneError(
             "embeddings_request_failed",
-            "Unable to generate embeddings",
-            status_code=502 if status_code < 500 else status_code,
-            details={"status_code": status_code, "provider": adapter.binding.provider_slug},
+            upstream_message or "Unable to generate embeddings",
+            status_code=normalized_status,
+            details={
+                "status_code": status_code,
+                "provider": adapter.binding.provider_slug,
+                "resource_id": resource_id,
+                "upstream_message": upstream_message,
+            },
         )
 
     embeddings = payload.get("embeddings")
@@ -116,7 +126,7 @@ def embed_text_inputs_with_target(
             "deployment_profile_slug": adapter.binding.deployment_profile_slug,
             "default_resource_id": adapter.binding.default_resource_id,
         },
-        "resource_id": str(model or _runtime_identifier_for_resource(adapter.binding.default_resource or {})).strip() or None,
+        "resource_id": resource_id,
         "count": len(embeddings),
         "dimension": normalized_dimension,
         "embeddings": embeddings,
@@ -169,11 +179,7 @@ def _is_actionable_local_embeddings_runtime_failure(
 def _embeddings_input_too_large_details(payload: dict[str, Any] | None, status_code: int) -> dict[str, Any] | None:
     if status_code != 400 or not isinstance(payload, dict):
         return None
-    detail = payload.get("detail")
-    if isinstance(detail, dict):
-        raw_message = str(detail.get("message") or detail.get("error") or "").strip()
-    else:
-        raw_message = str(detail or payload.get("error") or payload.get("message") or "").strip()
+    raw_message = _upstream_embeddings_error_message(payload) or ""
     message = raw_message.lower()
     if not message:
         return None
@@ -194,3 +200,28 @@ def _embeddings_input_too_large_details(payload: dict[str, Any] | None, status_c
         parsed["max_input_tokens"] = int(match.group("max_input_tokens"))
         parsed["requested_tokens"] = int(match.group("requested_tokens"))
     return parsed
+
+
+def _upstream_embeddings_error_message(payload: dict[str, Any] | None) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    detail = payload.get("detail")
+    if isinstance(detail, dict):
+        message = str(detail.get("message") or detail.get("error") or "").strip()
+        if message:
+            return message
+    elif isinstance(detail, str):
+        message = detail.strip()
+        if message:
+            return message
+    error = payload.get("error")
+    if isinstance(error, dict):
+        message = str(error.get("message") or error.get("error") or "").strip()
+        if message:
+            return message
+    elif isinstance(error, str):
+        message = error.strip()
+        if message:
+            return message
+    message = str(payload.get("message") or "").strip()
+    return message or None

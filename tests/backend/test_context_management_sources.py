@@ -195,3 +195,80 @@ def test_sync_knowledge_source_wraps_unexpected_exception_with_persisted_message
     assert exc_info.value.details["original_exception_message"] is None
     assert persisted["finished_run"]["error_summary"] == "Knowledge source sync failed."
     assert persisted["source_result"]["last_sync_error"] == "Knowledge source sync failed."
+
+
+def test_sync_knowledge_source_persists_precise_embeddings_failure_message(monkeypatch: pytest.MonkeyPatch):
+    persisted: dict[str, object] = {}
+
+    knowledge_base = {
+      "id": "kb-primary",
+      "index_name": "kb_product_docs",
+      "schema_json": {},
+    }
+    source = {
+      "id": "source-1",
+      "display_name": "Patient Guides",
+      "relative_path": "patient_guides",
+      "include_globs": ["**/*.pdf"],
+      "exclude_globs": [],
+      "lifecycle_state": "active",
+    }
+    run = {
+      "id": "run-1",
+    }
+
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_source", lambda *_args, **_kwargs: source)
+    monkeypatch.setattr(context_management_sources, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_resolve_source_directory", lambda *_args, **_kwargs: ("patient_guides", object()))
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources.context_repo, "mark_knowledge_source_syncing", lambda *_args, **_kwargs: source)
+    monkeypatch.setattr(context_management_sources.context_repo, "create_sync_run", lambda *_args, **_kwargs: run)
+    monkeypatch.setattr(
+        context_management_sources,
+        "_sync_knowledge_source_documents",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            PlatformControlPlaneError(
+                "embeddings_input_too_large",
+                (
+                    "Unable to generate embeddings because at least one input exceeds the configured embeddings model "
+                    "context limit. Reduce chunk size before retrying."
+                ),
+                status_code=400,
+                details={"requested_tokens": 258, "max_input_tokens": 256},
+            )
+        ),
+    )
+
+    def _finish_sync_run(*_args, **kwargs):
+        persisted["finished_run"] = kwargs
+        return {"id": "run-1", "status": "error"}
+
+    def _set_knowledge_source_sync_result(*_args, **kwargs):
+        persisted["source_result"] = kwargs
+        return {"id": "source-1", "last_sync_status": "error"}
+
+    monkeypatch.setattr(context_management_sources.context_repo, "finish_sync_run", _finish_sync_run)
+    monkeypatch.setattr(
+        context_management_sources.context_repo,
+        "set_knowledge_source_sync_result",
+        _set_knowledge_source_sync_result,
+    )
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_sync_error", lambda *_args, **kwargs: persisted.setdefault("kb_error", kwargs))
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_sources.sync_knowledge_source(
+            "postgresql://ignored",
+            config=object(),
+            knowledge_base_id="kb-primary",
+            source_id="source-1",
+            updated_by_user_id=1,
+        )
+
+    assert exc_info.value.code == "embeddings_input_too_large"
+    assert str(exc_info.value) == (
+        "Unable to generate embeddings because at least one input exceeds the configured embeddings model "
+        "context limit. Reduce chunk size before retrying."
+    )
+    assert persisted["finished_run"]["error_summary"] == str(exc_info.value)
+    assert persisted["source_result"]["last_sync_error"] == str(exc_info.value)
