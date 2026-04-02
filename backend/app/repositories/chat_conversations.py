@@ -11,6 +11,7 @@ from ..db import get_connection
 PLAIN_CONVERSATION_KIND = "plain"
 KNOWLEDGE_CONVERSATION_KIND = "knowledge"
 _UNSET = object()
+UNSET = _UNSET
 
 
 def _conversation_select_sql() -> str:

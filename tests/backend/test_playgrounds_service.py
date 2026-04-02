@@ -270,3 +270,48 @@ def test_send_playground_message_persists_structured_knowledge_metadata(monkeypa
         "knowledge_base_id": "kb-primary",
     }
     assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 1}
+
+
+def test_update_playground_session_preserves_unchanged_fields_when_binding_kb(monkeypatch):
+    session_row = {
+        "id": "sess-knowledge",
+        "conversation_kind": "knowledge",
+        "title": "Knowledge session",
+        "title_source": "auto",
+        "model_id": "safe-small",
+        "knowledge_base_id": None,
+        "assistant_ref": "agent.knowledge_chat",
+        "created_at": "2026-03-18T11:00:00+00:00",
+        "updated_at": "2026-03-18T11:00:00+00:00",
+        "message_count": 0,
+    }
+
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_require_session",
+        lambda *_args, **_kwargs: session_row,
+    )
+
+    def _update_session(_database_url: str, **kwargs):
+        assert kwargs["title"] is playgrounds_service.SESSION_UNSET
+        assert kwargs["title_source"] is playgrounds_service.SESSION_UNSET
+        assert kwargs["assistant_ref"] is playgrounds_service.SESSION_UNSET
+        assert kwargs["model_id"] is playgrounds_service.SESSION_UNSET
+        assert kwargs["knowledge_base_id"] == "kb-primary"
+        return {
+            **session_row,
+            "knowledge_base_id": "kb-primary",
+        }
+
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "update_session", _update_session)
+
+    updated = playgrounds_service.update_playground_session(
+        "postgresql://ignored",
+        owner_user_id=10,
+        session_id="sess-knowledge",
+        payload={"knowledge_binding": {"knowledge_base_id": "kb-primary"}},
+    )
+
+    assert updated["knowledge_binding"]["knowledge_base_id"] == "kb-primary"
+    assert updated["title"] == "Knowledge session"
+    assert updated["model_selection"]["model_id"] == "safe-small"

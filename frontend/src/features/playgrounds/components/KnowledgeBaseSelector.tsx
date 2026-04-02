@@ -22,6 +22,7 @@ export default function KnowledgeBaseSelector({
         onChange={(event) => onChange(event.currentTarget.value)}
         disabled={disabled}
       >
+        <option value="">Select knowledge base</option>
         {knowledgeBases.map((knowledgeBase) => (
           <option key={knowledgeBase.id} value={knowledgeBase.id}>{knowledgeBase.display_name}</option>
         ))}

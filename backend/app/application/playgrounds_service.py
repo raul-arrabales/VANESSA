@@ -39,7 +39,7 @@ from .playground_execution import (
 DEFAULT_TITLE_SOURCE = "auto"
 DEFAULT_CHAT_TITLE = "New chat session"
 DEFAULT_KNOWLEDGE_TITLE = "New knowledge session"
-SESSION_UNSET = object()
+SESSION_UNSET = playgrounds_repository.UNSET
 
 PlaygroundSessionValidationError = PlaygroundExecutionValidationError
 list_knowledge_chat_knowledge_bases = list_runtime_knowledge_base_options

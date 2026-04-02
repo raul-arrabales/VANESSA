@@ -9,6 +9,25 @@ from urllib.request import Request, urlopen
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 5.0
 
 
+def _normalized_optional_identifier(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"none", "null"}:
+        return None
+    return normalized
+
+
+def _binding_timeout_seconds(binding: dict[str, Any]) -> float:
+    config = binding.get("config") if isinstance(binding.get("config"), dict) else {}
+    raw_timeout = config.get("request_timeout_seconds", _DEFAULT_HTTP_TIMEOUT_SECONDS)
+    try:
+        timeout_seconds = float(raw_timeout)
+    except (TypeError, ValueError):
+        return _DEFAULT_HTTP_TIMEOUT_SECONDS
+    return timeout_seconds if timeout_seconds > 0 else _DEFAULT_HTTP_TIMEOUT_SECONDS
+
+
 class LlmRuntimeClientError(RuntimeError):
     def __init__(self, *, code: str, message: str, status_code: int, details: dict[str, Any] | None = None):
         super().__init__(message)
@@ -140,6 +159,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             self._chat_url(),
             method="POST",
             payload=payload,
+            timeout_seconds=_binding_timeout_seconds(self.llm_binding),
         )
         if response_payload is None:
             raise LlmRuntimeClientError(
@@ -202,6 +222,7 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
             self._graphql_url(),
             method="POST",
             payload={"query": operation["query"]},
+            timeout_seconds=_binding_timeout_seconds(self.vector_binding),
         )
         if payload is None:
             error_code = "vector_runtime_timeout" if status_code == 504 else "vector_runtime_unreachable"
@@ -278,6 +299,7 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
                 "with_payload": True,
                 "with_vector": False,
             },
+            timeout_seconds=_binding_timeout_seconds(self.vector_binding),
         )
         if payload is None:
             error_code = "vector_runtime_timeout" if status_code == 504 else "vector_runtime_unreachable"
@@ -337,6 +359,7 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
             self._embeddings_url(),
             method="POST",
             payload=payload,
+            timeout_seconds=_binding_timeout_seconds(self.embeddings_binding),
         )
         if response_payload is None:
             raise EmbeddingsRuntimeClientError(
@@ -406,6 +429,7 @@ class HttpMcpToolRuntimeClient(McpToolRuntimeClient):
                 "arguments": arguments,
                 "request_metadata": request_metadata,
             },
+            timeout_seconds=_binding_timeout_seconds(self.mcp_binding),
         )
         if payload is None:
             error_code = "tool_runtime_timeout" if status_code == 504 else "tool_runtime_unreachable"
@@ -466,6 +490,7 @@ class HttpSandboxToolRuntimeClient(SandboxToolRuntimeClient):
                 "timeout_seconds": timeout_seconds,
                 "policy": policy,
             },
+            timeout_seconds=_binding_timeout_seconds(self.sandbox_binding),
         )
         if payload is None:
             error_code = "tool_runtime_timeout" if status_code == 504 else "tool_runtime_unreachable"
@@ -947,7 +972,7 @@ def _build_weaviate_query_operation(
     query = (
         "{ Get { "
         f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id score }} }} '
-        "} } }"
+        "} }"
     )
     return {"query": query, "score_kind": "similarity"}
 
@@ -1098,11 +1123,11 @@ def _resolve_runtime_model_identifier(
     resource: dict[str, Any],
     error_cls: type[LlmRuntimeClientError] | type[EmbeddingsRuntimeClientError],
 ) -> str:
-    provider_resource_id = str(resource.get("provider_resource_id", "")).strip()
+    provider_resource_id = _normalized_optional_identifier(resource.get("provider_resource_id"))
     if provider_resource_id:
         return provider_resource_id
     metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
-    provider_model_id = str(metadata.get("provider_model_id", "")).strip()
+    provider_model_id = _normalized_optional_identifier(metadata.get("provider_model_id"))
     if provider_model_id:
         return provider_model_id
     return _resolve_local_runtime_model_identifier(binding=binding, served_model=resource, error_cls=error_cls)
@@ -1130,11 +1155,38 @@ def _resolve_local_runtime_model_identifier(
         for item in (models_payload.get("data") if isinstance(models_payload.get("data"), list) else [])
         if isinstance(item, dict) and str(item.get("id", "")).strip()
     }
+    metadata = served_model.get("metadata") if isinstance(served_model.get("metadata"), dict) else {}
+    binding_config = binding.get("config") if isinstance(binding.get("config"), dict) else {}
+    served_local_path = _normalized_optional_identifier(served_model.get("local_path")) or _normalized_optional_identifier(
+        metadata.get("local_path")
+    )
+    served_managed_model_id = _normalized_optional_identifier(
+        served_model.get("managed_model_id")
+    ) or _normalized_optional_identifier(metadata.get("managed_model_id"))
+    loaded_local_path = _normalized_optional_identifier(binding_config.get("loaded_local_path"))
+    loaded_managed_model_id = _normalized_optional_identifier(binding_config.get("loaded_managed_model_id"))
+    local_runtime_fallbacks: tuple[str | None, ...] = ()
+    if (
+        loaded_local_path
+        and served_local_path
+        and loaded_local_path == served_local_path
+    ) or (
+        loaded_managed_model_id
+        and served_managed_model_id
+        and loaded_managed_model_id == served_managed_model_id
+    ):
+        local_runtime_fallbacks = (
+            _normalized_optional_identifier(binding_config.get("loaded_runtime_model_id")),
+            _normalized_optional_identifier(binding_config.get("forced_model_id")),
+            _normalized_optional_identifier(binding_config.get("canonical_local_model_id")),
+            _normalized_optional_identifier(binding_config.get("local_fallback_model_id")),
+        )
     for candidate in (
-        str(served_model.get("local_path", "")).strip(),
-        str(served_model.get("id", "")).strip(),
-        str(served_model.get("name", "")).strip(),
-        str(served_model.get("source_id", "")).strip(),
+        served_local_path,
+        _normalized_optional_identifier(served_model.get("id")),
+        _normalized_optional_identifier(served_model.get("name")),
+        _normalized_optional_identifier(served_model.get("source_id")),
+        *local_runtime_fallbacks,
     ):
         if candidate and candidate in available_ids:
             return candidate

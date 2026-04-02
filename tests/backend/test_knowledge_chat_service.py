@@ -157,6 +157,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             "requested_by_user_id": 7,
             "requested_by_role": "user",
             "runtime_profile": "offline",
+            "timeout_seconds": 70.0,
             "platform_runtime": {
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {

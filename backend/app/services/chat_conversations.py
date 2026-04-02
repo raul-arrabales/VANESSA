@@ -15,7 +15,7 @@ DEFAULT_CONVERSATION_TITLE = "New conversation"
 DEFAULT_TITLE_SOURCE = "auto"
 MAX_CONTEXT_MESSAGES = 14
 CONTEXT_CHAR_BUDGET = 8000
-CHAT_CONVERSATION_UNSET = object()
+CHAT_CONVERSATION_UNSET = chat_repository.UNSET
 
 
 class ChatConversationValidationError(ValueError):

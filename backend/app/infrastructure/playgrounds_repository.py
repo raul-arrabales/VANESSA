@@ -4,6 +4,8 @@ from typing import Any
 
 from ..repositories import chat_conversations as chat_repository
 
+UNSET = chat_repository.UNSET
+
 
 def list_sessions(
     database_url: str,
@@ -69,11 +71,11 @@ def update_session(
     *,
     owner_user_id: int,
     conversation_id: str,
-    title: object = chat_repository._UNSET,
-    title_source: object = chat_repository._UNSET,
-    assistant_ref: object = chat_repository._UNSET,
-    model_id: object = chat_repository._UNSET,
-    knowledge_base_id: object = chat_repository._UNSET,
+    title: object = UNSET,
+    title_source: object = UNSET,
+    assistant_ref: object = UNSET,
+    model_id: object = UNSET,
+    knowledge_base_id: object = UNSET,
     conversation_kind: str,
 ) -> dict[str, Any] | None:
     return chat_repository.update_conversation(

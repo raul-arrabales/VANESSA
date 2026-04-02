@@ -3,7 +3,9 @@ import {
   createPlaygroundSession,
   getPlaygroundSession,
   listPlaygroundSessions,
+  updatePlaygroundSession,
 } from "../../../api/playgrounds";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions, PlaygroundSessionViewModel } from "../types";
 import { mapPlaygroundSessionDetail, mapPlaygroundSessionSummary } from "../types";
 import { sortSessions } from "../utils";
@@ -25,6 +27,7 @@ export function usePlaygroundSessions({
   config,
   options,
 }: UsePlaygroundSessionsParams) {
+  const { showErrorFeedback } = useActionFeedback();
   const [sessions, setSessions] = useState<PlaygroundSessionViewModel[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<PlaygroundSessionViewModel | null>(null);
@@ -127,8 +130,52 @@ export function usePlaygroundSessions({
     const load = async (): Promise<void> => {
       try {
         const session = await getPlaygroundSession(activeSessionId, config.playgroundKind, token);
+        const loadedSession = mapPlaygroundSessionDetail(session);
+        const needsKnowledgeBaseRepair = (
+          config.playgroundKind === "knowledge"
+          && config.selectors.knowledgeBase
+          && !session.knowledge_binding.knowledge_base_id
+          && Boolean(options.defaultKnowledgeBaseId)
+        );
+        if (needsKnowledgeBaseRepair) {
+          try {
+            const repaired = await updatePlaygroundSession(
+              activeSessionId,
+              {
+                knowledge_binding: {
+                  knowledge_base_id: options.defaultKnowledgeBaseId,
+                },
+              },
+              token,
+            );
+            if (!cancelled) {
+              const repairedSummary = mapPlaygroundSessionSummary(repaired);
+              setSessions((existing) => sortSessions([
+                {
+                  ...repairedSummary,
+                  messages: [],
+                },
+                ...existing.filter((item) => item.id !== repairedSummary.id),
+              ]));
+              setActiveSession({
+                ...loadedSession,
+                ...repairedSummary,
+                messages: loadedSession.messages,
+              });
+              setError("");
+            }
+            return;
+          } catch (requestError) {
+            if (!cancelled) {
+              setActiveSession(loadedSession);
+              setError(requestError instanceof Error ? requestError.message : config.feedback.updateKnowledgeBaseError);
+              showErrorFeedback(requestError, config.feedback.updateKnowledgeBaseError);
+            }
+            return;
+          }
+        }
         if (!cancelled) {
-          setActiveSession(mapPlaygroundSessionDetail(session));
+          setActiveSession(loadedSession);
           setError("");
         }
       } catch (requestError) {
@@ -142,7 +189,17 @@ export function usePlaygroundSessions({
     return () => {
       cancelled = true;
     };
-  }, [activeSession?.id, activeSessionId, config.feedback.sessionError, config.playgroundKind, token]);
+  }, [
+    activeSession?.id,
+    activeSessionId,
+    config.feedback.sessionError,
+    config.feedback.updateKnowledgeBaseError,
+    config.playgroundKind,
+    config.selectors.knowledgeBase,
+    options.defaultKnowledgeBaseId,
+    showErrorFeedback,
+    token,
+  ]);
 
   const canCreateSession = useMemo(
     () => options.models.length > 0 && sessions.every((session) => session.messageCount > 0),

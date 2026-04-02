@@ -315,3 +315,24 @@ def test_update_plain_conversation_marks_title_as_manual(monkeypatch: pytest.Mon
     assert updated["titleSource"] == "manual"
     assert conversations["conv-1"]["title"] == "Renamed thread"
     assert conversations["conv-1"]["title_source"] == "manual"
+    assert conversations["conv-1"]["model_id"] == "safe-small"
+
+
+def test_update_plain_conversation_preserves_title_when_only_model_changes(monkeypatch: pytest.MonkeyPatch) -> None:
+    conversations = {"conv-1": _conversation_row("conv-1", title="Pinned thread", title_source="manual")}
+    messages: dict[str, list[dict[str, object]]] = {"conv-1": []}
+    _install_fake_repo(monkeypatch, conversations=conversations, messages=messages)
+
+    updated = service.update_plain_conversation(
+        "postgresql://ignored",
+        owner_user_id=7,
+        conversation_id="conv-1",
+        model_id="safe-large",
+    )
+
+    assert updated["modelId"] == "safe-large"
+    assert updated["title"] == "Pinned thread"
+    assert updated["titleSource"] == "manual"
+    assert conversations["conv-1"]["title"] == "Pinned thread"
+    assert conversations["conv-1"]["title_source"] == "manual"
+    assert conversations["conv-1"]["model_id"] == "safe-large"

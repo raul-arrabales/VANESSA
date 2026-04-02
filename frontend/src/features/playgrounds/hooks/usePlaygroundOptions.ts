@@ -47,6 +47,7 @@ export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlay
           return;
         }
         const assistants = payload.assistants.filter((assistant) => assistant.playground_kind === config.playgroundKind);
+        const hasExplicitDefaultKnowledgeBase = Object.prototype.hasOwnProperty.call(payload, "default_knowledge_base_id");
         setOptions({
           models: payload.models.map((model) => ({
             id: model.id,
@@ -55,7 +56,9 @@ export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlay
           assistants,
           knowledgeBases: payload.knowledge_bases,
           defaultAssistantRef: config.defaultAssistantRef ?? assistants[0]?.assistant_ref ?? null,
-          defaultKnowledgeBaseId: payload.default_knowledge_base_id ?? payload.knowledge_bases[0]?.id ?? null,
+          defaultKnowledgeBaseId: hasExplicitDefaultKnowledgeBase
+            ? (payload.default_knowledge_base_id ?? null)
+            : (payload.knowledge_bases[0]?.id ?? null),
           configurationMessage: payload.configuration_message ?? "",
         });
         setError("");

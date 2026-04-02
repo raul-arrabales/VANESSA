@@ -44,6 +44,7 @@ def _platform_runtime(
                 "chat_completion_path": "/v1/chat/completions",
                 "request_format": request_format,
                 "forced_model_id": "local-default-model",
+                "request_timeout_seconds": 60,
             },
             "resources": [
                 {
@@ -87,6 +88,7 @@ def _platform_runtime(
             "config": {
                 "embeddings_path": "/v1/embeddings",
                 "forced_model_id": "local-vllm-embeddings-default",
+                "request_timeout_seconds": 60,
                 **(embeddings_config or {}),
             },
             "resources": [
@@ -160,10 +162,12 @@ def _platform_runtime(
 
 def test_openai_compatible_runtime_client_supports_vanessa_gateway_payloads(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
+    seen_timeouts: list[float] = []
 
     def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
-        del url, method, headers, timeout_seconds
+        del url, method, headers
         seen_payloads.append(dict(payload or {}))
+        seen_timeouts.append(timeout_seconds)
         return {"output": [{"role": "assistant", "content": [{"type": "text", "text": "gateway reply"}]}]}, 200
 
     monkeypatch.setattr(runtime_client, "http_json_request", _request)
@@ -186,6 +190,7 @@ def test_openai_compatible_runtime_client_supports_vanessa_gateway_payloads(monk
             "input": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
         }
     ]
+    assert seen_timeouts == [60.0]
 
 
 def test_openai_compatible_runtime_client_supports_openai_chat_responses(monkeypatch: pytest.MonkeyPatch):
@@ -216,6 +221,62 @@ def test_openai_compatible_runtime_client_supports_openai_chat_responses(monkeyp
         {
             "model": "local-default-model",
             "messages": [{"role": "user", "content": "hello"}],
+        }
+    ]
+
+
+def test_openai_compatible_runtime_client_uses_loaded_runtime_model_id_for_matching_local_binding(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen_payloads: list[dict[str, object]] = []
+    runtime = _platform_runtime()
+    llm = runtime["capabilities"]["llm_inference"]
+    assert isinstance(llm, dict)
+    llm["config"] = {
+        **dict(llm.get("config") or {}),
+        "loaded_runtime_model_id": "loaded",
+        "loaded_local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+    }
+    llm["resources"] = [
+        {
+            "id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "resource_kind": "model",
+            "ref_type": "managed_model",
+            "managed_model_id": "Qwen--Qwen2.5-0.5B-Instruct",
+            "provider_resource_id": None,
+            "display_name": "Qwen2.5-0.5B-Instruct",
+            "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+            "source_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "metadata": {
+                "provider_model_id": None,
+                "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+                "source_id": "Qwen/Qwen2.5-0.5B-Instruct",
+            },
+        }
+    ]
+    llm["default_resource_id"] = "Qwen--Qwen2.5-0.5B-Instruct"
+    llm["default_resource"] = dict(llm["resources"][0])
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del headers, timeout_seconds
+        if url.endswith("/v1/models"):
+            return {"data": [{"id": "loaded"}]}, 200
+        seen_payloads.append(dict(payload or {}))
+        return {"output": [{"role": "assistant", "content": [{"type": "text", "text": "llm reply"}]}]}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_llm_runtime_client(runtime)
+
+    payload = client.chat_completion(
+        requested_model="Qwen--Qwen2.5-0.5B-Instruct",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+    )
+
+    assert payload["requested_model"] == "Qwen--Qwen2.5-0.5B-Instruct"
+    assert seen_payloads == [
+        {
+            "model": "loaded",
+            "input": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
         }
     ]
 
@@ -313,6 +374,7 @@ def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results
             }
         ],
     }
+    assert str(seen_payloads[0]["query"]).count("{") == str(seen_payloads[0]["query"]).count("}")
     assert "nearVector: { vector: [0.1, 0.2] }" in str(seen_payloads[0])
     assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in str(seen_payloads[0])
 
@@ -398,10 +460,12 @@ def test_qdrant_vector_runtime_client_builds_similarity_query_and_normalizes_res
 
 def test_openai_compatible_embeddings_runtime_client_returns_vectors(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
+    seen_timeouts: list[float] = []
 
     def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
-        del url, method, headers, timeout_seconds
+        del url, method, headers
         seen_payloads.append(dict(payload or {}))
+        seen_timeouts.append(timeout_seconds)
         return {"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}, 200
 
     monkeypatch.setattr(runtime_client, "http_json_request", _request)
@@ -416,6 +480,7 @@ def test_openai_compatible_embeddings_runtime_client_returns_vectors(monkeypatch
         "requested_model": "local-vllm-embeddings-default",
     }
     assert seen_payloads == [{"model": "local-vllm-embeddings-default", "input": ["hello"]}]
+    assert seen_timeouts == [60.0]
 
 
 def test_openai_compatible_embeddings_runtime_client_surfaces_upstream_bad_requests(
@@ -439,6 +504,62 @@ def test_openai_compatible_embeddings_runtime_client_surfaces_upstream_bad_reque
     assert exc_info.value.code == "embeddings_runtime_request_failed"
     assert exc_info.value.status_code == 400
     assert exc_info.value.details["upstream"]["error"]["message"] == "The model does not support Embeddings API"
+
+
+def test_openai_compatible_embeddings_runtime_client_resolves_local_model_when_provider_model_id_is_null(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen_requests: list[tuple[str, dict[str, object] | None]] = []
+    runtime = _platform_runtime()
+    embeddings = runtime["capabilities"]["embeddings"]
+    assert isinstance(embeddings, dict)
+    embeddings["resources"] = [
+        {
+            "id": "sentence-transformers--all-MiniLM-L6-v2",
+            "resource_kind": "model",
+            "ref_type": "managed_model",
+            "managed_model_id": "sentence-transformers--all-MiniLM-L6-v2",
+            "provider_resource_id": None,
+            "display_name": "all-MiniLM-L6-v2",
+            "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+            "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            "metadata": {
+                "provider_model_id": None,
+                "local_path": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                "source_id": "sentence-transformers/all-MiniLM-L6-v2",
+            },
+        }
+    ]
+    embeddings["default_resource_id"] = "sentence-transformers--all-MiniLM-L6-v2"
+    embeddings["default_resource"] = dict(embeddings["resources"][0])
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del headers, timeout_seconds
+        seen_requests.append((url, dict(payload) if isinstance(payload, dict) else None))
+        if url.endswith("/v1/models"):
+            return {
+                "data": [
+                    {
+                        "id": "/models/llm/sentence-transformers--all-MiniLM-L6-v2",
+                    }
+                ]
+            }, 200
+        assert url.endswith("/v1/embeddings")
+        return {"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_embeddings_runtime_client(runtime)
+
+    payload = client.embed_texts(texts=["hello"])
+
+    assert payload["requested_model"] == "sentence-transformers--all-MiniLM-L6-v2"
+    assert seen_requests == [
+        ("http://llm:8000/v1/models", None),
+        (
+            "http://llm:8000/v1/embeddings",
+            {"model": "/models/llm/sentence-transformers--all-MiniLM-L6-v2", "input": ["hello"]},
+        ),
+    ]
 
 
 def test_mcp_tool_runtime_client_invokes_gateway(monkeypatch: pytest.MonkeyPatch):

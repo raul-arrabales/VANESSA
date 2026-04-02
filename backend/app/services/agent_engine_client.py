@@ -26,6 +26,7 @@ def _request_json(
     service_token: str,
     request_id: str,
     payload: dict[str, Any] | None = None,
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
 ) -> tuple[dict[str, Any], int]:
     headers = {
         "Content-Type": "application/json",
@@ -35,11 +36,17 @@ def _request_json(
     body = dumps(payload).encode("utf-8") if payload is not None else None
     req = Request(url, data=body, headers=headers, method=method)
     try:
-        with urlopen(req, timeout=_DEFAULT_HTTP_TIMEOUT_SECONDS) as response:
+        with urlopen(req, timeout=timeout_seconds) as response:
             status_code = int(response.status)
             raw = response.read().decode("utf-8")
             parsed = loads(raw) if raw else {}
             return parsed if isinstance(parsed, dict) else {}, status_code
+    except TimeoutError as error:
+        raise AgentEngineClientError(
+            code="agent_engine_timeout",
+            message="Agent engine timed out",
+            status_code=504,
+        ) from error
     except HTTPError as error:
         raw = error.read().decode("utf-8")
         parsed = loads(raw) if raw else {}
@@ -72,6 +79,7 @@ def create_execution(
     requested_by_role: str,
     runtime_profile: str,
     platform_runtime: dict[str, Any],
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
     org_id: str | None = None,
     group_id: str | None = None,
 ) -> tuple[dict[str, Any], int]:
@@ -94,6 +102,7 @@ def create_execution(
         payload=payload,
         service_token=service_token,
         request_id=request_id,
+        timeout_seconds=timeout_seconds,
     )
     execution_payload = parsed.get("execution")
     if not isinstance(execution_payload, dict):
@@ -112,12 +121,14 @@ def get_execution(
     service_token: str,
     request_id: str,
     execution_id: str,
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
 ) -> tuple[dict[str, Any], int]:
     parsed, status_code = _request_json(
         method="GET",
         url=f"{base_url.rstrip('/')}/v1/internal/agent-executions/{execution_id}",
         service_token=service_token,
         request_id=request_id,
+        timeout_seconds=timeout_seconds,
     )
     execution_payload = parsed.get("execution")
     if not isinstance(execution_payload, dict):

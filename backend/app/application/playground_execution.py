@@ -18,6 +18,7 @@ DEFAULT_TITLE = "New conversation"
 DEFAULT_TITLE_SOURCE = "auto"
 MAX_CONTEXT_MESSAGES = 14
 CONTEXT_CHAR_BUDGET = 8000
+_AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS = 10.0
 
 
 class PlaygroundExecutionValidationError(ValueError):
@@ -218,6 +219,7 @@ def execute_knowledge_request(
         requested_by_role=actor_user_role,
         runtime_profile=resolve_runtime_profile_impl(database_url),
         platform_runtime=platform_runtime,
+        timeout_seconds=max(float(config.llm_request_timeout_seconds), 1.0) + _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS,
     )
     execution_payload = response_payload.get("execution") if isinstance(response_payload.get("execution"), dict) else {}
     result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}

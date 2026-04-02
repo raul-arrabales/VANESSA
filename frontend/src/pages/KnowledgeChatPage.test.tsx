@@ -134,6 +134,56 @@ describe("KnowledgePlaygroundPage", () => {
     expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-1", { prompt: "First question" }, "token");
   });
 
+  it("auto-heals legacy knowledge sessions with no KB binding and lets the user send", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([
+      summary({
+        knowledge_binding: { knowledge_base_id: null },
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(
+      detail({
+        knowledge_binding: { knowledge_base_id: null },
+      }),
+    );
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValue(
+      summary({
+        knowledge_binding: { knowledge_base_id: "kb_primary" },
+      }),
+    );
+    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+      session: detail({
+        knowledge_binding: { knowledge_base_id: "kb_primary" },
+        message_count: 2,
+        messages: [
+          { id: "m1", role: "user", content: "Legacy question", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+          { id: "m2", role: "assistant", content: "legacy answer", metadata: { sources: [] }, createdAt: "2026-03-18T11:00:01Z" },
+        ],
+      }),
+      messages: [],
+      output: "legacy answer",
+      retrieval: { index: "knowledge_base", result_count: 0 },
+      sources: [],
+    });
+
+    await renderKnowledgeChat();
+
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
+      "sess-1",
+      { knowledge_binding: { knowledge_base_id: "kb_primary" } },
+      "token",
+    ));
+    expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+
+    await userEvent.type(screen.getByLabelText("Message"), "Legacy question");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+
+    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledWith(
+      "sess-1",
+      { prompt: "Legacy question" },
+      "token",
+    ));
+  });
+
   it("updates the knowledge-base selector through the canonical session API", async () => {
     playgroundApiMocks.updatePlaygroundSession.mockResolvedValue(
       summary({
@@ -162,6 +212,42 @@ describe("KnowledgePlaygroundPage", () => {
       { knowledge_binding: { knowledge_base_id: "kb_secondary" } },
       "token",
     ));
+  });
+
+  it("shows an honest empty selector state when no default KB is available", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([
+      summary({
+        knowledge_binding: { knowledge_base_id: null },
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(
+      detail({
+        knowledge_binding: { knowledge_base_id: null },
+      }),
+    );
+    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+      assistants: [],
+      models: [{ id: "safe-small", display_name: "Safe Small" }],
+      knowledge_bases: [
+        { id: "kb_primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: false },
+        { id: "kb_secondary", display_name: "Policies", index_name: "kb_policies", is_default: false },
+      ],
+      default_knowledge_base_id: null,
+      selection_required: true,
+      configuration_message: null,
+    });
+
+    await renderKnowledgeChat();
+
+    const selector = await screen.findByLabelText("Knowledge base");
+    expect(selector).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Select knowledge base" })).toBeVisible();
+
+    await userEvent.type(screen.getByLabelText("Message"), "Need an answer");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+
+    expect(screen.getByText("Knowledge base is required.")).toBeVisible();
+    expect(playgroundApiMocks.sendPlaygroundMessage).not.toHaveBeenCalled();
   });
 
   it("renders citations from persisted assistant metadata", async () => {

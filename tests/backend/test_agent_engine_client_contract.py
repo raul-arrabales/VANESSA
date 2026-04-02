@@ -23,11 +23,12 @@ def _golden_success_payload() -> dict[str, object]:
 
 def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
+    seen_timeouts: list[float] = []
 
     monkeypatch.setattr(
         agent_engine_client,
         "_request_json",
-        lambda **kwargs: seen_payloads.append(kwargs["payload"]) or (_golden_success_payload(), 201),
+        lambda **kwargs: seen_payloads.append(kwargs["payload"]) or seen_timeouts.append(kwargs["timeout_seconds"]) or (_golden_success_payload(), 201),
     )
 
     payload, status = agent_engine_client.create_execution(
@@ -59,6 +60,58 @@ def test_create_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
             },
         }
     ]
+    assert seen_timeouts == [agent_engine_client._DEFAULT_HTTP_TIMEOUT_SECONDS]
+
+
+def test_create_execution_accepts_explicit_timeout(monkeypatch: pytest.MonkeyPatch):
+    seen_timeouts: list[float] = []
+
+    monkeypatch.setattr(
+        agent_engine_client,
+        "_request_json",
+        lambda **kwargs: seen_timeouts.append(kwargs["timeout_seconds"]) or (_golden_success_payload(), 201),
+    )
+
+    payload, status = agent_engine_client.create_execution(
+        base_url="http://agent_engine:7000",
+        service_token="token",
+        request_id="req-timeout",
+        agent_id="agent.alpha",
+        execution_input={"prompt": "hello"},
+        requested_by_user_id=42,
+        requested_by_role="user",
+        runtime_profile="offline",
+        platform_runtime={
+            "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+            "capabilities": {},
+        },
+        timeout_seconds=45.0,
+    )
+
+    assert status == 201
+    assert payload["execution"]["id"] == "exec-1"
+    assert seen_timeouts == [45.0]
+
+
+def test_request_json_maps_transport_timeout_to_agent_engine_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        agent_engine_client,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError("timed out")),
+    )
+
+    with pytest.raises(agent_engine_client.AgentEngineClientError) as exc:
+        agent_engine_client._request_json(
+            method="POST",
+            url="http://agent_engine:7000/v1/internal/agent-executions",
+            service_token="token",
+            request_id="req-timeout",
+            payload={"agent_id": "agent.alpha"},
+            timeout_seconds=12.0,
+        )
+
+    assert exc.value.code == "agent_engine_timeout"
+    assert exc.value.status_code == 504
 
 
 def test_get_execution_validates_contract(monkeypatch: pytest.MonkeyPatch):
