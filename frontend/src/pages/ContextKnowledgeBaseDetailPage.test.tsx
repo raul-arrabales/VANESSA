@@ -513,7 +513,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     });
   });
 
-  it("renders the sources page and lets superadmins browse and sync sources", async () => {
+  it("renders the sources page with subviews and lets superadmins browse and sync sources", async () => {
     mockUser = {
       id: 1,
       email: "superadmin@example.com",
@@ -525,16 +525,65 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await renderContextWorkspace("/control/context/kb-primary/sources");
 
     expect(await screen.findByRole("heading", { name: "Sources" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Sync history" })).toBeVisible();
-    expect(screen.getByText(/Scanned 1 file/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add Source" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Existing Sources" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sync History" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Add source" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sync history" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Browse" }));
     await userEvent.click(await screen.findByRole("button", { name: "product_docs" }));
     await userEvent.click(screen.getByRole("button", { name: "Use current directory" }));
     expect(screen.getByDisplayValue("product_docs")).toBeVisible();
 
+    await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
+    expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
+
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
+  });
+
+  it("supports URL-driven source subviews and edit handoff", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/sources?view=history");
+
+    expect(await screen.findByRole("heading", { name: "Sync history" })).toBeVisible();
+    expect(screen.getByText(/Scanned 1 file/)).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
+    expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit source" })).toBeVisible();
+    expect(screen.getByDisplayValue("Docs folder")).toBeVisible();
+    expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+
+  });
+
+  it("falls back to the add-source subview for invalid superadmin source views", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/sources?view=unknown");
+
+    expect(await screen.findByRole("heading", { name: "Add source" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Sync history" })).not.toBeInTheDocument();
   });
 
   it("shows the backend sync failure message when source sync is rejected", async () => {
@@ -557,9 +606,21 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await renderContextWorkspace("/control/context/kb-primary/sources");
 
     await screen.findByRole("heading", { name: "Sources" });
+    await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
 
     expect(await screen.findByText(/chunk length 300 exceeds the safe maximum 254 tokens/i)).toBeVisible();
+  });
+
+  it("defaults non-superadmins to the existing sources view", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/sources");
+
+    expect(await screen.findByRole("heading", { name: "Sources" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Add Source" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Existing Sources" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sync History" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Existing sources" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
   });
 
   it("renders the retrieval page and runs retrieval queries", async () => {

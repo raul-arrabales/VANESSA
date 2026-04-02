@@ -370,6 +370,18 @@
     "queryDescription": "Ejecuta una consulta de recuperacion con el runtime del despliegue activo antes de vincular esta base de conocimiento a flujos del producto.",
     "sourcesTitle": "Fuentes",
     "sourcesDescription": "Administra fuentes de contenido repetibles que reconcilian documentos dentro de esta base de conocimiento.",
+    "sourceViews": {
+      "aria": "Secciones de gestion de fuentes",
+      "add": "Agregar fuente",
+      "list": "Fuentes existentes",
+      "history": "Historial de sincronizacion",
+      "addTitle": "Agregar fuente",
+      "addDescription": "Crea una fuente de contenido repetible o continua editando la fuente seleccionada actualmente.",
+      "editTitle": "Editar fuente",
+      "editDescription": "Actualiza la fuente de contenido seleccionada y guarda la nueva configuracion de sincronizacion para esta base de conocimiento.",
+      "listTitle": "Fuentes existentes",
+      "listDescription": "Revisa las fuentes ya configuradas para esta base de conocimiento y ejecuta acciones por fuente."
+    },
     "syncHistoryTitle": "Historial de sincronizacion",
     "syncHistoryDescription": "Revisa los intentos recientes de sincronizacion de fuentes y lo que cambio en cada ejecucion.",
     "documentsTitle": "Documentos",

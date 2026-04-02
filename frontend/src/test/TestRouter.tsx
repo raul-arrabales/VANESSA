@@ -8,9 +8,18 @@ type TestRouterProps = {
 };
 
 export default function TestRouter({ children, route = "/", routeState }: TestRouterProps): JSX.Element {
+  const parsedRoute = new URL(route, "http://localhost");
+
   return (
     <MemoryRouter
-      initialEntries={[{ pathname: route, state: routeState }]}
+      initialEntries={[
+        {
+          pathname: parsedRoute.pathname,
+          search: parsedRoute.search,
+          hash: parsedRoute.hash,
+          state: routeState,
+        },
+      ]}
       future={{
         v7_startTransition: true,
         v7_relativeSplatPath: true,

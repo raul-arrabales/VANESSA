@@ -376,6 +376,18 @@
     "queryDescription": "Run a retrieval query through the active deployment runtime before binding this knowledge base into product flows.",
     "sourcesTitle": "Sources",
     "sourcesDescription": "Manage repeatable content sources that reconcile documents into this knowledge base.",
+    "sourceViews": {
+      "aria": "Source management sections",
+      "add": "Add Source",
+      "list": "Existing Sources",
+      "history": "Sync History",
+      "addTitle": "Add source",
+      "addDescription": "Create a repeatable content source or continue editing the currently selected source.",
+      "editTitle": "Edit source",
+      "editDescription": "Update the selected content source and save the new sync settings for this knowledge base.",
+      "listTitle": "Existing sources",
+      "listDescription": "Review the sources already configured for this knowledge base and run per-source actions."
+    },
     "uploadTitle": "Upload documents",
     "uploadDescription": "Create or edit manual documents and upload supported files into this knowledge base.",
     "documentsBrowserTitle": "Browse documents",
