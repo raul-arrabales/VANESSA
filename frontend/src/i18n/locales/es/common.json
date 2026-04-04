@@ -46,6 +46,16 @@
     "settings": "Configuración",
     "designEditor": "Editor de diseno",
     "settingsMenuLabel": "Menú de identidad y configuración",
+    "pathCue": {
+      "aria": "Ubicacion actual"
+    },
+    "sidebar": {
+      "aria": "Navegacion de la aplicacion",
+      "open": "Abrir navegacion",
+      "close": "Cerrar navegacion",
+      "collapse": "Contraer barra lateral",
+      "expand": "Expandir barra lateral"
+    },
     "settingsHome": "Configuración",
     "settingsDesign": "Recursos de diseño",
     "breadcrumbs": {

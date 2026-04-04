@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
+import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import type { KnowledgeSource } from "../../../api/context";
 import { KnowledgeBaseSourceEditorSection } from "../components/KnowledgeBaseSourceEditorSection";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
@@ -28,6 +29,12 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = resolveSourcesPageView(searchParams.get("view"), detail.isSuperadmin);
   const availableViews = SOURCES_PAGE_VIEW_ORDER.filter((view) => detail.isSuperadmin || view !== "add");
+  const submenuItems = availableViews.map((view) => ({
+    id: view,
+    label: t(`contextManagement.sourceViews.${view}`),
+    isActive: activeView === view,
+    onSelect: () => handleChangeView(view),
+  }));
 
   function handleChangeView(view: SourcesPageView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -57,20 +64,7 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
               <h3 className="section-title">{t("contextManagement.sourcesTitle")}</h3>
               <p className="status-text">{t("contextManagement.sourcesDescription")}</p>
             </div>
-            <nav className="platform-subnav" aria-label={t("contextManagement.sourceViews.aria")}>
-              {availableViews.map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  className="link-chip"
-                  data-active={activeView === view ? "true" : "false"}
-                  aria-pressed={activeView === view}
-                  onClick={() => handleChangeView(view)}
-                >
-                  {t(`contextManagement.sourceViews.${view}`)}
-                </button>
-              ))}
-            </nav>
+            <PageSubmenuBar items={submenuItems} ariaLabel={t("contextManagement.sourceViews.aria")} />
           </section>
           {activeView === "add" ? (
             <KnowledgeBaseSourceEditorSection

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import PageSectionTabs from "../../../components/PageSectionTabs";
+import { PLATFORM_PAGE_NAV_ITEMS } from "../routes";
 
 type PlatformPageLayoutProps = {
   title: string;
@@ -9,12 +11,6 @@ type PlatformPageLayoutProps = {
   errorMessage?: string;
   children: ReactNode;
 };
-
-const subnavItems = [
-  { to: "/control/platform", labelKey: "platformControl.navigation.home" },
-  { to: "/control/platform/providers", labelKey: "platformControl.navigation.providers" },
-  { to: "/control/platform/deployments", labelKey: "platformControl.navigation.deployments" },
-];
 
 export default function PlatformPageLayout({
   title,
@@ -25,6 +21,14 @@ export default function PlatformPageLayout({
 }: PlatformPageLayoutProps): JSX.Element {
   const { t } = useTranslation("common");
   const location = useLocation();
+  const tabItems = PLATFORM_PAGE_NAV_ITEMS.map((item) => ({
+    id: item.id,
+    label: t(item.labelKey),
+    to: item.to,
+    isActive: item.to === "/control/platform"
+      ? location.pathname === item.to
+      : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
+  }));
 
   return (
     <section className="card-stack">
@@ -37,18 +41,7 @@ export default function PlatformPageLayout({
           </div>
           {actions ? <div className="platform-page-actions">{actions}</div> : null}
         </div>
-        <nav className="platform-subnav" aria-label={t("platformControl.navigation.aria")}>
-          {subnavItems.map((item) => {
-            const isActive = item.to === "/control/platform"
-              ? location.pathname === item.to
-              : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
-            return (
-              <Link key={item.to} className="link-chip" data-active={isActive ? "true" : "false"} to={item.to}>
-                {t(item.labelKey)}
-              </Link>
-            );
-          })}
-        </nav>
+        <PageSectionTabs items={tabItems} ariaLabel={t("platformControl.navigation.aria")} />
       </article>
 
       {errorMessage ? <p className="status-text error-text">{`${t("platformControl.feedback.prefix")} ${errorMessage}`}</p> : null}

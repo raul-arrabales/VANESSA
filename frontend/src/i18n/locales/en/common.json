@@ -51,6 +51,16 @@
     "settings": "Settings",
     "designEditor": "Design editor",
     "settingsMenuLabel": "Identity and settings menu",
+    "pathCue": {
+      "aria": "Current location"
+    },
+    "sidebar": {
+      "aria": "Application navigation",
+      "open": "Open navigation",
+      "close": "Close navigation",
+      "collapse": "Collapse sidebar",
+      "expand": "Expand sidebar"
+    },
     "settingsHome": "Settings",
     "settingsDesign": "Design resources",
     "breadcrumbs": {

@@ -1,0 +1,500 @@
+.app-shell {
+  --app-sidebar-width: 15.5rem;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.app-shell[data-sidebar-collapsed="true"] {
+  --app-sidebar-width: 4.75rem;
+}
+
+.app-sidebar.panel {
+  width: var(--app-sidebar-width);
+  min-width: var(--app-sidebar-width);
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-3);
+  position: sticky;
+  top: 0;
+  overflow: hidden;
+  z-index: 35;
+}
+
+.app-sidebar-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.app-sidebar-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.app-sidebar-toggle-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+}
+
+.app-sidebar-toggle-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-sidebar-toggle-icon {
+  transform: rotate(180deg);
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-sidebar-toggle-label {
+  display: none;
+}
+
+.app-sidebar-nav {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.app-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.app-sidebar-link {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.app-sidebar-link:hover,
+.app-sidebar-toggle:hover,
+.app-topbar-menu-button:hover {
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+}
+
+.app-sidebar-link[data-active="true"] {
+  color: var(--text-primary);
+  border-left-color: var(--accent-primary);
+  background: color-mix(in oklab, var(--accent-primary) 12%, var(--bg-surface));
+}
+
+.app-sidebar-link-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+}
+
+.app-sidebar-link-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.app-sidebar-link-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-sidebar-link {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-inline: var(--space-2);
+}
+
+.app-shell[data-sidebar-collapsed="true"] .app-sidebar-link-label {
+  display: none;
+}
+
+.app-sidebar-backdrop {
+  display: none;
+}
+
+.app-main {
+  min-width: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.app-main-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.app-topbar.panel {
+  margin: 0;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  padding: var(--space-2) var(--space-4);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  overflow: visible;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(16px);
+}
+
+.app-sidebar.panel::before,
+.app-topbar.panel::before {
+  content: none;
+}
+
+.app-topbar-leading,
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-topbar-actions {
+  justify-content: flex-end;
+}
+
+.app-topbar-menu-button {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-sm);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.app-topbar-menu-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.app-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+}
+
+.app-topbar-path {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: nowrap;
+  overflow: hidden;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.app-topbar-path-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.app-topbar-path-text,
+.app-topbar-path-current {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-topbar-path-link {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) var(--easing-standard),
+    text-decoration-color var(--duration-fast) var(--easing-standard);
+}
+
+.app-topbar-path-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--accent-primary) 55%, transparent);
+  text-underline-offset: 0.14em;
+}
+
+.app-topbar-path-link:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 80%, white);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.app-topbar-path-current {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.app-topbar-path-separator {
+  color: var(--text-secondary);
+}
+
+.app-topbar-runtime {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.app-topbar-runtime-note {
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.runtime-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.runtime-toggle-text {
+  white-space: nowrap;
+}
+
+.runtime-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.runtime-toggle-track {
+  width: 2.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.runtime-toggle-thumb {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 999px;
+  background: var(--text-secondary);
+  transition: transform var(--duration-fast) var(--easing-standard), background-color var(--duration-fast) var(--easing-standard);
+}
+
+.runtime-toggle input:checked + .runtime-toggle-track {
+  background: color-mix(in oklab, var(--accent-secondary) 35%, var(--bg-subtle));
+}
+
+.runtime-toggle input:checked + .runtime-toggle-track .runtime-toggle-thumb {
+  transform: translateX(0.95rem);
+  background: var(--accent-primary);
+}
+
+.runtime-toggle input:disabled + .runtime-toggle-track {
+  opacity: 0.65;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.38rem 0.72rem;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.user-menu-icon {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-muted);
+  background: color-mix(in oklab, var(--bg-subtle) 88%, transparent);
+  color: var(--accent-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-menu-icon svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  fill: currentColor;
+}
+
+.user-menu-label {
+  max-width: 12rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 10rem;
+  background: color-mix(in oklab, var(--bg-surface) 96%, transparent);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+  z-index: 120;
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+}
+
+.user-menu-item:hover {
+  background: color-mix(in oklab, var(--bg-subtle) 90%, transparent);
+}
+
+.user-menu-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-sidebar-toggle:focus-visible,
+.app-sidebar-link:focus-visible,
+.app-topbar-menu-button:focus-visible,
+.runtime-toggle:focus-within,
+.user-menu-trigger:focus-visible,
+.user-menu-item:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 80%, white);
+  outline-offset: 2px;
+}
+
+@media (max-width: 880px) {
+  .app-main-content {
+    padding-inline: var(--space-4);
+  }
+
+  .app-topbar.panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .app-topbar-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .app-topbar-runtime-note {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar.panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(18rem, 86vw);
+    min-width: min(18rem, 86vw);
+    transform: translateX(-110%);
+    transition: transform var(--duration-base) var(--easing-standard);
+    box-shadow: var(--shadow-3);
+  }
+
+  .app-sidebar[data-drawer-open="true"] {
+    transform: translateX(0);
+  }
+
+  .app-sidebar-backdrop[data-open="true"] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    border: 0;
+    padding: 0;
+    background: rgba(8, 17, 30, 0.32);
+    z-index: 34;
+  }
+
+  .app-topbar-menu-button {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-main-content {
+    padding: var(--space-3);
+  }
+}

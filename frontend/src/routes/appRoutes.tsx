@@ -1,6 +1,8 @@
 import { lazy, type JSX } from "react";
 import { matchPath } from "react-router-dom";
 import type { Role } from "../auth/types";
+import { hasRequiredRole } from "../auth/roles";
+import type { AppNavIconName } from "../components/AppNavIcon";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
@@ -59,6 +61,11 @@ export type AppRouteDefinition = {
   guestOnly?: boolean;
   navGroup?: AppRouteNavGroup;
   navAudience?: AppRouteAudience;
+  sidebar?: {
+    icon: AppNavIconName;
+    order: number;
+    labelKey?: string;
+  };
   element: JSX.Element;
 };
 
@@ -73,6 +80,10 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: false,
     navGroup: "primary",
     navAudience: "guest",
+    sidebar: {
+      icon: "home",
+      order: 10,
+    },
     element: <HomePage />,
   },
   {
@@ -86,6 +97,10 @@ export const appRoutes: AppRouteDefinition[] = [
     guestOnly: true,
     navGroup: "userMenu",
     navAudience: "guest",
+    sidebar: {
+      icon: "profile",
+      order: 20,
+    },
     element: <LoginPage />,
   },
   {
@@ -99,6 +114,10 @@ export const appRoutes: AppRouteDefinition[] = [
     guestOnly: true,
     navGroup: "userMenu",
     navAudience: "guest",
+    sidebar: {
+      icon: "profile",
+      order: 30,
+    },
     element: <RegisterPage />,
   },
   {
@@ -133,6 +152,10 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     navGroup: "userMenu",
     navAudience: "authenticated",
+    sidebar: {
+      icon: "adminPage",
+      order: 50,
+    },
     element: <ControlShellPage />,
   },
   {
@@ -166,6 +189,11 @@ export const appRoutes: AppRouteDefinition[] = [
     showInBreadcrumbs: true,
     requiresAuth: true,
     minimumRole: "user",
+    sidebar: {
+      icon: "models",
+      order: 40,
+      labelKey: "nav.agentBuilder",
+    },
     element: <AgentBuilderProjectsPage />,
   },
   {
@@ -460,6 +488,10 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     navGroup: "primary",
     navAudience: "authenticated",
+    sidebar: {
+      icon: "ai",
+      order: 20,
+    },
     element: <AiPage />,
   },
   {
@@ -480,6 +512,11 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
+    sidebar: {
+      icon: "ai",
+      order: 30,
+      labelKey: "nav.playgrounds",
+    },
     element: <PlaygroundsPage />,
   },
   {
@@ -508,6 +545,14 @@ function isRoutePrefix(pathname: string, routePath: string): boolean {
   return matchPath({ path: routePath, end: false }, pathname) !== null;
 }
 
+export function isAppRouteActive(pathname: string, routePath: string): boolean {
+  if (routePath === "/") {
+    return pathname === routePath;
+  }
+
+  return isRoutePrefix(pathname, routePath);
+}
+
 export function getBreadcrumbRoutes(pathname: string): AppRouteDefinition[] {
   return appRoutes
     .filter((route) => route.showInBreadcrumbs && isRoutePrefix(pathname, route.path))
@@ -533,4 +578,32 @@ export function getNavRoutes(
     }
     return true;
   });
+}
+
+export function getSidebarRoutes(
+  _pathname: string,
+  options: {
+    isAuthenticated: boolean;
+    role?: Role | null;
+  },
+): AppRouteDefinition[] {
+  const { isAuthenticated, role } = options;
+
+  return appRoutes
+    .filter((route) => {
+      if (!route.sidebar) {
+        return false;
+      }
+      if (route.guestOnly) {
+        return !isAuthenticated;
+      }
+      if (route.requiresAuth && !isAuthenticated) {
+        return false;
+      }
+      if (route.minimumRole && (!role || !hasRequiredRole(role, route.minimumRole))) {
+        return false;
+      }
+      return true;
+    })
+    .sort((left, right) => (left.sidebar?.order ?? 0) - (right.sidebar?.order ?? 0));
 }

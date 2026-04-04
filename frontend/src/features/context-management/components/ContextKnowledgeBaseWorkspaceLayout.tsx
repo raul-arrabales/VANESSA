@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
+import PageSectionTabs from "../../../components/PageSectionTabs";
 import type { KnowledgeBase } from "../../../api/context";
 import {
   buildKnowledgeBaseWorkspacePath,
@@ -19,6 +20,19 @@ export function ContextKnowledgeBaseWorkspaceLayout({
   const { t } = useTranslation("common");
   const { knowledgeBaseId = "" } = useParams();
   const location = useLocation();
+  const sectionTabs = CONTEXT_KNOWLEDGE_BASE_WORKSPACE_NAV_ITEMS.map((item) => {
+    const itemPath = buildKnowledgeBaseWorkspacePath(knowledgeBaseId, item.section);
+    const isActive = item.section === "overview"
+      ? location.pathname === itemPath
+      : location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
+
+    return {
+      id: item.section,
+      label: t(item.labelKey),
+      to: itemPath,
+      isActive,
+    };
+  });
 
   return (
     <section className="card-stack">
@@ -35,19 +49,7 @@ export function ContextKnowledgeBaseWorkspaceLayout({
             </Link>
           </div>
         </div>
-        <nav className="platform-subnav" aria-label={t("contextManagement.navigation.aria")}>
-          {CONTEXT_KNOWLEDGE_BASE_WORKSPACE_NAV_ITEMS.map((item) => {
-            const itemPath = buildKnowledgeBaseWorkspacePath(knowledgeBaseId, item.section);
-            const isActive = item.section === "overview"
-              ? location.pathname === itemPath
-              : location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
-            return (
-              <Link key={item.section} className="link-chip" data-active={isActive ? "true" : "false"} to={itemPath}>
-                {t(item.labelKey)}
-              </Link>
-            );
-          })}
-        </nav>
+        <PageSectionTabs items={sectionTabs} ariaLabel={t("contextManagement.navigation.aria")} />
       </article>
 
       {children}

@@ -1,0 +1,59 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  line-height: var(--line-height-body);
+  color: var(--text-primary);
+  position: relative;
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--lcars-rail-soft) 48%, transparent), transparent 26%),
+    radial-gradient(circle at 85% 0%, color-mix(in oklab, var(--accent-secondary) 16%, transparent), transparent 34%),
+    linear-gradient(150deg, var(--bg-canvas) 0%, color-mix(in oklab, var(--bg-canvas) 70%, var(--bg-subtle)) 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--theme-overlay-opacity);
+  background:
+    linear-gradient(180deg, transparent 0%, var(--theme-overlay-accent) 100%),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.04) 0,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  mix-blend-mode: screen;
+}
+
+[data-theme-family="retro"] body {
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--accent-secondary) 18%, transparent), transparent 34%),
+    linear-gradient(180deg, color-mix(in oklab, var(--bg-canvas) 70%, black) 0%, var(--bg-canvas) 100%);
+}
+
+a {
+  color: inherit;
+}
+

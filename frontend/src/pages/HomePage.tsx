@@ -2,14 +2,27 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../auth/AuthProvider";
 import QuoteOfTheDayCard from "../components/QuoteOfTheDayCard";
+import VanessaBrand from "../components/VanessaBrand";
 
 export default function HomePage(): JSX.Element {
   const { t } = useTranslation("common");
   const { isAuthenticated, user } = useAuth();
+  const welcomeBrand = (
+    <div className="app-brand welcome-page-brand">
+      <h1 className="app-brand-title">
+        <VanessaBrand
+          className="app-brand-display welcome-page-brand-display"
+          label={t("app.title")}
+          hoverMode="soft-glow"
+        />
+      </h1>
+    </div>
+  );
 
   if (!isAuthenticated) {
     return (
       <section className="panel card-stack">
+        {welcomeBrand}
         <h2 className="section-title">{t("home.guest.title")}</h2>
         <p className="status-text">{t("home.guest.description")}</p>
         <div className="toolbar" role="group" aria-label={t("home.guest.actions") }>
@@ -22,6 +35,7 @@ export default function HomePage(): JSX.Element {
 
   return (
     <section className="panel card-stack">
+      {welcomeBrand}
       <h2 className="section-title">{t("home.authenticated.title")}</h2>
       <p className="status-text">
         {t("home.authenticated.description", {

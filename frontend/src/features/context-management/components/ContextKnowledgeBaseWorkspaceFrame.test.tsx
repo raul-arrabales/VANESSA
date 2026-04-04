@@ -52,6 +52,7 @@ describe("ContextKnowledgeBaseWorkspaceFrame", () => {
     expect(screen.getByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByText("Loading knowledge bases...")).toBeVisible();
     expect(screen.getByText("frame-child")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Manage Sources" })).toHaveAttribute("href", "/control/context/kb-primary/sources");
   });
 

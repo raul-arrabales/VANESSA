@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
@@ -55,10 +55,11 @@ describe("App header", () => {
 
     const trigger = container.querySelector(".user-menu-trigger");
     expect(trigger).not.toBeNull();
-    expect(screen.getByTestId("phosphor-display")).toBeVisible();
+    expect(container.querySelector(".app-topbar-brand-mark")).not.toBeNull();
     expect(container.querySelector(".user-menu-icon")).not.toBeNull();
     expect(container.querySelector(".user-menu-label")).not.toBeNull();
     expect(container.querySelector(".app-brand")).not.toBeNull();
+    expect(container.querySelector(".welcome-page-brand-display")).not.toBeNull();
     expect(screen.getByRole("button", { name: await t("nav.guest") })).toBeVisible();
     expect(screen.getByRole("heading", { name: await t("app.title") })).toBeVisible();
     expect(screen.queryByText(await t("app.subtitle"))).toBeNull();
@@ -106,7 +107,9 @@ describe("App header", () => {
     await renderApp();
     await user.click(screen.getByRole("button", { name: "user" }));
 
-    expect(screen.getByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
+    const userMenuPanel = document.querySelector(".user-menu-panel");
+    expect(userMenuPanel).not.toBeNull();
+    expect(within(userMenuPanel as HTMLElement).getByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
   });
 
   it("enables runtime toggle for superadmin users", async () => {
@@ -182,9 +185,11 @@ describe("App header", () => {
     mockRuntimeError = "http://localhost:3000/";
 
     const container = await renderApp();
+    const topbar = container.querySelector(".app-topbar");
 
     expect(screen.getByRole("button", { name: await t("nav.guest") })).toBeVisible();
-    expect(container.querySelector(".app-header")).not.toHaveTextContent("http://localhost:3000/");
+    expect(topbar).not.toBeNull();
+    expect(topbar).not.toHaveTextContent("http://localhost:3000/");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -199,9 +204,11 @@ describe("App header", () => {
     mockRuntimeError = "http://localhost:3000/";
 
     const container = await renderApp();
+    const topbar = container.querySelector(".app-topbar");
 
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByText("http://localhost:3000/")).toBeVisible();
-    expect(container.querySelector(".app-header")).not.toHaveTextContent("http://localhost:3000/");
+    expect(topbar).not.toBeNull();
+    expect(topbar).not.toHaveTextContent("http://localhost:3000/");
   });
 });

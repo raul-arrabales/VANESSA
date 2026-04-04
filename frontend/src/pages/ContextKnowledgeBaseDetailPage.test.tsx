@@ -553,6 +553,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("button", { name: "Add Source" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Existing Sources" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Sync History" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add Source" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("heading", { name: "Add source" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sync history" })).not.toBeInTheDocument();
@@ -563,6 +564,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByDisplayValue("product_docs")).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
+    expect(screen.getByRole("button", { name: "Existing Sources" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
 

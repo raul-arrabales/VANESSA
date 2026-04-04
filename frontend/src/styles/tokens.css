@@ -1,0 +1,126 @@
+:root,
+[data-theme="default-day"] {
+  --font-body: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-heading: "Rajdhani", "Trebuchet MS", "Avenir Next", sans-serif;
+  --font-mono: "IBM Plex Mono", "Consolas", monospace;
+
+  --line-height-body: 1.5;
+  --line-height-heading: 1.15;
+  --tracking-heading: 0.08em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.75rem;
+  --space-8: 3.5rem;
+
+  --radius-sm: 0.45rem;
+  --radius-md: 0.85rem;
+  --radius-lg: 1.1rem;
+
+  --shadow-1: 0 6px 16px rgba(14, 28, 51, 0.08);
+  --shadow-2: 0 14px 34px rgba(14, 28, 51, 0.14);
+  --shadow-3: 0 24px 60px rgba(14, 28, 51, 0.2);
+
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+  --easing-standard: cubic-bezier(0.2, 0.7, 0, 1);
+
+  --bg-canvas: #ecf3fb;
+  --bg-surface: #f9fbff;
+  --bg-subtle: #e5edf8;
+  --text-primary: #0f213a;
+  --text-secondary: #385172;
+  --accent-primary: #0f62fe;
+  --accent-secondary: #1f7a99;
+  --border-muted: #bfd0e6;
+
+  --status-success: #0f7a3d;
+  --status-error: #b42318;
+
+  --lcars-rail: #f0a358;
+  --lcars-rail-soft: #ffd4a4;
+  --phosphor-on: color-mix(in oklab, var(--accent-primary) 70%, white);
+  --phosphor-off: color-mix(in oklab, var(--border-muted) 60%, transparent);
+  --phosphor-glow: color-mix(in oklab, var(--accent-primary) 20%, transparent);
+  --phosphor-glow-strong: color-mix(in oklab, var(--accent-primary) 34%, transparent);
+  --phosphor-screen: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+
+  --theme-overlay-opacity: 0;
+  --theme-overlay-accent: transparent;
+}
+
+[data-theme="default-night"] {
+  --bg-canvas: #08111e;
+  --bg-surface: #101c2d;
+  --bg-subtle: #16263a;
+  --text-primary: #e3eefc;
+  --text-secondary: #aac0dd;
+  --accent-primary: #78b3ff;
+  --accent-secondary: #73d1f1;
+  --border-muted: #30455f;
+
+  --status-success: #4bd58f;
+  --status-error: #ff8b87;
+
+  --lcars-rail: #ffb56f;
+  --lcars-rail-soft: #5a3a1b;
+  --phosphor-on: color-mix(in oklab, var(--accent-primary) 76%, white);
+  --phosphor-off: color-mix(in oklab, var(--border-muted) 72%, transparent);
+  --phosphor-glow: color-mix(in oklab, var(--accent-primary) 26%, transparent);
+  --phosphor-glow-strong: color-mix(in oklab, var(--accent-primary) 42%, transparent);
+  --phosphor-screen: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+
+  --shadow-1: 0 6px 16px rgba(0, 0, 0, 0.25);
+  --shadow-2: 0 14px 34px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="retro-terminal"] {
+  --font-body: "IBM Plex Mono", "Cascadia Mono", "Courier New", monospace;
+  --font-heading: "IBM Plex Mono", "Cascadia Mono", "Courier New", monospace;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", "Courier New", monospace;
+
+  --line-height-body: 1.55;
+  --line-height-heading: 1.2;
+  --tracking-heading: 0.12em;
+
+  --radius-sm: 0.18rem;
+  --radius-md: 0.28rem;
+  --radius-lg: 0.45rem;
+
+  --bg-canvas: #08140d;
+  --bg-surface: #0d1c13;
+  --bg-subtle: #11281b;
+  --text-primary: #d7ffd7;
+  --text-secondary: #8fd8a5;
+  --accent-primary: #63f59b;
+  --accent-secondary: #f4b860;
+  --border-muted: #2f6c49;
+
+  --status-success: #7dffa9;
+  --status-error: #ff9c6e;
+
+  --lcars-rail: #f0a93d;
+  --lcars-rail-soft: #4a3a1a;
+  --phosphor-on: color-mix(in oklab, var(--accent-primary) 88%, white);
+  --phosphor-off: color-mix(in oklab, var(--accent-primary) 34%, transparent);
+  --phosphor-glow: color-mix(in oklab, var(--accent-primary) 34%, transparent);
+  --phosphor-glow-strong: color-mix(in oklab, var(--accent-primary) 56%, transparent);
+  --phosphor-screen: color-mix(in oklab, var(--bg-surface) 78%, black 22%);
+
+  --shadow-1: 0 0 0 1px rgba(99, 245, 155, 0.18), 0 10px 28px rgba(0, 0, 0, 0.36);
+  --shadow-2: 0 0 0 1px rgba(99, 245, 155, 0.22), 0 16px 38px rgba(0, 0, 0, 0.44);
+  --shadow-3: 0 0 0 1px rgba(99, 245, 155, 0.28), 0 24px 56px rgba(0, 0, 0, 0.56);
+
+  --theme-overlay-opacity: 0.12;
+  --theme-overlay-accent: rgba(99, 245, 155, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+

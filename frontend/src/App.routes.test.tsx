@@ -547,35 +547,6 @@ describe("App superadmin models route", () => {
     expect(screen.queryByRole("link", { name: "Vanessa Core" })).toBeNull();
   });
 
-  it("always shows Home as the first breadcrumb link", async () => {
-    mockUser = {
-      id: 1,
-      email: "root@example.com",
-      username: "root",
-      role: "superadmin",
-      is_active: true,
-    };
-
-    await renderWithAppProviders(<App />, { route: "/control/models" });
-
-    const breadcrumbLinks = await screen.findAllByRole("link", { name: await t("nav.home") });
-    expect(breadcrumbLinks[0]).toHaveAttribute("href", "/");
-  });
-
-  it("renders the control breadcrumb with the control panel label", async () => {
-    mockUser = {
-      id: 1,
-      email: "root@example.com",
-      username: "root",
-      role: "superadmin",
-      is_active: true,
-    };
-
-    await renderWithAppProviders(<App />, { route: "/control/models" });
-
-    expect(await screen.findByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
-  });
-
   it("renders the model catalog subroute for authenticated users", async () => {
     mockUser = {
       id: 3,

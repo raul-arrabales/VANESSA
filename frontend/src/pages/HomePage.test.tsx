@@ -42,8 +42,40 @@ describe("HomePage quote of the day", () => {
 
     await renderHomePage();
 
+    expect(screen.getByRole("heading", { name: "VANESSA" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Quote of the day" })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the phosphor VANESSA banner above the authenticated welcome message", async () => {
+    mockUser = {
+      id: 2,
+      email: "pilot@example.com",
+      username: "pilot",
+      role: "user",
+      is_active: true,
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        quote: {
+          id: 1,
+          text: "The console thinks too.",
+          author: "VANESSA Curated",
+          source_universe: "Original",
+          tone: "funny",
+          language: "en",
+          date: "2026-03-11",
+          origin: "local",
+        },
+      }),
+    })));
+
+    await renderHomePage();
+
+    expect(screen.getByRole("heading", { name: "VANESSA" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   });
 
   it("refetches the quote after switching the UI language", async () => {

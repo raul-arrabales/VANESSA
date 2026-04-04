@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
@@ -43,7 +43,7 @@ vi.mock("../api/context", () => ({
 }));
 
 async function renderPage(language: "en" | "es" = "en"): Promise<void> {
-  await renderWithAppProviders(<PlatformControlPage />, { language });
+  await renderWithAppProviders(<PlatformControlPage />, { language, route: "/control/platform" });
 }
 
 describe("PlatformControlPage", () => {
@@ -63,6 +63,10 @@ describe("PlatformControlPage", () => {
     await renderPage();
 
     expect(await screen.findByRole("heading", { name: await t("platformControl.title") })).toBeVisible();
+    const sectionTabs = screen.getByRole("navigation", { name: await t("platformControl.navigation.aria") });
+    expect(within(sectionTabs).getByRole("link", { name: await t("platformControl.navigation.home") })).toHaveAttribute("aria-current", "page");
+    expect(within(sectionTabs).getByRole("link", { name: await t("platformControl.navigation.providers") })).toBeVisible();
+    expect(within(sectionTabs).getByRole("link", { name: await t("platformControl.navigation.deployments") })).toBeVisible();
     expect(await screen.findByText(await t("platformControl.sections.capabilities"))).toBeVisible();
     expect((await screen.findAllByText(await t("platformControl.capabilities.servedArtifacts"))).length).toBeGreaterThan(0);
     expect(await screen.findByText("GPT-5 (+1)")).toBeVisible();
