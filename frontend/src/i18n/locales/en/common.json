@@ -459,6 +459,7 @@
     },
     "fields": {
       "provider": "Backing provider",
+      "deploymentEligibility": "Deployment eligibility",
       "schema": "Knowledge base schema",
       "lifecycleState": "Lifecycle state",
       "lastSyncAt": "Last sync",

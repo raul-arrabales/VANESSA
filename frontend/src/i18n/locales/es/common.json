@@ -435,6 +435,7 @@
     },
     "fields": {
       "provider": "Proveedor de respaldo",
+      "deploymentEligibility": "Elegibilidad de despliegue",
       "schema": "Esquema de la base de conocimiento",
       "lifecycleState": "Estado del ciclo de vida",
       "lastSyncAt": "Ultima sincronizacion",

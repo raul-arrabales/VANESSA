@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
@@ -350,13 +350,38 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("link", { name: "Overview" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Manage Sources" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Upload Documents" })).toBeVisible();
-    expect(screen.getByText(/Weaviate local/)).toBeVisible();
-    expect(screen.getByText(/Embeddings local/)).toBeVisible();
-    expect(screen.getByText(/text-embedding-3-small/)).toBeVisible();
-    expect(screen.getByText(/Fixed length/)).toBeVisible();
-    expect(screen.getByText(/Chunk length: 300/)).toBeVisible();
-    expect(screen.getByText(/Chunk overlap: 60/)).toBeVisible();
-    expect(screen.getByText(/Local Default/)).toBeVisible();
+
+    const providerCard = screen.getByText("Backing provider").closest("article");
+    expect(providerCard).not.toBeNull();
+    expect(within(providerCard as HTMLElement).getByText("Weaviate local")).toBeVisible();
+    expect(within(providerCard as HTMLElement).getByText("weaviate_local")).toBeVisible();
+
+    const embeddingProviderCard = screen.getByText("Embeddings provider").closest("article");
+    expect(embeddingProviderCard).not.toBeNull();
+    expect(within(embeddingProviderCard as HTMLElement).getByText("Embeddings local")).toBeVisible();
+
+    const embeddingModelCard = screen.getByText("Embeddings model").closest("article");
+    expect(embeddingModelCard).not.toBeNull();
+    expect(within(embeddingModelCard as HTMLElement).getByText("text-embedding-3-small")).toBeVisible();
+
+    const chunkingStrategyCard = screen.getByText("Fixed length").closest("article");
+    expect(chunkingStrategyCard).not.toBeNull();
+    expect(within(chunkingStrategyCard as HTMLElement).getByText("Chunking strategy")).toBeVisible();
+
+    const chunkLengthCard = screen.getByText("300").closest("article");
+    expect(chunkLengthCard).not.toBeNull();
+    expect(within(chunkLengthCard as HTMLElement).getByText("Chunk length")).toBeVisible();
+
+    const chunkOverlapCard = screen.getByText("60").closest("article");
+    expect(chunkOverlapCard).not.toBeNull();
+    expect(within(chunkOverlapCard as HTMLElement).getByText("Chunk overlap")).toBeVisible();
+
+    const usageCard = screen.getByText("Deployment usage").closest("article");
+    expect(usageCard).not.toBeNull();
+    expect(within(usageCard as HTMLElement).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(usageCard as HTMLElement).getByText("Local Default")).toBeVisible();
+    expect(within(usageCard as HTMLElement).getByText("local-default · vector_store")).toBeVisible();
+
     expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
   });
 
