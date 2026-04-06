@@ -1,6 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PlaygroundSessionDetail, PlaygroundSessionSummary } from "../../api/playgrounds";
 import type { AuthUser } from "../../auth/types";
 import VanessaCorePage from "./pages/VanessaCorePage";
 import { renderWithAppProviders } from "../../test/renderWithAppProviders";
@@ -17,6 +18,30 @@ const playgroundApiMocks = vi.hoisted(() => ({
 }));
 
 let mockUser: AuthUser | null = null;
+
+function summary(overrides: Partial<PlaygroundSessionSummary> = {}): PlaygroundSessionSummary {
+  return {
+    id: "sess-vanessa",
+    playground_kind: "chat",
+    assistant_ref: "assistant.vanessa.core",
+    title: "Vanessa Core",
+    title_source: "auto",
+    model_selection: { model_id: "safe-small" },
+    knowledge_binding: { knowledge_base_id: null },
+    message_count: 0,
+    created_at: "2026-03-18T11:00:00Z",
+    updated_at: "2026-03-18T11:00:00Z",
+    ...overrides,
+  };
+}
+
+function detail(overrides: Partial<PlaygroundSessionDetail> = {}): PlaygroundSessionDetail {
+  return {
+    ...summary(overrides),
+    messages: [],
+    ...overrides,
+  };
+}
 
 vi.mock("../../api/playgrounds", () => ({
   getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
@@ -82,32 +107,8 @@ describe("VanessaCorePage", () => {
       configuration_message: null,
     });
     playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([]);
-    playgroundApiMocks.createPlaygroundSession.mockResolvedValue({
-      id: "sess-vanessa",
-      playground_kind: "chat",
-      assistant_ref: "assistant.vanessa.core",
-      title: "Vanessa Core",
-      title_source: "auto",
-      model_selection: { model_id: "safe-small" },
-      knowledge_binding: { knowledge_base_id: null },
-      message_count: 0,
-      created_at: "2026-03-18T11:00:00Z",
-      updated_at: "2026-03-18T11:00:00Z",
-      messages: [],
-    });
-    playgroundApiMocks.getPlaygroundSession.mockResolvedValue({
-      id: "sess-vanessa",
-      playground_kind: "chat",
-      assistant_ref: "assistant.vanessa.core",
-      title: "Vanessa Core",
-      title_source: "auto",
-      model_selection: { model_id: "safe-small" },
-      knowledge_binding: { knowledge_base_id: null },
-      message_count: 0,
-      created_at: "2026-03-18T11:00:00Z",
-      updated_at: "2026-03-18T11:00:00Z",
-      messages: [],
-    });
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValue(detail());
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(detail());
   });
 
   it("mounts Vanessa through the shared playground workspace with a fixed assistant identity", async () => {
@@ -150,5 +151,42 @@ describe("VanessaCorePage", () => {
     expect(screen.queryByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("uses the shared modal dialogs for saved Vanessa session actions", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      summary({
+        id: "sess-vanessa",
+        title: "Vanessa Core",
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValueOnce(detail());
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
+      summary({
+        title: "Vanessa Planning Session",
+      }),
+    );
+
+    await renderWithAppProviders(<VanessaCorePage />);
+
+    await screen.findByRole("button", { name: /^Vanessa Core/i });
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Vanessa Core" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+    expect(await screen.findByRole("dialog", { name: "Rename conversation" })).toBeVisible();
+    await userEvent.clear(screen.getByLabelText("Conversation title"));
+    await userEvent.type(screen.getByLabelText("Conversation title"), "Vanessa Planning Session");
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
+      "sess-vanessa",
+      { title: "Vanessa Planning Session" },
+      "token",
+    ));
+    expect(await screen.findByRole("button", { name: /^Vanessa Planning Session/i })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Vanessa Planning Session" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByRole("dialog", { name: "Delete conversation" })).toBeVisible();
   });
 });

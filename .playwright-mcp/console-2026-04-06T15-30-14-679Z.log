@@ -44,3 +44,19 @@
 [ 2603027ms] [LOG] i18next: initialized {debug: true, initAsync: true, ns: Array(1), defaultNS: common, fallbackLng: Array(1)} @ http://localhost:3000/node_modules/.vite/deps/i18next.js?v=0dd6f87c:207
 [ 2603064ms] [WARNING] ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition. @ http://localhost:3000/node_modules/.vite/deps/react-router-dom.js?v=e9fa3a1b:4435
 [ 2603064ms] [WARNING] ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath. @ http://localhost:3000/node_modules/.vite/deps/react-router-dom.js?v=e9fa3a1b:4435
+[ 6264613ms] [LOG] [vite] server connection lost. Polling for restart... @ http://localhost:3000/@vite/client:559
+[ 6264616ms] [ERROR] Failed to load resource: net::ERR_SOCKET_NOT_CONNECTED @ http://localhost:3000/:0
+[ 6265617ms] [ERROR] Failed to load resource: net::ERR_SOCKET_NOT_CONNECTED @ http://localhost:3000/:0
+[ 6267048ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/runtime/RuntimeModeProvider.tsx:0
+[ 6267048ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/theme/ThemeProvider.tsx:0
+[ 6267048ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/feedback/ActionFeedbackProvider.tsx:0
+[ 6267048ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/node_modules/vite/dist/client/env.mjs:0
+[ 6267049ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/auth/RouteGuards.tsx:0
+[ 6267049ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/auth/roles.ts:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/features/app-shell/AppChrome.tsx:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/pages/NotFoundPage.tsx:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/src/routes/appRoutes.tsx:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/node_modules/.vite/deps/i18next.js?v=42d23931:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/node_modules/.vite/deps/i18next-browser-languagedetector.js?v=74343575:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/node_modules/.vite/deps/i18next-resources-to-backend.js?v=9e1afe20:0
+[ 6267050ms] [ERROR] Failed to load resource: net::ERR_NETWORK_CHANGED @ http://localhost:3000/node_modules/.vite/deps/react-i18next.js?v=fcb87653:0

@@ -225,8 +225,6 @@ describe("ChatPlaygroundPage", () => {
     playgroundApiMocks.createPlaygroundSession.mockResolvedValue(
       sessionDetail("conv-draft", "New conversation"),
     );
-    vi.spyOn(window, "prompt").mockImplementation(() => null);
-    vi.spyOn(window, "confirm").mockImplementation(() => true);
   });
 
   it("renders a local draft immediately and shows history loading in the sidebar", async () => {
@@ -385,7 +383,6 @@ describe("ChatPlaygroundPage", () => {
     playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
       sessionSummary("conv-1", "Renamed thread", { updated_at: "2026-03-18T11:00:03Z" }),
     );
-    vi.mocked(window.prompt).mockImplementationOnce(() => "Renamed thread");
 
     renderChatPlayground();
 
@@ -394,10 +391,26 @@ describe("ChatPlaygroundPage", () => {
     expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
 
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread two" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    const renameDialog = await screen.findByRole("dialog", { name: "playgroundSessionDialogs.rename.title" });
+    expect(renameDialog).toBeVisible();
+    const renameInput = screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel");
+    expect(renameInput).toHaveFocus();
+    await userEvent.clear(renameInput);
+    expect(screen.getByRole("button", { name: "playgroundSessionDialogs.rename.confirm" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "playgroundSessionDialogs.cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "playgroundSessionDialogs.rename.title" })).toBeNull());
+    expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
+
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));
     expect(screen.getByRole("menuitem", { name: "Rename" })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
     await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+    expect(await screen.findByRole("dialog", { name: "playgroundSessionDialogs.rename.title" })).toBeVisible();
+    await userEvent.clear(screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel"));
+    await userEvent.type(screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel"), "Renamed thread");
+    await userEvent.click(screen.getByRole("button", { name: "playgroundSessionDialogs.rename.confirm" }));
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "conv-1",
       { title: "Renamed thread" },
@@ -407,6 +420,14 @@ describe("ChatPlaygroundPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByRole("dialog", { name: "playgroundSessionDialogs.delete.title" })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "playgroundSessionDialogs.delete.title" })).toBeNull());
+    expect(playgroundApiMocks.deletePlaygroundSession).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await userEvent.click(await screen.findByRole("button", { name: "playgroundSessionDialogs.delete.confirm" }));
 
     expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("conv-1", "token");
     await waitFor(() => expect(screen.queryByRole("button", { name: /^Renamed thread/i })).toBeNull());

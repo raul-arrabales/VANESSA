@@ -159,19 +159,14 @@ export function usePlaygroundSessionActions({
     }
   };
 
-  const renameSession = async (sessionId: string): Promise<void> => {
+  const renameSession = async (sessionId: string, nextTitle: string): Promise<boolean> => {
     if (!token) {
-      return;
+      return false;
     }
 
     const targetSession = savedSessions.find((session) => session.id === sessionId);
     if (!targetSession || targetSession.persistence === "draft") {
-      return;
-    }
-
-    const nextTitle = window.prompt(config.prompts.rename, targetSession.title);
-    if (nextTitle === null) {
-      return;
+      return false;
     }
 
     setError("");
@@ -185,24 +180,23 @@ export function usePlaygroundSessionActions({
           ? { ...current, ...updatedViewModel, messages: current.messages }
           : current
       ));
+      return true;
     } catch (requestError) {
       showErrorFeedback(requestError, config.feedback.renameError);
+      return false;
     } finally {
       setIsSessionBusy(false);
     }
   };
 
-  const deleteSession = async (sessionId: string): Promise<void> => {
+  const deleteSession = async (sessionId: string): Promise<boolean> => {
     if (!token) {
-      return;
+      return false;
     }
 
     const targetSession = savedSessions.find((session) => session.id === sessionId);
     if (!targetSession || targetSession.persistence === "draft") {
-      return;
-    }
-    if (!window.confirm(config.prompts.deleteConfirm)) {
-      return;
+      return false;
     }
 
     setError("");
@@ -214,7 +208,7 @@ export function usePlaygroundSessionActions({
 
       if (!isDeletingActiveSavedSession) {
         setSavedSessions(sortSessions(remaining));
-        return;
+        return true;
       }
 
       if (remaining.length === 0) {
@@ -246,8 +240,10 @@ export function usePlaygroundSessionActions({
         setActiveSessionId(sorted[0]?.id ?? null);
         setActiveSession(null);
       }
+      return true;
     } catch (requestError) {
       showErrorFeedback(requestError, config.feedback.deleteError);
+      return false;
     } finally {
       setIsSessionBusy(false);
     }

@@ -374,6 +374,22 @@
       "history": "Knowledge chat conversation history"
     }
   },
+  "playgroundSessionDialogs": {
+    "cancel": "Cancel",
+    "rename": {
+      "eyebrow": "Conversation action",
+      "title": "Rename conversation",
+      "description": "Choose a clearer title for this saved conversation.",
+      "fieldLabel": "Conversation title",
+      "confirm": "Save title"
+    },
+    "delete": {
+      "eyebrow": "Conversation action",
+      "title": "Delete conversation",
+      "description": "Delete \"{{title}}\"? This removes the saved conversation history from the sidebar.",
+      "confirm": "Delete conversation"
+    }
+  },
   "contextManagement": {
     "eyebrow": "Knowledge base workspace",
     "title": "Context management",

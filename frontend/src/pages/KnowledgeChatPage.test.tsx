@@ -215,6 +215,40 @@ describe("KnowledgePlaygroundPage", () => {
     expect(screen.queryByRole("button", { name: /Knowledge session/ })).toBeNull();
   });
 
+  it("opens custom conversation dialogs from the row menu without using browser-native prompts", async () => {
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
+      summary({
+        title: "Renamed knowledge chat",
+      }),
+    );
+
+    await renderKnowledgeChat();
+
+    await screen.findByRole("button", { name: /^Knowledge session/i });
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Knowledge session" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+    expect(await screen.findByRole("dialog", { name: "Rename conversation" })).toBeVisible();
+    expect(screen.getByLabelText("Conversation title")).toHaveValue("Knowledge session");
+    await userEvent.clear(screen.getByLabelText("Conversation title"));
+    await userEvent.type(screen.getByLabelText("Conversation title"), "Renamed knowledge chat");
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
+
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
+      "sess-1",
+      { title: "Renamed knowledge chat" },
+      "token",
+    ));
+    expect(await screen.findByRole("button", { name: /^Renamed knowledge chat/i })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed knowledge chat" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByRole("dialog", { name: "Delete conversation" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Delete conversation" })).toBeNull());
+    expect(playgroundApiMocks.deletePlaygroundSession).not.toHaveBeenCalled();
+  });
+
   it("shows the knowledge-base configuration blocker when no knowledge bases are available", async () => {
     playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValueOnce({
       knowledge_bases: [],

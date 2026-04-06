@@ -284,6 +284,7 @@ This should start the current local stack, including at least:
 - Prefer functional React components and typed API boundaries.
 - Keep browser code behind frontend API client modules.
 - Do not call backend-private/internal endpoints directly from UI code.
+- Do not use browser-native modal windows such as `window.alert`, `window.confirm`, or `window.prompt` for product UI. Use app-styled dialogs consistent with the existing modal patterns instead.
 
 ### 5.3. Naming and vocabulary
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import ModalDialog from "../../../components/ModalDialog";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useStickyChatScroll } from "../../../hooks/useStickyChatScroll";
 import AssistantSelector from "./AssistantSelector";
@@ -18,6 +20,7 @@ type PlaygroundWorkspaceProps = {
 };
 
 export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps): JSX.Element {
+  const { t } = useTranslation("common");
   const { token, isAuthenticated } = useAuth();
   const preferences = usePlaygroundPreferences(config.playgroundKind);
   const optionsState = usePlaygroundOptions({
@@ -46,7 +49,12 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
+  const [pendingDialog, setPendingDialog] = useState<{ kind: "rename" | "delete"; sessionId: string; title: string } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const threadVersion = useMemo(() => {
     if (!sessionState.activeSession) {
@@ -94,6 +102,17 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   useEffect(() => () => {
     abortActiveStreamRef.current();
   }, []);
+
+  useEffect(() => {
+    if (!pendingDialog) {
+      return;
+    }
+    if (!sessionState.savedSessions.some((session) => session.id === pendingDialog.sessionId)) {
+      setPendingDialog(null);
+      setRenameValue("");
+      setIsDialogSubmitting(false);
+    }
+  }, [pendingDialog, sessionState.savedSessions]);
 
   const isInteractionLocked = isSending || isSessionBusy;
   const activeSession = sessionState.activeSession;
@@ -158,8 +177,24 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           sessionState.setActiveSession(null);
           sessionState.setActiveError("");
         }}
-        onRenameSession={(sessionId) => void actions.renameSession(sessionId)}
-        onDeleteSession={(sessionId) => void actions.deleteSession(sessionId)}
+        onRenameSession={(sessionId) => {
+          const targetSession = sessionState.savedSessions.find((session) => session.id === sessionId);
+          if (!targetSession) {
+            return;
+          }
+          setPendingDialog({ kind: "rename", sessionId, title: targetSession.title });
+          setRenameValue(targetSession.title);
+          setIsDialogSubmitting(false);
+        }}
+        onDeleteSession={(sessionId) => {
+          const targetSession = sessionState.savedSessions.find((session) => session.id === sessionId);
+          if (!targetSession) {
+            return;
+          }
+          setPendingDialog({ kind: "delete", sessionId, title: targetSession.title });
+          setRenameValue("");
+          setIsDialogSubmitting(false);
+        }}
         canRenameSession={config.actions.rename}
         canDeleteSession={config.actions.delete}
       />
@@ -236,6 +271,120 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           onSubmit={() => void actions.sendPrompt()}
         />
       </div>
+      {pendingDialog?.kind === "rename" ? (
+        <ModalDialog
+          className="playground-session-dialog"
+          eyebrow={t("playgroundSessionDialogs.rename.eyebrow")}
+          title={t("playgroundSessionDialogs.rename.title")}
+          description={t("playgroundSessionDialogs.rename.description")}
+          onClose={() => {
+            if (!isDialogSubmitting) {
+              setPendingDialog(null);
+              setRenameValue("");
+            }
+          }}
+          closeDisabled={isDialogSubmitting}
+          initialFocusRef={renameInputRef}
+          actions={(
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setPendingDialog(null);
+                  setRenameValue("");
+                }}
+                disabled={isDialogSubmitting}
+              >
+                {t("playgroundSessionDialogs.cancel")}
+              </button>
+              <button
+                ref={confirmButtonRef}
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const nextTitle = renameValue.trim();
+                  if (!nextTitle) {
+                    return;
+                  }
+                  setIsDialogSubmitting(true);
+                  void actions.renameSession(pendingDialog.sessionId, nextTitle)
+                    .then((didRename) => {
+                      if (didRename) {
+                        setPendingDialog(null);
+                        setRenameValue("");
+                      }
+                    })
+                    .finally(() => {
+                      setIsDialogSubmitting(false);
+                    });
+                }}
+                disabled={isDialogSubmitting || !renameValue.trim()}
+              >
+                {t("playgroundSessionDialogs.rename.confirm")}
+              </button>
+            </>
+          )}
+        >
+          <label className="control-group">
+            <span className="field-label">{t("playgroundSessionDialogs.rename.fieldLabel")}</span>
+            <input
+              ref={renameInputRef}
+              className="field-input"
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.currentTarget.value)}
+              disabled={isDialogSubmitting}
+            />
+          </label>
+        </ModalDialog>
+      ) : null}
+      {pendingDialog?.kind === "delete" ? (
+        <ModalDialog
+          className="playground-session-dialog"
+          eyebrow={t("playgroundSessionDialogs.delete.eyebrow")}
+          title={t("playgroundSessionDialogs.delete.title")}
+          description={t("playgroundSessionDialogs.delete.description", { title: pendingDialog.title })}
+          onClose={() => {
+            if (!isDialogSubmitting) {
+              setPendingDialog(null);
+            }
+          }}
+          closeDisabled={isDialogSubmitting}
+          initialFocusRef={confirmButtonRef}
+          actions={(
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setPendingDialog(null)}
+                disabled={isDialogSubmitting}
+              >
+                {t("playgroundSessionDialogs.cancel")}
+              </button>
+              <button
+                ref={confirmButtonRef}
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  setIsDialogSubmitting(true);
+                  void actions.deleteSession(pendingDialog.sessionId)
+                    .then((didDelete) => {
+                      if (didDelete) {
+                        setPendingDialog(null);
+                      }
+                    })
+                    .finally(() => {
+                      setIsDialogSubmitting(false);
+                    });
+                }}
+                disabled={isDialogSubmitting}
+              >
+                {t("playgroundSessionDialogs.delete.confirm")}
+              </button>
+            </>
+          )}
+        />
+      ) : null}
     </section>
   );
 }

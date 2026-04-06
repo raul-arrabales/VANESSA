@@ -369,6 +369,22 @@
       "history": "Historial de conversaciones del chat de conocimiento"
     }
   },
+  "playgroundSessionDialogs": {
+    "cancel": "Cancelar",
+    "rename": {
+      "eyebrow": "Acción de conversación",
+      "title": "Renombrar conversación",
+      "description": "Elige un título más claro para esta conversación guardada.",
+      "fieldLabel": "Título de la conversación",
+      "confirm": "Guardar título"
+    },
+    "delete": {
+      "eyebrow": "Acción de conversación",
+      "title": "Eliminar conversación",
+      "description": "¿Eliminar \"{{title}}\"? Esto quita la conversación guardada del historial lateral.",
+      "confirm": "Eliminar conversación"
+    }
+  },
   "contextManagement": {
     "title": "Gestion de contexto",
     "description": "Administra bases de conocimiento reutilizables y organiza los documentos que exponen a la recuperacion.",
