@@ -60,7 +60,7 @@ export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
   modelLoadingText: "Loading available models...",
   knowledgeBaseLoadingText: "Loading knowledge bases...",
   emptyStateText: "No messages yet. Ask the knowledge playground to search the active corpus.",
-  newSessionLabel: "New knowledge chat",
+  newSessionLabel: "New chat",
   emptySessionTitle: "Knowledge playground",
   draftPlaceholder: "Ask about the knowledge base",
   selectors: {

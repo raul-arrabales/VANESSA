@@ -343,7 +343,7 @@
     "title": "Knowledge Chat",
     "description": "Search the shared knowledge corpus while keeping a separate citation-backed conversation history.",
     "actions": {
-      "newChat": "New knowledge chat",
+      "newChat": "New chat",
       "send": "Ask knowledge chat",
       "sending": "Searching..."
     },

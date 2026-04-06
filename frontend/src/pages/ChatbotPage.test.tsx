@@ -128,6 +128,14 @@ function renderChatPlayground() {
   );
 }
 
+function getChatShell(container: HTMLElement): HTMLElement {
+  const shell = container.querySelector(".chatbot-shell");
+  if (!(shell instanceof HTMLElement)) {
+    throw new Error("Expected chatbot shell to be present");
+  }
+  return shell;
+}
+
 function getChatThread(container: HTMLElement): HTMLDivElement {
   const thread = container.querySelector(".chatbot-thread");
   if (!(thread instanceof HTMLDivElement)) {
@@ -166,7 +174,7 @@ function setThreadMetrics(
 }
 
 async function openSavedChat(title = "Thread one"): Promise<void> {
-  await userEvent.click(await screen.findByRole("button", { name: new RegExp(title, "i") }));
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${title}`, "i") }));
 }
 
 async function waitForDraftReady(): Promise<void> {
@@ -237,7 +245,31 @@ describe("ChatPlaygroundPage", () => {
     expect(playgroundApiMocks.getPlaygroundSession).not.toHaveBeenCalled();
 
     resolveHistory([sessionSummary("conv-1", "Thread one")]);
-    expect(await screen.findByRole("button", { name: /Thread one/ })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
+  });
+
+  it("collapses the history into a slim rail and restores the persisted collapsed state", async () => {
+    const firstRender = renderChatPlayground();
+
+    await waitForDraftReady();
+    expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
+    expect(getChatShell(firstRender.container)).toHaveAttribute("data-history-collapsed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));
+
+    expect(getChatShell(firstRender.container)).toHaveAttribute("data-history-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeVisible();
+    expect(screen.queryByText("Choose a model and continue any prior conversation.")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Thread one/i })).toBeNull();
+
+    firstRender.unmount();
+
+    const secondRender = renderChatPlayground();
+
+    await waitForDraftReady();
+    expect(getChatShell(secondRender.container)).toHaveAttribute("data-history-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
   });
 
   it("shows model-loading UI instead of an empty-model state while chat models are still loading", async () => {
@@ -342,7 +374,7 @@ describe("ChatPlaygroundPage", () => {
     expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Answer with **bold**");
   });
 
-  it("manages rename and delete after explicitly resuming a saved session", async () => {
+  it("moves rename and delete into the row menu and keeps the main header clean", async () => {
     playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
       sessionSummary("conv-1", "Thread one", { updated_at: "2026-03-18T11:00:02Z" }),
       sessionSummary("conv-2", "Thread two", { updated_at: "2026-03-18T11:00:01Z", message_count: 2 }),
@@ -358,9 +390,14 @@ describe("ChatPlaygroundPage", () => {
     renderChatPlayground();
 
     await openSavedChat();
-    expect(await screen.findByRole("button", { name: /Thread two/ })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /^Thread two/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));
+    expect(screen.getByRole("menuitem", { name: "Rename" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "conv-1",
       { title: "Renamed thread" },
@@ -368,10 +405,11 @@ describe("ChatPlaygroundPage", () => {
     ));
     expect(await screen.findByRole("heading", { name: "Renamed thread" })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("conv-1", "token");
-    await waitFor(() => expect(screen.queryByRole("button", { name: /Renamed thread/ })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Renamed thread/i })).toBeNull());
     expect(playgroundApiMocks.getPlaygroundSession).toHaveBeenLastCalledWith("conv-2", "chat", "token");
   });
 
@@ -384,8 +422,6 @@ describe("ChatPlaygroundPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "New chat" }));
 
     expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
   });
 
@@ -397,7 +433,7 @@ describe("ChatPlaygroundPage", () => {
     expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
     expect(await screen.findByText("History failed")).toBeVisible();
     expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
-    expect(screen.getByLabelText("Message")).toBeEnabled();
+    await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
   });
 
   it("autoscrolls on send and when switching from the draft to a saved session", async () => {
@@ -439,7 +475,7 @@ describe("ChatPlaygroundPage", () => {
     setThreadMetrics(thread, { scrollTop: 200 });
     fireEvent.scroll(thread);
 
-    await userEvent.click(screen.getByRole("button", { name: /Thread two/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Thread two/i }));
     await screen.findByText("Second thread");
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
   });
@@ -474,10 +510,9 @@ describe("ChatPlaygroundPage", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Conversation actions for Thread one" })).toBeDisabled();
       expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: /Thread one/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /^Thread one/i })).toBeDisabled();
     });
 
     resolveStream(
@@ -492,5 +527,39 @@ describe("ChatPlaygroundPage", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled());
+  });
+
+  it("truncates long saved titles to one row while preserving the full title in a tooltip", async () => {
+    const longTitle = "This is a very long saved conversation title that should truncate in the history row";
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-1", longTitle, { updated_at: "2026-03-18T11:00:02Z" }),
+    ]);
+
+    renderChatPlayground();
+
+    const title = await screen.findByText(longTitle);
+    expect(title).toHaveClass("chatbot-conversation-item-title");
+    expect(title).toHaveAttribute("title", longTitle);
+  });
+
+  it("closes the conversation row menu on outside click and when another row menu opens", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-1", "Thread one", { updated_at: "2026-03-18T11:00:02Z" }),
+      sessionSummary("conv-2", "Thread two", { updated_at: "2026-03-18T11:00:01Z" }),
+    ]);
+
+    renderChatPlayground();
+
+    await screen.findByRole("button", { name: /^Thread one/i });
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));
+    expect(screen.getByRole("menuitem", { name: "Rename" })).toBeVisible();
+
+    await userEvent.click(document.body);
+    await waitFor(() => expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull());
+
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread two" }));
+    expect(screen.getByRole("button", { name: "Conversation actions for Thread two" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Conversation actions for Thread one" })).toHaveAttribute("aria-expanded", "false");
   });
 });

@@ -1,4 +1,5 @@
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "../../auth/types";
 import VanessaCorePage from "./pages/VanessaCorePage";
@@ -128,5 +129,26 @@ describe("VanessaCorePage", () => {
         "token",
       );
     });
+  });
+
+  it("collapses Vanessa history into a slim rail and keeps the shared controls accessible", async () => {
+    await renderWithAppProviders(<VanessaCorePage />);
+
+    expect(await screen.findByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeVisible();
+    const shell = document.querySelector(".chatbot-shell");
+    if (!(shell instanceof HTMLElement)) {
+      throw new Error("Expected chatbot shell to be present");
+    }
+
+    expect(shell).toHaveAttribute("data-history-collapsed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));
+
+    expect(shell).toHaveAttribute("data-history-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "New Vanessa session" })).toBeVisible();
+    expect(screen.queryByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 });

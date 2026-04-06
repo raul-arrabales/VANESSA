@@ -159,12 +159,17 @@ export function usePlaygroundSessionActions({
     }
   };
 
-  const renameSession = async (): Promise<void> => {
-    if (!token || !activeSession || activeSession.persistence === "draft") {
+  const renameSession = async (sessionId: string): Promise<void> => {
+    if (!token) {
       return;
     }
 
-    const nextTitle = window.prompt(config.prompts.rename, activeSession.title);
+    const targetSession = savedSessions.find((session) => session.id === sessionId);
+    if (!targetSession || targetSession.persistence === "draft") {
+      return;
+    }
+
+    const nextTitle = window.prompt(config.prompts.rename, targetSession.title);
     if (nextTitle === null) {
       return;
     }
@@ -172,11 +177,11 @@ export function usePlaygroundSessionActions({
     setError("");
     setIsSessionBusy(true);
     try {
-      const updated = await updatePlaygroundSession(activeSession.id, { title: nextTitle }, token);
+      const updated = await updatePlaygroundSession(sessionId, { title: nextTitle }, token);
       const updatedViewModel = mapPlaygroundSessionSummary(updated);
       setSavedSessions((existing) => upsertSession(existing, updatedViewModel));
       setActiveSession((current) => (
-        current && current.id === updatedViewModel.id
+        current && current.id === updatedViewModel.id && current.persistence === "saved"
           ? { ...current, ...updatedViewModel, messages: current.messages }
           : current
       ));
@@ -187,8 +192,13 @@ export function usePlaygroundSessionActions({
     }
   };
 
-  const deleteSession = async (): Promise<void> => {
-    if (!token || !activeSession || activeSession.persistence === "draft") {
+  const deleteSession = async (sessionId: string): Promise<void> => {
+    if (!token) {
+      return;
+    }
+
+    const targetSession = savedSessions.find((session) => session.id === sessionId);
+    if (!targetSession || targetSession.persistence === "draft") {
       return;
     }
     if (!window.confirm(config.prompts.deleteConfirm)) {
@@ -198,8 +208,15 @@ export function usePlaygroundSessionActions({
     setError("");
     setIsSessionBusy(true);
     try {
-      await deletePlaygroundSession(activeSession.id, token);
-      const remaining = removeSession(savedSessions, activeSession.id);
+      await deletePlaygroundSession(sessionId, token);
+      const remaining = removeSession(savedSessions, sessionId);
+      const isDeletingActiveSavedSession = activeSession?.id === sessionId && activeSession.persistence === "saved";
+
+      if (!isDeletingActiveSavedSession) {
+        setSavedSessions(sortSessions(remaining));
+        return;
+      }
+
       if (remaining.length === 0) {
         setSavedSessions([]);
         if (config.sessionBootstrap.mode === "draft-first") {

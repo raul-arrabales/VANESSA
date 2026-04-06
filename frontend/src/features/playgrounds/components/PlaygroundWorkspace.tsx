@@ -97,7 +97,6 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
 
   const isInteractionLocked = isSending || isSessionBusy;
   const activeSession = sessionState.activeSession;
-  const isDraftSession = activeSession?.persistence === "draft";
   const modelAvailabilityMessage = optionsState.modelError
     || (optionsState.hasLoadedModels && optionsState.models.length === 0
       ? "No enabled models are available right now."
@@ -133,33 +132,12 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           ? knowledgeBaseAvailabilityMessage
         : config.loadingText;
 
-  const headerToolbar = useMemo(() => (
-    <div className="chatbot-actions">
-      {config.actions.rename ? (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => void actions.renameSession()}
-          disabled={!activeSession || isDraftSession || isInteractionLocked}
-        >
-          Rename
-        </button>
-      ) : null}
-      {config.actions.delete ? (
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => void actions.deleteSession()}
-          disabled={!activeSession || isDraftSession || isInteractionLocked}
-        >
-          Delete
-        </button>
-      ) : null}
-    </div>
-  ), [actions, activeSession, config.actions.delete, config.actions.rename, isDraftSession, isInteractionLocked]);
-
   return (
-    <section className="panel chatbot-shell" aria-label={config.panelAriaLabel}>
+    <section
+      className="panel chatbot-shell"
+      aria-label={config.panelAriaLabel}
+      data-history-collapsed={preferences.isSidebarCollapsed ? "true" : "false"}
+    >
       <SessionSidebar
         title={config.title}
         introText={config.introText}
@@ -180,12 +158,15 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           sessionState.setActiveSession(null);
           sessionState.setActiveError("");
         }}
+        onRenameSession={(sessionId) => void actions.renameSession(sessionId)}
+        onDeleteSession={(sessionId) => void actions.deleteSession(sessionId)}
+        canRenameSession={config.actions.rename}
+        canDeleteSession={config.actions.delete}
       />
 
       <div className="chatbot-main card-stack">
         <div className="chatbot-sidebar-header">
           <h3 className="section-title">{activeSession?.title ?? config.emptySessionTitle}</h3>
-          {headerToolbar}
         </div>
 
         {config.selectors.model ? (

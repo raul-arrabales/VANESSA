@@ -44,8 +44,16 @@ vi.mock("../auth/AuthProvider", () => ({
   }),
 }));
 
-async function renderKnowledgeChat(): Promise<void> {
-  await renderWithAppProviders(<KnowledgePlaygroundPage />);
+async function renderKnowledgeChat() {
+  return await renderWithAppProviders(<KnowledgePlaygroundPage />);
+}
+
+function getKnowledgeShell(): HTMLElement {
+  const shell = document.querySelector(".chatbot-shell");
+  if (!(shell instanceof HTMLElement)) {
+    throw new Error("Expected chatbot shell to be present");
+  }
+  return shell;
 }
 
 function summary(overrides: Partial<PlaygroundSessionSummary> = {}): PlaygroundSessionSummary {
@@ -73,7 +81,7 @@ function detail(overrides: Partial<PlaygroundSessionDetail> = {}): PlaygroundSes
 }
 
 async function openSavedSession(title = "Knowledge session"): Promise<void> {
-  await userEvent.click(await screen.findByRole("button", { name: new RegExp(title, "i") }));
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${title}`, "i") }));
 }
 
 describe("KnowledgePlaygroundPage", () => {
@@ -190,6 +198,21 @@ describe("KnowledgePlaygroundPage", () => {
     });
 
     await waitFor(() => expect(screen.getByLabelText("Knowledge base")).toHaveValue("kb_primary"));
+  });
+
+  it("collapses the knowledge history into a slim rail while keeping the new-session control available", async () => {
+    await renderKnowledgeChat();
+
+    expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    expect(getKnowledgeShell()).toHaveAttribute("data-history-collapsed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));
+
+    expect(getKnowledgeShell()).toHaveAttribute("data-history-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeVisible();
+    expect(screen.queryByText("Ground answers in a bound knowledge base and continue prior sessions.")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Knowledge session/ })).toBeNull();
   });
 
   it("shows the knowledge-base configuration blocker when no knowledge bases are available", async () => {
