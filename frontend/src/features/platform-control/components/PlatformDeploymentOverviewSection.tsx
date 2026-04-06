@@ -76,9 +76,11 @@ export default function PlatformDeploymentOverviewSection({
                       ? t("platformControl.badges.ready")
                       : t("platformControl.badges.incomplete")}
                   </span>
-                  <div className="platform-inline-meta">
-                    <span className="status-text">{binding.configuration_status?.summary ?? t("platformControl.summary.none")}</span>
-                  </div>
+                  {!binding.configuration_status?.is_ready ? (
+                    <div className="platform-inline-meta">
+                      <span className="status-text">{binding.configuration_status?.summary ?? t("platformControl.summary.none")}</span>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}

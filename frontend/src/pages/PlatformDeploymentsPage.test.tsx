@@ -52,6 +52,8 @@ describe("PlatformDeploymentsPage", () => {
     expect(await screen.findByRole("heading", { name: await t("platformControl.deployments.title"), level: 2 })).toBeVisible();
     expect(await screen.findByText(await t("platformControl.sections.audit"))).toBeVisible();
     expect(await screen.findByText("2026-01-01T00:00:00+00:00")).toBeVisible();
+    expect(screen.queryByText("Ready.")).not.toBeInTheDocument();
+    expect(screen.getAllByText(await t("platformControl.badges.ready")).length).toBeGreaterThan(0);
     expect(await screen.findByRole("link", { name: await t("platformControl.actions.createDeployment") })).toHaveAttribute(
       "href",
       "/control/platform/deployments/new",
