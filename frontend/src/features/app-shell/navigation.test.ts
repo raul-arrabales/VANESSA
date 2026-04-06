@@ -46,4 +46,13 @@ describe("app-shell navigation", () => {
     expect(sidebarItems.some((item) => item.to === "/control" && item.isActive)).toBe(true);
     expect(userMenuItems.some((item) => item.to === "/control")).toBe(true);
   });
+
+  it("keeps guest auth sidebar items visually distinct when collapsed", () => {
+    const sidebarItems = buildSidebarItems("/", { isAuthenticated: false }, translate);
+    const loginItem = sidebarItems.find((item) => item.to === "/login");
+    const registerItem = sidebarItems.find((item) => item.to === "/register");
+
+    expect(loginItem?.icon).toBe("profile");
+    expect(registerItem?.icon).toBe("register");
+  });
 });

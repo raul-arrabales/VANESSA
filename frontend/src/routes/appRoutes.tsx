@@ -115,7 +115,7 @@ export const appRoutes: AppRouteDefinition[] = [
     navGroup: "userMenu",
     navAudience: "guest",
     sidebar: {
-      icon: "profile",
+      icon: "register",
       order: 30,
     },
     element: <RegisterPage />,
