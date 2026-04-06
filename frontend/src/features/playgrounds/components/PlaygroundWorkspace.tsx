@@ -13,6 +13,7 @@ import { usePlaygroundOptions } from "../hooks/usePlaygroundOptions";
 import { usePlaygroundPreferences } from "../hooks/usePlaygroundPreferences";
 import { usePlaygroundSessionActions } from "../hooks/usePlaygroundSessionActions";
 import { usePlaygroundSessions } from "../hooks/usePlaygroundSessions";
+import { usePlaygroundWorkspaceViewState } from "../hooks/usePlaygroundWorkspaceViewState";
 import type { PlaygroundWorkspaceConfig } from "../types";
 
 type PlaygroundWorkspaceProps = {
@@ -52,6 +53,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   const [pendingDialog, setPendingDialog] = useState<{ kind: "rename" | "delete"; sessionId: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
+  const [composerHeight, setComposerHeight] = useState(96);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -114,42 +116,13 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     }
   }, [pendingDialog, sessionState.savedSessions]);
 
-  const isInteractionLocked = isSending || isSessionBusy;
-  const activeSession = sessionState.activeSession;
-  const modelAvailabilityMessage = optionsState.modelError
-    || (optionsState.hasLoadedModels && optionsState.models.length === 0
-      ? "No enabled models are available right now."
-      : "");
-  const knowledgeBaseAvailabilityMessage = config.selectors.knowledgeBase
-    ? (
-      optionsState.knowledgeBaseError
-      || (
-        optionsState.hasLoadedKnowledgeBases && optionsState.knowledgeBases.length === 0
-          ? (optionsState.configurationMessage || "No knowledge bases are available right now.")
-          : ""
-      )
-    )
-    : "";
-  const hasUsableModels = optionsState.hasLoadedModels && !optionsState.modelError && optionsState.models.length > 0;
-  const hasUsableKnowledgeBases = !config.selectors.knowledgeBase
-    || (
-      optionsState.hasLoadedKnowledgeBases
-      && !optionsState.knowledgeBaseError
-      && optionsState.knowledgeBases.length > 0
-    );
-  const composerError = sessionState.activeError;
-  const isWorkspaceReady = Boolean(activeSession) && hasUsableModels && hasUsableKnowledgeBases;
-  const threadStatusText = sessionState.isActiveSessionLoading
-    ? config.loadingText
-    : !optionsState.hasLoadedModels
-      ? config.modelLoadingText
-      : modelAvailabilityMessage
-        ? modelAvailabilityMessage
-      : config.selectors.knowledgeBase && !optionsState.hasLoadedKnowledgeBases
-        ? config.knowledgeBaseLoadingText
-        : knowledgeBaseAvailabilityMessage
-          ? knowledgeBaseAvailabilityMessage
-        : config.loadingText;
+  const viewState = usePlaygroundWorkspaceViewState({
+    config,
+    optionsState,
+    sessionState,
+    isSending,
+    isSessionBusy,
+  });
 
   return (
     <section
@@ -165,7 +138,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
         canCreateSession={sessionState.canCreateSession}
-        isInteractionLocked={isInteractionLocked || sessionState.isActiveSessionLoading}
+        isInteractionLocked={viewState.isSidebarInteractionLocked}
         isCollapsed={preferences.isSidebarCollapsed}
         isHistoryLoading={sessionState.isHistoryLoading}
         historyError={sessionState.historyError}
@@ -199,20 +172,20 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         canDeleteSession={config.actions.delete}
       />
 
-      <div className="chatbot-main card-stack">
+      <div className="chatbot-main">
         <div className="chatbot-sidebar-header">
-          <h3 className="section-title">{activeSession?.title ?? config.emptySessionTitle}</h3>
+          <h3 className="section-title">{viewState.activeSession?.title ?? config.emptySessionTitle}</h3>
         </div>
 
         {config.selectors.model ? (
           <ModelSelector
             models={optionsState.models}
-            value={activeSession?.selectorState.modelId ?? ""}
+            value={viewState.activeSession?.selectorState.modelId ?? ""}
             isLoading={!optionsState.hasLoadedModels}
-            disabled={!activeSession || !hasUsableModels || isSending}
+            disabled={viewState.isModelSelectorDisabled}
             onChange={(value) => {
-              if (activeSession) {
-                void actions.updateModel(activeSession.id, value);
+              if (viewState.activeSession) {
+                void actions.updateModel(viewState.activeSession.id, value);
               }
             }}
           />
@@ -223,11 +196,11 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
             {config.selectors.assistant ? (
               <AssistantSelector
                 assistants={optionsState.assistants}
-                value={activeSession?.selectorState.assistantRef ?? optionsState.defaultAssistantRef ?? ""}
-                disabled={!activeSession || !hasUsableModels || isSending}
+                value={viewState.activeSession?.selectorState.assistantRef ?? optionsState.defaultAssistantRef ?? ""}
+                disabled={viewState.isAssistantSelectorDisabled}
                 onChange={(value) => {
-                  if (activeSession) {
-                    void actions.updateAssistant(activeSession.id, value);
+                  if (viewState.activeSession) {
+                    void actions.updateAssistant(viewState.activeSession.id, value);
                   }
                 }}
               />
@@ -235,11 +208,11 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
             {config.selectors.knowledgeBase ? (
               <KnowledgeBaseSelector
                 knowledgeBases={optionsState.knowledgeBases}
-                value={activeSession?.selectorState.knowledgeBaseId ?? ""}
-                disabled={!activeSession || !optionsState.hasLoadedKnowledgeBases || optionsState.knowledgeBases.length === 0 || isSending}
+                value={viewState.activeSession?.selectorState.knowledgeBaseId ?? ""}
+                disabled={viewState.isKnowledgeBaseSelectorDisabled}
                 onChange={(value) => {
-                  if (activeSession) {
-                    void actions.updateKnowledgeBase(activeSession.id, value);
+                  if (viewState.activeSession) {
+                    void actions.updateKnowledgeBase(viewState.activeSession.id, value);
                   }
                 }}
               />
@@ -248,27 +221,37 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         ) : null}
 
         <ThreadPanel
-          activeSession={activeSession}
-          isBootstrapping={!isWorkspaceReady || sessionState.isActiveSessionLoading}
-          loadingText={threadStatusText}
+          activeSession={viewState.activeSession}
+          isBootstrapping={viewState.isThreadBootstrapping}
+          loadingText={viewState.threadStatusText}
           emptyStateText={config.emptyStateText}
           threadRef={threadRef}
           handleScroll={handleScroll}
           hasUnreadContentBelow={hasUnreadContentBelow}
           isPinnedToBottom={isPinnedToBottom}
           scrollToBottom={scrollToBottom}
-        />
-
-        <Composer
-          draft={preferences.draft}
-          error={composerError}
-          disabled={isSending || !isWorkspaceReady}
-          submitLabel={config.messaging.submitLabel}
-          busyLabel={config.messaging.busyLabel}
-          isSending={isSending}
-          placeholder={config.draftPlaceholder}
-          onDraftChange={preferences.setDraft}
-          onSubmit={() => void actions.sendPrompt()}
+          composerHeight={composerHeight}
+          composer={(
+            <Composer
+              draft={preferences.draft}
+              error={viewState.composerError}
+              disabled={!viewState.isWorkspaceReady}
+              submitLabel={config.messaging.submitLabel}
+              busyLabel={config.messaging.busyLabel}
+              stopLabel={config.messaging.stopLabel}
+              isSending={isSending}
+              canStop={config.messaging.mode === "stream" && isSending}
+              placeholder={config.draftPlaceholder}
+              onDraftChange={preferences.setDraft}
+              onSubmit={() => void actions.sendPrompt()}
+              onCancel={actions.abortActiveStream}
+              onHeightChange={(height) => {
+                if (height > 0) {
+                  setComposerHeight(height);
+                }
+              }}
+            />
+          )}
         />
       </div>
       {pendingDialog?.kind === "rename" ? (

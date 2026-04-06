@@ -437,6 +437,8 @@ export function usePlaygroundSessionActions({
     },
     abortActiveStream: (): void => {
       streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+      setIsSending(false);
     },
   };
 }

@@ -55,6 +55,7 @@ export type PlaygroundWorkspaceConfig = {
     mode: "stream" | "request";
     submitLabel: string;
     busyLabel: string;
+    stopLabel: string;
   };
   actions: {
     rename: boolean;

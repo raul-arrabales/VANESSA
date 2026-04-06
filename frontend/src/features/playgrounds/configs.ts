@@ -21,6 +21,7 @@ export const chatPlaygroundConfig: PlaygroundWorkspaceConfig = {
     mode: "stream",
     submitLabel: "Send",
     busyLabel: "Streaming...",
+    stopLabel: "Stop response",
   },
   actions: {
     rename: true,
@@ -72,6 +73,7 @@ export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
     mode: "request",
     submitLabel: "Ask knowledge chat",
     busyLabel: "Asking...",
+    stopLabel: "Stop response",
   },
   actions: {
     rename: true,

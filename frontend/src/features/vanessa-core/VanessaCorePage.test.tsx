@@ -114,7 +114,7 @@ describe("VanessaCorePage", () => {
   it("mounts Vanessa through the shared playground workspace with a fixed assistant identity", async () => {
     await renderWithAppProviders(<VanessaCorePage />);
 
-    expect(await screen.findByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeVisible();
+    expect(await screen.findByText("Chat with Vanessa in the Vanessa AI workspace.")).toBeVisible();
     expect(screen.getByLabelText("Model")).toBeVisible();
     expect(screen.queryByLabelText("Assistant")).toBeNull();
     expect(screen.queryByLabelText("Knowledge base")).toBeNull();
@@ -135,7 +135,7 @@ describe("VanessaCorePage", () => {
   it("collapses Vanessa history into a slim rail and keeps the shared controls accessible", async () => {
     await renderWithAppProviders(<VanessaCorePage />);
 
-    expect(await screen.findByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeVisible();
+    expect(await screen.findByText("Chat with Vanessa in the Vanessa AI workspace.")).toBeVisible();
     const shell = document.querySelector(".chatbot-shell");
     if (!(shell instanceof HTMLElement)) {
       throw new Error("Expected chatbot shell to be present");
@@ -147,8 +147,8 @@ describe("VanessaCorePage", () => {
 
     expect(shell).toHaveAttribute("data-history-collapsed", "true");
     expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "New Vanessa session" })).toBeVisible();
-    expect(screen.queryByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeNull();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeVisible();
+    expect(screen.queryByText("Chat with Vanessa in the Vanessa AI workspace.")).toBeNull();
     expect(screen.queryByRole("button", { name: "Rename" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });

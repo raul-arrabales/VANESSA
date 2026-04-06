@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import ChatMessageBody from "../../../components/ChatMessageBody";
 import type { PlaygroundSessionViewModel } from "../types";
 
@@ -12,6 +12,8 @@ type ThreadPanelProps = {
   hasUnreadContentBelow: boolean;
   isPinnedToBottom: boolean;
   scrollToBottom: (options?: { behavior?: ScrollBehavior; force?: boolean }) => void;
+  composer: ReactNode;
+  composerHeight: number;
 };
 
 export default function ThreadPanel({
@@ -24,14 +26,23 @@ export default function ThreadPanel({
   hasUnreadContentBelow,
   isPinnedToBottom,
   scrollToBottom,
+  composer,
+  composerHeight,
 }: ThreadPanelProps): JSX.Element {
+  const shellStyle = {
+    ["--chatbot-composer-height" as string]: `${composerHeight}px`,
+  } as CSSProperties;
+
   return (
-    <div className="chatbot-thread-shell">
+    <div
+      ref={threadRef}
+      className="chatbot-thread-shell"
+      onScroll={handleScroll}
+      style={shellStyle}
+    >
       <div
-        ref={threadRef}
         className="chatbot-thread"
         aria-live="polite"
-        onScroll={handleScroll}
       >
         {activeSession?.messages.length
           ? activeSession.messages.map((message) => {
@@ -43,27 +54,31 @@ export default function ThreadPanel({
                 key={message.id}
                 className={`chatbot-message chatbot-message-${message.role}`}
               >
-                <p className="chatbot-message-role">{message.role === "user" ? "You" : "Assistant"}</p>
-                <ChatMessageBody
-                  content={message.content}
-                  renderMarkdown={message.role === "assistant"}
-                />
-                {message.role === "assistant" && sources.length > 0 ? (
-                  <div className="card-stack">
-                    {sources.map((source, index) => (
-                      <div key={String(source.id ?? source.title ?? index)} className="panel">
-                        <strong>{String(source.title ?? source.id ?? "Source")}</strong>
-                        <p>{String(source.snippet ?? "")}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="chatbot-message-surface">
+                  <ChatMessageBody
+                    content={message.content}
+                    renderMarkdown={message.role === "assistant"}
+                  />
+                  {message.role === "assistant" && sources.length > 0 ? (
+                    <div className="card-stack">
+                      {sources.map((source, index) => (
+                        <div key={String(source.id ?? source.title ?? index)} className="panel">
+                          <strong>{String(source.title ?? source.id ?? "Source")}</strong>
+                          <p>{String(source.snippet ?? "")}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </article>
             );
           })
-          : <p className="status-text">
+          : <p className="status-text chatbot-thread-status">
             {isBootstrapping ? loadingText : emptyStateText}
           </p>}
+      </div>
+      <div className="chatbot-thread-composer-slot">
+        {composer}
       </div>
       {hasUnreadContentBelow && !isPinnedToBottom
         ? (

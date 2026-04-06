@@ -1,0 +1,84 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - button "Contraer barra lateral" [ref=e6] [cursor=pointer]:
+      - img [ref=e8]
+      - generic [ref=e10]: Contraer barra lateral
+    - navigation "Navegacion de la aplicacion" [ref=e11]:
+      - list [ref=e12]:
+        - listitem [ref=e13]:
+          - link "Inicio" [ref=e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=e16]
+            - generic [ref=e18]: Inicio
+        - listitem [ref=e19]:
+          - link "Vanessa AI" [ref=e20] [cursor=pointer]:
+            - /url: /ai
+            - img [ref=e22]
+            - generic [ref=e24]: Vanessa AI
+        - listitem [ref=e25]:
+          - link "AI Playground" [ref=e26] [cursor=pointer]:
+            - /url: /playgrounds
+            - img [ref=e28]
+            - generic [ref=e30]: AI Playground
+        - listitem [ref=e31]:
+          - link "Constructor de agentes" [ref=e32] [cursor=pointer]:
+            - /url: /agent-builder
+            - img [ref=e34]
+            - generic [ref=e36]: Constructor de agentes
+        - listitem [ref=e37]:
+          - link "Panel de control" [ref=e38] [cursor=pointer]:
+            - /url: /control
+            - img [ref=e40]
+            - generic [ref=e42]: Panel de control
+  - generic [ref=e43]:
+    - banner [ref=e44]:
+      - link "VANESSA" [ref=e46] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e48]: VANESSA
+      - generic "Ubicacion actual" [ref=e106]:
+        - link "Inicio" [ref=e108] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e109]:
+          - generic [ref=e110]: /
+          - link "AI Playground" [ref=e111] [cursor=pointer]:
+            - /url: /playgrounds
+        - generic [ref=e112]:
+          - generic [ref=e113]: /
+          - generic [ref=e114]: Chat de conocimiento
+      - group "Controles de aplicacion" [ref=e115]:
+        - generic "Solo los superadministradores pueden cambiar el modo de ejecución." [ref=e117]:
+          - generic [ref=e118]: Sin conexión
+          - switch "Modo de ejecución" [disabled]
+        - group "Menú de identidad y configuración" [ref=e121]:
+          - button "sample-user" [ref=e122] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e127]: sample-user
+    - main [ref=e128]:
+      - region "Knowledge playground" [ref=e130]:
+        - complementary "Conversation history" [ref=e131]:
+          - generic [ref=e132]:
+            - heading "Knowledge playground" [level=2] [ref=e133]
+            - generic [ref=e134]:
+              - button "Collapse conversation history" [ref=e135] [cursor=pointer]:
+                - img [ref=e137]
+              - button "New chat" [disabled] [ref=e139]
+          - paragraph [ref=e140]: Ground answers in a bound knowledge base and continue prior sessions.
+          - list
+        - generic [ref=e141]:
+          - heading "Knowledge playground" [level=3] [ref=e143]
+          - generic [ref=e144]: Model
+          - combobox "Model" [disabled] [ref=e145]:
+            - option "Qwen2.5-0.5B-Instruct" [selected]
+          - generic [ref=e147]:
+            - text: Knowledge base
+            - combobox "Knowledge base" [disabled] [ref=e148]:
+              - option "Select knowledge base" [selected]
+          - generic [ref=e149]:
+            - paragraph [ref=e151]: Loading knowledge bases...
+            - generic [ref=e153]:
+              - generic [ref=e154]: Message
+              - textbox "Message" [disabled] [ref=e155]:
+                - /placeholder: Ask about the knowledge base
+              - button "Ask knowledge chat" [disabled] [ref=e156]:
+                - generic [ref=e157]: Ask knowledge chat
+                - img [ref=e159]

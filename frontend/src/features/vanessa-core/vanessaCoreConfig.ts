@@ -5,12 +5,12 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   playgroundKind: VANESSA_CORE_ASSISTANT_EXPERIENCE.playground_kind,
   title: "Vanessa Core",
   panelAriaLabel: "Vanessa Core workspace",
-  introText: "Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.",
+  introText: "Chat with Vanessa in the Vanessa AI workspace.",
   loadingText: "Loading Vanessa conversation...",
   modelLoadingText: "Loading available models...",
   knowledgeBaseLoadingText: "Loading knowledge bases...",
   emptyStateText: "No messages yet. Start a Vanessa conversation to build the thread.",
-  newSessionLabel: "New Vanessa session",
+  newSessionLabel: "New chat",
   emptySessionTitle: "Vanessa Core",
   draftPlaceholder: "Ask Vanessa anything",
   selectors: {
@@ -22,6 +22,7 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
     mode: "stream",
     submitLabel: "Send to Vanessa",
     busyLabel: "Vanessa is responding...",
+    stopLabel: "Stop Vanessa response",
   },
   actions: {
     rename: true,

@@ -1,0 +1,88 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - button "Contraer barra lateral" [ref=e6] [cursor=pointer]:
+      - img [ref=e8]
+      - generic [ref=e10]: Contraer barra lateral
+    - navigation "Navegacion de la aplicacion" [ref=e11]:
+      - list [ref=e12]:
+        - listitem [ref=e13]:
+          - link "Inicio" [ref=e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=e16]
+            - generic [ref=e18]: Inicio
+        - listitem [ref=e19]:
+          - link "Vanessa AI" [ref=e20] [cursor=pointer]:
+            - /url: /ai
+            - img [ref=e22]
+            - generic [ref=e24]: Vanessa AI
+        - listitem [ref=e25]:
+          - link "AI Playground" [ref=e26] [cursor=pointer]:
+            - /url: /playgrounds
+            - img [ref=e28]
+            - generic [ref=e30]: AI Playground
+        - listitem [ref=e31]:
+          - link "Constructor de agentes" [ref=e32] [cursor=pointer]:
+            - /url: /agent-builder
+            - img [ref=e34]
+            - generic [ref=e36]: Constructor de agentes
+        - listitem [ref=e37]:
+          - link "Panel de control" [ref=e38] [cursor=pointer]:
+            - /url: /control
+            - img [ref=e40]
+            - generic [ref=e42]: Panel de control
+  - generic [ref=e43]:
+    - banner [ref=e44]:
+      - link "VANESSA" [ref=e46] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e48]: VANESSA
+      - generic "Ubicacion actual" [ref=e106]:
+        - link "Inicio" [ref=e108] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e109]:
+          - generic [ref=e110]: /
+          - link "Vanessa AI" [ref=e139] [cursor=pointer]:
+            - /url: /ai
+        - generic [ref=e140]:
+          - generic [ref=e141]: /
+          - generic [ref=e142]: Vanessa Core
+      - group "Controles de aplicacion" [ref=e112]:
+        - generic "Solo los superadministradores pueden cambiar el modo de ejecución." [ref=e114]:
+          - generic [ref=e115]: Sin conexión
+          - switch "Modo de ejecución" [disabled]
+        - group "Menú de identidad y configuración" [ref=e118]:
+          - button "sample-user" [ref=e119] [cursor=pointer]:
+            - img [ref=e121]
+            - generic [ref=e124]: sample-user
+    - main [ref=e125]:
+      - region "Vanessa Core workspace" [ref=e143]:
+        - complementary "Conversation history" [ref=e144]:
+          - generic [ref=e145]:
+            - heading "Vanessa Core" [level=2] [ref=e146]
+            - generic [ref=e147]:
+              - button "Collapse conversation history" [ref=e148] [cursor=pointer]:
+                - img [ref=e150]
+              - button "New Vanessa session" [disabled] [ref=e152]
+          - paragraph [ref=e153]: Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.
+          - list [ref=e154]:
+            - generic [ref=e155]:
+              - button "New chat session 6/4/2026, 20:25:34" [ref=e156] [cursor=pointer]:
+                - strong [ref=e157]: New chat session
+                - generic [ref=e158]: 6/4/2026, 20:25:34
+              - generic [ref=e159]:
+                - button "Conversation actions for New chat session":
+                  - generic:
+                    - img
+        - generic [ref=e160]:
+          - heading "New chat session" [level=3] [ref=e162]
+          - generic [ref=e163]: Model
+          - combobox "Model" [ref=e164]:
+            - option "Qwen2.5-0.5B-Instruct" [selected]
+          - generic [ref=e165]:
+            - paragraph [ref=e167]: No messages yet. Start a Vanessa conversation to build the thread.
+            - generic [ref=e169]:
+              - generic [ref=e170]: Message
+              - textbox "Message" [ref=e171]:
+                - /placeholder: Ask Vanessa anything
+              - button "Send to Vanessa" [disabled] [ref=e172]:
+                - generic [ref=e173]: Send to Vanessa
+                - img [ref=e175]

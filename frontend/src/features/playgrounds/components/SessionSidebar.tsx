@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useSessionSidebarMenu } from "../hooks/useSessionSidebarMenu";
 import type { PlaygroundSessionViewModel } from "../types";
 import { formatTimestamp } from "../utils";
 
@@ -43,44 +43,17 @@ export default function SessionSidebar({
   canRenameSession,
   canDeleteSession,
 }: SessionSidebarProps): JSX.Element {
-  const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
-  const sidebarRef = useRef<HTMLElement | null>(null);
+  const {
+    sidebarRef,
+    isMenuOpen,
+    toggleMenu,
+    closeMenu,
+  } = useSessionSidebarMenu({
+    isCollapsed,
+    isInteractionLocked,
+    activeSessionId,
+  });
   const historyToggleLabel = isCollapsed ? "Expand conversation history" : "Collapse conversation history";
-
-  useEffect(() => {
-    if (isCollapsed || isInteractionLocked) {
-      setOpenMenuSessionId(null);
-    }
-  }, [isCollapsed, isInteractionLocked]);
-
-  useEffect(() => {
-    setOpenMenuSessionId(null);
-  }, [activeSessionId]);
-
-  useEffect(() => {
-    if (!openMenuSessionId) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent): void => {
-      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
-        setOpenMenuSessionId(null);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setOpenMenuSessionId(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [openMenuSessionId]);
 
   return (
     <aside className="chatbot-sidebar" aria-label="Conversation history" data-collapsed={isCollapsed} ref={sidebarRef}>
@@ -102,23 +75,21 @@ export default function SessionSidebar({
           </button>
           <button
             type="button"
-            className={isCollapsed ? "chatbot-sidebar-icon-button" : "btn btn-secondary"}
+            className="chatbot-sidebar-icon-button"
             onClick={onCreateSession}
-            aria-label={isCollapsed ? newSessionLabel : undefined}
-            title={isCollapsed ? newSessionLabel : undefined}
+            aria-label={newSessionLabel}
+            title={newSessionLabel}
             disabled={!canCreateSession || isInteractionLocked}
           >
-            {isCollapsed ? (
-              <span className="chatbot-sidebar-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" />
-                </svg>
-              </span>
-            ) : newSessionLabel}
+            <span className="chatbot-sidebar-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" />
+              </svg>
+            </span>
           </button>
         </div>
       </div>
-      {!isCollapsed ? <p className="status-text">{introText}</p> : null}
+      {!isCollapsed ? <p className="status-text chatbot-sidebar-intro">{introText}</p> : null}
       {!isCollapsed ? (
         <div className="chatbot-conversation-list" role="list">
           {isHistoryLoading ? (
@@ -136,19 +107,19 @@ export default function SessionSidebar({
           ) : null}
           {sessions.map((session) => {
             const actionsLabel = `Conversation actions for ${session.title}`;
-            const isMenuOpen = openMenuSessionId === session.id;
+            const rowMenuOpen = isMenuOpen(session.id);
 
             return (
               <div
                 key={session.id}
                 className={`chatbot-conversation-row ${session.id === activeSessionId ? "active" : ""}`}
-                data-menu-open={isMenuOpen ? "true" : "false"}
+                data-menu-open={rowMenuOpen ? "true" : "false"}
               >
                 <button
                   type="button"
                   className={`chatbot-conversation-item ${session.id === activeSessionId ? "active" : ""}`}
                   onClick={() => {
-                    setOpenMenuSessionId(null);
+                    closeMenu();
                     onSelectSession(session.id);
                   }}
                   disabled={isInteractionLocked}
@@ -165,10 +136,10 @@ export default function SessionSidebar({
                       aria-label={actionsLabel}
                       title={actionsLabel}
                       aria-haspopup="menu"
-                      aria-expanded={isMenuOpen}
+                      aria-expanded={rowMenuOpen}
                       onClick={(event) => {
                         event.stopPropagation();
-                        setOpenMenuSessionId((current) => (current === session.id ? null : session.id));
+                        toggleMenu(session.id);
                       }}
                       disabled={isInteractionLocked}
                     >
@@ -178,7 +149,7 @@ export default function SessionSidebar({
                         </svg>
                       </span>
                     </button>
-                    {isMenuOpen ? (
+                    {rowMenuOpen ? (
                       <div className="chatbot-conversation-menu" role="menu" aria-label={actionsLabel}>
                         {canRenameSession ? (
                           <button
@@ -186,7 +157,7 @@ export default function SessionSidebar({
                             className="chatbot-conversation-menu-item"
                             role="menuitem"
                             onClick={() => {
-                              setOpenMenuSessionId(null);
+                              closeMenu();
                               onRenameSession(session.id);
                             }}
                           >
@@ -199,7 +170,7 @@ export default function SessionSidebar({
                             className="chatbot-conversation-menu-item chatbot-conversation-menu-item-danger"
                             role="menuitem"
                             onClick={() => {
-                              setOpenMenuSessionId(null);
+                              closeMenu();
                               onDeleteSession(session.id);
                             }}
                           >

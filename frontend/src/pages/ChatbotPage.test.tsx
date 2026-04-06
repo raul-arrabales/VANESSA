@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PlaygroundSessionDetail,
   PlaygroundSessionSummary,
@@ -137,7 +137,7 @@ function getChatShell(container: HTMLElement): HTMLElement {
 }
 
 function getChatThread(container: HTMLElement): HTMLDivElement {
-  const thread = container.querySelector(".chatbot-thread");
+  const thread = container.querySelector(".chatbot-thread-shell");
   if (!(thread instanceof HTMLDivElement)) {
     throw new Error("Expected chatbot thread to be present");
   }
@@ -227,6 +227,10 @@ describe("ChatPlaygroundPage", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders a local draft immediately and shows history loading in the sidebar", async () => {
     let resolveHistory: (value: PlaygroundSessionSummary[]) => void = () => undefined;
     playgroundApiMocks.listPlaygroundSessions.mockImplementationOnce(
@@ -307,6 +311,34 @@ describe("ChatPlaygroundPage", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 
+  it("keeps the composer compact, uses Shift+Enter for new lines, and sends on Enter", async () => {
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
+      sendResult(
+        sessionSummary("conv-draft", "Keyboard send", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:01Z",
+        }),
+        "Keyboard send",
+        "done",
+      ),
+    );
+
+    renderChatPlayground();
+
+    await waitForDraftReady();
+    const messageInput = await screen.findByLabelText("Message");
+    expect(messageInput).toHaveAttribute("rows", "1");
+
+    await userEvent.type(messageInput, "Line one{Shift>}{Enter}{/Shift}Line two");
+    expect(messageInput).toHaveValue("Line one\nLine two");
+    expect(playgroundApiMocks.streamPlaygroundMessage).not.toHaveBeenCalled();
+
+    await userEvent.clear(messageInput);
+    await userEvent.type(messageInput, "Keyboard send{Enter}");
+
+    await waitFor(() => expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledTimes(1));
+  });
+
   it("updates draft selector state locally and creates a saved session only on the first send", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
@@ -370,6 +402,10 @@ describe("ChatPlaygroundPage", () => {
 
     expect(await screen.findByText("**literal user**")).toBeVisible();
     expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Answer with **bold**");
+    expect(screen.queryByText(/^You$/)).toBeNull();
+    expect(screen.queryByText(/^Assistant$/)).toBeNull();
+    expect(document.querySelector(".chatbot-message-user .chatbot-message-surface")).not.toBeNull();
+    expect(document.querySelector(".chatbot-message-assistant .chatbot-message-surface")).not.toBeNull();
   });
 
   it("moves rename and delete into the row menu and keeps the main header clean", async () => {
@@ -548,6 +584,31 @@ describe("ChatPlaygroundPage", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled());
+  });
+
+  it("turns the send control into a stop action during streaming and aborts when clicked", async () => {
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, streamOptions) => await new Promise<SendPlaygroundMessageResult>((_resolve, reject) => {
+        streamOptions.signal.addEventListener("abort", () => {
+          reject(new Error("aborted"));
+        }, { once: true });
+      }),
+    );
+
+    renderChatPlayground();
+
+    await waitForDraftReady();
+    await userEvent.type(screen.getByLabelText("Message"), "Stop mid-stream");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByRole("button", { name: "Stop response" })).toBeEnabled();
+    expect(screen.getByLabelText("Message")).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Stop response" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Stop response" })).toBeNull());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
   });
 
   it("truncates long saved titles to one row while preserving the full title in a tooltip", async () => {

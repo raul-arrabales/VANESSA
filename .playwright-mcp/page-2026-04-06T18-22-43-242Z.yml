@@ -1,0 +1,49 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - button "Contraer barra lateral" [ref=e6] [cursor=pointer]:
+      - img [ref=e8]
+      - generic [ref=e10]: Contraer barra lateral
+    - navigation "Navegacion de la aplicacion" [ref=e11]:
+      - list [ref=e12]:
+        - listitem [ref=e13]:
+          - link "Inicio" [ref=e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=e16]
+            - generic [ref=e18]: Inicio
+        - listitem [ref=e19]:
+          - link "Iniciar sesion" [ref=e20] [cursor=pointer]:
+            - /url: /login
+            - img [ref=e22]
+            - generic [ref=e24]: Iniciar sesion
+        - listitem [ref=e25]:
+          - link "Registro" [ref=e26] [cursor=pointer]:
+            - /url: /register
+            - img [ref=e28]
+            - generic [ref=e30]: Registro
+  - generic [ref=e31]:
+    - banner [ref=e32]:
+      - generic [ref=e33]:
+        - button "Abrir navegacion" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+        - link "VANESSA" [ref=e37] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e39]: VANESSA
+      - generic "Ubicacion actual" [ref=e97]:
+        - link "Inicio" [ref=e99] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e100]:
+          - generic [ref=e101]: /
+          - link "AI Playground" [ref=e102] [cursor=pointer]:
+            - /url: /playgrounds
+        - generic [ref=e103]:
+          - generic [ref=e104]: /
+          - generic [ref=e105]: Espacio de chat
+      - group "Controles de aplicacion" [ref=e106]:
+        - generic "Solo los superadministradores pueden cambiar el modo de ejecución." [ref=e108]:
+          - generic [ref=e109]: Sin conexión
+          - switch "Modo de ejecución" [disabled]
+        - group "Menú de identidad y configuración" [ref=e112]:
+          - button "Invitado" [ref=e113] [cursor=pointer]:
+            - img [ref=e115]
+            - generic [ref=e118]: Invitado
+    - main [ref=e119]
