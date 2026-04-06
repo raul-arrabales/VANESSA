@@ -16,7 +16,7 @@ export default function VanessaAiHomePage(): JSX.Element {
             title: t("ai.vanessa.title"),
             description: t("ai.vanessa.description"),
             to: "/ai/vanessa",
-            icon: "ai",
+            icon: "vanessa",
           },
         ]}
       />
