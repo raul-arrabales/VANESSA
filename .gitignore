@@ -15,3 +15,6 @@ models/llm/
 
 # MkDocs build output
 site/
+
+# Playwright MCP
+.playwright-mcp/
