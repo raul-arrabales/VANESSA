@@ -55,4 +55,13 @@ describe("app-shell navigation", () => {
     expect(loginItem?.icon).toBe("profile");
     expect(registerItem?.icon).toBe("register");
   });
+
+  it("keeps Vanessa AI and playgrounds visually distinct when collapsed", () => {
+    const sidebarItems = buildSidebarItems("/ai", { isAuthenticated: true }, translate);
+    const vanessaItem = sidebarItems.find((item) => item.to === "/ai");
+    const playgroundsItem = sidebarItems.find((item) => item.to === "/playgrounds");
+
+    expect(vanessaItem?.icon).toBe("vanessa");
+    expect(playgroundsItem?.icon).toBe("ai");
+  });
 });

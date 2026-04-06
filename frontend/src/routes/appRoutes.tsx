@@ -489,7 +489,7 @@ export const appRoutes: AppRouteDefinition[] = [
     navGroup: "primary",
     navAudience: "authenticated",
     sidebar: {
-      icon: "ai",
+      icon: "vanessa",
       order: 20,
     },
     element: <AiPage />,

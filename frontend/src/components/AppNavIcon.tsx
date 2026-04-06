@@ -2,6 +2,7 @@ export type AppNavIconName =
   | "home"
   | "profile"
   | "register"
+  | "vanessa"
   | "approvals"
   | "health"
   | "userPage"
@@ -27,6 +28,11 @@ const iconByName: Record<AppNavIconName, JSX.Element> = {
   register: (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <path d="M15 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-3 5c-3.31 0-6 1.79-6 4v1h7v-2.5c0-.92.27-1.78.73-2.5H12Zm6 0v2h2v2h-2v2h-2v-2h-2v-2h2v-2h2Z" />
+    </svg>
+  ),
+  vanessa: (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M4 5h3.1L12 16.36 16.9 5H20l-6.62 14h-2.76L4 5Z" />
     </svg>
   ),
   approvals: (
