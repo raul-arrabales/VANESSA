@@ -5,7 +5,8 @@ import VanessaCorePage from "./pages/VanessaCorePage";
 import { renderWithAppProviders } from "../../test/renderWithAppProviders";
 
 const playgroundApiMocks = vi.hoisted(() => ({
-  getPlaygroundOptions: vi.fn(),
+  getPlaygroundModelOptions: vi.fn(),
+  getPlaygroundKnowledgeBaseOptions: vi.fn(),
   listPlaygroundSessions: vi.fn(),
   createPlaygroundSession: vi.fn(),
   getPlaygroundSession: vi.fn(),
@@ -17,7 +18,8 @@ const playgroundApiMocks = vi.hoisted(() => ({
 let mockUser: AuthUser | null = null;
 
 vi.mock("../../api/playgrounds", () => ({
-  getPlaygroundOptions: playgroundApiMocks.getPlaygroundOptions,
+  getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
+  getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
   listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
   createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
   getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
@@ -51,7 +53,7 @@ describe("VanessaCorePage", () => {
       role: "user",
       is_active: true,
     };
-    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValue({
       assistants: [
         {
           assistant_ref: "assistant.playground.chat",
@@ -71,6 +73,8 @@ describe("VanessaCorePage", () => {
         },
       ],
       models: [{ id: "safe-small", display_name: "Safe Small" }],
+    });
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValue({
       knowledge_bases: [],
       default_knowledge_base_id: null,
       selection_required: false,

@@ -6,7 +6,9 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   title: "Vanessa Core",
   panelAriaLabel: "Vanessa Core workspace",
   introText: "Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.",
-  loadingText: "Loading Vanessa Core...",
+  loadingText: "Loading Vanessa conversation...",
+  modelLoadingText: "Loading available models...",
+  knowledgeBaseLoadingText: "Loading knowledge bases...",
   emptyStateText: "No messages yet. Start a Vanessa conversation to build the thread.",
   newSessionLabel: "New Vanessa session",
   emptySessionTitle: "Vanessa Core",
@@ -24,6 +26,10 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   actions: {
     rename: true,
     delete: true,
+  },
+  sessionBootstrap: {
+    mode: "saved-first",
+    historyLoadingText: "Loading Vanessa sessions...",
   },
   prompts: {
     rename: "Rename Vanessa session",

@@ -111,9 +111,11 @@ vi.mock("./api/modelops/access", () => ({
   updateModelAssignment: vi.fn(),
 }));
 vi.mock("./api/playgrounds", () => ({
-  getPlaygroundOptions: vi.fn(async () => ({
+  getPlaygroundModelOptions: vi.fn(async () => ({
     assistants: [],
     models: [{ id: "gpt-4", display_name: "GPT-4" }],
+  })),
+  getPlaygroundKnowledgeBaseOptions: vi.fn(async () => ({
     knowledge_bases: [{ id: "kb-primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: true }],
     default_knowledge_base_id: "kb-primary",
     selection_required: false,
@@ -483,7 +485,7 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/playgrounds/knowledge" });
 
-    expect(await screen.findByRole("heading", { name: "Knowledge playground" })).toBeVisible();
+    expect(await screen.findByLabelText("Knowledge base")).toBeVisible();
   });
 
   it("renders the chat playground page for authenticated users", async () => {

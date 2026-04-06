@@ -20,7 +20,7 @@ from ..services.chat_inference import (
     extract_output_text,
 )
 from ..services.modelops_common import ModelOpsError
-from ..services.modelops_queries import list_models
+from ..services.modelops_queries import list_model_picker_options
 from ..services.platform_types import PlatformControlPlaneError
 from .playground_execution import (
     PlaygroundExecutionRequest,
@@ -248,7 +248,36 @@ def get_playground_options(
     actor_user_id: int,
     actor_role: str,
 ) -> dict[str, Any]:
-    models = list_models(
+    models = get_playground_model_options(
+        database_url,
+        config=config,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+    )
+    knowledge_payload = get_playground_knowledge_base_options(
+        database_url,
+        config=config,
+    )
+    return {
+        "assistants": PLAYGROUND_ASSISTANTS,
+        "models": models["models"],
+        "knowledge_bases": knowledge_payload.get("knowledge_bases", []),
+        "default_knowledge_base_id": knowledge_payload.get("default_knowledge_base_id"),
+        "selection_required": bool(knowledge_payload.get("selection_required", False)),
+        "configuration_message": knowledge_payload.get("configuration_message"),
+    }
+
+
+def get_playground_model_options(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    actor_user_id: int,
+    actor_role: str,
+    playground_kind: str | None = None,
+) -> dict[str, Any]:
+    normalized_playground_kind = _normalize_playground_kind(playground_kind) if playground_kind is not None else None
+    models = list_model_picker_options(
         database_url,
         config=config,
         actor_user_id=actor_user_id,
@@ -256,33 +285,40 @@ def get_playground_options(
         require_active=True,
         capability_key="llm_inference",
     )
+    assistants = [
+        assistant
+        for assistant in PLAYGROUND_ASSISTANTS
+        if normalized_playground_kind is None or str(assistant.get("playground_kind", "")).strip().lower() == normalized_playground_kind
+    ]
+    return {
+        "assistants": assistants,
+        "models": models,
+    }
+
+
+def get_playground_knowledge_base_options(
+    database_url: str,
+    *,
+    config: AuthConfig,
+) -> dict[str, Any]:
     try:
         knowledge_payload, _status_code = list_knowledge_chat_knowledge_bases(
             database_url=database_url,
             config=config,
         )
+        return {
+            "knowledge_bases": knowledge_payload.get("knowledge_bases", []),
+            "default_knowledge_base_id": knowledge_payload.get("default_knowledge_base_id"),
+            "selection_required": bool(knowledge_payload.get("selection_required", False)),
+            "configuration_message": knowledge_payload.get("configuration_message"),
+        }
     except PlatformControlPlaneError as exc:
-        knowledge_payload = {
+        return {
             "knowledge_bases": [],
             "default_knowledge_base_id": None,
             "selection_required": False,
             "configuration_message": exc.message,
         }
-    return {
-        "assistants": PLAYGROUND_ASSISTANTS,
-        "models": [
-            {
-                "id": str(item.get("id", "")),
-                "display_name": str(item.get("name", "") or item.get("id", "")),
-                "task_key": str(item.get("task_key", "")),
-            }
-            for item in models
-        ],
-        "knowledge_bases": knowledge_payload.get("knowledge_bases", []),
-        "default_knowledge_base_id": knowledge_payload.get("default_knowledge_base_id"),
-        "selection_required": bool(knowledge_payload.get("selection_required", False)),
-        "configuration_message": knowledge_payload.get("configuration_message"),
-    }
 
 
 def _build_execution_request(

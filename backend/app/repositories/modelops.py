@@ -532,6 +532,93 @@ def list_models_for_actor(
     return [dict(row) for row in rows]
 
 
+def list_model_picker_rows_for_actor(
+    database_url: str,
+    *,
+    actor_user_id: int,
+    actor_role: str,
+    runtime_profile: str,
+    require_active: bool = False,
+    capability_key: str | None = None,
+) -> list[dict[str, Any]]:
+    normalized_role = actor_role.strip().lower()
+    eligible_clause = _eligible_clause(require_active=require_active, capability_key=capability_key)
+    runtime_filter = """
+        AND (
+            %s <> 'offline'
+            OR m.runtime_mode_policy = 'online_offline'
+            OR m.hosting_kind = 'local'
+            OR m.availability = 'offline_ready'
+        )
+    """
+
+    base_projection = """
+        SELECT DISTINCT
+            m.model_id,
+            m.name,
+            m.task_key,
+            m.updated_at
+        FROM model_registry m
+    """
+
+    if normalized_role == "superadmin":
+        query = f"""
+            {base_projection}
+            WHERE {eligible_clause}
+            {runtime_filter}
+            ORDER BY m.updated_at DESC, m.model_id ASC
+        """
+        params = (runtime_profile.strip().lower(),)
+    else:
+        query = f"""
+            WITH user_role_cte AS (
+                SELECT role
+                FROM users
+                WHERE id = %s
+            ),
+            user_groups_cte AS (
+                SELECT group_id
+                FROM user_group_memberships
+                WHERE user_id = %s
+            ),
+            assigned_models AS (
+                SELECT model_id FROM model_user_assignments WHERE user_id = %s
+                UNION
+                SELECT mga.model_id
+                FROM model_group_assignments mga
+                JOIN user_groups_cte ug ON ug.group_id = mga.group_id
+                UNION
+                SELECT model_id FROM model_global_assignments
+                UNION
+                SELECT jsonb_array_elements_text(msa.model_ids) AS model_id
+                FROM model_scope_assignments msa
+                JOIN user_role_cte ur ON ur.role = msa.scope
+            )
+            {base_projection}
+            LEFT JOIN assigned_models a ON a.model_id = m.model_id
+            WHERE
+                {eligible_clause}
+                AND (
+                    (m.owner_type = 'user' AND m.owner_user_id = %s)
+                    OR m.visibility_scope = 'platform'
+                    OR (m.visibility_scope IN ('user', 'group') AND a.model_id IS NOT NULL)
+                )
+                {runtime_filter}
+            ORDER BY m.updated_at DESC, m.model_id ASC
+        """
+        params = (
+            actor_user_id,
+            actor_user_id,
+            actor_user_id,
+            actor_user_id,
+            runtime_profile.strip().lower(),
+        )
+
+    with get_connection(database_url) as connection:
+        rows = connection.execute(query, params).fetchall()
+    return [dict(row) for row in rows]
+
+
 def append_validation(
     database_url: str,
     *,

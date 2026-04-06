@@ -61,6 +61,22 @@ export type PlaygroundOptions = {
   configuration_message?: string | null;
 };
 
+export type PlaygroundModelOptions = {
+  assistants: PlaygroundAssistantOption[];
+  models: Array<{
+    id: string;
+    display_name: string;
+    task_key?: string | null;
+  }>;
+};
+
+export type PlaygroundKnowledgeBaseOptions = {
+  knowledge_bases: PlaygroundKnowledgeBaseOption[];
+  default_knowledge_base_id?: string | null;
+  selection_required: boolean;
+  configuration_message?: string | null;
+};
+
 export type SendPlaygroundMessageResult = {
   session: PlaygroundSessionDetail;
   messages: PlaygroundMessage[];
@@ -242,6 +258,20 @@ export async function streamPlaygroundMessage(
 
 export async function getPlaygroundOptions(token: string): Promise<PlaygroundOptions> {
   return requestJson<PlaygroundOptions>("/v1/playgrounds/options", { token });
+}
+
+export async function getPlaygroundModelOptions(
+  playgroundKind: PlaygroundKind,
+  token: string,
+): Promise<PlaygroundModelOptions> {
+  return requestJson<PlaygroundModelOptions>(
+    `/v1/playgrounds/model-options?playground_kind=${encodeURIComponent(playgroundKind)}`,
+    { token },
+  );
+}
+
+export async function getPlaygroundKnowledgeBaseOptions(token: string): Promise<PlaygroundKnowledgeBaseOptions> {
+  return requestJson<PlaygroundKnowledgeBaseOptions>("/v1/playgrounds/knowledge-base-options", { token });
 }
 
 function parseSseEvent(rawEvent: string): { event: string; data: Record<string, unknown> } | null {

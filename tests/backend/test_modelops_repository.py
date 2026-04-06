@@ -133,3 +133,44 @@ def test_get_model_selects_artifact_and_dependency_subqueries(monkeypatch):
     assert "FROM model_runtime_dependencies d" in captured["query"]
     assert "WHERE m.model_id = %s" in captured["query"]
     assert captured["params"] == ("model-1",)
+
+
+def test_list_model_picker_rows_for_user_uses_lightweight_projection(monkeypatch):
+    captured: dict[str, object] = {}
+    expected_rows = [
+        {
+            "model_id": "allowed-model",
+            "name": "Allowed Model",
+            "task_key": "llm",
+        }
+    ]
+
+    class _FakeConnection:
+        def execute(self, query, params=None):
+            captured["query"] = str(query)
+            captured["params"] = params
+            return _FakeResult(many=expected_rows)
+
+    @contextmanager
+    def _fake_get_connection(_database_url: str) -> Iterator[_FakeConnection]:
+        yield _FakeConnection()
+
+    monkeypatch.setattr(modelops, "get_connection", _fake_get_connection)
+
+    rows = modelops.list_model_picker_rows_for_actor(
+        "postgresql://ignored",
+        actor_user_id=42,
+        actor_role="user",
+        runtime_profile="online",
+        require_active=True,
+        capability_key="llm_inference",
+    )
+
+    assert rows == expected_rows
+    assert "SELECT DISTINCT" in captured["query"]
+    assert "m.model_id" in captured["query"]
+    assert "m.name" in captured["query"]
+    assert "m.task_key" in captured["query"]
+    assert "FROM model_artifacts ma" not in captured["query"]
+    assert "FROM model_runtime_dependencies d" not in captured["query"]
+    assert captured["params"] == (42, 42, 42, 42, "online")

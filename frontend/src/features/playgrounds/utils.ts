@@ -1,4 +1,10 @@
-import type { PlaygroundMessageViewModel, PlaygroundSessionViewModel } from "./types";
+import type {
+  PlaygroundSelectorState,
+  PlaygroundSessionViewModel,
+  PlaygroundWorkspaceConfig,
+  PlaygroundWorkspaceOptions,
+  PlaygroundMessageViewModel,
+} from "./types";
 
 export function sortSessions(sessions: PlaygroundSessionViewModel[]): PlaygroundSessionViewModel[] {
   return [...sessions].sort((left, right) => {
@@ -73,4 +79,31 @@ export function updateTransientAssistantMessage(
       ? { ...message, content: `${message.content}${text}` }
       : message
   ));
+}
+
+export function createDraftSession(
+  config: PlaygroundWorkspaceConfig,
+  options: PlaygroundWorkspaceOptions,
+  source?: PlaygroundSessionViewModel | null,
+): PlaygroundSessionViewModel {
+  const selectorState: PlaygroundSelectorState = {
+    assistantRef: source?.selectorState.assistantRef ?? options.defaultAssistantRef ?? config.defaultAssistantRef ?? null,
+    modelId: source?.selectorState.modelId ?? options.models[0]?.id ?? null,
+    knowledgeBaseId: config.selectors.knowledgeBase
+      ? (source?.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId ?? null)
+      : null,
+  };
+
+  return {
+    id: createTransientMessageId(`draft-${config.playgroundKind}`),
+    playgroundKind: config.playgroundKind,
+    title: config.emptySessionTitle,
+    titleSource: "auto",
+    selectorState,
+    messageCount: 0,
+    createdAt: null,
+    updatedAt: null,
+    messages: [],
+    persistence: "draft",
+  };
 }

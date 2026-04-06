@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { getPlaygroundOptions } from "../../../api/playgrounds";
+import {
+  getPlaygroundKnowledgeBaseOptions,
+  getPlaygroundModelOptions,
+} from "../../../api/playgrounds";
 import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions } from "../types";
 
 type UsePlaygroundOptionsParams = {
@@ -8,83 +11,168 @@ type UsePlaygroundOptionsParams = {
   config: PlaygroundWorkspaceConfig;
 };
 
-export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlaygroundOptionsParams) {
-  const [options, setOptions] = useState<PlaygroundWorkspaceOptions>({
+function buildEmptyOptions(config: PlaygroundWorkspaceConfig): PlaygroundWorkspaceOptions {
+  return {
     models: [],
     assistants: [],
     knowledgeBases: [],
     defaultAssistantRef: config.defaultAssistantRef ?? null,
     defaultKnowledgeBaseId: null,
     configurationMessage: "",
-  });
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  };
+}
+
+export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlaygroundOptionsParams) {
+  const [options, setOptions] = useState<PlaygroundWorkspaceOptions>(() => buildEmptyOptions(config));
+  const [modelError, setModelError] = useState("");
+  const [knowledgeBaseError, setKnowledgeBaseError] = useState("");
+  const [isModelsLoading, setIsModelsLoading] = useState(false);
+  const [hasLoadedModels, setHasLoadedModels] = useState(false);
+  const [isKnowledgeBasesLoading, setIsKnowledgeBasesLoading] = useState(false);
+  const [hasLoadedKnowledgeBases, setHasLoadedKnowledgeBases] = useState(!config.selectors.knowledgeBase);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
-      setOptions({
-        models: [],
-        assistants: [],
-        knowledgeBases: [],
-        defaultAssistantRef: config.defaultAssistantRef ?? null,
-        defaultKnowledgeBaseId: null,
-        configurationMessage: "",
-      });
-      setError("");
-      setIsLoading(false);
-      setHasLoaded(false);
+      setOptions(buildEmptyOptions(config));
+      setModelError("");
+      setKnowledgeBaseError("");
+      setIsModelsLoading(false);
+      setHasLoadedModels(false);
+      setIsKnowledgeBasesLoading(false);
+      setHasLoadedKnowledgeBases(!config.selectors.knowledgeBase);
       return;
     }
 
     let cancelled = false;
-    const load = async (): Promise<void> => {
-      setIsLoading(true);
-      setHasLoaded(false);
+    const loadModels = async (): Promise<void> => {
+      setIsModelsLoading(true);
+      setHasLoadedModels(false);
       try {
-        const payload = await getPlaygroundOptions(token);
+        const payload = await getPlaygroundModelOptions(config.playgroundKind, token);
         if (cancelled) {
           return;
         }
-        const assistants = payload.assistants.filter((assistant) => assistant.playground_kind === config.playgroundKind);
-        const hasExplicitDefaultKnowledgeBase = Object.prototype.hasOwnProperty.call(payload, "default_knowledge_base_id");
-        setOptions({
+        setOptions((current) => ({
+          ...current,
           models: payload.models.map((model) => ({
             id: model.id,
             displayName: model.display_name,
           })),
-          assistants,
-          knowledgeBases: payload.knowledge_bases,
-          defaultAssistantRef: config.defaultAssistantRef ?? assistants[0]?.assistant_ref ?? null,
-          defaultKnowledgeBaseId: hasExplicitDefaultKnowledgeBase
-            ? (payload.default_knowledge_base_id ?? null)
-            : (payload.knowledge_bases[0]?.id ?? null),
-          configurationMessage: payload.configuration_message ?? "",
-        });
-        setError("");
-        setHasLoaded(true);
+          assistants: payload.assistants,
+          defaultAssistantRef: config.defaultAssistantRef ?? payload.assistants[0]?.assistant_ref ?? null,
+        }));
+        setModelError("");
       } catch (requestError) {
         if (!cancelled) {
-          setError(requestError instanceof Error ? requestError.message : config.feedback.optionsError);
-          setHasLoaded(true);
+          setModelError(requestError instanceof Error ? requestError.message : config.feedback.optionsError);
         }
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setIsModelsLoading(false);
+          setHasLoadedModels(true);
         }
       }
     };
 
-    void load();
+    void loadModels();
     return () => {
       cancelled = true;
     };
-  }, [config.defaultAssistantRef, config.feedback.optionsError, config.playgroundKind, isAuthenticated, token]);
+  }, [
+    config.defaultAssistantRef,
+    config.feedback.optionsError,
+    config.playgroundKind,
+    config.selectors.knowledgeBase,
+    isAuthenticated,
+    token,
+  ]);
 
-  return useMemo(() => ({
-    ...options,
-    error,
-    isLoading,
-    hasLoaded,
-  }), [error, hasLoaded, isLoading, options]);
+  useEffect(() => {
+    if (!config.selectors.knowledgeBase) {
+      setOptions((current) => ({
+        ...current,
+        knowledgeBases: [],
+        defaultKnowledgeBaseId: null,
+        configurationMessage: "",
+      }));
+      setKnowledgeBaseError("");
+      setIsKnowledgeBasesLoading(false);
+      setHasLoadedKnowledgeBases(true);
+      return;
+    }
+
+    if (!isAuthenticated || !token) {
+      setOptions((current) => ({
+        ...current,
+        knowledgeBases: [],
+        defaultKnowledgeBaseId: null,
+        configurationMessage: "",
+      }));
+      setKnowledgeBaseError("");
+      setIsKnowledgeBasesLoading(false);
+      setHasLoadedKnowledgeBases(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadKnowledgeBases = async (): Promise<void> => {
+      setIsKnowledgeBasesLoading(true);
+      setHasLoadedKnowledgeBases(false);
+      try {
+        const payload = await getPlaygroundKnowledgeBaseOptions(token);
+        if (cancelled) {
+          return;
+        }
+        const hasExplicitDefaultKnowledgeBase = Object.prototype.hasOwnProperty.call(payload, "default_knowledge_base_id");
+        setOptions((current) => ({
+          ...current,
+          knowledgeBases: payload.knowledge_bases,
+          defaultKnowledgeBaseId: hasExplicitDefaultKnowledgeBase
+            ? (payload.default_knowledge_base_id ?? null)
+            : (payload.knowledge_bases[0]?.id ?? null),
+          configurationMessage: payload.configuration_message ?? "",
+        }));
+        setKnowledgeBaseError("");
+      } catch (requestError) {
+        if (!cancelled) {
+          setKnowledgeBaseError(requestError instanceof Error ? requestError.message : config.feedback.optionsError);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsKnowledgeBasesLoading(false);
+          setHasLoadedKnowledgeBases(true);
+        }
+      }
+    };
+
+    void loadKnowledgeBases();
+    return () => {
+      cancelled = true;
+    };
+  }, [config.feedback.optionsError, config.selectors.knowledgeBase, isAuthenticated, token]);
+
+  return useMemo(() => {
+    const hasLoaded = hasLoadedModels && hasLoadedKnowledgeBases;
+    const isLoading = isModelsLoading || isKnowledgeBasesLoading;
+    return {
+      ...options,
+      error: modelError || knowledgeBaseError,
+      modelError,
+      knowledgeBaseError,
+      isLoading,
+      hasLoaded,
+      isModelsLoading,
+      hasLoadedModels,
+      isKnowledgeBasesLoading,
+      hasLoadedKnowledgeBases,
+    };
+  }, [
+    hasLoadedKnowledgeBases,
+    hasLoadedModels,
+    isKnowledgeBasesLoading,
+    isModelsLoading,
+    knowledgeBaseError,
+    modelError,
+    options,
+  ]);
 }

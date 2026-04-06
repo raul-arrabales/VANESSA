@@ -5,7 +5,9 @@ export const chatPlaygroundConfig: PlaygroundWorkspaceConfig = {
   title: "Chat",
   panelAriaLabel: "Chat panel",
   introText: "Choose a model and continue any prior conversation.",
-  loadingText: "Loading conversations...",
+  loadingText: "Loading conversation...",
+  modelLoadingText: "Loading available models...",
+  knowledgeBaseLoadingText: "Loading knowledge bases...",
   emptyStateText: "No messages yet. Start chatting to build context memory.",
   newSessionLabel: "New chat",
   emptySessionTitle: "New conversation",
@@ -23,6 +25,10 @@ export const chatPlaygroundConfig: PlaygroundWorkspaceConfig = {
   actions: {
     rename: true,
     delete: true,
+  },
+  sessionBootstrap: {
+    mode: "draft-first",
+    historyLoadingText: "Loading saved conversations...",
   },
   prompts: {
     rename: "Rename conversation",
@@ -50,7 +56,9 @@ export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
   title: "Knowledge playground",
   panelAriaLabel: "Knowledge playground",
   introText: "Ground answers in a bound knowledge base and continue prior sessions.",
-  loadingText: "Loading knowledge playground...",
+  loadingText: "Loading knowledge conversation...",
+  modelLoadingText: "Loading available models...",
+  knowledgeBaseLoadingText: "Loading knowledge bases...",
   emptyStateText: "No messages yet. Ask the knowledge playground to search the active corpus.",
   newSessionLabel: "New knowledge chat",
   emptySessionTitle: "Knowledge playground",
@@ -68,6 +76,10 @@ export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
   actions: {
     rename: true,
     delete: true,
+  },
+  sessionBootstrap: {
+    mode: "draft-first",
+    historyLoadingText: "Loading saved knowledge conversations...",
   },
   prompts: {
     rename: "Rename knowledge session",

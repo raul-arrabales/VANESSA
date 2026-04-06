@@ -20,10 +20,10 @@ def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases
 
     monkeypatch.setattr(
         playgrounds_service,
-        "list_models",
+        "list_model_picker_options",
         lambda *_args, **_kwargs: [
-            {"id": "safe-small", "name": "Safe Small", "task_key": "llm"},
-            {"id": "safe-large", "name": "Safe Large", "task_key": "llm"},
+            {"id": "safe-small", "display_name": "Safe Small", "task_key": "llm"},
+            {"id": "safe-large", "display_name": "Safe Large", "task_key": "llm"},
         ],
     )
     monkeypatch.setattr(
@@ -55,6 +55,82 @@ def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases
     }
     assert payload["models"][1]["display_name"] == "Safe Large"
     assert payload["default_knowledge_base_id"] == "kb-primary"
+
+
+def test_get_playground_model_options_returns_lightweight_models_and_filtered_assistants(monkeypatch):
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    monkeypatch.setattr(
+        playgrounds_service,
+        "list_model_picker_options",
+        lambda *_args, **_kwargs: [
+            {"id": "safe-small", "display_name": "Safe Small", "task_key": "llm"},
+            {"id": "safe-large", "display_name": "Safe Large", "task_key": "llm"},
+        ],
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "list_knowledge_chat_knowledge_bases",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("knowledge bases should not be loaded")),
+    )
+
+    payload = playgrounds_service.get_playground_model_options(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=10,
+        actor_role="user",
+        playground_kind="knowledge",
+    )
+
+    assert payload["models"][0]["display_name"] == "Safe Small"
+    assert {assistant["assistant_ref"] for assistant in payload["assistants"]} == {"agent.knowledge_chat"}
+
+
+def test_get_playground_knowledge_base_options_returns_fallback_configuration_message(monkeypatch):
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    def _raise_control_plane_error(**_kwargs):
+        raise playgrounds_service.PlatformControlPlaneError(
+            "knowledge_base_not_configured",
+            "Knowledge bases are not configured.",
+            status_code=409,
+        )
+
+    monkeypatch.setattr(playgrounds_service, "list_knowledge_chat_knowledge_bases", _raise_control_plane_error)
+
+    payload = playgrounds_service.get_playground_knowledge_base_options(
+        "postgresql://ignored",
+        config=config,
+    )
+
+    assert payload == {
+        "knowledge_bases": [],
+        "default_knowledge_base_id": None,
+        "selection_required": False,
+        "configuration_message": "Knowledge bases are not configured.",
+    }
 
 
 def test_send_playground_message_requires_knowledge_binding_for_knowledge_sessions(monkeypatch):

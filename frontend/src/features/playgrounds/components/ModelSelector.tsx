@@ -1,6 +1,7 @@
 type ModelSelectorProps = {
   models: Array<{ id: string; displayName: string }>;
   value: string;
+  isLoading: boolean;
   disabled: boolean;
   onChange: (value: string) => void;
 };
@@ -8,6 +9,7 @@ type ModelSelectorProps = {
 export default function ModelSelector({
   models,
   value,
+  isLoading,
   disabled,
   onChange,
 }: ModelSelectorProps): JSX.Element {
@@ -22,7 +24,9 @@ export default function ModelSelector({
         onChange={(event) => onChange(event.currentTarget.value)}
         disabled={disabled}
       >
-        {models.length === 0 ? <option value="">No enabled models</option> : null}
+        {models.length === 0 ? (
+          <option value="">{isLoading ? "Loading models..." : "No enabled models"}</option>
+        ) : null}
         {models.map((model) => (
           <option key={model.id} value={model.id}>{model.displayName}</option>
         ))}

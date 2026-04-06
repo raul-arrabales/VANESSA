@@ -25,11 +25,15 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     isAuthenticated,
     config,
   });
+  const hasLoadedRequiredOptions = optionsState.hasLoadedModels
+    && (!config.selectors.knowledgeBase || optionsState.hasLoadedKnowledgeBases);
+  const isRequiredOptionsLoading = optionsState.isModelsLoading
+    || (config.selectors.knowledgeBase && optionsState.isKnowledgeBasesLoading);
   const sessionState = usePlaygroundSessions({
     token,
     isAuthenticated,
-    isOptionsLoading: optionsState.isLoading,
-    hasLoadedOptions: optionsState.hasLoaded,
+    isOptionsLoading: isRequiredOptionsLoading,
+    hasLoadedOptions: hasLoadedRequiredOptions,
     config,
     options: {
       models: optionsState.models,
@@ -75,12 +79,12 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     },
     draft: preferences.draft,
     setDraft: preferences.setDraft,
-    sessions: sessionState.sessions,
-    setSessions: sessionState.setSessions,
+    savedSessions: sessionState.savedSessions,
+    setSavedSessions: sessionState.setSavedSessions,
     activeSession: sessionState.activeSession,
     setActiveSession: sessionState.setActiveSession,
     setActiveSessionId: sessionState.setActiveSessionId,
-    setError: sessionState.setError,
+    setError: sessionState.setActiveError,
     setIsSending,
     setIsSessionBusy,
     pinToBottomOnNextUpdate,
@@ -92,8 +96,42 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   }, []);
 
   const isInteractionLocked = isSending || isSessionBusy;
-  const combinedError = sessionState.error || optionsState.error;
   const activeSession = sessionState.activeSession;
+  const isDraftSession = activeSession?.persistence === "draft";
+  const modelAvailabilityMessage = optionsState.modelError
+    || (optionsState.hasLoadedModels && optionsState.models.length === 0
+      ? "No enabled models are available right now."
+      : "");
+  const knowledgeBaseAvailabilityMessage = config.selectors.knowledgeBase
+    ? (
+      optionsState.knowledgeBaseError
+      || (
+        optionsState.hasLoadedKnowledgeBases && optionsState.knowledgeBases.length === 0
+          ? (optionsState.configurationMessage || "No knowledge bases are available right now.")
+          : ""
+      )
+    )
+    : "";
+  const hasUsableModels = optionsState.hasLoadedModels && !optionsState.modelError && optionsState.models.length > 0;
+  const hasUsableKnowledgeBases = !config.selectors.knowledgeBase
+    || (
+      optionsState.hasLoadedKnowledgeBases
+      && !optionsState.knowledgeBaseError
+      && optionsState.knowledgeBases.length > 0
+    );
+  const composerError = sessionState.activeError;
+  const isWorkspaceReady = Boolean(activeSession) && hasUsableModels && hasUsableKnowledgeBases;
+  const threadStatusText = sessionState.isActiveSessionLoading
+    ? config.loadingText
+    : !optionsState.hasLoadedModels
+      ? config.modelLoadingText
+      : modelAvailabilityMessage
+        ? modelAvailabilityMessage
+      : config.selectors.knowledgeBase && !optionsState.hasLoadedKnowledgeBases
+        ? config.knowledgeBaseLoadingText
+        : knowledgeBaseAvailabilityMessage
+          ? knowledgeBaseAvailabilityMessage
+        : config.loadingText;
 
   const headerToolbar = useMemo(() => (
     <div className="chatbot-actions">
@@ -102,7 +140,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           type="button"
           className="btn btn-secondary"
           onClick={() => void actions.renameSession()}
-          disabled={!activeSession || isInteractionLocked}
+          disabled={!activeSession || isDraftSession || isInteractionLocked}
         >
           Rename
         </button>
@@ -112,31 +150,35 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           type="button"
           className="btn btn-secondary"
           onClick={() => void actions.deleteSession()}
-          disabled={!activeSession || isInteractionLocked}
+          disabled={!activeSession || isDraftSession || isInteractionLocked}
         >
           Delete
         </button>
       ) : null}
     </div>
-  ), [actions, activeSession, config.actions.delete, config.actions.rename, isInteractionLocked]);
+  ), [actions, activeSession, config.actions.delete, config.actions.rename, isDraftSession, isInteractionLocked]);
 
   return (
     <section className="panel chatbot-shell" aria-label={config.panelAriaLabel}>
       <SessionSidebar
         title={config.title}
         introText={config.introText}
+        historyLoadingText={config.sessionBootstrap.historyLoadingText}
         newSessionLabel={config.newSessionLabel}
-        sessions={sessionState.sessions}
+        sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
-        canCreateSession={sessionState.canCreateSession && !optionsState.isLoading}
-        isInteractionLocked={isInteractionLocked || sessionState.isBootstrapping}
+        canCreateSession={sessionState.canCreateSession}
+        isInteractionLocked={isInteractionLocked || sessionState.isActiveSessionLoading}
         isCollapsed={preferences.isSidebarCollapsed}
+        isHistoryLoading={sessionState.isHistoryLoading}
+        historyError={sessionState.historyError}
         onToggleCollapsed={preferences.toggleSidebar}
         onCreateSession={() => void actions.createSession()}
         onSelectSession={(sessionId) => {
           pinToBottomOnNextUpdate("auto");
           sessionState.setActiveSessionId(sessionId);
           sessionState.setActiveSession(null);
+          sessionState.setActiveError("");
         }}
       />
 
@@ -150,7 +192,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           <ModelSelector
             models={optionsState.models}
             value={activeSession?.selectorState.modelId ?? ""}
-            disabled={optionsState.models.length === 0 || !activeSession || isSending}
+            isLoading={!optionsState.hasLoadedModels}
+            disabled={!activeSession || !hasUsableModels || isSending}
             onChange={(value) => {
               if (activeSession) {
                 void actions.updateModel(activeSession.id, value);
@@ -165,7 +208,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
               <AssistantSelector
                 assistants={optionsState.assistants}
                 value={activeSession?.selectorState.assistantRef ?? optionsState.defaultAssistantRef ?? ""}
-                disabled={!activeSession || isSending}
+                disabled={!activeSession || !hasUsableModels || isSending}
                 onChange={(value) => {
                   if (activeSession) {
                     void actions.updateAssistant(activeSession.id, value);
@@ -177,7 +220,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
               <KnowledgeBaseSelector
                 knowledgeBases={optionsState.knowledgeBases}
                 value={activeSession?.selectorState.knowledgeBaseId ?? ""}
-                disabled={!activeSession || isSending}
+                disabled={!activeSession || !optionsState.hasLoadedKnowledgeBases || optionsState.knowledgeBases.length === 0 || isSending}
                 onChange={(value) => {
                   if (activeSession) {
                     void actions.updateKnowledgeBase(activeSession.id, value);
@@ -190,8 +233,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
 
         <ThreadPanel
           activeSession={activeSession}
-          isBootstrapping={sessionState.isBootstrapping || optionsState.isLoading}
-          loadingText={config.loadingText}
+          isBootstrapping={!isWorkspaceReady || sessionState.isActiveSessionLoading}
+          loadingText={threadStatusText}
           emptyStateText={config.emptyStateText}
           threadRef={threadRef}
           handleScroll={handleScroll}
@@ -202,8 +245,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
 
         <Composer
           draft={preferences.draft}
-          error={combinedError}
-          disabled={isSending}
+          error={composerError}
+          disabled={isSending || !isWorkspaceReady}
           submitLabel={config.messaging.submitLabel}
           busyLabel={config.messaging.busyLabel}
           isSending={isSending}

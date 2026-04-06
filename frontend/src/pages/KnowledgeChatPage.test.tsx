@@ -7,7 +7,8 @@ import KnowledgePlaygroundPage from "../features/playgrounds/pages/KnowledgePlay
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 
 const playgroundApiMocks = vi.hoisted(() => ({
-  getPlaygroundOptions: vi.fn(),
+  getPlaygroundModelOptions: vi.fn(),
+  getPlaygroundKnowledgeBaseOptions: vi.fn(),
   listPlaygroundSessions: vi.fn(),
   createPlaygroundSession: vi.fn(),
   getPlaygroundSession: vi.fn(),
@@ -19,7 +20,8 @@ const playgroundApiMocks = vi.hoisted(() => ({
 let mockUser: AuthUser | null = null;
 
 vi.mock("../api/playgrounds", () => ({
-  getPlaygroundOptions: playgroundApiMocks.getPlaygroundOptions,
+  getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
+  getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
   listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
   createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
   getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
@@ -70,6 +72,10 @@ function detail(overrides: Partial<PlaygroundSessionDetail> = {}): PlaygroundSes
   };
 }
 
+async function openSavedSession(title = "Knowledge session"): Promise<void> {
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(title, "i") }));
+}
+
 describe("KnowledgePlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,7 +87,7 @@ describe("KnowledgePlaygroundPage", () => {
       role: "user",
       is_active: true,
     };
-    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValue({
       assistants: [
         {
           assistant_ref: "agent.knowledge_chat",
@@ -93,6 +99,8 @@ describe("KnowledgePlaygroundPage", () => {
         },
       ],
       models: [{ id: "safe-small", display_name: "Safe Small" }],
+    });
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValue({
       knowledge_bases: [
         {
           id: "kb_primary",
@@ -107,11 +115,19 @@ describe("KnowledgePlaygroundPage", () => {
     });
     playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([summary()]);
     playgroundApiMocks.getPlaygroundSession.mockResolvedValue(detail());
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValue(
+      detail({
+        id: "sess-draft",
+        title: "Knowledge playground",
+      }),
+    );
   });
 
-  it("sends knowledge-playground requests through backend sessions", async () => {
+  it("sends knowledge-playground requests through a draft-backed session without preloading saved history", async () => {
     playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
       session: detail({
+        id: "sess-draft",
+        title: "First question",
         message_count: 2,
         messages: [
           { id: "m1", role: "user", content: "First question", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
@@ -126,15 +142,73 @@ describe("KnowledgePlaygroundPage", () => {
 
     await renderKnowledgeChat();
 
-    await screen.findByLabelText("Model");
+    expect(playgroundApiMocks.getPlaygroundSession).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+
     await userEvent.type(screen.getByLabelText("Message"), "First question");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
-    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
 
-    expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-1", { prompt: "First question" }, "token");
+    await waitFor(() => expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
+      {
+        playground_kind: "knowledge",
+        assistant_ref: "agent.knowledge_chat",
+        model_selection: { model_id: "safe-small" },
+        knowledge_binding: { knowledge_base_id: "kb_primary" },
+      },
+      "token",
+    ));
+    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
+    expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-draft", { prompt: "First question" }, "token");
   });
 
-  it("auto-heals legacy knowledge sessions with no KB binding and lets the user send", async () => {
+  it("waits for knowledge-base options after models load and shows a KB-specific loading message", async () => {
+    let resolveKnowledgeBases: (value: {
+      knowledge_bases: Array<{ id: string; display_name: string; index_name: string; is_default: boolean }>;
+      default_knowledge_base_id: string | null;
+      selection_required: boolean;
+      configuration_message: null;
+    }) => void = () => undefined;
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockImplementationOnce(
+      async () => await new Promise((resolve) => {
+        resolveKnowledgeBases = resolve;
+      }),
+    );
+
+    await renderKnowledgeChat();
+
+    expect(await screen.findByText("Loading knowledge bases...")).toBeVisible();
+    expect(screen.getByLabelText("Model")).toHaveDisplayValue("Safe Small");
+    expect(screen.getByRole("button", { name: "Ask knowledge chat" })).toBeDisabled();
+
+    resolveKnowledgeBases({
+      knowledge_bases: [
+        { id: "kb_primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: true },
+      ],
+      default_knowledge_base_id: "kb_primary",
+      selection_required: false,
+      configuration_message: null,
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Knowledge base")).toHaveValue("kb_primary"));
+  });
+
+  it("shows the knowledge-base configuration blocker when no knowledge bases are available", async () => {
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValueOnce({
+      knowledge_bases: [],
+      default_knowledge_base_id: null,
+      selection_required: false,
+      configuration_message: "Knowledge bases are not configured.",
+    });
+
+    await renderKnowledgeChat();
+
+    expect(await screen.findByText("Knowledge bases are not configured.")).toBeVisible();
+    expect(screen.getByLabelText("Knowledge base")).toBeDisabled();
+    expect(screen.getByLabelText("Message")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Ask knowledge chat" })).toBeDisabled();
+  });
+
+  it("auto-heals legacy knowledge sessions with no KB binding after explicit resume", async () => {
     playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([
       summary({
         knowledge_binding: { knowledge_base_id: null },
@@ -166,7 +240,9 @@ describe("KnowledgePlaygroundPage", () => {
     });
 
     await renderKnowledgeChat();
+    await openSavedSession();
 
+    await waitFor(() => expect(playgroundApiMocks.getPlaygroundSession).toHaveBeenCalledWith("sess-1", "knowledge", "token"));
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "sess-1",
       { knowledge_binding: { knowledge_base_id: "kb_primary" } },
@@ -184,15 +260,17 @@ describe("KnowledgePlaygroundPage", () => {
     ));
   });
 
-  it("updates the knowledge-base selector through the canonical session API", async () => {
+  it("updates the knowledge-base selector through the canonical session API only after a saved session is selected", async () => {
     playgroundApiMocks.updatePlaygroundSession.mockResolvedValue(
       summary({
         knowledge_binding: { knowledge_base_id: "kb_secondary" },
       }),
     );
-    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValue({
       assistants: [],
       models: [{ id: "safe-small", display_name: "Safe Small" }],
+    });
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValue({
       knowledge_bases: [
         { id: "kb_primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: true },
         { id: "kb_secondary", display_name: "Policies", index_name: "kb_policies", is_default: false },
@@ -203,9 +281,12 @@ describe("KnowledgePlaygroundPage", () => {
     });
 
     await renderKnowledgeChat();
-
-    await screen.findByLabelText("Knowledge base");
+    expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
     await userEvent.selectOptions(screen.getByLabelText("Knowledge base"), "kb_secondary");
+    expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
+
+    await openSavedSession();
+    await userEvent.selectOptions(await screen.findByLabelText("Knowledge base"), "kb_secondary");
 
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "sess-1",
@@ -214,20 +295,12 @@ describe("KnowledgePlaygroundPage", () => {
     ));
   });
 
-  it("shows an honest empty selector state when no default KB is available", async () => {
-    playgroundApiMocks.listPlaygroundSessions.mockResolvedValue([
-      summary({
-        knowledge_binding: { knowledge_base_id: null },
-      }),
-    ]);
-    playgroundApiMocks.getPlaygroundSession.mockResolvedValue(
-      detail({
-        knowledge_binding: { knowledge_base_id: null },
-      }),
-    );
-    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+  it("shows an honest empty selector state when no default KB is available on the local draft", async () => {
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValue({
       assistants: [],
       models: [{ id: "safe-small", display_name: "Safe Small" }],
+    });
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValue({
       knowledge_bases: [
         { id: "kb_primary", display_name: "Product Docs", index_name: "kb_product_docs", is_default: false },
         { id: "kb_secondary", display_name: "Policies", index_name: "kb_policies", is_default: false },
@@ -247,12 +320,15 @@ describe("KnowledgePlaygroundPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
     expect(screen.getByText("Knowledge base is required.")).toBeVisible();
+    expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
     expect(playgroundApiMocks.sendPlaygroundMessage).not.toHaveBeenCalled();
   });
 
-  it("renders citations from persisted assistant metadata", async () => {
+  it("renders citations from persisted assistant metadata after the first draft send", async () => {
     playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
       session: detail({
+        id: "sess-draft",
+        title: "How does retrieval work?",
         message_count: 2,
         messages: [
           { id: "m1", role: "user", content: "How does retrieval work?", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
@@ -280,8 +356,7 @@ describe("KnowledgePlaygroundPage", () => {
 
     await renderKnowledgeChat();
 
-    await screen.findByLabelText("Model");
-    expect(screen.getByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
     await userEvent.type(screen.getByLabelText("Message"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
@@ -289,9 +364,11 @@ describe("KnowledgePlaygroundPage", () => {
     expect(screen.getByText("Retrieval uses the shared knowledge corpus.")).toBeVisible();
   });
 
-  it("renders assistant markdown in knowledge playground replies", async () => {
+  it("renders assistant markdown in knowledge playground replies after persisting the draft", async () => {
     playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
       session: detail({
+        id: "sess-draft",
+        title: "Summarize the docs",
         message_count: 2,
         messages: [
           { id: "m1", role: "user", content: "Summarize the docs", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
@@ -311,8 +388,7 @@ describe("KnowledgePlaygroundPage", () => {
 
     await renderKnowledgeChat();
 
-    await screen.findByLabelText("Model");
-    await userEvent.type(screen.getByLabelText("Message"), "Summarize the docs");
+    await userEvent.type(await screen.findByLabelText("Message"), "Summarize the docs");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
     expect(await screen.findByRole("heading", { name: "Findings" })).toBeVisible();

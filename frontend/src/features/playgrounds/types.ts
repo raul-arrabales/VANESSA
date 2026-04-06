@@ -19,6 +19,8 @@ export type PlaygroundMessageViewModel = PlaygroundMessage & {
   isTransient?: boolean;
 };
 
+export type PlaygroundSessionPersistence = "draft" | "saved";
+
 export type PlaygroundSessionViewModel = {
   id: string;
   playgroundKind: PlaygroundVariant;
@@ -29,6 +31,7 @@ export type PlaygroundSessionViewModel = {
   createdAt: string | null;
   updatedAt: string | null;
   messages: PlaygroundMessageViewModel[];
+  persistence: PlaygroundSessionPersistence;
 };
 
 export type PlaygroundWorkspaceConfig = {
@@ -37,6 +40,8 @@ export type PlaygroundWorkspaceConfig = {
   panelAriaLabel: string;
   introText: string;
   loadingText: string;
+  modelLoadingText: string;
+  knowledgeBaseLoadingText: string;
   emptyStateText: string;
   newSessionLabel: string;
   emptySessionTitle: string;
@@ -54,6 +59,10 @@ export type PlaygroundWorkspaceConfig = {
   actions: {
     rename: boolean;
     delete: boolean;
+  };
+  sessionBootstrap: {
+    mode: "saved-first" | "draft-first";
+    historyLoadingText: string;
   };
   prompts: {
     rename: string;
@@ -105,6 +114,7 @@ export function mapPlaygroundSessionSummary(
     createdAt: session.created_at,
     updatedAt: session.updated_at,
     messages: [],
+    persistence: "saved",
   };
 }
 

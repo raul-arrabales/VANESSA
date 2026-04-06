@@ -43,6 +43,35 @@ def list_models(
     return items
 
 
+def list_model_picker_options(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    actor_user_id: int,
+    actor_role: str,
+    require_active: bool = False,
+    capability_key: str | None = None,
+) -> list[dict[str, Any]]:
+    _ = config
+    runtime_profile = resolve_runtime_profile(database_url)
+    rows = modelops_repo.list_model_picker_rows_for_actor(
+        database_url,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+        runtime_profile=runtime_profile,
+        require_active=require_active,
+        capability_key=capability_key,
+    )
+    return [
+        {
+            "id": str(row.get("model_id", "")),
+            "display_name": str(row.get("name", "") or row.get("model_id", "")),
+            "task_key": str(row.get("task_key", "")),
+        }
+        for row in rows
+    ]
+
+
 def get_model_detail(
     database_url: str,
     *,

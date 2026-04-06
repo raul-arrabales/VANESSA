@@ -11,6 +11,8 @@ from ...application.playgrounds_service import (
     PlaygroundSessionValidationError,
     create_playground_session,
     delete_playground_session,
+    get_playground_knowledge_base_options,
+    get_playground_model_options,
     get_playground_options,
     get_playground_session_detail,
     list_playground_sessions,
@@ -210,5 +212,28 @@ def get_playground_options_route():
         config=_config(),
         actor_user_id=int(g.current_user["id"]),
         actor_role=str(g.current_user.get("role", "user")),
+    )
+    return jsonify(payload), 200
+
+
+@bp.get("/v1/playgrounds/model-options")
+@require_role("user")
+def get_playground_model_options_route():
+    payload = get_playground_model_options(
+        _database_url(),
+        config=_config(),
+        actor_user_id=int(g.current_user["id"]),
+        actor_role=str(g.current_user.get("role", "user")),
+        playground_kind=request.args.get("playground_kind"),
+    )
+    return jsonify(payload), 200
+
+
+@bp.get("/v1/playgrounds/knowledge-base-options")
+@require_role("user")
+def get_playground_knowledge_base_options_route():
+    payload = get_playground_knowledge_base_options(
+        _database_url(),
+        config=_config(),
     )
     return jsonify(payload), 200

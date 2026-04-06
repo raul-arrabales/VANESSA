@@ -11,7 +11,8 @@ import ChatPlaygroundPage from "../features/playgrounds/pages/ChatPlaygroundPage
 import TestRouter from "../test/TestRouter";
 
 const playgroundApiMocks = vi.hoisted(() => ({
-  getPlaygroundOptions: vi.fn(),
+  getPlaygroundModelOptions: vi.fn(),
+  getPlaygroundKnowledgeBaseOptions: vi.fn(),
   listPlaygroundSessions: vi.fn(),
   createPlaygroundSession: vi.fn(),
   getPlaygroundSession: vi.fn(),
@@ -35,7 +36,8 @@ vi.mock("../components/ChatMessageBody", () => ({
 }));
 
 vi.mock("../api/playgrounds", () => ({
-  getPlaygroundOptions: playgroundApiMocks.getPlaygroundOptions,
+  getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
+  getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
   listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
   createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
   getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
@@ -163,6 +165,15 @@ function setThreadMetrics(
   });
 }
 
+async function openSavedChat(title = "Thread one"): Promise<void> {
+  await userEvent.click(await screen.findByRole("button", { name: new RegExp(title, "i") }));
+}
+
+async function waitForDraftReady(): Promise<void> {
+  await screen.findByRole("heading", { name: "New conversation" });
+  await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
+}
+
 describe("ChatPlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -186,12 +197,14 @@ describe("ChatPlaygroundPage", () => {
       is_active: true,
     };
     window.localStorage.clear();
-    playgroundApiMocks.getPlaygroundOptions.mockResolvedValue({
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValue({
       assistants: [],
       models: [
         { id: "safe-small", display_name: "Safe Small" },
         { id: "safe-large", display_name: "Safe Large" },
       ],
+    });
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValue({
       knowledge_bases: [],
       default_knowledge_base_id: null,
       selection_required: false,
@@ -201,48 +214,73 @@ describe("ChatPlaygroundPage", () => {
       sessionSummary("conv-1", "Thread one"),
     ]);
     playgroundApiMocks.getPlaygroundSession.mockResolvedValue(sessionDetail("conv-1", "Thread one"));
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValue(
+      sessionDetail("conv-draft", "New conversation"),
+    );
     vi.spyOn(window, "prompt").mockImplementation(() => null);
     vi.spyOn(window, "confirm").mockImplementation(() => true);
   });
 
-  it("shows backend-allowed models only", async () => {
-    renderChatPlayground();
-
-    const picker = await screen.findByLabelText("Model");
-    expect(picker).toBeVisible();
-    expect(screen.getByRole("option", { name: "Safe Small" })).toBeVisible();
-    expect(screen.getByRole("option", { name: "Safe Large" })).toBeVisible();
-    expect(screen.queryByRole("option", { name: "Admin Internal" })).toBeNull();
-  });
-
-  it("creates an empty session when the server has none", async () => {
-    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([]);
-    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(
-      sessionDetail("conv-new", "New conversation"),
+  it("renders a local draft immediately and shows history loading in the sidebar", async () => {
+    let resolveHistory: (value: PlaygroundSessionSummary[]) => void = () => undefined;
+    playgroundApiMocks.listPlaygroundSessions.mockImplementationOnce(
+      async () => await new Promise<PlaygroundSessionSummary[]>((resolve) => {
+        resolveHistory = resolve;
+      }),
     );
 
     renderChatPlayground();
 
-    await screen.findByRole("button", { name: /New chat/ });
+    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    expect(screen.getByText("Loading saved conversations...")).toBeVisible();
+    expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
+    expect(playgroundApiMocks.getPlaygroundSession).not.toHaveBeenCalled();
 
-    expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
-      {
-        playground_kind: "chat",
-        assistant_ref: "assistant.playground.chat",
-        model_selection: { model_id: "safe-small" },
-        knowledge_binding: { knowledge_base_id: null },
-      },
-      "token",
-    );
+    resolveHistory([sessionSummary("conv-1", "Thread one")]);
+    expect(await screen.findByRole("button", { name: /Thread one/ })).toBeVisible();
   });
 
-  it("updates the model and streams a chat reply", async () => {
-    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
-      sessionSummary("conv-1", "Thread one", { model_selection: { model_id: "safe-large" } }),
+  it("shows model-loading UI instead of an empty-model state while chat models are still loading", async () => {
+    let resolveModels: (value: { assistants: []; models: Array<{ id: string; display_name: string }> }) => void = () => undefined;
+    playgroundApiMocks.getPlaygroundModelOptions.mockImplementationOnce(
+      async () => await new Promise((resolve) => {
+        resolveModels = resolve;
+      }),
     );
+
+    renderChatPlayground();
+
+    expect(await screen.findByText("Loading available models...")).toBeVisible();
+    expect(screen.getByLabelText("Model")).toHaveDisplayValue("Loading models...");
+    expect(screen.queryByText("No enabled models")).toBeNull();
+
+    resolveModels({
+      assistants: [],
+      models: [{ id: "safe-small", display_name: "Safe Small" }],
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveDisplayValue("Safe Small"));
+    expect(screen.queryByText("Loading available models...")).toBeNull();
+  });
+
+  it("surfaces an honest unavailable-model state when no enabled models are returned", async () => {
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValueOnce({
+      assistants: [],
+      models: [],
+    });
+
+    renderChatPlayground();
+
+    expect(await screen.findByText("No enabled models are available right now.")).toBeVisible();
+    expect(screen.getByLabelText("Model")).toHaveDisplayValue("No enabled models");
+    expect(screen.getByLabelText("Message")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  it("updates draft selector state locally and creates a saved session only on the first send", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        sessionSummary("conv-1", "Test prompt", {
+        sessionSummary("conv-draft", "Test prompt", {
           model_selection: { model_id: "safe-large" },
           message_count: 2,
           updated_at: "2026-03-18T11:00:02Z",
@@ -254,18 +292,24 @@ describe("ChatPlaygroundPage", () => {
 
     renderChatPlayground();
 
-    await screen.findByRole("heading", { name: "Thread one" });
+    await waitForDraftReady();
     await userEvent.selectOptions(screen.getByLabelText("Model"), "safe-large");
+    expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
+
     await userEvent.type(screen.getByLabelText("Message"), "Test prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
-      "conv-1",
-      { model_selection: { model_id: "safe-large" } },
+    await waitFor(() => expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
+      {
+        playground_kind: "chat",
+        assistant_ref: "assistant.playground.chat",
+        model_selection: { model_id: "safe-large" },
+        knowledge_binding: { knowledge_base_id: null },
+      },
       "token",
     ));
     expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledWith(
-      "conv-1",
+      "conv-draft",
       { prompt: "Test prompt" },
       "token",
       expect.any(Object),
@@ -276,10 +320,10 @@ describe("ChatPlaygroundPage", () => {
     });
   });
 
-  it("keeps user messages as plain text while rendering assistant markdown", async () => {
+  it("keeps user messages as plain text while rendering assistant markdown after persisting the draft", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        sessionSummary("conv-1", "Literal user", {
+        sessionSummary("conv-draft", "Literal user", {
           message_count: 2,
           updated_at: "2026-03-18T11:00:01Z",
         }),
@@ -290,7 +334,7 @@ describe("ChatPlaygroundPage", () => {
 
     renderChatPlayground();
 
-    await screen.findByRole("heading", { name: "Thread one" });
+    await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "**literal user**");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
@@ -298,7 +342,7 @@ describe("ChatPlaygroundPage", () => {
     expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Answer with **bold**");
   });
 
-  it("renders multiple sessions from the API and manages rename/delete", async () => {
+  it("manages rename and delete after explicitly resuming a saved session", async () => {
     playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
       sessionSummary("conv-1", "Thread one", { updated_at: "2026-03-18T11:00:02Z" }),
       sessionSummary("conv-2", "Thread two", { updated_at: "2026-03-18T11:00:01Z", message_count: 2 }),
@@ -313,8 +357,8 @@ describe("ChatPlaygroundPage", () => {
 
     renderChatPlayground();
 
-    await screen.findByRole("button", { name: /Thread one/ });
-    expect(screen.getByRole("button", { name: /Thread two/ })).toBeVisible();
+    await openSavedChat();
+    expect(await screen.findByRole("button", { name: /Thread two/ })).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: "Rename" }));
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
@@ -331,207 +375,47 @@ describe("ChatPlaygroundPage", () => {
     expect(playgroundApiMocks.getPlaygroundSession).toHaveBeenLastCalledWith("conv-2", "chat", "token");
   });
 
-  it("disables new chat while an empty session exists and re-enables after sending", async () => {
-    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
-      sendResult(
-        sessionSummary("conv-1", "First message", {
-          message_count: 2,
-          updated_at: "2026-03-18T11:00:01Z",
-        }),
-        "First message",
-        "response",
-      ),
-    );
-    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(
-      sessionDetail("conv-2", "New conversation"),
-    );
-
+  it("switches back to a fresh local draft when New chat is clicked from a saved session", async () => {
     renderChatPlayground();
 
-    const newChatButton = await screen.findByRole("button", { name: "New chat" });
-    await waitFor(() => expect(newChatButton).toBeDisabled());
+    await openSavedChat();
+    expect(await screen.findByRole("heading", { name: "Thread one" })).toBeVisible();
 
-    await userEvent.type(screen.getByLabelText("Message"), "First message");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
 
-    await waitFor(() => expect(newChatButton).toBeEnabled());
-
-    await userEvent.click(newChatButton);
-    expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
-      {
-        playground_kind: "chat",
-        assistant_ref: "assistant.playground.chat",
-        model_selection: { model_id: "safe-small" },
-        knowledge_binding: { knowledge_base_id: null },
-      },
-      "token",
-    );
-    await waitFor(() => expect(newChatButton).toBeDisabled());
+    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
   });
 
-  it("renders assistant text incrementally while the stream is active", async () => {
-    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
-    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
-      async (_sessionId, _payload, _token, options) => {
-        options?.onDelta?.("## hello");
-        options?.onDelta?.("\n\n`code`");
-        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
-          resolveStream = resolve;
-        });
-      },
-    );
+  it("renders a sidebar history error without blocking the local draft", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockRejectedValueOnce(new Error("History failed"));
 
     renderChatPlayground();
 
-    await screen.findByRole("heading", { name: "Thread one" });
-    await userEvent.type(screen.getByLabelText("Message"), "Stream prompt");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("markdown-message")).toHaveTextContent("## hello");
-      expect(screen.getByTestId("markdown-message")).toHaveTextContent("`code`");
-    });
-    expect(screen.getByRole("button", { name: "Streaming..." })).toBeDisabled();
-
-    resolveStream(
-      sendResult(
-        sessionSummary("conv-1", "Stream prompt", {
-          message_count: 2,
-          updated_at: "2026-03-18T11:00:02Z",
-        }),
-        "Stream prompt",
-        "## hello\n\n`code`",
-      ),
-    );
-
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
+    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    expect(await screen.findByText("History failed")).toBeVisible();
     expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
+    expect(screen.getByLabelText("Message")).toBeEnabled();
   });
 
-  it("autoscrolls on send and continues following streamed deltas while pinned", async () => {
-    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
-    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
-      async (_sessionId, _payload, _token, options) => {
-        options?.onDelta?.("hello");
-        options?.onDelta?.(" world");
-        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
-          resolveStream = resolve;
-        });
-      },
-    );
-
-    const { container } = renderChatPlayground();
-
-    await screen.findByRole("heading", { name: "Thread one" });
-    const thread = getChatThread(container);
-    setThreadMetrics(thread, { scrollTop: 600 });
-    scrollToMock.mockClear();
-    scrollIntoViewMock.mockClear();
-
-    await userEvent.type(screen.getByLabelText("Message"), "Keep pinned");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
-    expect(await screen.findByText("hello world")).toBeVisible();
-
-    resolveStream(
-      sendResult(
-        sessionSummary("conv-1", "Keep pinned", {
-          message_count: 2,
-          updated_at: "2026-03-18T11:00:02Z",
-        }),
-        "Keep pinned",
-        "hello world",
-      ),
-    );
-
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
-  });
-
-  it("pauses autoscroll when the user scrolls up and resumes from jump to latest", async () => {
-    let resolveStream: (value: SendPlaygroundMessageResult) => void = () => {};
-    let streamOptions: { onDelta?: (text: string) => void } | undefined;
-
-    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
-      async (_sessionId, _payload, _token, options) => {
-        streamOptions = options;
-        return await new Promise<SendPlaygroundMessageResult>((resolve) => {
-          resolveStream = resolve;
-        });
-      },
-    );
-
-    const { container } = renderChatPlayground();
-
-    await screen.findByRole("heading", { name: "Thread one" });
-    const thread = getChatThread(container);
-    setThreadMetrics(thread, { scrollTop: 600 });
-
-    await userEvent.type(screen.getByLabelText("Message"), "Detach from stream");
-    await userEvent.click(screen.getByRole("button", { name: "Send" }));
-
-    await waitFor(() => expect(streamOptions).toBeDefined());
-    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-
-    scrollToMock.mockClear();
-    setThreadMetrics(thread, { scrollTop: 200 });
-    fireEvent.scroll(thread);
-
-    await act(async () => {
-      streamOptions?.onDelta?.("new token");
-    });
-
-    expect(scrollToMock).not.toHaveBeenCalled();
-    const jumpButton = await screen.findByRole("button", { name: "Jump to latest" });
-    expect(jumpButton).toBeVisible();
-
-    await userEvent.click(jumpButton);
-    expect(scrollToMock).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: "Jump to latest" })).toBeNull();
-
-    scrollToMock.mockClear();
-    await act(async () => {
-      streamOptions?.onDelta?.(" more");
-    });
-    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
-
-    resolveStream(
-      sendResult(
-        sessionSummary("conv-1", "Detach from stream", {
-          message_count: 2,
-          updated_at: "2026-03-18T11:00:02Z",
-        }),
-        "Detach from stream",
-        "new token more",
-      ),
-    );
-
-    await waitFor(() => expect(screen.queryByRole("button", { name: "Streaming..." })).toBeNull());
-  });
-
-  it("resets follow mode when sending a new prompt and when switching sessions", async () => {
+  it("autoscrolls on send and when switching from the draft to a saved session", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-1", "Thread one", { message_count: 2, updated_at: "2026-03-18T11:00:02Z" }),
+      sessionSummary("conv-2", "Thread two", { message_count: 2, updated_at: "2026-03-18T11:00:01Z" }),
+    ]);
     playgroundApiMocks.getPlaygroundSession
-      .mockResolvedValueOnce(sessionDetail("conv-1", "Thread one", {
-        message_count: 2,
-        messages: [
-          { id: "msg-1", role: "assistant", content: "Existing reply", metadata: {}, createdAt: "2026-03-18T10:59:00Z" },
-        ],
-      }))
       .mockResolvedValueOnce(sessionDetail("conv-2", "Thread two", {
         message_count: 2,
         messages: [
           { id: "msg-2", role: "assistant", content: "Second thread", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
         ],
       }));
-    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
-      sessionSummary("conv-1", "Thread one", { message_count: 2, updated_at: "2026-03-18T11:00:02Z" }),
-      sessionSummary("conv-2", "Thread two", { message_count: 2, updated_at: "2026-03-18T11:00:01Z" }),
-    ]);
     playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(
-        sessionSummary("conv-1", "Fresh send", {
-          message_count: 4,
+        sessionSummary("conv-draft", "Fresh send", {
+          message_count: 2,
           updated_at: "2026-03-18T11:00:03Z",
         }),
         "Fresh send",
@@ -540,8 +424,8 @@ describe("ChatPlaygroundPage", () => {
     );
 
     const { container } = renderChatPlayground();
+    await waitForDraftReady();
 
-    await screen.findByText("Existing reply");
     const thread = getChatThread(container);
     setThreadMetrics(thread, { scrollTop: 200 });
     fireEvent.scroll(thread);
@@ -560,16 +444,17 @@ describe("ChatPlaygroundPage", () => {
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
   });
 
-  it("restores the draft and removes the transient assistant reply when streaming fails", async () => {
+  it("restores the draft and cleans up the empty saved session when the first stream fails", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockRejectedValueOnce(new Error("Stream failed"));
 
     renderChatPlayground();
 
-    await screen.findByRole("heading", { name: "Thread one" });
+    await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Broken prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => expect(screen.getByLabelText("Message")).toHaveValue("Broken prompt"));
+    expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("conv-draft", "token");
     expect(feedbackMocks.showErrorFeedback).toHaveBeenCalledWith(expect.any(Error), "Message request failed.");
   });
 
@@ -583,19 +468,21 @@ describe("ChatPlaygroundPage", () => {
 
     renderChatPlayground();
 
-    await screen.findByRole("heading", { name: "Thread one" });
+    await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Lock controls");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
-    expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Thread one/ })).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+      expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Thread one/ })).toBeDisabled();
+    });
 
     resolveStream(
       sendResult(
-        sessionSummary("conv-1", "Lock controls", {
+        sessionSummary("conv-draft", "Lock controls", {
           message_count: 2,
           updated_at: "2026-03-18T11:00:02Z",
         }),

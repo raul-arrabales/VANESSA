@@ -227,3 +227,59 @@ def test_get_playground_options_route_returns_configuration_payload(client, monk
 
     assert response.status_code == 200
     assert response.get_json()["default_knowledge_base_id"] == "kb-primary"
+
+
+def test_get_playground_model_options_route_returns_lightweight_payload(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="model-options@example.com",
+        username="model-options-user",
+        password_hash=hash_password("options-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "options-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        playground_routes,
+        "get_playground_model_options",
+        lambda *_args, **_kwargs: {
+            "assistants": [{"assistant_ref": "assistant.playground.chat", "playground_kind": "chat"}],
+            "models": [{"id": "safe-small", "display_name": "Safe Small", "task_key": "llm"}],
+        },
+    )
+
+    response = test_client.get("/v1/playgrounds/model-options?playground_kind=chat", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["models"][0]["display_name"] == "Safe Small"
+
+
+def test_get_playground_knowledge_base_options_route_returns_payload(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="knowledge-options@example.com",
+        username="knowledge-options-user",
+        password_hash=hash_password("options-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "options-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        playground_routes,
+        "get_playground_knowledge_base_options",
+        lambda *_args, **_kwargs: {
+            "knowledge_bases": [{"id": "kb-primary", "display_name": "Product Docs", "index_name": "kb_product_docs", "is_default": True}],
+            "default_knowledge_base_id": "kb-primary",
+            "selection_required": False,
+            "configuration_message": None,
+        },
+    )
+
+    response = test_client.get("/v1/playgrounds/knowledge-base-options", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["knowledge_bases"][0]["id"] == "kb-primary"
