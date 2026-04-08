@@ -462,7 +462,9 @@
       "resyncing": "Resincronizando...",
       "testRetrieval": "Probar recuperacion",
       "querying": "Buscando...",
-      "browse": "Explorar"
+      "browse": "Explorar",
+      "expandChunkResult": "Expandir resultado de recuperacion para {{title}}",
+      "collapseChunkResult": "Contraer resultado de recuperacion para {{title}}"
     },
     "fields": {
       "provider": "Proveedor de respaldo",
@@ -482,7 +484,11 @@
       "documentText": "Texto del documento",
       "uploadFiles": "Subir archivos",
       "queryText": "Consulta de recuperacion",
-      "topK": "Top K"
+      "topK": "Top K",
+      "chunkLength": "Longitud del fragmento",
+      "chunkMetadata": "Metadatos del fragmento",
+      "chunkText": "Texto del fragmento",
+      "similarity": "Similitud"
     },
     "columns": {
       "name": "Base de conocimiento",
@@ -518,7 +524,8 @@
       "fullKnowledgeBaseResync": "Resincronizacion de la base de conocimiento",
       "syncRunSummary": "Se analizaron {{scanned}} archivo(s), cambiaron {{changed}}, se eliminaron {{deletedFiles}} archivo(s), se crearon {{createdDocs}} documentos, se actualizaron {{updatedDocs}} documentos y se eliminaron {{deletedDocs}} documentos.",
       "queryResultCount": "{{count}} resultado(s) de recuperacion",
-      "noQueryResults": "No hubo resultados de recuperacion para esta consulta."
+      "noQueryResults": "No hubo resultados de recuperacion para esta consulta.",
+      "chunkLengthTokens": "{{count}} tokens"
     },
     "feedback": {
       "loadFailed": "No se pudieron cargar los datos de gestion de contexto.",

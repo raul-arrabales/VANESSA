@@ -159,17 +159,42 @@ const contextApiMocks = vi.hoisted(() => ({
   ]),
   queryKnowledgeBase: vi.fn(async () => ({
     knowledge_base_id: "kb-primary",
-    retrieval: { index: "kb_product_docs", result_count: 1, top_k: 5 },
+    retrieval: { index: "kb_product_docs", result_count: 2, top_k: 5 },
     results: [
       {
         id: "doc-1",
         title: "Architecture Overview",
-        snippet: "Retrieved snippet",
+        text:
+          "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
         uri: "https://example.com/overview",
         source_type: "manual",
-        metadata: {},
-        score: 0.91,
-        score_kind: "similarity",
+        metadata: {
+          document_id: "doc-1",
+          chunk_index: 0,
+          source_name: "Docs folder",
+          uri: "https://example.com/overview",
+          empty_field: "",
+          unset_field: null,
+        },
+        chunk_length_tokens: 42,
+        similarity: 0.742,
+      },
+      {
+        id: "doc-2",
+        title: "FAQ",
+        text:
+          "Top matches should appear first so reviewers can quickly inspect the most relevant chunk before opening lower-ranked context entries tail-marker-beta",
+        uri: null,
+        source_type: "local_directory",
+        metadata: {
+          document_id: "doc-2",
+          chunk_index: 1,
+          source_name: "FAQ folder",
+          empty_field: "",
+          unset_field: undefined,
+        },
+        chunk_length_tokens: 21,
+        similarity: 0.913,
       },
     ],
   })),
@@ -657,7 +682,39 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
 
-    expect(await screen.findByText("Retrieved snippet")).toBeVisible();
+    const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
+    expect(resultButtons).toHaveLength(2);
+    expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "FAQ" })).toBeVisible();
+    expect(within(resultButtons[1] as HTMLElement).getByRole("heading", { name: "Architecture Overview" })).toBeVisible();
+    expect(within(resultButtons[0] as HTMLElement).getByText("Similarity: 0.913")).toBeVisible();
+    expect(within(resultButtons[1] as HTMLElement).getByText("Similarity: 0.742")).toBeVisible();
+    expect(screen.queryByText("Chunk metadata")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chunk length: 42 tokens")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/tail-marker-alpha/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for FAQ" }));
+
+    expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
+      "Top matches should appear first so reviewers can quickly inspect the most relevant chunk before opening lower-ranked context entries tail-marker-beta",
+    );
+    expect(screen.getByText("Chunk length: 21 tokens")).toBeVisible();
+    expect(screen.getByText("Chunk metadata")).toBeVisible();
+    expect(screen.getByText("document_id: doc-2")).toBeVisible();
+    expect(screen.getByText("chunk_index: 1")).toBeVisible();
+    expect(screen.getByText("source_name: FAQ folder")).toBeVisible();
+    expect(screen.queryByText(/^empty_field:/)).toBeNull();
+    expect(screen.queryByText(/^unset_field:/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Architecture Overview" }));
+
+    expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
+      "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
+    );
+    expect(screen.getByText("Chunk length: 42 tokens")).toBeVisible();
+    expect(screen.getByText("document_id: doc-1")).toBeVisible();
+    expect(screen.getByText("chunk_index: 0")).toBeVisible();
+    expect(screen.getByText("source_name: Docs folder")).toBeVisible();
+    expect(screen.queryByText("source_name: FAQ folder")).not.toBeInTheDocument();
     expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
       "kb-primary",
       { query_text: "How does retrieval work?", top_k: 5 },

@@ -144,12 +144,12 @@ export type KnowledgeSourceDirectoriesResponse = {
 export type KnowledgeBaseQueryResult = {
   id: string;
   title: string;
-  snippet: string;
+  text: string;
   uri?: string | null;
   source_type?: string | null;
   metadata: Record<string, unknown>;
-  score?: number | null;
-  score_kind?: string | null;
+  chunk_length_tokens: number;
+  similarity: number;
 };
 
 export type KnowledgeBaseQueryResponse = {

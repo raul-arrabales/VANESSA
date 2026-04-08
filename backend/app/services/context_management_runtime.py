@@ -8,12 +8,25 @@ from .context_management_serialization import (
     _serialize_query_result,
     _serialize_runtime_knowledge_base,
 )
+from .context_management_chunking import resolve_knowledge_base_tokenizer
 from .context_management_shared import _is_knowledge_base_eligible, _require_knowledge_base
 from .context_management_vectorization import (
     embed_knowledge_base_texts,
     validate_runtime_vectorization_compatibility,
 )
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
+
+
+def _normalize_query_result_similarity(result: dict[str, Any]) -> float:
+    raw_score = result.get("score")
+    try:
+        score = float(raw_score)
+    except (TypeError, ValueError):
+        return 0.0
+    score_kind = str(result.get("score_kind") or "").strip().lower()
+    if score_kind == "distance":
+        return 1.0 - score
+    return score
 
 
 def query_knowledge_base(
@@ -70,14 +83,34 @@ def query_knowledge_base(
         filters={},
     )
     results = query_payload.get("results") if isinstance(query_payload.get("results"), list) else []
+    tokenizer = resolve_knowledge_base_tokenizer(database_url, knowledge_base=knowledge_base)
+    normalized_results = sorted(
+        [
+            {
+                **item,
+                "similarity": _normalize_query_result_similarity(item),
+            }
+            for item in results
+            if isinstance(item, dict)
+        ],
+        key=lambda item: item["similarity"],
+        reverse=True,
+    )
     return {
         "knowledge_base_id": str(knowledge_base["id"]),
         "retrieval": {
             "index": str(query_payload.get("index") or knowledge_base.get("index_name") or "").strip(),
-            "result_count": len(results),
+            "result_count": len(normalized_results),
             "top_k": top_k,
         },
-        "results": [_serialize_query_result(item) for item in results if isinstance(item, dict)],
+        "results": [
+            _serialize_query_result(
+                item,
+                chunk_length_tokens=len(tokenizer.encode(str(item.get("text") or "").strip())),
+                similarity=item.get("similarity"),
+            )
+            for item in normalized_results
+        ],
     }
 
 

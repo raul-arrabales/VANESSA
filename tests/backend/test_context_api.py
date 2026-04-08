@@ -425,7 +425,16 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
         lambda *_args, **_kwargs: {
             "knowledge_base_id": "kb-primary",
             "retrieval": {"index": "kb_product_docs", "result_count": 1, "top_k": 5},
-            "results": [{"id": "doc-1", "title": "Architecture Overview", "snippet": "Hello"}],
+            "results": [
+                {
+                    "id": "doc-1",
+                    "title": "Architecture Overview",
+                    "text": "Hello from the retrieved chunk",
+                    "chunk_length_tokens": 12,
+                    "similarity": 0.987,
+                    "metadata": {"document_id": "doc-1"},
+                }
+            ],
         },
     )
 
@@ -437,6 +446,8 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
 
     assert response.status_code == 200
     assert response.get_json()["retrieval"]["index"] == "kb_product_docs"
+    assert response.get_json()["results"][0]["chunk_length_tokens"] == 12
+    assert response.get_json()["results"][0]["similarity"] == 0.987
 
 
 def test_list_knowledge_sources_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):

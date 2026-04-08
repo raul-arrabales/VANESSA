@@ -485,6 +485,8 @@
       "testRetrieval": "Test retrieval",
       "querying": "Searching...",
       "browse": "Browse",
+      "expandChunkResult": "Expand retrieval result for {{title}}",
+      "collapseChunkResult": "Collapse retrieval result for {{title}}",
       "openText": "Open text",
       "backToDocuments": "Back to documents"
     },
@@ -508,7 +510,11 @@
       "uploadFiles": "Upload files",
       "queryText": "Retrieval query",
       "topK": "Top K",
-      "chunkCount": "Chunk count"
+      "chunkCount": "Chunk count",
+      "chunkLength": "Chunk length",
+      "chunkMetadata": "Chunk metadata",
+      "chunkText": "Chunk text",
+      "similarity": "Similarity"
     },
     "columns": {
       "name": "Knowledge base",
@@ -549,7 +555,8 @@
       "fullKnowledgeBaseResync": "Knowledge base resync",
       "syncRunSummary": "Scanned {{scanned}} file(s), changed {{changed}}, deleted files {{deletedFiles}}, created documents {{createdDocs}}, updated documents {{updatedDocs}}, deleted documents {{deletedDocs}}.",
       "queryResultCount": "{{count}} retrieval result(s)",
-      "noQueryResults": "No retrieval results matched this query."
+      "noQueryResults": "No retrieval results matched this query.",
+      "chunkLengthTokens": "{{count}} tokens"
     },
     "feedback": {
       "loadFailed": "Unable to load context management data.",

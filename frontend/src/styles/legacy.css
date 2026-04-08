@@ -494,6 +494,52 @@
   resize: vertical;
 }
 
+.context-retrieval-result-card {
+  gap: var(--space-4);
+}
+
+.context-retrieval-result-toggle {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-retrieval-result-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+
+.context-retrieval-result-summary {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.context-retrieval-result-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.context-retrieval-result-details {
+  border-top: 1px solid var(--border-muted);
+  padding-top: var(--space-4);
+}
+
+.context-retrieval-result-text {
+  min-height: 10rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .quote-admin-checkbox-row {
   display: flex;
   gap: var(--space-4);

@@ -427,18 +427,22 @@ def _normalize_query_top_k(value: Any) -> int:
     return top_k
 
 
-def _serialize_query_result(result: dict[str, Any]) -> dict[str, Any]:
+def _serialize_query_result(
+    result: dict[str, Any],
+    *,
+    chunk_length_tokens: int | None = None,
+    similarity: float | None = None,
+) -> dict[str, Any]:
     metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
     text = " ".join(str(result.get("text") or "").split())
-    snippet = text if len(text) <= 220 else text[:219].rstrip() + "…"
     title = str(metadata.get("title") or result.get("id") or "").strip()
     return {
         "id": str(result.get("id") or "").strip(),
         "title": title,
-        "snippet": snippet,
+        "text": text,
         "uri": str(metadata.get("uri") or "").strip() or None,
         "source_type": str(metadata.get("source_type") or "").strip() or None,
         "metadata": metadata,
-        "score": result.get("score"),
-        "score_kind": result.get("score_kind"),
+        "chunk_length_tokens": chunk_length_tokens if isinstance(chunk_length_tokens, int) and chunk_length_tokens >= 0 else 0,
+        "similarity": float(similarity) if isinstance(similarity, (int, float)) else 0.0,
     }

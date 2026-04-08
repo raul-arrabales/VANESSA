@@ -27,7 +27,7 @@ def test_query_knowledge_base_rejects_active_provider_instance_mismatch(monkeypa
     )
     monkeypatch.setattr(context_management_runtime, "_is_knowledge_base_eligible", lambda _row: True)
     monkeypatch.setattr(
-        context_management_vectorization,
+        context_management_runtime,
         "embed_knowledge_base_texts",
         lambda *_args, **_kwargs: {"embeddings": [[0.1, 0.2]]},
     )
@@ -162,3 +162,125 @@ def test_query_knowledge_base_rejects_embeddings_target_mismatch(monkeypatch: py
         )
 
     assert exc_info.value.code == "knowledge_base_embeddings_resource_mismatch"
+
+
+def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        context_management_runtime,
+        "_require_knowledge_base",
+        lambda _db, _knowledge_base_id: {
+            "id": "kb-primary",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_provider_key": "openai_compatible_cloud_embeddings",
+            "embedding_resource_id": "text-embedding-3-small",
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+        },
+    )
+    monkeypatch.setattr(context_management_runtime, "_is_knowledge_base_eligible", lambda _row: True)
+    monkeypatch.setattr(
+        context_management_runtime,
+        "embed_knowledge_base_texts",
+        lambda *_args, **_kwargs: {"embeddings": [[0.1, 0.2]]},
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_vector_store_adapter",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            binding=SimpleNamespace(provider_instance_id="provider-2", provider_key="weaviate_local"),
+            query=lambda **_query_kwargs: {
+                "index": "kb_product_docs",
+                "results": [
+                    {
+                        "id": "doc-2#0",
+                        "text": "high similarity chunk text for the top match",
+                        "metadata": {
+                            "document_id": "doc-2",
+                            "chunk_index": 0,
+                            "title": "FAQ",
+                            "source_type": "manual",
+                        },
+                        "score": 0.91,
+                        "score_kind": "similarity",
+                    },
+                    {
+                        "id": "doc-1#0",
+                        "text": "retrieved chunk text",
+                        "metadata": {
+                            "document_id": "doc-1",
+                            "chunk_index": 0,
+                            "title": "Architecture Overview",
+                            "source_type": "local_directory",
+                            "source_name": "Docs folder",
+                            "uri": "https://example.com/overview",
+                        },
+                        "score": 0.23,
+                        "score_kind": "distance",
+                    },
+                ],
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_embeddings_adapter",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            binding=SimpleNamespace(
+                provider_instance_id="embedding-provider-1",
+                provider_key="openai_compatible_cloud_embeddings",
+                default_resource={"provider_resource_id": "text-embedding-3-small"},
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        context_management_runtime,
+        "resolve_knowledge_base_tokenizer",
+        lambda *_args, **_kwargs: SimpleNamespace(encode=lambda text: text.split()),
+    )
+
+    payload = context_management_runtime.query_knowledge_base(
+        "postgresql://ignored",
+        config=object(),
+        knowledge_base_id="kb-primary",
+        payload={"query_text": "hello", "top_k": 5},
+    )
+
+    assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 2, "top_k": 5}
+    assert payload["results"] == [
+        {
+            "id": "doc-2#0",
+            "title": "FAQ",
+            "text": "high similarity chunk text for the top match",
+            "uri": None,
+            "source_type": "manual",
+            "metadata": {
+                "document_id": "doc-2",
+                "chunk_index": 0,
+                "title": "FAQ",
+                "source_type": "manual",
+            },
+            "chunk_length_tokens": 8,
+            "similarity": 0.91,
+        },
+        {
+            "id": "doc-1#0",
+            "title": "Architecture Overview",
+            "text": "retrieved chunk text",
+            "uri": "https://example.com/overview",
+            "source_type": "local_directory",
+            "metadata": {
+                "document_id": "doc-1",
+                "chunk_index": 0,
+                "title": "Architecture Overview",
+                "source_type": "local_directory",
+                "source_name": "Docs folder",
+                "uri": "https://example.com/overview",
+            },
+            "chunk_length_tokens": 3,
+            "similarity": 0.77,
+        },
+    ]
