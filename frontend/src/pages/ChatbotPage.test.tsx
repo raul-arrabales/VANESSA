@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -23,6 +23,9 @@ const playgroundApiMocks = vi.hoisted(() => ({
 const feedbackMocks = vi.hoisted(() => ({
   showErrorFeedback: vi.fn(),
   showSuccessFeedback: vi.fn(),
+}));
+const clipboardMocks = vi.hoisted(() => ({
+  writeText: vi.fn(),
 }));
 const scrollIntoViewMock = vi.fn();
 const scrollToMock = vi.fn();
@@ -197,6 +200,14 @@ describe("ChatPlaygroundPage", () => {
     });
     scrollIntoViewMock.mockReset();
     scrollToMock.mockReset();
+    clipboardMocks.writeText.mockReset();
+    clipboardMocks.writeText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: clipboardMocks.writeText,
+      },
+    });
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -228,6 +239,7 @@ describe("ChatPlaygroundPage", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
   });
 
@@ -406,6 +418,61 @@ describe("ChatPlaygroundPage", () => {
     expect(screen.queryByText(/^Assistant$/)).toBeNull();
     expect(document.querySelector(".chatbot-message-user .chatbot-message-surface")).not.toBeNull();
     expect(document.querySelector(".chatbot-message-assistant .chatbot-message-surface")).not.toBeNull();
+  });
+
+  it("renders the copy action only for assistant messages and copies the assistant response", async () => {
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
+      sendResult(
+        sessionSummary("conv-draft", "Copyable answer", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:01Z",
+        }),
+        "Please answer",
+        "Assistant reply",
+      ),
+    );
+
+    renderChatPlayground();
+
+    await waitForDraftReady();
+    await userEvent.type(screen.getByLabelText("Message"), "Please answer");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Assistant reply");
+    expect(screen.getAllByRole("button", { name: "playgrounds.messageActions.copy" })).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "playgrounds.messageActions.copy" }));
+
+    expect(clipboardMocks.writeText).toHaveBeenCalledWith("Assistant reply");
+    expect(screen.getByRole("button", { name: "playgrounds.messageActions.copied" })).toBeVisible();
+  });
+
+  it("reports clipboard failures through shared action feedback", async () => {
+    clipboardMocks.writeText.mockRejectedValueOnce(new Error("Clipboard blocked"));
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
+      sendResult(
+        sessionSummary("conv-draft", "Clipboard failure", {
+          message_count: 2,
+          updated_at: "2026-03-18T11:00:01Z",
+        }),
+        "Need a copy",
+        "Copy me",
+      ),
+    );
+
+    renderChatPlayground();
+
+    await waitForDraftReady();
+    await userEvent.type(screen.getByLabelText("Message"), "Need a copy");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByTestId("markdown-message");
+
+    await userEvent.click(screen.getByRole("button", { name: "playgrounds.messageActions.copy" }));
+
+    await waitFor(() => expect(feedbackMocks.showErrorFeedback).toHaveBeenCalledWith(
+      expect.any(Error),
+      "playgrounds.messageActions.copyFailed",
+    ));
   });
 
   it("moves rename and delete into the row menu and keeps the main header clean", async () => {

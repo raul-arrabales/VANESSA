@@ -16,6 +16,9 @@ const playgroundApiMocks = vi.hoisted(() => ({
   deletePlaygroundSession: vi.fn(),
   streamPlaygroundMessage: vi.fn(),
 }));
+const clipboardMocks = vi.hoisted(() => ({
+  writeText: vi.fn(),
+}));
 
 let mockUser: AuthUser | null = null;
 
@@ -72,6 +75,14 @@ describe("VanessaCorePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    clipboardMocks.writeText.mockReset();
+    clipboardMocks.writeText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: clipboardMocks.writeText,
+      },
+    });
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -188,5 +199,24 @@ describe("VanessaCorePage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Vanessa Planning Session" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(await screen.findByRole("dialog", { name: "Delete conversation" })).toBeVisible();
+  });
+
+  it("shows the shared assistant copy action inside Vanessa conversation threads", async () => {
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(detail({
+      message_count: 1,
+      messages: [
+        {
+          id: "m-vanessa-1",
+          role: "assistant",
+          content: "Vanessa answer",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+      ],
+    }));
+
+    await renderWithAppProviders(<VanessaCorePage />);
+
+    expect(await screen.findByRole("button", { name: "Copy response" })).toBeVisible();
   });
 });

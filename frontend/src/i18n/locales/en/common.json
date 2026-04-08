@@ -330,6 +330,11 @@
     "title": "AI Playground",
     "description": "Use shared chat and knowledge-grounded workspaces to explore models and bound knowledge bases without entering Vanessa-specific assistant flows.",
     "aria": "AI Playground destinations",
+    "messageActions": {
+      "copy": "Copy response",
+      "copied": "Copied",
+      "copyFailed": "Unable to copy message content."
+    },
     "chat": {
       "title": "Chat Workspace",
       "description": "Start or continue a model-backed conversation in the shared playground workspace."

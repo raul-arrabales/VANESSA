@@ -325,6 +325,11 @@
     "title": "AI Playground",
     "description": "Usa workspaces compartidos de chat y conocimiento para explorar modelos y bases de conocimiento vinculadas sin entrar en flujos especificos de Vanessa.",
     "aria": "Destinos de AI Playground",
+    "messageActions": {
+      "copy": "Copiar respuesta",
+      "copied": "Copiado",
+      "copyFailed": "No se pudo copiar el contenido del mensaje."
+    },
     "chat": {
       "title": "Espacio de chat",
       "description": "Inicia o continua una conversacion con modelos dentro del workspace compartido."

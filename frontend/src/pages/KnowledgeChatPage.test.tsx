@@ -16,6 +16,9 @@ const playgroundApiMocks = vi.hoisted(() => ({
   sendPlaygroundMessage: vi.fn(),
   deletePlaygroundSession: vi.fn(),
 }));
+const clipboardMocks = vi.hoisted(() => ({
+  writeText: vi.fn(),
+}));
 
 let mockUser: AuthUser | null = null;
 
@@ -88,6 +91,14 @@ describe("KnowledgePlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    clipboardMocks.writeText.mockReset();
+    clipboardMocks.writeText.mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: clipboardMocks.writeText,
+      },
+    });
     mockUser = {
       id: 10,
       email: "user@example.com",
@@ -419,6 +430,47 @@ describe("KnowledgePlaygroundPage", () => {
 
     expect(await screen.findByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Retrieval uses the shared knowledge corpus.")).toBeVisible();
+  });
+
+  it("copies only the assistant answer text without including source cards", async () => {
+    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+      session: detail({
+        id: "sess-draft",
+        title: "How does retrieval work?",
+        message_count: 2,
+        messages: [
+          { id: "m1", role: "user", content: "How does retrieval work?", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+          {
+            id: "m2",
+            role: "assistant",
+            content: "knowledge answer",
+            metadata: {
+              sources: [
+                {
+                  id: "doc-1",
+                  title: "Architecture Overview",
+                  snippet: "Retrieval uses the shared knowledge corpus.",
+                },
+              ],
+            },
+            createdAt: "2026-03-18T11:00:01Z",
+          },
+        ],
+      }),
+      messages: [],
+      output: "knowledge answer",
+      retrieval: { index: "knowledge_base", result_count: 1 },
+    });
+
+    await renderKnowledgeChat();
+
+    await userEvent.type(await screen.findByLabelText("Message"), "How does retrieval work?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+
+    expect(await screen.findByText("Architecture Overview")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Copy response" }));
+
+    await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("knowledge answer"));
   });
 
   it("renders assistant markdown in knowledge playground replies after persisting the draft", async () => {
