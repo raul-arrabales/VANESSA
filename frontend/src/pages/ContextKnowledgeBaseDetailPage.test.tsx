@@ -11,6 +11,10 @@ import ContextKnowledgeBaseRetrievalPage from "../features/context-management/pa
 import ContextKnowledgeBaseUploadPage from "../features/context-management/pages/ContextKnowledgeBaseUploadPage";
 import ContextKnowledgeBaseDocumentsPage from "../features/context-management/pages/ContextKnowledgeBaseDocumentsPage";
 import ContextKnowledgeBaseDocumentViewPage from "../features/context-management/pages/ContextKnowledgeBaseDocumentViewPage";
+import {
+  buildKnowledgeBaseQueryResponse,
+  buildKnowledgeBaseQueryResult,
+} from "../features/context-management/retrievalTestBuilders";
 
 let mockUser: AuthUser | null = null;
 
@@ -157,25 +161,70 @@ const contextApiMocks = vi.hoisted(() => ({
       finished_at: "2026-03-26T20:10:01+00:00",
     },
   ]),
-  queryKnowledgeBase: vi.fn(async (_knowledgeBaseId: string, payload?: { search_method?: string; query_preprocessing?: string }) => {
-    if (payload?.search_method === "keyword") {
-      return {
-        knowledge_base_id: "kb-primary",
-        retrieval: {
-          index: "kb_product_docs",
-          result_count: 2,
-          top_k: 5,
-          search_method: "keyword",
-          query_preprocessing: payload.query_preprocessing ?? "none",
-        },
+  queryKnowledgeBase: vi.fn(
+    async (
+      _knowledgeBaseId: string,
+      payload?: { search_method?: string; query_preprocessing?: string; hybrid_alpha?: number },
+    ) => {
+    if (payload?.search_method === "hybrid") {
+      return buildKnowledgeBaseQueryResponse({
+        searchMethod: "hybrid",
+        queryPreprocessing: payload.query_preprocessing ?? "none",
+        hybridAlpha: payload.hybrid_alpha ?? 0.5,
         results: [
-          {
+          buildKnowledgeBaseQueryResult({
+            id: "doc-2",
+            title: "FAQ",
+            text:
+              "Hybrid retrieval blends semantic recall with lexical precision so testers can inspect high-confidence overlap results first tail-marker-hybrid-beta",
+            uri: null,
+            source_type: "local_directory",
+            metadata: {
+              document_id: "doc-2",
+              chunk_index: 1,
+              source_name: "FAQ folder",
+            },
+            chunk_length_tokens: 18,
+            relevance_score: 0.875,
+            relevance_kind: "hybrid_score",
+            relevance_components: {
+              semantic_score: 0.75,
+              keyword_score: 1,
+            },
+          }),
+          buildKnowledgeBaseQueryResult({
             id: "doc-1",
             title: "Architecture Overview",
             text:
+              "Hybrid fusion keeps strong semantic-only matches available even when lexical overlap is weaker tail-marker-hybrid-alpha",
+            uri: "https://example.com/overview",
+            metadata: {
+              document_id: "doc-1",
+              chunk_index: 0,
+              source_name: "Docs folder",
+              uri: "https://example.com/overview",
+            },
+            chunk_length_tokens: 15,
+            relevance_score: 0.625,
+            relevance_kind: "hybrid_score",
+            relevance_components: {
+              semantic_score: 0.9,
+              keyword_score: 0.35,
+            },
+          }),
+        ],
+      });
+    }
+    if (payload?.search_method === "keyword") {
+      return buildKnowledgeBaseQueryResponse({
+        searchMethod: "keyword",
+        queryPreprocessing: payload.query_preprocessing ?? "none",
+        results: [
+          buildKnowledgeBaseQueryResult({
+            id: "doc-1",
+            text:
               "Keyword retrieval can surface exact term matches for operators who want to inspect lexical hits first tail-marker-keyword-alpha",
             uri: "https://example.com/overview",
-            source_type: "manual",
             metadata: {
               document_id: "doc-1",
               chunk_index: 0,
@@ -187,8 +236,8 @@ const contextApiMocks = vi.hoisted(() => ({
             chunk_length_tokens: 19,
             relevance_score: 4.125,
             relevance_kind: "keyword_score",
-          },
-          {
+          }),
+          buildKnowledgeBaseQueryResult({
             id: "doc-2",
             title: "FAQ",
             text:
@@ -205,27 +254,19 @@ const contextApiMocks = vi.hoisted(() => ({
             chunk_length_tokens: 16,
             relevance_score: 2.5,
             relevance_kind: "keyword_score",
-          },
+          }),
         ],
-      };
+      });
     }
-    return {
-      knowledge_base_id: "kb-primary",
-      retrieval: {
-        index: "kb_product_docs",
-        result_count: 2,
-        top_k: 5,
-        search_method: "semantic",
-        query_preprocessing: payload?.query_preprocessing ?? "none",
-      },
+    return buildKnowledgeBaseQueryResponse({
+      searchMethod: "semantic",
+      queryPreprocessing: payload?.query_preprocessing ?? "none",
       results: [
-        {
+        buildKnowledgeBaseQueryResult({
           id: "doc-1",
-          title: "Architecture Overview",
           text:
             "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
           uri: "https://example.com/overview",
-          source_type: "manual",
           metadata: {
             document_id: "doc-1",
             chunk_index: 0,
@@ -237,8 +278,8 @@ const contextApiMocks = vi.hoisted(() => ({
           chunk_length_tokens: 42,
           relevance_score: 0.742,
           relevance_kind: "similarity",
-        },
-        {
+        }),
+        buildKnowledgeBaseQueryResult({
           id: "doc-2",
           title: "FAQ",
           text:
@@ -255,9 +296,9 @@ const contextApiMocks = vi.hoisted(() => ({
           chunk_length_tokens: 21,
           relevance_score: 0.913,
           relevance_kind: "similarity",
-        },
+        }),
       ],
-    };
+    });
   }),
   resyncKnowledgeBase: vi.fn(async () => ({
     id: "kb-primary",
@@ -819,6 +860,46 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         top_k: 5,
         search_method: "keyword",
         query_preprocessing: "none",
+      },
+      "token",
+    );
+  });
+
+  it("lets the operator run hybrid retrieval with a configurable alpha", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/retrieval");
+
+    expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+    await userEvent.selectOptions(screen.getByLabelText("Search method"), "hybrid");
+
+    const hybridAlphaInput = screen.getByLabelText("Hybrid alpha");
+    expect(hybridAlphaInput).toHaveValue(0.5);
+
+    await userEvent.clear(hybridAlphaInput);
+    await userEvent.type(hybridAlphaInput, "0.65");
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
+    expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "Chunk 1: FAQ" })).toBeVisible();
+    expect(within(resultButtons[0] as HTMLElement).getByText("Hybrid score: 0.875")).toBeVisible();
+    expect(within(resultButtons[1] as HTMLElement).getByText("Hybrid score: 0.625")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Chunk 1: FAQ" }));
+
+    expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
+      "Hybrid retrieval blends semantic recall with lexical precision so testers can inspect high-confidence overlap results first tail-marker-hybrid-beta",
+    );
+    expect(screen.getByText("Chunk length: 18 tokens")).toBeVisible();
+    expect(screen.getByText("Semantic score: 0.750")).toBeVisible();
+    expect(screen.getByText("Keyword score: 1.000")).toBeVisible();
+    expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
+      "kb-primary",
+      {
+        query_text: "How does retrieval work?",
+        top_k: 5,
+        search_method: "hybrid",
+        query_preprocessing: "none",
+        hybrid_alpha: 0.65,
       },
       "token",
     );

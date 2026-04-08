@@ -21,7 +21,10 @@
     "retrieval": {
       "index": "knowledge_base",
       "query": "optional explicit retrieval query",
+      "search_method": "hybrid",
+      "query_preprocessing": "normalize",
       "top_k": 5,
+      "hybrid_alpha": 0.5,
       "filters": {
         "tenant": "ops"
       }
@@ -210,8 +213,49 @@
           }
         }
       ],
-      "embedding_calls": [],
-      "retrieval_calls": [],
+      "embedding_calls": [
+        {
+          "provider_slug": "vllm-embeddings-local",
+          "provider_key": "vllm_embeddings_local",
+          "deployment_profile_slug": "local-default",
+          "requested_model": "local-vllm-embeddings-default",
+          "input_count": 1,
+          "dimension": 1536,
+          "status_code": 200
+        }
+      ],
+      "retrieval_calls": [
+        {
+          "provider_slug": "weaviate-local",
+          "provider_key": "weaviate_local",
+          "deployment_profile_slug": "local-default",
+          "index": "kb_product_docs",
+          "query": "how does retrieval work",
+          "top_k": 5,
+          "search_method": "hybrid",
+          "query_preprocessing": "normalize",
+          "hybrid_alpha": 0.5,
+          "result_count": 1,
+          "results": [
+            {
+              "id": "doc-1",
+              "text": "Hybrid retrieval blends semantic recall with lexical precision.",
+              "metadata": {
+                "title": "Architecture Overview",
+                "uri": "https://example.com/architecture"
+              },
+              "score": 0.94,
+              "score_kind": "hybrid_score",
+              "relevance_score": 0.94,
+              "relevance_kind": "hybrid_score",
+              "relevance_components": {
+                "semantic_score": 0.91,
+                "keyword_score": 0.97
+              }
+            }
+          ]
+        }
+      ],
       "model_calls": [
         {
           "provider_slug": "vllm-local-gateway",
@@ -237,7 +281,9 @@ For resource-bearing capabilities, the runtime snapshot is authoritative:
 - `vector_store.resource_policy` governs whether vector indexes must be explicitly bound or may be created/resolved under a deployment namespace.
 - Agent engine resolves the selected managed model resource to the provider-facing model id before issuing upstream requests.
 
-`input.retrieval` is optional and execution-scoped. In v1 it is text-query only at the public API boundary, but agent engine now resolves the query through the active `embeddings` binding before querying the active `vector_store` binding. The active vector binding may currently resolve to either `weaviate_http` or `qdrant_http`.
+`input.retrieval` is optional and execution-scoped. It uses the canonical retrieval contract with `search_method`, `query_preprocessing`, `top_k`, `filters`, and optional `hybrid_alpha`. Semantic retrieval uses the active `embeddings` plus `vector_store` bindings, keyword retrieval uses only `vector_store`, and hybrid retrieval is fused by backend/agent-engine retrieval logic instead of provider-native hybrid semantics.
+
+Detailed retrieval semantics, normalized result fields, and ownership boundaries are documented in [Retrieval Contract](retrieval_contract.md).
 
 `input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.resources`. When omitted, the active binding default resource is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 

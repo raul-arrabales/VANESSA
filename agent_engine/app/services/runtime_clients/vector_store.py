@@ -35,7 +35,8 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         self,
         *,
         index_name: str,
-        embedding: list[float],
+        search_method: str,
+        embedding: list[float] | None,
         top_k: int,
         filters: dict[str, Any],
         query_text: str | None = None,
@@ -43,6 +44,7 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         class_name = coerce_weaviate_class_name(index_name)
         operation = build_weaviate_query_operation(
             class_name=class_name,
+            query_text=query_text,
             embedding=embedding,
             top_k=top_k,
             filters=filters,
@@ -75,7 +77,11 @@ class WeaviateVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         rows = (((payload.get("data") or {}).get("Get") or {}).get(class_name) or [])
         if not isinstance(rows, list):
             rows = []
-        results = [normalize_weaviate_query_result(item) for item in rows if isinstance(item, dict)]
+        results = [
+            normalize_weaviate_query_result(item, score_kind=operation["score_kind"])
+            for item in rows
+            if isinstance(item, dict)
+        ]
         return {
             "index": index_name,
             "query": query_text,
@@ -103,22 +109,58 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
         self,
         *,
         index_name: str,
-        embedding: list[float],
+        search_method: str,
+        embedding: list[float] | None,
         top_k: int,
         filters: dict[str, Any],
         query_text: str | None = None,
     ) -> dict[str, Any]:
         collection_name = coerce_qdrant_collection_name(index_name)
+        if search_method == "semantic":
+            if embedding is None:
+                raise VectorStoreRuntimeClientError(
+                    code="invalid_vector_query",
+                    message="semantic vector queries require an embedding",
+                    status_code=400,
+                )
+            payload, _status_code = request_json_or_raise(
+                request_json=self.request_json,
+                error_cls=VectorStoreRuntimeClientError,
+                binding=self.vector_binding,
+                url=self._search_url(collection_name),
+                method="POST",
+                payload={
+                    "vector": embedding,
+                    "limit": top_k,
+                    "filter": {"must": qdrant_filter_conditions(filters)},
+                    "with_payload": True,
+                    "with_vector": False,
+                },
+                timeout_seconds=binding_timeout_seconds(self.vector_binding),
+                unavailable_code=vector_unavailable_code,
+                unavailable_message="Vector runtime unavailable",
+                request_failed_code=vector_request_failed_code,
+                request_failed_message="Vector runtime request failed",
+            )
+            points = payload.get("result") if isinstance(payload.get("result"), list) else []
+            return {
+                "index": index_name,
+                "query": query_text,
+                "top_k": top_k,
+                "results": [normalize_qdrant_query_result(item, score_kind="similarity") for item in points if isinstance(item, dict)],
+            }
+
+        must_filters = qdrant_filter_conditions(filters)
+        must_filters.append({"key": "text", "match": {"text": str(query_text or "")}})
         payload, _status_code = request_json_or_raise(
             request_json=self.request_json,
             error_cls=VectorStoreRuntimeClientError,
             binding=self.vector_binding,
-            url=self._search_url(collection_name),
+            url=self._scroll_url(collection_name),
             method="POST",
             payload={
-                "vector": embedding,
                 "limit": top_k,
-                "filter": {"must": qdrant_filter_conditions(filters)},
+                "filter": {"must": must_filters},
                 "with_payload": True,
                 "with_vector": False,
             },
@@ -128,17 +170,23 @@ class QdrantVectorStoreRuntimeClient(VectorStoreRuntimeClient):
             request_failed_code=vector_request_failed_code,
             request_failed_message="Vector runtime request failed",
         )
-        points = payload.get("result") if isinstance(payload.get("result"), list) else []
+        points = (((payload.get("result") or {}).get("points")) if isinstance(payload.get("result"), dict) else [])
+        if not isinstance(points, list):
+            points = []
         return {
             "index": index_name,
             "query": query_text,
             "top_k": top_k,
-            "results": [normalize_qdrant_query_result(item) for item in points if isinstance(item, dict)],
+            "results": [normalize_qdrant_query_result(item, score_kind="text_match") for item in points if isinstance(item, dict)],
         }
 
     def _search_url(self, collection_name: str) -> str:
         endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
         return endpoint_url + f"/collections/{collection_name}/points/search"
+
+    def _scroll_url(self, collection_name: str) -> str:
+        endpoint_url = str(self.vector_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + f"/collections/{collection_name}/points/scroll"
 
 
 def coerce_weaviate_class_name(index_name: str) -> str:
@@ -166,20 +214,29 @@ def coerce_metadata_key(key: str) -> str:
 def build_weaviate_query_operation(
     *,
     class_name: str,
-    embedding: list[float],
+    query_text: str | None,
+    embedding: list[float] | None,
     top_k: int,
     filters: dict[str, Any],
 ) -> dict[str, str]:
-    args: list[str] = [f"limit: {top_k}", f"nearVector: {{ vector: {graphql_list(embedding)} }}"]
+    args: list[str] = [f"limit: {top_k}"]
+    if embedding is not None:
+        args.append(f"nearVector: {{ vector: {graphql_list(embedding)} }}")
+        score_field = "distance"
+        score_kind = "distance"
+    else:
+        args.append(f'bm25: {{ query: {graphql_string(query_text or "")}, properties: ["text"] }}')
+        score_field = "score"
+        score_kind = "bm25"
     if filters:
         args.append(f"where: {graphql_where_filter(filters)}")
     args_text = ", ".join(args)
     query = (
         "{ Get { "
-        f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id score }} }} '
+        f'{class_name}({args_text}) {{ document_id text metadata_json _additional {{ id {score_field} }} }} '
         "} }"
     )
-    return {"query": query, "score_kind": "similarity"}
+    return {"query": query, "score_kind": score_kind}
 
 
 def graphql_string(value: str) -> str:
@@ -207,9 +264,10 @@ def graphql_where_filter(filters: dict[str, Any]) -> str:
     return "{ operator: And, operands: [" + ", ".join(operands) + "] }"
 
 
-def normalize_weaviate_query_result(item: dict[str, Any]) -> dict[str, Any]:
+def normalize_weaviate_query_result(item: dict[str, Any], *, score_kind: str) -> dict[str, Any]:
     additional = item.get("_additional")
     additional = additional if isinstance(additional, dict) else {}
+    score_field = "score" if score_kind == "bm25" else score_kind
     metadata_json = str(item.get("metadata_json", "")).strip()
     try:
         metadata = loads(metadata_json) if metadata_json else {}
@@ -221,8 +279,8 @@ def normalize_weaviate_query_result(item: dict[str, Any]) -> dict[str, Any]:
         "id": str(item.get("document_id") or additional.get("id") or "").strip(),
         "text": str(item.get("text", "")).strip(),
         "metadata": metadata,
-        "score": float(additional.get("score", 0.0) or 0.0),
-        "score_kind": "similarity",
+        "score": float(additional.get(score_field, 0.0) or 0.0),
+        "score_kind": score_kind,
     }
 
 
@@ -245,7 +303,7 @@ def qdrant_filter_conditions(filters: dict[str, Any]) -> list[dict[str, Any]]:
     return conditions
 
 
-def normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
+def normalize_qdrant_query_result(item: dict[str, Any], *, score_kind: str) -> dict[str, Any]:
     payload = item.get("payload")
     payload = payload if isinstance(payload, dict) else {}
     metadata = payload.get("metadata")
@@ -262,5 +320,5 @@ def normalize_qdrant_query_result(item: dict[str, Any]) -> dict[str, Any]:
         "text": str(payload.get("text", "")).strip(),
         "metadata": metadata,
         "score": score,
-        "score_kind": "similarity",
+        "score_kind": score_kind,
     }

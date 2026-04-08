@@ -3,6 +3,10 @@ from __future__ import annotations
 import pytest
 
 from app.services import context_management_serialization
+from app.services.context_management_retrieval_types import (
+    KnowledgeBaseRankedRetrievalResult,
+    KnowledgeBaseRetrievalRelevanceComponents,
+)
 from app.services.platform_types import PlatformControlPlaneError
 
 
@@ -248,6 +252,51 @@ def test_serialize_knowledge_base_includes_vectorization_summary():
             "unit": "tokens",
             "chunk_length": 300,
             "chunk_overlap": 60,
+        },
+    }
+
+
+def test_serialize_query_result_preserves_public_wire_shape_for_ranked_result():
+    payload = context_management_serialization._serialize_query_result(  # type: ignore[attr-defined]
+        KnowledgeBaseRankedRetrievalResult(
+            id="doc-1#0",
+            text="  Hello   from   retrieval   ",
+            metadata={
+                "title": "Architecture Overview",
+                "document_id": "doc-1",
+                "chunk_index": 0,
+                "uri": "https://example.com/overview",
+                "source_type": "manual",
+            },
+            relevance_score=0.742,
+            relevance_kind="hybrid_score",
+            relevance_components=KnowledgeBaseRetrievalRelevanceComponents(
+                semantic_score=0.81,
+                keyword_score=0.67,
+            ),
+        ),
+        chunk_length_tokens=12,
+    )
+
+    assert payload == {
+        "id": "doc-1#0",
+        "title": "Architecture Overview",
+        "text": "Hello from retrieval",
+        "uri": "https://example.com/overview",
+        "source_type": "manual",
+        "metadata": {
+            "title": "Architecture Overview",
+            "document_id": "doc-1",
+            "chunk_index": 0,
+            "uri": "https://example.com/overview",
+            "source_type": "manual",
+        },
+        "chunk_length_tokens": 12,
+        "relevance_score": 0.742,
+        "relevance_kind": "hybrid_score",
+        "relevance_components": {
+            "semantic_score": 0.81,
+            "keyword_score": 0.67,
         },
     }
 

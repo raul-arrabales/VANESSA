@@ -328,7 +328,59 @@ def test_openai_compatible_runtime_client_maps_transport_failures(monkeypatch: p
     assert exc_info.value.code == "runtime_unreachable"
 
 
-def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+def test_weaviate_vector_runtime_client_builds_semantic_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "data": {
+                "Get": {
+                    "KnowledgeBase": [
+                        {
+                            "document_id": "doc-1",
+                            "text": "retrieved text",
+                            "metadata_json": '{"tenant":"ops"}',
+                            "_additional": {"id": "uuid-1", "distance": 0.25},
+                        }
+                    ]
+                }
+            }
+        }, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_vector_store_runtime_client(_platform_runtime())
+
+    payload = client.query(
+        index_name="knowledge_base",
+        search_method="semantic",
+        embedding=[0.1, 0.2],
+        top_k=4,
+        filters={"tenant": "ops"},
+        query_text="hello",
+    )
+
+    assert payload == {
+        "index": "knowledge_base",
+        "query": "hello",
+        "top_k": 4,
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "retrieved text",
+                "metadata": {"tenant": "ops"},
+                "score": 0.25,
+                "score_kind": "distance",
+            }
+        ],
+    }
+    assert str(seen_payloads[0]["query"]).count("{") == str(seen_payloads[0]["query"]).count("}")
+    assert "nearVector: { vector: [0.1, 0.2] }" in str(seen_payloads[0])
+    assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in str(seen_payloads[0])
+
+
+def test_weaviate_vector_runtime_client_builds_keyword_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
 
     def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
@@ -354,7 +406,8 @@ def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results
 
     payload = client.query(
         index_name="knowledge_base",
-        embedding=[0.1, 0.2],
+        search_method="keyword",
+        embedding=None,
         top_k=4,
         filters={"tenant": "ops"},
         query_text="hello",
@@ -370,13 +423,11 @@ def test_weaviate_vector_runtime_client_builds_bm25_query_and_normalizes_results
                 "text": "retrieved text",
                 "metadata": {"tenant": "ops"},
                 "score": 7.5,
-                "score_kind": "similarity",
+                "score_kind": "bm25",
             }
         ],
     }
-    assert str(seen_payloads[0]["query"]).count("{") == str(seen_payloads[0]["query"]).count("}")
-    assert "nearVector: { vector: [0.1, 0.2] }" in str(seen_payloads[0])
-    assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in str(seen_payloads[0])
+    assert 'bm25: { query: "hello", properties: ["text"] }' in str(seen_payloads[0])
 
 
 def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pytest.MonkeyPatch):
@@ -386,6 +437,7 @@ def test_weaviate_vector_runtime_client_maps_transport_failures(monkeypatch: pyt
     with pytest.raises(runtime_client.VectorStoreRuntimeClientError) as exc_info:
         client.query(
             index_name="knowledge_base",
+            search_method="semantic",
             embedding=[0.1, 0.2],
             top_k=5,
             filters={},
@@ -427,6 +479,7 @@ def test_qdrant_vector_runtime_client_builds_similarity_query_and_normalizes_res
 
     payload = client.query(
         index_name="knowledge_base",
+        search_method="semantic",
         embedding=[0.1, 0.2],
         top_k=4,
         filters={"tenant": "ops"},
@@ -452,6 +505,77 @@ def test_qdrant_vector_runtime_client_builds_similarity_query_and_normalizes_res
             "vector": [0.1, 0.2],
             "limit": 4,
             "filter": {"must": [{"key": "tenant", "match": {"value": "ops"}}]},
+            "with_payload": True,
+            "with_vector": False,
+        }
+    ]
+
+
+def test_qdrant_vector_runtime_client_builds_keyword_query_and_normalizes_results(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "status": "ok",
+            "result": {
+                "points": [
+                    {
+                        "id": "doc-1",
+                        "payload": {
+                            "document_id": "doc-1",
+                            "text": "retrieved text",
+                            "metadata": {"tenant": "ops"},
+                        },
+                        "score": 1.0,
+                    }
+                ]
+            },
+        }, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_vector_store_runtime_client(
+        _platform_runtime(
+            vector_provider_key="qdrant_local",
+            vector_adapter_kind="qdrant_http",
+            vector_endpoint_url="http://qdrant:6333",
+            vector_healthcheck_url="http://qdrant:6333/healthz",
+        )
+    )
+
+    payload = client.query(
+        index_name="knowledge_base",
+        search_method="keyword",
+        embedding=None,
+        top_k=4,
+        filters={"tenant": "ops"},
+        query_text="hello",
+    )
+
+    assert payload == {
+        "index": "knowledge_base",
+        "query": "hello",
+        "top_k": 4,
+        "results": [
+            {
+                "id": "doc-1",
+                "text": "retrieved text",
+                "metadata": {"tenant": "ops"},
+                "score": 1.0,
+                "score_kind": "text_match",
+            }
+        ],
+    }
+    assert seen_payloads == [
+        {
+            "limit": 4,
+            "filter": {
+                "must": [
+                    {"key": "tenant", "match": {"value": "ops"}},
+                    {"key": "text", "match": {"text": "hello"}},
+                ]
+            },
             "with_payload": True,
             "with_vector": False,
         }

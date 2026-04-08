@@ -193,7 +193,8 @@ Bootstrap defaults:
 - `POST /v1/platform/providers/{id}/loaded-model` and `DELETE /v1/platform/providers/{id}/loaded-model` are the superadmin control-plane APIs for setting or clearing that local slot intent, and now immediately apply that change to the matching local runtime controller.
 - Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
-- Backend forwards optional `input.retrieval` payloads unchanged to `agent_engine`, which now uses the active `embeddings` and `vector_store` bindings for explicit retrieval requests before model execution.
+- Backend owns product/public retrieval request shaping, active KB selection, deployment-runtime resolution, and knowledge-chat/source projection. It forwards canonical `input.retrieval` payloads to `agent_engine`, which executes semantic / keyword / hybrid retrieval against the active runtime bindings.
+- Canonical backend ↔ agent-engine retrieval semantics are documented in [Retrieval Contract](retrieval_contract.md).
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
 - `GET /v1/playgrounds/options` exposes runtime-allowed models, assistants, and deployment-bound knowledge bases for user-facing playground selection.
 - `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.

@@ -155,6 +155,11 @@ def test_invalid_retrieval_input_returns_400():
         )
         assert status == 400
         assert payload["error"] == "invalid_retrieval_input"
+        assert payload["message"] == (
+            "retrieval must include a valid index, explicit or derived query text, "
+            "positive top_k, scalar filters, and valid search_method, "
+            "query_preprocessing, and hybrid_alpha values when provided"
+        )
     finally:
         server.shutdown()
         server.server_close()

@@ -38,17 +38,21 @@ vi.mock("../components/ChatMessageBody", () => ({
   ),
 }));
 
-vi.mock("../api/playgrounds", () => ({
-  getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
-  getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
-  listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
-  createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
-  getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
-  updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
-  deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
-  sendPlaygroundMessage: vi.fn(),
-  streamPlaygroundMessage: playgroundApiMocks.streamPlaygroundMessage,
-}));
+vi.mock("../api/playgrounds", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/playgrounds")>();
+  return {
+    ...actual,
+    getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
+    getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
+    listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
+    createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
+    getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
+    updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
+    deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
+    sendPlaygroundMessage: vi.fn(),
+    streamPlaygroundMessage: playgroundApiMocks.streamPlaygroundMessage,
+  };
+});
 
 vi.mock("../auth/AuthProvider", () => ({
   useAuth: () => ({

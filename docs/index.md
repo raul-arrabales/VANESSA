@@ -32,6 +32,7 @@ VANESSA (Versatile AI Navigator for Enhanced Semantic Search & Automation) is a 
 - [Setup](setup.md)
 - [Local Staging](local-staging.md)
 - [Services](services/backend.md)
+- [Retrieval Contract](services/retrieval_contract.md)
 - [ModelOps](services/modelops.md)
 - [Testing](testing.md)
 - [Security/Secrets](security-secrets.md)

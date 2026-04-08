@@ -8,6 +8,7 @@ export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKn
   retrievalQuery: string;
   retrievalTopK: string;
   retrievalSearchMethod: KnowledgeBaseSearchMethod;
+  retrievalHybridAlpha: string;
   retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
@@ -15,6 +16,7 @@ export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKn
   setRetrievalQuery: Dispatch<SetStateAction<string>>;
   setRetrievalTopK: Dispatch<SetStateAction<string>>;
   setRetrievalSearchMethod: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
+  setRetrievalHybridAlpha: Dispatch<SetStateAction<string>>;
   setRetrievalQueryPreprocessing: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
   handleTestRetrieval: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -25,6 +27,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
   const [retrievalQuery, setRetrievalQuery] = useState("");
   const [retrievalTopK, setRetrievalTopK] = useState("5");
   const [retrievalSearchMethod, setRetrievalSearchMethod] = useState<KnowledgeBaseSearchMethod>("semantic");
+  const [retrievalHybridAlpha, setRetrievalHybridAlpha] = useState("0.5");
   const [retrievalQueryPreprocessing, setRetrievalQueryPreprocessing] = useState<KnowledgeBaseQueryPreprocessing>("none");
   const [retrievalResults, setRetrievalResults] = useState<KnowledgeBaseQueryResult[]>([]);
   const [retrievalResultCount, setRetrievalResultCount] = useState<number | null>(null);
@@ -37,6 +40,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     }
     setIsQuerying(true);
     try {
+      const parsedHybridAlpha = Number.parseFloat(retrievalHybridAlpha);
       const response = await queryKnowledgeBase(
         workspace.knowledgeBase.id,
         {
@@ -44,6 +48,9 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
           top_k: Number.parseInt(retrievalTopK, 10) || 5,
           search_method: retrievalSearchMethod,
           query_preprocessing: retrievalQueryPreprocessing,
+          ...(retrievalSearchMethod === "hybrid"
+            ? { hybrid_alpha: Number.isFinite(parsedHybridAlpha) ? parsedHybridAlpha : 0.5 }
+            : {}),
         },
         workspace.token,
       );
@@ -61,6 +68,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     retrievalQuery,
     retrievalTopK,
     retrievalSearchMethod,
+    retrievalHybridAlpha,
     retrievalQueryPreprocessing,
     retrievalResults,
     retrievalResultCount,
@@ -68,6 +76,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     setRetrievalQuery,
     setRetrievalTopK,
     setRetrievalSearchMethod,
+    setRetrievalHybridAlpha,
     setRetrievalQueryPreprocessing,
     handleTestRetrieval,
   };

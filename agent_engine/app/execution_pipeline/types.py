@@ -3,13 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-
-@dataclass(slots=True)
-class RetrievalRequest:
-    index: str
-    query: str
-    top_k: int
-    filters: dict[str, Any] = field(default_factory=dict)
+from ..retrieval.types import RetrievalRequest
 
 
 @dataclass(slots=True)

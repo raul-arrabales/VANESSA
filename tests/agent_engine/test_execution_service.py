@@ -356,8 +356,8 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
                             "id": "doc-1",
                             "text": "retrieved text",
                             "metadata": {"tenant": "ops"},
-                            "score": 7.5,
-                            "score_kind": "bm25",
+                            "score": 0.75,
+                            "score_kind": "similarity",
                         }
                     ],
                 }
@@ -390,8 +390,11 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
                 "prompt": "hello",
                 "retrieval": {
                     "index": "knowledge_base",
+                    "query": "hello",
                     "top_k": 3,
                     "filters": {"tenant": "ops"},
+                    "search_method": "semantic",
+                    "query_preprocessing": "none",
                 },
             },
             "platform_runtime": {
@@ -437,14 +440,18 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
                 "index": "knowledge_base",
                 "query": "hello",
                 "top_k": 3,
+                "search_method": "semantic",
+                "query_preprocessing": "none",
                 "result_count": 1,
                 "results": [
                     {
                         "id": "doc-1",
                         "text": "retrieved text",
                         "metadata": {"tenant": "ops"},
-                        "score": 7.5,
-                        "score_kind": "bm25",
+                        "score": 0.75,
+                        "score_kind": "similarity",
+                        "relevance_score": 0.75,
+                        "relevance_kind": "similarity",
                     }
                 ],
             }
@@ -495,8 +502,8 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
                             "id": "doc-1",
                             "text": "qdrant text",
                             "metadata": {"tenant": "ops"},
-                            "score": 1.0,
-                            "score_kind": "text_match",
+                            "score": 0.88,
+                            "score_kind": "similarity",
                         }
                     ],
                 }
@@ -557,14 +564,18 @@ def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch
             "index": "knowledge_base",
             "query": "hello",
             "top_k": 5,
+            "search_method": "semantic",
+            "query_preprocessing": "none",
             "result_count": 1,
             "results": [
                 {
                     "id": "doc-1",
                     "text": "qdrant text",
                     "metadata": {"tenant": "ops"},
-                    "score": 1.0,
-                    "score_kind": "text_match",
+                    "score": 0.88,
+                    "score_kind": "similarity",
+                    "relevance_score": 0.88,
+                    "relevance_kind": "similarity",
                 }
             ],
         }

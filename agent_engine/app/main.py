@@ -120,7 +120,11 @@ class Handler(BaseHTTPRequestHandler):
                     400,
                     {
                         "error": "invalid_retrieval_input",
-                        "message": "retrieval must include a valid index, query source, top_k, and scalar filters",
+                        "message": (
+                            "retrieval must include a valid index, explicit or derived query text, "
+                            "positive top_k, scalar filters, and valid search_method, "
+                            "query_preprocessing, and hybrid_alpha values when provided"
+                        ),
                     },
                 )
                 return

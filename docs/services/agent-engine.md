@@ -17,7 +17,9 @@ The agent engine hosts multi-step orchestration workflows and tool logic.
 
 Execution records are persisted to PostgreSQL when `DATABASE_URL` is available; otherwise an in-memory fallback store is used.
 
-Backend resolves the active platform bindings and passes them to agent engine as an execution-scoped `platform_runtime` snapshot. Prompt- and message-based executions perform a real LLM call through the active `llm_inference` provider, and explicit `input.retrieval` requests now perform an embeddings call through the active `embeddings` provider before querying the active `vector_store` provider and then calling the LLM. The current retrieval runtime supports both `weaviate_http` and `qdrant_http` adapter kinds through the same normalized execution path.
+Backend resolves the active platform bindings and passes them to agent engine as an execution-scoped `platform_runtime` snapshot. Prompt- and message-based executions perform a real LLM call through the active `llm_inference` provider. Explicit `input.retrieval` requests use the canonical retrieval contract, and agent engine executes semantic / keyword / hybrid retrieval against the active runtime bindings before the LLM call.
+
+Canonical retrieval semantics, normalized result fields, and backend/engine ownership boundaries are documented in [Retrieval Contract](retrieval_contract.md).
 
 Tool/runtime convergence now adds two optional runtime capabilities to that same snapshot:
 
@@ -29,7 +31,7 @@ Execution flow summary:
 1. Normalize execution input into `ConversationState` and optional `RetrievalRequest`.
 2. Resolve the agent spec and enforce execute permissions.
 3. Validate runtime dependencies and resolve allowed tools.
-4. Execute retrieval planning against the active `embeddings` and `vector_store` bindings when requested.
+4. Execute semantic / keyword / hybrid retrieval against the active `embeddings` and `vector_store` bindings when requested.
 5. Call the active `llm_inference` provider with normalized messages and tool definitions.
 6. Dispatch tool calls through the active `mcp_runtime` or `sandbox_execution` provider.
 7. Assemble `ExecutionResult` and persist execution state transitions.
@@ -50,7 +52,7 @@ Current canonical built-in tools:
 - `tool.web_search` via `transport: mcp`
 - `tool.python_exec` via `transport: sandbox_http`
 
-Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and `retrieval_calls`.
+Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and canonical `retrieval_calls`.
 
 Canonical service notes: [`agent_engine/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/agent_engine/README.md).
 

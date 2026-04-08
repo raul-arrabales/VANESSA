@@ -512,17 +512,21 @@
       "retrievalSettings": "Retrieval settings",
       "topK": "Top K",
       "searchMethod": "Search method",
+      "hybridAlpha": "Hybrid alpha",
       "queryPreprocessing": "Query preprocessing",
       "chunkCount": "Chunk count",
       "chunkLength": "Chunk length",
       "chunkMetadata": "Chunk metadata",
       "chunkText": "Chunk text",
       "similarity": "Similarity",
-      "keywordScore": "Keyword score"
+      "semanticScore": "Semantic score",
+      "keywordScore": "Keyword score",
+      "hybridScore": "Hybrid score"
     },
     "searchMethods": {
       "semantic": "Semantic",
-      "keyword": "Keyword"
+      "keyword": "Keyword",
+      "hybrid": "Hybrid"
     },
     "queryPreprocessing": {
       "none": "As entered",

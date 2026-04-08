@@ -2,11 +2,33 @@ import { ApiError, buildUrl, requestJson } from "../auth/authApi";
 
 export type PlaygroundKind = "chat" | "knowledge";
 
+export type PlaygroundKnowledgeSource = {
+  id: string;
+  title?: string | null;
+  snippet?: string | null;
+  text?: string | null;
+  metadata?: Record<string, unknown>;
+  score?: number | null;
+  score_kind?: string | null;
+  relevance_score?: number | null;
+  relevance_kind?: string | null;
+  relevance_components?: {
+    semantic_score?: number;
+    keyword_score?: number;
+  } | null;
+  uri?: string | null;
+  source_type?: string | null;
+};
+
+export type PlaygroundMessageMetadata = Record<string, unknown> & {
+  sources?: PlaygroundKnowledgeSource[];
+};
+
 export type PlaygroundMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  metadata: Record<string, unknown>;
+  metadata: PlaygroundMessageMetadata;
   createdAt: string | null;
 };
 
@@ -82,12 +104,80 @@ export type SendPlaygroundMessageResult = {
   messages: PlaygroundMessage[];
   output: string;
   response?: Record<string, unknown>;
-  sources?: Array<Record<string, unknown>>;
+  sources?: PlaygroundKnowledgeSource[];
   retrieval?: {
     index: string;
     result_count: number;
   };
 };
+
+function stringOrNull(value: unknown): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+function numberOrNull(value: unknown): number | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  return typeof value === "number" ? value : undefined;
+}
+
+export function getPlaygroundMessageSources(
+  metadata: PlaygroundMessageMetadata | Record<string, unknown> | null | undefined,
+): PlaygroundKnowledgeSource[] {
+  const rawSources = Array.isArray(metadata?.sources) ? metadata.sources : [];
+
+  return rawSources.flatMap((source) => {
+    if (!source || typeof source !== "object") {
+      return [];
+    }
+
+    const rawSource = source as Record<string, unknown>;
+    const id = String(rawSource.id ?? "").trim();
+    if (!id) {
+      return [];
+    }
+
+    const rawComponents = rawSource.relevance_components;
+    const relevanceComponents = rawComponents && typeof rawComponents === "object"
+      ? {
+        semantic_score: typeof (rawComponents as Record<string, unknown>).semantic_score === "number"
+          ? (rawComponents as Record<string, unknown>).semantic_score as number
+          : undefined,
+        keyword_score: typeof (rawComponents as Record<string, unknown>).keyword_score === "number"
+          ? (rawComponents as Record<string, unknown>).keyword_score as number
+          : undefined,
+      }
+      : undefined;
+
+    return [{
+      id,
+      title: stringOrNull(rawSource.title),
+      snippet: stringOrNull(rawSource.snippet),
+      text: stringOrNull(rawSource.text),
+      metadata: rawSource.metadata && typeof rawSource.metadata === "object"
+        ? rawSource.metadata as Record<string, unknown>
+        : undefined,
+      score: numberOrNull(rawSource.score),
+      score_kind: stringOrNull(rawSource.score_kind),
+      relevance_score: numberOrNull(rawSource.relevance_score),
+      relevance_kind: stringOrNull(rawSource.relevance_kind),
+      relevance_components: relevanceComponents,
+      uri: stringOrNull(rawSource.uri),
+      source_type: stringOrNull(rawSource.source_type),
+    }];
+  });
+}
 
 export type StreamPlaygroundMessageOptions = {
   onDelta?: (text: string) => void;

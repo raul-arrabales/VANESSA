@@ -487,16 +487,20 @@
       "retrievalSettings": "Configuracion de recuperacion",
       "topK": "Top K",
       "searchMethod": "Metodo de busqueda",
+      "hybridAlpha": "Alpha hibrido",
       "queryPreprocessing": "Preprocesamiento de la consulta",
       "chunkLength": "Longitud del fragmento",
       "chunkMetadata": "Metadatos del fragmento",
       "chunkText": "Texto del fragmento",
       "similarity": "Similitud",
-      "keywordScore": "Puntuacion de palabras clave"
+      "semanticScore": "Puntuacion semantica",
+      "keywordScore": "Puntuacion de palabras clave",
+      "hybridScore": "Puntuacion hibrida"
     },
     "searchMethods": {
       "semantic": "Semantica",
-      "keyword": "Palabras clave"
+      "keyword": "Palabras clave",
+      "hybrid": "Hibrida"
     },
     "queryPreprocessing": {
       "none": "Como se escribio",

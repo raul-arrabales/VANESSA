@@ -12,6 +12,7 @@ from ..services.modelops_common import ModelOpsError
 from ..services.modelops_runtime import ensure_model_invokable
 from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
+from ..services.retrieval_result_projection import normalize_execution_retrieval
 from ..services.runtime_profile_service import resolve_runtime_profile
 
 DEFAULT_TITLE = "New conversation"
@@ -212,7 +213,11 @@ def execute_knowledge_request(
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
             "retrieval": {
                 "index": str(selected_knowledge_base["index_name"]),
+                "query": prompt,
                 "top_k": config.product_rag_top_k,
+                "filters": {},
+                "search_method": "semantic",
+                "query_preprocessing": "none",
             },
         },
         requested_by_user_id=actor_user_id,
@@ -223,7 +228,7 @@ def execute_knowledge_request(
     )
     execution_payload = response_payload.get("execution") if isinstance(response_payload.get("execution"), dict) else {}
     result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
-    sources, retrieval = normalize_execution_sources(execution_payload)
+    sources, retrieval = normalize_execution_retrieval(execution_payload)
     if not 200 <= execution_status < 300:
         raise AgentEngineClientError(
             code="knowledge_chat_failed",
@@ -249,41 +254,3 @@ def list_runtime_knowledge_base_options(
     get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
     platform_runtime = get_active_platform_runtime_impl(database_url, config)
     return list_active_runtime_knowledge_bases(platform_runtime, database_url=database_url), 200
-
-
-def normalize_execution_sources(execution_payload: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    result = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
-    retrieval_calls = result.get("retrieval_calls") if isinstance(result.get("retrieval_calls"), list) else []
-    first_call = retrieval_calls[0] if retrieval_calls and isinstance(retrieval_calls[0], dict) else {}
-    rows = first_call.get("results") if isinstance(first_call.get("results"), list) else []
-    sources = [serialize_source(item) for item in rows if isinstance(item, dict)]
-    retrieval = {
-        "index": str(first_call.get("index", "")).strip(),
-        "result_count": int(first_call.get("result_count", len(sources)) or 0),
-    }
-    return sources, retrieval
-
-
-def serialize_source(result: dict[str, Any]) -> dict[str, Any]:
-    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
-    text = str(result.get("text", "")).strip()
-    title = str(metadata.get("title", "")).strip() or str(result.get("id", "")).strip()
-    uri_raw = metadata.get("uri")
-    source_type_raw = metadata.get("source_type")
-    return {
-        "id": str(result.get("id", "")).strip(),
-        "title": title,
-        "snippet": trim_snippet(text),
-        "uri": string_or_none(uri_raw),
-        "source_type": string_or_none(source_type_raw),
-        "metadata": metadata,
-        "score": result.get("score"),
-        "score_kind": result.get("score_kind"),
-    }
-
-
-def trim_snippet(text: str, limit: int = 220) -> str:
-    normalized = " ".join(text.split())
-    if len(normalized) <= limit:
-        return normalized
-    return normalized[: limit - 1].rstrip() + "…"

@@ -13,7 +13,8 @@ if str(BACKEND_PATH) not in sys.path:
 
 from app.app import app  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
-from app.services import context_management, knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
+from app.repositories import context_management as context_repo  # noqa: E402
+from app.services import knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
 
 
 def _config(**overrides) -> AuthConfig:
@@ -35,7 +36,7 @@ def _config(**overrides) -> AuthConfig:
 
 def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        context_management.context_repo,
+        context_repo,
         "get_knowledge_bases",
         lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
     )
@@ -84,6 +85,9 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                         "retrieval_calls": [
                             {
                                 "index": "knowledge_base",
+                                "top_k": 5,
+                                "search_method": "semantic",
+                                "query_preprocessing": "none",
                                 "result_count": 1,
                                 "results": [
                                     {
@@ -96,6 +100,8 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                                         },
                                         "score": 0.92,
                                         "score_kind": "similarity",
+                                        "relevance_score": 0.92,
+                                        "relevance_kind": "similarity",
                                     }
                                 ],
                             }
@@ -122,7 +128,13 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
     assert status_code == 200
     assert payload["output"] == "retrieval answer"
     assert payload["knowledge_base_id"] == "kb-primary"
-    assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 1}
+    assert payload["retrieval"] == {
+        "index": "knowledge_base",
+        "result_count": 1,
+        "search_method": "semantic",
+        "query_preprocessing": "none",
+        "top_k": 5,
+    }
     assert payload["sources"] == [
         {
             "id": "doc-1",
@@ -137,6 +149,8 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             },
             "score": 0.92,
             "score_kind": "similarity",
+            "relevance_score": 0.92,
+            "relevance_kind": "similarity",
         }
     ]
     assert seen_calls == [
@@ -152,7 +166,14 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                     {"role": "assistant", "content": [{"type": "text", "text": "Previous answer"}]},
                     {"role": "user", "content": [{"type": "text", "text": "How does retrieval work?"}]},
                 ],
-                "retrieval": {"index": "kb_product_docs", "top_k": 5},
+                "retrieval": {
+                    "index": "kb_product_docs",
+                    "query": "How does retrieval work?",
+                    "top_k": 5,
+                    "filters": {},
+                    "search_method": "semantic",
+                    "query_preprocessing": "none",
+                },
             },
             "requested_by_user_id": 7,
             "requested_by_role": "user",
@@ -183,7 +204,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
 
 def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        context_management.context_repo,
+        context_repo,
         "get_knowledge_bases",
         lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
     )
@@ -235,7 +256,16 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
                         "status": "succeeded",
                         "result": {
                             "output_text": "answer",
-                            "retrieval_calls": [{"index": "knowledge_base", "result_count": 0, "results": []}],
+                            "retrieval_calls": [
+                                {
+                                    "index": "knowledge_base",
+                                    "top_k": 5,
+                                    "search_method": "semantic",
+                                    "query_preprocessing": "none",
+                                    "result_count": 0,
+                                    "results": [],
+                                }
+                            ],
                         },
                     }
                 },
@@ -245,12 +275,18 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
 
     assert status_code == 200
     assert payload["sources"] == []
-    assert payload["retrieval"] == {"index": "knowledge_base", "result_count": 0}
+    assert payload["retrieval"] == {
+        "index": "knowledge_base",
+        "result_count": 0,
+        "search_method": "semantic",
+        "query_preprocessing": "none",
+        "top_k": 5,
+    }
 
 
 def test_list_knowledge_chat_knowledge_bases_reports_selection_state(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        context_management.context_repo,
+        context_repo,
         "get_knowledge_bases",
         lambda _db, _ids: [{"id": "kb-primary", "lifecycle_state": "active", "sync_status": "ready"}],
     )

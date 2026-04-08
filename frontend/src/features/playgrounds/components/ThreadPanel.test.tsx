@@ -35,7 +35,19 @@ function buildSession(): PlaygroundSessionViewModel {
         id: "m-assistant",
         role: "assistant",
         content: "Assistant answer",
-        metadata: {},
+        metadata: {
+          sources: [
+            {
+              id: "doc-1",
+              title: "Architecture Overview",
+              text: "A longer retrieval-backed chunk that should be summarized when no snippet exists in the payload.",
+              score: 0.92,
+              score_kind: "similarity",
+              relevance_kind: "similarity",
+              metadata: { source_name: "Docs folder", ignored_empty: "" },
+            },
+          ],
+        },
         createdAt: "2026-03-18T11:00:01Z",
       },
     ],
@@ -73,6 +85,9 @@ describe("ThreadPanel", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "Copy response" })).toHaveLength(1);
+    expect(screen.getByText("Architecture Overview")).toBeVisible();
+    expect(screen.getByText(/A longer retrieval-backed chunk/)).toBeVisible();
+    expect(screen.queryByText(/Similarity/i)).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy response" }));

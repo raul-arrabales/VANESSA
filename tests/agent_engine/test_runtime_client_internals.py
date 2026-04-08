@@ -105,6 +105,7 @@ def test_resolve_runtime_model_identifier_uses_loaded_runtime_fallback(monkeypat
 def test_build_weaviate_query_operation_balances_braces() -> None:
     operation = vector_store.build_weaviate_query_operation(
         class_name="KnowledgeBase",
+        query_text=None,
         embedding=[0.1, 0.2],
         top_k=4,
         filters={"tenant": "ops"},
@@ -112,3 +113,4 @@ def test_build_weaviate_query_operation_balances_braces() -> None:
 
     assert operation["query"].count("{") == operation["query"].count("}")
     assert 'where: { path: ["tenant"], operator: Equal, valueText: "ops" }' in operation["query"]
+    assert operation["score_kind"] == "distance"

@@ -1,15 +1,30 @@
 from __future__ import annotations
 
+"""Agent-engine retrieval execution runtime; canonical contract: docs/services/retrieval_contract.md."""
+
 from json import dumps
 from typing import Any
 
-from ..execution_pipeline.types import RetrievalRequest
 from ..services.policy_runtime_gate import ExecutionBlockedError
 from ..services.runtime_client import (
     EmbeddingsRuntimeClientError,
     VectorStoreRuntimeClientError,
     build_embeddings_runtime_client,
     build_vector_store_runtime_client,
+)
+from .options import normalize_retrieval_request
+from .scoring import (
+    calculate_hybrid_branch_top_k,
+    coerce_query_result_score,
+    fuse_hybrid_results,
+    preprocess_retrieval_query_text,
+    rank_branch_results,
+)
+from .types import (
+    RankedRetrievalResult,
+    RetrievalBranchResult,
+    RetrievalCallMetadata,
+    RetrievalRequest,
 )
 
 
@@ -50,83 +65,6 @@ def _retrieval_dependency_error(exc: EmbeddingsRuntimeClientError) -> ExecutionB
         status_code=500,
         details=exc.details,
     )
-
-
-def normalize_retrieval_request(execution_input: dict[str, Any]) -> RetrievalRequest | None:
-    retrieval = execution_input.get("retrieval")
-    if retrieval is None:
-        return None
-    if not isinstance(retrieval, dict):
-        raise ValueError("invalid_retrieval_input")
-
-    index_name = str(retrieval.get("index", "")).strip()
-    if not index_name:
-        raise ValueError("invalid_retrieval_input")
-
-    raw_query = retrieval.get("query")
-    if raw_query is not None:
-        query_text = str(raw_query).strip()
-        if not query_text:
-            raise ValueError("invalid_retrieval_input")
-    else:
-        query_text = _derive_retrieval_query(execution_input)
-        if not query_text:
-            raise ValueError("invalid_retrieval_input")
-
-    top_k = retrieval.get("top_k", 5)
-    if isinstance(top_k, bool):
-        raise ValueError("invalid_retrieval_input")
-    try:
-        normalized_top_k = int(top_k)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("invalid_retrieval_input") from exc
-    if normalized_top_k <= 0:
-        raise ValueError("invalid_retrieval_input")
-
-    filters = retrieval.get("filters", {})
-    if filters is None:
-        filters = {}
-    if not isinstance(filters, dict):
-        raise ValueError("invalid_retrieval_input")
-
-    normalized_filters: dict[str, Any] = {}
-    for key, value in filters.items():
-        normalized_key = str(key).strip()
-        if not normalized_key:
-            raise ValueError("invalid_retrieval_input")
-        if isinstance(value, bool):
-            normalized_filters[normalized_key] = value
-            continue
-        if isinstance(value, (int, float, str)):
-            normalized_filters[normalized_key] = value
-            continue
-        raise ValueError("invalid_retrieval_input")
-
-    return RetrievalRequest(
-        index=index_name,
-        query=query_text,
-        top_k=normalized_top_k,
-        filters=normalized_filters,
-    )
-
-
-def _derive_retrieval_query(execution_input: dict[str, Any]) -> str:
-    prompt = str(execution_input.get("prompt", "")).strip()
-    if prompt:
-        return prompt
-
-    raw_messages = execution_input.get("messages")
-    if not isinstance(raw_messages, list):
-        return ""
-    for item in reversed(raw_messages):
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("role", "")).strip().lower() != "user":
-            continue
-        text = _message_text(item.get("content"))
-        if text:
-            return text
-    return ""
 
 
 def coerce_execution_messages(execution_input: dict[str, Any]) -> list[dict[str, Any]]:
@@ -172,21 +110,176 @@ def _coerce_messages(messages: list[Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def _message_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content.strip()
-    if not isinstance(content, list):
-        return ""
-    text_parts: list[str] = []
-    for part in content:
-        if not isinstance(part, dict):
+def _raise_vector_blocked_error(exc: VectorStoreRuntimeClientError) -> None:
+    if exc.code == "vector_runtime_timeout":
+        raise ExecutionBlockedError(
+            code="EXEC_TIMEOUT",
+            message="Execution timed out",
+            status_code=504,
+            details=exc.details,
+        ) from exc
+    if exc.code in {"vector_runtime_unreachable", "vector_runtime_upstream_unavailable"}:
+        raise ExecutionBlockedError(
+            code="EXEC_UPSTREAM_UNAVAILABLE",
+            message="Upstream LLM/tool dependency unavailable",
+            status_code=503,
+            details=exc.details,
+        ) from exc
+    raise ExecutionBlockedError(
+        code="EXEC_INTERNAL_ERROR",
+        message="Execution failed internally",
+        status_code=500,
+        details=exc.details,
+    ) from exc
+
+
+def _build_embedding_call(runtime_snapshot: dict[str, Any], embedding_payload: dict[str, Any]) -> dict[str, Any]:
+    embeddings_binding = runtime_snapshot.get("capabilities", {}).get("embeddings", {})
+    deployment_profile = runtime_snapshot.get("deployment_profile", {})
+    return {
+        "provider_slug": embeddings_binding.get("slug"),
+        "provider_key": embeddings_binding.get("provider_key"),
+        "deployment_profile_slug": deployment_profile.get("slug"),
+        "requested_model": embedding_payload.get("requested_model"),
+        "input_count": 1,
+        "dimension": int(embedding_payload.get("dimension", 0) or 0),
+        "status_code": int(embedding_payload.get("status_code", 200) or 200),
+    }
+
+
+def _coerce_branch_results(raw_results: Any) -> list[RetrievalBranchResult]:
+    if not isinstance(raw_results, list):
+        return []
+    branch_results: list[RetrievalBranchResult] = []
+    for item in raw_results:
+        if not isinstance(item, dict):
             continue
-        if str(part.get("type", "")).strip().lower() != "text":
+        result_id = str(item.get("id") or "").strip()
+        if not result_id:
             continue
-        text = str(part.get("text", "")).strip()
-        if text:
-            text_parts.append(text)
-    return "\n".join(text_parts)
+        branch_results.append(
+            RetrievalBranchResult(
+                id=result_id,
+                text=str(item.get("text") or ""),
+                metadata=item.get("metadata") if isinstance(item.get("metadata"), dict) else {},
+                score=coerce_query_result_score(item.get("score")),
+                score_kind=str(item.get("score_kind") or "").strip().lower(),
+            )
+        )
+    return branch_results
+
+
+def _run_vector_query(
+    client: Any,
+    *,
+    retrieval_request: RetrievalRequest,
+    query_text: str,
+    search_method: str,
+    embedding: list[float] | None,
+    top_k: int,
+) -> tuple[str, list[RetrievalBranchResult]]:
+    query_payload = client.query(
+        index_name=retrieval_request.index,
+        search_method=search_method,
+        embedding=embedding,
+        top_k=top_k,
+        filters=dict(retrieval_request.filters),
+        query_text=query_text,
+    )
+    query_index = str(query_payload.get("index") or retrieval_request.index).strip() or retrieval_request.index
+    return query_index, _coerce_branch_results(query_payload.get("results"))
+
+
+def _semantic_retrieval(
+    *,
+    runtime_snapshot: dict[str, Any],
+    retrieval_request: RetrievalRequest,
+    processed_query_text: str,
+    top_k: int,
+) -> tuple[dict[str, Any], str, list[RankedRetrievalResult]]:
+    embeddings_client = build_embeddings_runtime_client(runtime_snapshot)
+    embedding_payload = embeddings_client.embed_texts(texts=[processed_query_text])
+    vector_client = build_vector_store_runtime_client(runtime_snapshot)
+    query_index, branch_results = _run_vector_query(
+        vector_client,
+        retrieval_request=retrieval_request,
+        query_text=processed_query_text,
+        search_method="semantic",
+        embedding=list(embedding_payload["embeddings"][0]),
+        top_k=top_k,
+    )
+    return _build_embedding_call(runtime_snapshot, embedding_payload), query_index, rank_branch_results(
+        branch_results,
+        search_method="semantic",
+    )
+
+
+def _keyword_retrieval(
+    *,
+    runtime_snapshot: dict[str, Any],
+    retrieval_request: RetrievalRequest,
+    processed_query_text: str,
+    top_k: int,
+) -> tuple[str, list[RankedRetrievalResult]]:
+    vector_client = build_vector_store_runtime_client(runtime_snapshot)
+    query_index, branch_results = _run_vector_query(
+        vector_client,
+        retrieval_request=retrieval_request,
+        query_text=processed_query_text,
+        search_method="keyword",
+        embedding=None,
+        top_k=top_k,
+    )
+    return query_index, rank_branch_results(branch_results, search_method="keyword")
+
+
+def _serialize_ranked_result(result: RankedRetrievalResult) -> dict[str, Any]:
+    payload = {
+        "id": result.id,
+        "text": result.text,
+        "metadata": result.metadata,
+        "score": result.score,
+        "score_kind": result.score_kind,
+        "relevance_score": result.relevance_score,
+        "relevance_kind": result.relevance_kind,
+    }
+    if result.relevance_components is not None:
+        components = {
+            key: value
+            for key, value in {
+                "semantic_score": result.relevance_components.semantic_score,
+                "keyword_score": result.relevance_components.keyword_score,
+            }.items()
+            if isinstance(value, (int, float))
+        }
+        if components:
+            payload["relevance_components"] = components
+    return payload
+
+
+def _serialize_retrieval_call(
+    runtime_snapshot: dict[str, Any],
+    *,
+    metadata: RetrievalCallMetadata,
+    results: list[RankedRetrievalResult],
+) -> dict[str, Any]:
+    vector_binding = runtime_snapshot.get("capabilities", {}).get("vector_store", {})
+    deployment_profile = runtime_snapshot.get("deployment_profile", {})
+    payload = {
+        "provider_slug": vector_binding.get("slug"),
+        "provider_key": vector_binding.get("provider_key"),
+        "deployment_profile_slug": deployment_profile.get("slug"),
+        "index": metadata.index,
+        "query": metadata.query,
+        "top_k": metadata.top_k,
+        "search_method": metadata.search_method,
+        "query_preprocessing": metadata.query_preprocessing,
+        "result_count": metadata.result_count,
+        "results": [_serialize_ranked_result(item) for item in results],
+    }
+    if metadata.hybrid_alpha is not None:
+        payload["hybrid_alpha"] = metadata.hybrid_alpha
+    return payload
 
 
 def execute_retrieval_call(
@@ -198,17 +291,55 @@ def execute_retrieval_call(
         return None, None, []
 
     runtime_snapshot = platform_runtime if isinstance(platform_runtime, dict) else {}
-    try:
-        embeddings_client = build_embeddings_runtime_client(runtime_snapshot)
-        embedding_payload = embeddings_client.embed_texts(texts=[retrieval_request.query])
-        client = build_vector_store_runtime_client(runtime_snapshot)
-        query_payload = client.query(
-            index_name=retrieval_request.index,
-            embedding=list(embedding_payload["embeddings"][0]),
-            top_k=retrieval_request.top_k,
-            filters=dict(retrieval_request.filters),
-            query_text=retrieval_request.query,
+    processed_query_text = preprocess_retrieval_query_text(
+        retrieval_request.query,
+        query_preprocessing=retrieval_request.query_preprocessing,
+    )
+    if not processed_query_text:
+        raise ExecutionBlockedError(
+            code="EXEC_INTERNAL_ERROR",
+            message="Execution failed internally",
+            status_code=500,
+            details={"reason": "retrieval_query_empty_after_preprocessing"},
         )
+
+    embedding_call: dict[str, Any] | None = None
+    try:
+        if retrieval_request.search_method == "semantic":
+            embedding_call, query_index, ranked_results = _semantic_retrieval(
+                runtime_snapshot=runtime_snapshot,
+                retrieval_request=retrieval_request,
+                processed_query_text=processed_query_text,
+                top_k=retrieval_request.top_k,
+            )
+        elif retrieval_request.search_method == "keyword":
+            query_index, ranked_results = _keyword_retrieval(
+                runtime_snapshot=runtime_snapshot,
+                retrieval_request=retrieval_request,
+                processed_query_text=processed_query_text,
+                top_k=retrieval_request.top_k,
+            )
+        else:
+            branch_top_k = calculate_hybrid_branch_top_k(retrieval_request.top_k)
+            embedding_call, semantic_index, semantic_results = _semantic_retrieval(
+                runtime_snapshot=runtime_snapshot,
+                retrieval_request=retrieval_request,
+                processed_query_text=processed_query_text,
+                top_k=branch_top_k,
+            )
+            keyword_index, keyword_results = _keyword_retrieval(
+                runtime_snapshot=runtime_snapshot,
+                retrieval_request=retrieval_request,
+                processed_query_text=processed_query_text,
+                top_k=branch_top_k,
+            )
+            query_index = semantic_index or keyword_index or retrieval_request.index
+            ranked_results = fuse_hybrid_results(
+                semantic_results,
+                keyword_results,
+                hybrid_alpha=retrieval_request.hybrid_alpha if retrieval_request.hybrid_alpha is not None else 0.5,
+                top_k=retrieval_request.top_k,
+            )
     except EmbeddingsRuntimeClientError as exc:
         if exc.code == "embeddings_runtime_timeout":
             raise ExecutionBlockedError(
@@ -226,51 +357,22 @@ def execute_retrieval_call(
             ) from exc
         raise _retrieval_dependency_error(exc) from exc
     except VectorStoreRuntimeClientError as exc:
-        if exc.code == "vector_runtime_timeout":
-            raise ExecutionBlockedError(
-                code="EXEC_TIMEOUT",
-                message="Execution timed out",
-                status_code=504,
-                details=exc.details,
-            ) from exc
-        if exc.code in {"vector_runtime_unreachable", "vector_runtime_upstream_unavailable"}:
-            raise ExecutionBlockedError(
-                code="EXEC_UPSTREAM_UNAVAILABLE",
-                message="Upstream LLM/tool dependency unavailable",
-                status_code=503,
-                details=exc.details,
-            ) from exc
-        raise ExecutionBlockedError(
-            code="EXEC_INTERNAL_ERROR",
-            message="Execution failed internally",
-            status_code=500,
-            details=exc.details,
-        ) from exc
+        _raise_vector_blocked_error(exc)
 
-    embeddings_binding = runtime_snapshot.get("capabilities", {}).get("embeddings", {})
-    vector_binding = runtime_snapshot.get("capabilities", {}).get("vector_store", {})
-    deployment_profile = runtime_snapshot.get("deployment_profile", {})
-    results = query_payload.get("results") if isinstance(query_payload.get("results"), list) else []
-    embedding_call = {
-        "provider_slug": embeddings_binding.get("slug"),
-        "provider_key": embeddings_binding.get("provider_key"),
-        "deployment_profile_slug": deployment_profile.get("slug"),
-        "requested_model": embedding_payload.get("requested_model"),
-        "input_count": 1,
-        "dimension": int(embedding_payload.get("dimension", 0) or 0),
-        "status_code": int(embedding_payload.get("status_code", 200) or 200),
-    }
-    retrieval_call = {
-        "provider_slug": vector_binding.get("slug"),
-        "provider_key": vector_binding.get("provider_key"),
-        "deployment_profile_slug": deployment_profile.get("slug"),
-        "index": retrieval_request.index,
-        "query": retrieval_request.query,
-        "top_k": retrieval_request.top_k,
-        "result_count": len(results),
-        "results": results,
-    }
-    return embedding_call, retrieval_call, results
+    retrieval_call = _serialize_retrieval_call(
+        runtime_snapshot,
+        metadata=RetrievalCallMetadata(
+            index=query_index,
+            query=processed_query_text,
+            top_k=retrieval_request.top_k,
+            search_method=retrieval_request.search_method,
+            query_preprocessing=retrieval_request.query_preprocessing,
+            hybrid_alpha=retrieval_request.hybrid_alpha if retrieval_request.search_method == "hybrid" else None,
+            result_count=len(ranked_results),
+        ),
+        results=ranked_results,
+    )
+    return embedding_call, retrieval_call, retrieval_call["results"]
 
 
 def prepend_retrieval_context(

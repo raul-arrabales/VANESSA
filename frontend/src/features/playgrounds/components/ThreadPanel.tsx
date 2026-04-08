@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type R
 import { useTranslation } from "react-i18next";
 import ChatMessageBody from "../../../components/ChatMessageBody";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import { getPlaygroundMessageSources } from "../../../api/playgrounds";
+import KnowledgeSourcesList from "../../ai-shared/KnowledgeSourcesList";
+import { mapPlaygroundKnowledgeSourceToDisplayItem } from "../../ai-shared/retrieval";
 import type { PlaygroundSessionViewModel } from "../types";
 
 type ThreadPanelProps = {
@@ -82,9 +85,8 @@ export default function ThreadPanel({
       >
         {activeSession?.messages.length
           ? activeSession.messages.map((message) => {
-            const sources = Array.isArray(message.metadata.sources)
-              ? message.metadata.sources as Array<Record<string, unknown>>
-              : [];
+            const sourceItems = getPlaygroundMessageSources(message.metadata)
+              .map((source) => mapPlaygroundKnowledgeSourceToDisplayItem(source));
             return (
               <article
                 key={message.id}
@@ -95,15 +97,8 @@ export default function ThreadPanel({
                     content={message.content}
                     renderMarkdown={message.role === "assistant"}
                   />
-                  {message.role === "assistant" && sources.length > 0 ? (
-                    <div className="card-stack">
-                      {sources.map((source, index) => (
-                        <div key={String(source.id ?? source.title ?? index)} className="panel">
-                          <strong>{String(source.title ?? source.id ?? "Source")}</strong>
-                          <p>{String(source.snippet ?? "")}</p>
-                        </div>
-                      ))}
-                    </div>
+                  {message.role === "assistant" && sourceItems.length > 0 ? (
+                    <KnowledgeSourcesList items={sourceItems} />
                   ) : null}
                   {message.role === "assistant" ? (
                     <div

@@ -412,61 +412,69 @@ def build_knowledge_base_binding_resource(knowledge_base: dict[str, Any]) -> dic
         },
     }
 
-
-def _normalize_query_top_k(value: Any) -> int:
-    if value is None:
-        return 5
-    if isinstance(value, bool):
-        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400)
-    try:
-        top_k = int(value)
-    except (TypeError, ValueError) as exc:
-        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400) from exc
-    if top_k <= 0:
-        raise PlatformControlPlaneError("invalid_top_k", "top_k must be a positive integer", status_code=400)
-    return top_k
-
-
-def _normalize_query_search_method(value: Any) -> str:
-    normalized = str(value or "semantic").strip().lower() or "semantic"
-    if normalized not in {"semantic", "keyword"}:
-        raise PlatformControlPlaneError(
-            "invalid_search_method",
-            "search_method must be one of semantic or keyword",
-            status_code=400,
-        )
-    return normalized
-
-
-def _normalize_query_preprocessing(value: Any) -> str:
-    normalized = str(value or "none").strip().lower() or "none"
-    if normalized not in {"none", "normalize"}:
-        raise PlatformControlPlaneError(
-            "invalid_query_preprocessing",
-            "query_preprocessing must be one of none or normalize",
-            status_code=400,
-        )
-    return normalized
-
-
 def _serialize_query_result(
-    result: dict[str, Any],
+    result: Any,
     *,
     chunk_length_tokens: int | None = None,
     relevance_score: float | None = None,
     relevance_kind: str | None = None,
+    relevance_components: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
-    text = " ".join(str(result.get("text") or "").split())
-    title = str(metadata.get("title") or result.get("id") or "").strip()
-    return {
-        "id": str(result.get("id") or "").strip(),
+    result_metadata = getattr(result, "metadata", None)
+    if not isinstance(result_metadata, dict) and isinstance(result, dict):
+        result_metadata = result.get("metadata")
+    metadata = result_metadata if isinstance(result_metadata, dict) else {}
+    result_text = getattr(result, "text", None)
+    if result_text is None and isinstance(result, dict):
+        result_text = result.get("text")
+    text = " ".join(str(result_text or "").split())
+    result_id = getattr(result, "id", None)
+    if result_id is None and isinstance(result, dict):
+        result_id = result.get("id")
+    title = str(metadata.get("title") or result_id or "").strip()
+    result_relevance_score = relevance_score
+    if result_relevance_score is None:
+        result_relevance_score = getattr(result, "relevance_score", None)
+        if result_relevance_score is None and isinstance(result, dict):
+            result_relevance_score = result.get("relevance_score")
+    result_relevance_kind = relevance_kind
+    if result_relevance_kind is None:
+        result_relevance_kind = getattr(result, "relevance_kind", None)
+        if result_relevance_kind is None and isinstance(result, dict):
+            result_relevance_kind = result.get("relevance_kind")
+    result_relevance_components = relevance_components
+    if result_relevance_components is None:
+        raw_components = getattr(result, "relevance_components", None)
+        if raw_components is None and isinstance(result, dict):
+            raw_components = result.get("relevance_components")
+        if raw_components is not None:
+            result_relevance_components = {
+                key: value
+                for key, value in {
+                    "semantic_score": getattr(raw_components, "semantic_score", None)
+                    if not isinstance(raw_components, dict)
+                    else raw_components.get("semantic_score"),
+                    "keyword_score": getattr(raw_components, "keyword_score", None)
+                    if not isinstance(raw_components, dict)
+                    else raw_components.get("keyword_score"),
+                }.items()
+                if isinstance(value, (int, float))
+            }
+    serialized = {
+        "id": str(result_id or "").strip(),
         "title": title,
         "text": text,
         "uri": str(metadata.get("uri") or "").strip() or None,
         "source_type": str(metadata.get("source_type") or "").strip() or None,
         "metadata": metadata,
         "chunk_length_tokens": chunk_length_tokens if isinstance(chunk_length_tokens, int) and chunk_length_tokens >= 0 else 0,
-        "relevance_score": float(relevance_score) if isinstance(relevance_score, (int, float)) else 0.0,
-        "relevance_kind": str(relevance_kind or "").strip() or "similarity",
+        "relevance_score": float(result_relevance_score) if isinstance(result_relevance_score, (int, float)) else 0.0,
+        "relevance_kind": str(result_relevance_kind or "").strip() or "similarity",
     }
+    if isinstance(result_relevance_components, dict) and result_relevance_components:
+        serialized["relevance_components"] = {
+            key: float(value)
+            for key, value in result_relevance_components.items()
+            if key in {"semantic_score", "keyword_score"} and isinstance(value, (int, float))
+        }
+    return serialized

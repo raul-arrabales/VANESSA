@@ -468,6 +468,77 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
     assert response.get_json()["results"][0]["relevance_kind"] == "keyword_score"
 
 
+def test_query_knowledge_base_route_accepts_hybrid_search_parameters(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-hybrid-query@example.com",
+        username="admin-hybrid-query",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        context_routes,
+        "query_knowledge_base",
+        lambda *_args, **_kwargs: captured.update(_kwargs) or {
+            "knowledge_base_id": "kb-primary",
+            "retrieval": {
+                "index": "kb_product_docs",
+                "result_count": 1,
+                "top_k": 5,
+                "search_method": "hybrid",
+                "query_preprocessing": "normalize",
+                "hybrid_alpha": 0.65,
+            },
+            "results": [
+                {
+                    "id": "doc-2",
+                    "title": "FAQ",
+                    "text": "Hybrid retrieval result",
+                    "chunk_length_tokens": 8,
+                    "relevance_score": 0.812,
+                    "relevance_kind": "hybrid_score",
+                    "relevance_components": {"semantic_score": 0.74, "keyword_score": 0.95},
+                    "metadata": {"document_id": "doc-2"},
+                }
+            ],
+        },
+    )
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/query",
+        headers=_auth(token),
+        json={
+            "query_text": "raul",
+            "top_k": 5,
+            "search_method": "hybrid",
+            "query_preprocessing": "normalize",
+            "hybrid_alpha": 0.65,
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["knowledge_base_id"] == "kb-primary"
+    assert captured["payload"] == {
+        "query_text": "raul",
+        "top_k": 5,
+        "search_method": "hybrid",
+        "query_preprocessing": "normalize",
+        "hybrid_alpha": 0.65,
+    }
+    assert response.get_json()["retrieval"]["search_method"] == "hybrid"
+    assert response.get_json()["retrieval"]["hybrid_alpha"] == 0.65
+    assert response.get_json()["results"][0]["relevance_kind"] == "hybrid_score"
+    assert response.get_json()["results"][0]["relevance_components"] == {
+        "semantic_score": 0.74,
+        "keyword_score": 0.95,
+    }
+
+
 def test_list_knowledge_sources_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(

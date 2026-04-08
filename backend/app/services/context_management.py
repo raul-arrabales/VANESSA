@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from ..repositories import context_management as context_repo
+"""Public context-management service facade for cross-domain callers."""
+
 from .context_management_documents import (
     create_knowledge_base_document,
     delete_knowledge_base_document,
@@ -9,20 +10,6 @@ from .context_management_documents import (
     update_knowledge_base_document,
     upload_knowledge_base_documents,
 )
-from .context_management_ingestion import (
-    _documents_from_json_payload,
-    _document_from_json_item,
-    _extract_pdf_document,
-    _get_pdf_reader_dependencies,
-    _iter_source_files,
-    _parse_ingestion_documents,
-    _parse_source_documents,
-    _parse_upload_documents,
-    _read_ingestion_bytes,
-    _source_document_changed,
-    _source_document_id,
-    _source_document_key,
-)
 from .context_management_knowledge_bases import (
     create_knowledge_base,
     delete_knowledge_base,
@@ -30,83 +17,30 @@ from .context_management_knowledge_bases import (
     list_knowledge_bases,
     update_knowledge_base,
 )
-from .context_management_schema_profiles import create_schema_profile, list_schema_profiles
 from .context_management_runtime import (
     list_active_runtime_knowledge_bases,
     query_knowledge_base,
     resolve_runtime_knowledge_base_selection,
 )
-from .context_management_vectorization import list_vectorization_options
-from .context_management_serialization import (
-    _default_index_name,
-    _normalize_document_payload,
-    _normalize_glob_list,
-    _normalize_knowledge_base_payload,
-    _normalize_knowledge_source_payload,
-    _normalize_query_top_k,
-    _normalize_schema,
-    _normalize_schema_profile_payload,
-    _serialize_document,
-    _serialize_knowledge_base,
-    _serialize_knowledge_source,
-    _serialize_query_result,
-    _serialize_runtime_knowledge_base,
-    _serialize_schema_profile,
-    _serialize_sync_run,
-    build_knowledge_base_binding_resource,
-)
-from .context_management_shared import (
-    _chunk_document_id,
-    _chunk_document_text,
-    _chunk_knowledge_base_text,
-    _delete_document_chunks,
-    _ensure_knowledge_base_index,
-    _is_knowledge_base_eligible,
-    _mark_knowledge_base_sync_error,
-    _mark_knowledge_base_sync_ready,
-    _mark_knowledge_base_syncing,
-    _normalize_source_relative_path,
-    _refresh_document_count,
-    _require_knowledge_base,
-    _require_knowledge_source,
-    _resolve_knowledge_base_vector_adapter,
-    _resolve_source_directory,
-    _upsert_document_chunks,
-)
+from .context_management_schema_profiles import create_schema_profile, list_schema_profiles
+from .context_management_serialization import build_knowledge_base_binding_resource
 from .context_management_sources import (
-    _sync_knowledge_source_documents,
     create_knowledge_source,
     delete_knowledge_source,
-    list_source_directories,
     list_knowledge_base_sync_runs,
     list_knowledge_sources,
+    list_source_directories,
     sync_knowledge_source,
     update_knowledge_source,
 )
-from .context_management_types import (
-    _DEFAULT_CHUNK_SIZE,
-    _KB_LIFECYCLE_STATES,
-    _KB_SYNC_STATES,
-    _MAX_FILE_SIZE_BYTES,
-    _MAX_UPLOAD_DOCUMENTS,
-    _MAX_UPLOAD_FILES,
-    _SOURCE_LIFECYCLE_STATES,
-    _SOURCE_SYNC_STATES,
-    _SOURCE_TYPES,
-    _SUPPORTED_SCHEMA_PROPERTY_TYPES,
-    _SUPPORTED_UPLOAD_EXTENSIONS,
-)
+from .context_management_vectorization import list_vectorization_options
 
 __all__ = [
     "build_knowledge_base_binding_resource",
-    "context_repo",
-    "_chunk_document_id",
-    "_chunk_document_text",
-    "_chunk_knowledge_base_text",
     "create_knowledge_base",
     "create_knowledge_base_document",
-    "create_schema_profile",
     "create_knowledge_source",
+    "create_schema_profile",
     "delete_knowledge_base",
     "delete_knowledge_base_document",
     "delete_knowledge_source",
@@ -115,10 +49,10 @@ __all__ = [
     "list_knowledge_base_documents",
     "list_knowledge_base_sync_runs",
     "list_knowledge_bases",
+    "list_knowledge_sources",
     "list_schema_profiles",
     "list_source_directories",
     "list_vectorization_options",
-    "list_knowledge_sources",
     "query_knowledge_base",
     "resolve_runtime_knowledge_base_selection",
     "resync_knowledge_base",

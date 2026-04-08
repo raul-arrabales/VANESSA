@@ -12,6 +12,7 @@ export default function ContextKnowledgeBaseRetrievalPage(): JSX.Element {
           retrievalQuery={detail.retrievalQuery}
           retrievalTopK={detail.retrievalTopK}
           retrievalSearchMethod={detail.retrievalSearchMethod}
+          retrievalHybridAlpha={detail.retrievalHybridAlpha}
           retrievalQueryPreprocessing={detail.retrievalQueryPreprocessing}
           retrievalResults={detail.retrievalResults}
           retrievalResultCount={detail.retrievalResultCount}
@@ -19,6 +20,7 @@ export default function ContextKnowledgeBaseRetrievalPage(): JSX.Element {
           onQueryChange={detail.setRetrievalQuery}
           onTopKChange={detail.setRetrievalTopK}
           onSearchMethodChange={detail.setRetrievalSearchMethod}
+          onHybridAlphaChange={detail.setRetrievalHybridAlpha}
           onQueryPreprocessingChange={detail.setRetrievalQueryPreprocessing}
           onSubmit={detail.handleTestRetrieval}
         />

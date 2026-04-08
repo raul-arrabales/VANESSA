@@ -20,53 +20,6 @@ from .platform_types import PlatformControlPlaneError
 from .runtime_profile_service import resolve_runtime_profile
 
 
-def _trim_snippet(text: str, limit: int = 220) -> str:
-    normalized = " ".join(text.split())
-    if len(normalized) <= limit:
-        return normalized
-    return normalized[: limit - 1].rstrip() + "…"
-
-
-def _serialize_source(result: dict[str, Any]) -> dict[str, Any]:
-    metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
-    text = str(result.get("text", "")).strip()
-    title = str(metadata.get("title", "")).strip() or str(result.get("id", "")).strip()
-    uri_raw = metadata.get("uri")
-    uri = str(uri_raw).strip() if uri_raw is not None else ""
-    source_type_raw = metadata.get("source_type")
-    source_type = str(source_type_raw).strip() if source_type_raw is not None else ""
-    return {
-        "id": str(result.get("id", "")).strip(),
-        "title": title,
-        "snippet": _trim_snippet(text),
-        "uri": uri or None,
-        "source_type": source_type or None,
-        "metadata": metadata,
-        "score": result.get("score"),
-        "score_kind": result.get("score_kind"),
-    }
-
-
-def _normalize_sources(execution_payload: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    result = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
-    retrieval_calls = result.get("retrieval_calls") if isinstance(result.get("retrieval_calls"), list) else []
-    first_call = retrieval_calls[0] if retrieval_calls and isinstance(retrieval_calls[0], dict) else {}
-    rows = first_call.get("results") if isinstance(first_call.get("results"), list) else []
-    sources = [_serialize_source(item) for item in rows if isinstance(item, dict)]
-    retrieval = {
-        "index": str(first_call.get("index", "")).strip(),
-        "result_count": int(first_call.get("result_count", len(sources)) or 0),
-    }
-    return sources, retrieval
-
-
-def _build_execution_messages(prompt: str, history: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        *history,
-        {"role": "user", "content": [{"type": "text", "text": prompt}]},
-    ]
-
-
 def resolve_model_for_inference(
     database_url: str,
     *,

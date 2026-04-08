@@ -1,48 +1,35 @@
 from __future__ import annotations
 
-import unicodedata
 from typing import Any
 
 from ..repositories import context_management as context_repo
+from .context_management_retrieval_options import normalize_knowledge_base_retrieval_options
+from .context_management_retrieval_pipeline import run_knowledge_base_retrieval
+from .context_management_retrieval_types import KnowledgeBaseRankedRetrievalResult
 from .context_management_serialization import (
-    _normalize_query_preprocessing,
-    _normalize_query_search_method,
-    _normalize_query_top_k,
     _serialize_query_result,
     _serialize_runtime_knowledge_base,
 )
 from .context_management_chunking import resolve_knowledge_base_tokenizer
 from .context_management_shared import _is_knowledge_base_eligible, _require_knowledge_base
 from .context_management_vectorization import (
-    embed_knowledge_base_texts,
     require_knowledge_base_query_supported,
-    validate_runtime_vectorization_compatibility,
 )
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 
-def _normalize_query_result_relevance(result: dict[str, Any], *, search_method: str) -> tuple[float, str]:
-    raw_score = result.get("score")
-    try:
-        score = float(raw_score)
-    except (TypeError, ValueError):
-        score = 0.0
-    if search_method == "keyword":
-        return score, "keyword_score"
-    score_kind = str(result.get("score_kind") or "").strip().lower()
-    if score_kind == "distance":
-        return 1.0 - score, "similarity"
-    return score, "similarity"
-
-
-def _preprocess_query_text(query_text: str, *, query_preprocessing: str) -> str:
-    if query_preprocessing != "normalize":
-        return query_text
-    decomposed = unicodedata.normalize("NFKD", query_text)
-    without_diacritics = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    lowered = without_diacritics.lower()
-    normalized_chars = [ch if ch.isalnum() or ch.isspace() else " " for ch in lowered]
-    return " ".join("".join(normalized_chars).split())
+def _serialize_ranked_query_results(
+    ranked_results: list[KnowledgeBaseRankedRetrievalResult],
+    *,
+    tokenizer: Any,
+) -> list[dict[str, Any]]:
+    return [
+        _serialize_query_result(
+            item,
+            chunk_length_tokens=len(tokenizer.encode(item.text.strip())),
+        )
+        for item in ranked_results
+    ]
 
 
 def query_knowledge_base(
@@ -52,7 +39,7 @@ def query_knowledge_base(
     knowledge_base_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    from .platform_service import resolve_embeddings_adapter, resolve_vector_store_adapter
+    from .platform_service import resolve_vector_store_adapter
 
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
     if not _is_knowledge_base_eligible(knowledge_base):
@@ -62,19 +49,7 @@ def query_knowledge_base(
             status_code=409,
             details={"knowledge_base_id": knowledge_base_id},
         )
-    query_text = str(payload.get("query_text") or "").strip()
-    if not query_text:
-        raise PlatformControlPlaneError("invalid_query_text", "query_text must be a non-empty string", status_code=400)
-    top_k = _normalize_query_top_k(payload.get("top_k"))
-    search_method = _normalize_query_search_method(payload.get("search_method"))
-    query_preprocessing = _normalize_query_preprocessing(payload.get("query_preprocessing"))
-    processed_query_text = _preprocess_query_text(query_text, query_preprocessing=query_preprocessing)
-    if not processed_query_text:
-        raise PlatformControlPlaneError(
-            "invalid_query_text",
-            "query_text must remain non-empty after preprocessing",
-            status_code=400,
-        )
+    options = normalize_knowledge_base_retrieval_options(payload)
     require_knowledge_base_query_supported(knowledge_base)
     vector_adapter = resolve_vector_store_adapter(database_url, config)
     if str(vector_adapter.binding.provider_instance_id or "").strip() != str(knowledge_base.get("backing_provider_instance_id") or "").strip():
@@ -90,61 +65,25 @@ def query_knowledge_base(
                 "active_provider_key": vector_adapter.binding.provider_key,
             },
         )
-    query_embedding: list[float] | None = None
-    adapter_query_text: str | None = processed_query_text
-    if search_method == "semantic":
-        active_embeddings_adapter = resolve_embeddings_adapter(database_url, config)
-        validate_runtime_vectorization_compatibility(
-            knowledge_base,
-            active_embeddings_binding=active_embeddings_adapter.binding,
-        )
-        embedding_payload = embed_knowledge_base_texts(
-            database_url,
-            config=config,
-            knowledge_base=knowledge_base,
-            texts=[processed_query_text],
-        )
-        query_embedding = embedding_payload["embeddings"][0]
-        adapter_query_text = None
-    query_payload = vector_adapter.query(
-        index_name=str(knowledge_base["index_name"]),
-        query_text=adapter_query_text,
-        embedding=query_embedding,
-        top_k=top_k,
-        filters={},
+    retrieval_execution = run_knowledge_base_retrieval(
+        database_url,
+        config=config,
+        knowledge_base=knowledge_base,
+        vector_adapter=vector_adapter,
+        options=options,
     )
-    results = query_payload.get("results") if isinstance(query_payload.get("results"), list) else []
     tokenizer = resolve_knowledge_base_tokenizer(database_url, knowledge_base=knowledge_base)
-    normalized_results = sorted(
-        [
-            {
-                **item,
-                "relevance": _normalize_query_result_relevance(item, search_method=search_method),
-            }
-            for item in results
-            if isinstance(item, dict)
-        ],
-        key=lambda item: item["relevance"][0],
-        reverse=True,
-    )
     return {
         "knowledge_base_id": str(knowledge_base["id"]),
         "retrieval": {
-            "index": str(query_payload.get("index") or knowledge_base.get("index_name") or "").strip(),
-            "result_count": len(normalized_results),
-            "top_k": top_k,
-            "search_method": search_method,
-            "query_preprocessing": query_preprocessing,
+            "index": retrieval_execution.index,
+            "result_count": len(retrieval_execution.results),
+            "top_k": options.top_k,
+            "search_method": options.search_method,
+            "query_preprocessing": options.query_preprocessing,
+            **({"hybrid_alpha": options.hybrid_alpha} if options.hybrid_alpha is not None else {}),
         },
-        "results": [
-            _serialize_query_result(
-                item,
-                chunk_length_tokens=len(tokenizer.encode(str(item.get("text") or "").strip())),
-                relevance_score=item["relevance"][0],
-                relevance_kind=item["relevance"][1],
-            )
-            for item in normalized_results
-        ],
+        "results": _serialize_ranked_query_results(retrieval_execution.results, tokenizer=tokenizer),
     }
 
 

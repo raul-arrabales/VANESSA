@@ -16,7 +16,8 @@ Notes:
 - Public `/v1/agent-executions*` remains as compatibility alias.
 - Configure service token with `AGENT_ENGINE_SERVICE_TOKEN`.
 - Backend now sends an execution-scoped `platform_runtime` snapshot that may include active bindings for `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
-- Explicit retrieval requests are executed through the active `embeddings` and `vector_store` bindings before the final LLM call.
+- Explicit retrieval requests use the canonical retrieval contract documented in [`docs/services/retrieval_contract.md`](../docs/services/retrieval_contract.md).
+- Agent engine owns execution-time semantic / keyword / hybrid retrieval branching and emits canonical `relevance_*` fields while preserving provider `score` / `score_kind` fields on result items.
 - LLM-driven tool execution is now supported through registry-managed `tool_refs`.
   - `tool.web_search` dispatches through the active `mcp_runtime` provider.
   - `tool.python_exec` dispatches through the active `sandbox_execution` provider.

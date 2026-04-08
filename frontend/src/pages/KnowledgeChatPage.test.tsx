@@ -22,17 +22,21 @@ const clipboardMocks = vi.hoisted(() => ({
 
 let mockUser: AuthUser | null = null;
 
-vi.mock("../api/playgrounds", () => ({
-  getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
-  getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
-  listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
-  createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
-  getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
-  updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
-  deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
-  sendPlaygroundMessage: playgroundApiMocks.sendPlaygroundMessage,
-  streamPlaygroundMessage: vi.fn(),
-}));
+vi.mock("../api/playgrounds", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/playgrounds")>();
+  return {
+    ...actual,
+    getPlaygroundModelOptions: playgroundApiMocks.getPlaygroundModelOptions,
+    getPlaygroundKnowledgeBaseOptions: playgroundApiMocks.getPlaygroundKnowledgeBaseOptions,
+    listPlaygroundSessions: playgroundApiMocks.listPlaygroundSessions,
+    createPlaygroundSession: playgroundApiMocks.createPlaygroundSession,
+    getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
+    updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
+    deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
+    sendPlaygroundMessage: playgroundApiMocks.sendPlaygroundMessage,
+    streamPlaygroundMessage: vi.fn(),
+  };
+});
 
 vi.mock("../auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -410,6 +414,14 @@ describe("KnowledgePlaygroundPage", () => {
                   id: "doc-1",
                   title: "Architecture Overview",
                   snippet: "Retrieval uses the shared knowledge corpus.",
+                  score: 0.92,
+                  score_kind: "similarity",
+                  relevance_score: 0.92,
+                  relevance_kind: "similarity",
+                  metadata: {
+                    source_name: "Docs folder",
+                    ignored_empty: "",
+                  },
                 },
               ],
             },
@@ -430,6 +442,7 @@ describe("KnowledgePlaygroundPage", () => {
 
     expect(await screen.findByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Retrieval uses the shared knowledge corpus.")).toBeVisible();
+    expect(screen.queryByText(/Similarity/i)).not.toBeInTheDocument();
   });
 
   it("copies only the assistant answer text without including source cards", async () => {

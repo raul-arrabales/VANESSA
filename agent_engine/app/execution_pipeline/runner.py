@@ -11,10 +11,10 @@ from ..policies.runtime_policy import (
     validate_runtime_and_dependencies_stage as validate_runtime_and_dependencies,
 )
 from ..repositories import executions as executions_repo
+from ..retrieval.options import normalize_retrieval_request
 from ..retrieval.runtime import (
     coerce_execution_messages,
     execute_retrieval_call,
-    normalize_retrieval_request,
     prepend_retrieval_context,
 )
 from ..schemas.agent_executions import AgentExecutionRecord
