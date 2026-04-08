@@ -427,11 +427,34 @@ def _normalize_query_top_k(value: Any) -> int:
     return top_k
 
 
+def _normalize_query_search_method(value: Any) -> str:
+    normalized = str(value or "semantic").strip().lower() or "semantic"
+    if normalized not in {"semantic", "keyword"}:
+        raise PlatformControlPlaneError(
+            "invalid_search_method",
+            "search_method must be one of semantic or keyword",
+            status_code=400,
+        )
+    return normalized
+
+
+def _normalize_query_preprocessing(value: Any) -> str:
+    normalized = str(value or "none").strip().lower() or "none"
+    if normalized not in {"none", "normalize"}:
+        raise PlatformControlPlaneError(
+            "invalid_query_preprocessing",
+            "query_preprocessing must be one of none or normalize",
+            status_code=400,
+        )
+    return normalized
+
+
 def _serialize_query_result(
     result: dict[str, Any],
     *,
     chunk_length_tokens: int | None = None,
-    similarity: float | None = None,
+    relevance_score: float | None = None,
+    relevance_kind: str | None = None,
 ) -> dict[str, Any]:
     metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
     text = " ".join(str(result.get("text") or "").split())
@@ -444,5 +467,6 @@ def _serialize_query_result(
         "source_type": str(metadata.get("source_type") or "").strip() or None,
         "metadata": metadata,
         "chunk_length_tokens": chunk_length_tokens if isinstance(chunk_length_tokens, int) and chunk_length_tokens >= 0 else 0,
-        "similarity": float(similarity) if isinstance(similarity, (int, float)) else 0.0,
+        "relevance_score": float(relevance_score) if isinstance(relevance_score, (int, float)) else 0.0,
+        "relevance_kind": str(relevance_kind or "").strip() or "similarity",
     }

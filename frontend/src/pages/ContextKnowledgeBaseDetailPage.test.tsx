@@ -157,47 +157,108 @@ const contextApiMocks = vi.hoisted(() => ({
       finished_at: "2026-03-26T20:10:01+00:00",
     },
   ]),
-  queryKnowledgeBase: vi.fn(async () => ({
-    knowledge_base_id: "kb-primary",
-    retrieval: { index: "kb_product_docs", result_count: 2, top_k: 5 },
-    results: [
-      {
-        id: "doc-1",
-        title: "Architecture Overview",
-        text:
-          "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
-        uri: "https://example.com/overview",
-        source_type: "manual",
-        metadata: {
-          document_id: "doc-1",
-          chunk_index: 0,
-          source_name: "Docs folder",
+  queryKnowledgeBase: vi.fn(async (_knowledgeBaseId: string, payload?: { search_method?: string; query_preprocessing?: string }) => {
+    if (payload?.search_method === "keyword") {
+      return {
+        knowledge_base_id: "kb-primary",
+        retrieval: {
+          index: "kb_product_docs",
+          result_count: 2,
+          top_k: 5,
+          search_method: "keyword",
+          query_preprocessing: payload.query_preprocessing ?? "none",
+        },
+        results: [
+          {
+            id: "doc-1",
+            title: "Architecture Overview",
+            text:
+              "Keyword retrieval can surface exact term matches for operators who want to inspect lexical hits first tail-marker-keyword-alpha",
+            uri: "https://example.com/overview",
+            source_type: "manual",
+            metadata: {
+              document_id: "doc-1",
+              chunk_index: 0,
+              source_name: "Docs folder",
+              uri: "https://example.com/overview",
+              empty_field: "",
+              unset_field: null,
+            },
+            chunk_length_tokens: 19,
+            relevance_score: 4.125,
+            relevance_kind: "keyword_score",
+          },
+          {
+            id: "doc-2",
+            title: "FAQ",
+            text:
+              "Keyword ranking may differ from semantic ranking because provider text scoring favors term overlap tail-marker-keyword-beta",
+            uri: null,
+            source_type: "local_directory",
+            metadata: {
+              document_id: "doc-2",
+              chunk_index: 1,
+              source_name: "FAQ folder",
+              empty_field: "",
+              unset_field: undefined,
+            },
+            chunk_length_tokens: 16,
+            relevance_score: 2.5,
+            relevance_kind: "keyword_score",
+          },
+        ],
+      };
+    }
+    return {
+      knowledge_base_id: "kb-primary",
+      retrieval: {
+        index: "kb_product_docs",
+        result_count: 2,
+        top_k: 5,
+        search_method: "semantic",
+        query_preprocessing: payload?.query_preprocessing ?? "none",
+      },
+      results: [
+        {
+          id: "doc-1",
+          title: "Architecture Overview",
+          text:
+            "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
           uri: "https://example.com/overview",
-          empty_field: "",
-          unset_field: null,
+          source_type: "manual",
+          metadata: {
+            document_id: "doc-1",
+            chunk_index: 0,
+            source_name: "Docs folder",
+            uri: "https://example.com/overview",
+            empty_field: "",
+            unset_field: null,
+          },
+          chunk_length_tokens: 42,
+          relevance_score: 0.742,
+          relevance_kind: "similarity",
         },
-        chunk_length_tokens: 42,
-        similarity: 0.742,
-      },
-      {
-        id: "doc-2",
-        title: "FAQ",
-        text:
-          "Top matches should appear first so reviewers can quickly inspect the most relevant chunk before opening lower-ranked context entries tail-marker-beta",
-        uri: null,
-        source_type: "local_directory",
-        metadata: {
-          document_id: "doc-2",
-          chunk_index: 1,
-          source_name: "FAQ folder",
-          empty_field: "",
-          unset_field: undefined,
+        {
+          id: "doc-2",
+          title: "FAQ",
+          text:
+            "Top matches should appear first so reviewers can quickly inspect the most relevant chunk before opening lower-ranked context entries tail-marker-beta",
+          uri: null,
+          source_type: "local_directory",
+          metadata: {
+            document_id: "doc-2",
+            chunk_index: 1,
+            source_name: "FAQ folder",
+            empty_field: "",
+            unset_field: undefined,
+          },
+          chunk_length_tokens: 21,
+          relevance_score: 0.913,
+          relevance_kind: "similarity",
         },
-        chunk_length_tokens: 21,
-        similarity: 0.913,
-      },
-    ],
-  })),
+      ],
+    };
+  }),
   resyncKnowledgeBase: vi.fn(async () => ({
     id: "kb-primary",
     slug: "product-docs",
@@ -679,20 +740,24 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await renderContextWorkspace("/control/context/kb-primary/retrieval");
 
     expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Retrieval settings" })).toBeVisible();
+    expect(screen.getByLabelText("Search method")).toHaveValue("semantic");
+    expect(screen.getByLabelText("Query preprocessing")).toHaveValue("none");
     await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
 
     const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
     expect(resultButtons).toHaveLength(2);
-    expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "FAQ" })).toBeVisible();
-    expect(within(resultButtons[1] as HTMLElement).getByRole("heading", { name: "Architecture Overview" })).toBeVisible();
+    expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "Chunk 1: FAQ" })).toBeVisible();
+    expect(within(resultButtons[1] as HTMLElement).getByRole("heading", { name: "Chunk 2: Architecture Overview" })).toBeVisible();
     expect(within(resultButtons[0] as HTMLElement).getByText("Similarity: 0.913")).toBeVisible();
     expect(within(resultButtons[1] as HTMLElement).getByText("Similarity: 0.742")).toBeVisible();
+    expect((resultButtons[0] as HTMLElement).querySelector(".context-retrieval-result-expand-indicator")).not.toBeNull();
     expect(screen.queryByText("Chunk metadata")).not.toBeInTheDocument();
     expect(screen.queryByText("Chunk length: 42 tokens")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue(/tail-marker-alpha/)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for FAQ" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Chunk 1: FAQ" }));
 
     expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
       "Top matches should appear first so reviewers can quickly inspect the most relevant chunk before opening lower-ranked context entries tail-marker-beta",
@@ -705,7 +770,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.queryByText(/^empty_field:/)).toBeNull();
     expect(screen.queryByText(/^unset_field:/)).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Architecture Overview" }));
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Chunk 2: Architecture Overview" }));
 
     expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
       "Retrieved chunk previews show only the first tokens until the operator expands the card to inspect the full passage and its supporting metadata tail-marker-alpha",
@@ -717,7 +782,64 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.queryByText("source_name: FAQ folder")).not.toBeInTheDocument();
     expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
       "kb-primary",
-      { query_text: "How does retrieval work?", top_k: 5 },
+      {
+        query_text: "How does retrieval work?",
+        top_k: 5,
+        search_method: "semantic",
+        query_preprocessing: "none",
+      },
+      "token",
+    );
+  });
+
+  it("lets the operator switch retrieval search method to keyword", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/retrieval");
+
+    expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+    await userEvent.selectOptions(screen.getByLabelText("Search method"), "keyword");
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
+    expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "Chunk 1: Architecture Overview" })).toBeVisible();
+    expect(within(resultButtons[0] as HTMLElement).getByText("Keyword score: 4.125")).toBeVisible();
+    expect(within(resultButtons[1] as HTMLElement).getByText("Keyword score: 2.500")).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand retrieval result for Chunk 1: Architecture Overview" }));
+
+    expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(
+      "Keyword retrieval can surface exact term matches for operators who want to inspect lexical hits first tail-marker-keyword-alpha",
+    );
+    expect(screen.getByText("Chunk length: 19 tokens")).toBeVisible();
+    expect(screen.getByText("document_id: doc-1")).toBeVisible();
+    expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
+      "kb-primary",
+      {
+        query_text: "How does retrieval work?",
+        top_k: 5,
+        search_method: "keyword",
+        query_preprocessing: "none",
+      },
+      "token",
+    );
+  });
+
+  it("lets the operator enable query preprocessing before retrieval", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/retrieval");
+
+    expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Retrieval query"), "Raúl!!!");
+    await userEvent.selectOptions(screen.getByLabelText("Query preprocessing"), "normalize");
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    expect(contextApiMocks.queryKnowledgeBase).toHaveBeenCalledWith(
+      "kb-primary",
+      {
+        query_text: "Raúl!!!",
+        top_k: 5,
+        search_method: "semantic",
+        query_preprocessing: "normalize",
+      },
       "token",
     );
   });

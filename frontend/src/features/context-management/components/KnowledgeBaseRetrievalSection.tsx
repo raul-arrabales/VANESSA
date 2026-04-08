@@ -1,26 +1,38 @@
 import { type Dispatch, type FormEvent, type SetStateAction, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeBaseQueryResult } from "../../../api/context";
+import type {
+  KnowledgeBaseQueryPreprocessing,
+  KnowledgeBaseQueryResult,
+  KnowledgeBaseSearchMethod,
+} from "../../../api/context";
 
 type Props = {
   retrievalQuery: string;
   retrievalTopK: string;
+  retrievalSearchMethod: KnowledgeBaseSearchMethod;
+  retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
   isQuerying: boolean;
   onQueryChange: Dispatch<SetStateAction<string>>;
   onTopKChange: Dispatch<SetStateAction<string>>;
+  onSearchMethodChange: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
+  onQueryPreprocessingChange: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
 export function KnowledgeBaseRetrievalSection({
   retrievalQuery,
   retrievalTopK,
+  retrievalSearchMethod,
+  retrievalQueryPreprocessing,
   retrievalResults,
   retrievalResultCount,
   isQuerying,
   onQueryChange,
   onTopKChange,
+  onSearchMethodChange,
+  onQueryPreprocessingChange,
   onSubmit,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
@@ -51,8 +63,14 @@ export function KnowledgeBaseRetrievalSection({
   );
 
   const sortedResults = useMemo(
-    () => [...retrievalResults].sort((left, right) => right.similarity - left.similarity),
+    () => [...retrievalResults].sort((left, right) => right.relevance_score - left.relevance_score),
     [retrievalResults],
+  );
+
+  const getRelevanceLabel = (result: KnowledgeBaseQueryResult): string => (
+    result.relevance_kind === "keyword_score"
+      ? t("contextManagement.fields.keywordScore")
+      : t("contextManagement.fields.similarity")
   );
 
   const buildPreview = (text: string): string => {
@@ -80,17 +98,48 @@ export function KnowledgeBaseRetrievalSection({
             onChange={(event) => onQueryChange(event.currentTarget.value)}
           />
         </label>
-        <label className="card-stack">
-          <span className="field-label">{t("contextManagement.fields.topK")}</span>
-          <input
-            className="field-input"
-            type="number"
-            min={1}
-            step={1}
-            value={retrievalTopK}
-            onChange={(event) => onTopKChange(event.currentTarget.value)}
-          />
-        </label>
+        <section className="context-retrieval-settings card-stack" aria-labelledby="retrieval-settings-title">
+          <div className="card-stack">
+            <h4 id="retrieval-settings-title" className="field-label">
+              {t("contextManagement.fields.retrievalSettings")}
+            </h4>
+          </div>
+          <div className="context-retrieval-settings-row">
+            <label className="card-stack">
+              <span className="field-label">{t("contextManagement.fields.topK")}</span>
+              <input
+                className="field-input"
+                type="number"
+                min={1}
+                step={1}
+                value={retrievalTopK}
+                onChange={(event) => onTopKChange(event.currentTarget.value)}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("contextManagement.fields.searchMethod")}</span>
+              <select
+                className="field-input"
+                value={retrievalSearchMethod}
+                onChange={(event) => onSearchMethodChange(event.currentTarget.value as KnowledgeBaseSearchMethod)}
+              >
+                <option value="semantic">{t("contextManagement.searchMethods.semantic")}</option>
+                <option value="keyword">{t("contextManagement.searchMethods.keyword")}</option>
+              </select>
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("contextManagement.fields.queryPreprocessing")}</span>
+              <select
+                className="field-input"
+                value={retrievalQueryPreprocessing}
+                onChange={(event) => onQueryPreprocessingChange(event.currentTarget.value as KnowledgeBaseQueryPreprocessing)}
+              >
+                <option value="none">{t("contextManagement.queryPreprocessing.none")}</option>
+                <option value="normalize">{t("contextManagement.queryPreprocessing.normalize")}</option>
+              </select>
+            </label>
+          </div>
+        </section>
         <div className="form-actions">
           <button type="submit" className="btn btn-primary" disabled={isQuerying || !retrievalQuery.trim()}>
             {isQuerying ? t("contextManagement.actions.querying") : t("contextManagement.actions.testRetrieval")}
@@ -103,11 +152,12 @@ export function KnowledgeBaseRetrievalSection({
       {retrievalResults.length === 0 && retrievalResultCount !== null ? (
         <p className="status-text">{t("contextManagement.states.noQueryResults")}</p>
       ) : null}
-      {sortedResults.map((result) => {
+      {sortedResults.map((result, index) => {
         const metadataEntries = getVisibleMetadataEntries(result.metadata);
         const isExpanded = expandedResultId === result.id;
         const preview = buildPreview(result.text);
         const title = result.title || result.id;
+        const displayTitle = `Chunk ${index + 1}: ${title}`;
 
         return (
           <article key={result.id} className="panel card-stack context-retrieval-result-card">
@@ -118,25 +168,34 @@ export function KnowledgeBaseRetrievalSection({
               aria-controls={`retrieval-result-details-${result.id}`}
               aria-label={t(
                 isExpanded ? "contextManagement.actions.collapseChunkResult" : "contextManagement.actions.expandChunkResult",
-                { title },
+                { title: displayTitle },
               )}
               onClick={() => setExpandedResultId((current) => (current === result.id ? null : result.id))}
             >
               <div className="context-retrieval-result-summary">
-                <div className="platform-card-header">
+                <div className="platform-card-header context-retrieval-result-header">
                   <div className="card-stack">
-                    <h4 className="section-title">{title}</h4>
+                    <h4 className="section-title">{displayTitle}</h4>
                     <p className="status-text">
-                      {t("contextManagement.fields.similarity")}: {result.similarity.toFixed(3)}
+                      {getRelevanceLabel(result)}: {result.relevance_score.toFixed(3)}
                     </p>
                   </div>
+                  <span
+                    className="context-retrieval-result-expand-indicator"
+                    data-expanded={isExpanded ? "true" : "false"}
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 16 16" focusable="false">
+                      <path d="M4 6l4 4 4-4" />
+                    </svg>
+                  </span>
                 </div>
                 <p className="status-text context-retrieval-result-preview">{preview}</p>
               </div>
               <span className="sr-only">
                 {t(
                   isExpanded ? "contextManagement.actions.collapseChunkResult" : "contextManagement.actions.expandChunkResult",
-                  { title },
+                  { title: displayTitle },
                 )}
               </span>
             </button>

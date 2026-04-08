@@ -509,12 +509,24 @@
       "documentText": "Document text",
       "uploadFiles": "Upload files",
       "queryText": "Retrieval query",
+      "retrievalSettings": "Retrieval settings",
       "topK": "Top K",
+      "searchMethod": "Search method",
+      "queryPreprocessing": "Query preprocessing",
       "chunkCount": "Chunk count",
       "chunkLength": "Chunk length",
       "chunkMetadata": "Chunk metadata",
       "chunkText": "Chunk text",
-      "similarity": "Similarity"
+      "similarity": "Similarity",
+      "keywordScore": "Keyword score"
+    },
+    "searchMethods": {
+      "semantic": "Semantic",
+      "keyword": "Keyword"
+    },
+    "queryPreprocessing": {
+      "none": "As entered",
+      "normalize": "Normalized"
     },
     "columns": {
       "name": "Knowledge base",

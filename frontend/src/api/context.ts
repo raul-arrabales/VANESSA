@@ -149,8 +149,12 @@ export type KnowledgeBaseQueryResult = {
   source_type?: string | null;
   metadata: Record<string, unknown>;
   chunk_length_tokens: number;
-  similarity: number;
+  relevance_score: number;
+  relevance_kind: "similarity" | "keyword_score" | string;
 };
+
+export type KnowledgeBaseSearchMethod = "semantic" | "keyword";
+export type KnowledgeBaseQueryPreprocessing = "none" | "normalize";
 
 export type KnowledgeBaseQueryResponse = {
   knowledge_base_id: string;
@@ -158,6 +162,8 @@ export type KnowledgeBaseQueryResponse = {
     index: string;
     result_count: number;
     top_k: number;
+    search_method: KnowledgeBaseSearchMethod | string;
+    query_preprocessing?: KnowledgeBaseQueryPreprocessing | string;
   };
   results: KnowledgeBaseQueryResult[];
 };
@@ -363,6 +369,8 @@ export async function queryKnowledgeBase(
   payload: {
     query_text: string;
     top_k?: number;
+    search_method?: KnowledgeBaseSearchMethod;
+    query_preprocessing?: KnowledgeBaseQueryPreprocessing;
   },
   token: string,
 ): Promise<KnowledgeBaseQueryResponse> {

@@ -11,11 +11,15 @@ export default function ContextKnowledgeBaseRetrievalPage(): JSX.Element {
         <KnowledgeBaseRetrievalSection
           retrievalQuery={detail.retrievalQuery}
           retrievalTopK={detail.retrievalTopK}
+          retrievalSearchMethod={detail.retrievalSearchMethod}
+          retrievalQueryPreprocessing={detail.retrievalQueryPreprocessing}
           retrievalResults={detail.retrievalResults}
           retrievalResultCount={detail.retrievalResultCount}
           isQuerying={detail.isQuerying}
           onQueryChange={detail.setRetrievalQuery}
           onTopKChange={detail.setRetrievalTopK}
+          onSearchMethodChange={detail.setRetrievalSearchMethod}
+          onQueryPreprocessingChange={detail.setRetrievalQueryPreprocessing}
           onSubmit={detail.handleTestRetrieval}
         />
       )}

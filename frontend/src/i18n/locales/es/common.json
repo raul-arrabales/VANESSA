@@ -484,11 +484,23 @@
       "documentText": "Texto del documento",
       "uploadFiles": "Subir archivos",
       "queryText": "Consulta de recuperacion",
+      "retrievalSettings": "Configuracion de recuperacion",
       "topK": "Top K",
+      "searchMethod": "Metodo de busqueda",
+      "queryPreprocessing": "Preprocesamiento de la consulta",
       "chunkLength": "Longitud del fragmento",
       "chunkMetadata": "Metadatos del fragmento",
       "chunkText": "Texto del fragmento",
-      "similarity": "Similitud"
+      "similarity": "Similitud",
+      "keywordScore": "Puntuacion de palabras clave"
+    },
+    "searchMethods": {
+      "semantic": "Semantica",
+      "keyword": "Palabras clave"
+    },
+    "queryPreprocessing": {
+      "none": "Como se escribio",
+      "normalize": "Normalizada"
     },
     "columns": {
       "name": "Base de conocimiento",

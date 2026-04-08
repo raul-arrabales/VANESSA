@@ -164,7 +164,11 @@ def test_query_knowledge_base_rejects_embeddings_target_mismatch(monkeypatch: py
     assert exc_info.value.code == "knowledge_base_embeddings_resource_mismatch"
 
 
-def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves_metadata(monkeypatch: pytest.MonkeyPatch):
+def test_query_knowledge_base_semantic_normalizes_similarity_orders_results_and_preserves_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    captured_query_kwargs: dict[str, object] = {}
+
     monkeypatch.setattr(
         context_management_runtime,
         "_require_knowledge_base",
@@ -192,7 +196,7 @@ def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves
         "resolve_vector_store_adapter",
         lambda *_args, **_kwargs: SimpleNamespace(
             binding=SimpleNamespace(provider_instance_id="provider-2", provider_key="weaviate_local"),
-            query=lambda **_query_kwargs: {
+            query=lambda **_query_kwargs: captured_query_kwargs.update(_query_kwargs) or {
                 "index": "kb_product_docs",
                 "results": [
                     {
@@ -249,7 +253,15 @@ def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves
         payload={"query_text": "hello", "top_k": 5},
     )
 
-    assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 2, "top_k": 5}
+    assert captured_query_kwargs["query_text"] is None
+    assert captured_query_kwargs["embedding"] == [0.1, 0.2]
+    assert payload["retrieval"] == {
+        "index": "kb_product_docs",
+        "result_count": 2,
+        "top_k": 5,
+        "search_method": "semantic",
+        "query_preprocessing": "none",
+    }
     assert payload["results"] == [
         {
             "id": "doc-2#0",
@@ -264,7 +276,8 @@ def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves
                 "source_type": "manual",
             },
             "chunk_length_tokens": 8,
-            "similarity": 0.91,
+            "relevance_score": 0.91,
+            "relevance_kind": "similarity",
         },
         {
             "id": "doc-1#0",
@@ -281,6 +294,167 @@ def test_query_knowledge_base_normalizes_similarity_orders_results_and_preserves
                 "uri": "https://example.com/overview",
             },
             "chunk_length_tokens": 3,
-            "similarity": 0.77,
+            "relevance_score": 0.77,
+            "relevance_kind": "similarity",
         },
     ]
+
+
+def test_query_knowledge_base_keyword_skips_embeddings_and_returns_keyword_scores(monkeypatch: pytest.MonkeyPatch):
+    captured_query_kwargs: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        context_management_runtime,
+        "_require_knowledge_base",
+        lambda _db, _knowledge_base_id: {
+            "id": "kb-primary",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_provider_key": "openai_compatible_cloud_embeddings",
+            "embedding_resource_id": "text-embedding-3-small",
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+        },
+    )
+    monkeypatch.setattr(context_management_runtime, "_is_knowledge_base_eligible", lambda _row: True)
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_vector_store_adapter",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            binding=SimpleNamespace(provider_instance_id="provider-2", provider_key="weaviate_local"),
+            query=lambda **_query_kwargs: captured_query_kwargs.update(_query_kwargs) or {
+                "index": "kb_product_docs",
+                "results": [
+                    {
+                        "id": "doc-1#0",
+                        "text": "keyword matched chunk",
+                        "metadata": {
+                            "document_id": "doc-1",
+                            "chunk_index": 0,
+                            "title": "Keyword match",
+                        },
+                        "score": 3.2,
+                        "score_kind": "bm25",
+                    }
+                ],
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_embeddings_adapter",
+        lambda *_args, **_kwargs: pytest.fail("keyword search should not resolve embeddings adapter"),
+    )
+    monkeypatch.setattr(
+        context_management_runtime,
+        "embed_knowledge_base_texts",
+        lambda *_args, **_kwargs: pytest.fail("keyword search should not embed the query"),
+    )
+    monkeypatch.setattr(
+        context_management_runtime,
+        "resolve_knowledge_base_tokenizer",
+        lambda *_args, **_kwargs: SimpleNamespace(encode=lambda text: text.split()),
+    )
+
+    payload = context_management_runtime.query_knowledge_base(
+        "postgresql://ignored",
+        config=object(),
+        knowledge_base_id="kb-primary",
+        payload={"query_text": "hello", "top_k": 5, "search_method": "keyword"},
+    )
+
+    assert captured_query_kwargs["query_text"] == "hello"
+    assert captured_query_kwargs["embedding"] is None
+    assert payload["retrieval"] == {
+        "index": "kb_product_docs",
+        "result_count": 1,
+        "top_k": 5,
+        "search_method": "keyword",
+        "query_preprocessing": "none",
+    }
+    assert payload["results"] == [
+        {
+            "id": "doc-1#0",
+            "title": "Keyword match",
+            "text": "keyword matched chunk",
+            "uri": None,
+            "source_type": None,
+            "metadata": {
+                "document_id": "doc-1",
+                "chunk_index": 0,
+                "title": "Keyword match",
+            },
+            "chunk_length_tokens": 3,
+            "relevance_score": 3.2,
+            "relevance_kind": "keyword_score",
+        }
+    ]
+
+
+def test_query_knowledge_base_normalizes_query_text_when_preprocessing_is_enabled(monkeypatch: pytest.MonkeyPatch):
+    captured_query_kwargs: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        context_management_runtime,
+        "_require_knowledge_base",
+        lambda _db, _knowledge_base_id: {
+            "id": "kb-primary",
+            "index_name": "kb_product_docs",
+            "backing_provider_instance_id": "provider-2",
+            "backing_provider_key": "weaviate_local",
+            "vectorization_mode": "vanessa_embeddings",
+            "embedding_provider_instance_id": "embedding-provider-1",
+            "embedding_provider_key": "openai_compatible_cloud_embeddings",
+            "embedding_resource_id": "text-embedding-3-small",
+            "lifecycle_state": "active",
+            "sync_status": "ready",
+        },
+    )
+    monkeypatch.setattr(context_management_runtime, "_is_knowledge_base_eligible", lambda _row: True)
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_vector_store_adapter",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            binding=SimpleNamespace(provider_instance_id="provider-2", provider_key="weaviate_local"),
+            query=lambda **_query_kwargs: captured_query_kwargs.update(_query_kwargs) or {"index": "kb_product_docs", "results": []},
+        ),
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_embeddings_adapter",
+        lambda *_args, **_kwargs: pytest.fail("keyword search should not resolve embeddings adapter"),
+    )
+    monkeypatch.setattr(
+        context_management_runtime,
+        "embed_knowledge_base_texts",
+        lambda *_args, **_kwargs: pytest.fail("keyword search should not embed the query"),
+    )
+    monkeypatch.setattr(
+        context_management_runtime,
+        "resolve_knowledge_base_tokenizer",
+        lambda *_args, **_kwargs: SimpleNamespace(encode=lambda text: text.split()),
+    )
+
+    payload = context_management_runtime.query_knowledge_base(
+        "postgresql://ignored",
+        config=object(),
+        knowledge_base_id="kb-primary",
+        payload={
+            "query_text": "  Raúl!!! & Co.  ",
+            "top_k": 5,
+            "search_method": "keyword",
+            "query_preprocessing": "normalize",
+        },
+    )
+
+    assert captured_query_kwargs["query_text"] == "raul co"
+    assert payload["retrieval"] == {
+        "index": "kb_product_docs",
+        "result_count": 0,
+        "top_k": 5,
+        "search_method": "keyword",
+        "query_preprocessing": "normalize",
+    }

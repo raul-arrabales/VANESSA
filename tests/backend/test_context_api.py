@@ -418,20 +418,28 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
         is_active=True,
     )
     token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         context_routes,
         "query_knowledge_base",
-        lambda *_args, **_kwargs: {
+        lambda *_args, **_kwargs: captured.update(_kwargs) or {
             "knowledge_base_id": "kb-primary",
-            "retrieval": {"index": "kb_product_docs", "result_count": 1, "top_k": 5},
+            "retrieval": {
+                "index": "kb_product_docs",
+                "result_count": 1,
+                "top_k": 5,
+                "search_method": "keyword",
+                "query_preprocessing": "normalize",
+            },
             "results": [
                 {
                     "id": "doc-1",
                     "title": "Architecture Overview",
                     "text": "Hello from the retrieved chunk",
                     "chunk_length_tokens": 12,
-                    "similarity": 0.987,
+                    "relevance_score": 0.987,
+                    "relevance_kind": "keyword_score",
                     "metadata": {"document_id": "doc-1"},
                 }
             ],
@@ -441,13 +449,23 @@ def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatc
     response = test_client.post(
         "/v1/context/knowledge-bases/kb-primary/query",
         headers=_auth(token),
-        json={"query_text": "hello", "top_k": 5},
+        json={"query_text": "hello", "top_k": 5, "search_method": "keyword", "query_preprocessing": "normalize"},
     )
 
     assert response.status_code == 200
+    assert captured["knowledge_base_id"] == "kb-primary"
+    assert captured["payload"] == {
+        "query_text": "hello",
+        "top_k": 5,
+        "search_method": "keyword",
+        "query_preprocessing": "normalize",
+    }
     assert response.get_json()["retrieval"]["index"] == "kb_product_docs"
+    assert response.get_json()["retrieval"]["search_method"] == "keyword"
+    assert response.get_json()["retrieval"]["query_preprocessing"] == "normalize"
     assert response.get_json()["results"][0]["chunk_length_tokens"] == 12
-    assert response.get_json()["results"][0]["similarity"] == 0.987
+    assert response.get_json()["results"][0]["relevance_score"] == 0.987
+    assert response.get_json()["results"][0]["relevance_kind"] == "keyword_score"
 
 
 def test_list_knowledge_sources_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
