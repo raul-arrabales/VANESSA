@@ -841,11 +841,24 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("heading", { name: "Add source" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sync history" })).not.toBeInTheDocument();
+    expect(screen.getByText("Enter a relative path manually or click Browse to choose a directory.")).toBeVisible();
 
-    await userEvent.click(screen.getByRole("button", { name: "Browse" }));
-    await userEvent.click(await screen.findByRole("button", { name: "product_docs" }));
-    await userEvent.click(screen.getByRole("button", { name: "Use current directory" }));
-    expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+    const browseButton = screen.getByRole("button", { name: "Browse" });
+    const relativePathLabel = screen.getByText("Relative path");
+    expect(browseButton.compareDocumentPosition(relativePathLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await userEvent.click(browseButton);
+    const usedDirectoryButton = await screen.findByRole("button", { name: "product_docs (Used)" });
+    expect(usedDirectoryButton).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Use current directory" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Browse source directories" }).closest(".panel-nested")).toBeTruthy();
+
+    const relativePathInput = document.getElementById("kb-source-relative-path");
+    expect(relativePathInput).toBeInstanceOf(HTMLInputElement);
+    await userEvent.type(relativePathInput as HTMLInputElement, "product_docs");
+    await userEvent.click(screen.getByRole("button", { name: "Add source" }));
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("This directory is already configured for another source.")).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
     expect(screen.getByRole("button", { name: "Existing Sources" })).toHaveAttribute("aria-pressed", "true");
@@ -879,6 +892,9 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(await screen.findByRole("heading", { name: "Edit source" })).toBeVisible();
     expect(screen.getByDisplayValue("Docs folder")).toBeVisible();
     expect(screen.getByDisplayValue("product_docs")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Browse" }));
+    expect(await screen.findByRole("button", { name: "Use current directory" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "product_docs/guides" })).toBeEnabled();
 
   });
 

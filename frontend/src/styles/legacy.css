@@ -113,6 +113,10 @@
   background: linear-gradient(180deg, var(--lcars-rail) 0%, var(--lcars-rail-soft) 100%);
 }
 
+.panel.panel-nested::before {
+  content: none;
+}
+
 [data-theme-family="retro"] .panel {
   background:
     linear-gradient(180deg, color-mix(in oklab, var(--bg-surface) 96%, black 4%), color-mix(in oklab, var(--bg-subtle) 88%, transparent)),

@@ -104,4 +104,12 @@ describe("StyleGuidePage theme editor", () => {
       expect(getTokenHexInput("--bg-canvas").value).toBe("#333333");
     });
   });
+
+  it("documents nested panels without the repeated left rail", () => {
+    renderStyleGuide();
+
+    expect(screen.getByRole("heading", { name: "Panel hierarchy" })).toBeVisible();
+    expect(screen.getByText(/Use the left rail only on the highest-level page or workspace panel\./)).toBeVisible();
+    expect(screen.getByTestId("nested-panel-example")).toHaveClass("panel-nested");
+  });
 });

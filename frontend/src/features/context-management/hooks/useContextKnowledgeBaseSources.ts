@@ -1,4 +1,4 @@
-import { type Dispatch, type FormEvent, type SetStateAction, useState } from "react";
+import { type Dispatch, type FormEvent, type SetStateAction, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createKnowledgeSource,
@@ -11,12 +11,20 @@ import type { KnowledgeSourceDirectoriesResponse } from "../../../api/context";
 import { createEmptySourceForm, parseGlobText, type SourceFormState } from "../types";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
+function normalizeRelativePath(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "");
+}
+
 export type ContextKnowledgeBaseSourcesResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
   sourceForm: SourceFormState;
   sourceDirectoryBrowser: {
     open: boolean;
     loading: boolean;
     payload: KnowledgeSourceDirectoriesResponse | null;
+    usedPaths: Set<string>;
+    currentPathUsed: boolean;
   };
   syncingSourceId: string | null;
   setSourceForm: Dispatch<SetStateAction<SourceFormState>>;
@@ -38,15 +46,39 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
   const [sourceDirectoryBrowserOpen, setSourceDirectoryBrowserOpen] = useState(false);
   const [sourceDirectoryBrowserLoading, setSourceDirectoryBrowserLoading] = useState(false);
   const [sourceDirectoryBrowserPayload, setSourceDirectoryBrowserPayload] = useState<KnowledgeSourceDirectoriesResponse | null>(null);
+  const currentSourceId = sourceForm.id;
+  const usedPaths = useMemo(() => {
+    const next = new Set<string>();
+    workspace.sources.forEach((source) => {
+      if (currentSourceId && source.id === currentSourceId) {
+        return;
+      }
+      const normalizedPath = normalizeRelativePath(source.relative_path);
+      if (normalizedPath) {
+        next.add(normalizedPath);
+      }
+    });
+    return next;
+  }, [currentSourceId, workspace.sources]);
+  const currentBrowserPath = normalizeRelativePath(sourceDirectoryBrowserPayload?.current_relative_path);
+  const currentPathUsed = currentBrowserPath ? usedPaths.has(currentBrowserPath) : false;
 
   async function handleSubmitSource(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin) {
       return;
     }
+    const normalizedRelativePath = normalizeRelativePath(sourceForm.relativePath);
+    if (normalizedRelativePath && usedPaths.has(normalizedRelativePath)) {
+      workspace.showErrorFeedback(
+        t("contextManagement.feedback.sourcePathUsed"),
+        t("contextManagement.feedback.sourceSaveFailed"),
+      );
+      return;
+    }
     const payload = {
       display_name: sourceForm.displayName,
-      relative_path: sourceForm.relativePath,
+      relative_path: normalizedRelativePath,
       include_globs: parseGlobText(sourceForm.includeGlobs),
       exclude_globs: parseGlobText(sourceForm.excludeGlobs),
       lifecycle_state: sourceForm.lifecycleState,
@@ -112,13 +144,17 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
   }
 
   async function handleSelectAndBrowseSourceDirectory(rootId: string | null, relativePath: string): Promise<void> {
-    setSourceForm((current) => ({ ...current, relativePath }));
+    const normalizedPath = normalizeRelativePath(relativePath);
+    if (usedPaths.has(normalizedPath)) {
+      return;
+    }
+    setSourceForm((current) => ({ ...current, relativePath: normalizedPath }));
     await handleBrowseSourceDirectories(rootId, relativePath);
   }
 
   function handleUseCurrentSourceDirectory(): void {
-    const currentRelativePath = sourceDirectoryBrowserPayload?.current_relative_path ?? "";
-    if (!currentRelativePath) {
+    const currentRelativePath = normalizeRelativePath(sourceDirectoryBrowserPayload?.current_relative_path);
+    if (!currentRelativePath || usedPaths.has(currentRelativePath)) {
       return;
     }
     setSourceForm((current) => ({ ...current, relativePath: currentRelativePath }));
@@ -149,6 +185,8 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
       open: sourceDirectoryBrowserOpen,
       loading: sourceDirectoryBrowserLoading,
       payload: sourceDirectoryBrowserPayload,
+      usedPaths,
+      currentPathUsed,
     },
     syncingSourceId,
     setSourceForm,

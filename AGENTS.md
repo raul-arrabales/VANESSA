@@ -285,6 +285,7 @@ This should start the current local stack, including at least:
 - Keep browser code behind frontend API client modules.
 - Do not call backend-private/internal endpoints directly from UI code.
 - Do not use browser-native modal windows such as `window.alert`, `window.confirm`, or `window.prompt` for product UI. Use app-styled dialogs consistent with the existing modal patterns instead.
+- Treat the shared panel left-rail decoration as a top-level page/workspace affordance only. Nested sections inside an existing panel should use the nested panel variant (for example `panel panel-nested`) or another non-railed container so the left rail is not repeated within the same page section.
 
 ### 5.3. Naming and vocabulary
 

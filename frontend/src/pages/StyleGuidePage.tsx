@@ -84,6 +84,20 @@ export default function StyleGuidePage(): JSX.Element {
       </article>
 
       <article className="panel card-stack">
+        <h2 className="section-title">Panel hierarchy</h2>
+        <p className="status-text">
+          Use the left rail only on the highest-level page or workspace panel. Nested sections inside that panel should use
+          <code className="code-inline"> panel panel-nested</code>
+          {" "}
+          so the rail does not repeat.
+        </p>
+        <div className="panel panel-nested card-stack" data-testid="nested-panel-example">
+          <h3 className="section-title">Nested panel example</h3>
+          <p className="status-text">Nested panels keep the shared surface styling without repeating the left rail decoration.</p>
+        </div>
+      </article>
+
+      <article className="panel card-stack">
         <h2 className="section-title">Spacing / Radius / Shadow</h2>
         <div className="token-row">
           {spacingTokens.map((token) => <code className="code-inline" key={token}>{token}</code>)}
