@@ -22,7 +22,6 @@ def discover_hf_models(
         search=query or None,
         filter=task if task else None,
         sort=sort,
-        direction=-1,
         limit=limit,
     )
     results: list[dict[str, Any]] = []
