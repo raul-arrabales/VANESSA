@@ -12,6 +12,8 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
           <KnowledgeBaseOverviewSection
             knowledgeBase={knowledgeBase}
             form={detail.form}
+            totalSourceCount={detail.sources.length}
+            syncedSourceCount={detail.sources.filter((source) => source.last_sync_status === "ready").length}
             isDeleteDialogOpen={detail.isDeleteDialogOpen}
             isDeleting={detail.isDeleting}
             isSuperadmin={detail.isSuperadmin}

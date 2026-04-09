@@ -31,7 +31,7 @@ export type ContextKnowledgeBaseOverviewResult = ReturnType<typeof useContextKno
 export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewResult {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
-  const workspace = useContextKnowledgeBaseLoader();
+  const workspace = useContextKnowledgeBaseLoader({ loadSources: true });
   const [form, setForm] = useState<KnowledgeBaseOverviewFormState>({
     slug: "",
     displayName: "",

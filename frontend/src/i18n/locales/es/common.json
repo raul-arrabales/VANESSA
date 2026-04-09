@@ -490,6 +490,9 @@
     },
     "fields": {
       "provider": "Proveedor de respaldo",
+      "indexedFiles": "Archivos indexados",
+      "sources": "Fuentes",
+      "syncedSources": "Fuentes sincronizadas",
       "deploymentEligibility": "Elegibilidad de despliegue",
       "schema": "Esquema de la base de conocimiento",
       "lifecycleState": "Estado del ciclo de vida",

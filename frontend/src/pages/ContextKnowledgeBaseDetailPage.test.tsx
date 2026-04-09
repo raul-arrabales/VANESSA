@@ -5,7 +5,7 @@ import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import type { AuthUser } from "../auth/types";
 import { ApiError } from "../auth/authApi";
-import type { KnowledgeBaseQueryPreprocessing } from "../api/context";
+import type { KnowledgeBaseQueryPreprocessing, KnowledgeSource } from "../api/context";
 import ContextKnowledgeBaseDetailPage from "./ContextKnowledgeBaseDetailPage";
 import ContextKnowledgeBasesPage from "../features/context-management/pages/ContextKnowledgeBasesPage";
 import ContextKnowledgeBaseSourcesPage from "../features/context-management/pages/ContextKnowledgeBaseSourcesPage";
@@ -134,7 +134,7 @@ const contextApiMocks = vi.hoisted(() => ({
       managed_by_source: false,
     },
   ]),
-  listKnowledgeSources: vi.fn(async () => [
+  listKnowledgeSources: vi.fn<() => Promise<KnowledgeSource[]>>(async () => [
     {
       id: "source-1",
       knowledge_base_id: "kb-primary",
@@ -460,8 +460,8 @@ const contextApiMocks = vi.hoisted(() => ({
 
 vi.mock("../api/context", () => contextApiMocks);
 
-async function renderContextWorkspace(route: string): Promise<void> {
-  await renderWithAppProviders(
+async function renderContextWorkspace(route: string) {
+  return await renderWithAppProviders(
     <Routes>
       <Route path="/control/context" element={<ContextKnowledgeBasesPage />} />
       <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
@@ -488,12 +488,58 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
   });
 
   it("renders the overview page with metadata and workspace subnav", async () => {
-    await renderContextWorkspace("/control/context/kb-primary");
+    contextApiMocks.listKnowledgeSources.mockResolvedValueOnce([
+      {
+        id: "source-1",
+        knowledge_base_id: "kb-primary",
+        source_type: "local_directory",
+        display_name: "Docs folder",
+        relative_path: "product_docs",
+        include_globs: ["**/*.md"],
+        exclude_globs: [] as string[],
+        lifecycle_state: "active",
+        last_sync_status: "ready",
+        last_sync_at: "2026-03-26T20:10:00+00:00",
+        last_sync_error: null,
+      },
+      {
+        id: "source-2",
+        knowledge_base_id: "kb-primary",
+        source_type: "local_directory",
+        display_name: "Draft folder",
+        relative_path: "draft_docs",
+        include_globs: ["**/*.md"],
+        exclude_globs: [] as string[],
+        lifecycle_state: "active",
+        last_sync_status: "error",
+        last_sync_at: "2026-03-26T20:12:00+00:00",
+        last_sync_error: "Source sync failed.",
+      },
+    ]);
+
+    const view = await renderContextWorkspace("/control/context/kb-primary");
 
     expect(await screen.findByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Overview" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Manage Sources" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Upload Documents" })).toBeVisible();
+
+    const summaryCards = Array.from(view.container.querySelectorAll(".context-kb-summary-card"));
+    expect(summaryCards.length).toBeGreaterThan(4);
+    expect(within(summaryCards[0] as HTMLElement).getByText("Knowledge base")).toBeVisible();
+    expect(within(summaryCards[0] as HTMLElement).getByText("Product Docs")).toBeVisible();
+
+    const indexedFilesCard = summaryCards.find((card) => within(card as HTMLElement).queryByText("Indexed files"));
+    expect(indexedFilesCard).not.toBeNull();
+    expect(within(indexedFilesCard as HTMLElement).getByText("2")).toBeVisible();
+
+    const sourcesCard = summaryCards.find((card) => within(card as HTMLElement).queryByText(/^Sources$/));
+    expect(sourcesCard).not.toBeNull();
+    expect(within(sourcesCard as HTMLElement).getByText("2")).toBeVisible();
+
+    const syncedSourcesCard = summaryCards.find((card) => within(card as HTMLElement).queryByText("Synced sources"));
+    expect(syncedSourcesCard).not.toBeNull();
+    expect(within(syncedSourcesCard as HTMLElement).getByText("1")).toBeVisible();
 
     const providerCard = screen.getByText("Backing provider").closest("article");
     expect(providerCard).not.toBeNull();

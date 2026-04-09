@@ -8,6 +8,8 @@ import type { KnowledgeBaseOverviewFormState } from "../types";
 type Props = {
   knowledgeBase: KnowledgeBase;
   form: KnowledgeBaseOverviewFormState;
+  totalSourceCount: number;
+  syncedSourceCount: number;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
   isSuperadmin: boolean;
@@ -39,6 +41,8 @@ function SummaryCard({ label, value, secondary = null }: SummaryCardProps): JSX.
 export function KnowledgeBaseOverviewSection({
   knowledgeBase,
   form,
+  totalSourceCount,
+  syncedSourceCount,
   isDeleteDialogOpen,
   isDeleting,
   isSuperadmin,
@@ -98,13 +102,28 @@ export function KnowledgeBaseOverviewSection({
         <span className="platform-badge" data-tone={knowledgeBase.sync_status === "ready" ? "enabled" : "disabled"}>
           {`${knowledgeBase.lifecycle_state} / ${knowledgeBase.sync_status}`}
         </span>
-        <span className="status-text">{knowledgeBase.index_name}</span>
       </div>
       <div className="platform-detail-grid context-kb-summary-grid">
+        <SummaryCard
+          label={t("contextManagement.columns.name")}
+          value={knowledgeBase.display_name || noneLabel}
+        />
         <SummaryCard
           label={t("contextManagement.fields.provider")}
           value={backingProviderValue}
           secondary={backingProviderSecondary}
+        />
+        <SummaryCard
+          label={t("contextManagement.fields.indexedFiles")}
+          value={String(knowledgeBase.document_count)}
+        />
+        <SummaryCard
+          label={t("contextManagement.fields.sources")}
+          value={String(totalSourceCount)}
+        />
+        <SummaryCard
+          label={t("contextManagement.fields.syncedSources")}
+          value={String(syncedSourceCount)}
         />
         <article className="platform-summary-card context-kb-summary-card">
           <span className="field-label">{t("contextManagement.usageTitle")}</span>
