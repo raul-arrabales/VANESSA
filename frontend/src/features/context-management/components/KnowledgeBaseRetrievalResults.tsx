@@ -1,63 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeBaseQueryResult } from "../../../api/context";
 import { formatElapsedDuration } from "../../../utils/timing";
 import {
   mapKnowledgeBaseQueryResultToDisplayItem,
   sortRetrievalResultsByRelevance,
 } from "../../ai-shared/retrieval";
+import type { KnowledgeBaseRetrievalRunState } from "../hooks/useContextKnowledgeBaseRetrieval";
 import { KnowledgeBaseRetrievalResultCard } from "./KnowledgeBaseRetrievalResultCard";
 
 type Props = {
-  retrievalResults: KnowledgeBaseQueryResult[];
-  retrievalResultCount: number | null;
-  retrievalDurationMs: number | null;
-  completedQueryId: number;
+  retrievalRun: KnowledgeBaseRetrievalRunState | null;
 };
 
-export function KnowledgeBaseRetrievalResults({
-  retrievalResults,
-  retrievalResultCount,
-  retrievalDurationMs,
-  completedQueryId,
-}: Props): JSX.Element {
+export function KnowledgeBaseRetrievalResults({ retrievalRun }: Props): JSX.Element {
   const { t, i18n } = useTranslation("common");
   const [expandedResultId, setExpandedResultId] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setExpandedResultId(null);
-  }, [retrievalResults]);
+  }, [retrievalRun?.results]);
 
   useEffect(() => {
-    if (completedQueryId < 1) {
+    if ((retrievalRun?.completedQueryId ?? 0) < 1) {
       return;
     }
     resultsRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  }, [completedQueryId]);
+  }, [retrievalRun?.completedQueryId]);
 
   const displayItems = useMemo(
-    () => sortRetrievalResultsByRelevance(retrievalResults)
+    () => sortRetrievalResultsByRelevance(retrievalRun?.results ?? [])
       .map((result, index) => mapKnowledgeBaseQueryResultToDisplayItem(result, index)),
-    [retrievalResults],
+    [retrievalRun?.results],
   );
 
   return (
     <div ref={resultsRef} className="card-stack">
-      {retrievalResultCount !== null ? (
-        <p className="status-text">{t("contextManagement.states.queryResultCount", { count: retrievalResultCount })}</p>
+      {retrievalRun !== null ? (
+        <p className="status-text">{t("contextManagement.states.queryResultCount", { count: retrievalRun.resultCount })}</p>
       ) : null}
-      {retrievalDurationMs !== null ? (
+      {retrievalRun !== null ? (
         <p className="status-text">
           {t("contextManagement.states.queryDuration", {
-            duration: formatElapsedDuration(retrievalDurationMs, i18n.language),
+            duration: formatElapsedDuration(retrievalRun.durationMs, i18n.language),
           })}
         </p>
       ) : null}
-      {retrievalResults.length === 0 && retrievalResultCount !== null ? (
+      {retrievalRun !== null && retrievalRun.results.length === 0 ? (
         <p className="status-text">{t("contextManagement.states.noQueryResults")}</p>
       ) : null}
       {displayItems.map((item) => (

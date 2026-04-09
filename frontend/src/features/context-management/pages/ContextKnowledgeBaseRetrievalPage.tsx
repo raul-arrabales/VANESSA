@@ -9,22 +9,10 @@ export default function ContextKnowledgeBaseRetrievalPage(): JSX.Element {
     <ContextKnowledgeBaseWorkspaceFrame knowledgeBase={detail.knowledgeBase} loading={detail.loading}>
       {() => (
         <KnowledgeBaseRetrievalSection
-          retrievalQuery={detail.retrievalQuery}
-          retrievalTopK={detail.retrievalTopK}
-          retrievalSearchMethod={detail.retrievalSearchMethod}
-          retrievalHybridAlpha={detail.retrievalHybridAlpha}
-          retrievalQueryPreprocessing={detail.retrievalQueryPreprocessing}
-          retrievalResults={detail.retrievalResults}
-          retrievalResultCount={detail.retrievalResultCount}
-          retrievalDurationMs={detail.retrievalDurationMs}
-          completedQueryId={detail.completedQueryId}
+          retrievalForm={detail.retrievalForm}
+          retrievalRun={detail.retrievalRun}
+          retrievalActions={detail.retrievalActions}
           isQuerying={detail.isQuerying}
-          onQueryChange={detail.setRetrievalQuery}
-          onTopKChange={detail.setRetrievalTopK}
-          onSearchMethodChange={detail.setRetrievalSearchMethod}
-          onHybridAlphaChange={detail.setRetrievalHybridAlpha}
-          onQueryPreprocessingChange={detail.setRetrievalQueryPreprocessing}
-          onSubmit={detail.handleTestRetrieval}
         />
       )}
     </ContextKnowledgeBaseWorkspaceFrame>

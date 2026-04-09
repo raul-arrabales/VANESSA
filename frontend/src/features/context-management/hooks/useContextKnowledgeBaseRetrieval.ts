@@ -5,23 +5,35 @@ import type { KnowledgeBaseQueryPreprocessing, KnowledgeBaseQueryResult, Knowled
 import { getCurrentTimeMs } from "../../../utils/timing";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
-export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
-  retrievalQuery: string;
-  retrievalTopK: string;
-  retrievalSearchMethod: KnowledgeBaseSearchMethod;
-  retrievalHybridAlpha: string;
-  retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
-  retrievalResults: KnowledgeBaseQueryResult[];
-  retrievalResultCount: number | null;
-  retrievalDurationMs: number | null;
+export type KnowledgeBaseRetrievalFormState = {
+  query: string;
+  topK: string;
+  searchMethod: KnowledgeBaseSearchMethod;
+  hybridAlpha: string;
+  queryPreprocessing: KnowledgeBaseQueryPreprocessing;
+};
+
+export type KnowledgeBaseRetrievalRunState = {
+  results: KnowledgeBaseQueryResult[];
+  resultCount: number;
+  durationMs: number;
   completedQueryId: number;
+};
+
+export type KnowledgeBaseRetrievalActions = {
+  setQuery: Dispatch<SetStateAction<string>>;
+  setTopK: Dispatch<SetStateAction<string>>;
+  setSearchMethod: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
+  setHybridAlpha: Dispatch<SetStateAction<string>>;
+  setQueryPreprocessing: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
+  submit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+};
+
+export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
+  retrievalForm: KnowledgeBaseRetrievalFormState;
+  retrievalRun: KnowledgeBaseRetrievalRunState | null;
   isQuerying: boolean;
-  setRetrievalQuery: Dispatch<SetStateAction<string>>;
-  setRetrievalTopK: Dispatch<SetStateAction<string>>;
-  setRetrievalSearchMethod: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
-  setRetrievalHybridAlpha: Dispatch<SetStateAction<string>>;
-  setRetrievalQueryPreprocessing: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
-  handleTestRetrieval: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  retrievalActions: KnowledgeBaseRetrievalActions;
 };
 
 export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrievalResult {
@@ -32,20 +44,16 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
   const [retrievalSearchMethod, setRetrievalSearchMethod] = useState<KnowledgeBaseSearchMethod>("semantic");
   const [retrievalHybridAlpha, setRetrievalHybridAlpha] = useState("0.5");
   const [retrievalQueryPreprocessing, setRetrievalQueryPreprocessing] = useState<KnowledgeBaseQueryPreprocessing>("none");
-  const [retrievalResults, setRetrievalResults] = useState<KnowledgeBaseQueryResult[]>([]);
-  const [retrievalResultCount, setRetrievalResultCount] = useState<number | null>(null);
-  const [retrievalDurationMs, setRetrievalDurationMs] = useState<number | null>(null);
-  const [completedQueryId, setCompletedQueryId] = useState(0);
+  const [retrievalRun, setRetrievalRun] = useState<KnowledgeBaseRetrievalRunState | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
 
-  async function handleTestRetrieval(event: FormEvent<HTMLFormElement>): Promise<void> {
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!workspace.token || !workspace.knowledgeBase || isQuerying) {
       return;
     }
     const startedAt = getCurrentTimeMs();
     setIsQuerying(true);
-    setRetrievalDurationMs(null);
     try {
       const parsedHybridAlpha = Number.parseFloat(retrievalHybridAlpha);
       const response = await queryKnowledgeBase(
@@ -61,12 +69,13 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
         },
         workspace.token,
       );
-      setRetrievalResults(response.results);
-      setRetrievalResultCount(response.retrieval.result_count);
-      setRetrievalDurationMs(Math.max(0, getCurrentTimeMs() - startedAt));
-      setCompletedQueryId((current) => current + 1);
+      setRetrievalRun((current) => ({
+        results: response.results,
+        resultCount: response.retrieval.result_count,
+        durationMs: Math.max(0, getCurrentTimeMs() - startedAt),
+        completedQueryId: (current?.completedQueryId ?? 0) + 1,
+      }));
     } catch (requestError) {
-      setRetrievalDurationMs(null);
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.queryFailed"));
     } finally {
       setIsQuerying(false);
@@ -75,21 +84,22 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
 
   return {
     ...workspace,
-    retrievalQuery,
-    retrievalTopK,
-    retrievalSearchMethod,
-    retrievalHybridAlpha,
-    retrievalQueryPreprocessing,
-    retrievalResults,
-    retrievalResultCount,
-    retrievalDurationMs,
-    completedQueryId,
+    retrievalForm: {
+      query: retrievalQuery,
+      topK: retrievalTopK,
+      searchMethod: retrievalSearchMethod,
+      hybridAlpha: retrievalHybridAlpha,
+      queryPreprocessing: retrievalQueryPreprocessing,
+    },
+    retrievalRun,
     isQuerying,
-    setRetrievalQuery,
-    setRetrievalTopK,
-    setRetrievalSearchMethod,
-    setRetrievalHybridAlpha,
-    setRetrievalQueryPreprocessing,
-    handleTestRetrieval,
+    retrievalActions: {
+      setQuery: setRetrievalQuery,
+      setTopK: setRetrievalTopK,
+      setSearchMethod: setRetrievalSearchMethod,
+      setHybridAlpha: setRetrievalHybridAlpha,
+      setQueryPreprocessing: setRetrievalQueryPreprocessing,
+      submit,
+    },
   };
 }

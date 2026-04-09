@@ -1,49 +1,24 @@
-import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type {
-  KnowledgeBaseQueryPreprocessing,
-  KnowledgeBaseQueryResult,
-  KnowledgeBaseSearchMethod,
-} from "../../../api/context";
+  KnowledgeBaseRetrievalActions,
+  KnowledgeBaseRetrievalFormState,
+  KnowledgeBaseRetrievalRunState,
+} from "../hooks/useContextKnowledgeBaseRetrieval";
 import { KnowledgeBaseRetrievalResults } from "./KnowledgeBaseRetrievalResults";
 import { KnowledgeBaseRetrievalSettingsForm } from "./KnowledgeBaseRetrievalSettingsForm";
 
 type Props = {
-  retrievalQuery: string;
-  retrievalTopK: string;
-  retrievalSearchMethod: KnowledgeBaseSearchMethod;
-  retrievalHybridAlpha: string;
-  retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
-  retrievalResults: KnowledgeBaseQueryResult[];
-  retrievalResultCount: number | null;
-  retrievalDurationMs: number | null;
-  completedQueryId: number;
+  retrievalForm: KnowledgeBaseRetrievalFormState;
+  retrievalRun: KnowledgeBaseRetrievalRunState | null;
+  retrievalActions: KnowledgeBaseRetrievalActions;
   isQuerying: boolean;
-  onQueryChange: Dispatch<SetStateAction<string>>;
-  onTopKChange: Dispatch<SetStateAction<string>>;
-  onSearchMethodChange: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
-  onHybridAlphaChange: Dispatch<SetStateAction<string>>;
-  onQueryPreprocessingChange: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
 export function KnowledgeBaseRetrievalSection({
-  retrievalQuery,
-  retrievalTopK,
-  retrievalSearchMethod,
-  retrievalHybridAlpha,
-  retrievalQueryPreprocessing,
-  retrievalResults,
-  retrievalResultCount,
-  retrievalDurationMs,
-  completedQueryId,
+  retrievalForm,
+  retrievalRun,
+  retrievalActions,
   isQuerying,
-  onQueryChange,
-  onTopKChange,
-  onSearchMethodChange,
-  onHybridAlphaChange,
-  onQueryPreprocessingChange,
-  onSubmit,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
 
@@ -56,25 +31,20 @@ export function KnowledgeBaseRetrievalSection({
         </div>
       </div>
       <KnowledgeBaseRetrievalSettingsForm
-        retrievalQuery={retrievalQuery}
-        retrievalTopK={retrievalTopK}
-        retrievalSearchMethod={retrievalSearchMethod}
-        retrievalHybridAlpha={retrievalHybridAlpha}
-        retrievalQueryPreprocessing={retrievalQueryPreprocessing}
+        retrievalQuery={retrievalForm.query}
+        retrievalTopK={retrievalForm.topK}
+        retrievalSearchMethod={retrievalForm.searchMethod}
+        retrievalHybridAlpha={retrievalForm.hybridAlpha}
+        retrievalQueryPreprocessing={retrievalForm.queryPreprocessing}
         isQuerying={isQuerying}
-        onQueryChange={onQueryChange}
-        onTopKChange={onTopKChange}
-        onSearchMethodChange={onSearchMethodChange}
-        onHybridAlphaChange={onHybridAlphaChange}
-        onQueryPreprocessingChange={onQueryPreprocessingChange}
-        onSubmit={onSubmit}
+        onQueryChange={retrievalActions.setQuery}
+        onTopKChange={retrievalActions.setTopK}
+        onSearchMethodChange={retrievalActions.setSearchMethod}
+        onHybridAlphaChange={retrievalActions.setHybridAlpha}
+        onQueryPreprocessingChange={retrievalActions.setQueryPreprocessing}
+        onSubmit={retrievalActions.submit}
       />
-      <KnowledgeBaseRetrievalResults
-        retrievalResults={retrievalResults}
-        retrievalResultCount={retrievalResultCount}
-        retrievalDurationMs={retrievalDurationMs}
-        completedQueryId={completedQueryId}
-      />
+      <KnowledgeBaseRetrievalResults retrievalRun={retrievalRun} />
     </section>
   );
 }

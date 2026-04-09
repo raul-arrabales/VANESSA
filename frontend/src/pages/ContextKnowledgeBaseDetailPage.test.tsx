@@ -1026,6 +1026,56 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     performanceNowSpy.mockRestore();
   });
 
+  it("keeps the last successful retrieval snapshot visible after a failed rerun", async () => {
+    contextApiMocks.queryKnowledgeBase
+      .mockResolvedValueOnce(
+        buildKnowledgeBaseQueryResponse({
+          results: [
+            buildKnowledgeBaseQueryResult({
+              id: "doc-stable",
+              title: "Stable Result",
+              text: "This result should remain visible after a failed rerun tail-marker-stable",
+              metadata: {
+                document_id: "doc-stable",
+                chunk_index: 0,
+                source_name: "Stable source",
+              },
+              chunk_length_tokens: 11,
+              relevance_score: 0.81,
+            }),
+          ],
+        }),
+      )
+      .mockRejectedValueOnce(new ApiError("Retrieval request failed.", 500, "retrieval_failed"));
+
+    await renderContextWorkspace("/control/context/kb-primary/retrieval");
+
+    expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+
+    let nowCallCount = 0;
+    const performanceNowSpy = vi.spyOn(performance, "now").mockImplementation(() => {
+      nowCallCount += 1;
+      return nowCallCount === 1 ? 100 : 460;
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    expect(await screen.findByText("1 retrieval result(s)")).toBeVisible();
+    expect(screen.getByText("Completed in 360 ms.")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Expand retrieval result for Chunk 1: Stable Result" })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Retrieval request failed.")).toBeVisible();
+    expect(screen.getByText("1 retrieval result(s)")).toBeVisible();
+    expect(screen.getByText("Completed in 360 ms.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Expand retrieval result for Chunk 1: Stable Result" })).toBeVisible();
+
+    performanceNowSpy.mockRestore();
+  });
+
   it("lets the operator switch retrieval search method to keyword", async () => {
     await renderContextWorkspace("/control/context/kb-primary/retrieval");
 
