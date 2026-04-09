@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { registerManagedModel } from "../../../api/modelops/models";
 import { useAuth } from "../../../auth/AuthProvider";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { TASK_OPTIONS } from "../domain";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import { useLocalDownloads } from "../hooks/useLocalDownloads";
@@ -10,7 +11,8 @@ import { useLocalDownloads } from "../hooks/useLocalDownloads";
 export default function LocalModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
-  const { discoveredModels, selectedModelInfo, downloadJobs, hasActiveJobs, error, feedback, search, inspect, download } =
+  const { showErrorFeedback } = useActionFeedback();
+  const { discoveredModels, selectedModelInfo, downloadJobs, hasActiveJobs, feedback, search, inspect, download } =
     useLocalDownloads(token);
 
   const [discoveryTaskKey, setDiscoveryTaskKey] = useState("llm");
@@ -25,7 +27,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
   });
   const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
   const [manualFeedback, setManualFeedback] = useState("");
-  const [manualError, setManualError] = useState("");
 
   return (
     <section className="card-stack">
@@ -104,7 +105,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
                 .then((model) => {
                   setLastRegisteredModelId(model.id);
                   setManualFeedback(t("modelOps.local.manualSuccess"));
-                  setManualError("");
                   setManualState({
                     id: "",
                     name: "",
@@ -115,7 +115,9 @@ export default function LocalModelRegisterPage(): JSX.Element {
                   });
                 })
                 .catch((requestError) => {
-                  setManualError(requestError instanceof Error ? requestError.message : t("modelOps.local.manualFailure"));
+                  showErrorFeedback(requestError, t("modelOps.local.manualFailure"), {
+                    titleKey: "modelOps.local.manualTitle",
+                  });
                 });
             }}
           >
@@ -133,7 +135,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
           </Link>
         </div>
       )}
-      {(error || manualError) && <p className="error-text">{error || manualError}</p>}
     </section>
   );
 }

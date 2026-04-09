@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   discoverHfModels,
   getHfModelDetails,
@@ -6,6 +7,7 @@ import {
   startModelDownload,
 } from "../../../api/modelops/local";
 import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/modelops/types";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 const ACTIVE_JOB_STATUSES = new Set(["queued", "running"]);
 const BASE_POLL_INTERVAL_MS = 3000;
@@ -31,7 +33,6 @@ export function useLocalDownloads(token: string): {
   selectedModelInfo: string;
   downloadJobs: ModelDownloadJob[];
   hasActiveJobs: boolean;
-  error: string;
   feedback: string;
   search: (params: { query: string; task_key: string }) => Promise<void>;
   inspect: (sourceId: string) => Promise<void>;
@@ -41,8 +42,9 @@ export function useLocalDownloads(token: string): {
   const [discoveredModels, setDiscoveredModels] = useState<HfDiscoveredModel[]>([]);
   const [selectedModelInfo, setSelectedModelInfo] = useState("");
   const [downloadJobs, setDownloadJobs] = useState<ModelDownloadJob[]>([]);
-  const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  const { t } = useTranslation("common");
+  const { showErrorFeedback } = useActionFeedback();
   const jobsRef = useRef<ModelDownloadJob[]>([]);
   const pollingStartedAtRef = useRef<number | null>(null);
 
@@ -133,7 +135,6 @@ export function useLocalDownloads(token: string): {
     if (!token) {
       return;
     }
-    setError("");
     setFeedback("");
     try {
       const models = await discoverHfModels(token, {
@@ -149,22 +150,25 @@ export function useLocalDownloads(token: string): {
         setFeedback("No models found for this query.");
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to search Hugging Face.");
+      showErrorFeedback(requestError, t("models.feedback.discoveryFailed"), {
+        titleKey: "modelOps.local.discoveryTitle",
+      });
     }
-  }, [token]);
+  }, [showErrorFeedback, t, token]);
 
   const inspect = useCallback(async (sourceId: string): Promise<void> => {
     if (!token) {
       return;
     }
-    setError("");
     try {
       const details = await getHfModelDetails(sourceId, token);
       setSelectedModelInfo(`${details.source_id} • ${details.files.length} files`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load model details.");
+      showErrorFeedback(requestError, t("modelOps.local.inspectFailure"), {
+        titleKey: "modelOps.local.discoveryTitle",
+      });
     }
-  }, [token]);
+  }, [showErrorFeedback, t, token]);
 
   const download = useCallback(async (
     model: HfDiscoveredModel,
@@ -174,7 +178,6 @@ export function useLocalDownloads(token: string): {
     if (!token) {
       return;
     }
-    setError("");
     setFeedback("");
     try {
       const job = await startModelDownload(
@@ -189,16 +192,17 @@ export function useLocalDownloads(token: string): {
       setDownloadJobs((current) => [job, ...current]);
       setFeedback(`Started download for ${model.source_id}.`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to start download.");
+      showErrorFeedback(requestError, t("models.feedback.downloadStartFailed"), {
+        titleKey: "modelOps.local.discoveryTitle",
+      });
     }
-  }, [token]);
+  }, [showErrorFeedback, t, token]);
 
   return {
     discoveredModels,
     selectedModelInfo,
     downloadJobs,
     hasActiveJobs,
-    error,
     feedback,
     search,
     inspect,

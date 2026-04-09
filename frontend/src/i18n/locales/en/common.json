@@ -1009,6 +1009,7 @@
       "description": "Onboard local models through Hugging Face discovery, downloads, or manual artifact registration.",
       "discoveryTitle": "Hugging Face discovery",
       "discoveryPlaceholder": "e.g. llama instruct",
+      "inspectFailure": "Unable to load model details.",
       "pollingActive": "Polling active downloads.",
       "noActiveJobs": "No active downloads.",
       "manualTitle": "Manual local registration",

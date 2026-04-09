@@ -978,6 +978,7 @@
       "description": "Incorpora modelos locales mediante descubrimiento en Hugging Face, descargas o registro manual de artefactos.",
       "discoveryTitle": "Descubrimiento en Hugging Face",
       "discoveryPlaceholder": "ej. llama instruct",
+      "inspectFailure": "No se pudieron cargar los detalles del modelo.",
       "pollingActive": "Consultando descargas activas.",
       "noActiveJobs": "No hay descargas activas.",
       "manualTitle": "Registro manual local",
