@@ -76,7 +76,7 @@ export default function ModelTestPage(): JSX.Element {
     return (
       <section className="panel card-stack">
         <h2 className="section-title">{t("modelOps.testing.title")}</h2>
-        <p className="status-text">{testState.error || t("modelOps.detail.notFound")}</p>
+        <p className="status-text">{t("modelOps.detail.notFound")}</p>
       </section>
     );
   }
@@ -222,7 +222,6 @@ export default function ModelTestPage(): JSX.Element {
         result={testState.latestResult}
         latestTest={latestTest}
         summary={resultSummary}
-        error={testState.error}
       />
 
       <ModelValidationAction
@@ -237,8 +236,6 @@ export default function ModelTestPage(): JSX.Element {
         requestPayload={debugPayload.requestPayload}
         responsePayload={debugPayload.responsePayload}
       />
-
-      {testState.feedback && <p className="status-text">{testState.feedback}</p>}
     </section>
   );
 }

@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ModelDetailPage from "./ModelDetailPage";
@@ -170,5 +171,42 @@ describe("ModelDetailPage", () => {
       "href",
       "/control/models/access?modelId=gpt-private",
     );
+  });
+
+  it("opens shared modal feedback for lifecycle mutation failures without inline errors", async () => {
+    const user = userEvent.setup();
+    mockUser = { id: 1, username: "tester", email: "t@example.com", role: "user", is_active: true };
+    modelApiMocks.getManagedModel.mockResolvedValue({
+      id: "gpt-private",
+      name: "GPT Private",
+      provider: "openai_compatible",
+      provider_model_id: "gpt-4.1",
+      backend: "external_api",
+      hosting: "cloud",
+      owner_type: "user",
+      owner_user_id: 1,
+      visibility_scope: "private",
+      lifecycle_state: "validated",
+      is_validation_current: true,
+      last_validation_status: "success",
+      task_key: "llm",
+      source: "external_provider",
+      artifact: {},
+      usage_summary: { total_requests: 2, metrics: {} },
+    });
+    modelApiMocks.activateManagedModel.mockRejectedValue(new Error("Activation request failed."));
+
+    const view = await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId" element={<ModelDetailPage />} />
+      </Routes>,
+      { route: "/control/models/gpt-private" },
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Activate" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Model detail" });
+    expect(within(dialog).getByText("Activation request failed.")).toBeVisible();
+    expect(view.container.querySelector(".error-text")).toBeNull();
   });
 });

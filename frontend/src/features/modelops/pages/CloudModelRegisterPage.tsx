@@ -32,7 +32,7 @@ type CloudModelState = {
 export default function CloudModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
-  const { credentials, recentCloudModels, isLoading, isSaving, error, feedback, saveCredential, registerCloudModel } =
+  const { credentials, recentCloudModels, isLoading, isSaving, feedback, saveCredential, registerCloudModel } =
     useCloudRegistrationFlow(token);
   const isSuperadmin = user?.role === "superadmin";
   const canTest = user?.role === "admin" || user?.role === "superadmin";
@@ -154,7 +154,6 @@ export default function CloudModelRegisterPage(): JSX.Element {
           </Link>
         </div>
       )}
-      {error && <p className="error-text">{error}</p>}
     </section>
   );
 }

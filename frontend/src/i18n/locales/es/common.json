@@ -337,6 +337,21 @@
     "knowledge": {
       "title": "Chat de conocimiento",
       "description": "Haz preguntas sobre bases de conocimiento vinculadas al despliegue y revisa citas con fragmentos de soporte."
+    },
+    "shared": {
+      "noEnabledModels": "No hay modelos habilitados disponibles ahora mismo.",
+      "noKnowledgeBases": "No hay bases de conocimiento disponibles ahora mismo.",
+      "modelSelector": {
+        "label": "Modelo",
+        "aria": "Modelo",
+        "loading": "Cargando modelos...",
+        "empty": "No hay modelos habilitados"
+      },
+      "knowledgeBaseSelector": {
+        "label": "Base de conocimiento",
+        "aria": "Base de conocimiento",
+        "placeholder": "Selecciona una base de conocimiento"
+      }
     }
   },
   "knowledgeChat": {
@@ -389,6 +404,12 @@
       "description": "¿Eliminar \"{{title}}\"? Esto quita la conversación guardada del historial lateral.",
       "confirm": "Eliminar conversación"
     }
+  },
+  "playgroundSessionSidebar": {
+    "aria": "Historial de conversaciones",
+    "expand": "Expandir historial de conversaciones",
+    "collapse": "Contraer historial de conversaciones",
+    "actionsFor": "Acciones de la conversación para {{title}}"
   },
   "contextManagement": {
     "title": "Gestion de contexto",
@@ -940,9 +961,23 @@
       "title": "Inicio de ModelOps",
       "description": "Revisa los modelos a los que tienes acceso, registra modelos cloud y entra en el flujo correcto sin mezclar operaciones.",
       "superadminDescription": "Revisa el estado global de ModelOps, entra en onboarding cloud o local y gestiona accesos sin concentrar todo en una sola pagina.",
+      "loadFailed": "No se pudo cargar el resumen de modelos.",
       "summaryTitle": "Resumen",
       "entryTitle": "Flujos",
       "entryAria": "Navegacion de flujos de ModelOps",
+      "summaryCards": {
+        "totalModels": "Modelos totales",
+        "activeModels": "Modelos activos",
+        "inactiveModels": "Modelos inactivos",
+        "localModels": "Modelos locales",
+        "cloudModels": "Modelos cloud",
+        "validated": "Validados",
+        "personalModels": "Modelos personales",
+        "sharedPlatform": "Compartidos / plataforma",
+        "activeDownloads": "Descargas activas",
+        "accessibleModels": "Modelos accesibles",
+        "savedCredentials": "Credenciales guardadas"
+      },
       "cards": {
         "catalogTitle": "Explorar catalogo",
         "catalogDescription": "Revisa los modelos accesibles y abre paginas de detalle mas claras.",
@@ -959,6 +994,7 @@
     "catalog": {
       "title": "Catalogo de modelos",
       "description": "Explora los modelos visibles para tu rol y entra a paginas de detalle para el trabajo de ciclo de vida.",
+      "loadFailed": "No se pudieron cargar los modelos.",
       "empty": "Ningun modelo coincide con los filtros actuales.",
       "validatedBadge": "Validado",
       "notValidatedBadge": "No validado"
@@ -971,13 +1007,20 @@
       "registrationTitle": "Registrar modelo cloud",
       "recentTitle": "Modelos cloud registrados recientemente",
       "emptyRecent": "Todavia no hay modelos cloud registrados.",
-      "selectCredential": "Selecciona una credencial"
+      "selectCredential": "Selecciona una credencial",
+      "loadFailed": "No se pudieron cargar los datos del registro cloud.",
+      "credentialSaved": "Credencial guardada.",
+      "credentialSaveFailed": "No se pudo guardar la credencial.",
+      "modelRegistered": "Modelo registrado.",
+      "modelRegisterFailed": "No se pudo registrar el modelo cloud."
     },
     "local": {
       "title": "Registro de modelos locales",
       "description": "Incorpora modelos locales mediante descubrimiento en Hugging Face, descargas o registro manual de artefactos.",
       "discoveryTitle": "Descubrimiento en Hugging Face",
       "discoveryPlaceholder": "ej. llama instruct",
+      "discoveryResultsAria": "Resultados del descubrimiento local",
+      "downloadJobsAria": "Trabajos de descarga",
       "inspectFailure": "No se pudieron cargar los detalles del modelo.",
       "pollingActive": "Consultando descargas activas.",
       "noActiveJobs": "No hay descargas activas.",
@@ -994,12 +1037,23 @@
     },
     "access": {
       "title": "Gestion de acceso a modelos",
-      "description": "Asigna acceso por rol sin mezclar estos controles con las paginas de registro."
+      "description": "Asigna acceso por rol sin mezclar estos controles con las paginas de registro.",
+      "loadFailed": "No se pudo cargar la configuracion de acceso a modelos.",
+      "saveFailed": "No se pudieron guardar las asignaciones.",
+      "saved": "Asignaciones de {{scope}} guardadas."
     },
     "detail": {
       "title": "Detalle del modelo",
+      "loadFailed": "No se pudieron cargar los detalles del modelo.",
+      "updateFailed": "No se pudo actualizar el modelo.",
+      "registered": "Modelo registrado.",
+      "activated": "Modelo activado.",
+      "deactivated": "Modelo desactivado.",
+      "unregistered": "Registro del modelo eliminado.",
+      "deleted": "Modelo eliminado.",
       "notFound": "Los detalles del modelo no estan disponibles.",
       "metadataTitle": "Resumen",
+      "metadataAria": "Metadatos del modelo",
       "validationsTitle": "Historial de validacion",
       "activationRequiresValidation": "La activacion requiere una validacion correcta y vigente.",
       "noValidations": "Todavia no se han registrado validaciones.",
@@ -1009,6 +1063,12 @@
     },
     "testing": {
       "title": "Prueba del modelo",
+      "loadFailed": "No se pudo cargar la pagina de pruebas del modelo.",
+      "runSucceeded": "La prueba del modelo fue correcta.",
+      "runFailed": "La prueba del modelo fallo.",
+      "runFailedRequest": "No se pudo ejecutar la prueba del modelo.",
+      "validationConfirmed": "El modelo se marco como validado.",
+      "validationFailed": "No se pudo validar el modelo.",
       "validationStatus": "Validacion",
       "currentValidation": "Actual",
       "lastTestSummary": "Ultima prueba: {{result}} · {{timestamp}}",

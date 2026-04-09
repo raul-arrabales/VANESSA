@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listModelOpsModels } from "../../../api/modelops/models";
 import { listModelCredentials } from "../../../api/modelops/credentials";
 import { listDownloadJobs } from "../../../api/modelops/local";
@@ -21,6 +22,7 @@ export function useModelOpsSummary(
   refresh: () => Promise<void>;
   cards: Array<{ label: string; value: number }>;
 } {
+  const { t } = useTranslation("common");
   const [summary, setSummary] = useState<SummaryState>({
     models: [],
     credentialCount: 0,
@@ -50,11 +52,11 @@ export function useModelOpsSummary(
         activeDownloadJobs,
       });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load model summary.");
+      setError(requestError instanceof Error ? requestError.message : t("modelOps.home.loadFailed"));
     } finally {
       setIsLoading(false);
     }
-  }, [role, token]);
+  }, [role, t, token]);
 
   useEffect(() => {
     void refresh();
@@ -71,15 +73,15 @@ export function useModelOpsSummary(
 
     if (role === "superadmin") {
       return [
-        { label: "Total models", value: models.length },
-        { label: "Active models", value: activeCount },
-        { label: "Inactive models", value: Math.max(models.length - activeCount, 0) },
-        { label: "Local models", value: localCount },
-        { label: "Cloud models", value: cloudCount },
-        { label: "Validated", value: validatedCount },
-        { label: "Personal models", value: personalCount },
-        { label: "Shared/platform", value: sharedCount },
-        { label: "Active downloads", value: summary.activeDownloadJobs },
+        { label: t("modelOps.home.summaryCards.totalModels"), value: models.length },
+        { label: t("modelOps.home.summaryCards.activeModels"), value: activeCount },
+        { label: t("modelOps.home.summaryCards.inactiveModels"), value: Math.max(models.length - activeCount, 0) },
+        { label: t("modelOps.home.summaryCards.localModels"), value: localCount },
+        { label: t("modelOps.home.summaryCards.cloudModels"), value: cloudCount },
+        { label: t("modelOps.home.summaryCards.validated"), value: validatedCount },
+        { label: t("modelOps.home.summaryCards.personalModels"), value: personalCount },
+        { label: t("modelOps.home.summaryCards.sharedPlatform"), value: sharedCount },
+        { label: t("modelOps.home.summaryCards.activeDownloads"), value: summary.activeDownloadJobs },
       ];
     }
 
@@ -87,13 +89,13 @@ export function useModelOpsSummary(
       (model) => model.owner_type === "user" || model.visibility_scope === "private",
     ).length;
     return [
-      { label: "Accessible models", value: models.length },
-      { label: "Active models", value: activeCount },
-      { label: "Inactive models", value: Math.max(models.length - activeCount, 0) },
-      { label: "Personal models", value: accessiblePersonalCount },
-      { label: "Saved credentials", value: summary.credentialCount },
+      { label: t("modelOps.home.summaryCards.accessibleModels"), value: models.length },
+      { label: t("modelOps.home.summaryCards.activeModels"), value: activeCount },
+      { label: t("modelOps.home.summaryCards.inactiveModels"), value: Math.max(models.length - activeCount, 0) },
+      { label: t("modelOps.home.summaryCards.personalModels"), value: accessiblePersonalCount },
+      { label: t("modelOps.home.summaryCards.savedCredentials"), value: summary.credentialCount },
     ];
-  }, [role, summary]);
+  }, [role, summary, t]);
 
   return { summary, isLoading, error, refresh, cards };
 }

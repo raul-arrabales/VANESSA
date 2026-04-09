@@ -49,7 +49,7 @@ export default function LocalDiscoveryPanel({
         </button>
       </div>
       {selectedModelInfo && <p className="status-text">{selectedModelInfo}</p>}
-      <ul className="card-stack" aria-label="Local discovery results">
+      <ul className="card-stack" aria-label={t("modelOps.local.discoveryResultsAria")}>
         {discoveredModels.map((model) => (
           <li key={model.source_id} className="status-row">
             <span>{`${model.source_id} · ${model.downloads ?? 0} downloads`}</span>
@@ -67,7 +67,7 @@ export default function LocalDiscoveryPanel({
       <p className="status-text">
         {hasActiveJobs ? t("modelOps.local.pollingActive") : t("modelOps.local.noActiveJobs")}
       </p>
-      <ul className="card-stack" aria-label="Download jobs">
+      <ul className="card-stack" aria-label={t("modelOps.local.downloadJobsAria")}>
         {downloadJobs.map((job) => (
           <li key={job.job_id} className="status-row">
             <span>{`${job.source_id} · ${job.status}`}</span>

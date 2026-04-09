@@ -56,14 +56,11 @@ describe("Composer", () => {
     });
 
     class ResizeObserverMock {
-      private readonly callback: ResizeObserverCallback;
-
       public readonly observe = vi.fn();
 
       public readonly disconnect = vi.fn();
 
       public constructor(callback: ResizeObserverCallback) {
-        this.callback = callback;
         resizeObserverInstances.push({
           callback,
           observe: this.observe,

@@ -3,6 +3,11 @@ import { knowledgePlaygroundConfig, chatPlaygroundConfig } from "../configs";
 import { buildPlaygroundWorkspaceViewState } from "./usePlaygroundWorkspaceViewState";
 import type { PlaygroundSessionViewModel, PlaygroundWorkspaceOptions } from "../types";
 
+const localizedMessages = {
+  noEnabledModels: "No enabled models are available right now.",
+  noKnowledgeBases: "No knowledge bases are available right now.",
+};
+
 function buildOptionsState(
   overrides: Partial<PlaygroundWorkspaceOptions & {
     modelError: string;
@@ -72,6 +77,7 @@ describe("buildPlaygroundWorkspaceViewState", () => {
       sessionState: buildSessionState(),
       isSending: false,
       isSessionBusy: false,
+      localizedMessages,
     });
 
     expect(result.threadStatusText).toBe("Loading available models...");
@@ -89,6 +95,7 @@ describe("buildPlaygroundWorkspaceViewState", () => {
       sessionState: buildSessionState(),
       isSending: false,
       isSessionBusy: false,
+      localizedMessages,
     });
 
     expect(result.modelAvailabilityMessage).toBe("No enabled models are available right now.");
@@ -115,6 +122,7 @@ describe("buildPlaygroundWorkspaceViewState", () => {
       }),
       isSending: false,
       isSessionBusy: false,
+      localizedMessages,
     });
 
     expect(result.threadStatusText).toBe("Loading knowledge bases...");
@@ -141,6 +149,7 @@ describe("buildPlaygroundWorkspaceViewState", () => {
       }),
       isSending: false,
       isSessionBusy: false,
+      localizedMessages,
     });
 
     expect(result.knowledgeBaseAvailabilityMessage).toBe("Knowledge bases are not configured.");
@@ -159,6 +168,7 @@ describe("buildPlaygroundWorkspaceViewState", () => {
       }),
       isSending: false,
       isSessionBusy: true,
+      localizedMessages,
     });
 
     expect(result.threadStatusText).toBe(chatPlaygroundConfig.loadingText);

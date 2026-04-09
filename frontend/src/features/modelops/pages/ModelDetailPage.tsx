@@ -23,7 +23,7 @@ export default function ModelDetailPage(): JSX.Element {
     return (
       <section className="panel card-stack">
         <h2 className="section-title">{t("modelOps.detail.title")}</h2>
-        <p className="status-text">{detail.error || t("modelOps.detail.notFound")}</p>
+        <p className="status-text">{t("modelOps.detail.notFound")}</p>
       </section>
     );
   }
@@ -71,7 +71,7 @@ export default function ModelDetailPage(): JSX.Element {
 
       <article className="panel card-stack">
         <h2 className="section-title">{t("modelOps.detail.metadataTitle")}</h2>
-        <ul className="card-stack" aria-label="Model metadata">
+        <ul className="card-stack" aria-label={t("modelOps.detail.metadataAria")}>
           <li className="status-row"><span>{`${t("modelOps.fields.providerModelId")}: ${model.provider_model_id ?? "--"}`}</span></li>
           <li className="status-row"><span>{`${t("modelOps.fields.source")}: ${model.source ?? "--"}`}</span></li>
           <li className="status-row"><span>{`${t("modelOps.fields.localPath")}: ${model.artifact?.storage_path ?? model.metadata?.local_path ?? "--"}`}</span></li>
@@ -81,9 +81,6 @@ export default function ModelDetailPage(): JSX.Element {
 
       <UsageSummaryPanel usage={detail.usage} />
       <ValidationHistoryPanel validations={detail.validations} />
-
-      {detail.feedback && <p className="status-text">{detail.feedback}</p>}
-      {detail.error && <p className="error-text">{detail.error}</p>}
     </section>
   );
 }

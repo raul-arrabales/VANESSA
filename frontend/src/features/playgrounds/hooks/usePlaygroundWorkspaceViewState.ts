@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   PlaygroundSessionViewModel,
   PlaygroundWorkspaceConfig,
@@ -24,6 +25,10 @@ export type UsePlaygroundWorkspaceViewStateParams = {
   sessionState: PlaygroundWorkspaceSessionState;
   isSending: boolean;
   isSessionBusy: boolean;
+  localizedMessages?: {
+    noEnabledModels: string;
+    noKnowledgeBases: string;
+  };
 };
 
 export type PlaygroundWorkspaceViewState = {
@@ -49,18 +54,19 @@ export function buildPlaygroundWorkspaceViewState({
   sessionState,
   isSending,
   isSessionBusy,
+  localizedMessages,
 }: UsePlaygroundWorkspaceViewStateParams): PlaygroundWorkspaceViewState {
   const activeSession = sessionState.activeSession;
   const modelAvailabilityMessage = optionsState.modelError
     || (optionsState.hasLoadedModels && optionsState.models.length === 0
-      ? "No enabled models are available right now."
+      ? (localizedMessages?.noEnabledModels ?? "")
       : "");
   const knowledgeBaseAvailabilityMessage = config.selectors.knowledgeBase
     ? (
       optionsState.knowledgeBaseError
       || (
         optionsState.hasLoadedKnowledgeBases && optionsState.knowledgeBases.length === 0
-          ? (optionsState.configurationMessage || "No knowledge bases are available right now.")
+          ? (optionsState.configurationMessage || localizedMessages?.noKnowledgeBases || "")
           : ""
       )
     )
@@ -108,5 +114,13 @@ export function buildPlaygroundWorkspaceViewState({
 export function usePlaygroundWorkspaceViewState(
   params: UsePlaygroundWorkspaceViewStateParams,
 ): PlaygroundWorkspaceViewState {
-  return useMemo(() => buildPlaygroundWorkspaceViewState(params), [params]);
+  const { t } = useTranslation("common");
+
+  return useMemo(() => buildPlaygroundWorkspaceViewState({
+    ...params,
+    localizedMessages: {
+      noEnabledModels: t("playgrounds.shared.noEnabledModels"),
+      noKnowledgeBases: t("playgrounds.shared.noKnowledgeBases"),
+    },
+  }), [params, t]);
 }

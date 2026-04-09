@@ -49,7 +49,7 @@ describe("retrieval presentation", () => {
     });
 
     expect(getRetrievalScoreKind(hybridResult)).toBe("hybrid_score");
-    expect(getRetrievalScoreKind({ id: "doc-1", score_kind: "bm25" })).toBe("keyword_score");
+    expect(getRetrievalScoreKind({ score_kind: "bm25" })).toBe("keyword_score");
     expect(getRetrievalComponentScoreRows(hybridResult)).toEqual([
       { kind: "semantic_score", value: 0.81 },
       { kind: "keyword_score", value: 0.67 },

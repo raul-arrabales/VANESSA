@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listModelOpsModels } from "../../../api/modelops/models";
 import { listModelAssignments, updateModelAssignment } from "../../../api/modelops/access";
 import type { ManagedModel, ModelScopeAssignment } from "../../../api/modelops/types";
@@ -13,6 +14,7 @@ export function useModelAssignments(token: string): {
   refresh: () => Promise<void>;
   toggleAssignment: (scope: string, modelId: string) => Promise<void>;
 } {
+  const { t } = useTranslation("common");
   const [models, setModels] = useState<ManagedModel[]>([]);
   const [assignments, setAssignments] = useState<ModelScopeAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,11 +36,11 @@ export function useModelAssignments(token: string): {
       setModels(modelRows);
       setAssignments(assignmentRows);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load model access settings.");
+      setError(requestError instanceof Error ? requestError.message : t("modelOps.access.loadFailed"));
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [t, token]);
 
   useEffect(() => {
     void refresh();
@@ -68,11 +70,11 @@ export function useModelAssignments(token: string): {
         const others = currentAssignments.filter((assignment) => assignment.scope !== scope);
         return [...others, saved];
       });
-      setFeedback(`Saved ${scope} assignments.`);
+      setFeedback(t("modelOps.access.saved", { scope }));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to save assignments.");
+      setError(requestError instanceof Error ? requestError.message : t("modelOps.access.saveFailed"));
     }
-  }, [assignmentByScope, token]);
+  }, [assignmentByScope, t, token]);
 
   return {
     models,

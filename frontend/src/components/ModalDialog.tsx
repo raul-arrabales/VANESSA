@@ -6,7 +6,7 @@ type ModalDialogProps = {
   eyebrow?: string;
   onClose: () => void;
   closeDisabled?: boolean;
-  initialFocusRef?: RefObject<HTMLElement | null>;
+  initialFocusRef?: RefObject<HTMLElement>;
   className?: string;
   children?: ReactNode;
   actions?: ReactNode;

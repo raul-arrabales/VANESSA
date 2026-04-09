@@ -42,8 +42,6 @@ export type ManagedModelTestState = {
   isLoading: boolean;
   isRunningTest: boolean;
   isValidating: boolean;
-  error: string;
-  feedback: string;
   refresh: () => Promise<void>;
   runTest: (inputs: ModelTestInput, options?: { providerInstanceId?: string }) => Promise<void>;
   markValidated: () => Promise<void>;

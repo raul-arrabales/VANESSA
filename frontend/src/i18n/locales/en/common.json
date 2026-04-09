@@ -342,6 +342,21 @@
     "knowledge": {
       "title": "Knowledge Chat",
       "description": "Ask questions against deployment-bound knowledge bases and review cited source snippets."
+    },
+    "shared": {
+      "noEnabledModels": "No enabled models are available right now.",
+      "noKnowledgeBases": "No knowledge bases are available right now.",
+      "modelSelector": {
+        "label": "Model",
+        "aria": "Model",
+        "loading": "Loading models...",
+        "empty": "No enabled models"
+      },
+      "knowledgeBaseSelector": {
+        "label": "Knowledge base",
+        "aria": "Knowledge base",
+        "placeholder": "Select knowledge base"
+      }
     }
   },
   "knowledgeChat": {
@@ -394,6 +409,12 @@
       "description": "Delete \"{{title}}\"? This removes the saved conversation history from the sidebar.",
       "confirm": "Delete conversation"
     }
+  },
+  "playgroundSessionSidebar": {
+    "aria": "Conversation history",
+    "expand": "Expand conversation history",
+    "collapse": "Collapse conversation history",
+    "actionsFor": "Conversation actions for {{title}}"
   },
   "contextManagement": {
     "eyebrow": "Knowledge base workspace",
@@ -971,9 +992,23 @@
       "title": "ModelOps home",
       "description": "Review the models you can access, register cloud-hosted models, and move into the right workflow without operational clutter.",
       "superadminDescription": "Review platform-wide ModelOps health, jump into cloud or local onboarding, and manage access without keeping every operation on one page.",
+      "loadFailed": "Unable to load model summary.",
       "summaryTitle": "Summary",
       "entryTitle": "Workflows",
       "entryAria": "ModelOps workflow navigation",
+      "summaryCards": {
+        "totalModels": "Total models",
+        "activeModels": "Active models",
+        "inactiveModels": "Inactive models",
+        "localModels": "Local models",
+        "cloudModels": "Cloud models",
+        "validated": "Validated",
+        "personalModels": "Personal models",
+        "sharedPlatform": "Shared/platform",
+        "activeDownloads": "Active downloads",
+        "accessibleModels": "Accessible models",
+        "savedCredentials": "Saved credentials"
+      },
       "cards": {
         "catalogTitle": "Browse catalog",
         "catalogDescription": "Review accessible models and open focused detail pages.",
@@ -990,6 +1025,7 @@
     "catalog": {
       "title": "Model catalog",
       "description": "Browse the models visible to your current role and move into detail pages for lifecycle work.",
+      "loadFailed": "Unable to load models.",
       "empty": "No models matched the current filters.",
       "validatedBadge": "Validated",
       "notValidatedBadge": "Not validated"
@@ -1002,13 +1038,20 @@
       "registrationTitle": "Register cloud model",
       "recentTitle": "Recently registered cloud models",
       "emptyRecent": "No cloud models have been registered yet.",
-      "selectCredential": "Select credential"
+      "selectCredential": "Select credential",
+      "loadFailed": "Unable to load cloud registration data.",
+      "credentialSaved": "Credential saved.",
+      "credentialSaveFailed": "Unable to save credential.",
+      "modelRegistered": "Model registered.",
+      "modelRegisterFailed": "Unable to register cloud model."
     },
     "local": {
       "title": "Local model registration",
       "description": "Onboard local models through Hugging Face discovery, downloads, or manual artifact registration.",
       "discoveryTitle": "Hugging Face discovery",
       "discoveryPlaceholder": "e.g. llama instruct",
+      "discoveryResultsAria": "Local discovery results",
+      "downloadJobsAria": "Download jobs",
       "inspectFailure": "Unable to load model details.",
       "pollingActive": "Polling active downloads.",
       "noActiveJobs": "No active downloads.",
@@ -1025,12 +1068,23 @@
     },
     "access": {
       "title": "Model access management",
-      "description": "Assign role-scope access to models without mixing those controls into registration pages."
+      "description": "Assign role-scope access to models without mixing those controls into registration pages.",
+      "loadFailed": "Unable to load model access settings.",
+      "saveFailed": "Unable to save assignments.",
+      "saved": "Saved {{scope}} assignments."
     },
     "detail": {
       "title": "Model detail",
+      "loadFailed": "Unable to load model details.",
+      "updateFailed": "Unable to update model.",
+      "registered": "Model registered.",
+      "activated": "Model activated.",
+      "deactivated": "Model deactivated.",
+      "unregistered": "Model unregistered.",
+      "deleted": "Model deleted.",
       "notFound": "Model details are not available.",
       "metadataTitle": "Overview",
+      "metadataAria": "Model metadata",
       "validationsTitle": "Validation history",
       "activationRequiresValidation": "Activation requires current successful validation.",
       "noValidations": "No validations have been recorded yet.",
@@ -1040,6 +1094,12 @@
     },
     "testing": {
       "title": "Model test",
+      "loadFailed": "Unable to load model test page.",
+      "runSucceeded": "Model test succeeded.",
+      "runFailed": "Model test failed.",
+      "runFailedRequest": "Unable to run model test.",
+      "validationConfirmed": "Model marked as validated.",
+      "validationFailed": "Unable to validate model.",
       "validationStatus": "Validation",
       "currentValidation": "Current",
       "lastTestSummary": "Last test: {{result}} · {{timestamp}}",

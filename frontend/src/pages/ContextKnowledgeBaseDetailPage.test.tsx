@@ -5,6 +5,7 @@ import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import type { AuthUser } from "../auth/types";
 import { ApiError } from "../auth/authApi";
+import type { KnowledgeBaseQueryPreprocessing } from "../api/context";
 import ContextKnowledgeBaseDetailPage from "./ContextKnowledgeBaseDetailPage";
 import ContextKnowledgeBasesPage from "../features/context-management/pages/ContextKnowledgeBasesPage";
 import ContextKnowledgeBaseSourcesPage from "../features/context-management/pages/ContextKnowledgeBaseSourcesPage";
@@ -179,7 +180,7 @@ const contextApiMocks = vi.hoisted(() => ({
   queryKnowledgeBase: vi.fn(
     async (
       _knowledgeBaseId: string,
-      payload?: { search_method?: string; query_preprocessing?: string; hybrid_alpha?: number },
+      payload?: { search_method?: string; query_preprocessing?: KnowledgeBaseQueryPreprocessing; hybrid_alpha?: number },
     ) => {
     if (payload?.search_method === "hybrid") {
       return buildKnowledgeBaseQueryResponse({
@@ -748,7 +749,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       role: "superadmin",
       is_active: true,
     };
-    let resolveDelete: (() => void) | null = null;
+    let resolveDelete!: () => void;
     contextApiMocks.deleteKnowledgeBase.mockImplementationOnce(
       () =>
         new Promise<void>((resolve) => {
@@ -771,9 +772,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("dialog", { name: "Delete knowledge base" })).toBeVisible();
 
     expect(resolveDelete).toBeTypeOf("function");
-    if (resolveDelete) {
-      resolveDelete();
-    }
+    resolveDelete();
     await waitFor(() => expect(contextApiMocks.deleteKnowledgeBase).toHaveBeenCalledWith("kb-primary", "token"));
   });
 

@@ -55,8 +55,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [composerHeight, setComposerHeight] = useState(96);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
-  const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const threadVersion = useMemo(() => {
     if (!sessionState.activeSession) {

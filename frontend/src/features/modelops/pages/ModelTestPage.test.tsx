@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -217,6 +217,24 @@ describe("ModelTestPage", () => {
     );
     expect((await screen.findAllByText("hello back")).length).toBeGreaterThan(0);
     expect(await screen.findByRole("button", { name: "Mark as validated" })).toBeEnabled();
+  });
+
+  it("opens shared modal feedback for test run request failures without inline errors", async () => {
+    const user = userEvent.setup();
+    modelApiMocks.runManagedModelTest.mockRejectedValue(new Error("Test request failed."));
+
+    const view = await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId/test" element={<ModelTestPage />} />
+      </Routes>,
+      { route: "/control/models/gpt-private/test" },
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Run test" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Model test" });
+    expect(within(dialog).getByText("Test request failed.")).toBeVisible();
+    expect(view.container.querySelector(".error-text")).toBeNull();
   });
 
   it("shows runtime selection for superadmin local llm tests and sends provider override", async () => {

@@ -51,7 +51,7 @@ export function KnowledgeBaseOverviewSection({
   onResync,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
-  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
   const noneLabel = t("platformControl.summary.none");
   const vectorizationModeLabel =
     knowledgeBase.vectorization.mode === "self_provided"

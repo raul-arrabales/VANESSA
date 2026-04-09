@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listModelOpsModels, registerManagedModel } from "../../../api/modelops/models";
 import { createModelCredential, listModelCredentials } from "../../../api/modelops/credentials";
 import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 export function useCloudRegistrationFlow(
   token: string,
@@ -10,7 +12,6 @@ export function useCloudRegistrationFlow(
   recentCloudModels: ManagedModel[];
   isLoading: boolean;
   isSaving: boolean;
-  error: string;
   feedback: string;
   refresh: () => Promise<void>;
   saveCredential: (payload: {
@@ -37,15 +38,15 @@ export function useCloudRegistrationFlow(
   const [recentCloudModels, setRecentCloudModels] = useState<ManagedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  const { t } = useTranslation("common");
+  const { showErrorFeedback } = useActionFeedback();
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!token) {
       return;
     }
     setIsLoading(true);
-    setError("");
     try {
       const [credentialRows, modelRows] = await Promise.all([
         listModelCredentials(token),
@@ -54,11 +55,13 @@ export function useCloudRegistrationFlow(
       setCredentials(credentialRows);
       setRecentCloudModels(modelRows.filter((model) => model.backend === "external_api").slice(0, 6));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load cloud registration data.");
+      showErrorFeedback(requestError, t("modelOps.cloud.loadFailed"), {
+        titleKey: "modelOps.cloud.title",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [showErrorFeedback, t, token]);
 
   useEffect(() => {
     void refresh();
@@ -75,18 +78,19 @@ export function useCloudRegistrationFlow(
       return;
     }
     setIsSaving(true);
-    setError("");
     setFeedback("");
     try {
       await createModelCredential(payload, token);
-      setFeedback("Credential saved.");
+      setFeedback(t("modelOps.cloud.credentialSaved"));
       await refresh();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to save credential.");
+      showErrorFeedback(requestError, t("modelOps.cloud.credentialSaveFailed"), {
+        titleKey: "modelOps.cloud.credentialsTitle",
+      });
     } finally {
       setIsSaving(false);
     }
-  }, [refresh, token]);
+  }, [refresh, showErrorFeedback, t, token]);
 
   const registerCloudModel = useCallback(async (payload: {
     id: string;
@@ -104,7 +108,6 @@ export function useCloudRegistrationFlow(
       return null;
     }
     setIsSaving(true);
-    setError("");
     setFeedback("");
     try {
       const created = await registerManagedModel(
@@ -125,23 +128,24 @@ export function useCloudRegistrationFlow(
         },
         token,
       );
-      setFeedback("Model registered.");
+      setFeedback(t("modelOps.cloud.modelRegistered"));
       await refresh();
       return created;
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to register cloud model.");
+      showErrorFeedback(requestError, t("modelOps.cloud.modelRegisterFailed"), {
+        titleKey: "modelOps.cloud.registrationTitle",
+      });
       return null;
     } finally {
       setIsSaving(false);
     }
-  }, [refresh, token]);
+  }, [refresh, showErrorFeedback, t, token]);
 
   return {
     credentials,
     recentCloudModels,
     isLoading,
     isSaving,
-    error,
     feedback,
     refresh,
     saveCredential,

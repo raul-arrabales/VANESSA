@@ -1,19 +1,22 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { registerManagedModel } from "../../../api/modelops/models";
 import { useAuth } from "../../../auth/AuthProvider";
-import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { TASK_OPTIONS } from "../domain";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import { useLocalDownloads } from "../hooks/useLocalDownloads";
+import { useLocalModelRegistration } from "../hooks/useLocalModelRegistration";
 
 export default function LocalModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token } = useAuth();
-  const { showErrorFeedback } = useActionFeedback();
   const { discoveredModels, selectedModelInfo, downloadJobs, hasActiveJobs, feedback, search, inspect, download } =
     useLocalDownloads(token);
+  const {
+    lastRegisteredModelId,
+    feedback: manualFeedback,
+    registerLocalModel,
+  } = useLocalModelRegistration(token);
 
   const [discoveryTaskKey, setDiscoveryTaskKey] = useState("llm");
   const [discoverQuery, setDiscoverQuery] = useState("");
@@ -25,9 +28,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
     taskKey: "llm",
     comment: "",
   });
-  const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
-  const [manualFeedback, setManualFeedback] = useState("");
-
   return (
     <section className="card-stack">
       <article className="panel card-stack">
@@ -81,30 +81,17 @@ export default function LocalModelRegisterPage(): JSX.Element {
             type="button"
             className="btn btn-primary"
             onClick={() => {
-              if (!token) {
-                return;
-              }
               const category = TASK_OPTIONS.find((option) => option.value === manualState.taskKey)?.category ?? "generative";
-              void registerManagedModel(
-                {
-                  id: manualState.id.trim(),
-                  name: manualState.name.trim(),
-                  provider: manualState.provider.trim() || "local",
-                  backend: "local",
-                  owner_type: "platform",
-                  source: "local_folder",
-                  availability: "offline_ready",
-                  visibility_scope: "platform",
-                  local_path: manualState.localPath.trim(),
-                  task_key: manualState.taskKey,
-                  category,
-                  comment: manualState.comment.trim() || undefined,
-                },
-                token,
-              )
-                .then((model) => {
-                  setLastRegisteredModelId(model.id);
-                  setManualFeedback(t("modelOps.local.manualSuccess"));
+              void registerLocalModel({
+                id: manualState.id,
+                name: manualState.name,
+                provider: manualState.provider,
+                localPath: manualState.localPath,
+                taskKey: manualState.taskKey,
+                category,
+                comment: manualState.comment,
+              }).then((didRegister) => {
+                if (didRegister) {
                   setManualState({
                     id: "",
                     name: "",
@@ -113,12 +100,8 @@ export default function LocalModelRegisterPage(): JSX.Element {
                     taskKey: "llm",
                     comment: "",
                   });
-                })
-                .catch((requestError) => {
-                  showErrorFeedback(requestError, t("modelOps.local.manualFailure"), {
-                    titleKey: "modelOps.local.manualTitle",
-                  });
-                });
+                }
+              });
             }}
           >
             {t("modelOps.actions.registerLocal")}

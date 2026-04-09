@@ -5,14 +5,12 @@ type ModelTestResultPanelProps = {
   result: ModelTestResult | null;
   latestTest: ModelTestRun | null;
   summary: string;
-  error: string;
 };
 
 export default function ModelTestResultPanel({
   result,
   latestTest,
   summary,
-  error,
 }: ModelTestResultPanelProps): JSX.Element {
   const { t } = useTranslation("common");
 
@@ -48,7 +46,6 @@ export default function ModelTestResultPanel({
       ) : (
         <p className="status-text">{t("modelOps.testing.noResult")}</p>
       )}
-      {error && <p className="error-text">{error}</p>}
     </article>
   );
 }

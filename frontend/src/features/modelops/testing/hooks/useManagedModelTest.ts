@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { getManagedModel } from "../../../../api/modelops/models";
 import { listManagedModelTests, runManagedModelTest, validateManagedModel } from "../../../../api/modelops/testing";
 import type { ManagedModel, ModelTestResult, ModelTestRun } from "../../../../api/modelops/types";
+import { useActionFeedback } from "../../../../feedback/ActionFeedbackProvider";
 import type { ManagedModelTestState, ModelTestInput } from "../types";
 
 export function useManagedModelTest(
@@ -15,8 +17,8 @@ export function useManagedModelTest(
   const [isLoading, setIsLoading] = useState(false);
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const { t } = useTranslation("common");
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!token || !modelId) {
@@ -24,7 +26,6 @@ export function useManagedModelTest(
     }
 
     setIsLoading(true);
-    setError("");
     try {
       const [modelPayload, testsPayload] = await Promise.all([
         getManagedModel(modelId, token),
@@ -37,11 +38,13 @@ export function useManagedModelTest(
         setPendingTestRunId(latestSuccessful?.id ?? "");
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load model test page.");
+      showErrorFeedback(requestError, t("modelOps.testing.loadFailed"), {
+        titleKey: "modelOps.testing.title",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [modelId, pendingTestRunId, token]);
+  }, [modelId, pendingTestRunId, showErrorFeedback, t, token]);
 
   useEffect(() => {
     void refresh();
@@ -63,8 +66,6 @@ export function useManagedModelTest(
     }
 
     setIsRunningTest(true);
-    setError("");
-    setFeedback("");
     try {
       const payload = await runManagedModelTest(
         modelId,
@@ -77,17 +78,27 @@ export function useManagedModelTest(
       setModel(payload.model);
       setLatestResult(payload.result);
       setPendingTestRunId(payload.test_run.result === "success" ? payload.test_run.id : "");
-      setFeedback(payload.test_run.result === "success" ? "Model test succeeded." : "Model test failed.");
+      if (payload.test_run.result === "success") {
+        showSuccessFeedback(t("modelOps.testing.runSucceeded"), {
+          titleKey: "modelOps.testing.title",
+        });
+      } else {
+        showErrorFeedback(undefined, t("modelOps.testing.runFailed"), {
+          titleKey: "modelOps.testing.title",
+        });
+      }
       await refresh();
     } catch (requestError) {
       setPendingTestRunId("");
       setLatestResult(null);
       await refresh();
-      setError(requestError instanceof Error ? requestError.message : "Unable to run model test.");
+      showErrorFeedback(requestError, t("modelOps.testing.runFailedRequest"), {
+        titleKey: "modelOps.testing.title",
+      });
     } finally {
       setIsRunningTest(false);
     }
-  }, [modelId, refresh, token]);
+  }, [modelId, refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
   const markValidated = useCallback(async (): Promise<void> => {
     if (!token || !modelId || !latestSuccessfulTestRunId) {
@@ -95,19 +106,21 @@ export function useManagedModelTest(
     }
 
     setIsValidating(true);
-    setError("");
-    setFeedback("");
     try {
       const nextModel = await validateManagedModel(modelId, token, { testRunId: latestSuccessfulTestRunId });
       setModel(nextModel);
-      setFeedback("Model marked as validated.");
+      showSuccessFeedback(t("modelOps.testing.validationConfirmed"), {
+        titleKey: "modelOps.testing.title",
+      });
       await refresh();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to validate model.");
+      showErrorFeedback(requestError, t("modelOps.testing.validationFailed"), {
+        titleKey: "modelOps.testing.title",
+      });
     } finally {
       setIsValidating(false);
     }
-  }, [latestSuccessfulTestRunId, modelId, refresh, token]);
+  }, [latestSuccessfulTestRunId, modelId, refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
   return {
     model,
@@ -117,8 +130,6 @@ export function useManagedModelTest(
     isLoading,
     isRunningTest,
     isValidating,
-    error,
-    feedback,
     refresh,
     runTest,
     markValidated,

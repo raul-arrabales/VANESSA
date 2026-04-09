@@ -147,7 +147,7 @@ export function useLocalDownloads(token: string): {
       setDiscoveredModels(models);
       setSelectedModelInfo("");
       if (models.length === 0) {
-        setFeedback("No models found for this query.");
+        setFeedback(t("models.discovery.empty"));
       }
     } catch (requestError) {
       showErrorFeedback(requestError, t("models.feedback.discoveryFailed"), {
@@ -190,7 +190,7 @@ export function useLocalDownloads(token: string): {
         token,
       );
       setDownloadJobs((current) => [job, ...current]);
-      setFeedback(`Started download for ${model.source_id}.`);
+      setFeedback(t("models.feedback.downloadStarted", { source: model.source_id }));
     } catch (requestError) {
       showErrorFeedback(requestError, t("models.feedback.downloadStartFailed"), {
         titleKey: "modelOps.local.discoveryTitle",

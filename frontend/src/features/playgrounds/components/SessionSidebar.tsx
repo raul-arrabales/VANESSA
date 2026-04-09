@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useSessionSidebarMenu } from "../hooks/useSessionSidebarMenu";
 import type { PlaygroundSessionViewModel } from "../types";
 import { formatTimestamp } from "../utils";
@@ -43,6 +44,7 @@ export default function SessionSidebar({
   canRenameSession,
   canDeleteSession,
 }: SessionSidebarProps): JSX.Element {
+  const { t } = useTranslation("common");
   const {
     sidebarRef,
     isMenuOpen,
@@ -53,10 +55,17 @@ export default function SessionSidebar({
     isInteractionLocked,
     activeSessionId,
   });
-  const historyToggleLabel = isCollapsed ? "Expand conversation history" : "Collapse conversation history";
+  const historyToggleLabel = isCollapsed
+    ? t("playgroundSessionSidebar.expand")
+    : t("playgroundSessionSidebar.collapse");
 
   return (
-    <aside className="chatbot-sidebar" aria-label="Conversation history" data-collapsed={isCollapsed} ref={sidebarRef}>
+    <aside
+      className="chatbot-sidebar"
+      aria-label={t("playgroundSessionSidebar.aria")}
+      data-collapsed={isCollapsed}
+      ref={sidebarRef}
+    >
       <div className="chatbot-sidebar-header">
         {!isCollapsed ? <h2 className="section-title">{title}</h2> : null}
         <div className="chatbot-sidebar-actions">
@@ -106,7 +115,7 @@ export default function SessionSidebar({
             <p className="status-text error-text">{historyError}</p>
           ) : null}
           {sessions.map((session) => {
-            const actionsLabel = `Conversation actions for ${session.title}`;
+            const actionsLabel = t("playgroundSessionSidebar.actionsFor", { title: session.title });
             const rowMenuOpen = isMenuOpen(session.id);
 
             return (

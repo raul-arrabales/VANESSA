@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   activateManagedModel,
   deactivateManagedModel,
@@ -10,6 +11,7 @@ import {
   unregisterManagedModel,
 } from "../../../api/modelops/models";
 import type { ManagedModel, ModelUsageSummary, ModelValidationRecord } from "../../../api/modelops/types";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 export function useManagedModelDetail(
   modelId: string | undefined,
@@ -20,8 +22,6 @@ export function useManagedModelDetail(
   validations: ModelValidationRecord[];
   isLoading: boolean;
   isMutating: boolean;
-  error: string;
-  feedback: string;
   refresh: () => Promise<void>;
   register: () => Promise<void>;
   activate: () => Promise<void>;
@@ -34,8 +34,8 @@ export function useManagedModelDetail(
   const [validations, setValidations] = useState<ModelValidationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
-  const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const { t } = useTranslation("common");
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!token || !modelId) {
@@ -43,7 +43,6 @@ export function useManagedModelDetail(
     }
 
     setIsLoading(true);
-    setError("");
 
     try {
       const [modelPayload, usagePayload, validationPayload] = await Promise.all([
@@ -55,11 +54,13 @@ export function useManagedModelDetail(
       setUsage(usagePayload.usage ?? modelPayload.usage_summary ?? null);
       setValidations(validationPayload.validations);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load model details.");
+      showErrorFeedback(requestError, t("modelOps.detail.loadFailed"), {
+        titleKey: "modelOps.detail.title",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [modelId, token]);
+  }, [modelId, showErrorFeedback, t, token]);
 
   useEffect(() => {
     void refresh();
@@ -67,17 +68,19 @@ export function useManagedModelDetail(
 
   async function runMutation(
     action: () => Promise<unknown>,
-    successMessage: string,
+    successMessageKey: string,
   ): Promise<void> {
     setIsMutating(true);
-    setError("");
-    setFeedback("");
     try {
       await action();
-      setFeedback(successMessage);
+      showSuccessFeedback(t(successMessageKey), {
+        titleKey: "modelOps.detail.title",
+      });
       await refresh();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to update model.");
+      showErrorFeedback(requestError, t("modelOps.detail.updateFailed"), {
+        titleKey: "modelOps.detail.title",
+      });
     } finally {
       setIsMutating(false);
     }
@@ -89,38 +92,36 @@ export function useManagedModelDetail(
     validations,
     isLoading,
     isMutating,
-    error,
-    feedback,
     refresh,
     register: async () => {
       if (!token || !modelId) {
         return;
       }
-      await runMutation(() => registerExistingManagedModel(modelId, token), "Model registered.");
+      await runMutation(() => registerExistingManagedModel(modelId, token), "modelOps.detail.registered");
     },
     activate: async () => {
       if (!token || !modelId) {
         return;
       }
-      await runMutation(() => activateManagedModel(modelId, token), "Model activated.");
+      await runMutation(() => activateManagedModel(modelId, token), "modelOps.detail.activated");
     },
     deactivate: async () => {
       if (!token || !modelId) {
         return;
       }
-      await runMutation(() => deactivateManagedModel(modelId, token), "Model deactivated.");
+      await runMutation(() => deactivateManagedModel(modelId, token), "modelOps.detail.deactivated");
     },
     unregister: async () => {
       if (!token || !modelId) {
         return;
       }
-      await runMutation(() => unregisterManagedModel(modelId, token), "Model unregistered.");
+      await runMutation(() => unregisterManagedModel(modelId, token), "modelOps.detail.unregistered");
     },
     remove: async () => {
       if (!token || !modelId) {
         return;
       }
-      await runMutation(() => deleteManagedModel(modelId, token), "Model deleted.");
+      await runMutation(() => deleteManagedModel(modelId, token), "modelOps.detail.deleted");
     },
   };
 }

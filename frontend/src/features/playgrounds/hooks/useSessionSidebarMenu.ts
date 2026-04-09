@@ -8,7 +8,7 @@ type UseSessionSidebarMenuParams = {
 };
 
 type UseSessionSidebarMenuResult = {
-  sidebarRef: RefObject<HTMLElement | null>;
+  sidebarRef: RefObject<HTMLElement>;
   openMenuSessionId: string | null;
   isMenuOpen: (sessionId: string) => boolean;
   toggleMenu: (sessionId: string) => void;
@@ -21,7 +21,7 @@ export function useSessionSidebarMenu({
   activeSessionId,
 }: UseSessionSidebarMenuParams): UseSessionSidebarMenuResult {
   const [openMenuSessionId, setOpenMenuSessionId] = useState<string | null>(null);
-  const sidebarRef = useRef<HTMLElement | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (isCollapsed || isInteractionLocked) {

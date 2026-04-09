@@ -84,4 +84,36 @@ describe("CloudModelRegisterPage", () => {
       "/control/models/gpt-private",
     );
   });
+
+  it("shows credential save failures in the shared feedback modal instead of inline errors", async () => {
+    mockRole = "superadmin";
+    modelApiMocks.createModelCredential.mockRejectedValueOnce(new Error("Credential store is unavailable."));
+    const user = userEvent.setup();
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await user.click(screen.getByRole("button", { name: "Save credential" }));
+
+    expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
+    expect(screen.getByText("Credential store is unavailable.")).toBeVisible();
+    expect(view.container.querySelector(".error-text")).toBeNull();
+  });
+
+  it("shows cloud model registration failures in the shared feedback modal", async () => {
+    mockRole = "user";
+    modelApiMocks.registerManagedModel.mockRejectedValueOnce(new Error("Provider model validation failed."));
+    const user = userEvent.setup();
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await user.type(screen.getByLabelText("Model id"), "gpt-private");
+    await user.type(screen.getByLabelText("Model name"), "GPT Private");
+    await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
+    await user.selectOptions(screen.getByLabelText("Credential"), "cred-1");
+    await user.click(screen.getByRole("button", { name: "Register cloud model" }));
+
+    expect(await screen.findByRole("dialog", { name: "Register cloud model" })).toBeVisible();
+    expect(screen.getByText("Provider model validation failed.")).toBeVisible();
+    expect(view.container.querySelector(".error-text")).toBeNull();
+  });
 });

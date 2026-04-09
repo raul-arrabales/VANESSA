@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { listModelOpsModels } from "../../../api/modelops/models";
 import type { ManagedModel } from "../../../api/modelops/types";
 
@@ -8,6 +9,7 @@ export function useModelCatalog(token: string): {
   error: string;
   refresh: () => Promise<void>;
 } {
+  const { t } = useTranslation("common");
   const [models, setModels] = useState<ManagedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,11 +25,11 @@ export function useModelCatalog(token: string): {
     try {
       setModels(await listModelOpsModels(token));
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to load models.");
+      setError(requestError instanceof Error ? requestError.message : t("modelOps.catalog.loadFailed"));
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [t, token]);
 
   useEffect(() => {
     void refresh();
