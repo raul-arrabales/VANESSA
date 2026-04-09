@@ -498,6 +498,11 @@
   resize: vertical;
 }
 
+.context-retrieval-query-textarea {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .context-retrieval-result-card {
   gap: var(--space-4);
 }

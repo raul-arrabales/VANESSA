@@ -34,6 +34,7 @@ describe("KnowledgeBaseRetrievalSettingsForm", () => {
     );
 
     expect(screen.queryByLabelText("Hybrid alpha")).toBeNull();
+    expect(screen.getByLabelText("Retrieval query")).toHaveAttribute("rows", "2");
 
     rerender(
       <KnowledgeBaseRetrievalSettingsForm
