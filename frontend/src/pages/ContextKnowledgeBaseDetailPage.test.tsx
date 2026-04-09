@@ -6,6 +6,7 @@ import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import type { AuthUser } from "../auth/types";
 import { ApiError } from "../auth/authApi";
 import ContextKnowledgeBaseDetailPage from "./ContextKnowledgeBaseDetailPage";
+import ContextKnowledgeBasesPage from "../features/context-management/pages/ContextKnowledgeBasesPage";
 import ContextKnowledgeBaseSourcesPage from "../features/context-management/pages/ContextKnowledgeBaseSourcesPage";
 import ContextKnowledgeBaseRetrievalPage from "../features/context-management/pages/ContextKnowledgeBaseRetrievalPage";
 import ContextKnowledgeBaseUploadPage from "../features/context-management/pages/ContextKnowledgeBaseUploadPage";
@@ -27,6 +28,20 @@ vi.mock("../auth/AuthProvider", () => ({
 }));
 
 const contextApiMocks = vi.hoisted(() => ({
+  listKnowledgeBases: vi.fn(async () => [
+    {
+      id: "kb-primary",
+      slug: "product-docs",
+      display_name: "Product Docs",
+      description: "docs",
+      index_name: "kb_product_docs",
+      lifecycle_state: "active",
+      sync_status: "ready",
+      document_count: 2,
+      eligible_for_binding: true,
+      binding_count: 1,
+    },
+  ]),
   getKnowledgeBase: vi.fn(async () => ({
     id: "kb-primary",
     slug: "product-docs",
@@ -447,6 +462,7 @@ vi.mock("../api/context", () => contextApiMocks);
 async function renderContextWorkspace(route: string): Promise<void> {
   await renderWithAppProviders(
     <Routes>
+      <Route path="/control/context" element={<ContextKnowledgeBasesPage />} />
       <Route path="/control/context/:knowledgeBaseId" element={<ContextKnowledgeBaseDetailPage />} />
       <Route path="/control/context/:knowledgeBaseId/sources" element={<ContextKnowledgeBaseSourcesPage />} />
       <Route path="/control/context/:knowledgeBaseId/retrieval" element={<ContextKnowledgeBaseRetrievalPage />} />
@@ -663,6 +679,102 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         "token",
       );
     });
+  });
+
+  it("opens a confirmation dialog before deleting a knowledge base", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary");
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete knowledge base" }));
+
+    expect(screen.getByRole("dialog", { name: "Delete knowledge base" })).toBeVisible();
+    expect(screen.getByText("Delete 'Product Docs'? This action cannot be undone.")).toBeVisible();
+    expect(contextApiMocks.deleteKnowledgeBase).not.toHaveBeenCalled();
+  });
+
+  it("closes the delete confirmation dialog without deleting when canceled", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary");
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete knowledge base" }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Delete knowledge base" })).not.toBeInTheDocument();
+    expect(contextApiMocks.deleteKnowledgeBase).not.toHaveBeenCalled();
+  });
+
+  it("deletes the knowledge base only after confirmation and shows success feedback on redirect", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+    contextApiMocks.deleteKnowledgeBase.mockResolvedValueOnce(undefined);
+
+    await renderContextWorkspace("/control/context/kb-primary");
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete knowledge base" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() => expect(contextApiMocks.deleteKnowledgeBase).toHaveBeenCalledWith("kb-primary", "token"));
+    expect(await screen.findByRole("heading", { name: "Context management" })).toBeVisible();
+    expect(await screen.findByText("Knowledge base 'Product Docs' deleted.")).toBeVisible();
+  });
+
+  it("keeps the delete dialog open and non-dismissible while deletion is pending", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+    let resolveDelete: (() => void) | null = null;
+    contextApiMocks.deleteKnowledgeBase.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDelete = resolve;
+        }),
+    );
+
+    await renderContextWorkspace("/control/context/kb-primary");
+
+    await screen.findByRole("heading", { name: "Product Docs" });
+    await userEvent.click(screen.getByRole("button", { name: "Delete knowledge base" }));
+    await userEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Confirm delete" })).toBeDisabled();
+    });
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Delete knowledge base" })).toBeVisible();
+
+    expect(resolveDelete).toBeTypeOf("function");
+    if (resolveDelete) {
+      resolveDelete();
+    }
+    await waitFor(() => expect(contextApiMocks.deleteKnowledgeBase).toHaveBeenCalledWith("kb-primary", "token"));
   });
 
   it("renders the sources page with subviews and lets superadmins browse and sync sources", async () => {

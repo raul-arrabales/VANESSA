@@ -462,6 +462,7 @@
     "actions": {
       "newKnowledgeBase": "New knowledge base",
       "create": "Create knowledge base",
+      "cancel": "Cancel",
       "addProperty": "Add property",
       "removeProperty": "Remove property",
       "manage": "Manage",
@@ -617,6 +618,12 @@
       "resynced": "Knowledge base '{{name}}' resynced.",
       "resyncFailed": "Unable to resync the knowledge base.",
       "queryFailed": "Unable to run the retrieval test."
+    },
+    "deleteDialog": {
+      "eyebrow": "Knowledge base management",
+      "title": "Delete knowledge base",
+      "description": "Delete '{{name}}'? This action cannot be undone.",
+      "confirm": "Confirm delete"
     },
     "aria": {
       "table": "Knowledge base inventory"

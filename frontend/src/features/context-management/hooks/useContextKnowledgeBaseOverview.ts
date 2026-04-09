@@ -18,9 +18,13 @@ import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 export type ContextKnowledgeBaseOverviewResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
   form: KnowledgeBaseOverviewFormState;
   setForm: Dispatch<SetStateAction<KnowledgeBaseOverviewFormState>>;
+  isDeleteDialogOpen: boolean;
+  isDeleting: boolean;
   isResyncing: boolean;
   handleSaveKnowledgeBase: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  handleDeleteKnowledgeBase: () => Promise<void>;
+  openDeleteDialog: () => void;
+  closeDeleteDialog: () => void;
+  confirmDeleteKnowledgeBase: () => Promise<void>;
   handleResyncKnowledgeBase: () => Promise<void>;
 };
 
@@ -35,6 +39,8 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     lifecycleState: "active",
     chunking: createDefaultChunkingFormState(),
   });
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isResyncing, setIsResyncing] = useState(false);
 
   useEffect(() => {
@@ -92,10 +98,25 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     }
   }
 
-  async function handleDeleteKnowledgeBase(): Promise<void> {
-    if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin) {
+  function openDeleteDialog(): void {
+    if (!workspace.knowledgeBase || !workspace.isSuperadmin) {
       return;
     }
+    setIsDeleteDialogOpen(true);
+  }
+
+  function closeDeleteDialog(): void {
+    if (isDeleting) {
+      return;
+    }
+    setIsDeleteDialogOpen(false);
+  }
+
+  async function confirmDeleteKnowledgeBase(): Promise<void> {
+    if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin || isDeleting) {
+      return;
+    }
+    setIsDeleting(true);
     try {
       await deleteKnowledgeBase(workspace.knowledgeBase.id, workspace.token);
       navigate("/control/context", {
@@ -106,6 +127,8 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
       });
     } catch (requestError) {
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.deleteFailed"));
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -130,9 +153,13 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     ...workspace,
     form,
     setForm,
+    isDeleteDialogOpen,
+    isDeleting,
     isResyncing,
     handleSaveKnowledgeBase,
-    handleDeleteKnowledgeBase,
+    openDeleteDialog,
+    closeDeleteDialog,
+    confirmDeleteKnowledgeBase,
     handleResyncKnowledgeBase,
   };
 }

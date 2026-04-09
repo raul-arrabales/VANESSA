@@ -440,6 +440,7 @@
     "actions": {
       "newKnowledgeBase": "Nueva base de conocimiento",
       "create": "Crear base de conocimiento",
+      "cancel": "Cancelar",
       "addProperty": "Agregar propiedad",
       "removeProperty": "Eliminar propiedad",
       "manage": "Gestionar",
@@ -586,6 +587,12 @@
       "resynced": "La base de conocimiento '{{name}}' se resincronizo.",
       "resyncFailed": "No se pudo resincronizar la base de conocimiento.",
       "queryFailed": "No se pudo ejecutar la prueba de recuperacion."
+    },
+    "deleteDialog": {
+      "eyebrow": "Gestion de base de conocimiento",
+      "title": "Eliminar base de conocimiento",
+      "description": "¿Eliminar '{{name}}'? Esta accion no se puede deshacer.",
+      "confirm": "Confirmar eliminacion"
     },
     "aria": {
       "table": "Inventario de bases de conocimiento"

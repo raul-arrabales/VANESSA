@@ -1,17 +1,22 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useRef, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
+import ModalDialog from "../../../components/ModalDialog";
 import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
 import type { KnowledgeBaseOverviewFormState } from "../types";
 
 type Props = {
   knowledgeBase: KnowledgeBase;
   form: KnowledgeBaseOverviewFormState;
+  isDeleteDialogOpen: boolean;
+  isDeleting: boolean;
   isSuperadmin: boolean;
   isResyncing: boolean;
   onFormChange: Dispatch<SetStateAction<KnowledgeBaseOverviewFormState>>;
+  onCloseDeleteDialog: () => void;
+  onConfirmDelete: () => Promise<void>;
+  onOpenDeleteDialog: () => void;
   onSave: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onDelete: () => Promise<void>;
   onResync: () => Promise<void>;
 };
 
@@ -34,14 +39,19 @@ function SummaryCard({ label, value, secondary = null }: SummaryCardProps): JSX.
 export function KnowledgeBaseOverviewSection({
   knowledgeBase,
   form,
+  isDeleteDialogOpen,
+  isDeleting,
   isSuperadmin,
   isResyncing,
   onFormChange,
+  onCloseDeleteDialog,
+  onConfirmDelete,
+  onOpenDeleteDialog,
   onSave,
-  onDelete,
   onResync,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
+  const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const noneLabel = t("platformControl.summary.none");
   const vectorizationModeLabel =
     knowledgeBase.vectorization.mode === "self_provided"
@@ -230,12 +240,43 @@ export function KnowledgeBaseOverviewSection({
             <button type="submit" className="btn btn-primary">
               {t("contextManagement.actions.save")}
             </button>
-            <button type="button" className="btn btn-danger" onClick={() => void onDelete()}>
+            <button type="button" className="btn btn-danger" onClick={onOpenDeleteDialog}>
               {t("contextManagement.actions.delete")}
             </button>
           </div>
         ) : null}
       </form>
+      {isDeleteDialogOpen ? (
+        <ModalDialog
+          eyebrow={t("contextManagement.deleteDialog.eyebrow")}
+          title={t("contextManagement.deleteDialog.title")}
+          description={t("contextManagement.deleteDialog.description", { name: knowledgeBase.display_name })}
+          onClose={onCloseDeleteDialog}
+          closeDisabled={isDeleting}
+          initialFocusRef={confirmButtonRef}
+          actions={(
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onCloseDeleteDialog}
+                disabled={isDeleting}
+              >
+                {t("contextManagement.actions.cancel")}
+              </button>
+              <button
+                ref={confirmButtonRef}
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void onConfirmDelete()}
+                disabled={isDeleting}
+              >
+                {t("contextManagement.deleteDialog.confirm")}
+              </button>
+            </>
+          )}
+        />
+      ) : null}
     </section>
   );
 }

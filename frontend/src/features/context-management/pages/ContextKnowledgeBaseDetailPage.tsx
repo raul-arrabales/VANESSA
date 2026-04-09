@@ -12,11 +12,15 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
           <KnowledgeBaseOverviewSection
             knowledgeBase={knowledgeBase}
             form={detail.form}
+            isDeleteDialogOpen={detail.isDeleteDialogOpen}
+            isDeleting={detail.isDeleting}
             isSuperadmin={detail.isSuperadmin}
             isResyncing={detail.isResyncing}
             onFormChange={detail.setForm}
+            onCloseDeleteDialog={detail.closeDeleteDialog}
+            onConfirmDelete={detail.confirmDeleteKnowledgeBase}
+            onOpenDeleteDialog={detail.openDeleteDialog}
             onSave={detail.handleSaveKnowledgeBase}
-            onDelete={detail.handleDeleteKnowledgeBase}
             onResync={detail.handleResyncKnowledgeBase}
           />
         </section>
