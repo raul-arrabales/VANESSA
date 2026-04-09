@@ -442,6 +442,18 @@
     },
     "uploadTitle": "Upload documents",
     "uploadDescription": "Create or edit manual documents and upload supported files into this knowledge base.",
+    "uploadViews": {
+      "aria": "Upload document sections",
+      "manual": "Manual Document",
+      "upload": "Upload Files",
+      "manage": "Manage Manual Documents",
+      "manualTitle": "Manual document",
+      "manualDescription": "Create a new manual document or continue editing the selected document.",
+      "uploadTitle": "Upload supported files",
+      "uploadDescription": "Upload supported file types directly into this knowledge base.",
+      "manageTitle": "Manage manual documents",
+      "manageDescription": "Review manually curated documents and run edit or delete actions."
+    },
     "documentsBrowserTitle": "Browse documents",
     "documentsBrowserDescription": "Review the documents currently stored in this knowledge base and open full text in a separate window.",
     "documentViewTitle": "Document text",

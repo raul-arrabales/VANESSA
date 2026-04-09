@@ -434,10 +434,38 @@
       "listTitle": "Fuentes existentes",
       "listDescription": "Revisa las fuentes ya configuradas para esta base de conocimiento y ejecuta acciones por fuente."
     },
+    "uploadTitle": "Subir documentos",
+    "uploadDescription": "Crea o edita documentos manuales y sube archivos compatibles a esta base de conocimiento.",
+    "uploadViews": {
+      "aria": "Secciones de carga de documentos",
+      "manual": "Documento manual",
+      "upload": "Subir archivos",
+      "manage": "Gestionar documentos manuales",
+      "manualTitle": "Documento manual",
+      "manualDescription": "Crea un nuevo documento manual o continua editando el documento seleccionado.",
+      "uploadTitle": "Subir archivos compatibles",
+      "uploadDescription": "Sube tipos de archivo compatibles directamente a esta base de conocimiento.",
+      "manageTitle": "Gestionar documentos manuales",
+      "manageDescription": "Revisa documentos curados manualmente y ejecuta acciones de edicion o eliminacion."
+    },
+    "documentsBrowserTitle": "Explorar documentos",
+    "documentsBrowserDescription": "Revisa los documentos almacenados actualmente en esta base de conocimiento y abre el texto completo en una ventana separada.",
+    "documentViewTitle": "Texto del documento",
+    "documentViewDescription": "Lee el texto completo y los detalles de origen de este documento de base de conocimiento.",
+    "manualDocumentsTitle": "Documentos manuales",
+    "manualDocumentsDescription": "Gestiona documentos curados manualmente por separado del contenido gestionado por fuentes.",
     "syncHistoryTitle": "Historial de sincronizacion",
     "syncHistoryDescription": "Revisa los intentos recientes de sincronizacion de fuentes y lo que cambio en cada ejecucion.",
     "documentsTitle": "Documentos",
     "usageTitle": "Uso en despliegues",
+    "navigation": {
+      "aria": "Secciones de la base de conocimiento",
+      "overview": "Resumen",
+      "sources": "Gestionar fuentes",
+      "retrieval": "Probar recuperacion",
+      "upload": "Subir documentos",
+      "documents": "Explorar documentos"
+    },
     "advancedSettings": {
       "title": "Configuracion avanzada",
       "description": "Elige como esta base de conocimiento obtendra sus vectores antes de empezar a ingerir documentos.",

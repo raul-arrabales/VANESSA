@@ -1169,15 +1169,21 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
   });
 
   it("shows the upload page in read-only mode for admins", async () => {
-    await renderContextWorkspace("/control/context/kb-primary/upload");
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=manual");
 
     expect(await screen.findByRole("heading", { name: "Upload documents" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Manual Documents" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Manual Document" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload Files" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Manage manual documents" })).toBeVisible();
     expect(screen.getByText(/only superadmins can create, edit, upload, or delete/i)).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add document" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
   });
 
-  it("lets superadmins edit manual documents from the upload page", async () => {
+  it("shows all upload subviews for superadmins and defaults to the manual document form", async () => {
     mockUser = {
       id: 1,
       email: "superadmin@example.com",
@@ -1189,13 +1195,89 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await renderContextWorkspace("/control/context/kb-primary/upload");
 
     expect(await screen.findByRole("heading", { name: "Upload documents" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manual Document" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Upload Files" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Manual Documents" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Manual document" })).toBeVisible();
+    expect(screen.getByLabelText("Document title")).toBeVisible();
+    expect(screen.getByLabelText("Document text")).toBeVisible();
+    expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
+    expect(screen.queryByText("Manual Note")).not.toBeInTheDocument();
+  });
+
+  it("supports the upload subview deep link for superadmins", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=upload");
+
+    expect(await screen.findByRole("heading", { name: "Upload supported files" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Upload Files" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.querySelector('input[type="file"]')).not.toBeNull();
+    expect(screen.getByText("Supported file types: .txt, .md, .json, .jsonl, .pdf.")).toBeVisible();
+    expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
+    expect(screen.queryByText("Manual Note")).not.toBeInTheDocument();
+  });
+
+  it("supports the manage subview deep link for superadmins", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=manage");
+
+    expect(await screen.findByRole("heading", { name: "Manage manual documents" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manage Manual Documents" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Manual Note")).toBeVisible();
+    expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
+  });
+
+  it("falls back invalid upload subviews to the manual view for superadmins", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=unknown");
+
+    expect(await screen.findByRole("heading", { name: "Manual document" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Manual Document" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("lets superadmins edit manual documents from the upload manage view", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=manage");
+
+    expect(await screen.findByRole("heading", { name: "Manage manual documents" })).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
     expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
 
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByRole("button", { name: "Manual Document" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByDisplayValue("Manual Note")).toBeVisible();
     expect(screen.getByDisplayValue("Operator note")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
   it("renders the browse documents page as summary cards with open-text links", async () => {
