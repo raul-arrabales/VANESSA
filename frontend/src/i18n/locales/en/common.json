@@ -597,6 +597,7 @@
       "fullKnowledgeBaseResync": "Knowledge base resync",
       "syncRunSummary": "Scanned {{scanned}} file(s), changed {{changed}}, deleted files {{deletedFiles}}, created documents {{createdDocs}}, updated documents {{updatedDocs}}, deleted documents {{deletedDocs}}.",
       "queryResultCount": "{{count}} retrieval result(s)",
+      "queryDuration": "Completed in {{duration}}.",
       "noQueryResults": "No retrieval results matched this query.",
       "chunkLengthTokens": "{{count}} tokens"
     },

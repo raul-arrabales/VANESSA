@@ -566,6 +566,7 @@
       "fullKnowledgeBaseResync": "Resincronizacion de la base de conocimiento",
       "syncRunSummary": "Se analizaron {{scanned}} archivo(s), cambiaron {{changed}}, se eliminaron {{deletedFiles}} archivo(s), se crearon {{createdDocs}} documentos, se actualizaron {{updatedDocs}} documentos y se eliminaron {{deletedDocs}} documentos.",
       "queryResultCount": "{{count}} resultado(s) de recuperacion",
+      "queryDuration": "Completado en {{duration}}.",
       "noQueryResults": "No hubo resultados de recuperacion para esta consulta.",
       "chunkLengthTokens": "{{count}} tokens"
     },

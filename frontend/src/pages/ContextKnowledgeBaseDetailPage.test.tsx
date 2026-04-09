@@ -966,10 +966,17 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByLabelText("Search method")).toHaveValue("semantic");
     expect(screen.getByLabelText("Query preprocessing")).toHaveValue("none");
     await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+    let nowCallCount = 0;
+    const performanceNowSpy = vi.spyOn(performance, "now").mockImplementation(() => {
+      nowCallCount += 1;
+      return nowCallCount === 1 ? 100 : 460;
+    });
     await userEvent.click(screen.getByRole("button", { name: "Test retrieval" }));
 
     const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
     expect(resultButtons).toHaveLength(2);
+    expect(screen.getByText("2 retrieval result(s)")).toBeVisible();
+    expect(screen.getByText("Completed in 360 ms.")).toBeVisible();
     expect(scrollIntoViewMock).toHaveBeenCalledWith({
       behavior: "smooth",
       block: "start",
@@ -1016,6 +1023,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       },
       "token",
     );
+    performanceNowSpy.mockRestore();
   });
 
   it("lets the operator switch retrieval search method to keyword", async () => {

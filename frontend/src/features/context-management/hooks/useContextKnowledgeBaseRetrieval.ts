@@ -2,6 +2,7 @@ import { type Dispatch, type FormEvent, type SetStateAction, useState } from "re
 import { useTranslation } from "react-i18next";
 import { queryKnowledgeBase } from "../../../api/context";
 import type { KnowledgeBaseQueryPreprocessing, KnowledgeBaseQueryResult, KnowledgeBaseSearchMethod } from "../../../api/context";
+import { getCurrentTimeMs } from "../../../utils/timing";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
 export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
@@ -12,6 +13,7 @@ export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKn
   retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
+  retrievalDurationMs: number | null;
   completedQueryId: number;
   isQuerying: boolean;
   setRetrievalQuery: Dispatch<SetStateAction<string>>;
@@ -32,6 +34,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
   const [retrievalQueryPreprocessing, setRetrievalQueryPreprocessing] = useState<KnowledgeBaseQueryPreprocessing>("none");
   const [retrievalResults, setRetrievalResults] = useState<KnowledgeBaseQueryResult[]>([]);
   const [retrievalResultCount, setRetrievalResultCount] = useState<number | null>(null);
+  const [retrievalDurationMs, setRetrievalDurationMs] = useState<number | null>(null);
   const [completedQueryId, setCompletedQueryId] = useState(0);
   const [isQuerying, setIsQuerying] = useState(false);
 
@@ -40,7 +43,9 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     if (!workspace.token || !workspace.knowledgeBase || isQuerying) {
       return;
     }
+    const startedAt = getCurrentTimeMs();
     setIsQuerying(true);
+    setRetrievalDurationMs(null);
     try {
       const parsedHybridAlpha = Number.parseFloat(retrievalHybridAlpha);
       const response = await queryKnowledgeBase(
@@ -58,8 +63,10 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
       );
       setRetrievalResults(response.results);
       setRetrievalResultCount(response.retrieval.result_count);
+      setRetrievalDurationMs(Math.max(0, getCurrentTimeMs() - startedAt));
       setCompletedQueryId((current) => current + 1);
     } catch (requestError) {
+      setRetrievalDurationMs(null);
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.queryFailed"));
     } finally {
       setIsQuerying(false);
@@ -75,6 +82,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     retrievalQueryPreprocessing,
     retrievalResults,
     retrievalResultCount,
+    retrievalDurationMs,
     completedQueryId,
     isQuerying,
     setRetrievalQuery,
