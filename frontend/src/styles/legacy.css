@@ -1435,6 +1435,18 @@
   gap: var(--space-2);
 }
 
+.context-metadata-editor-row {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.context-metadata-viewer-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
 .is-highlighted {
   border-radius: var(--radius-sm);
   padding: var(--space-2);
@@ -1462,6 +1474,10 @@
 
   .deployment-binding-field-wide {
     grid-column: 1 / -1;
+  }
+
+  .context-metadata-editor-row {
+    grid-template-columns: 1fr;
   }
 
 }

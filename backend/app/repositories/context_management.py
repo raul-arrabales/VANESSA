@@ -568,6 +568,7 @@ def create_knowledge_source(
     relative_path: str,
     include_globs: list[str],
     exclude_globs: list[str],
+    metadata_json: dict[str, Any],
     lifecycle_state: str,
     created_by_user_id: int | None,
     updated_by_user_id: int | None,
@@ -583,11 +584,12 @@ def create_knowledge_source(
                 relative_path,
                 include_globs,
                 exclude_globs,
+                metadata_json,
                 lifecycle_state,
                 created_by_user_id,
                 updated_by_user_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s)
             RETURNING *
             """,
             (
@@ -598,6 +600,7 @@ def create_knowledge_source(
                 relative_path.strip(),
                 Jsonb(include_globs),
                 Jsonb(exclude_globs),
+                Jsonb(metadata_json),
                 lifecycle_state.strip().lower(),
                 created_by_user_id,
                 updated_by_user_id,
@@ -617,6 +620,7 @@ def update_knowledge_source(
     relative_path: str,
     include_globs: list[str],
     exclude_globs: list[str],
+    metadata_json: dict[str, Any],
     lifecycle_state: str,
     updated_by_user_id: int | None,
 ) -> dict[str, Any] | None:
@@ -629,6 +633,7 @@ def update_knowledge_source(
               relative_path = %s,
               include_globs = %s::jsonb,
               exclude_globs = %s::jsonb,
+              metadata_json = %s::jsonb,
               lifecycle_state = %s,
               updated_by_user_id = %s,
               updated_at = NOW()
@@ -640,6 +645,7 @@ def update_knowledge_source(
                 relative_path.strip(),
                 Jsonb(include_globs),
                 Jsonb(exclude_globs),
+                Jsonb(metadata_json),
                 lifecycle_state.strip().lower(),
                 updated_by_user_id,
                 knowledge_base_id.strip(),

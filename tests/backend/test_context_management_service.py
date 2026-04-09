@@ -33,10 +33,11 @@ def test_create_context_knowledge_source_requires_json_object() -> None:
 def test_upload_context_knowledge_base_documents_passes_files_through(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
-    def _upload_documents(_database_url: str, *, config, knowledge_base_id: str, files, created_by_user_id: int):
+    def _upload_documents(_database_url: str, *, config, knowledge_base_id: str, files, metadata, created_by_user_id: int):
         captured["config"] = config
         captured["knowledge_base_id"] = knowledge_base_id
         captured["files"] = files
+        captured["metadata"] = metadata
         captured["created_by_user_id"] = created_by_user_id
         return {"uploaded": len(files)}
 
@@ -47,6 +48,7 @@ def test_upload_context_knowledge_base_documents_passes_files_through(monkeypatc
         config="config",
         knowledge_base_id="kb-1",
         files=["file-a", "file-b"],
+        metadata={"topic": "ops"},
         created_by_user_id=22,
     )
 
@@ -54,6 +56,7 @@ def test_upload_context_knowledge_base_documents_passes_files_through(monkeypatc
         "config": "config",
         "knowledge_base_id": "kb-1",
         "files": ["file-a", "file-b"],
+        "metadata": {"topic": "ops"},
         "created_by_user_id": 22,
     }
     assert payload == {"uploaded": 2}

@@ -181,9 +181,53 @@ def _normalize_document_payload(payload: dict[str, Any], *, existing: dict[str, 
     }
 
 
+def _normalize_schema_managed_metadata(
+    schema: dict[str, Any],
+    metadata: Any,
+    *,
+    existing_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    normalized_schema = _normalize_schema(schema)
+    schema_properties = {
+        str(item.get("name") or "").strip(): str(item.get("data_type") or "text").strip().lower() or "text"
+        for item in list(normalized_schema.get("properties") or [])
+    }
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        raise PlatformControlPlaneError("invalid_metadata", "metadata must be an object", status_code=400)
+    normalized: dict[str, Any] = {}
+    for key, value in metadata.items():
+        property_name = str(key or "").strip()
+        property_type = schema_properties.get(property_name)
+        if not property_name or property_type is None:
+            raise PlatformControlPlaneError(
+                "invalid_metadata_key",
+                f"metadata key '{property_name or key}' is not defined in the knowledge-base schema",
+                status_code=400,
+            )
+        normalized[property_name] = _coerce_schema_managed_metadata_value(
+            value,
+            property_type=property_type,
+            field_name=f"metadata.{property_name}",
+        )
+    if not existing_metadata:
+        return normalized
+    preserved = {
+        str(key): value
+        for key, value in existing_metadata.items()
+        if str(key) not in schema_properties
+    }
+    return {
+        **preserved,
+        **normalized,
+    }
+
+
 def _normalize_knowledge_source_payload(
     payload: dict[str, Any],
     *,
+    knowledge_base_schema: dict[str, Any] | None = None,
     existing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     source_type = str(payload.get("source_type", existing.get("source_type", "local_directory") if existing else "local_directory")).strip().lower() or "local_directory"
@@ -194,6 +238,11 @@ def _normalize_knowledge_source_payload(
     lifecycle_state = str(payload.get("lifecycle_state", existing.get("lifecycle_state", "active") if existing else "active")).strip().lower() or "active"
     include_globs = _normalize_glob_list(payload.get("include_globs", existing.get("include_globs", []) if existing else []), field_name="include_globs")
     exclude_globs = _normalize_glob_list(payload.get("exclude_globs", existing.get("exclude_globs", []) if existing else []), field_name="exclude_globs")
+    metadata = _normalize_schema_managed_metadata(
+        knowledge_base_schema or {},
+        payload.get("metadata", existing.get("metadata_json", {}) if existing else {}),
+        existing_metadata=dict(existing.get("metadata_json") or {}) if existing else None,
+    )
     if source_type not in _SOURCE_TYPES:
         raise PlatformControlPlaneError(
             "unsupported_source_type",
@@ -212,6 +261,7 @@ def _normalize_knowledge_source_payload(
         "relative_path": relative_path,
         "include_globs": include_globs,
         "exclude_globs": exclude_globs,
+        "metadata": metadata,
         "lifecycle_state": lifecycle_state,
     }
 
@@ -264,6 +314,49 @@ def _normalize_glob_list(value: Any, *, field_name: str) -> list[str]:
         if entry:
             normalized.append(entry)
     return normalized
+
+
+def _coerce_schema_managed_metadata_value(value: Any, *, property_type: str, field_name: str) -> str | int | float | bool:
+    normalized_type = property_type.strip().lower()
+    if normalized_type == "text":
+        if isinstance(value, (dict, list)):
+            raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be a string", status_code=400)
+        return str(value)
+    if normalized_type == "number":
+        if isinstance(value, bool):
+            raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be a number", status_code=400)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            stripped = value.strip()
+            try:
+                return float(stripped)
+            except ValueError as exc:
+                raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be a number", status_code=400) from exc
+        raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be a number", status_code=400)
+    if normalized_type == "int":
+        if isinstance(value, bool):
+            raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be an integer", status_code=400)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, str):
+            stripped = value.strip()
+            if re.fullmatch(r"-?\d+", stripped):
+                return int(stripped)
+        raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be an integer", status_code=400)
+    if normalized_type == "boolean":
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip().lower()
+            if stripped == "true":
+                return True
+            if stripped == "false":
+                return False
+        raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} must be true or false", status_code=400)
+    raise PlatformControlPlaneError("invalid_metadata_value", f"{field_name} has an unsupported metadata type", status_code=400)
 
 
 def _serialize_knowledge_base(row: dict[str, Any]) -> dict[str, Any]:
@@ -350,6 +443,7 @@ def _serialize_knowledge_source(row: dict[str, Any]) -> dict[str, Any]:
         "relative_path": str(row.get("relative_path") or "").strip(),
         "include_globs": list(row.get("include_globs") or []),
         "exclude_globs": list(row.get("exclude_globs") or []),
+        "metadata": dict(row.get("metadata_json") or {}),
         "lifecycle_state": str(row.get("lifecycle_state") or "").strip(),
         "last_sync_status": str(row.get("last_sync_status") or "").strip(),
         "last_sync_at": row.get("last_sync_at").isoformat() if row.get("last_sync_at") else None,

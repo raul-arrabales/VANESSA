@@ -60,6 +60,7 @@ def _parse_source_documents(file_path: Path, *, relative_path: str, source: dict
             "source_name": str(source.get("display_name") or "").strip() or relative_path,
             "metadata": {
                 **dict(document.get("metadata") or {}),
+                **dict(source.get("metadata_json") or source.get("metadata") or {}),
                 "source_path": relative_path,
                 "source_display_name": str(source.get("display_name") or "").strip() or None,
             },

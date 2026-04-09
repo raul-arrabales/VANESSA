@@ -301,6 +301,63 @@ def test_serialize_query_result_preserves_public_wire_shape_for_ranked_result():
     }
 
 
+def test_normalize_schema_managed_metadata_coerces_supported_types_and_preserves_unknown_existing_keys():
+    payload = context_management_serialization._normalize_schema_managed_metadata(  # type: ignore[attr-defined]
+        {
+            "properties": [
+                {"name": "category", "data_type": "text"},
+                {"name": "score", "data_type": "number"},
+                {"name": "page_count", "data_type": "int"},
+                {"name": "published", "data_type": "boolean"},
+            ]
+        },
+        {
+            "category": "guide",
+            "score": "0.75",
+            "page_count": "12",
+            "published": "true",
+        },
+        existing_metadata={"legacy_tag": "keep-me"},
+    )
+
+    assert payload == {
+        "legacy_tag": "keep-me",
+        "category": "guide",
+        "score": 0.75,
+        "page_count": 12,
+        "published": True,
+    }
+
+
+def test_normalize_schema_managed_metadata_rejects_unknown_keys():
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_serialization._normalize_schema_managed_metadata(  # type: ignore[attr-defined]
+            {"properties": [{"name": "category", "data_type": "text"}]},
+            {"unsupported": "value"},
+        )
+
+    assert exc_info.value.code == "invalid_metadata_key"
+
+
+def test_serialize_knowledge_source_includes_metadata():
+    payload = context_management_serialization._serialize_knowledge_source(  # type: ignore[attr-defined]
+        {
+            "id": "source-1",
+            "knowledge_base_id": "kb-primary",
+            "source_type": "local_directory",
+            "display_name": "Docs folder",
+            "relative_path": "product_docs",
+            "include_globs": ["**/*.md"],
+            "exclude_globs": [],
+            "metadata_json": {"category": "guide"},
+            "lifecycle_state": "active",
+            "last_sync_status": "ready",
+        }
+    )
+
+    assert payload["metadata"] == {"category": "guide"}
+
+
 def test_normalize_knowledge_base_payload_accepts_chunking_on_create(monkeypatch: pytest.MonkeyPatch):
     _patch_vectorization(monkeypatch)
 

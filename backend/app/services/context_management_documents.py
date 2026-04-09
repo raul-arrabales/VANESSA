@@ -6,7 +6,12 @@ from uuid import uuid4
 from ..config import AuthConfig
 from ..repositories import context_management as context_repo
 from .context_management_ingestion import _parse_upload_documents
-from .context_management_serialization import _normalize_document_payload, _serialize_document, _serialize_knowledge_base
+from .context_management_serialization import (
+    _normalize_document_payload,
+    _normalize_schema_managed_metadata,
+    _serialize_document,
+    _serialize_knowledge_base,
+)
 from .context_management_shared import (
     _chunk_knowledge_base_text,
     _delete_document_chunks,
@@ -46,6 +51,10 @@ def create_knowledge_base_document(
     )
     document_id = str(uuid4())
     normalized = _normalize_document_payload(payload)
+    normalized["metadata"] = _normalize_schema_managed_metadata(
+        dict(knowledge_base.get("schema_json") or {}),
+        normalized["metadata"],
+    )
     chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
     document = context_repo.create_document(
         database_url,
@@ -111,6 +120,11 @@ def update_knowledge_base_document(
         summary="Re-indexing knowledge-base document.",
     )
     normalized = _normalize_document_payload(payload, existing=existing)
+    normalized["metadata"] = _normalize_schema_managed_metadata(
+        dict(knowledge_base.get("schema_json") or {}),
+        normalized["metadata"],
+        existing_metadata=dict(existing.get("metadata_json") or {}),
+    )
     chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
     try:
         _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
@@ -200,6 +214,7 @@ def upload_knowledge_base_documents(
     config: AuthConfig,
     knowledge_base_id: str,
     files: list[Any],
+    metadata: dict[str, Any] | None,
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
@@ -212,6 +227,10 @@ def upload_knowledge_base_documents(
             f"Upload supports at most {_MAX_UPLOAD_FILES} files at a time",
             status_code=400,
         )
+    normalized_batch_metadata = _normalize_schema_managed_metadata(
+        dict(knowledge_base.get("schema_json") or {}),
+        metadata or {},
+    )
     created_documents: list[dict[str, Any]] = []
     for file_storage in files:
         parsed_documents = _parse_upload_documents(file_storage)
@@ -227,7 +246,13 @@ def upload_knowledge_base_documents(
                     database_url,
                     config=config,
                     knowledge_base_id=knowledge_base_id,
-                    payload=parsed_document,
+                    payload={
+                        **parsed_document,
+                        "metadata": {
+                            **dict(parsed_document.get("metadata") or {}),
+                            **normalized_batch_metadata,
+                        },
+                    },
                     created_by_user_id=created_by_user_id,
                 )
             )

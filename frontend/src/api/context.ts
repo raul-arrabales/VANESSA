@@ -199,6 +199,7 @@ export type KnowledgeSource = {
   relative_path: string;
   include_globs: string[];
   exclude_globs: string[];
+  metadata: Record<string, unknown>;
   lifecycle_state: "active" | "archived" | string;
   last_sync_status: "idle" | "syncing" | "ready" | "error" | string;
   last_sync_at?: string | null;
@@ -428,6 +429,7 @@ export async function createKnowledgeSource(
     relative_path: string;
     include_globs?: string[];
     exclude_globs?: string[];
+    metadata?: Record<string, unknown>;
     lifecycle_state?: string;
     source_type?: string;
   },
@@ -452,6 +454,7 @@ export async function updateKnowledgeSource(
     relative_path: string;
     include_globs?: string[];
     exclude_globs?: string[];
+    metadata?: Record<string, unknown>;
     lifecycle_state?: string;
     source_type?: string;
   },
@@ -568,12 +571,14 @@ export async function deleteKnowledgeBaseDocument(
 export async function uploadKnowledgeBaseDocuments(
   knowledgeBaseId: string,
   files: File[],
+  metadata: Record<string, unknown>,
   token: string,
 ): Promise<{ documents: KnowledgeDocument[]; count: number }> {
   const formData = new FormData();
   files.forEach((file) => {
     formData.append("files", file);
   });
+  formData.append("metadata", JSON.stringify(metadata));
   const response = await fetch(buildUrl(`/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/uploads`), {
     method: "POST",
     headers: {

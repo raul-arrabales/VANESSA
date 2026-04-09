@@ -514,6 +514,7 @@
       "deleteDocument": "Delete document",
       "edit": "Edit",
       "upload": "Upload files",
+      "viewMetadata": "View metadata",
       "resync": "Resync knowledge base",
       "resyncing": "Resyncing...",
       "testRetrieval": "Test retrieval",
@@ -613,6 +614,26 @@
       "noQueryResults": "No retrieval results matched this query.",
       "chunkLengthTokens": "{{count}} tokens"
     },
+    "metadataEditor": {
+      "title": "Metadata",
+      "description": "Add schema-defined metadata properties for this item.",
+      "empty": "No metadata properties have been added yet.",
+      "noSchemaProperties": "This knowledge base schema does not define any metadata properties yet.",
+      "propertyName": "Property name",
+      "propertyValue": "Property value",
+      "selectProperty": "Select a property",
+      "selectBooleanValue": "Select true or false",
+      "booleanTrue": "True",
+      "booleanFalse": "False",
+      "add": "Add metadata property",
+      "remove": "Remove metadata property"
+    },
+    "metadataViewer": {
+      "title": "Metadata for {{title}}",
+      "description": "Review the effective metadata stored for this document.",
+      "empty": "No metadata is stored for this document.",
+      "aria": "Document metadata"
+    },
     "feedback": {
       "loadFailed": "Unable to load context management data.",
       "providerLoadFailed": "Unable to load vector-store providers.",
@@ -654,6 +675,12 @@
       "sourceSyncFailed": "Unable to sync the source.",
       "uploaded": "Uploaded {{count}} file(s).",
       "uploadFailed": "Unable to upload files.",
+      "metadataDuplicateProperty": "Each metadata property can only be added once.",
+      "metadataPropertyNameRequired": "Select a metadata property name before saving.",
+      "metadataInvalidText": "Metadata text values must be plain text.",
+      "metadataInvalidNumber": "Metadata number values must be valid numbers.",
+      "metadataInvalidInteger": "Metadata integer values must be whole numbers.",
+      "metadataInvalidBoolean": "Metadata boolean values must be true or false.",
       "resynced": "Knowledge base '{{name}}' resynced.",
       "resyncFailed": "Unable to resync the knowledge base.",
       "queryFailed": "Unable to run the retrieval test."

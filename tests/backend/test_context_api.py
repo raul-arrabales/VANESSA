@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import pytest
 
 from app.api.http import context as context_routes  # noqa: E402
@@ -596,6 +597,57 @@ def test_create_knowledge_source_route_requires_superadmin(client):
     assert response.status_code == 403
 
 
+def test_create_knowledge_source_route_passes_metadata_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-create-source@example.com",
+        username="superadmin-create-source",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _create_source(_db, *, config, knowledge_base_id: str, payload, created_by_user_id: int):
+        captured["knowledge_base_id"] = knowledge_base_id
+        captured["payload"] = payload
+        captured["created_by_user_id"] = created_by_user_id
+        return {
+            "id": "source-1",
+            "knowledge_base_id": knowledge_base_id,
+            "source_type": "local_directory",
+            "display_name": payload["display_name"],
+            "relative_path": payload["relative_path"],
+            "include_globs": [],
+            "exclude_globs": [],
+            "metadata": payload["metadata"],
+            "lifecycle_state": "active",
+            "last_sync_status": "idle",
+        }
+
+    monkeypatch.setattr(context_routes, "create_knowledge_source", _create_source)
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/sources",
+        headers=_auth(token),
+        json={
+            "display_name": "Docs folder",
+            "relative_path": "product_docs",
+            "metadata": {"category": "guide"},
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["payload"] == {
+        "display_name": "Docs folder",
+        "relative_path": "product_docs",
+        "metadata": {"category": "guide"},
+    }
+    assert response.get_json()["source"]["metadata"] == {"category": "guide"}
+
+
 def test_sync_knowledge_source_route_returns_payload_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     superadmin = users.create_user(
@@ -666,3 +718,41 @@ def test_list_knowledge_base_sync_runs_route_returns_payload_for_admin(client, m
 
     assert response.status_code == 200
     assert response.get_json()["sync_runs"][0]["source_display_name"] == "Docs folder"
+
+
+def test_upload_knowledge_base_documents_route_passes_multipart_metadata(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-upload-docs@example.com",
+        username="superadmin-upload-docs",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _upload_documents(_db, *, config, knowledge_base_id: str, files, metadata, created_by_user_id: int):
+        captured["knowledge_base_id"] = knowledge_base_id
+        captured["metadata"] = metadata
+        captured["file_names"] = [getattr(file, "filename", "") for file in files]
+        captured["created_by_user_id"] = created_by_user_id
+        return {"documents": [], "count": 0}
+
+    monkeypatch.setattr(context_routes, "upload_knowledge_base_documents", _upload_documents)
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/uploads",
+        headers=_auth(token),
+        data={
+            "metadata": '{"category":"guide","published":true}',
+            "files": (io.BytesIO(b"hello"), "guide.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    assert captured["knowledge_base_id"] == "kb-primary"
+    assert captured["metadata"] == {"category": "guide", "published": True}
+    assert captured["file_names"] == ["guide.txt"]

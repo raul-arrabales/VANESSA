@@ -1,11 +1,18 @@
 import type { ChunkingFormState } from "./chunkingForm";
 
+export type MetadataEntryFormState = {
+  id: string;
+  propertyName: string;
+  value: string;
+};
+
 export type DocumentFormState = {
   id: string | null;
   title: string;
   sourceName: string;
   uri: string;
   text: string;
+  metadataEntries: MetadataEntryFormState[];
 };
 
 export type SourceFormState = {
@@ -15,6 +22,7 @@ export type SourceFormState = {
   includeGlobs: string;
   excludeGlobs: string;
   lifecycleState: string;
+  metadataEntries: MetadataEntryFormState[];
 };
 
 export type KnowledgeBaseOverviewFormState = {
@@ -31,6 +39,7 @@ export const EMPTY_DOCUMENT_FORM: DocumentFormState = {
   sourceName: "",
   uri: "",
   text: "",
+  metadataEntries: [],
 };
 
 export const DEFAULT_SOURCE_INCLUDE_GLOBS = "*.md\n*.txt\n*.pdf\n*.json\n*.jsonl\n**/*.md\n**/*.txt\n**/*.pdf\n**/*.json\n**/*.jsonl";
@@ -44,6 +53,7 @@ export function createEmptySourceForm(): SourceFormState {
     includeGlobs: DEFAULT_SOURCE_INCLUDE_GLOBS,
     excludeGlobs: DEFAULT_SOURCE_EXCLUDE_GLOBS,
     lifecycleState: "active",
+    metadataEntries: [],
   };
 }
 

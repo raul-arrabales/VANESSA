@@ -67,6 +67,7 @@ const contextApiMocks = vi.hoisted(() => ({
       relative_path: "product_docs",
       include_globs: ["**/*.md"],
       exclude_globs: [],
+      metadata: {},
       lifecycle_state: "active",
       last_sync_status: "ready",
     },

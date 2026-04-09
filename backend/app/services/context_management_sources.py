@@ -144,8 +144,11 @@ def create_knowledge_source(
     payload: dict[str, Any],
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
-    _require_knowledge_base(database_url, knowledge_base_id)
-    normalized = _normalize_knowledge_source_payload(payload)
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    normalized = _normalize_knowledge_source_payload(
+        payload,
+        knowledge_base_schema=dict(knowledge_base.get("schema_json") or {}),
+    )
     _resolve_source_directory(config, normalized["relative_path"], require_exists=True)
     source = context_repo.create_knowledge_source(
         database_url,
@@ -155,6 +158,7 @@ def create_knowledge_source(
         relative_path=normalized["relative_path"],
         include_globs=normalized["include_globs"],
         exclude_globs=normalized["exclude_globs"],
+        metadata_json=normalized["metadata"],
         lifecycle_state=normalized["lifecycle_state"],
         created_by_user_id=created_by_user_id,
         updated_by_user_id=created_by_user_id,
@@ -171,8 +175,13 @@ def update_knowledge_source(
     payload: dict[str, Any],
     updated_by_user_id: int | None,
 ) -> dict[str, Any]:
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
     existing = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
-    normalized = _normalize_knowledge_source_payload(payload, existing=existing)
+    normalized = _normalize_knowledge_source_payload(
+        payload,
+        knowledge_base_schema=dict(knowledge_base.get("schema_json") or {}),
+        existing=existing,
+    )
     _resolve_source_directory(config, normalized["relative_path"], require_exists=True)
     updated = context_repo.update_knowledge_source(
         database_url,
@@ -182,6 +191,7 @@ def update_knowledge_source(
         relative_path=normalized["relative_path"],
         include_globs=normalized["include_globs"],
         exclude_globs=normalized["exclude_globs"],
+        metadata_json=normalized["metadata"],
         lifecycle_state=normalized["lifecycle_state"],
         updated_by_user_id=updated_by_user_id,
     )

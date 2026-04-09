@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from flask import Blueprint, g, jsonify, request
 
 from ...application.context_management_service import (
@@ -406,12 +408,23 @@ def delete_knowledge_base_document_route(knowledge_base_id: str, document_id: st
 @require_role("superadmin")
 def upload_knowledge_base_documents_route(knowledge_base_id: str):
     files = request.files.getlist("files")
+    raw_metadata = str(request.form.get("metadata") or "").strip()
+    metadata = None
+    if raw_metadata:
+        try:
+            parsed_metadata = json.loads(raw_metadata)
+        except json.JSONDecodeError:
+            return _json_error(400, "invalid_metadata", "metadata must be a JSON object")
+        if not isinstance(parsed_metadata, dict):
+            return _json_error(400, "invalid_metadata", "metadata must be a JSON object")
+        metadata = parsed_metadata
     try:
         payload = upload_knowledge_base_documents(
             _database_url(),
             config=_config(),
             knowledge_base_id=knowledge_base_id,
             files=files,
+            metadata=metadata,
             created_by_user_id=int(g.current_user["id"]),
         )
     except PlatformControlPlaneError as exc:

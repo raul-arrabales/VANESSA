@@ -7,6 +7,7 @@ import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowled
 import { KnowledgeBaseSourcesListSection } from "../components/KnowledgeBaseSourcesListSection";
 import { KnowledgeBaseSyncHistorySection } from "../components/KnowledgeBaseSyncHistorySection";
 import { useContextKnowledgeBaseSources } from "../hooks/useContextKnowledgeBaseSources";
+import { metadataEntriesFromRecord } from "../metadataEditor";
 
 type SourcesPageView = "add" | "list" | "history";
 
@@ -51,6 +52,7 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
       includeGlobs: source.include_globs.join("\n"),
       excludeGlobs: source.exclude_globs.join("\n"),
       lifecycleState: source.lifecycle_state,
+      metadataEntries: metadataEntriesFromRecord(source.metadata, detail.knowledgeBase?.schema ?? {}),
     });
     handleChangeView("add");
   }
@@ -68,6 +70,7 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
           </section>
           {activeView === "add" ? (
             <KnowledgeBaseSourceEditorSection
+              schemaProperties={detail.knowledgeBase?.schema.properties ?? []}
               sourceForm={detail.sourceForm}
               sourceDirectoryBrowser={detail.sourceDirectoryBrowser}
               onSourceFormChange={detail.setSourceForm}

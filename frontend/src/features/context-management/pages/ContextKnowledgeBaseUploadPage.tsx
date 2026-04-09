@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
+import { KnowledgeBaseMetadataEditor } from "../components/KnowledgeBaseMetadataEditor";
 import { KnowledgeBaseDocumentCard } from "../components/KnowledgeBaseDocumentCard";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
 import { isManualKnowledgeBaseDocument } from "../documentPresentation";
+import { metadataEntriesFromRecord } from "../metadataEditor";
 import { EMPTY_DOCUMENT_FORM } from "../types";
 import { useContextKnowledgeBaseUpload } from "../hooks/useContextKnowledgeBaseUpload";
 
@@ -49,6 +51,7 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
       sourceName: document.source_name ?? "",
       uri: document.uri ?? "",
       text: document.text,
+      metadataEntries: metadataEntriesFromRecord(document.metadata, detail.knowledgeBase?.schema ?? {}),
     });
     handleChangeView("manual");
   }
@@ -120,6 +123,13 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
                     }}
                   />
                 </label>
+                <KnowledgeBaseMetadataEditor
+                  schemaProperties={detail.knowledgeBase?.schema.properties ?? []}
+                  entries={detail.documentForm.metadataEntries}
+                  onChange={(metadataEntries) => {
+                    detail.setDocumentForm((current) => ({ ...current, metadataEntries }));
+                  }}
+                />
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary">
                     {detail.documentForm.id
@@ -159,6 +169,11 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
                     onChange={(event) => detail.setUploadFiles(Array.from(event.currentTarget.files ?? []))}
                   />
                 </label>
+                <KnowledgeBaseMetadataEditor
+                  schemaProperties={detail.knowledgeBase?.schema.properties ?? []}
+                  entries={detail.uploadMetadataEntries}
+                  onChange={detail.setUploadMetadataEntries}
+                />
                 <div className="form-actions">
                   <button
                     type="button"

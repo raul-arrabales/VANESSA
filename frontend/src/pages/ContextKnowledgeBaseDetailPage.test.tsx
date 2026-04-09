@@ -66,7 +66,13 @@ const contextApiMocks = vi.hoisted(() => ({
     last_sync_at: "2026-03-26T20:00:00+00:00",
     last_sync_error: null,
     last_sync_summary: "Managed knowledge base index is ready.",
-    schema: {},
+    schema: {
+      properties: [
+        { name: "category", data_type: "text" },
+        { name: "page_count", data_type: "int" },
+        { name: "published", data_type: "boolean" },
+      ],
+    },
     vectorization: {
       mode: "vanessa_embeddings",
       embedding_provider_instance_id: "embedding-provider-1",
@@ -112,7 +118,11 @@ const contextApiMocks = vi.hoisted(() => ({
       source_name: "Docs folder",
       uri: null,
       text: "Hello world from source managed content",
-      metadata: {},
+      metadata: {
+        category: "guide",
+        published: true,
+        source_path: "product_docs/overview.txt",
+      },
       chunk_count: 1,
       source_id: "source-1",
       source_path: "product_docs/overview.txt",
@@ -127,7 +137,10 @@ const contextApiMocks = vi.hoisted(() => ({
       source_name: "Operator note",
       uri: "https://example.com/manual-note",
       text: "A manually curated note for testing uploads and editing.",
-      metadata: {},
+      metadata: {
+        category: "memo",
+        page_count: 2,
+      },
       chunk_count: 2,
       source_id: null,
       source_path: null,
@@ -144,6 +157,10 @@ const contextApiMocks = vi.hoisted(() => ({
       relative_path: "product_docs",
       include_globs: ["**/*.md"],
       exclude_globs: [] as string[],
+      metadata: {
+        category: "guide",
+        published: true,
+      },
       lifecycle_state: "active",
       last_sync_status: "ready",
       last_sync_at: "2026-03-26T20:10:00+00:00",
@@ -339,7 +356,13 @@ const contextApiMocks = vi.hoisted(() => ({
     last_sync_at: "2026-03-26T21:00:00+00:00",
     last_sync_error: null,
     last_sync_summary: "Resynced 2 document(s) and 3 chunk(s).",
-    schema: {},
+    schema: {
+      properties: [
+        { name: "category", data_type: "text" },
+        { name: "page_count", data_type: "int" },
+        { name: "published", data_type: "boolean" },
+      ],
+    },
     vectorization: {
       mode: "vanessa_embeddings",
       embedding_provider_instance_id: "embedding-provider-1",
@@ -394,7 +417,13 @@ const contextApiMocks = vi.hoisted(() => ({
       last_sync_at: "2026-03-26T21:00:00+00:00",
       last_sync_error: null,
       last_sync_summary: "Source 'Docs folder' synced 1 created, 0 updated, 0 deleted document(s).",
-      schema: {},
+      schema: {
+        properties: [
+          { name: "category", data_type: "text" },
+          { name: "page_count", data_type: "int" },
+          { name: "published", data_type: "boolean" },
+        ],
+      },
       vectorization: {
         mode: "vanessa_embeddings",
         embedding_provider_instance_id: "embedding-provider-1",
@@ -430,6 +459,10 @@ const contextApiMocks = vi.hoisted(() => ({
       relative_path: "product_docs",
       include_globs: ["**/*.md"],
       exclude_globs: [] as string[],
+      metadata: {
+        category: "guide",
+        published: true,
+      },
       lifecycle_state: "active",
       last_sync_status: "ready",
       last_sync_at: "2026-03-26T21:00:00+00:00",
@@ -503,6 +536,10 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         relative_path: "product_docs",
         include_globs: ["**/*.md"],
         exclude_globs: [] as string[],
+        metadata: {
+          category: "guide",
+          published: true,
+        },
         lifecycle_state: "active",
         last_sync_status: "ready",
         last_sync_at: "2026-03-26T20:10:00+00:00",
@@ -516,6 +553,9 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         relative_path: "draft_docs",
         include_globs: ["**/*.md"],
         exclude_globs: [] as string[],
+        metadata: {
+          category: "draft",
+        },
         lifecycle_state: "active",
         last_sync_status: "error",
         last_sync_at: "2026-03-26T20:12:00+00:00",
@@ -628,7 +668,13 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       last_sync_at: "2026-03-26T20:00:00+00:00",
       last_sync_error: null,
       last_sync_summary: "Managed knowledge base index is ready.",
-      schema: {},
+      schema: {
+        properties: [
+          { name: "category", data_type: "text" },
+          { name: "page_count", data_type: "int" },
+          { name: "published", data_type: "boolean" },
+        ],
+      },
       vectorization: {
         mode: "vanessa_embeddings",
         embedding_provider_instance_id: "embedding-provider-1",
@@ -678,7 +724,13 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       last_sync_at: null,
       last_sync_error: null,
       last_sync_summary: "Managed knowledge base index is ready.",
-      schema: {},
+      schema: {
+        properties: [
+          { name: "category", data_type: "text" },
+          { name: "page_count", data_type: "int" },
+          { name: "published", data_type: "boolean" },
+        ],
+      },
       vectorization: {
         mode: "vanessa_embeddings",
         embedding_provider_instance_id: "embedding-provider-1",
@@ -1201,6 +1253,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByLabelText("Document title")).toBeVisible();
     expect(screen.getByLabelText("Document text")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Metadata" })).toBeVisible();
     expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
     expect(screen.queryByText("Manual Note")).not.toBeInTheDocument();
   });
@@ -1220,6 +1273,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("button", { name: "Upload Files" })).toHaveAttribute("aria-pressed", "true");
     expect(document.querySelector('input[type="file"]')).not.toBeNull();
     expect(screen.getByText("Supported file types: .txt, .md, .json, .jsonl, .pdf.")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Metadata" })).toBeVisible();
     expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
     expect(screen.queryByText("Manual Note")).not.toBeInTheDocument();
   });
@@ -1277,10 +1331,73 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(await screen.findByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByDisplayValue("Manual Note")).toBeVisible();
     expect(screen.getByDisplayValue("Operator note")).toBeVisible();
+    expect(screen.getByDisplayValue("memo")).toBeVisible();
+    expect(screen.getByDisplayValue("2")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
-  it("renders the browse documents page as summary cards with open-text links", async () => {
+  it("submits manual-document metadata using schema-driven fields", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload");
+
+    await screen.findByRole("heading", { name: "Manual document" });
+    await userEvent.click(screen.getByRole("button", { name: "Add metadata property" }));
+    const propertySelect = screen.getByLabelText("Property name");
+    await userEvent.selectOptions(propertySelect, "category");
+    await userEvent.type(screen.getByLabelText("Property value"), "guide");
+    await userEvent.type(screen.getByLabelText("Document title"), "Release note");
+    await userEvent.type(screen.getByLabelText("Document text"), "Document body");
+
+    await userEvent.click(screen.getByRole("button", { name: "Add document" }));
+
+    await waitFor(() => expect(contextApiMocks.createKnowledgeBaseDocument).toHaveBeenCalledWith(
+      "kb-primary",
+      expect.objectContaining({
+        title: "Release note",
+        text: "Document body",
+        metadata: { category: "guide" },
+      }),
+      "token",
+    ));
+  });
+
+  it("submits shared upload metadata for uploaded files", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/upload?view=upload");
+
+    await screen.findByRole("heading", { name: "Upload supported files" });
+    await userEvent.click(screen.getByRole("button", { name: "Add metadata property" }));
+    await userEvent.selectOptions(screen.getByLabelText("Property name"), "published");
+    await userEvent.selectOptions(screen.getByLabelText("Property value"), "true");
+    const file = new File(["hello"], "guide.txt", { type: "text/plain" });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(fileInput, file);
+
+    await userEvent.click(screen.getByRole("button", { name: "Upload files" }));
+
+    await waitFor(() => expect(contextApiMocks.uploadKnowledgeBaseDocuments).toHaveBeenCalledWith(
+      "kb-primary",
+      [file],
+      { published: true },
+      "token",
+    ));
+  });
+
+  it("renders the browse documents page as summary cards with document actions", async () => {
     await renderContextWorkspace("/control/context/kb-primary/documents");
 
     expect(await screen.findByRole("heading", { name: "Browse documents" })).toBeVisible();
@@ -1293,6 +1410,42 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(openLinks).toHaveLength(2);
     expect(openLinks[0]).toHaveAttribute("target", "_blank");
     expect(openLinks[0]).toHaveAttribute("href", "/control/context/kb-primary/documents/doc-1/view");
+    expect(screen.getAllByRole("button", { name: "View metadata" })).toHaveLength(2);
+  });
+
+  it("shows effective metadata in a modal from the browse documents page", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/documents");
+
+    await screen.findByRole("heading", { name: "Browse documents" });
+    await userEvent.click(screen.getAllByRole("button", { name: "View metadata" })[0]);
+
+    expect(await screen.findByRole("dialog", { name: "Metadata for Architecture Overview" })).toBeVisible();
+    expect(screen.getByText("category")).toBeVisible();
+    expect(screen.getByText("guide")).toBeVisible();
+    expect(screen.getByText("published")).toBeVisible();
+    expect(screen.getByText("true")).toBeVisible();
+    expect(screen.getByText("source_path")).toBeVisible();
+    expect(screen.getByText("product_docs/overview.txt")).toBeVisible();
+  });
+
+  it("preloads source metadata when editing an existing source", async () => {
+    mockUser = {
+      id: 1,
+      email: "superadmin@example.com",
+      username: "superadmin",
+      role: "superadmin",
+      is_active: true,
+    };
+
+    await renderContextWorkspace("/control/context/kb-primary/sources?view=list");
+
+    await screen.findByRole("heading", { name: "Existing sources" });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByRole("heading", { name: "Edit source" })).toBeVisible();
+    expect(screen.getByDisplayValue("guide")).toBeVisible();
+    const propertyValueFields = screen.getAllByLabelText("Property value");
+    expect((propertyValueFields[1] as HTMLSelectElement).value).toBe("true");
   });
 
   it("renders the document viewer with full text and handles missing documents", async () => {

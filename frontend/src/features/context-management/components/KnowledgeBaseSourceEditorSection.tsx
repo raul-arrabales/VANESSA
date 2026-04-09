@@ -1,9 +1,11 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeSourceDirectoriesResponse } from "../../../api/context";
+import type { KnowledgeBaseSchemaProperty, KnowledgeSourceDirectoriesResponse } from "../../../api/context";
+import { KnowledgeBaseMetadataEditor } from "./KnowledgeBaseMetadataEditor";
 import { createEmptySourceForm, type SourceFormState } from "../types";
 
 type Props = {
+  schemaProperties: KnowledgeBaseSchemaProperty[];
   sourceForm: SourceFormState;
   sourceDirectoryBrowser: {
     open: boolean;
@@ -22,6 +24,7 @@ type Props = {
 };
 
 export function KnowledgeBaseSourceEditorSection({
+  schemaProperties,
   sourceForm,
   sourceDirectoryBrowser,
   onSourceFormChange,
@@ -203,6 +206,13 @@ export function KnowledgeBaseSourceEditorSection({
             <option value="archived">archived</option>
           </select>
         </label>
+        <KnowledgeBaseMetadataEditor
+          schemaProperties={schemaProperties}
+          entries={sourceForm.metadataEntries}
+          onChange={(metadataEntries) => {
+            onSourceFormChange((current) => ({ ...current, metadataEntries }));
+          }}
+        />
         <div className="form-actions">
           <button type="submit" className="btn btn-primary">
             {sourceForm.id ? t("contextManagement.actions.updateSource") : t("contextManagement.actions.addSource")}

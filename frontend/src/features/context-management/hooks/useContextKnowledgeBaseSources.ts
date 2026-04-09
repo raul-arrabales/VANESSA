@@ -8,6 +8,10 @@ import {
   updateKnowledgeSource,
 } from "../../../api/context";
 import type { KnowledgeSourceDirectoriesResponse } from "../../../api/context";
+import {
+  buildMetadataRecord,
+  MetadataEditorValidationError,
+} from "../metadataEditor";
 import { createEmptySourceForm, parseGlobText, type SourceFormState } from "../types";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
@@ -81,6 +85,7 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
       relative_path: normalizedRelativePath,
       include_globs: parseGlobText(sourceForm.includeGlobs),
       exclude_globs: parseGlobText(sourceForm.excludeGlobs),
+      metadata: buildMetadataRecord(sourceForm.metadataEntries, workspace.knowledgeBase.schema),
       lifecycle_state: sourceForm.lifecycleState,
       source_type: "local_directory",
     };
@@ -97,6 +102,10 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
       setSourceDirectoryBrowserPayload(null);
       await workspace.reload();
     } catch (requestError) {
+      if (requestError instanceof MetadataEditorValidationError) {
+        workspace.showErrorFeedback(getMetadataValidationMessage(requestError, t), t("contextManagement.feedback.sourceSaveFailed"));
+        return;
+      }
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.sourceSaveFailed"));
     }
   }
@@ -199,4 +208,26 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
     handleSelectAndBrowseSourceDirectory,
     handleUseCurrentSourceDirectory,
   };
+}
+
+function getMetadataValidationMessage(
+  error: MetadataEditorValidationError,
+  t: ReturnType<typeof useTranslation<"common">>["t"],
+): string {
+  if (error.code === "duplicate_property") {
+    return t("contextManagement.feedback.metadataDuplicateProperty");
+  }
+  if (error.code === "missing_property_name") {
+    return t("contextManagement.feedback.metadataPropertyNameRequired");
+  }
+  if (error.code === "invalid_number") {
+    return t("contextManagement.feedback.metadataInvalidNumber");
+  }
+  if (error.code === "invalid_int") {
+    return t("contextManagement.feedback.metadataInvalidInteger");
+  }
+  if (error.code === "invalid_boolean") {
+    return t("contextManagement.feedback.metadataInvalidBoolean");
+  }
+  return t("contextManagement.feedback.metadataInvalidText");
 }

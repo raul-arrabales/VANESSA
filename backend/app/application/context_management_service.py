@@ -288,6 +288,7 @@ def upload_context_knowledge_base_documents(
     config,
     knowledge_base_id: str,
     files,
+    metadata: dict[str, Any] | None,
     created_by_user_id: int,
 ):
     return _upload_knowledge_base_documents(
@@ -295,5 +296,6 @@ def upload_context_knowledge_base_documents(
         config=config,
         knowledge_base_id=knowledge_base_id,
         files=files,
+        metadata=metadata,
         created_by_user_id=created_by_user_id,
     )

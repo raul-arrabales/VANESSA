@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS context_knowledge_sources (
     relative_path TEXT NOT NULL,
     include_globs JSONB NOT NULL DEFAULT '[]'::jsonb,
     exclude_globs JSONB NOT NULL DEFAULT '[]'::jsonb,
+    metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     lifecycle_state TEXT NOT NULL DEFAULT 'active',
     last_sync_status TEXT NOT NULL DEFAULT 'idle',
     last_sync_at TIMESTAMPTZ,
@@ -26,6 +27,8 @@ ALTER TABLE context_knowledge_sources
     ADD COLUMN IF NOT EXISTS include_globs JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE context_knowledge_sources
     ADD COLUMN IF NOT EXISTS exclude_globs JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE context_knowledge_sources
+    ADD COLUMN IF NOT EXISTS metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE context_knowledge_sources
     ADD COLUMN IF NOT EXISTS lifecycle_state TEXT NOT NULL DEFAULT 'active';
 ALTER TABLE context_knowledge_sources
