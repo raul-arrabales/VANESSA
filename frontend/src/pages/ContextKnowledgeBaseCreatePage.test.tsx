@@ -199,6 +199,7 @@ describe("ContextKnowledgeBaseCreatePage", () => {
     await waitFor(() => expect(providerSelect).toHaveValue("provider-2"));
     expect(contextApi.listKnowledgeBaseSchemaProfiles).toHaveBeenCalledWith("weaviate_local", "token");
     expect(contextApi.getKnowledgeBaseVectorizationOptions).toHaveBeenCalledWith("provider-2", "token");
+    expect(screen.getByRole("heading", { name: "Advanced settings" }).closest(".panel-nested")).toBeTruthy();
     expect(await screen.findByLabelText("Chunking strategy")).toHaveValue("fixed_length");
     expect(screen.getByLabelText("Chunk length")).toHaveValue(300);
     expect(screen.getByLabelText("Chunk overlap")).toHaveValue(60);

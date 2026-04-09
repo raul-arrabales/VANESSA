@@ -19,7 +19,7 @@ export function KnowledgeBaseDocumentCard({
   actions = null,
 }: KnowledgeBaseDocumentCardProps): JSX.Element {
   return (
-    <article className="panel card-stack">
+    <article className="panel panel-nested card-stack">
       <KnowledgeBaseDocumentMetadata document={document} titleAs={titleAs} showStatusChip={showStatusChip} />
       <p className="status-text">{buildKnowledgeBaseDocumentExcerpt(document.text, excerptLength)}</p>
       {actions ? <div className="form-actions">{actions}</div> : null}

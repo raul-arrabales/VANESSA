@@ -864,6 +864,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("button", { name: "Existing Sources" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Docs folder" }).closest(".panel-nested")).toBeTruthy();
 
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
@@ -882,6 +883,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     expect(await screen.findByRole("heading", { name: "Sync history" })).toBeVisible();
     expect(screen.getByText(/Scanned 1 file/)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Docs folder" }).closest(".panel-nested")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
 
@@ -1134,6 +1136,8 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(await screen.findByRole("heading", { name: "Browse documents" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".panel-nested")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Manual Note" }).closest(".panel-nested")).toBeTruthy();
 
     const openLinks = screen.getAllByRole("link", { name: "Open text" });
     expect(openLinks).toHaveLength(2);

@@ -164,6 +164,12 @@ describe("PlatformDeploymentDetailPage", () => {
     const llmRow = await screen.findByTestId("deployment-binding-row-llm_inference");
     const embeddingsRow = screen.getByTestId("deployment-binding-row-embeddings");
     const vectorRow = screen.getByTestId("deployment-binding-row-vector_store");
+    const identityRow = screen.getByTestId("deployment-identity-row");
+
+    expect(identityRow).toHaveClass("panel-nested");
+    expect(llmRow).toHaveClass("panel-nested");
+    expect(embeddingsRow).toHaveClass("panel-nested");
+    expect(vectorRow).toHaveClass("panel-nested");
 
     expect(
       within(llmRow).getByLabelText(

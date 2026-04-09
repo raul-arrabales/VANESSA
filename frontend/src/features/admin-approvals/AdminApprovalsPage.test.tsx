@@ -98,6 +98,7 @@ describe("AdminApprovalsPage", () => {
       expect(approvalsApiMocks.listPendingUsers).toHaveBeenCalledWith("token");
     });
     expect(screen.getByText("#12 pending (pending@example.com)")).toBeVisible();
+    expect(screen.getByText("#12 pending (pending@example.com)").closest(".panel-nested")).toBeTruthy();
   });
 
   it("activates and promotes pending users", async () => {

@@ -18,7 +18,7 @@ export function KnowledgeBaseSyncHistorySection({ syncRuns }: Props): JSX.Elemen
       </div>
       {syncRuns.length === 0 ? <p className="status-text">{t("contextManagement.states.noSyncRuns")}</p> : null}
       {syncRuns.map((run) => (
-        <article key={run.id} className="panel card-stack">
+        <article key={run.id} className="panel panel-nested card-stack">
           <div className="platform-card-header">
             <div className="card-stack">
               <h4 className="section-title">{run.source_display_name || t("contextManagement.states.fullKnowledgeBaseResync")}</h4>

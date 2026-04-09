@@ -31,7 +31,7 @@ export function KnowledgeBaseSourcesListSection({
 
       {sources.length === 0 ? <p className="status-text">{t("contextManagement.states.noSources")}</p> : null}
       {sources.map((source) => (
-        <article key={source.id} className="panel card-stack">
+        <article key={source.id} className="panel panel-nested card-stack">
           <div className="platform-card-header">
             <div className="card-stack">
               <h4 className="section-title">{source.display_name}</h4>

@@ -69,7 +69,7 @@ export default function AdminApprovalsPage(): JSX.Element {
       ) : (
         <div className="card-stack" role="table" aria-label={t("auth.approvals.tableAria")}>
           {pendingUsers.map((pendingUser) => (
-            <article key={pendingUser.id} className="panel card-stack">
+            <article key={pendingUser.id} className="panel panel-nested card-stack">
               <p className="status-text">#{pendingUser.id} {pendingUser.username} ({pendingUser.email})</p>
               <p className="status-text">{t("auth.approvals.roleLabel", { role: pendingUser.role })}</p>
               <div className="form-actions">

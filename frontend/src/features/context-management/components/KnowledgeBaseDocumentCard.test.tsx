@@ -34,5 +34,6 @@ describe("KnowledgeBaseDocumentCard", () => {
     expect(screen.getByText("Managed by Docs folder (product_docs/overview.txt)")).toBeVisible();
     expect(screen.getByText("Hello wor...")).toBeVisible();
     expect(screen.getByRole("button", { name: "Open text" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".panel-nested")).toBeTruthy();
   });
 });

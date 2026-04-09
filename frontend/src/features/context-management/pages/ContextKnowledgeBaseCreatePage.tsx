@@ -102,7 +102,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
         </label>
 
         {selectedProviderId ? (
-          <section className="panel card-stack" aria-labelledby="kb-advanced-settings-title">
+          <section className="panel panel-nested card-stack" aria-labelledby="kb-advanced-settings-title">
             <div className="card-stack">
               <h3 id="kb-advanced-settings-title" className="section-title">
                 {t("contextManagement.advancedSettings.title")}

@@ -240,7 +240,7 @@ export default function PlatformDeploymentCapabilitySection({
 
   return (
     <section
-      className="deployment-binding-row panel"
+      className="deployment-binding-row panel panel-nested"
       aria-labelledby={rowTitleId}
       data-testid={`deployment-binding-row-${section.capabilityKey}`}
     >

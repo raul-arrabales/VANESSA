@@ -123,7 +123,7 @@ export default function PlatformDeploymentForm({
   return (
     <form className="card-stack" onSubmit={onSubmit}>
       <div className="deployment-settings-layout">
-        <div className="deployment-identity-row panel" data-testid="deployment-identity-row">
+        <div className="deployment-identity-row panel panel-nested" data-testid="deployment-identity-row">
           <div className="deployment-binding-heading">
             <span className="field-label">{t("platformControl.forms.deployment.deploymentIdentity")}</span>
             <h4 className="deployment-binding-title">{t("platformControl.sections.settings")}</h4>
