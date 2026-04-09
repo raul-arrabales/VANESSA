@@ -16,6 +16,7 @@ type Props = {
   retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
+  completedQueryId: number;
   isQuerying: boolean;
   onQueryChange: Dispatch<SetStateAction<string>>;
   onTopKChange: Dispatch<SetStateAction<string>>;
@@ -33,6 +34,7 @@ export function KnowledgeBaseRetrievalSection({
   retrievalQueryPreprocessing,
   retrievalResults,
   retrievalResultCount,
+  completedQueryId,
   isQuerying,
   onQueryChange,
   onTopKChange,
@@ -68,6 +70,7 @@ export function KnowledgeBaseRetrievalSection({
       <KnowledgeBaseRetrievalResults
         retrievalResults={retrievalResults}
         retrievalResultCount={retrievalResultCount}
+        completedQueryId={completedQueryId}
       />
     </section>
   );

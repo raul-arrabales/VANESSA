@@ -19,6 +19,7 @@ import {
 } from "../features/context-management/retrievalTestBuilders";
 
 let mockUser: AuthUser | null = null;
+const scrollIntoViewMock = vi.fn();
 
 vi.mock("../auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -478,6 +479,11 @@ async function renderContextWorkspace(route: string) {
 describe("ContextKnowledgeBaseWorkspace pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    scrollIntoViewMock.mockReset();
     mockUser = {
       id: 1,
       email: "admin@example.com",
@@ -964,6 +970,10 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     const resultButtons = await screen.findAllByRole("button", { name: /Expand retrieval result for/i });
     expect(resultButtons).toHaveLength(2);
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "start",
+    });
     expect(within(resultButtons[0] as HTMLElement).getByRole("heading", { name: "Chunk 1: FAQ" })).toBeVisible();
     expect(within(resultButtons[1] as HTMLElement).getByRole("heading", { name: "Chunk 2: Architecture Overview" })).toBeVisible();
     expect(within(resultButtons[0] as HTMLElement).getByText("Similarity: 0.913")).toBeVisible();

@@ -12,6 +12,7 @@ export type ContextKnowledgeBaseRetrievalResult = ReturnType<typeof useContextKn
   retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
+  completedQueryId: number;
   isQuerying: boolean;
   setRetrievalQuery: Dispatch<SetStateAction<string>>;
   setRetrievalTopK: Dispatch<SetStateAction<string>>;
@@ -31,6 +32,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
   const [retrievalQueryPreprocessing, setRetrievalQueryPreprocessing] = useState<KnowledgeBaseQueryPreprocessing>("none");
   const [retrievalResults, setRetrievalResults] = useState<KnowledgeBaseQueryResult[]>([]);
   const [retrievalResultCount, setRetrievalResultCount] = useState<number | null>(null);
+  const [completedQueryId, setCompletedQueryId] = useState(0);
   const [isQuerying, setIsQuerying] = useState(false);
 
   async function handleTestRetrieval(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -56,6 +58,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
       );
       setRetrievalResults(response.results);
       setRetrievalResultCount(response.retrieval.result_count);
+      setCompletedQueryId((current) => current + 1);
     } catch (requestError) {
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.queryFailed"));
     } finally {
@@ -72,6 +75,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
     retrievalQueryPreprocessing,
     retrievalResults,
     retrievalResultCount,
+    completedQueryId,
     isQuerying,
     setRetrievalQuery,
     setRetrievalTopK,

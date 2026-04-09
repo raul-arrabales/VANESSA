@@ -16,6 +16,7 @@ export default function ContextKnowledgeBaseRetrievalPage(): JSX.Element {
           retrievalQueryPreprocessing={detail.retrievalQueryPreprocessing}
           retrievalResults={detail.retrievalResults}
           retrievalResultCount={detail.retrievalResultCount}
+          completedQueryId={detail.completedQueryId}
           isQuerying={detail.isQuerying}
           onQueryChange={detail.setRetrievalQuery}
           onTopKChange={detail.setRetrievalTopK}

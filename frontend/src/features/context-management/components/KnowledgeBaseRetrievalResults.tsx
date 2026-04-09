@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBaseQueryResult } from "../../../api/context";
 import {
@@ -10,18 +10,31 @@ import { KnowledgeBaseRetrievalResultCard } from "./KnowledgeBaseRetrievalResult
 type Props = {
   retrievalResults: KnowledgeBaseQueryResult[];
   retrievalResultCount: number | null;
+  completedQueryId: number;
 };
 
 export function KnowledgeBaseRetrievalResults({
   retrievalResults,
   retrievalResultCount,
+  completedQueryId,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
   const [expandedResultId, setExpandedResultId] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setExpandedResultId(null);
   }, [retrievalResults]);
+
+  useEffect(() => {
+    if (completedQueryId < 1) {
+      return;
+    }
+    resultsRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [completedQueryId]);
 
   const displayItems = useMemo(
     () => sortRetrievalResultsByRelevance(retrievalResults)
@@ -30,7 +43,7 @@ export function KnowledgeBaseRetrievalResults({
   );
 
   return (
-    <>
+    <div ref={resultsRef} className="card-stack">
       {retrievalResultCount !== null ? (
         <p className="status-text">{t("contextManagement.states.queryResultCount", { count: retrievalResultCount })}</p>
       ) : null}
@@ -45,6 +58,6 @@ export function KnowledgeBaseRetrievalResults({
           onToggle={() => setExpandedResultId((current) => (current === item.id ? null : item.id))}
         />
       ))}
-    </>
+    </div>
   );
 }
