@@ -44,7 +44,7 @@ export function useLocalDownloads(token: string): {
   const [downloadJobs, setDownloadJobs] = useState<ModelDownloadJob[]>([]);
   const [feedback, setFeedback] = useState("");
   const { t } = useTranslation("common");
-  const { showErrorFeedback } = useActionFeedback();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const jobsRef = useRef<ModelDownloadJob[]>([]);
   const pollingStartedAtRef = useRef<number | null>(null);
 
@@ -190,13 +190,15 @@ export function useLocalDownloads(token: string): {
         token,
       );
       setDownloadJobs((current) => [job, ...current]);
-      setFeedback(t("models.feedback.downloadStarted", { source: model.source_id }));
+      showSuccessFeedback(t("models.feedback.downloadStarted", { source: model.source_id }), {
+        titleKey: "modelOps.local.discoveryTitle",
+      });
     } catch (requestError) {
       showErrorFeedback(requestError, t("models.feedback.downloadStartFailed"), {
         titleKey: "modelOps.local.discoveryTitle",
       });
     }
-  }, [showErrorFeedback, t, token]);
+  }, [showErrorFeedback, showSuccessFeedback, t, token]);
 
   return {
     discoveredModels,

@@ -12,7 +12,6 @@ export function useCloudRegistrationFlow(
   recentCloudModels: ManagedModel[];
   isLoading: boolean;
   isSaving: boolean;
-  feedback: string;
   refresh: () => Promise<void>;
   saveCredential: (payload: {
     provider: string;
@@ -38,9 +37,8 @@ export function useCloudRegistrationFlow(
   const [recentCloudModels, setRecentCloudModels] = useState<ManagedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState("");
   const { t } = useTranslation("common");
-  const { showErrorFeedback } = useActionFeedback();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!token) {
@@ -78,10 +76,11 @@ export function useCloudRegistrationFlow(
       return;
     }
     setIsSaving(true);
-    setFeedback("");
     try {
       await createModelCredential(payload, token);
-      setFeedback(t("modelOps.cloud.credentialSaved"));
+      showSuccessFeedback(t("modelOps.cloud.credentialSaved"), {
+        titleKey: "modelOps.cloud.credentialsTitle",
+      });
       await refresh();
     } catch (requestError) {
       showErrorFeedback(requestError, t("modelOps.cloud.credentialSaveFailed"), {
@@ -90,7 +89,7 @@ export function useCloudRegistrationFlow(
     } finally {
       setIsSaving(false);
     }
-  }, [refresh, showErrorFeedback, t, token]);
+  }, [refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
   const registerCloudModel = useCallback(async (payload: {
     id: string;
@@ -108,7 +107,6 @@ export function useCloudRegistrationFlow(
       return null;
     }
     setIsSaving(true);
-    setFeedback("");
     try {
       const created = await registerManagedModel(
         {
@@ -128,7 +126,9 @@ export function useCloudRegistrationFlow(
         },
         token,
       );
-      setFeedback(t("modelOps.cloud.modelRegistered"));
+      showSuccessFeedback(t("modelOps.cloud.modelRegistered"), {
+        titleKey: "modelOps.cloud.registrationTitle",
+      });
       await refresh();
       return created;
     } catch (requestError) {
@@ -139,14 +139,13 @@ export function useCloudRegistrationFlow(
     } finally {
       setIsSaving(false);
     }
-  }, [refresh, showErrorFeedback, t, token]);
+  }, [refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
   return {
     credentials,
     recentCloudModels,
     isLoading,
     isSaving,
-    feedback,
     refresh,
     saveCredential,
     registerCloudModel,

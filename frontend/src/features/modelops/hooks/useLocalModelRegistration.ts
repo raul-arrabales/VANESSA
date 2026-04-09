@@ -15,13 +15,11 @@ type LocalModelRegistrationPayload = {
 
 export function useLocalModelRegistration(token: string): {
   lastRegisteredModelId: string;
-  feedback: string;
   registerLocalModel: (payload: LocalModelRegistrationPayload) => Promise<boolean>;
 } {
   const { t } = useTranslation("common");
-  const { showErrorFeedback } = useActionFeedback();
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
-  const [feedback, setFeedback] = useState("");
 
   const registerLocalModel = useCallback(async (payload: LocalModelRegistrationPayload): Promise<boolean> => {
     if (!token) {
@@ -47,7 +45,9 @@ export function useLocalModelRegistration(token: string): {
         token,
       );
       setLastRegisteredModelId(model.id);
-      setFeedback(t("modelOps.local.manualSuccess"));
+      showSuccessFeedback(t("modelOps.local.manualSuccess"), {
+        titleKey: "modelOps.local.manualTitle",
+      });
       return true;
     } catch (requestError) {
       showErrorFeedback(requestError, t("modelOps.local.manualFailure"), {
@@ -55,11 +55,10 @@ export function useLocalModelRegistration(token: string): {
       });
       return false;
     }
-  }, [showErrorFeedback, t, token]);
+  }, [showErrorFeedback, showSuccessFeedback, t, token]);
 
   return {
     lastRegisteredModelId,
-    feedback,
     registerLocalModel,
   };
 }

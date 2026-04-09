@@ -105,6 +105,21 @@ describe("LocalModelRegisterPage", () => {
     expect(view.container.querySelector(".error-text")).toBeNull();
   });
 
+  it("shows manual registration success in the shared modal and keeps only one success message", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Local model registration" });
+    await user.type(screen.getByLabelText("Model id"), "phi-local");
+    await user.type(screen.getByLabelText("Model name"), "Phi Local");
+    await user.click(screen.getByRole("button", { name: "Register local model" }));
+
+    expect(await screen.findByRole("dialog", { name: "Manual local registration" })).toBeVisible();
+    expect(screen.getAllByText("Local model registered.")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Test model" })).toHaveAttribute("href", "/control/models/phi-local/test");
+  });
+
   it("routes inspect failures through the themed discovery modal", async () => {
     localApiMocks.discoverHfModels.mockResolvedValueOnce([
       {
@@ -141,5 +156,29 @@ describe("LocalModelRegisterPage", () => {
 
     expect(await screen.findByText("No models found for this query.")).toBeVisible();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows download starts in the shared modal while keeping discovery empty-state feedback inline only", async () => {
+    localApiMocks.discoverHfModels.mockResolvedValueOnce([
+      {
+        source_id: "meta-llama/Llama-3-8B-Instruct",
+        name: "Llama 3 8B Instruct",
+        downloads: 42,
+        likes: 5,
+        tags: ["llm"],
+        provider: "huggingface",
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Local model registration" });
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+    await user.click(await screen.findByRole("button", { name: "Download" }));
+
+    expect(await screen.findByRole("dialog", { name: "Hugging Face discovery" })).toBeVisible();
+    expect(screen.getAllByText("Started download for meta-llama/Llama-3-8B-Instruct.")).toHaveLength(1);
+    expect(screen.queryByText("No models found for this query.")).not.toBeInTheDocument();
   });
 });

@@ -3,23 +3,21 @@ import { useTranslation } from "react-i18next";
 import { listModelOpsModels } from "../../../api/modelops/models";
 import { listModelAssignments, updateModelAssignment } from "../../../api/modelops/access";
 import type { ManagedModel, ModelScopeAssignment } from "../../../api/modelops/types";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 export function useModelAssignments(token: string): {
   models: ManagedModel[];
   assignments: ModelScopeAssignment[];
   assignmentByScope: Map<string, string[]>;
   isLoading: boolean;
-  error: string;
-  feedback: string;
   refresh: () => Promise<void>;
   toggleAssignment: (scope: string, modelId: string) => Promise<void>;
 } {
   const { t } = useTranslation("common");
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const [models, setModels] = useState<ManagedModel[]>([]);
   const [assignments, setAssignments] = useState<ModelScopeAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!token) {
@@ -27,7 +25,6 @@ export function useModelAssignments(token: string): {
     }
 
     setIsLoading(true);
-    setError("");
     try {
       const [modelRows, assignmentRows] = await Promise.all([
         listModelOpsModels(token),
@@ -36,11 +33,13 @@ export function useModelAssignments(token: string): {
       setModels(modelRows);
       setAssignments(assignmentRows);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : t("modelOps.access.loadFailed"));
+      showErrorFeedback(requestError, t("modelOps.access.loadFailed"), {
+        titleKey: "modelOps.access.title",
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [t, token]);
+  }, [showErrorFeedback, t, token]);
 
   useEffect(() => {
     void refresh();
@@ -62,27 +61,27 @@ export function useModelAssignments(token: string): {
     const current = assignmentByScope.get(scope) ?? [];
     const next = current.includes(modelId) ? current.filter((id) => id !== modelId) : [...current, modelId];
 
-    setError("");
-    setFeedback("");
     try {
       const saved = await updateModelAssignment(scope, next, token);
       setAssignments((currentAssignments) => {
         const others = currentAssignments.filter((assignment) => assignment.scope !== scope);
         return [...others, saved];
       });
-      setFeedback(t("modelOps.access.saved", { scope }));
+      showSuccessFeedback(t("modelOps.access.saved", { scope }), {
+        titleKey: "modelOps.access.title",
+      });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : t("modelOps.access.saveFailed"));
+      showErrorFeedback(requestError, t("modelOps.access.saveFailed"), {
+        titleKey: "modelOps.access.title",
+      });
     }
-  }, [assignmentByScope, t, token]);
+  }, [assignmentByScope, showErrorFeedback, showSuccessFeedback, t, token]);
 
   return {
     models,
     assignments,
     assignmentByScope,
     isLoading,
-    error,
-    feedback,
     refresh,
     toggleAssignment,
   };

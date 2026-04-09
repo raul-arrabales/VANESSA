@@ -79,10 +79,25 @@ describe("CloudModelRegisterPage", () => {
     await user.click(screen.getByRole("button", { name: "Register cloud model" }));
 
     expect(modelApiMocks.registerManagedModel).toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Register cloud model" })).toBeVisible();
+    expect(screen.getAllByText("Model registered.")).toHaveLength(1);
     expect(await screen.findByRole("link", { name: "Open details" })).toHaveAttribute(
       "href",
       "/control/models/gpt-private",
     );
+  });
+
+  it("shows credential save success in the shared feedback modal without leaving inline feedback", async () => {
+    mockRole = "superadmin";
+    const user = userEvent.setup();
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+
+    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await user.click(screen.getByRole("button", { name: "Save credential" }));
+
+    expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
+    expect(screen.getAllByText("Credential saved.")).toHaveLength(1);
+    expect(view.container.querySelector(".error-text")).toBeNull();
   });
 
   it("shows credential save failures in the shared feedback modal instead of inline errors", async () => {

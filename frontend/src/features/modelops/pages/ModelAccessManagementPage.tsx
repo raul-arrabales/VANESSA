@@ -11,7 +11,7 @@ export default function ModelAccessManagementPage(): JSX.Element {
   const { token } = useAuth();
   const [searchParams] = useSearchParams();
   const highlightedModelId = searchParams.get("modelId") ?? undefined;
-  const { models, assignmentByScope, error, feedback, isLoading, toggleAssignment } = useModelAssignments(token);
+  const { models, assignmentByScope, isLoading, toggleAssignment } = useModelAssignments(token);
   const [search, setSearch] = useState("");
 
   const filteredModels = useMemo(() => {
@@ -47,8 +47,6 @@ export default function ModelAccessManagementPage(): JSX.Element {
           highlightedModelId={highlightedModelId}
         />
       )}
-      {feedback && <p className="status-text">{feedback}</p>}
-      {error && <p className="error-text">{error}</p>}
     </section>
   );
 }

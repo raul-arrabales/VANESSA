@@ -4,6 +4,7 @@ import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/modelops/
 type LocalDiscoveryPanelProps = {
   taskKey: string;
   query: string;
+  feedback: string;
   discoveredModels: HfDiscoveredModel[];
   selectedModelInfo: string;
   downloadJobs: ModelDownloadJob[];
@@ -18,6 +19,7 @@ type LocalDiscoveryPanelProps = {
 export default function LocalDiscoveryPanel({
   taskKey,
   query,
+  feedback,
   discoveredModels,
   selectedModelInfo,
   downloadJobs,
@@ -48,6 +50,7 @@ export default function LocalDiscoveryPanel({
           {t("modelOps.actions.searchHf")}
         </button>
       </div>
+      {feedback ? <p className="status-text">{feedback}</p> : null}
       {selectedModelInfo && <p className="status-text">{selectedModelInfo}</p>}
       <ul className="card-stack" aria-label={t("modelOps.local.discoveryResultsAria")}>
         {discoveredModels.map((model) => (

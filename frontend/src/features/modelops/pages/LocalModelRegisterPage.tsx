@@ -14,7 +14,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
     useLocalDownloads(token);
   const {
     lastRegisteredModelId,
-    feedback: manualFeedback,
     registerLocalModel,
   } = useLocalModelRegistration(token);
 
@@ -43,6 +42,7 @@ export default function LocalModelRegisterPage(): JSX.Element {
       <LocalDiscoveryPanel
         taskKey={discoveryTaskKey}
         query={discoverQuery}
+        feedback={feedback}
         discoveredModels={discoveredModels}
         selectedModelInfo={selectedModelInfo}
         downloadJobs={downloadJobs}
@@ -109,8 +109,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
         </div>
       </article>
 
-      {feedback && <p className="status-text">{feedback}</p>}
-      {manualFeedback && <p className="status-text">{manualFeedback}</p>}
       {lastRegisteredModelId && (
         <div className="button-row">
           <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(lastRegisteredModelId)}/test`}>

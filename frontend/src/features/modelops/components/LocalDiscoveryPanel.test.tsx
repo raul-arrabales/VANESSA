@@ -9,6 +9,7 @@ describe("LocalDiscoveryPanel", () => {
       <LocalDiscoveryPanel
         taskKey="llm"
         query=""
+        feedback=""
         discoveredModels={[]}
         selectedModelInfo=""
         downloadJobs={[]}
