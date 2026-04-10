@@ -4,6 +4,8 @@ import { useAuth } from "../auth/AuthProvider";
 import QuoteOfTheDayCard from "../components/QuoteOfTheDayCard";
 import VanessaBrand from "../components/VanessaBrand";
 
+const VANESSA_DOCS_URL = "https://raul-arrabales.github.io/VANESSA/";
+
 export default function HomePage(): JSX.Element {
   const { t } = useTranslation("common");
   const { isAuthenticated, user } = useAuth();
@@ -28,6 +30,9 @@ export default function HomePage(): JSX.Element {
         <div className="toolbar" role="group" aria-label={t("home.guest.actions") }>
           <Link to="/login" className="btn btn-primary">{t("home.guest.login")}</Link>
           <Link to="/register" className="btn btn-secondary">{t("home.guest.register")}</Link>
+          <a href={VANESSA_DOCS_URL} target="_blank" rel="noreferrer" className="btn btn-secondary">
+            {t("home.guest.docs")}
+          </a>
         </div>
       </section>
     );

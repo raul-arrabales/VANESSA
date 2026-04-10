@@ -51,6 +51,7 @@
     "settings": "Settings",
     "designEditor": "Design editor",
     "settingsMenuLabel": "Identity and settings menu",
+    "docs": "Docs",
     "pathCue": {
       "aria": "Current location"
     },
@@ -248,7 +249,8 @@
       "description": "Sign in or create an account to start using your AI mission console.",
       "actions": "Guest quick actions",
       "login": "Go to login",
-      "register": "Create an account"
+      "register": "Create an account",
+      "docs": "Read the docs"
     },
     "authenticated": {
       "title": "Welcome back",

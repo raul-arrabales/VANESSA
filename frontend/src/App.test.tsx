@@ -110,6 +110,11 @@ describe("App header", () => {
     const userMenuPanel = document.querySelector(".user-menu-panel");
     expect(userMenuPanel).not.toBeNull();
     expect(within(userMenuPanel as HTMLElement).getByRole("link", { name: await t("nav.controlPanel") })).toHaveAttribute("href", "/control");
+    expect(within(userMenuPanel as HTMLElement).getByRole("link", { name: "Docs" })).toHaveAttribute(
+      "href",
+      "https://raul-arrabales.github.io/VANESSA/",
+    );
+    expect(within(userMenuPanel as HTMLElement).getByRole("link", { name: "Docs" })).toHaveAttribute("target", "_blank");
   });
 
   it("enables runtime toggle for superadmin users", async () => {

@@ -9,6 +9,8 @@ import { useRuntimeMode } from "../../runtime/RuntimeModeProvider";
 import { buildSidebarItems, buildTopBarPathItems, buildUserMenuItems } from "./navigation";
 import { useAppShellState } from "./useAppShellState";
 
+const VANESSA_DOCS_URL = "https://raul-arrabales.github.io/VANESSA/";
+
 type RuntimeModeConfirmationDialogProps = {
   nextMode: "offline" | "online";
   isPending: boolean;
@@ -258,6 +260,8 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
           pathItems={pathItems}
           runtimeControl={runtimeControl}
           showLogout={isAuthenticated}
+          docsLabel={t("nav.docs")}
+          docsUrl={VANESSA_DOCS_URL}
           onToggleNavigationDrawer={toggleSidebarDrawer}
           onToggleUserMenu={toggleUserMenu}
           onCloseUserMenu={closeUserMenu}

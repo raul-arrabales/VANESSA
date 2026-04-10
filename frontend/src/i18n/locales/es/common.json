@@ -46,6 +46,7 @@
     "settings": "Configuración",
     "designEditor": "Editor de diseno",
     "settingsMenuLabel": "Menú de identidad y configuración",
+    "docs": "Docs",
     "pathCue": {
       "aria": "Ubicacion actual"
     },
@@ -243,7 +244,8 @@
       "description": "Inicia sesion o crea una cuenta para empezar a usar tu consola de IA.",
       "actions": "Acciones rapidas para invitados",
       "login": "Ir a inicio de sesion",
-      "register": "Crear una cuenta"
+      "register": "Crear una cuenta",
+      "docs": "Leer la documentacion"
     },
     "authenticated": {
       "title": "Bienvenido de nuevo",

@@ -43,6 +43,11 @@ describe("HomePage quote of the day", () => {
     await renderHomePage();
 
     expect(screen.getByRole("heading", { name: "VANESSA" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Read the docs" })).toHaveAttribute(
+      "href",
+      "https://raul-arrabales.github.io/VANESSA/",
+    );
+    expect(screen.getByRole("link", { name: "Read the docs" })).toHaveAttribute("target", "_blank");
     expect(screen.queryByRole("heading", { name: "Quote of the day" })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });

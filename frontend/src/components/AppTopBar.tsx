@@ -17,6 +17,8 @@ type AppTopBarProps = {
   pathItems: TopBarPathItem[];
   runtimeControl: JSX.Element;
   showLogout: boolean;
+  docsLabel: string;
+  docsUrl: string;
   onToggleNavigationDrawer: () => void;
   onToggleUserMenu: () => void;
   onCloseUserMenu: () => void;
@@ -38,6 +40,8 @@ export default function AppTopBar({
   pathItems,
   runtimeControl,
   showLogout,
+  docsLabel,
+  docsUrl,
   onToggleNavigationDrawer,
   onToggleUserMenu,
   onCloseUserMenu,
@@ -105,6 +109,15 @@ export default function AppTopBar({
                   {route.label}
                 </Link>
               ))}
+              <a
+                href={docsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="user-menu-item"
+                onClick={onCloseUserMenu}
+              >
+                {docsLabel}
+              </a>
               {showLogout ? (
                 <button type="button" className="user-menu-item user-menu-button" onClick={onLogout}>
                   {logoutLabel}
