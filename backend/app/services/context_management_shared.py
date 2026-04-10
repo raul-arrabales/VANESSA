@@ -148,6 +148,28 @@ def _chunk_document_id(document_id: str, index: int) -> str:
     return f"{document_id}::chunk::{index}"
 
 
+def _build_chunk_metadata(
+    *,
+    knowledge_base: KnowledgeBaseRecord,
+    document: KnowledgeDocumentRecord,
+    chunk_index: int,
+) -> dict[str, Any]:
+    document_metadata = dict(document.get("metadata_json") or document.get("metadata") or {})
+    built_in_metadata = {
+        "knowledge_base_id": str(knowledge_base["id"]),
+        "document_id": str(document["id"]),
+        "chunk_index": chunk_index,
+        "title": str(document.get("title") or "").strip(),
+        "source_type": str(document.get("source_type") or "").strip(),
+        "source_name": str(document.get("source_name") or "").strip() or None,
+        "uri": str(document.get("uri") or "").strip() or None,
+    }
+    return {
+        **document_metadata,
+        **built_in_metadata,
+    }
+
+
 def normalize_knowledge_source_sync_failure(
     exc: Exception,
     *,
@@ -236,15 +258,11 @@ def _upsert_document_chunks(
             "id": _chunk_document_id(str(document["id"]), index),
             "text": chunk,
             "embedding": embeddings[index] if index < len(embeddings) else None,
-            "metadata": {
-                "knowledge_base_id": str(knowledge_base["id"]),
-                "document_id": str(document["id"]),
-                "chunk_index": index,
-                "title": str(document.get("title") or "").strip(),
-                "source_type": str(document.get("source_type") or "").strip(),
-                "source_name": str(document.get("source_name") or "").strip() or None,
-                "uri": str(document.get("uri") or "").strip() or None,
-            },
+            "metadata": _build_chunk_metadata(
+                knowledge_base=knowledge_base,
+                document=document,
+                chunk_index=index,
+            ),
         }
         for index, chunk in enumerate(chunks)
     ]
