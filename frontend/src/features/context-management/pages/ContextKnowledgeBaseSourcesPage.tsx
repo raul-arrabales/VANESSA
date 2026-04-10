@@ -58,16 +58,13 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
   }
 
   return (
-    <ContextKnowledgeBaseWorkspaceFrame knowledgeBase={detail.knowledgeBase} loading={detail.loading}>
+    <ContextKnowledgeBaseWorkspaceFrame
+      knowledgeBase={detail.knowledgeBase}
+      loading={detail.loading}
+      secondaryNavigation={<PageSubmenuBar items={submenuItems} ariaLabel={t("contextManagement.sourceViews.aria")} />}
+    >
       {() => (
         <section className="card-stack">
-          <section className="panel card-stack">
-            <div className="card-stack">
-              <h3 className="section-title">{t("contextManagement.sourcesTitle")}</h3>
-              <p className="status-text">{t("contextManagement.sourcesDescription")}</p>
-            </div>
-            <PageSubmenuBar items={submenuItems} ariaLabel={t("contextManagement.sourceViews.aria")} />
-          </section>
           {activeView === "add" ? (
             <KnowledgeBaseSourceEditorSection
               schemaProperties={detail.knowledgeBase?.schema.properties ?? []}

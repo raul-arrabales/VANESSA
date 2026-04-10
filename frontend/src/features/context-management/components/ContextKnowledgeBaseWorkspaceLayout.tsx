@@ -10,11 +10,13 @@ import {
 
 type ContextKnowledgeBaseWorkspaceLayoutProps = {
   knowledgeBase: KnowledgeBase | null;
+  secondaryNavigation?: ReactNode;
   children: ReactNode;
 };
 
 export function ContextKnowledgeBaseWorkspaceLayout({
   knowledgeBase,
+  secondaryNavigation,
   children,
 }: ContextKnowledgeBaseWorkspaceLayoutProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -50,6 +52,11 @@ export function ContextKnowledgeBaseWorkspaceLayout({
           </div>
         </div>
         <PageSectionTabs items={sectionTabs} ariaLabel={t("contextManagement.navigation.aria")} />
+        {secondaryNavigation ? (
+          <div className="context-workspace-secondary-nav">
+            {secondaryNavigation}
+          </div>
+        ) : null}
       </article>
 
       {children}

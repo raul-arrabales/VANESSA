@@ -40,7 +40,11 @@ describe("ContextKnowledgeBaseWorkspaceFrame", () => {
         <Route
           path="/control/context/:knowledgeBaseId"
           element={
-            <ContextKnowledgeBaseWorkspaceFrame knowledgeBase={knowledgeBase} loading>
+            <ContextKnowledgeBaseWorkspaceFrame
+              knowledgeBase={knowledgeBase}
+              loading
+              secondaryNavigation={<div>secondary-nav</div>}
+            >
               {() => <p>frame-child</p>}
             </ContextKnowledgeBaseWorkspaceFrame>
           }
@@ -52,6 +56,7 @@ describe("ContextKnowledgeBaseWorkspaceFrame", () => {
     expect(screen.getByRole("heading", { name: "Product Docs" })).toBeVisible();
     expect(screen.getByText("Loading knowledge bases...")).toBeVisible();
     expect(screen.getByText("frame-child")).toBeVisible();
+    expect(screen.getByText("secondary-nav")).toBeVisible();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Manage Sources" })).toHaveAttribute("href", "/control/context/kb-primary/sources");
   });

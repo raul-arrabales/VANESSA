@@ -894,17 +894,21 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       is_active: true,
     };
 
-    await renderContextWorkspace("/control/context/kb-primary/sources");
+    const view = await renderContextWorkspace("/control/context/kb-primary/sources");
 
-    expect(await screen.findByRole("heading", { name: "Sources" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Add source" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Add Source" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Existing Sources" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Sync History" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Add Source" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("heading", { name: "Add source" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Existing sources" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Sync history" })).not.toBeInTheDocument();
     expect(screen.getByText("Enter a relative path manually or click Browse to choose a directory.")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument();
+
+    const workspacePanel = view.container.querySelector(".context-workspace-secondary-nav");
+    expect(workspacePanel).not.toBeNull();
+    expect(workspacePanel?.closest(".panel")).not.toBeNull();
 
     const browseButton = screen.getByRole("button", { name: "Browse" });
     const relativePathLabel = screen.getByText("Relative path");
@@ -997,7 +1001,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     await renderContextWorkspace("/control/context/kb-primary/sources");
 
-    await screen.findByRole("heading", { name: "Sources" });
+    await screen.findByRole("heading", { name: "Add source" });
     await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
     await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
 
@@ -1007,12 +1011,12 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
   it("defaults non-superadmins to the existing sources view", async () => {
     await renderContextWorkspace("/control/context/kb-primary/sources");
 
-    expect(await screen.findByRole("heading", { name: "Sources" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add Source" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Existing Sources" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Sync History" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument();
   });
 
   it("renders the retrieval page and runs retrieval queries", async () => {
@@ -1259,18 +1263,19 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
   });
 
   it("shows the upload page in read-only mode for admins", async () => {
-    await renderContextWorkspace("/control/context/kb-primary/upload?view=manual");
+    const view = await renderContextWorkspace("/control/context/kb-primary/upload?view=manual");
 
-    expect(await screen.findByRole("heading", { name: "Upload documents" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Manage manual documents" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Manage Manual Documents" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Manual Document" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Upload Files" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Manage manual documents" })).toBeVisible();
     expect(screen.getByText(/only superadmins can create, edit, upload, or delete/i)).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add document" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Upload documents" })).not.toBeInTheDocument();
+    expect(view.container.querySelector(".context-workspace-secondary-nav")).not.toBeNull();
   });
 
   it("shows all upload subviews for superadmins and defaults to the manual document form", async () => {
@@ -1284,16 +1289,16 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     await renderContextWorkspace("/control/context/kb-primary/upload");
 
-    expect(await screen.findByRole("heading", { name: "Upload documents" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Manual Document" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Upload Files" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Manage Manual Documents" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByLabelText("Document title")).toBeVisible();
     expect(screen.getByLabelText("Document text")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Metadata" })).toBeVisible();
     expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
     expect(screen.queryByText("Manual Note")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Upload documents" })).not.toBeInTheDocument();
   });
 
   it("supports the upload subview deep link for superadmins", async () => {

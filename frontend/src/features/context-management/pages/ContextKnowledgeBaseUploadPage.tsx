@@ -57,19 +57,13 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
   }
 
   return (
-    <ContextKnowledgeBaseWorkspaceFrame knowledgeBase={detail.knowledgeBase} loading={detail.loading}>
+    <ContextKnowledgeBaseWorkspaceFrame
+      knowledgeBase={detail.knowledgeBase}
+      loading={detail.loading}
+      secondaryNavigation={<PageSubmenuBar items={submenuItems} ariaLabel={t("contextManagement.uploadViews.aria")} />}
+    >
       {() => (
         <section className="card-stack">
-          <section className="panel card-stack">
-            <div className="platform-card-header">
-              <div className="card-stack">
-                <h3 className="section-title">{t("contextManagement.uploadTitle")}</h3>
-                <p className="status-text">{t("contextManagement.uploadDescription")}</p>
-              </div>
-            </div>
-            <PageSubmenuBar items={submenuItems} ariaLabel={t("contextManagement.uploadViews.aria")} />
-          </section>
-
           {activeView === "manual" ? (
             <section className="panel card-stack">
               <div className="platform-card-header">

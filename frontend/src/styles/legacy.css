@@ -404,6 +404,12 @@
   background: color-mix(in oklab, var(--bg-subtle) 64%, transparent);
 }
 
+.context-workspace-secondary-nav {
+  display: flex;
+  align-items: flex-start;
+  padding-top: var(--space-1);
+}
+
 .page-submenu-item {
   border: 0;
   background: transparent;
