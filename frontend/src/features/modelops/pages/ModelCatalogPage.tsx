@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ModelCatalogFilters from "../components/ModelCatalogFilters";
 import ModelCatalogList from "../components/ModelCatalogList";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { useModelCatalog } from "../hooks/useModelCatalog";
 import { useAuth } from "../../../auth/AuthProvider";
 import { canAccessModelTesting } from "../domain";
@@ -32,12 +33,10 @@ export default function ModelCatalogPage(): JSX.Element {
   const canTest = canAccessModelTesting(user);
 
   return (
-    <section className="card-stack">
+    <ModelOpsWorkspaceFrame>
       <article className="panel card-stack">
         <h2 className="section-title">{t("modelOps.catalog.title")}</h2>
         <p className="status-text">{t("modelOps.catalog.description")}</p>
-      </article>
-      <article className="panel card-stack">
         <ModelCatalogFilters
           search={search}
           taskFilter={taskFilter}
@@ -63,6 +62,6 @@ export default function ModelCatalogPage(): JSX.Element {
         />
       )}
       {error && <p className="error-text">{error}</p>}
-    </section>
+    </ModelOpsWorkspaceFrame>
   );
 }

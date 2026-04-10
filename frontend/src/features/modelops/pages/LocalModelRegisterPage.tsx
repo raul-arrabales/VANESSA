@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { TASK_OPTIONS } from "../domain";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import { useLocalDownloads } from "../hooks/useLocalDownloads";
@@ -28,17 +29,7 @@ export default function LocalModelRegisterPage(): JSX.Element {
     comment: "",
   });
   return (
-    <section className="card-stack">
-      <article className="panel card-stack">
-        <h2 className="section-title">{t("modelOps.local.title")}</h2>
-        <p className="status-text">{t("modelOps.local.description")}</p>
-        <div className="button-row">
-          <Link className="btn btn-secondary" to="/control/models/local/artifacts">
-            {t("modelOps.actions.viewArtifacts")}
-          </Link>
-        </div>
-      </article>
-
+    <ModelOpsWorkspaceFrame>
       <LocalDiscoveryPanel
         taskKey={discoveryTaskKey}
         query={discoverQuery}
@@ -116,6 +107,6 @@ export default function LocalModelRegisterPage(): JSX.Element {
           </Link>
         </div>
       )}
-    </section>
+    </ModelOpsWorkspaceFrame>
   );
 }

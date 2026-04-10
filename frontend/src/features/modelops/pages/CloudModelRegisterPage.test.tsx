@@ -51,27 +51,32 @@ describe("CloudModelRegisterPage", () => {
 
   it("hides platform scope controls for regular users", async () => {
     mockRole = "user";
-    await renderWithAppProviders(<CloudModelRegisterPage />);
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
-    expect(await screen.findByRole("heading", { name: "Cloud model registration" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Register cloud model" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Register cloud model" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Model access" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Register local model" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Credential scope")).toBeNull();
     expect(screen.queryByLabelText("Owner type")).toBeNull();
   });
 
   it("shows platform scope controls for superadmins", async () => {
     mockRole = "superadmin";
-    await renderWithAppProviders(<CloudModelRegisterPage />);
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
     expect(await screen.findByLabelText("Credential scope")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Model access" })).toHaveAttribute("href", "/control/models/access");
+    expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("href", "/control/models/local/register");
     expect(screen.getByLabelText("Owner type")).toBeVisible();
   });
 
   it("registers a cloud model and shows the next-step detail link for regular users", async () => {
     mockRole = "user";
     const user = userEvent.setup();
-    await renderWithAppProviders(<CloudModelRegisterPage />);
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
-    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await screen.findByRole("heading", { name: "Register cloud model" });
     await user.type(screen.getByLabelText("Model id"), "gpt-private");
     await user.type(screen.getByLabelText("Model name"), "GPT Private");
     await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");
@@ -90,9 +95,9 @@ describe("CloudModelRegisterPage", () => {
   it("shows credential save success in the shared feedback modal without leaving inline feedback", async () => {
     mockRole = "superadmin";
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
-    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await screen.findByRole("heading", { name: "Register cloud model" });
     await user.click(screen.getByRole("button", { name: "Save credential" }));
 
     expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
@@ -104,9 +109,9 @@ describe("CloudModelRegisterPage", () => {
     mockRole = "superadmin";
     modelApiMocks.createModelCredential.mockRejectedValueOnce(new Error("Credential store is unavailable."));
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
-    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await screen.findByRole("heading", { name: "Register cloud model" });
     await user.click(screen.getByRole("button", { name: "Save credential" }));
 
     expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
@@ -118,9 +123,9 @@ describe("CloudModelRegisterPage", () => {
     mockRole = "user";
     modelApiMocks.registerManagedModel.mockRejectedValueOnce(new Error("Provider model validation failed."));
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<CloudModelRegisterPage />);
+    const view = await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
 
-    await screen.findByRole("heading", { name: "Cloud model registration" });
+    await screen.findByRole("heading", { name: "Register cloud model" });
     await user.type(screen.getByLabelText("Model id"), "gpt-private");
     await user.type(screen.getByLabelText("Model name"), "GPT Private");
     await user.type(screen.getByLabelText("Provider model id"), "gpt-4.1");

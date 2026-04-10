@@ -60,9 +60,11 @@ describe("LocalModelRegisterPage", () => {
       new Error("Model discovery disabled for runtime profile 'offline'"),
     );
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<LocalModelRegisterPage />);
+    const view = await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
+    expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Local artifacts" })).toHaveAttribute("href", "/control/models/local/artifacts");
     await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
 
     expect(await screen.findByRole("dialog", { name: "Hugging Face discovery" })).toBeVisible();
@@ -76,9 +78,9 @@ describe("LocalModelRegisterPage", () => {
     );
     const user = userEvent.setup();
 
-    await renderWithAppProviders(<LocalModelRegisterPage />);
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
     await screen.findByRole("dialog", { name: "Hugging Face discovery" });
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -93,9 +95,9 @@ describe("LocalModelRegisterPage", () => {
       new Error("Manual registration failed for phi-local"),
     );
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<LocalModelRegisterPage />);
+    const view = await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.type(screen.getByLabelText("Model id"), "phi-local");
     await user.type(screen.getByLabelText("Model name"), "Phi Local");
     await user.click(screen.getByRole("button", { name: "Register local model" }));
@@ -108,9 +110,9 @@ describe("LocalModelRegisterPage", () => {
   it("shows manual registration success in the shared modal and keeps only one success message", async () => {
     const user = userEvent.setup();
 
-    await renderWithAppProviders(<LocalModelRegisterPage />);
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.type(screen.getByLabelText("Model id"), "phi-local");
     await user.type(screen.getByLabelText("Model name"), "Phi Local");
     await user.click(screen.getByRole("button", { name: "Register local model" }));
@@ -135,9 +137,9 @@ describe("LocalModelRegisterPage", () => {
       new Error("Repository details are unavailable right now."),
     );
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<LocalModelRegisterPage />);
+    const view = await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
     await user.click(await screen.findByRole("button", { name: "Inspect" }));
 
@@ -149,9 +151,9 @@ describe("LocalModelRegisterPage", () => {
   it("keeps non-error discovery feedback inline when no models are found", async () => {
     const user = userEvent.setup();
 
-    await renderWithAppProviders(<LocalModelRegisterPage />);
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
 
     expect(await screen.findByText("No models found for this query.")).toBeVisible();
@@ -171,9 +173,9 @@ describe("LocalModelRegisterPage", () => {
     ]);
     const user = userEvent.setup();
 
-    await renderWithAppProviders(<LocalModelRegisterPage />);
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
 
-    await screen.findByRole("heading", { name: "Local model registration" });
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
     await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
     await user.click(await screen.findByRole("button", { name: "Download" }));
 

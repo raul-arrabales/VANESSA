@@ -992,8 +992,15 @@
     }
   },
   "modelOps": {
+    "eyebrow": "ModelOps",
     "states": {
       "loading": "Loading ModelOps data..."
+    },
+    "workspace": {
+      "title": "ModelOps",
+      "description": "Review accessible models, move between catalog and registration flows, and manage the shared model workspace without jumping through separate landing cards.",
+      "superadminDescription": "Review platform-wide model health, switch between cloud and local onboarding flows, and manage shared access from one tabbed workspace.",
+      "navigationAria": "ModelOps workspace navigation"
     },
     "actions": {
       "openDetail": "Open details",
@@ -1051,8 +1058,6 @@
       "superadminDescription": "Review platform-wide ModelOps health, jump into cloud or local onboarding, and manage access without keeping every operation on one page.",
       "loadFailed": "Unable to load model summary.",
       "summaryTitle": "Summary",
-      "entryTitle": "Workflows",
-      "entryAria": "ModelOps workflow navigation",
       "summaryCards": {
         "totalModels": "Total models",
         "activeModels": "Active models",
@@ -1065,18 +1070,6 @@
         "activeDownloads": "Active downloads",
         "accessibleModels": "Accessible models",
         "savedCredentials": "Saved credentials"
-      },
-      "cards": {
-        "catalogTitle": "Browse catalog",
-        "catalogDescription": "Review accessible models and open focused detail pages.",
-        "cloudTitle": "Register cloud model",
-        "cloudDescription": "Add BYOK cloud models with personal or platform-aware controls.",
-        "localTitle": "Register local model",
-        "localDescription": "Discover, download, and register local models.",
-        "artifactsTitle": "Review local artifacts",
-        "artifactsDescription": "Inspect local artifacts and finish registration work.",
-        "accessTitle": "Manage access",
-        "accessDescription": "Assign model availability by role scope."
       }
     },
     "catalog": {

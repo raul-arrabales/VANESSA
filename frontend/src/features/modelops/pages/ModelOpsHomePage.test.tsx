@@ -70,8 +70,11 @@ describe("ModelOpsHomePage", () => {
   });
 
   it("renders translated summary card labels", async () => {
-    await renderWithAppProviders(<ModelOpsHomePage />, { language: "es" });
+    await renderWithAppProviders(<ModelOpsHomePage />, { language: "es", route: "/control/models" });
 
+    expect(screen.getByRole("link", { name: "Modelos" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Catalogo de modelos" })).toHaveAttribute("href", "/control/models/catalog");
+    expect(screen.queryByRole("heading", { name: "Flujos" })).not.toBeInTheDocument();
     expect(await screen.findByText("Modelos totales")).toBeVisible();
     expect(screen.getByText("Modelos activos")).toBeVisible();
     expect(screen.getByText("Modelos locales")).toBeVisible();

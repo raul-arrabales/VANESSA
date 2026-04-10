@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { ManagedModel } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import ModelCatalogList from "../components/ModelCatalogList";
 import CloudCredentialForm from "../components/CloudCredentialForm";
 import CloudModelRegistrationForm from "../components/CloudModelRegistrationForm";
@@ -64,14 +65,7 @@ export default function CloudModelRegisterPage(): JSX.Element {
   );
 
   return (
-    <section className="card-stack">
-      <article className="panel card-stack">
-        <h2 className="section-title">{t("modelOps.cloud.title")}</h2>
-        <p className="status-text">
-          {isSuperadmin ? t("modelOps.cloud.superadminDescription") : t("modelOps.cloud.description")}
-        </p>
-      </article>
-
+    <ModelOpsWorkspaceFrame>
       <CloudCredentialForm
         state={credentialState}
         isSaving={isSaving}
@@ -153,6 +147,6 @@ export default function CloudModelRegisterPage(): JSX.Element {
           </Link>
         </div>
       )}
-    </section>
+    </ModelOpsWorkspaceFrame>
   );
 }

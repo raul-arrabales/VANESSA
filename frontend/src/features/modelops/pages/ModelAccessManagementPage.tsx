@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import AccessMatrix from "../components/AccessMatrix";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { MODEL_ACCESS_SCOPES } from "../domain";
 import { useModelAssignments } from "../hooks/useModelAssignments";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -27,7 +28,7 @@ export default function ModelAccessManagementPage(): JSX.Element {
   }, [models, search]);
 
   return (
-    <section className="card-stack">
+    <ModelOpsWorkspaceFrame>
       <article className="panel card-stack">
         <h2 className="section-title">{t("modelOps.access.title")}</h2>
         <p className="status-text">{t("modelOps.access.description")}</p>
@@ -47,6 +48,6 @@ export default function ModelAccessManagementPage(): JSX.Element {
           highlightedModelId={highlightedModelId}
         />
       )}
-    </section>
+    </ModelOpsWorkspaceFrame>
   );
 }

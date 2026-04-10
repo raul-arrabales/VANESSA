@@ -364,6 +364,22 @@
   padding-bottom: var(--space-2);
 }
 
+.modelops-workspace-layout,
+.modelops-workspace-header-panel {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.modelops-workspace-header-panel {
+  gap: var(--space-2);
+}
+
+.modelops-workspace-header-panel .platform-page-header {
+  display: grid;
+  justify-content: stretch;
+  gap: var(--space-2);
+}
+
 .page-section-tab {
   position: relative;
   padding: var(--space-2) 0;

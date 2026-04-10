@@ -54,9 +54,11 @@ describe("ModelAccessManagementPage", () => {
 
   it("shows load failures in the shared feedback modal instead of inline errors", async () => {
     modelApiMocks.listModelOpsModels.mockRejectedValueOnce(new Error("Access data is unavailable."));
-    const view = await renderWithAppProviders(<ModelAccessManagementPage />);
+    const view = await renderWithAppProviders(<ModelAccessManagementPage />, { route: "/control/models/access" });
 
     expect(await screen.findByLabelText("Search")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Model access" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Register local model" })).not.toBeInTheDocument();
     expect(await screen.findByRole("dialog", { name: "Model access management" })).toBeVisible();
     expect(screen.getAllByText("Access data is unavailable.")).toHaveLength(1);
     expect(view.container.querySelector(".error-text")).toBeNull();
@@ -65,7 +67,7 @@ describe("ModelAccessManagementPage", () => {
   it("shows assignment save success in the shared feedback modal with no inline success block", async () => {
     const user = userEvent.setup();
 
-    await renderWithAppProviders(<ModelAccessManagementPage />);
+    await renderWithAppProviders(<ModelAccessManagementPage />, { route: "/control/models/access" });
 
     expect(await screen.findByRole("heading", { name: "Model access management" })).toBeVisible();
     await user.click((await screen.findAllByRole("checkbox"))[0] as HTMLInputElement);
@@ -80,7 +82,7 @@ describe("ModelAccessManagementPage", () => {
   it("shows assignment save failures in the shared feedback modal instead of inline errors", async () => {
     accessApiMocks.updateModelAssignment.mockRejectedValueOnce(new Error("Assignment save failed."));
     const user = userEvent.setup();
-    const view = await renderWithAppProviders(<ModelAccessManagementPage />);
+    const view = await renderWithAppProviders(<ModelAccessManagementPage />, { route: "/control/models/access" });
 
     expect(await screen.findByRole("heading", { name: "Model access management" })).toBeVisible();
     await user.click((await screen.findAllByRole("checkbox"))[0] as HTMLInputElement);

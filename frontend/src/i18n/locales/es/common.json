@@ -984,8 +984,15 @@
     }
   },
   "modelOps": {
+    "eyebrow": "ModelOps",
     "states": {
       "loading": "Cargando datos de ModelOps..."
+    },
+    "workspace": {
+      "title": "ModelOps",
+      "description": "Revisa los modelos accesibles, cambia entre catalogo y flujos de registro, y gestiona el espacio de trabajo de modelos sin depender de tarjetas de entrada separadas.",
+      "superadminDescription": "Revisa el estado global de los modelos, cambia entre onboarding cloud y local, y gestiona el acceso compartido desde un unico espacio de trabajo con pestañas.",
+      "navigationAria": "Navegacion del espacio de trabajo de ModelOps"
     },
     "actions": {
       "openDetail": "Abrir detalle",
@@ -1043,8 +1050,6 @@
       "superadminDescription": "Revisa el estado global de ModelOps, entra en onboarding cloud o local y gestiona accesos sin concentrar todo en una sola pagina.",
       "loadFailed": "No se pudo cargar el resumen de modelos.",
       "summaryTitle": "Resumen",
-      "entryTitle": "Flujos",
-      "entryAria": "Navegacion de flujos de ModelOps",
       "summaryCards": {
         "totalModels": "Modelos totales",
         "activeModels": "Modelos activos",
@@ -1057,18 +1062,6 @@
         "activeDownloads": "Descargas activas",
         "accessibleModels": "Modelos accesibles",
         "savedCredentials": "Credenciales guardadas"
-      },
-      "cards": {
-        "catalogTitle": "Explorar catalogo",
-        "catalogDescription": "Revisa los modelos accesibles y abre paginas de detalle mas claras.",
-        "cloudTitle": "Registrar modelo cloud",
-        "cloudDescription": "Agrega modelos BYOK con controles personales o de plataforma.",
-        "localTitle": "Registrar modelo local",
-        "localDescription": "Descubre, descarga y registra modelos locales.",
-        "artifactsTitle": "Revisar artefactos locales",
-        "artifactsDescription": "Inspecciona artefactos locales y completa su registro.",
-        "accessTitle": "Gestionar acceso",
-        "accessDescription": "Asigna disponibilidad de modelos por alcance de rol."
       }
     },
     "catalog": {

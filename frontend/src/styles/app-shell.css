@@ -160,6 +160,7 @@
   padding: var(--space-4) var(--space-5) var(--space-6);
   display: grid;
   gap: var(--space-5);
+  align-content: start;
 }
 
 .app-topbar.panel {
