@@ -274,7 +274,7 @@ describe("PlatformProviderDetailPage", () => {
 
     const loadedModelSection = (await screen.findByRole("heading", { name: loadedModelTitle })).closest("article");
     expect(loadedModelSection).not.toBeNull();
-    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".platform-summary-card");
+    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".summary-card");
     expect(loadedModelCard).not.toBeNull();
     expect(within(loadedModelCard as HTMLElement).getByText(localEmbeddingsModel.name)).toBeVisible();
     expect(within(loadedModelCard as HTMLElement).queryByText(await t("platformControl.summary.none"))).not.toBeInTheDocument();
@@ -299,7 +299,7 @@ describe("PlatformProviderDetailPage", () => {
 
     const loadedModelSection = (await screen.findByRole("heading", { name: loadedModelTitle })).closest("article");
     expect(loadedModelSection).not.toBeNull();
-    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".platform-summary-card");
+    const loadedModelCard = within(loadedModelSection as HTMLElement).getByText(await t("platformControl.providers.loadedModelLabel")).closest(".summary-card");
     expect(loadedModelCard).not.toBeNull();
     expect(within(loadedModelCard as HTMLElement).getByText("/models/llm/Qwen--Qwen2.5-0.5B-Instruct")).toBeVisible();
     expect(within(loadedModelCard as HTMLElement).queryByText(await t("platformControl.summary.none"))).not.toBeInTheDocument();

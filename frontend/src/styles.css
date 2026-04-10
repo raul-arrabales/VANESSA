@@ -2,5 +2,16 @@
 @import "./styles/base.css";
 @import "./styles/app-shell.css";
 @import "./styles/brand.css";
-@import "./styles/legacy.css";
+@import "./styles/shared/primitives.css";
+@import "./styles/shared/surfaces.css";
+@import "./styles/shared/forms.css";
+@import "./styles/shared/workspace.css";
+@import "./styles/shared/overlays.css";
+@import "./styles/features/quote-management.css";
+@import "./styles/features/platform-control.css";
+@import "./styles/features/context-management.css";
+@import "./styles/features/modelops.css";
+@import "./styles/features/theme-admin.css";
+@import "./styles/features/health-auth.css";
+@import "./styles/shared/retro-theme.css";
 @import "./styles/playgrounds-chat.css";

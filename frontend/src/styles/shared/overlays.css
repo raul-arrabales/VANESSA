@@ -1,0 +1,67 @@
+/* Shared overlays and feedback surfaces used by app-wide modal flows. */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-canvas) 36%, rgba(8, 17, 30, 0.68));
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  width: min(32rem, 100%);
+  padding-right: var(--space-6);
+  box-shadow: var(--shadow-3);
+  animation: modal-enter var(--duration-base) var(--easing-standard);
+}
+
+.modal-title {
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.modal-message {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.modal-actions {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.action-feedback-modal {
+  width: min(34rem, 100%);
+}
+
+.action-feedback-modal[data-kind="error"]::before {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--status-error) 84%, white) 0%, var(--status-error) 100%);
+}
+
+.action-feedback-modal[data-kind="success"]::before {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--status-success) 84%, white) 0%, var(--status-success) 100%);
+}
+
+.action-feedback-modal[data-kind="error"] .modal-title {
+  color: var(--status-error);
+}
+
+.action-feedback-modal[data-kind="success"] .modal-title {
+  color: var(--status-success);
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

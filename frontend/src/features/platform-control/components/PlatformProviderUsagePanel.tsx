@@ -62,7 +62,7 @@ export default function PlatformProviderUsagePanel({
                   </tbody>
                 </table>
               </div>
-              <div className="platform-inline-meta">
+              <div className="inline-meta-list">
                 <Link className="btn btn-secondary" to={`/control/platform/deployments/${entry.deployment.id}`}>
                   {t("platformControl.actions.openDeployment")}
                 </Link>

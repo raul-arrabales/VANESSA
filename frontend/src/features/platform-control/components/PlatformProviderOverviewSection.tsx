@@ -25,7 +25,7 @@ export default function PlatformProviderOverviewSection({
             <code className="code-inline">{provider.slug}</code>
           </span>
         </div>
-        <div className="platform-inline-meta">
+        <div className="inline-meta-list">
           <span className="platform-badge" data-tone={provider.enabled ? "enabled" : "disabled"}>
             {provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled")}
           </span>
@@ -38,22 +38,22 @@ export default function PlatformProviderOverviewSection({
       </div>
       <p className="status-text">{provider.description || t("platformControl.providers.noDescription")}</p>
       <div className="platform-detail-grid">
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.familyLabel")}</span>
           <strong>{providerFamily?.display_name ?? provider.provider_key}</strong>
           <span className="status-text">{provider.provider_key}</span>
         </div>
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.capabilityLabel")}</span>
           <strong>{provider.capability}</strong>
           <span className="status-text">{provider.adapter_kind}</span>
         </div>
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.endpointLabel")}</span>
           <strong>{provider.endpoint_url}</strong>
           <span className="status-text">{provider.healthcheck_url ?? t("platformControl.summary.none")}</span>
         </div>
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.activeDeploymentLabel")}</span>
           <strong>{activeDeployment?.display_name ?? t("platformControl.summary.none")}</strong>
           <span className="status-text">

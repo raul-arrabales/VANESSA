@@ -30,7 +30,7 @@ type SummaryCardProps = {
 
 function SummaryCard({ label, value, secondary = null }: SummaryCardProps): JSX.Element {
   return (
-    <article className="platform-summary-card context-kb-summary-card">
+    <article className="summary-card context-kb-summary-card">
       <span className="field-label">{label}</span>
       <strong className="context-kb-summary-value">{value}</strong>
       {secondary ? <span className="status-text">{secondary}</span> : null}
@@ -125,7 +125,7 @@ export function KnowledgeBaseOverviewSection({
           label={t("contextManagement.fields.syncedSources")}
           value={String(syncedSourceCount)}
         />
-        <article className="platform-summary-card context-kb-summary-card">
+        <article className="summary-card context-kb-summary-card">
           <span className="field-label">{t("contextManagement.usageTitle")}</span>
           {knowledgeBase.deployment_usage?.length ? (
             <ul className="context-kb-summary-list">
@@ -207,7 +207,7 @@ export function KnowledgeBaseOverviewSection({
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
           <textarea
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={form.description}
             disabled={!isSuperadmin}
             onChange={(event) => {

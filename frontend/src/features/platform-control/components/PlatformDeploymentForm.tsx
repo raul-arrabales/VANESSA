@@ -129,7 +129,7 @@ export default function PlatformDeploymentForm({
             <h4 className="deployment-binding-title">{t("platformControl.sections.settings")}</h4>
             <p className="status-text">{t("platformControl.deployments.settingsDescription")}</p>
             {identityAction ? (
-              <div className="platform-inline-meta">
+              <div className="inline-meta-list">
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -192,7 +192,7 @@ export default function PlatformDeploymentForm({
       <label className="card-stack">
         <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
         <textarea
-          className="field-input quote-admin-textarea"
+          className="field-input form-textarea"
           value={value.description}
           onChange={(event) => onChange({ ...value, description: event.target.value })}
         />

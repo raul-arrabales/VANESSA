@@ -171,7 +171,7 @@ export function KnowledgeBaseSourceEditorSection({
           <span className="field-label">{t("contextManagement.fields.includeGlobs")}</span>
           <textarea
             id="kb-source-include-globs"
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={sourceForm.includeGlobs}
             onChange={(event) => {
               const value = event.currentTarget.value;
@@ -183,7 +183,7 @@ export function KnowledgeBaseSourceEditorSection({
           <span className="field-label">{t("contextManagement.fields.excludeGlobs")}</span>
           <textarea
             id="kb-source-exclude-globs"
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={sourceForm.excludeGlobs}
             onChange={(event) => {
               const value = event.currentTarget.value;

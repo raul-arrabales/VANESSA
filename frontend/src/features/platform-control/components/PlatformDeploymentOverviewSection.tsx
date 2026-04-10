@@ -59,7 +59,7 @@ export default function PlatformDeploymentOverviewSection({
                 <td>{capabilityLabelByKey.get(binding.capability) ?? binding.capability}</td>
                 <td>
                   <strong>{binding.provider.display_name}</strong>
-                  <div className="platform-inline-meta">
+                  <div className="inline-meta-list">
                     <Link className="status-text" to={`/control/platform/providers/${binding.provider.id}`}>
                       {binding.provider.slug}
                     </Link>
@@ -77,7 +77,7 @@ export default function PlatformDeploymentOverviewSection({
                       : t("platformControl.badges.incomplete")}
                   </span>
                   {!binding.configuration_status?.is_ready ? (
-                    <div className="platform-inline-meta">
+                    <div className="inline-meta-list">
                       <span className="status-text">{binding.configuration_status?.summary ?? t("platformControl.summary.none")}</span>
                     </div>
                   ) : null}
@@ -87,7 +87,7 @@ export default function PlatformDeploymentOverviewSection({
           </tbody>
         </table>
       </div>
-      <div className="platform-inline-meta">
+      <div className="inline-meta-list">
         <button
           type="button"
           className="btn btn-primary"

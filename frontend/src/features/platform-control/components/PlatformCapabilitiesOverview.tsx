@@ -75,7 +75,7 @@ export default function PlatformCapabilitiesOverview({
                         ) : null}
                       </>
                     ) : null}
-                    <div className="platform-inline-meta">
+                    <div className="inline-meta-list">
                       <Link className="btn btn-secondary" to={`/control/platform/providers/${provider.id}`}>
                         {t("platformControl.actions.openProvider")}
                       </Link>
@@ -89,7 +89,7 @@ export default function PlatformCapabilitiesOverview({
                 ) : (
                   <>
                     <p className="status-text">{t("platformControl.capabilities.unbound")}</p>
-                    <div className="platform-inline-meta">
+                    <div className="inline-meta-list">
                       <Link className="btn btn-secondary" to="/control/platform/deployments">
                         {t("platformControl.actions.viewDeployments")}
                       </Link>

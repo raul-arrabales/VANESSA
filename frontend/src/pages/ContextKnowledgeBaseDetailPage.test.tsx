@@ -906,7 +906,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByText("Enter a relative path manually or click Browse to choose a directory.")).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Sources" })).not.toBeInTheDocument();
 
-    const workspacePanel = view.container.querySelector(".context-workspace-secondary-nav");
+    const workspacePanel = view.container.querySelector(".tabbed-workspace-secondary-nav");
     expect(workspacePanel).not.toBeNull();
     expect(workspacePanel?.closest(".panel")).not.toBeNull();
 
@@ -1275,7 +1275,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.queryByLabelText("Upload files")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Document title")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Upload documents" })).not.toBeInTheDocument();
-    expect(view.container.querySelector(".context-workspace-secondary-nav")).not.toBeNull();
+    expect(view.container.querySelector(".tabbed-workspace-secondary-nav")).not.toBeNull();
   });
 
   it("shows all upload subviews for superadmins and defaults to the manual document form", async () => {

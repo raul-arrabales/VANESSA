@@ -1,0 +1,96 @@
+/* Backend health, architecture, and auth-page-specific styling. */
+
+.health-table-wrap {
+  overflow-x: auto;
+}
+
+.architecture-panel {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.architecture-panel .section-title {
+  margin: 0;
+}
+
+.architecture-diagram {
+  overflow-x: auto;
+  border: 1px solid color-mix(in oklab, var(--border-muted) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-subtle) 78%, transparent);
+  padding: var(--space-3);
+}
+
+.architecture-diagram svg {
+  width: 100%;
+  min-width: 820px;
+  height: auto;
+  display: block;
+}
+
+.architecture-diagram [data-container][data-status="up"] rect {
+  stroke: var(--status-success);
+  stroke-width: 2.8;
+}
+
+.architecture-diagram [data-container][data-status="down"] rect {
+  stroke: #f79009;
+  stroke-width: 2.8;
+}
+
+.architecture-diagram [data-container][data-status="unknown"] rect {
+  stroke: var(--border-muted);
+  stroke-width: 2.2;
+}
+
+.health-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 44rem;
+}
+
+.health-table th,
+.health-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-muted);
+  vertical-align: middle;
+}
+
+.health-table th {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.health-icon {
+  display: inline-block;
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+
+.health-icon-up {
+  background: var(--status-success);
+}
+
+.health-icon-down {
+  background: #f79009;
+}
+
+.health-icon-unknown {
+  background: var(--border-muted);
+}
+
+.health-label {
+  vertical-align: middle;
+}
+
+.auth-panel {
+  width: min(620px, 100%);
+}

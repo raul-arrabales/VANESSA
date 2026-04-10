@@ -51,7 +51,7 @@ export function KnowledgeBaseRetrievalSettingsForm({
       <label className="card-stack">
         <span className="field-label">{t("contextManagement.fields.queryText")}</span>
         <textarea
-          className="field-input quote-admin-textarea context-retrieval-query-textarea"
+          className="field-input form-textarea context-retrieval-query-textarea"
           rows={2}
           value={retrievalQuery}
           onChange={(event) => onQueryChange(event.currentTarget.value)}

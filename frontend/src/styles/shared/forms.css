@@ -1,0 +1,22 @@
+/* Shared form helpers: cross-feature form layouts, textarea sizing, and reusable row utilities. */
+
+.form-textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.button-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.form-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.catalog-multiselect {
+  min-height: 10rem;
+}

@@ -109,7 +109,7 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
                 <label className="card-stack">
                   <span className="field-label">{t("contextManagement.fields.documentText")}</span>
                   <textarea
-                    className="field-input quote-admin-textarea"
+                    className="field-input form-textarea"
                     value={detail.documentForm.text}
                     onChange={(event) => {
                       const value = event.currentTarget.value;

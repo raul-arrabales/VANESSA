@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
-import PageSectionTabs from "../../../components/PageSectionTabs";
+import TabbedWorkspaceLayout from "../../../components/TabbedWorkspaceLayout";
 import { PLATFORM_PAGE_NAV_ITEMS } from "../routes";
 
 type PlatformPageLayoutProps = {
@@ -31,22 +31,16 @@ export default function PlatformPageLayout({
   }));
 
   return (
-    <section className="card-stack">
-      <article className="panel card-stack">
-        <div className="platform-page-header">
-          <div className="status-row">
-            <p className="eyebrow">{t("platformControl.eyebrow")}</p>
-            <h2 className="section-title">{title}</h2>
-            <p className="status-text">{description}</p>
-          </div>
-          {actions ? <div className="platform-page-actions">{actions}</div> : null}
-        </div>
-        <PageSectionTabs items={tabItems} ariaLabel={t("platformControl.navigation.aria")} />
-      </article>
-
+    <TabbedWorkspaceLayout
+      eyebrow={t("platformControl.eyebrow")}
+      title={title}
+      description={description}
+      tabs={tabItems}
+      ariaLabel={t("platformControl.navigation.aria")}
+      actions={actions}
+    >
       {errorMessage ? <p className="status-text error-text">{`${t("platformControl.feedback.prefix")} ${errorMessage}`}</p> : null}
-
       {children}
-    </section>
+    </TabbedWorkspaceLayout>
   );
 }

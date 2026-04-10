@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation, useParams } from "react-router-dom";
-import PageSectionTabs from "../../../components/PageSectionTabs";
+import TabbedWorkspaceLayout from "../../../components/TabbedWorkspaceLayout";
 import type { KnowledgeBase } from "../../../api/context";
 import {
   buildKnowledgeBaseWorkspacePath,
@@ -37,29 +37,20 @@ export function ContextKnowledgeBaseWorkspaceLayout({
   });
 
   return (
-    <section className="card-stack">
-      <article className="panel card-stack">
-        <div className="platform-page-header">
-          <div className="status-row">
-            <p className="eyebrow">{t("contextManagement.eyebrow")}</p>
-            <h2 className="section-title">{knowledgeBase?.display_name ?? t("contextManagement.detailTitle")}</h2>
-            <p className="status-text">{knowledgeBase?.description || t("contextManagement.detailDescription")}</p>
-          </div>
-          <div className="platform-page-actions">
-            <Link className="btn btn-secondary" to="/control/context">
-              {t("contextManagement.actions.back")}
-            </Link>
-          </div>
-        </div>
-        <PageSectionTabs items={sectionTabs} ariaLabel={t("contextManagement.navigation.aria")} />
-        {secondaryNavigation ? (
-          <div className="context-workspace-secondary-nav">
-            {secondaryNavigation}
-          </div>
-        ) : null}
-      </article>
-
+    <TabbedWorkspaceLayout
+      eyebrow={t("contextManagement.eyebrow")}
+      title={knowledgeBase?.display_name ?? t("contextManagement.detailTitle")}
+      description={knowledgeBase?.description || t("contextManagement.detailDescription")}
+      tabs={sectionTabs}
+      ariaLabel={t("contextManagement.navigation.aria")}
+      actions={(
+        <Link className="btn btn-secondary" to="/control/context">
+          {t("contextManagement.actions.back")}
+        </Link>
+      )}
+      secondaryNavigation={secondaryNavigation}
+    >
       {children}
-    </section>
+    </TabbedWorkspaceLayout>
   );
 }

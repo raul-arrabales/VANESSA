@@ -66,7 +66,7 @@ export function KnowledgeBaseRetrievalResultCard({
           <label className="card-stack">
             <span className="field-label">{t("contextManagement.fields.chunkText")}</span>
             <textarea
-              className="field-input quote-admin-textarea context-retrieval-result-text"
+              className="field-input form-textarea context-retrieval-result-text"
               value={result.text}
               readOnly
               aria-label={t("contextManagement.fields.chunkText")}

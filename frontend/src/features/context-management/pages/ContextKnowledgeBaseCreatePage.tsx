@@ -82,7 +82,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
         </label>
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
-          <textarea className="field-input quote-admin-textarea" value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
+          <textarea className="field-input form-textarea" value={description} onChange={(event) => setDescription(event.currentTarget.value)} />
         </label>
         <label className="card-stack">
           <span className="field-label">{t("contextManagement.fields.provider")}</span>
@@ -292,7 +292,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
             <label className="card-stack">
               <span className="field-label">{t("contextManagement.schema.rawJson")}</span>
               <textarea
-                className="field-input quote-admin-textarea"
+                className="field-input form-textarea"
                 value={schemaText}
                 onChange={(event) => setSchemaText(event.currentTarget.value)}
                 placeholder='{"properties":[{"name":"title","data_type":"text"}]}'
@@ -330,7 +330,7 @@ export default function ContextKnowledgeBaseCreatePage(): JSX.Element {
               <label className="card-stack">
                 <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
                 <textarea
-                  className="field-input quote-admin-textarea"
+                  className="field-input form-textarea"
                   value={saveProfileDescription}
                   onChange={(event) => setSaveProfileDescription(event.currentTarget.value)}
                 />

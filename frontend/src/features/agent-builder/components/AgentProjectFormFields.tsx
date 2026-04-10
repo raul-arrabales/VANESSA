@@ -49,14 +49,14 @@ export function AgentProjectFormFields({ form, setForm, disableId = false }: Pro
       </label>
       <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.description")}</span>
-        <textarea className="field-input quote-admin-textarea" value={form.description} onChange={(event) => {
+        <textarea className="field-input form-textarea" value={form.description} onChange={(event) => {
           const value = event.currentTarget.value;
           setForm((current) => ({ ...current, description: value }));
         }} />
       </label>
       <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.instructions")}</span>
-        <textarea className="field-input quote-admin-textarea" value={form.instructions} onChange={(event) => {
+        <textarea className="field-input form-textarea" value={form.instructions} onChange={(event) => {
           const value = event.currentTarget.value;
           setForm((current) => ({ ...current, instructions: value }));
         }} />
@@ -70,21 +70,21 @@ export function AgentProjectFormFields({ form, setForm, disableId = false }: Pro
       </label>
       <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.toolRefs")}</span>
-        <textarea className="field-input quote-admin-textarea" value={form.toolRefsText} onChange={(event) => {
+        <textarea className="field-input form-textarea" value={form.toolRefsText} onChange={(event) => {
           const value = event.currentTarget.value;
           setForm((current) => ({ ...current, toolRefsText: value }));
         }} />
       </label>
       <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.workflowDefinition")}</span>
-        <textarea className="field-input quote-admin-textarea" value={form.workflowDefinitionText} onChange={(event) => {
+        <textarea className="field-input form-textarea" value={form.workflowDefinitionText} onChange={(event) => {
           const value = event.currentTarget.value;
           setForm((current) => ({ ...current, workflowDefinitionText: value }));
         }} />
       </label>
       <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.toolPolicy")}</span>
-        <textarea className="field-input quote-admin-textarea" value={form.toolPolicyText} onChange={(event) => {
+        <textarea className="field-input form-textarea" value={form.toolPolicyText} onChange={(event) => {
           const value = event.currentTarget.value;
           setForm((current) => ({ ...current, toolPolicyText: value }));
         }} />

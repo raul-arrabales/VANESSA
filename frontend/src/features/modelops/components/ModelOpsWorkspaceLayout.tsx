@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../../auth/AuthProvider";
-import PageSectionTabs from "../../../components/PageSectionTabs";
+import TabbedWorkspaceLayout from "../../../components/TabbedWorkspaceLayout";
 import {
   canAccessModelOpsWorkspaceSection,
   isModelOpsWorkspacePathActive,
@@ -18,9 +18,6 @@ export function ModelOpsWorkspaceLayout({ children }: ModelOpsWorkspaceLayoutPro
   const { user } = useAuth();
   const location = useLocation();
   const isSuperadmin = user?.role === "superadmin";
-  const activeSection = MODEL_OPS_WORKSPACE_NAV_ITEMS.find((item) => (
-    isModelOpsWorkspacePathActive(location.pathname, item.path)
-  ))?.section ?? "overview";
   const tabItems = MODEL_OPS_WORKSPACE_NAV_ITEMS
     .filter((item) => canAccessModelOpsWorkspaceSection(user?.role, item.minimumRole))
     .map((item) => ({
@@ -31,21 +28,14 @@ export function ModelOpsWorkspaceLayout({ children }: ModelOpsWorkspaceLayoutPro
     }));
 
   return (
-    <section className="card-stack modelops-workspace-layout">
-      <article className="panel card-stack modelops-workspace-header-panel" data-modelops-section={activeSection}>
-        <div className="platform-page-header">
-          <div className="status-row">
-            <p className="eyebrow">{t("modelOps.eyebrow")}</p>
-            <h2 className="section-title">{t("modelOps.workspace.title")}</h2>
-            <p className="status-text">
-              {isSuperadmin ? t("modelOps.workspace.superadminDescription") : t("modelOps.workspace.description")}
-            </p>
-          </div>
-        </div>
-        <PageSectionTabs items={tabItems} ariaLabel={t("modelOps.workspace.navigationAria")} />
-      </article>
-
+    <TabbedWorkspaceLayout
+      eyebrow={t("modelOps.eyebrow")}
+      title={t("modelOps.workspace.title")}
+      description={isSuperadmin ? t("modelOps.workspace.superadminDescription") : t("modelOps.workspace.description")}
+      tabs={tabItems}
+      ariaLabel={t("modelOps.workspace.navigationAria")}
+    >
       {children}
-    </section>
+    </TabbedWorkspaceLayout>
   );
 }

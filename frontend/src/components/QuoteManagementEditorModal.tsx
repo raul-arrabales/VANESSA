@@ -81,7 +81,7 @@ export default function QuoteManagementEditorModal({
             <label className="control-group">
               <span className="field-label">{t("quoteAdmin.editor.fields.text")}</span>
               <textarea
-                className="field-input quote-admin-textarea"
+                className="field-input form-textarea"
                 value={draft.text}
                 onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
               />

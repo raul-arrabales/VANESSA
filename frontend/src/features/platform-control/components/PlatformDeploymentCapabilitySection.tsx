@@ -298,7 +298,7 @@ export default function PlatformDeploymentCapabilitySection({
       ) : null}
 
       {saveAction ? (
-        <div className="platform-inline-meta">
+        <div className="inline-meta-list">
           <button
             type="button"
             className="btn btn-primary"

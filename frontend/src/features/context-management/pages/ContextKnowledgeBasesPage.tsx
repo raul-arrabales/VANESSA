@@ -42,7 +42,7 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
                 <tr key={knowledgeBase.id}>
                   <td>
                     <strong>{knowledgeBase.display_name}</strong>
-                    <div className="platform-inline-meta">
+                    <div className="inline-meta-list">
                       <span className="status-text">{knowledgeBase.slug}</span>
                     </div>
                   </td>

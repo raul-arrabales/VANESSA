@@ -1,0 +1,201 @@
+/* Context-management-specific summary, schema, metadata, and retrieval styles. */
+
+.context-kb-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.context-kb-summary-card {
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.context-kb-summary-value,
+.context-kb-summary-list-primary {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.context-kb-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.context-kb-summary-list-item {
+  display: grid;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in oklab, var(--border-muted) 90%, transparent);
+}
+
+.context-kb-summary-list-item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.context-kb-summary-list-secondary,
+.context-kb-summary-callout {
+  line-height: 1.5;
+}
+
+.context-retrieval-query-textarea {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.context-retrieval-result-card {
+  gap: var(--space-4);
+}
+
+.context-retrieval-result-card::before {
+  content: none;
+}
+
+.context-retrieval-settings {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-subtle) 78%, transparent);
+}
+
+.context-retrieval-settings-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.context-retrieval-settings-row > .card-stack {
+  flex: 1 1 14rem;
+}
+
+.context-retrieval-result-toggle {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-retrieval-result-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+
+.context-retrieval-result-summary {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.context-retrieval-result-header {
+  align-items: center;
+}
+
+.context-retrieval-result-expand-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border-muted);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-subtle) 72%, transparent);
+  color: var(--text-secondary);
+  flex: 0 0 auto;
+  transition:
+    transform var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.context-retrieval-result-expand-indicator[data-expanded="true"] {
+  transform: rotate(180deg);
+  color: var(--accent-primary);
+  border-color: color-mix(in oklab, var(--accent-primary) 40%, var(--border-muted));
+}
+
+.context-retrieval-result-expand-indicator svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.context-retrieval-result-expand-indicator path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.context-retrieval-result-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.context-retrieval-result-details {
+  border-top: 1px solid var(--border-muted);
+  padding-top: var(--space-4);
+}
+
+.context-retrieval-result-text {
+  min-height: 10rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.context-schema-panel,
+.context-schema-save-panel {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: color-mix(in oklab, var(--bg-subtle) 78%, transparent);
+}
+
+.context-schema-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.context-schema-mode-toggle,
+.context-schema-actions,
+.context-schema-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.context-schema-row > .card-stack {
+  flex: 1 1 14rem;
+}
+
+.context-metadata-editor-row {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.context-metadata-viewer-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@media (max-width: 880px) {
+  .context-metadata-editor-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -33,14 +33,14 @@ export default function PlatformProviderLoadedModelSection({
         <p className="status-text">{t("platformControl.providers.loadedModelDescription")}</p>
       </div>
       <div className="platform-detail-grid">
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.loadedModelLabel")}</span>
           <strong>{loadDisplay.loadedModelPrimary}</strong>
           {loadDisplay.loadedModelSecondaryDetail ? (
             <span className="status-text">{loadDisplay.loadedModelSecondaryDetail}</span>
           ) : null}
         </div>
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.loadedModelStateLabel")}</span>
           <strong>{loadDisplay.providerLoadState}</strong>
           <span className={loadDisplay.hasLoadError ? "status-text error-text" : "status-text"}>

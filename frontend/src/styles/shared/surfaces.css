@@ -1,0 +1,202 @@
+/* Shared surfaces: panel chrome, reusable cards, and multi-feature summary grids. */
+
+.option-card-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.option-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--bg-surface) 94%, transparent);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.option-card-link {
+  height: 100%;
+  display: grid;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: inherit;
+  padding: var(--space-4);
+  transition:
+    box-shadow var(--duration-fast) var(--easing-standard),
+    transform var(--duration-fast) var(--easing-standard),
+    border-color var(--duration-fast) var(--easing-standard),
+    background-color var(--duration-fast) var(--easing-standard);
+}
+
+.option-card .section-title {
+  font-size: 1.03rem;
+}
+
+.option-card-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.option-card-heading .section-title {
+  margin: 0;
+  font-size: 1.03rem;
+}
+
+.option-card .status-text {
+  margin: 0;
+}
+
+.option-card-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-secondary);
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in oklab, var(--border-muted) 82%, transparent);
+  background: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+}
+
+.option-card-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.option-card-link:hover {
+  transform: translateY(-2px);
+  background: color-mix(in oklab, var(--bg-surface) 90%, var(--bg-subtle));
+}
+
+.option-card-link:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 84%, white);
+  outline-offset: -2px;
+}
+
+.option-card:hover {
+  border-color: color-mix(in oklab, var(--accent-secondary) 55%, var(--border-muted));
+  box-shadow: var(--shadow-2);
+}
+
+.panel {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5);
+  position: relative;
+  overflow: clip;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.5rem;
+  background: linear-gradient(180deg, var(--lcars-rail) 0%, var(--lcars-rail-soft) 100%);
+}
+
+.panel.panel-nested::before {
+  content: none;
+}
+
+.quote-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in oklab, var(--accent-secondary) 35%, var(--border-muted));
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--bg-surface) 92%, transparent), color-mix(in oklab, var(--bg-subtle) 84%, transparent)),
+    radial-gradient(circle at top right, color-mix(in oklab, var(--lcars-rail-soft) 44%, transparent), transparent 42%);
+}
+
+.quote-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--lcars-rail) 18%, transparent), transparent 30%);
+  opacity: 0.9;
+}
+
+.quote-card-header,
+.quote-card-body,
+.quote-card-meta,
+.quote-card > .status-text {
+  position: relative;
+  z-index: 1;
+}
+
+.quote-card-title {
+  margin: 0;
+}
+
+.quote-card-eyebrow {
+  margin: 0;
+}
+
+.quote-card-body {
+  margin: 0;
+  padding: 0;
+  border-left: 0.2rem solid color-mix(in oklab, var(--accent-primary) 60%, transparent);
+  padding-left: var(--space-4);
+  color: var(--text-primary);
+}
+
+.quote-card-body p {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.quote-card-meta {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.quote-card-refresh {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.84rem;
+}
+
+.summary-card-grid,
+.platform-capability-grid,
+.catalog-grid,
+.platform-directory-grid,
+.platform-detail-grid,
+.platform-filter-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.summary-card,
+.platform-capability-card,
+.platform-deployment-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.inline-meta-list {
+  margin-top: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}

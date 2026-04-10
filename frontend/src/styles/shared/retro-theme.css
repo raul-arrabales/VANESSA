@@ -1,0 +1,42 @@
+/* Retro theme overrides layered after shared and feature base styles. */
+
+[data-theme-family="retro"] .panel {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--bg-surface) 96%, black 4%), color-mix(in oklab, var(--bg-subtle) 88%, transparent)),
+    linear-gradient(90deg, color-mix(in oklab, var(--accent-primary) 8%, transparent), transparent 18%);
+  border-color: color-mix(in oklab, var(--border-muted) 88%, var(--accent-primary));
+}
+
+[data-theme-family="retro"] .panel::before {
+  width: 0.38rem;
+  background: linear-gradient(180deg, var(--accent-secondary) 0%, var(--accent-primary) 100%);
+}
+
+[data-theme-family="retro"] .app-brand-title,
+[data-theme-family="retro"] .theme-preset-title,
+[data-theme-family="retro"] .deployment-binding-title,
+[data-theme-family="retro"] .quote-admin-summary-value {
+  text-shadow: 0 0 0.55rem color-mix(in oklab, var(--accent-primary) 30%, transparent);
+}
+
+[data-theme-family="retro"] .eyebrow,
+[data-theme-family="retro"] .subtitle,
+[data-theme-family="retro"] .status-text {
+  text-shadow: 0 0 0.4rem color-mix(in oklab, var(--accent-primary) 10%, transparent);
+}
+
+[data-theme-family="retro"] .quote-card,
+[data-theme-family="retro"] .option-card,
+[data-theme-family="retro"] .user-menu-panel,
+[data-theme-family="retro"] .field-input {
+  background: color-mix(in oklab, var(--bg-surface) 94%, black 6%);
+  border-color: color-mix(in oklab, var(--border-muted) 84%, var(--accent-primary));
+}
+
+[data-theme-family="retro"] .primary-button,
+[data-theme-family="retro"] .secondary-button,
+[data-theme-family="retro"] .btn,
+[data-theme-family="retro"] .link-chip,
+[data-theme-family="retro"] .user-menu-trigger {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent-primary) 12%, transparent);
+}

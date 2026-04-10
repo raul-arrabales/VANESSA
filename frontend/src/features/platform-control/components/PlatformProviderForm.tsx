@@ -99,7 +99,7 @@ export default function PlatformProviderForm({
       <label className="card-stack">
         <span className="field-label">{t("platformControl.forms.provider.description")}</span>
         <textarea
-          className="field-input quote-admin-textarea"
+          className="field-input form-textarea"
           value={value.description}
           onChange={(event) => onChange({ ...value, description: event.target.value })}
         />
@@ -108,7 +108,7 @@ export default function PlatformProviderForm({
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.provider.config")}</span>
           <textarea
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={value.configText}
             onChange={(event) => onChange({ ...value, configText: event.target.value })}
           />
@@ -116,7 +116,7 @@ export default function PlatformProviderForm({
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.provider.secretRefs")}</span>
           <textarea
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={value.secretRefsText}
             onChange={(event) => onChange({ ...value, secretRefsText: event.target.value })}
           />

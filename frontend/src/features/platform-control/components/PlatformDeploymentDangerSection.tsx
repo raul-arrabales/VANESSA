@@ -21,7 +21,7 @@ export default function PlatformDeploymentDangerSection({
         <h3 className="section-title">{t("platformControl.sections.danger")}</h3>
         <p className="status-text">{t("platformControl.deployments.deleteDescription")}</p>
       </div>
-      <div className="platform-inline-meta">
+      <div className="inline-meta-list">
         {confirmDelete ? (
           <>
             <button type="button" className="btn btn-secondary" onClick={() => onToggleConfirmDelete(false)}>

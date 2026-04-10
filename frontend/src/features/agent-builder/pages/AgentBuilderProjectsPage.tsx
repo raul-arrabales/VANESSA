@@ -45,7 +45,7 @@ export default function AgentBuilderProjectsPage(): JSX.Element {
                   <tr key={project.id}>
                     <td>
                       <strong>{project.spec.name}</strong>
-                      <div className="platform-inline-meta">
+                      <div className="inline-meta-list">
                         <span className="status-text">{project.id}</span>
                       </div>
                     </td>

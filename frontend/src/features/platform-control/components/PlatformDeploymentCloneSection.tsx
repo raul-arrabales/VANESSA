@@ -50,7 +50,7 @@ export default function PlatformDeploymentCloneSection({
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.deployment.description")}</span>
           <textarea
-            className="field-input quote-admin-textarea"
+            className="field-input form-textarea"
             value={cloneForm.description}
             onChange={(event) => onCloneFormChange({ ...cloneForm, description: event.target.value })}
           />

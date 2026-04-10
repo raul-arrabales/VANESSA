@@ -1,0 +1,25 @@
+/* ModelOps-specific card summaries and local section headers. */
+
+.modelops-summary-grid,
+.modelops-filter-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.modelops-summary-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.modelops-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}

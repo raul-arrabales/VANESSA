@@ -1,0 +1,50 @@
+/* Quote surfaces beyond the shared card and form primitives. */
+
+.quote-admin-page {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.quote-admin-header,
+.quote-admin-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.quote-admin-summary-grid,
+.quote-admin-filter-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.quote-admin-summary-card {
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.quote-admin-summary-value {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  letter-spacing: 0.06em;
+}
+
+.quote-admin-checkbox-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.quote-admin-modal {
+  width: min(56rem, 100%);
+  max-height: min(90vh, 52rem);
+  overflow: auto;
+}

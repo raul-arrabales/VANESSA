@@ -20,23 +20,23 @@ export default function PlatformSummaryCards({
   const { t } = useTranslation("common");
 
   return (
-    <div className="platform-summary-grid">
-      <div className="platform-summary-card">
+    <div className="summary-card-grid">
+      <div className="summary-card">
         <span className="field-label">{t("platformControl.summary.activeDeployment")}</span>
         <strong>{activeDeployment?.display_name ?? t("platformControl.summary.none")}</strong>
         <span className="status-text">{activeDeployment?.slug ?? t("platformControl.summary.none")}</span>
       </div>
-      <div className="platform-summary-card">
+      <div className="summary-card">
         <span className="field-label">{t("platformControl.summary.requiredCoverage")}</span>
         <strong>{`${coveredRequiredCapabilities}/${requiredCapabilities}`}</strong>
         <span className="status-text">{t("platformControl.summary.requiredCoverageDescription")}</span>
       </div>
-      <div className="platform-summary-card">
+      <div className="summary-card">
         <span className="field-label">{t("platformControl.summary.lastActivation")}</span>
         <strong>{latestActivation?.deployment_profile.display_name ?? t("platformControl.summary.none")}</strong>
         <span className="status-text">{latestActivation?.activated_at ?? t("platformControl.summary.none")}</span>
       </div>
-      <div className="platform-summary-card">
+      <div className="summary-card">
         <span className="field-label">{t("platformControl.summary.loadState")}</span>
         <span className="platform-badge" data-tone={state === "success" ? "active" : state === "error" ? "inactive" : "required"}>
           {t(`platformControl.state.${state}`)}

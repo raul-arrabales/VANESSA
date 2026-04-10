@@ -322,18 +322,18 @@ export default function CatalogControlPage(): JSX.Element {
           </button>
         </div>
 
-        <div className="platform-summary-grid">
-          <div className="platform-summary-card">
+        <div className="summary-card-grid">
+          <div className="summary-card">
             <span className="field-label">{t("catalogControl.summary.agents")}</span>
             <strong>{agents.length}</strong>
             <span className="status-text">{t("catalogControl.summary.publishedCount", { count: publishedAgents })}</span>
           </div>
-          <div className="platform-summary-card">
+          <div className="summary-card">
             <span className="field-label">{t("catalogControl.summary.tools")}</span>
             <strong>{tools.length}</strong>
             <span className="status-text">{t("catalogControl.summary.publishedCount", { count: publishedTools })}</span>
           </div>
-          <div className="platform-summary-card">
+          <div className="summary-card">
             <span className="field-label">{t("catalogControl.summary.models")}</span>
             <strong>{models.length}</strong>
             <span className="status-text">{t(`catalogControl.state.${state}`)}</span>
@@ -397,11 +397,11 @@ export default function CatalogControlPage(): JSX.Element {
           </div>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.description")}</span>
-            <textarea className="field-input quote-admin-textarea" value={agentForm.description} onChange={(event) => setAgentForm((current) => ({ ...current, description: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={agentForm.description} onChange={(event) => setAgentForm((current) => ({ ...current, description: event.target.value }))} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.instructions")}</span>
-            <textarea className="field-input quote-admin-textarea" value={agentForm.instructions} onChange={(event) => setAgentForm((current) => ({ ...current, instructions: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={agentForm.instructions} onChange={(event) => setAgentForm((current) => ({ ...current, instructions: event.target.value }))} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.toolRefs")}</span>
@@ -578,19 +578,19 @@ export default function CatalogControlPage(): JSX.Element {
           </div>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.tool.description")}</span>
-            <textarea className="field-input quote-admin-textarea" value={toolForm.description} onChange={(event) => setToolForm((current) => ({ ...current, description: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={toolForm.description} onChange={(event) => setToolForm((current) => ({ ...current, description: event.target.value }))} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.tool.inputSchema")}</span>
-            <textarea className="field-input quote-admin-textarea" value={toolForm.inputSchemaText} onChange={(event) => setToolForm((current) => ({ ...current, inputSchemaText: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={toolForm.inputSchemaText} onChange={(event) => setToolForm((current) => ({ ...current, inputSchemaText: event.target.value }))} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.tool.outputSchema")}</span>
-            <textarea className="field-input quote-admin-textarea" value={toolForm.outputSchemaText} onChange={(event) => setToolForm((current) => ({ ...current, outputSchemaText: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={toolForm.outputSchemaText} onChange={(event) => setToolForm((current) => ({ ...current, outputSchemaText: event.target.value }))} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.tool.safetyPolicy")}</span>
-            <textarea className="field-input quote-admin-textarea" value={toolForm.safetyPolicyText} onChange={(event) => setToolForm((current) => ({ ...current, safetyPolicyText: event.target.value }))} />
+            <textarea className="field-input form-textarea" value={toolForm.safetyPolicyText} onChange={(event) => setToolForm((current) => ({ ...current, safetyPolicyText: event.target.value }))} />
           </label>
           <p className="status-text">{t("catalogControl.forms.tool.connectionProfile")}</p>
           <div className="status-row">

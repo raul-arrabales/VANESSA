@@ -41,12 +41,12 @@ export default function PlatformProviderLoadPanel({
       </div>
       <p className="modal-message">{display.loadPanelSummary}</p>
       <div className="platform-detail-grid">
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.loadPanelRequestedModelLabel")}</span>
           <strong>{display.loadPanelModelName}</strong>
           <span className="status-text">{display.loadPanelModelId}</span>
         </div>
-        <div className="platform-summary-card">
+        <div className="summary-card">
           <span className="field-label">{t("platformControl.providers.loadPanelRuntimeLabel")}</span>
           <strong>{display.loadPanelRuntimeLabel}</strong>
           <span className={display.hasLoadError ? "status-text error-text" : "status-text"}>
