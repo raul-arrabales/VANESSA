@@ -64,7 +64,7 @@ export default function ContextKnowledgeBaseDocumentsPage(): JSX.Element {
                   className="btn btn-primary"
                   onClick={() => setSelectedDocument(null)}
                 >
-                  {t("platformControl.actions.close")}
+                  {t("actionFeedback.dialog.close")}
                 </button>
               )}
             >

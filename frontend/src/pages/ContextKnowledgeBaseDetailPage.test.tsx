@@ -1463,6 +1463,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "View metadata" })[0]);
 
     expect(await screen.findByRole("dialog", { name: "Metadata for Architecture Overview" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Close" })).toBeVisible();
     expect(screen.getByText("category")).toBeVisible();
     expect(screen.getByText("guide")).toBeVisible();
     expect(screen.getByText("published")).toBeVisible();
