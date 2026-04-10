@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { KnowledgeBaseSchemaProperty } from "../../../api/context";
 import type {
   KnowledgeBaseRetrievalActions,
   KnowledgeBaseRetrievalFormState,
@@ -8,6 +9,7 @@ import { KnowledgeBaseRetrievalResults } from "./KnowledgeBaseRetrievalResults";
 import { KnowledgeBaseRetrievalSettingsForm } from "./KnowledgeBaseRetrievalSettingsForm";
 
 type Props = {
+  schemaProperties: KnowledgeBaseSchemaProperty[];
   retrievalForm: KnowledgeBaseRetrievalFormState;
   retrievalRun: KnowledgeBaseRetrievalRunState | null;
   retrievalActions: KnowledgeBaseRetrievalActions;
@@ -15,6 +17,7 @@ type Props = {
 };
 
 export function KnowledgeBaseRetrievalSection({
+  schemaProperties,
   retrievalForm,
   retrievalRun,
   retrievalActions,
@@ -31,17 +34,20 @@ export function KnowledgeBaseRetrievalSection({
         </div>
       </div>
       <KnowledgeBaseRetrievalSettingsForm
+        schemaProperties={schemaProperties}
         retrievalQuery={retrievalForm.query}
         retrievalTopK={retrievalForm.topK}
         retrievalSearchMethod={retrievalForm.searchMethod}
         retrievalHybridAlpha={retrievalForm.hybridAlpha}
         retrievalQueryPreprocessing={retrievalForm.queryPreprocessing}
+        retrievalFilters={retrievalForm.filters}
         isQuerying={isQuerying}
         onQueryChange={retrievalActions.setQuery}
         onTopKChange={retrievalActions.setTopK}
         onSearchMethodChange={retrievalActions.setSearchMethod}
         onHybridAlphaChange={retrievalActions.setHybridAlpha}
         onQueryPreprocessingChange={retrievalActions.setQueryPreprocessing}
+        onFiltersChange={retrievalActions.setFilters}
         onSubmit={retrievalActions.submit}
       />
       <KnowledgeBaseRetrievalResults retrievalRun={retrievalRun} />

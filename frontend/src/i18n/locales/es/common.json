@@ -620,6 +620,14 @@
       "add": "Agregar propiedad de metadatos",
       "remove": "Eliminar propiedad de metadatos"
     },
+    "retrievalFilters": {
+      "title": "Filtros de metadatos",
+      "description": "Limita los resultados de recuperacion a fragmentos cuyos metadatos definidos por el esquema coinciden exactamente con cada filtro activo.",
+      "empty": "Todavia no se agregaron filtros de recuperacion.",
+      "noSchemaProperties": "El esquema de esta base de conocimiento todavia no define propiedades de metadatos filtrables.",
+      "add": "Agregar filtro de recuperacion",
+      "remove": "Eliminar filtro de recuperacion"
+    },
     "metadataViewer": {
       "title": "Metadatos de {{title}}",
       "description": "Revisa los metadatos efectivos almacenados para este documento.",

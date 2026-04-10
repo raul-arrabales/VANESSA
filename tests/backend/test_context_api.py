@@ -540,6 +540,70 @@ def test_query_knowledge_base_route_accepts_hybrid_search_parameters(client, mon
     }
 
 
+def test_query_knowledge_base_route_accepts_metadata_filters(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    admin = users.create_user(
+        "ignored",
+        email="admin-filter-query@example.com",
+        username="admin-filter-query",
+        password_hash=hash_password("admin-pass-123"),
+        role="admin",
+        is_active=True,
+    )
+    token = _login(test_client, admin["username"], "admin-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        context_routes,
+        "query_knowledge_base",
+        lambda *_args, **_kwargs: captured.update(_kwargs) or {
+            "knowledge_base_id": "kb-primary",
+            "retrieval": {
+                "index": "kb_product_docs",
+                "result_count": 1,
+                "top_k": 5,
+                "search_method": "semantic",
+                "query_preprocessing": "none",
+            },
+            "results": [
+                {
+                    "id": "doc-filtered",
+                    "title": "Filtered Result",
+                    "text": "Filtered chunk",
+                    "chunk_length_tokens": 9,
+                    "relevance_score": 0.88,
+                    "relevance_kind": "similarity",
+                    "metadata": {"document_id": "doc-filtered", "category": "guide"},
+                }
+            ],
+        },
+    )
+
+    response = test_client.post(
+        "/v1/context/knowledge-bases/kb-primary/query",
+        headers=_auth(token),
+        json={
+            "query_text": "hello",
+            "filters": {
+                "category": "guide",
+                "page_count": 2,
+                "published": True,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["payload"] == {
+        "query_text": "hello",
+        "filters": {
+            "category": "guide",
+            "page_count": 2,
+            "published": True,
+        },
+    }
+    assert response.get_json()["results"][0]["id"] == "doc-filtered"
+
+
 def test_list_knowledge_sources_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(

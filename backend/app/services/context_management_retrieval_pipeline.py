@@ -59,13 +59,14 @@ def _run_vector_query(
     query_text: str | None,
     embedding: list[float] | None,
     top_k: int,
+    filters: dict[str, Any],
 ) -> tuple[str, list[KnowledgeBaseRetrievalBranchResult]]:
     query_payload = vector_adapter.query(
         index_name=index_name,
         query_text=query_text,
         embedding=embedding,
         top_k=top_k,
-        filters={},
+        filters=filters,
     )
     query_index = str(query_payload.get("index") or index_name).strip() or index_name
     return query_index, _coerce_branch_results(query_payload.get("results"))
@@ -79,6 +80,7 @@ def _run_semantic_branch(
     vector_adapter: Any,
     processed_query_text: str,
     top_k: int,
+    filters: dict[str, Any],
 ):
     from .platform_service import resolve_embeddings_adapter
 
@@ -100,6 +102,7 @@ def _run_semantic_branch(
         query_text=None,
         embedding=query_embedding,
         top_k=top_k,
+        filters=filters,
     )
     return query_index, rank_branch_results(branch_results, search_method="semantic")
 
@@ -110,6 +113,7 @@ def _run_keyword_branch(
     vector_adapter: Any,
     processed_query_text: str,
     top_k: int,
+    filters: dict[str, Any],
 ):
     query_index, branch_results = _run_vector_query(
         vector_adapter,
@@ -117,6 +121,7 @@ def _run_keyword_branch(
         query_text=processed_query_text,
         embedding=None,
         top_k=top_k,
+        filters=filters,
     )
     return query_index, rank_branch_results(branch_results, search_method="keyword")
 
@@ -145,19 +150,21 @@ def run_knowledge_base_retrieval(
             database_url,
             config=config,
             knowledge_base=knowledge_base,
-            vector_adapter=vector_adapter,
-            processed_query_text=processed_query_text,
-            top_k=options.top_k,
-        )
+        vector_adapter=vector_adapter,
+        processed_query_text=processed_query_text,
+        top_k=options.top_k,
+        filters=options.filters,
+    )
         return KnowledgeBaseRetrievalExecution(index=query_index, results=ranked_results)
 
     if options.search_method == "keyword":
         query_index, ranked_results = _run_keyword_branch(
             knowledge_base=knowledge_base,
-            vector_adapter=vector_adapter,
-            processed_query_text=processed_query_text,
-            top_k=options.top_k,
-        )
+        vector_adapter=vector_adapter,
+        processed_query_text=processed_query_text,
+        top_k=options.top_k,
+        filters=options.filters,
+    )
         return KnowledgeBaseRetrievalExecution(index=query_index, results=ranked_results)
 
     branch_top_k = calculate_hybrid_branch_top_k(options.top_k)
@@ -168,12 +175,14 @@ def run_knowledge_base_retrieval(
         vector_adapter=vector_adapter,
         processed_query_text=processed_query_text,
         top_k=branch_top_k,
+        filters=options.filters,
     )
     keyword_index, keyword_results = _run_keyword_branch(
         knowledge_base=knowledge_base,
         vector_adapter=vector_adapter,
         processed_query_text=processed_query_text,
         top_k=branch_top_k,
+        filters=options.filters,
     )
     return KnowledgeBaseRetrievalExecution(
         index=semantic_index or keyword_index or str(knowledge_base["index_name"]),

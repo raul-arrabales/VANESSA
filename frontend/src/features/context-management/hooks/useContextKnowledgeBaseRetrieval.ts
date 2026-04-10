@@ -3,6 +3,11 @@ import { useTranslation } from "react-i18next";
 import { queryKnowledgeBase } from "../../../api/context";
 import type { KnowledgeBaseQueryPreprocessing, KnowledgeBaseQueryResult, KnowledgeBaseSearchMethod } from "../../../api/context";
 import { getCurrentTimeMs } from "../../../utils/timing";
+import {
+  buildMetadataRecord,
+  MetadataEditorValidationError,
+} from "../metadataEditor";
+import type { MetadataEntryFormState } from "../types";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
 
 export type KnowledgeBaseRetrievalFormState = {
@@ -11,6 +16,7 @@ export type KnowledgeBaseRetrievalFormState = {
   searchMethod: KnowledgeBaseSearchMethod;
   hybridAlpha: string;
   queryPreprocessing: KnowledgeBaseQueryPreprocessing;
+  filters: MetadataEntryFormState[];
 };
 
 export type KnowledgeBaseRetrievalRunState = {
@@ -26,6 +32,7 @@ export type KnowledgeBaseRetrievalActions = {
   setSearchMethod: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
   setHybridAlpha: Dispatch<SetStateAction<string>>;
   setQueryPreprocessing: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
+  setFilters: Dispatch<SetStateAction<MetadataEntryFormState[]>>;
   submit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
@@ -44,12 +51,24 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
   const [retrievalSearchMethod, setRetrievalSearchMethod] = useState<KnowledgeBaseSearchMethod>("semantic");
   const [retrievalHybridAlpha, setRetrievalHybridAlpha] = useState("0.5");
   const [retrievalQueryPreprocessing, setRetrievalQueryPreprocessing] = useState<KnowledgeBaseQueryPreprocessing>("none");
+  const [retrievalFilters, setRetrievalFilters] = useState<MetadataEntryFormState[]>([]);
   const [retrievalRun, setRetrievalRun] = useState<KnowledgeBaseRetrievalRunState | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!workspace.token || !workspace.knowledgeBase || isQuerying) {
+      return;
+    }
+    let filters: Record<string, unknown>;
+    try {
+      filters = buildMetadataRecord(retrievalFilters, workspace.knowledgeBase.schema);
+    } catch (requestError) {
+      if (requestError instanceof MetadataEditorValidationError) {
+        workspace.showErrorFeedback(getMetadataValidationMessage(requestError, t), t("contextManagement.feedback.queryFailed"));
+        return;
+      }
+      workspace.showErrorFeedback(requestError, t("contextManagement.feedback.queryFailed"));
       return;
     }
     const startedAt = getCurrentTimeMs();
@@ -63,6 +82,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
           top_k: Number.parseInt(retrievalTopK, 10) || 5,
           search_method: retrievalSearchMethod,
           query_preprocessing: retrievalQueryPreprocessing,
+          ...(Object.keys(filters).length > 0 ? { filters } : {}),
           ...(retrievalSearchMethod === "hybrid"
             ? { hybrid_alpha: Number.isFinite(parsedHybridAlpha) ? parsedHybridAlpha : 0.5 }
             : {}),
@@ -90,6 +110,7 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
       searchMethod: retrievalSearchMethod,
       hybridAlpha: retrievalHybridAlpha,
       queryPreprocessing: retrievalQueryPreprocessing,
+      filters: retrievalFilters,
     },
     retrievalRun,
     isQuerying,
@@ -99,7 +120,30 @@ export function useContextKnowledgeBaseRetrieval(): ContextKnowledgeBaseRetrieva
       setSearchMethod: setRetrievalSearchMethod,
       setHybridAlpha: setRetrievalHybridAlpha,
       setQueryPreprocessing: setRetrievalQueryPreprocessing,
+      setFilters: setRetrievalFilters,
       submit,
     },
   };
+}
+
+function getMetadataValidationMessage(
+  error: MetadataEditorValidationError,
+  t: ReturnType<typeof useTranslation<"common">>["t"],
+): string {
+  if (error.code === "duplicate_property") {
+    return t("contextManagement.feedback.metadataDuplicateProperty");
+  }
+  if (error.code === "missing_property_name") {
+    return t("contextManagement.feedback.metadataPropertyNameRequired");
+  }
+  if (error.code === "invalid_number") {
+    return t("contextManagement.feedback.metadataInvalidNumber");
+  }
+  if (error.code === "invalid_int") {
+    return t("contextManagement.feedback.metadataInvalidInteger");
+  }
+  if (error.code === "invalid_boolean") {
+    return t("contextManagement.feedback.metadataInvalidBoolean");
+  }
+  return t("contextManagement.feedback.metadataInvalidText");
 }

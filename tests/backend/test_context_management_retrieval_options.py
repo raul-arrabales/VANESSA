@@ -47,3 +47,58 @@ def test_normalize_knowledge_base_retrieval_options_rejects_missing_query_text()
         context_management_retrieval_options.normalize_knowledge_base_retrieval_options({})
 
     assert exc_info.value.code == "invalid_query_text"
+
+
+def test_normalize_knowledge_base_retrieval_options_coerces_typed_filters_against_schema():
+    options = context_management_retrieval_options.normalize_knowledge_base_retrieval_options(
+        {
+            "query_text": "hello",
+            "filters": {
+                "category": "guide",
+                "score": 0.75,
+                "page_count": 12,
+                "published": True,
+            },
+        },
+        knowledge_base_schema={
+            "properties": [
+                {"name": "category", "data_type": "text"},
+                {"name": "score", "data_type": "number"},
+                {"name": "page_count", "data_type": "int"},
+                {"name": "published", "data_type": "boolean"},
+            ]
+        },
+    )
+
+    assert options.filters == {
+        "category": "guide",
+        "score": 0.75,
+        "page_count": 12,
+        "published": True,
+    }
+
+
+def test_normalize_knowledge_base_retrieval_options_rejects_unknown_filter_property():
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_retrieval_options.normalize_knowledge_base_retrieval_options(
+            {
+                "query_text": "hello",
+                "filters": {"unknown_field": "guide"},
+            },
+            knowledge_base_schema={"properties": [{"name": "category", "data_type": "text"}]},
+        )
+
+    assert exc_info.value.code == "invalid_metadata_key"
+
+
+def test_normalize_knowledge_base_retrieval_options_rejects_invalid_filter_value_type():
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        context_management_retrieval_options.normalize_knowledge_base_retrieval_options(
+            {
+                "query_text": "hello",
+                "filters": {"page_count": 1.25},
+            },
+            knowledge_base_schema={"properties": [{"name": "page_count", "data_type": "int"}]},
+        )
+
+    assert exc_info.value.code == "invalid_metadata_value"

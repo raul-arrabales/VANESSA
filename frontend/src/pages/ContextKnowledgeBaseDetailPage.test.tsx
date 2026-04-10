@@ -198,7 +198,12 @@ const contextApiMocks = vi.hoisted(() => ({
   queryKnowledgeBase: vi.fn(
     async (
       _knowledgeBaseId: string,
-      payload?: { search_method?: string; query_preprocessing?: KnowledgeBaseQueryPreprocessing; hybrid_alpha?: number },
+      payload?: {
+        search_method?: string;
+        query_preprocessing?: KnowledgeBaseQueryPreprocessing;
+        hybrid_alpha?: number;
+        filters?: Record<string, unknown>;
+      },
     ) => {
     if (payload?.search_method === "hybrid") {
       return buildKnowledgeBaseQueryResponse({
@@ -1018,6 +1023,20 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByLabelText("Search method")).toHaveValue("semantic");
     expect(screen.getByLabelText("Query preprocessing")).toHaveValue("none");
     await userEvent.type(screen.getByLabelText("Retrieval query"), "How does retrieval work?");
+    await userEvent.click(screen.getByRole("button", { name: "Add retrieval filter" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add retrieval filter" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add retrieval filter" }));
+
+    const propertyInputs = screen.getAllByLabelText("Property name");
+    await userEvent.selectOptions(propertyInputs[0], "category");
+    await userEvent.selectOptions(propertyInputs[1], "page_count");
+    await userEvent.selectOptions(propertyInputs[2], "published");
+
+    const valueInputs = screen.getAllByLabelText("Property value");
+    await userEvent.type(valueInputs[0], "guide");
+    await userEvent.type(valueInputs[1], "2");
+    await userEvent.selectOptions(valueInputs[2], "true");
+
     let nowCallCount = 0;
     const performanceNowSpy = vi.spyOn(performance, "now").mockImplementation(() => {
       nowCallCount += 1;
@@ -1072,6 +1091,11 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         top_k: 5,
         search_method: "semantic",
         query_preprocessing: "none",
+        filters: {
+          category: "guide",
+          page_count: 2,
+          published: true,
+        },
       },
       "token",
     );
@@ -1218,6 +1242,20 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
       },
       "token",
     );
+  });
+
+  it("keeps duplicate retrieval filter properties unavailable in later rows", async () => {
+    await renderContextWorkspace("/control/context/kb-primary/retrieval");
+
+    expect(await screen.findByRole("heading", { name: "Test retrieval" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Add retrieval filter" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add retrieval filter" }));
+
+    const propertyInputs = screen.getAllByLabelText("Property name");
+    await userEvent.selectOptions(propertyInputs[0], "category");
+
+    expect(within(propertyInputs[1]).queryByRole("option", { name: "category" })).toBeNull();
+    expect(within(propertyInputs[1]).getByRole("option", { name: "page_count" })).toBeVisible();
   });
 
   it("shows the upload page in read-only mode for admins", async () => {

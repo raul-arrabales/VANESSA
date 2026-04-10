@@ -378,6 +378,7 @@ export async function queryKnowledgeBase(
     search_method?: KnowledgeBaseSearchMethod;
     query_preprocessing?: KnowledgeBaseQueryPreprocessing;
     hybrid_alpha?: number;
+    filters?: Record<string, unknown>;
   },
   token: string,
 ): Promise<KnowledgeBaseQueryResponse> {

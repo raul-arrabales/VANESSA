@@ -6,18 +6,37 @@ import {
 } from "../metadataEditor";
 import type { MetadataEntryFormState } from "../types";
 
+export type KnowledgeBaseMetadataEditorCopy = {
+  title: string;
+  description: string;
+  empty: string;
+  noSchemaProperties: string;
+  add: string;
+  remove: string;
+};
+
 type Props = {
   schemaProperties: KnowledgeBaseSchemaProperty[];
   entries: MetadataEntryFormState[];
   onChange: (entries: MetadataEntryFormState[]) => void;
+  copy?: Partial<KnowledgeBaseMetadataEditorCopy>;
 };
 
 export function KnowledgeBaseMetadataEditor({
   schemaProperties,
   entries,
   onChange,
+  copy,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
+  const editorCopy: KnowledgeBaseMetadataEditorCopy = {
+    title: copy?.title ?? t("contextManagement.metadataEditor.title"),
+    description: copy?.description ?? t("contextManagement.metadataEditor.description"),
+    empty: copy?.empty ?? t("contextManagement.metadataEditor.empty"),
+    noSchemaProperties: copy?.noSchemaProperties ?? t("contextManagement.metadataEditor.noSchemaProperties"),
+    add: copy?.add ?? t("contextManagement.metadataEditor.add"),
+    remove: copy?.remove ?? t("contextManagement.metadataEditor.remove"),
+  };
 
   const propertyNames = schemaProperties.map((property) => property.name);
 
@@ -25,15 +44,15 @@ export function KnowledgeBaseMetadataEditor({
     <section className="card-stack">
       <div className="platform-card-header">
         <div className="card-stack">
-          <h5 className="section-title">{t("contextManagement.metadataEditor.title")}</h5>
-          <p className="status-text">{t("contextManagement.metadataEditor.description")}</p>
+          <h5 className="section-title">{editorCopy.title}</h5>
+          <p className="status-text">{editorCopy.description}</p>
         </div>
       </div>
       {schemaProperties.length === 0 ? (
-        <p className="status-text">{t("contextManagement.metadataEditor.noSchemaProperties")}</p>
+        <p className="status-text">{editorCopy.noSchemaProperties}</p>
       ) : null}
       {schemaProperties.length > 0 && entries.length === 0 ? (
-        <p className="status-text">{t("contextManagement.metadataEditor.empty")}</p>
+        <p className="status-text">{editorCopy.empty}</p>
       ) : null}
       {entries.map((entry) => {
         const propertyType = getMetadataPropertyType(entry.propertyName, schemaProperties);
@@ -101,7 +120,7 @@ export function KnowledgeBaseMetadataEditor({
                 className="btn btn-secondary"
                 onClick={() => onChange(entries.filter((candidate) => candidate.id !== entry.id))}
               >
-                {t("contextManagement.metadataEditor.remove")}
+                {editorCopy.remove}
               </button>
             </div>
           </div>
@@ -114,7 +133,7 @@ export function KnowledgeBaseMetadataEditor({
           disabled={schemaProperties.length === 0 || entries.length >= schemaProperties.length}
           onClick={() => onChange([...entries, createEmptyMetadataEntry()])}
         >
-          {t("contextManagement.metadataEditor.add")}
+          {editorCopy.add}
         </button>
       </div>
     </section>

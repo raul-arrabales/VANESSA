@@ -2,37 +2,46 @@ import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   KnowledgeBaseQueryPreprocessing,
+  KnowledgeBaseSchemaProperty,
   KnowledgeBaseSearchMethod,
 } from "../../../api/context";
 import { shouldShowHybridAlphaControl } from "../../ai-shared/retrieval";
+import type { MetadataEntryFormState } from "../types";
+import { KnowledgeBaseRetrievalFiltersEditor } from "./KnowledgeBaseRetrievalFiltersEditor";
 
 type Props = {
+  schemaProperties: KnowledgeBaseSchemaProperty[];
   retrievalQuery: string;
   retrievalTopK: string;
   retrievalSearchMethod: KnowledgeBaseSearchMethod;
   retrievalHybridAlpha: string;
   retrievalQueryPreprocessing: KnowledgeBaseQueryPreprocessing;
+  retrievalFilters: MetadataEntryFormState[];
   isQuerying: boolean;
   onQueryChange: Dispatch<SetStateAction<string>>;
   onTopKChange: Dispatch<SetStateAction<string>>;
   onSearchMethodChange: Dispatch<SetStateAction<KnowledgeBaseSearchMethod>>;
   onHybridAlphaChange: Dispatch<SetStateAction<string>>;
   onQueryPreprocessingChange: Dispatch<SetStateAction<KnowledgeBaseQueryPreprocessing>>;
+  onFiltersChange: Dispatch<SetStateAction<MetadataEntryFormState[]>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
 export function KnowledgeBaseRetrievalSettingsForm({
+  schemaProperties,
   retrievalQuery,
   retrievalTopK,
   retrievalSearchMethod,
   retrievalHybridAlpha,
   retrievalQueryPreprocessing,
+  retrievalFilters,
   isQuerying,
   onQueryChange,
   onTopKChange,
   onSearchMethodChange,
   onHybridAlphaChange,
   onQueryPreprocessingChange,
+  onFiltersChange,
   onSubmit,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
@@ -104,6 +113,11 @@ export function KnowledgeBaseRetrievalSettingsForm({
             </select>
           </label>
         </div>
+        <KnowledgeBaseRetrievalFiltersEditor
+          schemaProperties={schemaProperties}
+          entries={retrievalFilters}
+          onChange={onFiltersChange}
+        />
       </section>
       <div className="form-actions">
         <button type="submit" className="btn btn-primary" disabled={isQuerying || !retrievalQuery.trim()}>

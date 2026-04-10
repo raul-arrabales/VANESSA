@@ -628,6 +628,14 @@
       "add": "Add metadata property",
       "remove": "Remove metadata property"
     },
+    "retrievalFilters": {
+      "title": "Metadata filters",
+      "description": "Narrow retrieval results to chunks whose schema-defined metadata exactly matches every active filter.",
+      "empty": "No retrieval filters have been added yet.",
+      "noSchemaProperties": "This knowledge base schema does not define any filterable metadata properties yet.",
+      "add": "Add retrieval filter",
+      "remove": "Remove retrieval filter"
+    },
     "metadataViewer": {
       "title": "Metadata for {{title}}",
       "description": "Review the effective metadata stored for this document.",

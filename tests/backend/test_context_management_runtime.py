@@ -186,6 +186,13 @@ def test_query_knowledge_base_semantic_normalizes_similarity_orders_results_and_
             "embedding_provider_instance_id": "embedding-provider-1",
             "embedding_provider_key": "openai_compatible_cloud_embeddings",
             "embedding_resource_id": "text-embedding-3-small",
+            "schema_json": {
+                "properties": [
+                    {"name": "category", "data_type": "text"},
+                    {"name": "page_count", "data_type": "int"},
+                    {"name": "published", "data_type": "boolean"},
+                ]
+            },
             "lifecycle_state": "active",
             "sync_status": "ready",
         },
@@ -255,11 +262,24 @@ def test_query_knowledge_base_semantic_normalizes_similarity_orders_results_and_
         "postgresql://ignored",
         config=object(),
         knowledge_base_id="kb-primary",
-        payload={"query_text": "hello", "top_k": 5},
+        payload={
+            "query_text": "hello",
+            "top_k": 5,
+            "filters": {
+                "category": "guide",
+                "page_count": 2,
+                "published": True,
+            },
+        },
     )
 
     assert captured_query_kwargs["query_text"] is None
     assert captured_query_kwargs["embedding"] == [0.1, 0.2]
+    assert captured_query_kwargs["filters"] == {
+        "category": "guide",
+        "page_count": 2,
+        "published": True,
+    }
     assert payload["retrieval"] == {
         "index": "kb_product_docs",
         "result_count": 2,
@@ -320,6 +340,12 @@ def test_query_knowledge_base_keyword_skips_embeddings_and_returns_keyword_score
             "embedding_provider_instance_id": "embedding-provider-1",
             "embedding_provider_key": "openai_compatible_cloud_embeddings",
             "embedding_resource_id": "text-embedding-3-small",
+            "schema_json": {
+                "properties": [
+                    {"name": "category", "data_type": "text"},
+                    {"name": "published", "data_type": "boolean"},
+                ]
+            },
             "lifecycle_state": "active",
             "sync_status": "ready",
         },
@@ -368,11 +394,23 @@ def test_query_knowledge_base_keyword_skips_embeddings_and_returns_keyword_score
         "postgresql://ignored",
         config=object(),
         knowledge_base_id="kb-primary",
-        payload={"query_text": "hello", "top_k": 5, "search_method": "keyword"},
+        payload={
+            "query_text": "hello",
+            "top_k": 5,
+            "search_method": "keyword",
+            "filters": {
+                "category": "guide",
+                "published": False,
+            },
+        },
     )
 
     assert captured_query_kwargs["query_text"] == "hello"
     assert captured_query_kwargs["embedding"] is None
+    assert captured_query_kwargs["filters"] == {
+        "category": "guide",
+        "published": False,
+    }
     assert payload["retrieval"] == {
         "index": "kb_product_docs",
         "result_count": 1,
@@ -483,6 +521,12 @@ def test_query_knowledge_base_hybrid_fuses_branch_scores_and_returns_component_b
             "embedding_provider_instance_id": "embedding-provider-1",
             "embedding_provider_key": "openai_compatible_cloud_embeddings",
             "embedding_resource_id": "text-embedding-3-small",
+            "schema_json": {
+                "properties": [
+                    {"name": "category", "data_type": "text"},
+                    {"name": "page_count", "data_type": "int"},
+                ]
+            },
             "lifecycle_state": "active",
             "sync_status": "ready",
         },
@@ -577,6 +621,10 @@ def test_query_knowledge_base_hybrid_fuses_branch_scores_and_returns_component_b
             "top_k": 4,
             "search_method": "hybrid",
             "query_preprocessing": "normalize",
+            "filters": {
+                "category": "guide",
+                "page_count": 3,
+            },
         },
     )
 
@@ -585,9 +633,17 @@ def test_query_knowledge_base_hybrid_fuses_branch_scores_and_returns_component_b
     assert captured_queries[0]["query_text"] is None
     assert captured_queries[0]["embedding"] == [0.4, 0.6]
     assert captured_queries[0]["top_k"] == 12
+    assert captured_queries[0]["filters"] == {
+        "category": "guide",
+        "page_count": 3,
+    }
     assert captured_queries[1]["query_text"] == "raul"
     assert captured_queries[1]["embedding"] is None
     assert captured_queries[1]["top_k"] == 12
+    assert captured_queries[1]["filters"] == {
+        "category": "guide",
+        "page_count": 3,
+    }
     assert payload["retrieval"] == {
         "index": "kb_product_docs",
         "result_count": 4,

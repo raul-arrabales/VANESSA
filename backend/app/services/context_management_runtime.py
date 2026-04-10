@@ -49,7 +49,10 @@ def query_knowledge_base(
             status_code=409,
             details={"knowledge_base_id": knowledge_base_id},
         )
-    options = normalize_knowledge_base_retrieval_options(payload)
+    options = normalize_knowledge_base_retrieval_options(
+        payload,
+        knowledge_base_schema=dict(knowledge_base.get("schema_json") or {}),
+    )
     require_knowledge_base_query_supported(knowledge_base)
     vector_adapter = resolve_vector_store_adapter(database_url, config)
     if str(vector_adapter.binding.provider_instance_id or "").strip() != str(knowledge_base.get("backing_provider_instance_id") or "").strip():

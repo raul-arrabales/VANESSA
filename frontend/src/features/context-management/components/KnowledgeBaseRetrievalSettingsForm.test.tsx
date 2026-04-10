@@ -15,40 +15,48 @@ describe("KnowledgeBaseRetrievalSettingsForm", () => {
     const handleSearchMethodChange = vi.fn();
     const handleHybridAlphaChange = vi.fn();
     const handleQueryPreprocessingChange = vi.fn();
+    const handleFiltersChange = vi.fn();
 
     const { rerender } = await renderWithAppProviders(
       <KnowledgeBaseRetrievalSettingsForm
+        schemaProperties={[{ name: "category", data_type: "text" }]}
         retrievalQuery="How does retrieval work?"
         retrievalTopK="5"
         retrievalSearchMethod="semantic"
         retrievalHybridAlpha="0.5"
         retrievalQueryPreprocessing="none"
+        retrievalFilters={[]}
         isQuerying={false}
         onQueryChange={handleQueryChange}
         onTopKChange={handleTopKChange}
         onSearchMethodChange={handleSearchMethodChange}
         onHybridAlphaChange={handleHybridAlphaChange}
         onQueryPreprocessingChange={handleQueryPreprocessingChange}
+        onFiltersChange={handleFiltersChange}
         onSubmit={handleSubmit}
       />,
     );
 
     expect(screen.queryByLabelText("Hybrid alpha")).toBeNull();
     expect(screen.getByLabelText("Retrieval query")).toHaveAttribute("rows", "2");
+    expect(screen.getByText("Metadata filters")).toBeVisible();
 
     rerender(
       <KnowledgeBaseRetrievalSettingsForm
+        schemaProperties={[{ name: "category", data_type: "text" }]}
         retrievalQuery="How does retrieval work?"
         retrievalTopK="5"
         retrievalSearchMethod="hybrid"
         retrievalHybridAlpha="0.5"
         retrievalQueryPreprocessing="none"
+        retrievalFilters={[]}
         isQuerying={false}
         onQueryChange={handleQueryChange}
         onTopKChange={handleTopKChange}
         onSearchMethodChange={handleSearchMethodChange}
         onHybridAlphaChange={handleHybridAlphaChange}
         onQueryPreprocessingChange={handleQueryPreprocessingChange}
+        onFiltersChange={handleFiltersChange}
         onSubmit={handleSubmit}
       />,
     );
