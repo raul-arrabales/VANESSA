@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ModelCredential } from "../../../api/modelops/types";
-import { TASK_OPTIONS } from "../domain";
+import { CLOUD_PROVIDER_OPTIONS, TASK_OPTIONS } from "../domain";
 
 type CloudModelRegistrationState = {
   id: string;
@@ -18,6 +18,7 @@ type CloudModelRegistrationState = {
 type CloudModelRegistrationFormProps = {
   state: CloudModelRegistrationState;
   credentials: ModelCredential[];
+  isLoading: boolean;
   isSaving: boolean;
   allowPlatformOwnership: boolean;
   onChange: (next: CloudModelRegistrationState) => void;
@@ -27,6 +28,7 @@ type CloudModelRegistrationFormProps = {
 export default function CloudModelRegistrationForm({
   state,
   credentials,
+  isLoading,
   isSaving,
   allowPlatformOwnership,
   onChange,
@@ -38,6 +40,8 @@ export default function CloudModelRegistrationForm({
     () => credentials.filter((credential) => credential.provider === state.provider),
     [credentials, state.provider],
   );
+  const hasCredentialsForProvider = filteredCredentials.length > 0;
+  const showNoCredentialsHint = !isLoading && !hasCredentialsForProvider;
 
   return (
     <article className="panel card-stack">
@@ -54,9 +58,9 @@ export default function CloudModelRegistrationForm({
           value={state.provider}
           onChange={(event) => onChange({ ...state, provider: event.currentTarget.value, credentialId: "" })}
         >
-          <option value="openai_compatible">OpenAI-compatible</option>
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
+          {CLOUD_PROVIDER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
+          ))}
         </select>
         {allowPlatformOwnership && (
           <>
@@ -98,7 +102,11 @@ export default function CloudModelRegistrationForm({
           value={state.credentialId}
           onChange={(event) => onChange({ ...state, credentialId: event.currentTarget.value })}
         >
-          <option value="">{t("modelOps.cloud.selectCredential")}</option>
+          <option value="" disabled={showNoCredentialsHint}>
+            {showNoCredentialsHint
+              ? t("modelOps.cloud.noCredentialsForProvider")
+              : t("modelOps.cloud.selectCredential")}
+          </option>
           {filteredCredentials.map((credential) => (
             <option key={credential.id} value={credential.id}>
               {`${credential.display_name} · ****${credential.api_key_last4}`}

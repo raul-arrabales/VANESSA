@@ -8,6 +8,12 @@ export const TASK_OPTIONS = [
   { value: "classification", label: "Classification", category: "predictive" as const },
 ] as const;
 
+export const CLOUD_PROVIDER_OPTIONS = [
+  { value: "openai_compatible", labelKey: "settings.modelAccess.providers.openaiCompatible" },
+  { value: "openai", labelKey: "settings.modelAccess.providers.openai" },
+  { value: "anthropic", labelKey: "settings.modelAccess.providers.anthropic" },
+] as const;
+
 export const MODEL_ACCESS_SCOPES = ["user", "admin", "superadmin"] as const;
 export const TESTABLE_MODEL_LIFECYCLE_STATES: ManagedModelLifecycleState[] = [
   "registered",

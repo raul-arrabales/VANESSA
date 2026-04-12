@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { CLOUD_PROVIDER_OPTIONS } from "../domain";
 
 type CredentialFormState = {
   provider: string;
@@ -27,7 +28,7 @@ export default function CloudCredentialForm({
 
   return (
     <article className="panel card-stack">
-      <h2 className="section-title">{t("modelOps.cloud.credentialsTitle")}</h2>
+      <h2 className="section-title">{t("modelOps.cloud.newCredentialTitle")}</h2>
       <div className="control-group">
         <label className="field-label" htmlFor="cloud-credential-provider">{t("modelOps.fields.provider")}</label>
         <select
@@ -36,9 +37,9 @@ export default function CloudCredentialForm({
           value={state.provider}
           onChange={(event) => onChange({ ...state, provider: event.currentTarget.value })}
         >
-          <option value="openai_compatible">OpenAI-compatible</option>
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
+          {CLOUD_PROVIDER_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{t(option.labelKey)}</option>
+          ))}
         </select>
         {canChoosePlatformScope && (
           <>

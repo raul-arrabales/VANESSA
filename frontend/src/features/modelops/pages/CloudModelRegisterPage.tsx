@@ -6,6 +6,7 @@ import type { ManagedModel } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import ModelCatalogList from "../components/ModelCatalogList";
+import CloudCredentialList from "../components/CloudCredentialList";
 import CloudCredentialForm from "../components/CloudCredentialForm";
 import CloudModelRegistrationForm from "../components/CloudModelRegistrationForm";
 import { TASK_OPTIONS } from "../domain";
@@ -49,7 +50,7 @@ function resolveCloudModelRegisterView(value: string | null): CloudModelRegister
 export default function CloudModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
-  const { credentials, recentCloudModels, isLoading, isSaving, saveCredential, registerCloudModel } =
+  const { credentials, recentCloudModels, isLoading, isSaving, saveCredential, deleteCredential, registerCloudModel } =
     useCloudRegistrationFlow(token);
   const isSuperadmin = user?.role === "superadmin";
   const canTest = user?.role === "admin" || user?.role === "superadmin";
@@ -100,22 +101,30 @@ export default function CloudModelRegisterPage(): JSX.Element {
     >
       <section className="card-stack">
         {activeView === "credentials" ? (
-          <CloudCredentialForm
-            state={credentialState}
-            isSaving={isSaving}
-            canChoosePlatformScope={isSuperadmin}
-            onChange={setCredentialState}
-            onSubmit={async () => {
-              await saveCredential({
-                provider: credentialState.provider,
-                display_name: credentialState.displayName.trim() || undefined,
-                api_base_url: credentialState.apiBaseUrl.trim() || undefined,
-                api_key: credentialState.apiKey,
-                credential_scope: isSuperadmin ? credentialState.credentialScope : "personal",
-              });
-              setCredentialState((current) => ({ ...current, displayName: "", apiKey: "" }));
-            }}
-          />
+          <>
+            <CloudCredentialList
+              credentials={credentials}
+              isLoading={isLoading}
+              isDeleting={isSaving}
+              onDelete={deleteCredential}
+            />
+            <CloudCredentialForm
+              state={credentialState}
+              isSaving={isSaving}
+              canChoosePlatformScope={isSuperadmin}
+              onChange={setCredentialState}
+              onSubmit={async () => {
+                await saveCredential({
+                  provider: credentialState.provider,
+                  display_name: credentialState.displayName.trim() || undefined,
+                  api_base_url: credentialState.apiBaseUrl.trim() || undefined,
+                  api_key: credentialState.apiKey,
+                  credential_scope: isSuperadmin ? credentialState.credentialScope : "personal",
+                });
+                setCredentialState((current) => ({ ...current, displayName: "", apiKey: "" }));
+              }}
+            />
+          </>
         ) : null}
 
         {activeView === "register" ? (
@@ -123,6 +132,7 @@ export default function CloudModelRegisterPage(): JSX.Element {
             <CloudModelRegistrationForm
               state={modelState}
               credentials={credentials}
+              isLoading={isLoading}
               isSaving={isSaving}
               allowPlatformOwnership={isSuperadmin}
               onChange={setModelState}

@@ -8,6 +8,7 @@ const modelApiMocks = vi.hoisted(() => ({
   listModelCredentials: vi.fn(),
   listModelOpsModels: vi.fn(),
   createModelCredential: vi.fn(),
+  revokeModelCredential: vi.fn(),
   registerManagedModel: vi.fn(),
 }));
 
@@ -24,6 +25,7 @@ function getCloudRegisterSubmitButton(): HTMLButtonElement {
 vi.mock("../../../api/modelops/credentials", () => ({
   listModelCredentials: modelApiMocks.listModelCredentials,
   createModelCredential: modelApiMocks.createModelCredential,
+  revokeModelCredential: modelApiMocks.revokeModelCredential,
 }));
 
 vi.mock("../../../api/modelops/models", () => ({
@@ -48,12 +50,23 @@ describe("CloudModelRegisterPage", () => {
         credential_scope: "personal",
         provider: "openai_compatible",
         display_name: "My key",
+        api_base_url: "https://api.openai.com/v1",
         api_key_last4: "1234",
         is_active: true,
       },
     ]);
     modelApiMocks.listModelOpsModels.mockResolvedValue([]);
     modelApiMocks.createModelCredential.mockResolvedValue({});
+    modelApiMocks.revokeModelCredential.mockResolvedValue({
+      id: "cred-1",
+      owner_user_id: 1,
+      credential_scope: "personal",
+      provider: "openai_compatible",
+      display_name: "My key",
+      api_base_url: "https://api.openai.com/v1",
+      api_key_last4: "1234",
+      is_active: false,
+    });
     modelApiMocks.registerManagedModel.mockResolvedValue({ id: "gpt-private" });
   });
 
@@ -73,6 +86,81 @@ describe("CloudModelRegisterPage", () => {
     expect(screen.queryByLabelText("Owner type")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Credentials" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recently registered cloud models" })).not.toBeInTheDocument();
+  });
+
+  it("lists saved credentials before the new credential form", async () => {
+    mockRole = "superadmin";
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
+
+    const savedHeading = await screen.findByRole("heading", { name: "Saved credentials" });
+    const formHeading = screen.getByRole("heading", { name: "Save new credential" });
+    expect(savedHeading.compareDocumentPosition(formHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const credentialList = screen.getByRole("list", { name: "Saved cloud credentials" });
+    expect(credentialList).toBeVisible();
+    expect(within(credentialList).getByText("My key")).toBeVisible();
+    expect(within(credentialList).getByText("OpenAI compatible")).toBeVisible();
+    expect(within(credentialList).getByText("Personal")).toBeVisible();
+    expect(within(credentialList).getByText("https://api.openai.com/v1")).toBeVisible();
+    expect(within(credentialList).getByText("****1234")).toBeVisible();
+    expect(within(credentialList).getByRole("button", { name: "Delete" })).toBeVisible();
+  });
+
+  it("closes the credential delete confirmation without deleting when canceled", async () => {
+    mockRole = "superadmin";
+    const user = userEvent.setup();
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
+
+    const credentialList = await screen.findByRole("list", { name: "Saved cloud credentials" });
+    await user.click(within(credentialList).getByRole("button", { name: "Delete" }));
+
+    expect(await screen.findByRole("dialog", { name: "Delete credential" })).toBeVisible();
+    expect(screen.getByText("Delete My key? Models using this credential may need a new credential before they can be tested or used.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Delete credential" })).not.toBeInTheDocument();
+    expect(modelApiMocks.revokeModelCredential).not.toHaveBeenCalled();
+  });
+
+  it("deletes a saved credential after confirmation", async () => {
+    mockRole = "superadmin";
+    const user = userEvent.setup();
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
+
+    const credentialList = await screen.findByRole("list", { name: "Saved cloud credentials" });
+    await user.click(within(credentialList).getByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "Delete credential" }));
+
+    expect(modelApiMocks.revokeModelCredential).toHaveBeenCalledWith("cred-1", "token");
+    expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
+    expect(screen.getAllByText("Credential deleted.")).toHaveLength(1);
+  });
+
+  it("shows an empty saved credential state above the new credential form", async () => {
+    mockRole = "superadmin";
+    modelApiMocks.listModelCredentials.mockResolvedValueOnce([]);
+
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
+
+    expect(await screen.findByRole("heading", { name: "Saved credentials" })).toBeVisible();
+    expect(screen.getByText("No credentials have been saved yet.")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Save new credential" })).toBeVisible();
+  });
+
+  it("explains when the selected provider has no saved credentials", async () => {
+    mockRole = "user";
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register" });
+
+    await screen.findByRole("heading", { name: "Register cloud model" });
+    await user.selectOptions(screen.getByLabelText("Provider"), "anthropic");
+
+    const credentialSelect = screen.getByLabelText("Credential");
+    const hintOption = within(credentialSelect).getByRole("option", {
+      name: "No credentials saved for the selected provider.",
+    });
+    expect(hintOption).toBeDisabled();
+    expect(credentialSelect).toHaveValue("");
   });
 
   it("shows platform scope controls for superadmins", async () => {
@@ -97,13 +185,15 @@ describe("CloudModelRegisterPage", () => {
     const viewNav = await screen.findByRole("navigation", { name: "Cloud model registration sections" });
     await user.click(within(viewNav).getByRole("button", { name: "Credentials" }));
     expect(within(viewNav).getByRole("button", { name: "Credentials" })).toHaveAttribute("aria-pressed", "true");
-    expect(await screen.findByRole("heading", { name: "Credentials" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Saved credentials" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Save new credential" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Register cloud model" })).not.toBeInTheDocument();
 
     await user.click(within(viewNav).getByRole("button", { name: "Recently registered" }));
     expect(within(viewNav).getByRole("button", { name: "Recently registered" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Recently registered cloud models" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Credentials" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Saved credentials" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Save new credential" })).not.toBeInTheDocument();
 
     await user.click(within(viewNav).getByRole("button", { name: "Register cloud model" }));
     expect(within(viewNav).getByRole("button", { name: "Register cloud model" })).toHaveAttribute("aria-pressed", "true");
@@ -116,7 +206,8 @@ describe("CloudModelRegisterPage", () => {
     await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=unknown" });
 
     expect(await screen.findByRole("heading", { name: "Register cloud model" })).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Credentials" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Saved credentials" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Save new credential" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recently registered cloud models" })).not.toBeInTheDocument();
   });
 
@@ -173,7 +264,7 @@ describe("CloudModelRegisterPage", () => {
     const user = userEvent.setup();
     const view = await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
 
-    await screen.findByRole("heading", { name: "Credentials" });
+    await screen.findByRole("heading", { name: "Save new credential" });
     await user.click(screen.getByRole("button", { name: "Save credential" }));
 
     expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
@@ -187,7 +278,7 @@ describe("CloudModelRegisterPage", () => {
     const user = userEvent.setup();
     const view = await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
 
-    await screen.findByRole("heading", { name: "Credentials" });
+    await screen.findByRole("heading", { name: "Save new credential" });
     await user.click(screen.getByRole("button", { name: "Save credential" }));
 
     expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();

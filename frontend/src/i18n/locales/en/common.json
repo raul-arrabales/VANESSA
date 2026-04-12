@@ -1084,6 +1084,8 @@
       "description": "Register cloud-hosted models with personal credentials and account-scoped visibility.",
       "superadminDescription": "Register cloud-hosted models with personal or platform credentials, then validate and activate them from focused detail pages.",
       "credentialsTitle": "Credentials",
+      "savedCredentialsTitle": "Saved credentials",
+      "newCredentialTitle": "Save new credential",
       "registrationTitle": "Register cloud model",
       "recentTitle": "Recently registered cloud models",
       "views": {
@@ -1092,11 +1094,23 @@
         "register": "Register cloud model",
         "recent": "Recently registered"
       },
+      "savedCredentialsListAria": "Saved cloud credentials",
+      "emptyCredentials": "No credentials have been saved yet.",
       "emptyRecent": "No cloud models have been registered yet.",
       "selectCredential": "Select credential",
+      "noCredentialsForProvider": "No credentials saved for the selected provider.",
+      "deleteCredential": "Delete",
+      "deleteCredentialDialog": {
+        "title": "Delete credential",
+        "description": "Delete {{name}}? Models using this credential may need a new credential before they can be tested or used.",
+        "cancel": "Cancel",
+        "confirm": "Delete credential"
+      },
       "loadFailed": "Unable to load cloud registration data.",
       "credentialSaved": "Credential saved.",
       "credentialSaveFailed": "Unable to save credential.",
+      "credentialDeleted": "Credential deleted.",
+      "credentialDeleteFailed": "Unable to delete credential.",
       "modelRegistered": "Model registered.",
       "modelRegisterFailed": "Unable to register cloud model."
     },

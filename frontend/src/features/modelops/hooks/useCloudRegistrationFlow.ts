@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listModelOpsModels, registerManagedModel } from "../../../api/modelops/models";
-import { createModelCredential, listModelCredentials } from "../../../api/modelops/credentials";
+import { createModelCredential, listModelCredentials, revokeModelCredential } from "../../../api/modelops/credentials";
 import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
@@ -20,6 +20,7 @@ export function useCloudRegistrationFlow(
     api_key: string;
     credential_scope?: "platform" | "personal";
   }) => Promise<void>;
+  deleteCredential: (credentialId: string) => Promise<void>;
   registerCloudModel: (payload: {
     id: string;
     name: string;
@@ -91,6 +92,26 @@ export function useCloudRegistrationFlow(
     }
   }, [refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
+  const deleteCredential = useCallback(async (credentialId: string): Promise<void> => {
+    if (!token) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await revokeModelCredential(credentialId, token);
+      showSuccessFeedback(t("modelOps.cloud.credentialDeleted"), {
+        titleKey: "modelOps.cloud.credentialsTitle",
+      });
+      await refresh();
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("modelOps.cloud.credentialDeleteFailed"), {
+        titleKey: "modelOps.cloud.credentialsTitle",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [refresh, showErrorFeedback, showSuccessFeedback, t, token]);
+
   const registerCloudModel = useCallback(async (payload: {
     id: string;
     name: string;
@@ -148,6 +169,7 @@ export function useCloudRegistrationFlow(
     isSaving,
     refresh,
     saveCredential,
+    deleteCredential,
     registerCloudModel,
   };
 }

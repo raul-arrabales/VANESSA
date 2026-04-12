@@ -1076,6 +1076,8 @@
       "description": "Registra modelos alojados en la nube con credenciales personales y visibilidad acotada a tu cuenta.",
       "superadminDescription": "Registra modelos cloud con credenciales personales o de plataforma y luego validalos o activalos desde paginas de detalle.",
       "credentialsTitle": "Credenciales",
+      "savedCredentialsTitle": "Credenciales guardadas",
+      "newCredentialTitle": "Guardar nueva credencial",
       "registrationTitle": "Registrar modelo cloud",
       "recentTitle": "Modelos cloud registrados recientemente",
       "views": {
@@ -1084,11 +1086,23 @@
         "register": "Registrar modelo cloud",
         "recent": "Registrados recientemente"
       },
+      "savedCredentialsListAria": "Credenciales cloud guardadas",
+      "emptyCredentials": "Todavia no se han guardado credenciales.",
       "emptyRecent": "Todavia no hay modelos cloud registrados.",
       "selectCredential": "Selecciona una credencial",
+      "noCredentialsForProvider": "No hay credenciales guardadas para el proveedor seleccionado.",
+      "deleteCredential": "Eliminar",
+      "deleteCredentialDialog": {
+        "title": "Eliminar credencial",
+        "description": "Eliminar {{name}}? Los modelos que usen esta credencial pueden necesitar una nueva antes de poder probarse o usarse.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar credencial"
+      },
       "loadFailed": "No se pudieron cargar los datos del registro cloud.",
       "credentialSaved": "Credencial guardada.",
       "credentialSaveFailed": "No se pudo guardar la credencial.",
+      "credentialDeleted": "Credencial eliminada.",
+      "credentialDeleteFailed": "No se pudo eliminar la credencial.",
       "modelRegistered": "Modelo registrado.",
       "modelRegisterFailed": "No se pudo registrar el modelo cloud."
     },
