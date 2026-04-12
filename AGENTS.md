@@ -284,6 +284,7 @@ This should start the current local stack, including at least:
 - Prefer functional React components and typed API boundaries.
 - Keep browser code behind frontend API client modules.
 - Do not call backend-private/internal endpoints directly from UI code.
+- In user-facing copy, avoid unsubstantial references to how the frontend is designed, such as mentioning tabs, cards, workspaces, or layout mechanics unless that detail is necessary for the user task. Prefer succinct, clear indications of what the page or section does.
 - Do not use browser-native modal windows such as `window.alert`, `window.confirm`, or `window.prompt` for product UI. Use app-styled dialogs consistent with the existing modal patterns instead.
 - Treat the shared panel left-rail decoration as a top-level page/workspace affordance only. Nested sections inside an existing panel should use the nested panel variant (for example `panel panel-nested`) or another non-railed container so the left rail is not repeated within the same page section.
 

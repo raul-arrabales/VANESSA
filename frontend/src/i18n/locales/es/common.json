@@ -990,7 +990,7 @@
     "workspace": {
       "title": "ModelOps",
       "description": "Revisa los modelos accesibles, cambia entre catalogo y flujos de registro, y gestiona el espacio de trabajo de modelos sin depender de tarjetas de entrada separadas.",
-      "superadminDescription": "Revisa el estado global de los modelos, cambia entre onboarding cloud y local, y gestiona el acceso compartido desde un unico espacio de trabajo con pestañas.",
+      "superadminDescription": "Revisa el estado global de los modelos, cambia entre onboarding cloud y local, y gestiona el acceso compartido.",
       "navigationAria": "Navegacion del espacio de trabajo de ModelOps"
     },
     "actions": {
@@ -1157,7 +1157,7 @@
     },
     "access": {
       "title": "Gestion de acceso a modelos",
-      "description": "Asigna acceso por rol sin mezclar estos controles con las paginas de registro.",
+      "description": "Asigna acceso a modelos por rol.",
       "loadFailed": "No se pudo cargar la configuracion de acceso a modelos.",
       "saveFailed": "No se pudieron guardar las asignaciones.",
       "saved": "Asignaciones de {{scope}} guardadas."

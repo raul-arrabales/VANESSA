@@ -998,7 +998,7 @@
     "workspace": {
       "title": "ModelOps",
       "description": "Review accessible models, move between catalog and registration flows, and manage the shared model workspace without jumping through separate landing cards.",
-      "superadminDescription": "Review platform-wide model health, switch between cloud and local onboarding flows, and manage shared access from one tabbed workspace.",
+      "superadminDescription": "Review platform-wide model health, switch between cloud and local onboarding flows, and manage shared access.",
       "navigationAria": "ModelOps workspace navigation"
     },
     "actions": {
@@ -1165,7 +1165,7 @@
     },
     "access": {
       "title": "Model access management",
-      "description": "Assign role-scope access to models without mixing those controls into registration pages.",
+      "description": "Assign role-scope access to models.",
       "loadFailed": "Unable to load model access settings.",
       "saveFailed": "Unable to save assignments.",
       "saved": "Saved {{scope}} assignments."
