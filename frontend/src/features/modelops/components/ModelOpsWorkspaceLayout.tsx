@@ -11,9 +11,13 @@ import {
 
 type ModelOpsWorkspaceLayoutProps = {
   children: ReactNode;
+  secondaryNavigation?: ReactNode;
 };
 
-export function ModelOpsWorkspaceLayout({ children }: ModelOpsWorkspaceLayoutProps): JSX.Element {
+export function ModelOpsWorkspaceLayout({
+  children,
+  secondaryNavigation,
+}: ModelOpsWorkspaceLayoutProps): JSX.Element {
   const { t } = useTranslation("common");
   const { user } = useAuth();
   const location = useLocation();
@@ -34,6 +38,7 @@ export function ModelOpsWorkspaceLayout({ children }: ModelOpsWorkspaceLayoutPro
       description={isSuperadmin ? t("modelOps.workspace.superadminDescription") : t("modelOps.workspace.description")}
       tabs={tabItems}
       ariaLabel={t("modelOps.workspace.navigationAria")}
+      secondaryNavigation={secondaryNavigation}
     >
       {children}
     </TabbedWorkspaceLayout>

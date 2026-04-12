@@ -1079,6 +1079,12 @@
       "credentialsTitle": "Credenciales",
       "registrationTitle": "Registrar modelo cloud",
       "recentTitle": "Modelos cloud registrados recientemente",
+      "views": {
+        "aria": "Secciones del registro de modelos cloud",
+        "credentials": "Credenciales",
+        "register": "Registrar modelo cloud",
+        "recent": "Registrados recientemente"
+      },
       "emptyRecent": "Todavia no hay modelos cloud registrados.",
       "selectCredential": "Selecciona una credencial",
       "loadFailed": "No se pudieron cargar los datos del registro cloud.",

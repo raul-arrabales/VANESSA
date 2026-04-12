@@ -63,4 +63,26 @@ describe("ModelOpsWorkspaceFrame", () => {
     expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("href", "/control/models/local/register");
     expect(screen.getByRole("link", { name: "Local artifacts" })).toHaveAttribute("aria-current", "page");
   });
+
+  it("renders secondary navigation when supplied", async () => {
+    mockRole = "user";
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route
+          path="/control/models/cloud/register"
+          element={
+            <ModelOpsWorkspaceFrame secondaryNavigation={<nav aria-label="Secondary">Subview nav</nav>}>
+              <p>workspace-child</p>
+            </ModelOpsWorkspaceFrame>
+          }
+        />
+      </Routes>,
+      { route: "/control/models/cloud/register" },
+    );
+
+    expect(screen.getByRole("navigation", { name: "Secondary" })).toBeVisible();
+    expect(screen.getByText("Subview nav")).toBeVisible();
+    expect(screen.getByText("Subview nav").closest(".tabbed-workspace-secondary-nav")).not.toBeNull();
+  });
 });

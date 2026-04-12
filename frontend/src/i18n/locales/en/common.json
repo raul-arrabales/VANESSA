@@ -1087,6 +1087,12 @@
       "credentialsTitle": "Credentials",
       "registrationTitle": "Register cloud model",
       "recentTitle": "Recently registered cloud models",
+      "views": {
+        "aria": "Cloud model registration sections",
+        "credentials": "Credentials",
+        "register": "Register cloud model",
+        "recent": "Recently registered"
+      },
       "emptyRecent": "No cloud models have been registered yet.",
       "selectCredential": "Select credential",
       "loadFailed": "Unable to load cloud registration data.",

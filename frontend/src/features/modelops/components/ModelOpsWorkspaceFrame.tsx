@@ -3,11 +3,15 @@ import { ModelOpsWorkspaceLayout } from "./ModelOpsWorkspaceLayout";
 
 type ModelOpsWorkspaceFrameProps = {
   children: ReactNode;
+  secondaryNavigation?: ReactNode;
 };
 
-export function ModelOpsWorkspaceFrame({ children }: ModelOpsWorkspaceFrameProps): JSX.Element {
+export function ModelOpsWorkspaceFrame({
+  children,
+  secondaryNavigation,
+}: ModelOpsWorkspaceFrameProps): JSX.Element {
   return (
-    <ModelOpsWorkspaceLayout>
+    <ModelOpsWorkspaceLayout secondaryNavigation={secondaryNavigation}>
       {children}
     </ModelOpsWorkspaceLayout>
   );
