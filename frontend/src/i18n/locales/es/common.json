@@ -1158,6 +1158,17 @@
     "access": {
       "title": "Gestion de acceso a modelos",
       "description": "Asigna acceso a modelos por rol.",
+      "empty": "No hay modelos disponibles.",
+      "tableAria": "Asignaciones de acceso a modelos",
+      "columns": {
+        "model": "Modelo"
+      },
+      "scopes": {
+        "user": "usuario",
+        "admin": "admin",
+        "superadmin": "superadmin"
+      },
+      "toggleLabel": "Permitir acceso de {{scope}} a {{model}}",
       "loadFailed": "No se pudo cargar la configuracion de acceso a modelos.",
       "saveFailed": "No se pudieron guardar las asignaciones.",
       "saved": "Asignaciones de {{scope}} guardadas."

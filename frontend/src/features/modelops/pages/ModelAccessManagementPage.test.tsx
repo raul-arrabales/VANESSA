@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ModelAccessManagementPage from "./ModelAccessManagementPage";
@@ -62,6 +62,29 @@ describe("ModelAccessManagementPage", () => {
     expect(await screen.findByRole("dialog", { name: "Model access management" })).toBeVisible();
     expect(screen.getAllByText("Access data is unavailable.")).toHaveLength(1);
     expect(view.container.querySelector(".error-text")).toBeNull();
+  });
+
+  it("renders models once with role scopes as checkbox columns", async () => {
+    accessApiMocks.listModelAssignments.mockResolvedValueOnce([
+      { scope: "admin", model_ids: ["model-1"] },
+    ]);
+
+    await renderWithAppProviders(<ModelAccessManagementPage />, { route: "/control/models/access" });
+
+    const table = await screen.findByRole("table", { name: "Model access assignments" });
+    expect(within(table).getByRole("columnheader", { name: "Model" })).toBeVisible();
+    expect(within(table).getByRole("columnheader", { name: "user" })).toBeVisible();
+    expect(within(table).getByRole("columnheader", { name: "admin" })).toBeVisible();
+    expect(within(table).getByRole("columnheader", { name: "superadmin" })).toBeVisible();
+
+    const modelRow = within(table).getByRole("row", { name: /Test Model/ });
+    const toggles = within(modelRow).getAllByRole("checkbox");
+    expect(toggles).toHaveLength(3);
+    expect(within(modelRow).getByText("llm")).toHaveClass("status-chip-info");
+    expect(within(modelRow).getByText("active")).toHaveClass("status-chip-success");
+    expect(within(modelRow).getByRole("checkbox", { name: "Allow user access to Test Model" })).not.toBeChecked();
+    expect(within(modelRow).getByRole("checkbox", { name: "Allow admin access to Test Model" })).toBeChecked();
+    expect(within(modelRow).getByRole("checkbox", { name: "Allow superadmin access to Test Model" })).not.toBeChecked();
   });
 
   it("shows assignment save success in the shared feedback modal with no inline success block", async () => {

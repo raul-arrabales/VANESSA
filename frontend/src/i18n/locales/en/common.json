@@ -1166,6 +1166,17 @@
     "access": {
       "title": "Model access management",
       "description": "Assign role-scope access to models.",
+      "empty": "No models available.",
+      "tableAria": "Model access assignments",
+      "columns": {
+        "model": "Model"
+      },
+      "scopes": {
+        "user": "user",
+        "admin": "admin",
+        "superadmin": "superadmin"
+      },
+      "toggleLabel": "Allow {{scope}} access to {{model}}",
       "loadFailed": "Unable to load model access settings.",
       "saveFailed": "Unable to save assignments.",
       "saved": "Saved {{scope}} assignments."

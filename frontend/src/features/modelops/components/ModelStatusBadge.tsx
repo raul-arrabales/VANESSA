@@ -1,6 +1,6 @@
 type ModelStatusBadgeProps = {
   label: string;
-  tone?: "neutral" | "success" | "warning";
+  tone?: "neutral" | "success" | "warning" | "info" | "danger";
 };
 
 export default function ModelStatusBadge({ label, tone = "neutral" }: ModelStatusBadgeProps): JSX.Element {

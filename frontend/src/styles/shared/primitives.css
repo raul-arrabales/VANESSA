@@ -255,6 +255,16 @@
   border-color: color-mix(in oklab, #f79009 34%, var(--border-muted));
 }
 
+.status-chip-info {
+  color: var(--accent-primary);
+  border-color: color-mix(in oklab, var(--accent-primary) 34%, var(--border-muted));
+}
+
+.status-chip-danger {
+  color: var(--status-error);
+  border-color: color-mix(in oklab, var(--status-error) 34%, var(--border-muted));
+}
+
 .status-chip-neutral {
   color: var(--text-secondary);
 }

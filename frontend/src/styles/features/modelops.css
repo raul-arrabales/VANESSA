@@ -81,3 +81,34 @@
   font-size: 0.82rem;
   white-space: pre-wrap;
 }
+
+.modelops-access-table {
+  min-width: 36rem;
+}
+
+.modelops-access-table th:not(:first-child),
+.modelops-access-table td:not(:first-child) {
+  text-align: center;
+}
+
+.modelops-access-table tbody th {
+  font-weight: 400;
+}
+
+.modelops-access-table tr.is-highlighted th,
+.modelops-access-table tr.is-highlighted td {
+  background: color-mix(in oklab, var(--accent-secondary) 12%, var(--bg-subtle));
+}
+
+.modelops-access-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.5rem;
+}
+
+.modelops-access-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
