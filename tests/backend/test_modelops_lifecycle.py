@@ -106,3 +106,97 @@ def test_activate_model_requires_current_successful_validation(monkeypatch: pyte
         )
 
     assert exc_info.value.code == "validation_failed"
+
+
+def test_activate_model_blocks_missing_cloud_credential(monkeypatch: pytest.MonkeyPatch, config: AuthConfig):
+    monkeypatch.setattr(
+        modelops_lifecycle,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "model-1",
+            "backend_kind": "external_api",
+            "owner_type": "user",
+            "credential_id": "cred-1",
+            "credential_is_active": False,
+            "lifecycle_state": "validated",
+            "is_validation_current": True,
+            "last_validation_status": "success",
+            "runtime_mode_policy": "online_only",
+            "owner_user_id": 1,
+        },
+    )
+
+    with pytest.raises(ModelOpsError) as exc_info:
+        modelops_lifecycle.activate_model(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=1,
+            actor_role="superadmin",
+            model_id="model-1",
+        )
+
+    assert exc_info.value.code == "credential_unavailable"
+
+
+def test_update_model_credential_requires_matching_provider_and_stales_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        modelops_lifecycle,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "gpt-private",
+            "provider": "openai_compatible",
+            "backend_kind": "external_api",
+            "owner_type": "user",
+            "owner_user_id": 7,
+            "credential_id": "old-cred",
+            "lifecycle_state": "active",
+        },
+    )
+    monkeypatch.setattr(
+        modelops_lifecycle,
+        "get_active_credential_secret",
+        lambda *args, **kwargs: {"id": "new-cred", "provider_slug": "openai_compatible"},
+    )
+
+    def _update_model_credential(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "model_id": kwargs["model_id"],
+            "name": "GPT Private",
+            "provider": "openai_compatible",
+            "backend_kind": "external_api",
+            "owner_type": "user",
+            "owner_user_id": 7,
+            "credential_id": kwargs["credential_id"],
+            "credential_is_active": True,
+            "credential_provider_slug": "openai_compatible",
+            "credential_display_name": "New key",
+            "credential_api_key_last4": "1234",
+            "lifecycle_state": "inactive",
+            "is_validation_current": False,
+            "last_validation_status": None,
+            "metadata": {},
+            "artifact": {},
+            "dependencies": [],
+        }
+
+    monkeypatch.setattr(modelops_lifecycle.modelops_repo, "update_model_credential", _update_model_credential)
+    monkeypatch.setattr(modelops_lifecycle.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
+
+    model = modelops_lifecycle.update_model_credential(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=7,
+        actor_role="user",
+        model_id="gpt-private",
+        credential_id="new-cred",
+    )
+
+    assert captured["credential_id"] == "new-cred"
+    assert model["credential"]["status"] == "active"
+    assert model["is_validation_current"] is False

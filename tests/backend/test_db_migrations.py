@@ -149,6 +149,21 @@ def test_platform_binding_resources_migration_guards_legacy_copy_when_table_abse
     assert "DROP TABLE IF EXISTS platform_binding_served_models;" in migration_sql
 
 
+def test_model_management_migration_allows_reusing_revoked_credential_names():
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "004_model_management.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    assert "DROP CONSTRAINT IF EXISTS model_provider_credentials_owner_user_id_provider_slug_disp_key" in migration_sql
+    assert "model_provider_credentials_active_owner_provider_display_name_idx" in migration_sql
+    assert "WHERE is_active = TRUE" in migration_sql
+
+
 def test_context_management_migration_tracks_backing_provider_instances():
     migration_file = (
         Path(__file__).resolve().parents[2]

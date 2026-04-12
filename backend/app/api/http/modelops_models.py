@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from flask import g, jsonify, request
 
-from ...application.modelops_models_service import parse_capability_key, parse_eligible_only, parse_limit
+from ...application.modelops_models_service import (
+    parse_capability_key,
+    parse_eligible_only,
+    parse_limit,
+    parse_update_credential_request,
+)
 from ...application.modelops_testing_service import parse_model_test_request, parse_test_limit, parse_validation_request
 from ...authz import require_role
 from ...services.modelops_common import ModelOpsError
@@ -26,6 +31,7 @@ def register_modelops_models_routes(
     activate_model_fn,
     deactivate_model_fn,
     unregister_model_fn,
+    update_model_credential_fn,
     delete_model_fn,
 ):
     @bp.get("/v1/modelops/models")
@@ -226,6 +232,22 @@ def register_modelops_models_routes(
                 actor_user_id=int(g.current_user["id"]),
                 actor_role=str(g.current_user.get("role", "user")),
                 model_id=model_id,
+            )
+        except ModelOpsError as exc:
+            return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)
+        return jsonify({"model": model}), 200
+
+    @bp.patch("/v1/modelops/models/<model_id>/credential")
+    @require_role("user")
+    def update_modelops_model_credential_route(model_id: str):
+        try:
+            model = update_model_credential_fn(
+                config_getter().database_url,
+                config=config_getter(),
+                actor_user_id=int(g.current_user["id"]),
+                actor_role=str(g.current_user.get("role", "user")),
+                model_id=model_id,
+                credential_id=parse_update_credential_request(request.get_json(silent=True)),
             )
         except ModelOpsError as exc:
             return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)

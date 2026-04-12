@@ -14,9 +14,15 @@ CREATE TABLE IF NOT EXISTS model_provider_credentials (
     created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     revoked_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (owner_user_id, provider_slug, display_name)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE model_provider_credentials
+    DROP CONSTRAINT IF EXISTS model_provider_credentials_owner_user_id_provider_slug_disp_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS model_provider_credentials_active_owner_provider_display_name_idx
+    ON model_provider_credentials (owner_user_id, provider_slug, display_name)
+    WHERE is_active = TRUE;
 
 CREATE INDEX IF NOT EXISTS model_provider_credentials_owner_idx
     ON model_provider_credentials (owner_user_id, provider_slug, is_active);

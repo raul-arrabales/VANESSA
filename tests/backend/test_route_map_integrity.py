@@ -35,6 +35,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/modelops/models/<model_id>/activate",
         "/v1/modelops/models/<model_id>/deactivate",
         "/v1/modelops/models/<model_id>/unregister",
+        "/v1/modelops/models/<model_id>/credential",
         "/v1/modelops/credentials",
         "/v1/modelops/credentials/<credential_id>",
         "/v1/modelops/catalog",

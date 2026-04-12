@@ -143,6 +143,19 @@ export type ModelCredential = {
   revoked_at?: string | null;
 };
 
+export type ManagedModelCredentialStatus = "active" | "revoked" | "missing" | "not_required";
+
+export type ManagedModelCredentialSummary = {
+  id?: string | null;
+  status: ManagedModelCredentialStatus;
+  provider?: string | null;
+  display_name?: string | null;
+  credential_scope?: "platform" | "personal" | null;
+  api_base_url?: string | null;
+  api_key_last4?: string | null;
+  revoked_at?: string | null;
+};
+
 export type ModelArtifactSummary = {
   storage_path?: string | null;
   artifact_status?: string | null;
@@ -176,6 +189,7 @@ export type ManagedModel = {
   artifact?: ModelArtifactSummary;
   usage_summary?: ModelUsageSummary;
   validation_history?: ModelValidationRecord[];
+  credential?: ManagedModelCredentialSummary;
   comment?: string | null;
   metadata?: Record<string, unknown>;
 };

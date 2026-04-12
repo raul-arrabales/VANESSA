@@ -9,8 +9,10 @@ import {
   getManagedModelValidations,
   registerExistingManagedModel,
   unregisterManagedModel,
+  updateManagedModelCredential,
 } from "../../../api/modelops/models";
-import type { ManagedModel, ModelUsageSummary, ModelValidationRecord } from "../../../api/modelops/types";
+import { listModelCredentials } from "../../../api/modelops/credentials";
+import type { ManagedModel, ModelCredential, ModelUsageSummary, ModelValidationRecord } from "../../../api/modelops/types";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 export function useManagedModelDetail(
@@ -18,6 +20,7 @@ export function useManagedModelDetail(
   token: string,
 ): {
   model: ManagedModel | null;
+  credentials: ModelCredential[];
   usage: ModelUsageSummary | null;
   validations: ModelValidationRecord[];
   isLoading: boolean;
@@ -27,9 +30,11 @@ export function useManagedModelDetail(
   activate: () => Promise<void>;
   deactivate: () => Promise<void>;
   unregister: () => Promise<void>;
+  replaceCredential: (credentialId: string) => Promise<void>;
   remove: () => Promise<void>;
 } {
   const [model, setModel] = useState<ManagedModel | null>(null);
+  const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [usage, setUsage] = useState<ModelUsageSummary | null>(null);
   const [validations, setValidations] = useState<ModelValidationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +58,11 @@ export function useManagedModelDetail(
       setModel(modelPayload);
       setUsage(usagePayload.usage ?? modelPayload.usage_summary ?? null);
       setValidations(validationPayload.validations);
+      if (modelPayload.backend === "external_api") {
+        setCredentials(await listModelCredentials(token));
+      } else {
+        setCredentials([]);
+      }
     } catch (requestError) {
       showErrorFeedback(requestError, t("modelOps.detail.loadFailed"), {
         titleKey: "modelOps.detail.title",
@@ -88,6 +98,7 @@ export function useManagedModelDetail(
 
   return {
     model,
+    credentials,
     usage,
     validations,
     isLoading,
@@ -116,6 +127,15 @@ export function useManagedModelDetail(
         return;
       }
       await runMutation(() => unregisterManagedModel(modelId, token), "modelOps.detail.unregistered");
+    },
+    replaceCredential: async (credentialId: string) => {
+      if (!token || !modelId || !credentialId) {
+        return;
+      }
+      await runMutation(
+        () => updateManagedModelCredential(modelId, credentialId, token),
+        "modelOps.detail.credentialUpdated",
+      );
     },
     remove: async () => {
       if (!token || !modelId) {

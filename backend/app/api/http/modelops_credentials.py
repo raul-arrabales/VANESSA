@@ -65,7 +65,7 @@ def register_modelops_credentials_routes(
     @require_role("user")
     def delete_modelops_credential_route(credential_id: str):
         try:
-            revoked = revoke_credential_fn(
+            revoke_result = revoke_credential_fn(
                 config_getter().database_url,
                 credential_id=credential_id,
                 owner_user_id=int(g.current_user["id"]),
@@ -73,8 +73,18 @@ def register_modelops_credentials_routes(
         except ModelOpsError as exc:
             return json_error_fn(exc.status_code, exc.code, exc.message, details=exc.details or None)
 
-        if revoked is None:
+        if revoke_result is None:
             return json_error_fn(404, "credential_not_found", "Credential not found")
+        if isinstance(revoke_result, dict) and isinstance(revoke_result.get("credential"), dict):
+            revoked = revoke_result["credential"]
+            affected_models = [
+                str(item.get("model_id"))
+                for item in (revoke_result.get("affected_models") or [])
+                if isinstance(item, dict) and item.get("model_id")
+            ]
+        else:
+            revoked = revoke_result
+            affected_models = []
 
         append_audit_event_fn(
             config_getter().database_url,
@@ -82,6 +92,10 @@ def register_modelops_credentials_routes(
             event_type="credential.revoked",
             target_type="credential",
             target_id=credential_id,
-            payload={},
+            payload={"affected_model_count": len(affected_models)},
         )
-        return jsonify({"credential": serialize_credential_fn(revoked)}), 200
+        return jsonify({
+            "credential": serialize_credential_fn(revoked),
+            "affected_models": affected_models,
+            "affected_model_count": len(affected_models),
+        }), 200

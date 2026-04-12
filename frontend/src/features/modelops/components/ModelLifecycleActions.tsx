@@ -27,7 +27,9 @@ export default function ModelLifecycleActions({
   const canActivateAction = permissions.canActivate && model.lifecycle_state !== "active";
   const isCurrentlyValidated =
     model.is_validation_current === true && model.last_validation_status === "success";
-  const activateDisabled = isPending || !isCurrentlyValidated;
+  const credentialStatus = model.credential?.status ?? (model.backend === "external_api" ? "missing" : "not_required");
+  const isCredentialReady = credentialStatus === "active" || credentialStatus === "not_required";
+  const activateDisabled = isPending || !isCurrentlyValidated || !isCredentialReady;
 
   return (
     <>
@@ -60,6 +62,9 @@ export default function ModelLifecycleActions({
       </div>
       {canActivateAction && !isCurrentlyValidated && (
         <p className="status-text">{t("modelOps.detail.activationRequiresValidation")}</p>
+      )}
+      {canActivateAction && isCurrentlyValidated && !isCredentialReady && (
+        <p className="status-text">{t("modelOps.detail.credentialReplacementRequired")}</p>
       )}
     </>
   );

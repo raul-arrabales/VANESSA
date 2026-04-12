@@ -23,7 +23,7 @@ def can_manage_model(row: dict[str, Any], *, actor_user_id: int, actor_role: str
             return
         raise ModelOpsError("forbidden", "Admins cannot perform this model lifecycle action", status_code=403)
     if normalized_role == "user":
-        if is_owned_by_actor and action in {"read", "activate", "deactivate", "delete", "unregister"}:
+        if is_owned_by_actor and action in {"read", "activate", "deactivate", "delete", "unregister", "update"}:
             return
         if is_owned_by_actor and action == "create":
             return

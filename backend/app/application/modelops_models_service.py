@@ -10,6 +10,7 @@ from ..services.modelops_lifecycle import (
     delete_model as _delete_model,
     register_existing_model as _register_existing_model,
     unregister_model as _unregister_model,
+    update_model_credential as _update_model_credential,
 )
 from ..services.modelops_queries import (
     get_model_detail as _get_model_detail,
@@ -32,6 +33,14 @@ def parse_capability_key(value: Any) -> str | None:
 
 def parse_eligible_only(value: Any) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes"}
+
+
+def parse_update_credential_request(payload: Any) -> str:
+    body = require_json_object(payload)
+    credential_id = str(body.get("credential_id", "")).strip()
+    if not credential_id:
+        raise ModelOpsError("missing_config", "credential_id is required", status_code=400)
+    return credential_id
 
 
 def parse_limit(value: Any, *, default: int, minimum: int, maximum: int, error_code: str = "invalid_limit") -> int:
@@ -196,6 +205,25 @@ def unregister_model(
         actor_user_id=actor_user_id,
         actor_role=actor_role,
         model_id=model_id,
+    )
+
+
+def update_model_credential(
+    database_url: str,
+    *,
+    config,
+    actor_user_id: int,
+    actor_role: str,
+    model_id: str,
+    credential_id: str,
+):
+    return _update_model_credential(
+        database_url,
+        config=config,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+        model_id=model_id,
+        credential_id=credential_id,
     )
 
 

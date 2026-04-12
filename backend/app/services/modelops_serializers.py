@@ -39,6 +39,19 @@ def serialize_model(row: dict[str, Any]) -> dict[str, Any]:
     artifact = row.get("artifact") if isinstance(row.get("artifact"), dict) else {}
     dependencies = row.get("dependencies") if isinstance(row.get("dependencies"), list) else []
     usage = serialize_model_usage_summary(row.get("usage_summary"))
+    credential_id = row.get("credential_id")
+    backend_kind = str(row.get("backend_kind") or row.get("backend") or "").strip().lower()
+    owner_type = str(row.get("owner_type") or "").strip().lower()
+    if backend_kind != "external_api" or (owner_type == "platform" and not credential_id):
+        credential_status = "not_required"
+    elif not credential_id:
+        credential_status = "missing"
+    elif row.get("credential_is_active") is True:
+        credential_status = "active"
+    elif row.get("credential_revoked_at") is not None or row.get("credential_is_active") is False:
+        credential_status = "revoked"
+    else:
+        credential_status = "missing"
     return {
         "id": row.get("model_id"),
         "global_model_id": row.get("global_model_id"),
@@ -71,6 +84,16 @@ def serialize_model(row: dict[str, Any]) -> dict[str, Any]:
         "metadata": metadata,
         "artifact": artifact,
         "dependencies": dependencies,
+        "credential": {
+            "id": str(credential_id) if credential_id else None,
+            "status": credential_status,
+            "provider": row.get("credential_provider_slug"),
+            "display_name": row.get("credential_display_name"),
+            "credential_scope": row.get("credential_scope"),
+            "api_base_url": row.get("credential_api_base_url"),
+            "api_key_last4": row.get("credential_api_key_last4"),
+            "revoked_at": row.get("credential_revoked_at"),
+        },
         "usage_summary": usage,
     }
 

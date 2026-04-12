@@ -144,6 +144,19 @@ export async function unregisterManagedModel(modelId: string, token: string): Pr
   return result.model;
 }
 
+export async function updateManagedModelCredential(
+  modelId: string,
+  credentialId: string,
+  token: string,
+): Promise<ManagedModel> {
+  const result = await requestJson<{ model: ManagedModel }>(`/v1/modelops/models/${encodeURIComponent(modelId)}/credential`, {
+    method: "PATCH",
+    token,
+    body: { credential_id: credentialId },
+  });
+  return result.model;
+}
+
 export async function deleteManagedModel(modelId: string, token: string): Promise<void> {
   await requestJson<{ deleted: boolean }>(`/v1/modelops/models/${encodeURIComponent(modelId)}`, {
     method: "DELETE",

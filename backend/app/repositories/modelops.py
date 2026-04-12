@@ -93,6 +93,14 @@ def compute_config_fingerprint(row: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def cloud_credential_is_ready(row: dict[str, Any]) -> bool:
+    if str(row.get("backend_kind") or row.get("backend") or "").strip().lower() != "external_api":
+        return True
+    if str(row.get("owner_type") or "").strip().lower() == OWNER_PLATFORM and not row.get("credential_id"):
+        return True
+    return bool(row.get("credential_id")) and bool(row.get("credential_is_active"))
+
+
 def upsert_model_record(
     database_url: str,
     *,
@@ -361,6 +369,14 @@ def get_model(database_url: str, model_id: str) -> dict[str, Any] | None:
             """
             SELECT
                 m.*,
+                c.owner_user_id AS credential_owner_user_id,
+                c.credential_scope AS credential_scope,
+                c.provider_slug AS credential_provider_slug,
+                c.display_name AS credential_display_name,
+                c.api_base_url AS credential_api_base_url,
+                c.api_key_last4 AS credential_api_key_last4,
+                c.is_active AS credential_is_active,
+                c.revoked_at AS credential_revoked_at,
                 (
                     SELECT jsonb_build_object(
                         'storage_path', ma.storage_path,
@@ -389,6 +405,7 @@ def get_model(database_url: str, model_id: str) -> dict[str, Any] | None:
                     WHERE d.model_id = m.model_id
                 ) AS dependencies
             FROM model_registry m
+            LEFT JOIN model_provider_credentials c ON c.id = m.credential_id
             WHERE m.model_id = %s
             """,
             (model_id.strip(),),
@@ -406,6 +423,18 @@ def _eligible_clause(*, require_active: bool, capability_key: str | None) -> str
                 "m.lifecycle_state = 'active'",
                 "m.is_validation_current = TRUE",
                 "m.last_validation_status = 'success'",
+                """(
+                    m.backend_kind <> 'external_api'
+                    OR (m.owner_type = 'platform' AND m.credential_id IS NULL)
+                    OR (
+                        m.credential_id IS NOT NULL
+                        AND EXISTS (
+                            SELECT 1
+                            FROM model_provider_credentials c
+                            WHERE c.id = m.credential_id AND c.is_active = TRUE
+                        )
+                    )
+                )""",
             ]
         )
     if capability_key == "embeddings":
@@ -438,6 +467,14 @@ def list_models_for_actor(
     base_projection = """
         SELECT DISTINCT
             m.*,
+            c.owner_user_id AS credential_owner_user_id,
+            c.credential_scope AS credential_scope,
+            c.provider_slug AS credential_provider_slug,
+            c.display_name AS credential_display_name,
+            c.api_base_url AS credential_api_base_url,
+            c.api_key_last4 AS credential_api_key_last4,
+            c.is_active AS credential_is_active,
+            c.revoked_at AS credential_revoked_at,
             COALESCE(
                 (
                     SELECT jsonb_build_object(
@@ -472,6 +509,7 @@ def list_models_for_actor(
                 '[]'::jsonb
             ) AS dependencies
         FROM model_registry m
+        LEFT JOIN model_provider_credentials c ON c.id = m.credential_id
     """
 
     if normalized_role == "superadmin":
@@ -530,6 +568,62 @@ def list_models_for_actor(
     with get_connection(database_url) as connection:
         rows = connection.execute(query, params).fetchall()
     return [dict(row) for row in rows]
+
+
+def mark_models_for_revoked_credential(database_url: str, *, credential_id: str) -> list[dict[str, Any]]:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            UPDATE model_registry
+            SET
+                is_validation_current = FALSE,
+                last_validation_status = NULL,
+                last_validation_config_fingerprint = NULL,
+                last_validation_error = %s::jsonb,
+                lifecycle_state = CASE WHEN lifecycle_state = 'active' THEN 'inactive' ELSE lifecycle_state END,
+                is_enabled = CASE WHEN lifecycle_state = 'active' THEN FALSE ELSE is_enabled END,
+                updated_at = NOW()
+            WHERE credential_id = %s::uuid
+              AND backend_kind = 'external_api'
+              AND lifecycle_state <> 'deleted'
+            RETURNING model_id, name, lifecycle_state, is_validation_current, last_validation_status
+            """,
+            (Jsonb({"reason": "credential_revoked"}), credential_id.strip()),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_model_credential(database_url: str, *, model_id: str, credential_id: str) -> dict[str, Any] | None:
+    current = get_model(database_url, model_id)
+    if current is None:
+        return None
+    fingerprint = compute_config_fingerprint({**current, "credential_id": credential_id})
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE model_registry
+            SET
+                credential_id = %s::uuid,
+                current_config_fingerprint = %s,
+                is_validation_current = FALSE,
+                last_validation_status = NULL,
+                last_validated_at = NULL,
+                last_validation_error = %s::jsonb,
+                last_validation_config_fingerprint = NULL,
+                lifecycle_state = CASE WHEN lifecycle_state = 'active' THEN 'inactive' ELSE lifecycle_state END,
+                is_enabled = CASE WHEN lifecycle_state = 'active' THEN FALSE ELSE is_enabled END,
+                updated_at = NOW()
+            WHERE model_id = %s
+            RETURNING *
+            """,
+            (
+                credential_id.strip(),
+                fingerprint,
+                Jsonb({"reason": "credential_changed"}),
+                model_id.strip(),
+            ),
+        ).fetchone()
+    return get_model(database_url, model_id) if row else None
 
 
 def list_model_picker_rows_for_actor(

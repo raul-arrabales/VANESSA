@@ -155,6 +155,7 @@ def activate_model(
         model_id=model_id,
     )
     can_manage_model(row, actor_user_id=actor_user_id, actor_role=actor_role, action="activate")
+    _ensure_cloud_credential_ready(row)
     if not bool(row.get("is_validation_current")) or str(row.get("last_validation_status", "")).strip().lower() != modelops_repo.VALIDATION_SUCCESS:
         raise ModelOpsError("validation_failed", "Model must be successfully validated before activation", status_code=409)
     if resolve_runtime_profile(database_url) == "offline" and str(row.get("runtime_mode_policy", "")).strip().lower() == "online_only":
@@ -169,6 +170,79 @@ def activate_model(
         payload={},
     )
     return serialize_model(updated or row)
+
+
+def _ensure_cloud_credential_ready(row: dict[str, Any]) -> None:
+    if modelops_repo.cloud_credential_is_ready(row):
+        return
+    raise ModelOpsError(
+        "credential_unavailable",
+        "Cloud model credential is missing or revoked",
+        status_code=409,
+    )
+
+
+def update_model_credential(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    actor_user_id: int,
+    actor_role: str,
+    model_id: str,
+    credential_id: str,
+) -> dict[str, Any]:
+    row = get_accessible_model(
+        database_url,
+        config=config,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
+        model_id=model_id,
+    )
+    can_manage_model(row, actor_user_id=actor_user_id, actor_role=actor_role, action="update")
+    if str(row.get("backend_kind", "")).strip().lower() != "external_api":
+        raise ModelOpsError("credential_not_required", "Only cloud models can be assigned credentials", status_code=409)
+
+    normalized_credential_id = str(credential_id or "").strip()
+    if not normalized_credential_id:
+        raise ModelOpsError("missing_config", "credential_id is required", status_code=400)
+    try:
+        secret = get_active_credential_secret(
+            database_url,
+            credential_id=normalized_credential_id,
+            requester_user_id=actor_user_id,
+            requester_role=actor_role,
+            encryption_key=config.model_credentials_encryption_key,
+        )
+    except ValueError as exc:
+        raise ModelOpsError("invalid_credential_id", "credential_id must be a UUID", status_code=400) from exc
+    if secret is None:
+        raise ModelOpsError("missing_config", "Active credential not found", status_code=400)
+    credential_provider = str(secret.get("provider_slug") or "").strip().lower()
+    model_provider = str(row.get("provider") or "").strip().lower()
+    if credential_provider != model_provider:
+        raise ModelOpsError(
+            "credential_provider_mismatch",
+            "Credential provider does not match the model provider",
+            status_code=400,
+            details={"credential_provider": credential_provider, "model_provider": model_provider},
+        )
+
+    updated = modelops_repo.update_model_credential(
+        database_url,
+        model_id=model_id,
+        credential_id=normalized_credential_id,
+    )
+    if updated is None:
+        raise ModelOpsError("not_found", "Model not found", status_code=404)
+    modelops_repo.append_audit_event(
+        database_url,
+        actor_user_id=actor_user_id,
+        event_type="model.credential_updated",
+        target_type="model",
+        target_id=model_id,
+        payload={"credential_id": normalized_credential_id},
+    )
+    return serialize_model(updated)
 
 
 def deactivate_model(

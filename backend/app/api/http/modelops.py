@@ -36,6 +36,7 @@ from ...application.modelops_models_service import (
     list_models as _list_models,
     register_existing_model as _register_existing_model,
     unregister_model as _unregister_model,
+    update_model_credential as _update_model_credential,
 )
 from ...application.modelops_testing_service import (
     get_model_test_runtimes as _get_model_test_runtimes,
@@ -73,6 +74,7 @@ run_model_test = _run_model_test
 activate_model = _activate_model
 deactivate_model = _deactivate_model
 unregister_model = _unregister_model
+update_model_credential = _update_model_credential
 delete_model = _delete_model
 create_credential = _create_credential
 list_credentials_for_user = _list_credentials_for_user
@@ -105,6 +107,7 @@ register_modelops_models_routes(
     activate_model_fn=lambda *args, **kwargs: activate_model(*args, **kwargs),
     deactivate_model_fn=lambda *args, **kwargs: deactivate_model(*args, **kwargs),
     unregister_model_fn=lambda *args, **kwargs: unregister_model(*args, **kwargs),
+    update_model_credential_fn=lambda *args, **kwargs: update_model_credential(*args, **kwargs),
     delete_model_fn=lambda *args, **kwargs: delete_model(*args, **kwargs),
 )
 
@@ -167,6 +170,7 @@ __all__ = [
     "activate_model",
     "deactivate_model",
     "unregister_model",
+    "update_model_credential",
     "delete_model",
     "create_credential",
     "list_credentials_for_user",

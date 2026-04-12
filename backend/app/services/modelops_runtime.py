@@ -33,6 +33,13 @@ def ensure_model_invokable(
         raise ModelOpsError("invalid_state_transition", "Model is not active", status_code=409)
     if not row["is_validation_current"] or row["last_validation_status"] != "success":
         raise ModelOpsError("validation_failed", "Model validation is not current", status_code=409)
+    credential = row.get("credential") if isinstance(row.get("credential"), dict) else {}
+    credential_status = str(credential.get("status") or "").strip().lower()
+    if (
+        str(row.get("backend") or row.get("backend_kind") or "").strip().lower() == "external_api"
+        and credential_status not in {"active", "not_required"}
+    ):
+        raise ModelOpsError("credential_unavailable", "Cloud model credential is missing or revoked", status_code=409)
     runtime_profile = resolve_runtime_profile(database_url)
     if runtime_profile != "online" and row["runtime_mode_policy"] == "online_only":
         raise ModelOpsError("offline_not_allowed", "Model is not available in offline mode", status_code=409)

@@ -1,3 +1,4 @@
+import { type FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -5,7 +6,7 @@ import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
-import { canAccessModelTesting, getModelLifecyclePermissions } from "../domain";
+import { CLOUD_PROVIDER_OPTIONS, canAccessModelTesting, getModelLifecyclePermissions } from "../domain";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -14,6 +15,7 @@ export default function ModelDetailPage(): JSX.Element {
   const detail = useManagedModelDetail(modelId, token);
   const permissions = getModelLifecyclePermissions(user, detail.model);
   const canTest = canAccessModelTesting(user);
+  const [replacementCredentialId, setReplacementCredentialId] = useState("");
 
   if (detail.isLoading) {
     return <p className="status-text">{t("modelOps.states.loading")}</p>;
@@ -29,6 +31,21 @@ export default function ModelDetailPage(): JSX.Element {
   }
 
   const model = detail.model;
+  const credentialStatus = model.credential?.status ?? (model.backend === "external_api" ? "missing" : "not_required");
+  const canReplaceCredential =
+    model.backend === "external_api"
+    && credentialStatus !== "not_required"
+    && (user?.role === "superadmin" || (user?.role === "user" && model.owner_type === "user" && model.owner_user_id === user.id));
+  const matchingCredentials = detail.credentials.filter(
+    (credential) => credential.provider === model.provider && credential.id !== model.credential?.id,
+  );
+  const providerOption = CLOUD_PROVIDER_OPTIONS.find((option) => option.value === model.provider);
+  const providerLabel = providerOption ? t(providerOption.labelKey) : model.provider;
+
+  function handleCredentialSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    void detail.replaceCredential(replacementCredentialId);
+  }
 
   return (
     <section className="card-stack">
@@ -68,6 +85,58 @@ export default function ModelDetailPage(): JSX.Element {
           onDelete={detail.remove}
         />
       </article>
+
+      {model.backend === "external_api" && credentialStatus !== "not_required" ? (
+        <article className="panel card-stack">
+          <h2 className="section-title">{t("modelOps.detail.credentialTitle")}</h2>
+          <p className="status-text">
+            {`${t("modelOps.detail.credentialStatusLabel")}: ${t(`modelOps.detail.credentialStatuses.${credentialStatus}`)}`}
+          </p>
+          <p className="status-text">
+            {model.credential?.display_name && model.credential.api_key_last4
+              ? t("modelOps.detail.currentCredential", {
+                  name: model.credential.display_name,
+                  suffix: model.credential.api_key_last4,
+                })
+              : t("modelOps.detail.noCurrentCredential")}
+          </p>
+          {credentialStatus === "revoked" || credentialStatus === "missing" ? (
+            <p className="status-text">{t("modelOps.detail.credentialReplacementRequired")}</p>
+          ) : null}
+          {canReplaceCredential ? (
+            <form className="form-grid" onSubmit={handleCredentialSubmit}>
+              <label className="field-label" htmlFor="replacement-credential-id">
+                {t("modelOps.detail.replacementCredentialLabel", { provider: providerLabel })}
+              </label>
+              <select
+                id="replacement-credential-id"
+                className="input"
+                value={replacementCredentialId}
+                onChange={(event) => setReplacementCredentialId(event.currentTarget.value)}
+                disabled={detail.isMutating || matchingCredentials.length === 0}
+              >
+                <option value="">
+                  {matchingCredentials.length === 0
+                    ? t("modelOps.detail.noReplacementCredentials")
+                    : t("modelOps.cloud.selectCredential")}
+                </option>
+                {matchingCredentials.map((credential) => (
+                  <option key={credential.id} value={credential.id}>
+                    {`${credential.display_name} · ****${credential.api_key_last4}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={detail.isMutating || !replacementCredentialId}
+              >
+                {t("modelOps.detail.replaceCredential")}
+              </button>
+            </form>
+          ) : null}
+        </article>
+      ) : null}
 
       <article className="panel card-stack">
         <h2 className="section-title">{t("modelOps.detail.metadataTitle")}</h2>

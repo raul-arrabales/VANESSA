@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..repositories import context_management as context_repo
-from ..repositories.modelops import get_model as get_model_by_id
+from ..repositories.modelops import cloud_credential_is_ready, get_model as get_model_by_id
 from ..repositories import platform_control_plane as platform_repo
 from .context_management import build_knowledge_base_binding_resource
 from .platform_adapters import (
@@ -669,6 +669,13 @@ def _validate_model_binding_resource(
                 "provider_resource_id_required",
                 "Cloud providers require provider_model_id on the selected model",
                 status_code=400,
+                details={"resource_id": resource.get("id"), "managed_model_id": managed_model_id},
+            )
+        if not cloud_credential_is_ready(model_row):
+            raise PlatformControlPlaneError(
+                "resource_credential_unavailable",
+                "Cloud model credential is missing or revoked",
+                status_code=409,
                 details={"resource_id": resource.get("id"), "managed_model_id": managed_model_id},
             )
         provider_resource_id = str(model_row.get("provider_model_id", "")).strip()

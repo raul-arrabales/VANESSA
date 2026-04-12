@@ -46,18 +46,31 @@ def create_credential(database_url: str, **kwargs):
     try:
         return _create_credential(database_url, **kwargs)
     except ValueError as exc:
+        if str(exc) == "duplicate_credential":
+            raise ModelOpsError(
+                "duplicate_credential",
+                "A credential with this name already exists for the selected provider",
+                status_code=409,
+            ) from exc
         raise ModelOpsError(str(exc), "Invalid credential payload", status_code=400) from exc
 
 
 def revoke_credential(database_url: str, *, credential_id: str, owner_user_id: int):
     try:
-        return _revoke_credential(
+        revoked = _revoke_credential(
             database_url,
             credential_id=credential_id,
             owner_user_id=owner_user_id,
         )
     except ValueError as exc:
         raise ModelOpsError("invalid_credential_id", "credential_id must be a UUID", status_code=400) from exc
+    if revoked is None:
+        return None
+    affected_models = modelops_repo.mark_models_for_revoked_credential(database_url, credential_id=credential_id)
+    return {
+        "credential": revoked,
+        "affected_models": affected_models,
+    }
 
 
 def append_audit_event(database_url: str, **kwargs) -> None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from psycopg import errors
+
 from ..db import get_connection
 
 _ALLOWED_SCOPES = {"platform", "personal"}
@@ -64,34 +66,37 @@ def create_credential(
         raise ValueError("invalid_api_key")
 
     with get_connection(database_url) as connection:
-        row = connection.execute(
-            """
-            INSERT INTO model_provider_credentials (
-                owner_user_id, credential_scope, provider_slug, display_name,
-                api_base_url, api_key_encrypted, api_key_last4, created_by_user_id
-            )
-            VALUES (
-                %s, %s, %s, %s, %s,
-                pgp_sym_encrypt(%s, %s),
-                %s,
-                %s
-            )
-            RETURNING id, owner_user_id, credential_scope, provider_slug, display_name,
-                      api_base_url, api_key_last4, is_active, created_by_user_id,
-                      revoked_at, created_at, updated_at
-            """,
-            (
-                owner_user_id,
-                scope,
-                provider,
-                display_name.strip(),
-                api_base_url.strip() if api_base_url else None,
-                key_value,
-                encryption_key,
-                key_value[-4:],
-                created_by_user_id,
-            ),
-        ).fetchone()
+        try:
+            row = connection.execute(
+                """
+                INSERT INTO model_provider_credentials (
+                    owner_user_id, credential_scope, provider_slug, display_name,
+                    api_base_url, api_key_encrypted, api_key_last4, created_by_user_id
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    pgp_sym_encrypt(%s, %s),
+                    %s,
+                    %s
+                )
+                RETURNING id, owner_user_id, credential_scope, provider_slug, display_name,
+                          api_base_url, api_key_last4, is_active, created_by_user_id,
+                          revoked_at, created_at, updated_at
+                """,
+                (
+                    owner_user_id,
+                    scope,
+                    provider,
+                    display_name.strip(),
+                    api_base_url.strip() if api_base_url else None,
+                    key_value,
+                    encryption_key,
+                    key_value[-4:],
+                    created_by_user_id,
+                ),
+            ).fetchone()
+        except errors.UniqueViolation as exc:
+            raise ValueError("duplicate_credential") from exc
     if row is None:
         raise RuntimeError("failed_to_create_credential")
     return dict(row)
@@ -168,5 +173,20 @@ def get_active_credential_secret_by_id(
             WHERE id = %s AND is_active = TRUE
             """,
             (encryption_key, str(parsed)),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def get_credential_metadata_by_id(database_url: str, *, credential_id: str) -> dict[str, Any] | None:
+    parsed = UUID(credential_id)
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            SELECT id, owner_user_id, credential_scope, provider_slug, display_name, api_base_url,
+                   api_key_last4, is_active, created_by_user_id, revoked_at, created_at, updated_at
+            FROM model_provider_credentials
+            WHERE id = %s
+            """,
+            (str(parsed),),
         ).fetchone()
     return dict(row) if row else None

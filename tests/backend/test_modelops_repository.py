@@ -54,6 +54,7 @@ def test_list_models_for_superadmin_applies_active_and_capability_filters(monkey
     assert "m.lifecycle_state = 'active'" in captured["query"]
     assert "m.is_validation_current = TRUE" in captured["query"]
     assert "m.last_validation_status = 'success'" in captured["query"]
+    assert "c.id = m.credential_id AND c.is_active = TRUE" in captured["query"]
     assert "m.task_key = 'embeddings'" in captured["query"]
     assert "user_role_cte" not in captured["query"]
     assert captured["params"] == ("online",)
