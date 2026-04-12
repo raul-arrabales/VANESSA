@@ -15,9 +15,11 @@ def test_normalize_discovery_request_maps_embedding_task_key() -> None:
         task=None,
         sort="downloads",
         limit="5",
+        offset="10",
     )
     assert request["task"] == "feature-extraction"
     assert request["limit"] == 5
+    assert request["offset"] == 10
 
 
 def test_normalize_download_request_requires_source_id() -> None:

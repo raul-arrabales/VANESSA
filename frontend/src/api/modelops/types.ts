@@ -64,6 +64,14 @@ export type HfDiscoveredModel = {
   provider: string;
 };
 
+export type HfModelFileDetails = {
+  path: string;
+  size?: number | null;
+  file_type?: string | null;
+  blob_id?: string | null;
+  lfs?: Record<string, unknown> | null;
+};
+
 export type HfModelDetails = {
   source_id: string;
   name: string;
@@ -71,7 +79,21 @@ export type HfModelDetails = {
   downloads?: number | null;
   likes?: number | null;
   tags: string[];
-  files: Array<{ path: string; size?: number | null }>;
+  author?: string | null;
+  pipeline_tag?: string | null;
+  library_name?: string | null;
+  gated?: string | boolean | null;
+  private?: boolean | null;
+  disabled?: boolean | null;
+  created_at?: string | null;
+  last_modified?: string | null;
+  used_storage?: number | null;
+  card_data?: Record<string, unknown> | null;
+  config?: Record<string, unknown> | null;
+  safetensors?: Record<string, unknown> | null;
+  model_index?: unknown | null;
+  transformers_info?: Record<string, unknown> | null;
+  files: HfModelFileDetails[];
 };
 
 export type ModelDownloadJob = {

@@ -23,3 +23,61 @@
   gap: var(--space-3);
   flex-wrap: wrap;
 }
+
+.modelops-discovery-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.modelops-discovery-actions {
+  flex: 0 0 auto;
+}
+
+.modelops-discovery-result-number {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.modelops-hf-detail-modal {
+  width: min(62rem, 100%);
+  max-height: min(82vh, 52rem);
+  overflow: auto;
+}
+
+.modelops-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.modelops-detail-grid div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.modelops-detail-grid dt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.modelops-detail-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.modelops-json-block {
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 72%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}

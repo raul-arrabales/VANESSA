@@ -38,15 +38,55 @@ vi.mock("../../../auth/AuthProvider", () => ({
   }),
 }));
 
+function buildDiscoveredModel(index: number) {
+  return {
+    source_id: `org/model-${index}`,
+    name: `Model ${index}`,
+    downloads: 100 - index,
+    likes: index,
+    tags: ["llm"],
+    provider: "huggingface",
+  };
+}
+
 describe("LocalModelRegisterPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
     localApiMocks.discoverHfModels.mockResolvedValue([]);
     localApiMocks.getHfModelDetails.mockResolvedValue({
       source_id: "meta-llama/Llama-3-8B-Instruct",
       name: "Llama 3 8B Instruct",
-      files: [],
-      tags: ["llm"],
+      sha: "abc123",
+      downloads: 42,
+      likes: 5,
+      author: "meta-llama",
+      pipeline_tag: "text-generation",
+      library_name: "transformers",
+      gated: "manual",
+      private: false,
+      disabled: false,
+      last_modified: "2026-01-03T03:04:00+00:00",
+      used_storage: 2048,
+      files: [
+        {
+          path: "model.safetensors",
+          size: 1024,
+          file_type: "safetensors",
+          blob_id: "blob-1",
+          lfs: { oid: "sha256:abc", size: 1024 },
+        },
+        { path: "config.json", size: 256, file_type: "json" },
+      ],
+      tags: ["llm", "safetensors"],
+      card_data: { license: "apache-2.0" },
+      config: { model_type: "llama" },
+      safetensors: { total: 1 },
+      model_index: [{ name: "llama" }],
+      transformers_info: { auto_model: "AutoModelForCausalLM" },
     });
     localApiMocks.listDownloadJobs.mockResolvedValue([]);
     localApiMocks.startModelDownload.mockResolvedValue({
@@ -114,6 +154,107 @@ describe("LocalModelRegisterPage", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Hugging Face discovery" })).not.toBeInTheDocument();
     });
+  });
+
+  it("scrolls to the top of the discovery results after a successful search", async () => {
+    localApiMocks.discoverHfModels.mockResolvedValueOnce([
+      {
+        source_id: "meta-llama/Llama-3-8B-Instruct",
+        name: "Llama 3 8B Instruct",
+        downloads: 42,
+        likes: 5,
+        tags: ["llm"],
+        provider: "huggingface",
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register?view=discovery" });
+
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+
+    expect(await screen.findByText("meta-llama/Llama-3-8B-Instruct")).toBeVisible();
+    await waitFor(() => {
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  });
+
+  it("loads an additional Hugging Face results batch and appends it to the list", async () => {
+    localApiMocks.discoverHfModels
+      .mockResolvedValueOnce(Array.from({ length: 12 }, (_item, index) => buildDiscoveredModel(index)))
+      .mockResolvedValueOnce([
+        buildDiscoveredModel(12),
+        buildDiscoveredModel(13),
+      ]);
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register?view=discovery" });
+
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+
+    expect(await screen.findByText("org/model-0")).toBeVisible();
+    vi.mocked(HTMLElement.prototype.scrollIntoView).mockClear();
+    await user.click(await screen.findByRole("button", { name: "Load more matches" }));
+
+    expect(await screen.findByText("org/model-13")).toBeVisible();
+    expect(screen.getByText("org/model-0")).toBeVisible();
+    expect(screen.getByText("13.")).toBeVisible();
+    expect(screen.getByText("14.")).toBeVisible();
+    await waitFor(() => {
+      expect(vi.mocked(HTMLElement.prototype.scrollIntoView).mock.contexts).toContainEqual(
+        expect.objectContaining({
+          dataset: expect.objectContaining({
+            discoveryResultIndex: "12",
+          }),
+        }),
+      );
+    });
+    expect(localApiMocks.discoverHfModels).toHaveBeenNthCalledWith(
+      2,
+      "token",
+      expect.objectContaining({
+        limit: 12,
+        offset: 12,
+      }),
+    );
+    expect(screen.queryByRole("button", { name: "Load more matches" })).not.toBeInTheDocument();
+  });
+
+  it("resets result numbering when a new Hugging Face search replaces the list", async () => {
+    localApiMocks.discoverHfModels
+      .mockResolvedValueOnce(Array.from({ length: 12 }, (_item, index) => buildDiscoveredModel(index)))
+      .mockResolvedValueOnce([
+        buildDiscoveredModel(12),
+        buildDiscoveredModel(13),
+      ])
+      .mockResolvedValueOnce([
+        {
+          ...buildDiscoveredModel(99),
+          source_id: "org/fresh-model",
+          name: "Fresh Model",
+        },
+      ]);
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register?view=discovery" });
+
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+    await user.click(await screen.findByRole("button", { name: "Load more matches" }));
+
+    expect(await screen.findByText("14.")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+
+    expect(await screen.findByText("org/fresh-model")).toBeVisible();
+    expect(screen.getByText("1.")).toBeVisible();
+    expect(screen.queryByText("14.")).not.toBeInTheDocument();
+    expect(screen.queryByText("org/model-13")).not.toBeInTheDocument();
   });
 
   it("shows manual registration failures in the shared modal instead of inline text", async () => {
@@ -248,7 +389,40 @@ describe("LocalModelRegisterPage", () => {
 
     expect(await screen.findByRole("dialog", { name: "Hugging Face discovery" })).toBeVisible();
     expect(screen.getByText("Repository details are unavailable right now.")).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "meta-llama/Llama-3-8B-Instruct" })).not.toBeInTheDocument();
     expect(view.container.querySelector(".error-text")).toBeNull();
+  });
+
+  it("opens inspected Hugging Face model details in an app modal", async () => {
+    localApiMocks.discoverHfModels.mockResolvedValueOnce([
+      {
+        source_id: "meta-llama/Llama-3-8B-Instruct",
+        name: "Llama 3 8B Instruct",
+        downloads: 42,
+        likes: 5,
+        tags: ["llm", "safetensors"],
+        provider: "huggingface",
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register?view=discovery" });
+
+    await screen.findByRole("heading", { name: "Hugging Face discovery" });
+    await user.click(screen.getByRole("button", { name: "Search Hugging Face" }));
+    await user.click(await screen.findByRole("button", { name: "Inspect" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "meta-llama/Llama-3-8B-Instruct" });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByText("Llama 3 8B Instruct")).toBeVisible();
+    expect(within(dialog).getByText("meta-llama")).toBeVisible();
+    expect(within(dialog).getByText("text-generation")).toBeVisible();
+    expect(within(dialog).getByText("transformers")).toBeVisible();
+    expect(within(dialog).getByText("safetensors: 1")).toBeVisible();
+    expect(within(dialog).getByText("json: 1")).toBeVisible();
+    expect(within(dialog).getByText("model.safetensors")).toBeVisible();
+    expect(within(dialog).getByText("Blob: blob-1")).toBeVisible();
+    expect(within(dialog).getByText(/apache-2.0/)).toBeVisible();
   });
 
   it("keeps non-error discovery feedback inline when no models are found", async () => {

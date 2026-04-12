@@ -27,7 +27,7 @@ export async function createModelCatalogItem(
 
 export async function discoverHfModels(
   token: string,
-  options: { query?: string; task?: string; task_key?: string; sort?: string; limit?: number } = {},
+  options: { query?: string; task?: string; task_key?: string; sort?: string; limit?: number; offset?: number } = {},
 ): Promise<HfDiscoveredModel[]> {
   const params = new URLSearchParams();
   if (options.query) params.set("query", options.query);
@@ -35,6 +35,7 @@ export async function discoverHfModels(
   if (options.task_key) params.set("task_key", options.task_key);
   if (options.sort) params.set("sort", options.sort);
   if (options.limit) params.set("limit", String(options.limit));
+  if (options.offset) params.set("offset", String(options.offset));
   const query = params.toString();
   const result = await requestJson<{ models: HfDiscoveredModel[] }>(`/v1/modelops/discovery/huggingface${query ? `?${query}` : ""}`, { token });
   return result.models;

@@ -106,6 +106,7 @@ def register_modelops_local_routes(
                 task=request.args.get("task"),
                 sort=request.args.get("sort"),
                 limit=request.args.get("limit"),
+                offset=request.args.get("offset"),
             )
             models = discover_hf_models_fn(
                 database_url=config_getter().database_url,
@@ -113,6 +114,7 @@ def register_modelops_local_routes(
                 task=str(discovery_request["task"]),
                 sort=str(discovery_request["sort"]),
                 limit=int(discovery_request["limit"]),
+                offset=int(discovery_request["offset"]),
                 token=config_getter().hf_token,
             )
         except ConnectivityPolicyError as exc:

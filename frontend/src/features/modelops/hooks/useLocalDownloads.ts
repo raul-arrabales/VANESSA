@@ -6,13 +6,14 @@ import {
   listDownloadJobs,
   startModelDownload,
 } from "../../../api/modelops/local";
-import type { HfDiscoveredModel, ModelDownloadJob } from "../../../api/modelops/types";
+import type { HfDiscoveredModel, HfModelDetails, ModelDownloadJob } from "../../../api/modelops/types";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 
 const ACTIVE_JOB_STATUSES = new Set(["queued", "running"]);
 const BASE_POLL_INTERVAL_MS = 3000;
 const BACKOFF_POLL_INTERVAL_MS = 5000;
 const POLL_BACKOFF_AFTER_MS = 120_000;
+const HF_DISCOVERY_BATCH_SIZE = 12;
 
 function mergeActiveJobs(currentJobs: ModelDownloadJob[], activeJobs: ModelDownloadJob[]): ModelDownloadJob[] {
   const activeById = new Map(activeJobs.map((job) => [job.job_id, job]));
@@ -30,19 +31,28 @@ function mergeActiveJobs(currentJobs: ModelDownloadJob[], activeJobs: ModelDownl
 
 export function useLocalDownloads(token: string): {
   discoveredModels: HfDiscoveredModel[];
-  selectedModelInfo: string;
   downloadJobs: ModelDownloadJob[];
   hasActiveJobs: boolean;
+  completedSearchId: number;
+  completedLoadMoreId: number;
+  latestLoadedBatchStartIndex: number | null;
+  canLoadMoreModels: boolean;
+  isLoadingMoreModels: boolean;
   feedback: string;
   search: (params: { query: string; task_key: string }) => Promise<void>;
-  inspect: (sourceId: string) => Promise<void>;
+  loadMore: (params: { query: string; task_key: string }) => Promise<void>;
+  inspect: (sourceId: string) => Promise<HfModelDetails | null>;
   download: (model: HfDiscoveredModel, taskKey: string, category?: "predictive" | "generative") => Promise<void>;
   refreshJobs: () => Promise<void>;
 } {
   const [discoveredModels, setDiscoveredModels] = useState<HfDiscoveredModel[]>([]);
-  const [selectedModelInfo, setSelectedModelInfo] = useState("");
   const [downloadJobs, setDownloadJobs] = useState<ModelDownloadJob[]>([]);
   const [feedback, setFeedback] = useState("");
+  const [completedSearchId, setCompletedSearchId] = useState(0);
+  const [completedLoadMoreId, setCompletedLoadMoreId] = useState(0);
+  const [latestLoadedBatchStartIndex, setLatestLoadedBatchStartIndex] = useState<number | null>(null);
+  const [canLoadMoreModels, setCanLoadMoreModels] = useState(false);
+  const [isLoadingMoreModels, setIsLoadingMoreModels] = useState(false);
   const { t } = useTranslation("common");
   const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const jobsRef = useRef<ModelDownloadJob[]>([]);
@@ -142,10 +152,15 @@ export function useLocalDownloads(token: string): {
         task_key: params.task_key,
         task: params.task_key === "embeddings" ? "feature-extraction" : "text-generation",
         sort: "downloads",
-        limit: 12,
+        limit: HF_DISCOVERY_BATCH_SIZE,
       });
       setDiscoveredModels(models);
-      setSelectedModelInfo("");
+      setCanLoadMoreModels(models.length === HF_DISCOVERY_BATCH_SIZE);
+      setIsLoadingMoreModels(false);
+      setLatestLoadedBatchStartIndex(null);
+      if (models.length > 0) {
+        setCompletedSearchId((current) => current + 1);
+      }
       if (models.length === 0) {
         setFeedback(t("models.discovery.empty"));
       }
@@ -156,17 +171,48 @@ export function useLocalDownloads(token: string): {
     }
   }, [showErrorFeedback, t, token]);
 
-  const inspect = useCallback(async (sourceId: string): Promise<void> => {
-    if (!token) {
+  const loadMore = useCallback(async (params: { query: string; task_key: string }): Promise<void> => {
+    if (!token || isLoadingMoreModels) {
       return;
     }
+    setFeedback("");
+    setIsLoadingMoreModels(true);
+    const offset = discoveredModels.length;
     try {
-      const details = await getHfModelDetails(sourceId, token);
-      setSelectedModelInfo(`${details.source_id} • ${details.files.length} files`);
+      const models = await discoverHfModels(token, {
+        query: params.query,
+        task_key: params.task_key,
+        task: params.task_key === "embeddings" ? "feature-extraction" : "text-generation",
+        sort: "downloads",
+        limit: HF_DISCOVERY_BATCH_SIZE,
+        offset,
+      });
+      setDiscoveredModels((current) => [...current, ...models]);
+      setCanLoadMoreModels(models.length === HF_DISCOVERY_BATCH_SIZE);
+      if (models.length > 0) {
+        setLatestLoadedBatchStartIndex(offset);
+        setCompletedLoadMoreId((current) => current + 1);
+      }
+    } catch (requestError) {
+      showErrorFeedback(requestError, t("models.feedback.discoveryFailed"), {
+        titleKey: "modelOps.local.discoveryTitle",
+      });
+    } finally {
+      setIsLoadingMoreModels(false);
+    }
+  }, [discoveredModels.length, isLoadingMoreModels, showErrorFeedback, t, token]);
+
+  const inspect = useCallback(async (sourceId: string): Promise<HfModelDetails | null> => {
+    if (!token) {
+      return null;
+    }
+    try {
+      return await getHfModelDetails(sourceId, token);
     } catch (requestError) {
       showErrorFeedback(requestError, t("modelOps.local.inspectFailure"), {
         titleKey: "modelOps.local.discoveryTitle",
       });
+      return null;
     }
   }, [showErrorFeedback, t, token]);
 
@@ -202,11 +248,16 @@ export function useLocalDownloads(token: string): {
 
   return {
     discoveredModels,
-    selectedModelInfo,
     downloadJobs,
     hasActiveJobs,
+    completedSearchId,
+    completedLoadMoreId,
+    latestLoadedBatchStartIndex,
+    canLoadMoreModels,
+    isLoadingMoreModels,
     feedback,
     search,
+    loadMore,
     inspect,
     download,
     refreshJobs,

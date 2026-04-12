@@ -4,10 +4,11 @@ import { useTranslation } from "react-i18next";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { listLocalModelArtifacts } from "../../../api/modelops/local";
 import { registerExistingManagedModel } from "../../../api/modelops/models";
-import type { LocalModelArtifact } from "../../../api/modelops/types";
+import type { HfModelDetails, LocalModelArtifact } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { TASK_OPTIONS } from "../domain";
+import HfModelDetailModal from "../components/HfModelDetailModal";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import LocalDownloadsPanel from "../components/LocalDownloadsPanel";
 import LocalArtifactList from "../components/LocalArtifactList";
@@ -41,7 +42,21 @@ export default function LocalModelRegisterPage(): JSX.Element {
     isActive: activeView === view,
     onSelect: () => handleChangeView(view),
   }));
-  const { discoveredModels, selectedModelInfo, downloadJobs, hasActiveJobs, feedback, search, inspect, download } =
+  const {
+    discoveredModels,
+    completedSearchId,
+    completedLoadMoreId,
+    latestLoadedBatchStartIndex,
+    canLoadMoreModels,
+    isLoadingMoreModels,
+    downloadJobs,
+    hasActiveJobs,
+    feedback,
+    search,
+    loadMore,
+    inspect,
+    download,
+  } =
     useLocalDownloads(token);
   const {
     lastRegisteredModelId,
@@ -63,6 +78,7 @@ export default function LocalModelRegisterPage(): JSX.Element {
   const [artifactsError, setArtifactsError] = useState("");
   const [artifactsFeedback, setArtifactsFeedback] = useState("");
   const [registeringArtifactId, setRegisteringArtifactId] = useState("");
+  const [inspectedHfModel, setInspectedHfModel] = useState<HfModelDetails | null>(null);
 
   useEffect(() => {
     if (!token || activeView !== "artifacts") {
@@ -95,11 +111,21 @@ export default function LocalModelRegisterPage(): JSX.Element {
             query={discoverQuery}
             feedback={feedback}
             discoveredModels={discoveredModels}
-            selectedModelInfo={selectedModelInfo}
+            completedSearchId={completedSearchId}
+            completedLoadMoreId={completedLoadMoreId}
+            latestLoadedBatchStartIndex={latestLoadedBatchStartIndex}
+            canLoadMoreModels={canLoadMoreModels}
+            isLoadingMoreModels={isLoadingMoreModels}
             onTaskKeyChange={setDiscoveryTaskKey}
             onQueryChange={setDiscoverQuery}
             onSearch={() => search({ query: discoverQuery, task_key: discoveryTaskKey })}
-            onInspect={inspect}
+            onLoadMore={() => loadMore({ query: discoverQuery, task_key: discoveryTaskKey })}
+            onInspect={async (sourceId) => {
+              const details = await inspect(sourceId);
+              if (details) {
+                setInspectedHfModel(details);
+              }
+            }}
             onDownload={(model) => download(
               model,
               discoveryTaskKey,
@@ -214,6 +240,12 @@ export default function LocalModelRegisterPage(): JSX.Element {
           </>
         ) : null}
       </section>
+      {inspectedHfModel ? (
+        <HfModelDetailModal
+          model={inspectedHfModel}
+          onClose={() => setInspectedHfModel(null)}
+        />
+      ) : null}
     </ModelOpsWorkspaceFrame>
   );
 }

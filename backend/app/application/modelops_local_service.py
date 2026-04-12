@@ -19,6 +19,8 @@ from ..services.modelops_common import ModelOpsError
 
 DISCOVERY_LIMIT_MIN = 1
 DISCOVERY_LIMIT_MAX = 50
+DISCOVERY_OFFSET_MIN = 0
+DISCOVERY_OFFSET_MAX = 500
 HF_TASK_BY_TASK_KEY = {
     "llm": "text-generation",
     "embeddings": "feature-extraction",
@@ -47,13 +49,14 @@ def assert_internet_allowed(database_url: str, operation: str) -> None:
     _assert_internet_allowed(database_url, operation)
 
 
-def discover_hf_models(*, database_url: str, query: str, task: str, sort: str, limit: int, token: str | None = None):
+def discover_hf_models(*, database_url: str, query: str, task: str, sort: str, limit: int, offset: int = 0, token: str | None = None):
     return _discover_hf_models(
         database_url=database_url,
         query=query,
         task=task,
         sort=sort,
         limit=limit,
+        offset=offset,
         token=token,
     )
 
@@ -104,7 +107,15 @@ def parse_discovery_limit(value: Any) -> int:
         raise ModelOpsError("invalid_limit", "limit must be an integer", status_code=400) from exc
 
 
-def normalize_discovery_request(*, query: Any, task_key: Any, task: Any, sort: Any, limit: Any) -> dict[str, object]:
+def parse_discovery_offset(value: Any) -> int:
+    raw_value = str(value if value is not None else 0).strip() or "0"
+    try:
+        return max(DISCOVERY_OFFSET_MIN, min(DISCOVERY_OFFSET_MAX, int(raw_value)))
+    except ValueError as exc:
+        raise ModelOpsError("invalid_offset", "offset must be an integer", status_code=400) from exc
+
+
+def normalize_discovery_request(*, query: Any, task_key: Any, task: Any, sort: Any, limit: Any, offset: Any = None) -> dict[str, object]:
     normalized_task_key = str(task_key or "").strip().lower() or modelops_repo.TASK_LLM
     normalized_task = str(task or "").strip() or HF_TASK_BY_TASK_KEY.get(normalized_task_key, "text-generation")
     return {
@@ -113,6 +124,7 @@ def normalize_discovery_request(*, query: Any, task_key: Any, task: Any, sort: A
         "task": normalized_task,
         "sort": str(sort or "downloads").strip() or "downloads",
         "limit": parse_discovery_limit(limit),
+        "offset": parse_discovery_offset(offset),
     }
 
 
