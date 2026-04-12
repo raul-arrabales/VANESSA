@@ -3,8 +3,7 @@ export type ModelOpsWorkspaceSection =
   | "catalog"
   | "cloud"
   | "access"
-  | "local-register"
-  | "local-artifacts";
+  | "local-register";
 
 type ModelOpsWorkspaceNavItem = {
   section: ModelOpsWorkspaceSection;
@@ -30,22 +29,16 @@ export const MODEL_OPS_WORKSPACE_NAV_ITEMS: ModelOpsWorkspaceNavItem[] = [
     labelKey: "nav.modelsCloudRegister",
   },
   {
-    section: "access",
-    path: "/control/models/access",
-    labelKey: "nav.modelsAccess",
-    minimumRole: "admin",
-  },
-  {
     section: "local-register",
     path: "/control/models/local/register",
     labelKey: "nav.modelsLocalRegister",
     minimumRole: "superadmin",
   },
   {
-    section: "local-artifacts",
-    path: "/control/models/local/artifacts",
-    labelKey: "nav.modelsLocalArtifacts",
-    minimumRole: "superadmin",
+    section: "access",
+    path: "/control/models/access",
+    labelKey: "nav.modelsAccess",
+    minimumRole: "admin",
   },
 ];
 

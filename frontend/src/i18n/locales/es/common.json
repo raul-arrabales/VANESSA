@@ -39,7 +39,6 @@
     "modelsCatalog": "Catalogo de modelos",
     "modelsCloudRegister": "Registrar modelo cloud",
     "modelsLocalRegister": "Registrar modelo local",
-    "modelsLocalArtifacts": "Artefactos locales",
     "modelsAccess": "Acceso a modelos",
     "modelTest": "Prueba del modelo",
     "modelDetail": "Detalle del modelo",
@@ -1100,10 +1099,18 @@
       "discoveryPlaceholder": "ej. llama instruct",
       "discoveryResultsAria": "Resultados del descubrimiento local",
       "downloadJobsAria": "Trabajos de descarga",
+      "activeDownloadsTitle": "Descargas activas",
       "inspectFailure": "No se pudieron cargar los detalles del modelo.",
       "pollingActive": "Consultando descargas activas.",
       "noActiveJobs": "No hay descargas activas.",
       "manualTitle": "Registro manual local",
+      "views": {
+        "aria": "Secciones del registro de modelos locales",
+        "discovery": "Descubrimiento en Hugging Face",
+        "downloads": "Descargas activas",
+        "manual": "Registro manual",
+        "artifacts": "Artefactos locales"
+      },
       "manualSuccess": "Modelo local registrado.",
       "manualFailure": "No se pudo registrar el modelo local.",
       "noArtifacts": "Todavia no hay artefactos locales disponibles."

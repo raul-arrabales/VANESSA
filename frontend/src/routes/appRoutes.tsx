@@ -34,7 +34,6 @@ const ModelOpsHomePage = lazy(() => import("../features/modelops/pages/ModelOpsH
 const ModelCatalogPage = lazy(() => import("../features/modelops/pages/ModelCatalogPage"));
 const CloudModelRegisterPage = lazy(() => import("../features/modelops/pages/CloudModelRegisterPage"));
 const LocalModelRegisterPage = lazy(() => import("../features/modelops/pages/LocalModelRegisterPage"));
-const LocalArtifactsPage = lazy(() => import("../features/modelops/pages/LocalArtifactsPage"));
 const ModelAccessManagementPage = lazy(() => import("../features/modelops/pages/ModelAccessManagementPage"));
 const ModelTestPage = lazy(() => import("../features/modelops/pages/ModelTestPage"));
 const ModelDetailPage = lazy(() => import("../features/modelops/pages/ModelDetailPage"));
@@ -434,17 +433,6 @@ export const appRoutes: AppRouteDefinition[] = [
     requiresAuth: true,
     minimumRole: "superadmin",
     element: <LocalModelRegisterPage />,
-  },
-  {
-    id: "control-models-local-artifacts",
-    path: "/control/models/local/artifacts",
-    titleKey: "nav.modelsLocalArtifacts",
-    section: "control",
-    showInNav: false,
-    showInBreadcrumbs: true,
-    requiresAuth: true,
-    minimumRole: "superadmin",
-    element: <LocalArtifactsPage />,
   },
   {
     id: "control-models-access",

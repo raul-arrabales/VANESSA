@@ -44,7 +44,6 @@
     "modelsCatalog": "Model catalog",
     "modelsCloudRegister": "Register cloud model",
     "modelsLocalRegister": "Register local model",
-    "modelsLocalArtifacts": "Local artifacts",
     "modelsAccess": "Model access",
     "modelTest": "Model test",
     "modelDetail": "Model detail",
@@ -1108,10 +1107,18 @@
       "discoveryPlaceholder": "e.g. llama instruct",
       "discoveryResultsAria": "Local discovery results",
       "downloadJobsAria": "Download jobs",
+      "activeDownloadsTitle": "Active downloads",
       "inspectFailure": "Unable to load model details.",
       "pollingActive": "Polling active downloads.",
       "noActiveJobs": "No active downloads.",
       "manualTitle": "Manual local registration",
+      "views": {
+        "aria": "Local model registration sections",
+        "discovery": "Hugging Face discovery",
+        "downloads": "Active downloads",
+        "manual": "Manual registration",
+        "artifacts": "Local artifacts"
+      },
       "manualSuccess": "Local model registered.",
       "manualFailure": "Unable to register local model.",
       "noArtifacts": "No local artifacts are available yet."

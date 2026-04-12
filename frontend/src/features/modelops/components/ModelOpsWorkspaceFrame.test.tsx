@@ -48,7 +48,7 @@ describe("ModelOpsWorkspaceFrame", () => {
     await renderWithAppProviders(
       <Routes>
         <Route
-          path="/control/models/local/artifacts"
+          path="/control/models/local/register"
           element={
             <ModelOpsWorkspaceFrame>
               <p>workspace-child</p>
@@ -56,12 +56,12 @@ describe("ModelOpsWorkspaceFrame", () => {
           }
         />
       </Routes>,
-      { route: "/control/models/local/artifacts" },
+      { route: "/control/models/local/register" },
     );
 
     expect(screen.getByRole("link", { name: "Model access" })).toHaveAttribute("href", "/control/models/access");
-    expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("href", "/control/models/local/register");
-    expect(screen.getByRole("link", { name: "Local artifacts" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Local artifacts" })).not.toBeInTheDocument();
   });
 
   it("renders secondary navigation when supplied", async () => {
