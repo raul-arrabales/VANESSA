@@ -56,6 +56,55 @@ def _file_type(path: str | None) -> str:
     return filename.rsplit(".", maxsplit=1)[-1] or "unknown"
 
 
+def _map_model_file(sibling: Any) -> dict[str, Any]:
+    path = getattr(sibling, "rfilename", None)
+    file_details = {
+        "path": path,
+        "size": getattr(sibling, "size", None),
+        "file_type": _file_type(path),
+    }
+    _add_optional(file_details, "blob_id", getattr(sibling, "blob_id", None))
+    _add_optional(file_details, "lfs", getattr(sibling, "lfs", None))
+    return file_details
+
+
+def _optional_model_detail_fields(info: Any) -> dict[str, Any]:
+    return {
+        "author": getattr(info, "author", None),
+        "pipeline_tag": getattr(info, "pipeline_tag", None),
+        "library_name": getattr(info, "library_name", None),
+        "gated": getattr(info, "gated", None),
+        "private": getattr(info, "private", None),
+        "disabled": getattr(info, "disabled", None),
+        "created_at": _first_attr(info, "created_at", "createdAt"),
+        "last_modified": _first_attr(info, "last_modified", "lastModified"),
+        "used_storage": _first_attr(info, "used_storage", "usedStorage"),
+        "card_data": _first_attr(info, "card_data", "cardData"),
+        "config": getattr(info, "config", None),
+        "safetensors": getattr(info, "safetensors", None),
+        "model_index": _first_attr(info, "model_index", "modelIndex"),
+        "transformers_info": _first_attr(info, "transformers_info", "transformersInfo"),
+    }
+
+
+def _map_model_details(info: Any) -> dict[str, Any]:
+    result = {
+        "source_id": info.id,
+        "name": info.id.split("/")[-1] if info.id else "",
+        "sha": getattr(info, "sha", None),
+        "downloads": getattr(info, "downloads", None),
+        "likes": getattr(info, "likes", None),
+        "tags": getattr(info, "tags", []) or [],
+        "files": [
+            _map_model_file(sibling)
+            for sibling in (getattr(info, "siblings", None) or [])
+        ],
+    }
+    for key, value in _optional_model_detail_fields(info).items():
+        _add_optional(result, key, value)
+    return result
+
+
 def discover_hf_models(
     *,
     database_url: str,
@@ -99,47 +148,4 @@ def get_hf_model_details(source_id: str, *, database_url: str, token: str | None
 
     api = HfApi(token=token or None)
     info = api.model_info(repo_id=source_id, files_metadata=True)
-    result = {
-        "source_id": info.id,
-        "name": info.id.split("/")[-1] if info.id else "",
-        "sha": getattr(info, "sha", None),
-        "downloads": getattr(info, "downloads", None),
-        "likes": getattr(info, "likes", None),
-        "tags": getattr(info, "tags", []) or [],
-        "files": [
-            {
-                "path": getattr(sibling, "rfilename", None),
-                "size": getattr(sibling, "size", None),
-                "file_type": _file_type(getattr(sibling, "rfilename", None)),
-                **(
-                    {"blob_id": getattr(sibling, "blob_id")}
-                    if getattr(sibling, "blob_id", None) is not None
-                    else {}
-                ),
-                **(
-                    {"lfs": _json_safe(getattr(sibling, "lfs"))}
-                    if getattr(sibling, "lfs", None) is not None
-                    else {}
-                ),
-            }
-            for sibling in (getattr(info, "siblings", None) or [])
-        ],
-    }
-    for key, value in {
-        "author": getattr(info, "author", None),
-        "pipeline_tag": getattr(info, "pipeline_tag", None),
-        "library_name": getattr(info, "library_name", None),
-        "gated": getattr(info, "gated", None),
-        "private": getattr(info, "private", None),
-        "disabled": getattr(info, "disabled", None),
-        "created_at": _first_attr(info, "created_at", "createdAt"),
-        "last_modified": _first_attr(info, "last_modified", "lastModified"),
-        "used_storage": _first_attr(info, "used_storage", "usedStorage"),
-        "card_data": _first_attr(info, "card_data", "cardData"),
-        "config": getattr(info, "config", None),
-        "safetensors": getattr(info, "safetensors", None),
-        "model_index": _first_attr(info, "model_index", "modelIndex"),
-        "transformers_info": _first_attr(info, "transformers_info", "transformersInfo"),
-    }.items():
-        _add_optional(result, key, value)
-    return result
+    return _map_model_details(info)

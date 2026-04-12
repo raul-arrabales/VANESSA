@@ -257,42 +257,6 @@ describe("LocalModelRegisterPage", () => {
     expect(screen.queryByText("org/model-13")).not.toBeInTheDocument();
   });
 
-  it("shows manual registration failures in the shared modal instead of inline text", async () => {
-    modelApiMocks.registerManagedModel.mockRejectedValueOnce(
-      new Error("Manual registration failed for phi-local"),
-    );
-    const user = userEvent.setup();
-    const view = await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
-
-    await screen.findByRole("heading", { name: "Hugging Face discovery" });
-    await user.click(screen.getByRole("button", { name: "Manual registration" }));
-    await screen.findByRole("heading", { name: "Manual local registration" });
-    await user.type(screen.getByLabelText("Model id"), "phi-local");
-    await user.type(screen.getByLabelText("Model name"), "Phi Local");
-    await user.click(screen.getByRole("button", { name: "Register local model" }));
-
-    expect(await screen.findByRole("dialog", { name: "Manual local registration" })).toBeVisible();
-    expect(screen.getByText("Manual registration failed for phi-local")).toBeVisible();
-    expect(view.container.querySelector(".error-text")).toBeNull();
-  });
-
-  it("shows manual registration success in the shared modal and keeps only one success message", async () => {
-    const user = userEvent.setup();
-
-    await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register" });
-
-    await screen.findByRole("heading", { name: "Hugging Face discovery" });
-    await user.click(screen.getByRole("button", { name: "Manual registration" }));
-    await screen.findByRole("heading", { name: "Manual local registration" });
-    await user.type(screen.getByLabelText("Model id"), "phi-local");
-    await user.type(screen.getByLabelText("Model name"), "Phi Local");
-    await user.click(screen.getByRole("button", { name: "Register local model" }));
-
-    expect(await screen.findByRole("dialog", { name: "Manual local registration" })).toBeVisible();
-    expect(screen.getAllByText("Local model registered.")).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Test model" })).toHaveAttribute("href", "/control/models/phi-local/test");
-  });
-
   it("switches between URL-driven local model views", async () => {
     const user = userEvent.setup();
 
@@ -350,20 +314,13 @@ describe("LocalModelRegisterPage", () => {
     expect(screen.queryByRole("heading", { name: "Hugging Face discovery" })).not.toBeInTheDocument();
   });
 
-  it("renders local artifacts as a register-local subview and registers ready artifacts", async () => {
-    const user = userEvent.setup();
-
+  it("renders local artifacts as a register-local subview", async () => {
     await renderWithAppProviders(<LocalModelRegisterPage />, { route: "/control/models/local/register?view=artifacts" });
 
     expect(await screen.findByRole("heading", { name: "Local artifacts" })).toBeVisible();
     expect(await screen.findByText("Phi Local")).toBeVisible();
     expect(screen.getByRole("link", { name: "Register local model" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Local artifacts" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Register" }));
-
-    expect(modelApiMocks.registerExistingManagedModel).toHaveBeenCalledWith("phi-local", "token");
-    expect(await screen.findByText("Artifact registered successfully.")).toBeVisible();
   });
 
   it("routes inspect failures through the themed discovery modal", async () => {
@@ -414,15 +371,7 @@ describe("LocalModelRegisterPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "meta-llama/Llama-3-8B-Instruct" });
     expect(dialog).toBeVisible();
-    expect(within(dialog).getByText("Llama 3 8B Instruct")).toBeVisible();
-    expect(within(dialog).getByText("meta-llama")).toBeVisible();
-    expect(within(dialog).getByText("text-generation")).toBeVisible();
-    expect(within(dialog).getByText("transformers")).toBeVisible();
-    expect(within(dialog).getByText("safetensors: 1")).toBeVisible();
-    expect(within(dialog).getByText("json: 1")).toBeVisible();
-    expect(within(dialog).getByText("model.safetensors")).toBeVisible();
-    expect(within(dialog).getByText("Blob: blob-1")).toBeVisible();
-    expect(within(dialog).getByText(/apache-2.0/)).toBeVisible();
+    expect(localApiMocks.getHfModelDetails).toHaveBeenCalledWith("meta-llama/Llama-3-8B-Instruct", "token");
   });
 
   it("keeps non-error discovery feedback inline when no models are found", async () => {

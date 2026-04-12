@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
-import { listLocalModelArtifacts } from "../../../api/modelops/local";
-import { registerExistingManagedModel } from "../../../api/modelops/models";
-import type { HfModelDetails, LocalModelArtifact } from "../../../api/modelops/types";
+import type { HfModelDetails } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { TASK_OPTIONS } from "../domain";
 import HfModelDetailModal from "../components/HfModelDetailModal";
+import LocalArtifactsPanel from "../components/LocalArtifactsPanel";
 import LocalDiscoveryPanel from "../components/LocalDiscoveryPanel";
 import LocalDownloadsPanel from "../components/LocalDownloadsPanel";
-import LocalArtifactList from "../components/LocalArtifactList";
-import { useLocalDownloads } from "../hooks/useLocalDownloads";
-import { useLocalModelRegistration } from "../hooks/useLocalModelRegistration";
+import LocalManualRegistrationPanel from "../components/LocalManualRegistrationPanel";
+import { useHfDiscovery } from "../hooks/useHfDiscovery";
+import { useLocalDownloadJobs } from "../hooks/useLocalDownloadJobs";
 
 type LocalModelRegisterView = "discovery" | "downloads" | "manual" | "artifacts";
 
@@ -49,50 +48,21 @@ export default function LocalModelRegisterPage(): JSX.Element {
     latestLoadedBatchStartIndex,
     canLoadMoreModels,
     isLoadingMoreModels,
-    downloadJobs,
-    hasActiveJobs,
     feedback,
     search,
     loadMore,
     inspect,
-    download,
   } =
-    useLocalDownloads(token);
+    useHfDiscovery(token);
   const {
-    lastRegisteredModelId,
-    registerLocalModel,
-  } = useLocalModelRegistration(token);
+    downloadJobs,
+    hasActiveJobs,
+    download,
+  } = useLocalDownloadJobs(token);
 
   const [discoveryTaskKey, setDiscoveryTaskKey] = useState("llm");
   const [discoverQuery, setDiscoverQuery] = useState("");
-  const [manualState, setManualState] = useState({
-    id: "",
-    name: "",
-    provider: "local",
-    localPath: "",
-    taskKey: "llm",
-    comment: "",
-  });
-  const [artifacts, setArtifacts] = useState<LocalModelArtifact[]>([]);
-  const [artifactsLoading, setArtifactsLoading] = useState(false);
-  const [artifactsError, setArtifactsError] = useState("");
-  const [artifactsFeedback, setArtifactsFeedback] = useState("");
-  const [registeringArtifactId, setRegisteringArtifactId] = useState("");
   const [inspectedHfModel, setInspectedHfModel] = useState<HfModelDetails | null>(null);
-
-  useEffect(() => {
-    if (!token || activeView !== "artifacts") {
-      return;
-    }
-    setArtifactsLoading(true);
-    setArtifactsError("");
-    void listLocalModelArtifacts(token)
-      .then(setArtifacts)
-      .catch((requestError) => {
-        setArtifactsError(requestError instanceof Error ? requestError.message : "Unable to load local artifacts.");
-      })
-      .finally(() => setArtifactsLoading(false));
-  }, [activeView, token]);
 
   function handleChangeView(view: LocalModelRegisterView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -142,102 +112,11 @@ export default function LocalModelRegisterPage(): JSX.Element {
         ) : null}
 
         {activeView === "manual" ? (
-          <>
-            <article className="panel card-stack">
-              <h2 className="section-title">{t("modelOps.local.manualTitle")}</h2>
-              <div className="control-group">
-                <label className="field-label" htmlFor="local-model-id">{t("modelOps.fields.modelId")}</label>
-                <input id="local-model-id" className="field-input" value={manualState.id} onChange={(event) => setManualState({ ...manualState, id: event.currentTarget.value })} />
-                <label className="field-label" htmlFor="local-model-name">{t("modelOps.fields.modelName")}</label>
-                <input id="local-model-name" className="field-input" value={manualState.name} onChange={(event) => setManualState({ ...manualState, name: event.currentTarget.value })} />
-                <label className="field-label" htmlFor="local-model-provider">{t("modelOps.fields.provider")}</label>
-                <input id="local-model-provider" className="field-input" value={manualState.provider} onChange={(event) => setManualState({ ...manualState, provider: event.currentTarget.value })} />
-                <label className="field-label" htmlFor="local-model-path">{t("modelOps.fields.localPath")}</label>
-                <input id="local-model-path" className="field-input" value={manualState.localPath} onChange={(event) => setManualState({ ...manualState, localPath: event.currentTarget.value })} />
-                <label className="field-label" htmlFor="local-model-task">{t("modelOps.fields.task")}</label>
-                <select id="local-model-task" className="field-input" value={manualState.taskKey} onChange={(event) => setManualState({ ...manualState, taskKey: event.currentTarget.value })}>
-                  {TASK_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <label className="field-label" htmlFor="local-model-comment">{t("modelOps.fields.comment")}</label>
-                <input id="local-model-comment" className="field-input" value={manualState.comment} onChange={(event) => setManualState({ ...manualState, comment: event.currentTarget.value })} />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    const category = TASK_OPTIONS.find((option) => option.value === manualState.taskKey)?.category ?? "generative";
-                    void registerLocalModel({
-                      id: manualState.id,
-                      name: manualState.name,
-                      provider: manualState.provider,
-                      localPath: manualState.localPath,
-                      taskKey: manualState.taskKey,
-                      category,
-                      comment: manualState.comment,
-                    }).then((didRegister) => {
-                      if (didRegister) {
-                        setManualState({
-                          id: "",
-                          name: "",
-                          provider: "local",
-                          localPath: "",
-                          taskKey: "llm",
-                          comment: "",
-                        });
-                      }
-                    });
-                  }}
-                >
-                  {t("modelOps.actions.registerLocal")}
-                </button>
-              </div>
-            </article>
-
-            {lastRegisteredModelId && (
-              <div className="button-row">
-                <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(lastRegisteredModelId)}/test`}>
-                  {t("modelOps.actions.testModel")}
-                </Link>
-              </div>
-            )}
-          </>
+          <LocalManualRegistrationPanel token={token} />
         ) : null}
 
         {activeView === "artifacts" ? (
-          <>
-            <article className="panel card-stack">
-              <h2 className="section-title">{t("modelOps.artifacts.title")}</h2>
-              <p className="status-text">{t("modelOps.artifacts.description")}</p>
-              {artifactsLoading ? (
-                <p className="status-text">{t("modelOps.states.loading")}</p>
-              ) : (
-                <LocalArtifactList
-                  artifacts={artifacts}
-                  registeringArtifactId={registeringArtifactId}
-                  onRegister={async (artifact) => {
-                    if (!token || !artifact.suggested_model_id) {
-                      return;
-                    }
-                    setRegisteringArtifactId(artifact.artifact_id);
-                    setArtifactsError("");
-                    setArtifactsFeedback("");
-                    try {
-                      await registerExistingManagedModel(artifact.suggested_model_id, token);
-                      setArtifacts(await listLocalModelArtifacts(token));
-                      setArtifactsFeedback(t("modelOps.artifacts.registered"));
-                    } catch (requestError) {
-                      setArtifactsError(requestError instanceof Error ? requestError.message : t("modelOps.artifacts.registerFailed"));
-                    } finally {
-                      setRegisteringArtifactId("");
-                    }
-                  }}
-                />
-              )}
-            </article>
-            {artifactsFeedback && <p className="status-text">{artifactsFeedback}</p>}
-            {artifactsError && <p className="error-text">{artifactsError}</p>}
-          </>
+          <LocalArtifactsPanel token={token} />
         ) : null}
       </section>
       {inspectedHfModel ? (
