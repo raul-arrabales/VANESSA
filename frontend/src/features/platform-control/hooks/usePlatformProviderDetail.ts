@@ -10,7 +10,8 @@ import {
   type PlatformProviderValidation,
 } from "../../../api/platform";
 import { listModelOpsModels } from "../../../api/modelops/models";
-import type { ManagedModel } from "../../../api/modelops/types";
+import { listModelCredentials } from "../../../api/modelops/credentials";
+import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { getActiveDeployment } from "../platformTopology";
 import { buildProviderForm, parseJsonObject, type ProviderFormState } from "../providerForm";
@@ -49,6 +50,9 @@ export function usePlatformProviderDetail({
   const [slotModels, setSlotModels] = useState<ManagedModel[]>([]);
   const [slotModelId, setSlotModelId] = useState("");
   const [slotLoading, setSlotLoading] = useState(false);
+  const [credentials, setCredentials] = useState<ModelCredential[]>([]);
+  const [credentialsLoading, setCredentialsLoading] = useState(false);
+  const [validationCredentialId, setValidationCredentialId] = useState("");
 
   const provider = providers.find((item) => item.id === providerId) ?? null;
   const providerFamily = provider
@@ -67,6 +71,14 @@ export function usePlatformProviderDetail({
       && provider.provider_key !== "openai_compatible_cloud_llm"
       && provider.provider_key !== "openai_compatible_cloud_embeddings"
     : false;
+  const supportsByokValidation = provider
+    ? provider.provider_key === "openai_compatible_cloud_llm"
+      || provider.provider_key === "openai_compatible_cloud_embeddings"
+    : false;
+  const validationCredentials = useMemo(
+    () => credentials.filter((credential) => credential.provider === "openai" || credential.provider === "openai_compatible"),
+    [credentials],
+  );
   const selectedSlotModel = useMemo(
     () => slotModels.find((model) => model.id === slotModelId) ?? null,
     [slotModelId, slotModels],
@@ -97,8 +109,38 @@ export function usePlatformProviderDetail({
     if (provider) {
       setForm(buildProviderForm(provider));
       setSlotModelId(provider.loaded_managed_model_id ?? "");
+      setValidationCredentialId("");
     }
   }, [provider]);
+
+  useEffect(() => {
+    if (!token || !supportsByokValidation) {
+      setCredentials([]);
+      setCredentialsLoading(false);
+      return;
+    }
+    let isActive = true;
+    setCredentialsLoading(true);
+    void listModelCredentials(token)
+      .then((rows) => {
+        if (isActive) {
+          setCredentials(rows);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setCredentials([]);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setCredentialsLoading(false);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [supportsByokValidation, token]);
 
   useEffect(() => {
     if (!token || !provider || !supportsLocalSlot) {
@@ -177,7 +219,9 @@ export function usePlatformProviderDetail({
     setValidating(true);
     setErrorMessage("");
     try {
-      const nextValidation = await validatePlatformProvider(provider.id, token);
+      const nextValidation = validationCredentialId
+        ? await validatePlatformProvider(provider.id, token, { credentialId: validationCredentialId })
+        : await validatePlatformProvider(provider.id, token);
       setValidation(nextValidation);
       showSuccessFeedback(t("platformControl.feedback.validationSuccess", { slug: provider.slug }));
     } catch (error) {
@@ -280,5 +324,10 @@ export function usePlatformProviderDetail({
     handleDelete,
     handleSubmit,
     handleValidate,
+    credentialsLoading,
+    setValidationCredentialId,
+    supportsByokValidation,
+    validationCredentialId,
+    validationCredentials,
   };
 }

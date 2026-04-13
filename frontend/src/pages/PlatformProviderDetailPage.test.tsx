@@ -7,6 +7,7 @@ import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import PlatformProviderDetailPage from "./PlatformProviderDetailPage";
 import * as platformApi from "../api/platform";
+import * as modelOpsCredentialsApi from "../api/modelops/credentials";
 import * as modelOpsModelsApi from "../api/modelops/models";
 import { embeddingsModelsFixture, primePlatformControlMocks, providersFixture } from "../test/platformControlFixtures";
 
@@ -39,6 +40,10 @@ vi.mock("../api/modelops", () => ({
 
 vi.mock("../api/modelops/models", () => ({
   listModelOpsModels: vi.fn(),
+}));
+
+vi.mock("../api/modelops/credentials", () => ({
+  listModelCredentials: vi.fn(),
 }));
 
 vi.mock("../api/context", () => ({
@@ -75,6 +80,26 @@ function buildProvidersList(
   return [providersFixture[0], embeddingsProvider, providersFixture[2]];
 }
 
+function buildCloudProvider(
+  overrides: Partial<platformApi.PlatformProvider> = {},
+): platformApi.PlatformProvider {
+  return {
+    id: "provider-cloud",
+    slug: "openai-compatible-cloud",
+    provider_key: "openai_compatible_cloud_llm",
+    capability: "llm_inference",
+    adapter_kind: "openai_compatible_llm",
+    display_name: "OpenAI-compatible cloud",
+    description: "Cloud LLM endpoint.",
+    endpoint_url: "https://api.openai.com/v1",
+    healthcheck_url: null,
+    enabled: true,
+    config: {},
+    secret_refs: {},
+    ...overrides,
+  };
+}
+
 describe("PlatformProviderDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,6 +113,7 @@ describe("PlatformProviderDetailPage", () => {
     };
     primePlatformControlMocks();
     vi.mocked(modelOpsModelsApi.listModelOpsModels).mockResolvedValue([localEmbeddingsModel]);
+    vi.mocked(modelOpsCredentialsApi.listModelCredentials).mockResolvedValue([]);
   });
 
   it("shows usage grouped by deployment and validates the provider", async () => {
@@ -116,6 +142,72 @@ describe("PlatformProviderDetailPage", () => {
       expect(platformApi.validatePlatformProvider).toHaveBeenCalledWith("provider-1", "token");
     });
     expect(await screen.findByText(await t("platformControl.providers.resourcesReachable"))).toBeVisible();
+  });
+
+  it("validates cloud providers with a selected BYOK credential", async () => {
+    const user = userEvent.setup();
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([buildCloudProvider()]);
+    vi.mocked(modelOpsCredentialsApi.listModelCredentials).mockResolvedValue([
+      {
+        id: "cred-openai",
+        owner_user_id: 1,
+        credential_scope: "personal",
+        provider: "openai",
+        display_name: "OpenAI key",
+        api_base_url: "https://api.openai.com/v1",
+        api_key_last4: "1234",
+        is_active: true,
+        revoked_at: null,
+      },
+      {
+        id: "cred-anthropic",
+        owner_user_id: 1,
+        credential_scope: "personal",
+        provider: "anthropic",
+        display_name: "Claude key",
+        api_base_url: null,
+        api_key_last4: "5678",
+        is_active: true,
+        revoked_at: null,
+      },
+    ]);
+    vi.mocked(platformApi.validatePlatformProvider).mockResolvedValue({
+      provider: { id: "provider-cloud", slug: "openai-compatible-cloud" },
+      validation: {
+        health: { reachable: true, status_code: 200 },
+        resources_reachable: true,
+        resources_status_code: 200,
+        credential: {
+          id: "cred-openai",
+          provider: "openai",
+          display_name: "OpenAI key",
+          api_base_url: "https://api.openai.com/v1",
+        },
+      },
+    });
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-cloud" },
+    );
+
+    const credentialSelect = await screen.findByLabelText(await t("platformControl.providers.validationCredentialLabel"));
+    expect(await screen.findByRole("option", { name: "OpenAI key · openai · ****1234" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: "Claude key · anthropic · ****5678" })).not.toBeInTheDocument();
+
+    await user.selectOptions(credentialSelect, "cred-openai");
+    await user.click(screen.getByRole("button", { name: await t("platformControl.actions.validate") }));
+
+    await waitFor(() => {
+      expect(platformApi.validatePlatformProvider).toHaveBeenCalledWith(
+        "provider-cloud",
+        "token",
+        { credentialId: "cred-openai" },
+      );
+    });
+    expect(await screen.findByText(await t("platformControl.providers.validationCredentialUsed", { name: "OpenAI key" }))).toBeVisible();
   });
 
   it("saves provider changes from the detail page", async () => {

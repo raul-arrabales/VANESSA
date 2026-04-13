@@ -1,15 +1,26 @@
 import { useTranslation } from "react-i18next";
 import type { PlatformProviderValidation } from "../../../api/platform";
+import type { ModelCredential } from "../../../api/modelops/types";
 
 type PlatformProviderValidationPanelProps = {
   validation: PlatformProviderValidation | null;
   isValidating: boolean;
+  credentials: ModelCredential[];
+  credentialsLoading: boolean;
+  selectedCredentialId: string;
+  supportsByokValidation: boolean;
+  onCredentialChange: (credentialId: string) => void;
   onValidate: () => void;
 };
 
 export default function PlatformProviderValidationPanel({
   validation,
   isValidating,
+  credentials,
+  credentialsLoading,
+  selectedCredentialId,
+  supportsByokValidation,
+  onCredentialChange,
   onValidate,
 }: PlatformProviderValidationPanelProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -26,6 +37,35 @@ export default function PlatformProviderValidationPanel({
         </button>
       </div>
 
+      {supportsByokValidation ? (
+        <div className="card-stack">
+          <label className="field-label" htmlFor="platform-provider-validation-credential">
+            {t("platformControl.providers.validationCredentialLabel")}
+          </label>
+          <select
+            id="platform-provider-validation-credential"
+            className="field-input"
+            value={selectedCredentialId}
+            disabled={credentialsLoading}
+            onChange={(event) => onCredentialChange(event.currentTarget.value)}
+          >
+            <option value="">{t("platformControl.providers.validationProviderSecrets")}</option>
+            {credentials.map((credential) => (
+              <option key={credential.id} value={credential.id}>
+                {`${credential.display_name} · ${credential.provider} · ****${credential.api_key_last4}`}
+              </option>
+            ))}
+          </select>
+          <span className="status-text">
+            {credentialsLoading
+              ? t("platformControl.providers.validationCredentialsLoading")
+              : credentials.length
+                ? t("platformControl.providers.validationCredentialHelp")
+                : t("platformControl.providers.validationNoCredentials")}
+          </span>
+        </div>
+      ) : null}
+
       {validation ? (
         <div className="card-stack">
           <div className="status-row">
@@ -41,6 +81,13 @@ export default function PlatformProviderValidationPanel({
               {validation.validation.resources_reachable
                 ? t("platformControl.providers.resourcesReachable")
                 : t("platformControl.providers.resourcesUnavailable")}
+            </span>
+          ) : null}
+          {validation.validation.credential ? (
+            <span className="status-text">
+              {t("platformControl.providers.validationCredentialUsed", {
+                name: validation.validation.credential.display_name,
+              })}
             </span>
           ) : null}
           {typeof validation.validation.embeddings_reachable === "boolean" ? (

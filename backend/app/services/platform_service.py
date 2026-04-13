@@ -191,12 +191,23 @@ def delete_provider(database_url: str, *, config, provider_instance_id: str) -> 
     )
 
 
-def validate_provider(database_url: str, *, config, provider_instance_id: str):
+def validate_provider(
+    database_url: str,
+    *,
+    config,
+    provider_instance_id: str,
+    credential_id: str | None = None,
+    actor_user_id: int | None = None,
+    actor_role: str = "user",
+):
     _sync_platform_helpers()
     return _platform_providers_module.validate_provider(
         database_url,
         config=config,
         provider_instance_id=provider_instance_id,
+        credential_id=credential_id,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
     )
 
 

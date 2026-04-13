@@ -414,8 +414,8 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     monkeypatch.setattr(
         platform_routes,
         "validate_provider",
-        lambda _db, *, config, provider_instance_id: {
-            "provider": {"id": provider_instance_id, "slug": "vllm-local-gateway"},
+        lambda _db, **kwargs: {
+            "provider": {"id": kwargs["provider_instance_id"], "slug": "vllm-local-gateway"},
             "validation": {"health": {"reachable": True, "status_code": 200}},
         },
     )
@@ -627,6 +627,45 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
     assert query_response.get_json()["results"][0]["id"] == "doc-1"
     assert delete_response.status_code == 200
     assert delete_response.get_json()["deleted_ids"] == ["doc-1"]
+
+
+def test_validate_provider_route_passes_byok_credential_context(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = user_store.create_user(
+        "ignored",
+        email="root@example.com",
+        username="root",
+        password_hash=hash_password("root-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+    seen: dict[str, object] = {}
+
+    def _validate_provider(_db, **kwargs):
+        seen.update(kwargs)
+        return {
+            "provider": {"id": kwargs["provider_instance_id"], "slug": "openai-cloud"},
+            "validation": {
+                "health": {"reachable": True, "status_code": 200},
+                "credential": {"id": "cred-1", "provider": "openai", "display_name": "OpenAI key"},
+            },
+        }
+
+    monkeypatch.setattr(platform_routes, "validate_provider", _validate_provider)
+
+    response = test_client.post(
+        "/v1/platform/providers/provider-cloud/validate",
+        headers=_auth(token),
+        json={"credential_id": "cred-1"},
+    )
+
+    assert response.status_code == 200
+    assert seen["provider_instance_id"] == "provider-cloud"
+    assert seen["payload"] == {"credential_id": "cred-1"}
+    assert seen["actor_user_id"] == root["id"]
+    assert seen["actor_role"] == "superadmin"
+    assert response.get_json()["validation"]["credential"]["display_name"] == "OpenAI key"
 
 
 def test_platform_vector_routes_return_control_plane_errors(client, monkeypatch: pytest.MonkeyPatch):

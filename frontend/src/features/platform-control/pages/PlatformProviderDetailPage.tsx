@@ -19,6 +19,7 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     activeDeployment,
     capabilities,
     confirmDelete,
+    credentialsLoading,
     deployments,
     dismissTrackedLoadPanel,
     errorMessage,
@@ -41,13 +42,17 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     setConfirmDelete,
     setForm,
     setSlotModelId,
+    setValidationCredentialId,
     slotLoading,
     slotModelId,
     slotModels,
     state,
     supportsLocalSlot,
+    supportsByokValidation,
     validating,
     validation,
+    validationCredentialId,
+    validationCredentials,
   } = usePlatformProviderDetail({
     providerId,
     token,
@@ -82,6 +87,11 @@ export default function PlatformProviderDetailPage(): JSX.Element {
           <PlatformProviderValidationPanel
             validation={validation}
             isValidating={validating}
+            credentials={validationCredentials}
+            credentialsLoading={credentialsLoading}
+            selectedCredentialId={validationCredentialId}
+            supportsByokValidation={supportsByokValidation}
+            onCredentialChange={setValidationCredentialId}
             onValidate={() => void handleValidate()}
           />
 

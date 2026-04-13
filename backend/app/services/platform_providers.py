@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from ..config import AuthConfig
 from ..repositories import platform_control_plane as platform_repo
+from ..repositories.model_credentials import get_active_credential_secret
 from .platform_bindings import (
     _adapter_from_binding,
     _coerce_provider_input,
@@ -30,6 +32,13 @@ from .platform_types import (
     PlatformControlPlaneError,
     ProviderBinding,
 )
+
+_OPENAI_COMPATIBLE_CLOUD_PROVIDER_KEYS = {
+    "openai_compatible_cloud_llm",
+    "openai_compatible_cloud_embeddings",
+}
+_OPENAI_COMPATIBLE_CREDENTIAL_PROVIDERS = {"openai", "openai_compatible"}
+_OPENAI_DEFAULT_API_BASE_URL = "https://api.openai.com/v1"
 
 
 def list_capabilities(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:
@@ -190,7 +199,15 @@ def delete_provider(database_url: str, *, config: AuthConfig, provider_instance_
         raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
 
 
-def validate_provider(database_url: str, *, config: AuthConfig, provider_instance_id: str) -> dict[str, Any]:
+def validate_provider(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_instance_id: str,
+    credential_id: str | None = None,
+    actor_user_id: int | None = None,
+    actor_role: str = "user",
+) -> dict[str, Any]:
     ensure_platform_bootstrap_state(database_url, config)
     provider_row = platform_repo.get_provider_instance(database_url, provider_instance_id)
     if provider_row is None:
@@ -198,18 +215,33 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
 
     binding_row = platform_repo.get_active_binding_for_provider_instance(database_url, provider_instance_id=provider_instance_id)
     binding = ProviderBinding.from_row(binding_row or provider_row)
+    credential_summary: dict[str, Any] | None = None
+    if credential_id:
+        if actor_user_id is None:
+            raise PlatformControlPlaneError("missing_actor", "Actor user id is required for credential validation", status_code=400)
+        binding, credential_summary = _binding_with_validation_credential(
+            database_url,
+            config=config,
+            binding=binding,
+            credential_id=credential_id,
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+        )
     if binding.capability_key == CAPABILITY_LLM_INFERENCE:
         adapter = _adapter_from_binding(binding)
         health = adapter.health()
         resources, resources_status = _list_adapter_resources(adapter)
+        validation = {
+            "health": health,
+            "resources_reachable": 200 <= resources_status < 300,
+            "resources_status_code": resources_status,
+            "resources": [_serialize_binding_resource(resource) for resource in resources],
+        }
+        if credential_summary:
+            validation["credential"] = credential_summary
         return {
             "provider": _serialize_provider_row(provider_row),
-            "validation": {
-                "health": health,
-                "resources_reachable": 200 <= resources_status < 300,
-                "resources_status_code": resources_status,
-                "resources": [_serialize_binding_resource(resource) for resource in resources],
-            },
+            "validation": validation,
         }
 
     if binding.capability_key == CAPABILITY_EMBEDDINGS:
@@ -217,32 +249,38 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
         health = adapter.health()
         resources, resources_status = _list_adapter_resources(adapter)
         if not binding.default_resource_id:
+            validation = {
+                "health": health,
+                "embeddings_reachable": False,
+                "embeddings_status_code": 409,
+                "binding_error": "default_resource_required",
+                "resources_reachable": 200 <= resources_status < 300,
+                "resources_status_code": resources_status,
+                "resources": [_serialize_binding_resource(resource) for resource in resources],
+            }
+            if credential_summary:
+                validation["credential"] = credential_summary
             return {
                 "provider": _serialize_provider_row(provider_row),
-                "validation": {
-                    "health": health,
-                    "embeddings_reachable": False,
-                    "embeddings_status_code": 409,
-                    "binding_error": "default_resource_required",
-                    "resources_reachable": 200 <= resources_status < 300,
-                    "resources_status_code": resources_status,
-                    "resources": [_serialize_binding_resource(resource) for resource in resources],
-                },
+                "validation": validation,
             }
         embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
         embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
         embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
+        validation = {
+            "health": health,
+            "embeddings_reachable": embeddings_payload is not None and 200 <= embeddings_status < 300,
+            "embeddings_status_code": embeddings_status,
+            "embedding_dimension": embedding_dimension,
+            "resources_reachable": 200 <= resources_status < 300,
+            "resources_status_code": resources_status,
+            "resources": [_serialize_binding_resource(resource) for resource in resources],
+        }
+        if credential_summary:
+            validation["credential"] = credential_summary
         return {
             "provider": _serialize_provider_row(provider_row),
-            "validation": {
-                "health": health,
-                "embeddings_reachable": embeddings_payload is not None and 200 <= embeddings_status < 300,
-                "embeddings_status_code": embeddings_status,
-                "embedding_dimension": embedding_dimension,
-                "resources_reachable": 200 <= resources_status < 300,
-                "resources_status_code": resources_status,
-                "resources": [_serialize_binding_resource(resource) for resource in resources],
-            },
+            "validation": validation,
         }
 
     if binding.capability_key == CAPABILITY_VECTOR_STORE:
@@ -287,3 +325,64 @@ def validate_provider(database_url: str, *, config: AuthConfig, provider_instanc
         }
 
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
+
+
+def _binding_with_validation_credential(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    binding: ProviderBinding,
+    credential_id: str,
+    actor_user_id: int,
+    actor_role: str,
+) -> tuple[ProviderBinding, dict[str, Any]]:
+    if binding.provider_key not in _OPENAI_COMPATIBLE_CLOUD_PROVIDER_KEYS:
+        raise PlatformControlPlaneError(
+            "credential_validation_unsupported",
+            "BYOK credential validation is only supported for OpenAI-compatible cloud providers",
+            status_code=409,
+        )
+    try:
+        secret = get_active_credential_secret(
+            database_url,
+            credential_id=credential_id,
+            requester_user_id=actor_user_id,
+            requester_role=actor_role,
+            encryption_key=config.model_credentials_encryption_key,
+        )
+    except ValueError as exc:
+        raise PlatformControlPlaneError("invalid_credential_id", "credential_id must be a UUID", status_code=400) from exc
+    if secret is None:
+        raise PlatformControlPlaneError("credential_not_found", "Active credential not found", status_code=404)
+
+    credential_provider = str(secret.get("provider_slug") or "").strip().lower()
+    if credential_provider not in _OPENAI_COMPATIBLE_CREDENTIAL_PROVIDERS:
+        raise PlatformControlPlaneError(
+            "credential_provider_mismatch",
+            "Credential provider does not match this platform provider",
+            status_code=409,
+            details={"credential_provider": credential_provider, "provider_key": binding.provider_key},
+        )
+
+    credential_base_url = str(secret.get("api_base_url") or "").strip()
+    if not credential_base_url and credential_provider == "openai":
+        credential_base_url = _OPENAI_DEFAULT_API_BASE_URL
+    endpoint_url = credential_base_url or binding.endpoint_url
+    if not endpoint_url:
+        raise PlatformControlPlaneError(
+            "missing_credential_api_base_url",
+            "Credential is missing api_base_url and the provider has no endpoint URL",
+            status_code=400,
+        )
+
+    next_config = dict(binding.config)
+    secret_refs = dict(next_config.get("secret_refs") or {})
+    secret_refs["api_key"] = str(secret.get("api_key") or "").strip()
+    next_config["secret_refs"] = secret_refs
+
+    return replace(binding, endpoint_url=endpoint_url, healthcheck_url=None, config=next_config), {
+        "id": str(secret.get("id") or credential_id),
+        "provider": credential_provider,
+        "display_name": str(secret.get("display_name") or ""),
+        "api_base_url": credential_base_url or None,
+    }

@@ -149,6 +149,12 @@ export type PlatformProviderValidation = {
       display_name?: string | null;
       metadata?: Record<string, unknown>;
     }>;
+    credential?: {
+      id: string;
+      provider: string;
+      display_name: string;
+      api_base_url?: string | null;
+    };
     binding_error?: string;
     resource_errors?: Array<{
       code: string;
@@ -289,10 +295,15 @@ export async function listPlatformActivationAudit(token: string): Promise<Platfo
   return result.activation_audit;
 }
 
-export async function validatePlatformProvider(providerId: string, token: string): Promise<PlatformProviderValidation> {
+export async function validatePlatformProvider(
+  providerId: string,
+  token: string,
+  options: { credentialId?: string } = {},
+): Promise<PlatformProviderValidation> {
   return requestJson<PlatformProviderValidation>(`/v1/platform/providers/${encodeURIComponent(providerId)}/validate`, {
     method: "POST",
     token,
+    body: options.credentialId ? { credential_id: options.credentialId } : undefined,
   });
 }
 

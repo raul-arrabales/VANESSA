@@ -158,6 +158,39 @@ describe("platform api", () => {
     );
   });
 
+  it("posts selected provider validation credentials", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({
+        provider: { id: "provider-1", slug: "openai-compatible-cloud" },
+        validation: {
+          health: { reachable: true, status_code: 200 },
+          credential: {
+            id: "cred-1",
+            provider: "openai",
+            display_name: "OpenAI key",
+            api_base_url: "https://api.openai.com/v1",
+          },
+        },
+      }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await validatePlatformProvider("provider-1", "token", { credentialId: "cred-1" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/platform/providers/provider-1/validate",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ credential_id: "cred-1" }),
+      }),
+    );
+  });
+
   it("supports provider and deployment mutations", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({
       ok: true,

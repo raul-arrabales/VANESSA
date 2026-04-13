@@ -163,7 +163,17 @@ def delete_platform_provider_route(provider_id: str):
 @require_role("superadmin")
 def validate_platform_provider_route(provider_id: str):
     try:
-        payload = validate_provider(_database_url(), config=_config(), provider_instance_id=provider_id)
+        body = request.get_json(silent=True)
+        payload = validate_provider(
+            _database_url(),
+            config=_config(),
+            provider_instance_id=provider_id,
+            payload=body if body is not None else {},
+            actor_user_id=int(g.current_user["id"]),
+            actor_role=str(g.current_user.get("role", "user")),
+        )
+    except PlatformControlRequestError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(payload), 200

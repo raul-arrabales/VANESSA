@@ -262,6 +262,73 @@ def test_openai_adapter_uses_models_url_when_healthcheck_is_null(monkeypatch: py
     assert health["reachable"] is True
 
 
+def test_validate_cloud_provider_can_use_byok_credential(monkeypatch: pytest.MonkeyPatch):
+    seen_requests: list[dict[str, object]] = []
+
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "capability_key": "llm_inference",
+            "adapter_kind": "openai_compatible_llm",
+            "display_name": "OpenAI cloud",
+            "description": "desc",
+            "endpoint_url": "https://wrong.example/v1",
+            "healthcheck_url": None,
+            "enabled": True,
+            "config_json": {"models_path": "/models"},
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_active_binding_for_provider_instance",
+        lambda _db, *, provider_instance_id: None,
+    )
+    monkeypatch.setattr(
+        platform_service._platform_providers_module,
+        "get_active_credential_secret",
+        lambda *args, **kwargs: {
+            "id": "cred-1",
+            "provider_slug": "openai",
+            "display_name": "OpenAI key",
+            "api_base_url": None,
+            "api_key": "sk-test",
+        },
+    )
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del method, payload, timeout_seconds
+        seen_requests.append({"url": url, "headers": dict(headers or {})})
+        return {"data": []}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+
+    result = platform_service.validate_provider(
+        "ignored",
+        config=type("Config", (), {"model_credentials_encryption_key": "key"})(),
+        provider_instance_id="provider-openai",
+        credential_id="00000000-0000-0000-0000-000000000001",
+        actor_user_id=1,
+        actor_role="superadmin",
+    )
+
+    assert seen_requests == [
+        {"url": "https://api.openai.com/v1/models", "headers": {"Authorization": "Bearer sk-test"}},
+        {"url": "https://api.openai.com/v1/models", "headers": {"Authorization": "Bearer sk-test"}},
+    ]
+    assert result["validation"]["credential"] == {
+        "id": "cred-1",
+        "provider": "openai",
+        "display_name": "OpenAI key",
+        "api_base_url": "https://api.openai.com/v1",
+    }
+    assert result["validation"]["resources_reachable"] is True
+
+
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(

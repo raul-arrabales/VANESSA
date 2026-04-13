@@ -78,11 +78,23 @@ def delete_platform_provider(database_url: str, *, config, provider_instance_id:
     )
 
 
-def validate_platform_provider(database_url: str, *, config, provider_instance_id: str):
+def validate_platform_provider(
+    database_url: str,
+    *,
+    config,
+    provider_instance_id: str,
+    payload: Any | None = None,
+    actor_user_id: int | None = None,
+    actor_role: str = "user",
+):
+    body = _require_json_object(payload if payload is not None else {})
     return _validate_provider(
         database_url,
         config=config,
         provider_instance_id=provider_instance_id,
+        credential_id=str(body.get("credential_id", "")).strip() or None,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
     )
 
 
