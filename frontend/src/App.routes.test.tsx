@@ -56,7 +56,9 @@ vi.mock("./api/modelops", () => ({
   activateManagedModel: vi.fn(),
   deactivateManagedModel: vi.fn(),
   unregisterManagedModel: vi.fn(),
+  updateManagedModelCredential: vi.fn(),
   deleteManagedModel: vi.fn(),
+  discoverCloudProviderModels: vi.fn(async () => []),
   discoverHfModels: vi.fn(async () => []),
   getHfModelDetails: vi.fn(async () => ({ source_id: "hf/model", name: "model", files: [] })),
   startModelDownload: vi.fn(),
@@ -66,6 +68,7 @@ vi.mock("./api/modelops/models", () => ({
   registerManagedModel: vi.fn(),
   listAvailableManagedModels: vi.fn(),
   listModelOpsModels: vi.fn(async () => [{ id: "gpt-4", name: "GPT-4", lifecycle_state: "active", is_validation_current: true, last_validation_status: "success" }]),
+  discoverCloudProviderModels: vi.fn(async () => []),
   getManagedModel: vi.fn(async () => ({
     id: "gpt-4",
     name: "GPT-4",
@@ -86,6 +89,7 @@ vi.mock("./api/modelops/models", () => ({
   activateManagedModel: vi.fn(),
   deactivateManagedModel: vi.fn(),
   unregisterManagedModel: vi.fn(),
+  updateManagedModelCredential: vi.fn(),
   deleteManagedModel: vi.fn(),
 }));
 vi.mock("./api/modelops/testing", () => ({

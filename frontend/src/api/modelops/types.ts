@@ -64,6 +64,16 @@ export type HfDiscoveredModel = {
   provider: string;
 };
 
+export type CloudDiscoveredModel = {
+  provider_model_id: string;
+  name: string;
+  owned_by?: string | null;
+  created_at?: string | null;
+  task_key: ManagedModelTaskKey;
+  category?: "predictive" | "generative" | null;
+  metadata?: Record<string, unknown>;
+};
+
 export type HfModelFileDetails = {
   path: string;
   size?: number | null;

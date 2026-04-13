@@ -4,6 +4,7 @@ import pytest
 
 from app.config import AuthConfig
 from app.services import modelops_testing
+from app.services import platform_adapters
 from tests.backend.support.auth_harness import build_test_auth_config
 
 
@@ -41,7 +42,7 @@ def test_run_model_test_persists_successful_cloud_llm_result(monkeypatch: pytest
         },
     )
     monkeypatch.setattr(
-        modelops_testing,
+        platform_adapters,
         "http_json_request",
         lambda *args, **kwargs: (
             {
@@ -101,6 +102,93 @@ def test_run_model_test_persists_successful_cloud_llm_result(monkeypatch: pytest
     assert result["test_run"]["id"] == "test-run-1"
     assert result["result"]["response_text"] == "hello back"
     assert audit_events == ["model.tested"]
+
+
+def test_run_model_test_uses_gpt5_chat_completion_token_budget(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    recorded_test_run: dict[str, object] = {}
+    seen_payloads: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_accessible_model",
+        lambda *args, **kwargs: {
+            "model_id": "gpt-5-nano-personal",
+            "lifecycle_state": "registered",
+            "backend_kind": "external_api",
+            "hosting_kind": "cloud",
+            "runtime_mode_policy": "online_only",
+            "task_key": "llm",
+            "provider_model_id": "gpt-5-nano",
+            "credential_id": "cred-1",
+            "current_config_fingerprint": "fingerprint-1",
+            "artifact": {},
+        },
+    )
+    monkeypatch.setattr(
+        modelops_testing,
+        "get_active_credential_secret_by_id",
+        lambda *args, **kwargs: {
+            "api_base_url": "https://api.openai.com/v1",
+            "api_key": "sk-test-secret",
+        },
+    )
+
+    def _http_json_request(*args, **kwargs):
+        del args
+        seen_payloads.append(dict(kwargs["payload"]))
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": "hello from gpt-5-nano",
+                    }
+                }
+            ]
+        }, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _http_json_request)
+    monkeypatch.setattr(modelops_testing, "resolve_runtime_profile", lambda _database_url: "online")
+    monkeypatch.setattr(modelops_testing.modelops_repo, "get_model", lambda _database_url, model_id: {"model_id": model_id, "artifact": {}})
+
+    def _append_model_test_run(_database_url: str, **kwargs):
+        recorded_test_run.update(kwargs)
+        return {
+            "id": "test-run-1",
+            "model_id": kwargs["model_id"],
+            "task_key": kwargs["task_key"],
+            "result": kwargs["result"],
+            "summary": kwargs["summary"],
+            "input_payload": kwargs["input_payload"],
+            "output_payload": kwargs["output_payload"],
+            "error_details": kwargs["error_details"],
+            "latency_ms": kwargs["latency_ms"],
+            "config_fingerprint": kwargs["config_fingerprint"],
+        }
+
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_model_test_run", _append_model_test_run)
+    monkeypatch.setattr(modelops_testing.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
+
+    result = modelops_testing.run_model_test(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=1,
+        actor_role="superadmin",
+        model_id="gpt-5-nano-personal",
+        inputs={"prompt": "hello"},
+    )
+
+    assert seen_payloads == [
+        {
+            "model": "gpt-5-nano",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_completion_tokens": 64,
+        }
+    ]
+    assert recorded_test_run["input_payload"] == seen_payloads[0]
+    assert result["result"]["response_text"] == "hello from gpt-5-nano"
 
 
 def test_run_model_test_allows_superadmin_local_llm_with_exact_runtime_match(

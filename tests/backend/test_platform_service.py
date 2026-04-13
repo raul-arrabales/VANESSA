@@ -178,6 +178,90 @@ def test_default_resource_runtime_identifier_ignores_string_none_provider_resour
     )
 
 
+def test_provider_binding_from_row_normalizes_stringified_null_urls():
+    binding = platform_service.ProviderBinding.from_row(
+        {
+            "id": "provider-openai",
+            "capability_key": "llm_inference",
+            "provider_slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "display_name": "OpenAI cloud",
+            "description": "desc",
+            "endpoint_url": "None",
+            "healthcheck_url": None,
+            "enabled": True,
+            "adapter_kind": "openai_compatible_llm",
+        }
+    )
+
+    assert binding.endpoint_url == ""
+    assert binding.healthcheck_url is None
+
+
+def test_http_json_request_reports_invalid_provider_url_without_raising():
+    payload, status_code = platform_adapters.http_json_request("None", method="GET")
+
+    assert status_code == 400
+    assert payload == {"error": "invalid_url", "message": "Provider URL is missing or invalid"}
+
+
+def test_http_json_request_reports_non_json_success_without_raising(monkeypatch: pytest.MonkeyPatch):
+    class _Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self) -> bytes:
+            return b"<html>not json</html>"
+
+    monkeypatch.setattr(platform_adapters, "urlopen", lambda *args, **kwargs: _Response())
+
+    payload, status_code = platform_adapters.http_json_request("https://example.test/models", method="GET")
+
+    assert status_code == 502
+    assert payload == {
+        "error": "invalid_json",
+        "message": "Provider returned a non-JSON response",
+        "body": "<html>not json</html>",
+        "upstream_status_code": 200,
+    }
+
+
+def test_openai_adapter_uses_models_url_when_healthcheck_is_null(monkeypatch: pytest.MonkeyPatch):
+    seen_urls: list[str] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del method, payload, headers, timeout_seconds
+        seen_urls.append(url)
+        return {"data": []}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    binding = platform_service.ProviderBinding.from_row(
+        {
+            "id": "provider-openai",
+            "capability_key": "llm_inference",
+            "provider_slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "display_name": "OpenAI cloud",
+            "description": "desc",
+            "endpoint_url": "https://api.openai.com/v1",
+            "healthcheck_url": None,
+            "enabled": True,
+            "adapter_kind": "openai_compatible_llm",
+            "config": {"models_path": "/models"},
+        }
+    )
+
+    health = platform_adapters.OpenAICompatibleLlmAdapter(binding).health()
+
+    assert seen_urls == ["https://api.openai.com/v1/models"]
+    assert health["reachable"] is True
+
+
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -1707,6 +1791,71 @@ def test_openai_adapter_normalizes_openai_chat_payloads(monkeypatch: pytest.Monk
     assert payload == {
         "choices": [{"message": {"role": "assistant", "content": "llama.cpp says hi"}}],
         "output": [{"role": "assistant", "content": [{"type": "text", "text": "llama.cpp says hi"}]}],
+    }
+
+
+def test_openai_adapter_uses_completion_token_budget_for_gpt5_chat_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del url, method, headers, timeout_seconds
+        seen_payloads.append(dict(payload or {}))
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "gpt-5 says hi",
+                    }
+                }
+            ]
+        }, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleLlmAdapter(
+        platform_service.ProviderBinding(
+            capability_key="llm_inference",
+            provider_instance_id="provider-2",
+            provider_slug="openai-cloud",
+            provider_key="openai_compatible_cloud_llm",
+            provider_display_name="OpenAI cloud",
+            provider_description="desc",
+            endpoint_url="https://api.openai.com/v1",
+            healthcheck_url=None,
+            enabled=True,
+            adapter_kind="openai_compatible_llm",
+            config={
+                "chat_completion_path": "/v1/chat/completions",
+                "request_format": "openai_chat",
+            },
+            binding_config={},
+            deployment_profile_id="deployment-2",
+            deployment_profile_slug="cloud",
+            deployment_profile_display_name="Cloud",
+        )
+    )
+
+    payload, status_code = adapter.chat_completion(
+        model="gpt-5-nano",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+        max_tokens=64,
+        temperature=0.1,
+        allow_local_fallback=False,
+    )
+
+    assert status_code == 200
+    assert seen_payloads == [
+        {
+            "model": "gpt-5-nano",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_completion_tokens": 64,
+        }
+    ]
+    assert payload == {
+        "choices": [{"message": {"role": "assistant", "content": "gpt-5 says hi"}}],
+        "output": [{"role": "assistant", "content": [{"type": "text", "text": "gpt-5 says hi"}]}],
     }
 
 

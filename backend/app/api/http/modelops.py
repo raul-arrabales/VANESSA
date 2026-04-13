@@ -13,6 +13,9 @@ from ...application.modelops_credentials_service import (
     list_credentials_for_user as _list_credentials_for_user,
     revoke_credential as _revoke_credential,
 )
+from ...application.modelops_cloud_discovery_service import (
+    discover_cloud_provider_models as _discover_cloud_provider_models,
+)
 from ...application.modelops_local_service import (
     append_audit_event as _append_local_audit_event,
     assert_internet_allowed as _assert_internet_allowed,
@@ -56,6 +59,7 @@ from .modelops_common import (
     serialize_local_artifact,
 )
 from .modelops_credentials import register_modelops_credentials_routes
+from .modelops_cloud_discovery import register_modelops_cloud_discovery_routes
 from .modelops_local import register_modelops_local_routes
 from .modelops_models import register_modelops_models_routes
 
@@ -79,6 +83,7 @@ delete_model = _delete_model
 create_credential = _create_credential
 list_credentials_for_user = _list_credentials_for_user
 revoke_credential = _revoke_credential
+discover_cloud_provider_models = _discover_cloud_provider_models
 list_scope_assignments = _list_scope_assignments
 upsert_scope_assignment = _upsert_scope_assignment
 assert_internet_allowed = _assert_internet_allowed
@@ -132,6 +137,13 @@ register_modelops_access_routes(
     append_audit_event_fn=lambda *args, **kwargs: _append_access_audit_event(*args, **kwargs),
 )
 
+register_modelops_cloud_discovery_routes(
+    bp,
+    config_getter=lambda: _config(),
+    json_error_fn=_json_error,
+    discover_cloud_provider_models_fn=lambda *args, **kwargs: discover_cloud_provider_models(*args, **kwargs),
+)
+
 register_modelops_local_routes(
     bp,
     config_getter=lambda: _config(),
@@ -175,6 +187,7 @@ __all__ = [
     "create_credential",
     "list_credentials_for_user",
     "revoke_credential",
+    "discover_cloud_provider_models",
     "list_scope_assignments",
     "upsert_scope_assignment",
     "assert_internet_allowed",

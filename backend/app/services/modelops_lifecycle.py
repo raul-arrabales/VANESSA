@@ -52,8 +52,10 @@ def create_model(
     )
     if visibility_scope not in {"private", "user", "group", "platform"}:
         raise ModelOpsError("missing_config", "visibility_scope must be private, user, group, or platform", status_code=400)
-    if owner_type == modelops_repo.OWNER_USER and actor_role == "user" and visibility_scope != "private":
-        raise ModelOpsError("forbidden", "Regular users can only create private personal models", status_code=403)
+    if owner_type == modelops_repo.OWNER_USER and visibility_scope != "private":
+        raise ModelOpsError("missing_config", "Personal models must use private visibility", status_code=400)
+    if owner_type == modelops_repo.OWNER_PLATFORM and visibility_scope != "platform":
+        raise ModelOpsError("missing_config", "Platform models must use platform visibility", status_code=400)
     provider_model_id = str(payload.get("provider_model_id", "")).strip() or None
     credential_id = str(payload.get("credential_id", "")).strip() or None
     owner_user_id = actor_user_id if owner_type == modelops_repo.OWNER_USER else None

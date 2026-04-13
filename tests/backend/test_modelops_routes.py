@@ -50,6 +50,23 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
         item["revoked_at"] = datetime.now(tz=timezone.utc)
         return dict(item)
 
+    def _discover_cloud_provider_models(_db: str, **kwargs):
+        return {
+            "provider": kwargs["provider"],
+            "credential_id": kwargs["credential_id"],
+            "models": [
+                {
+                    "provider_model_id": "gpt-4.1",
+                    "name": "gpt-4.1",
+                    "owned_by": "openai",
+                    "created_at": None,
+                    "task_key": "llm",
+                    "category": "generative",
+                    "metadata": {"provider_model_id": "gpt-4.1"},
+                }
+            ],
+        }
+
     def _create_model(_db: str, **kwargs):
         if not kwargs["payload"].get("task_key"):
             raise routes.ModelOpsError("missing_config", "task_key is required", status_code=400)
@@ -84,6 +101,7 @@ def client(backend_test_client_factory, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(routes, "create_credential", _create_credential)
     monkeypatch.setattr(routes, "list_credentials_for_user", _list_credentials)
     monkeypatch.setattr(routes, "revoke_credential", _revoke_credential)
+    monkeypatch.setattr(routes, "discover_cloud_provider_models", _discover_cloud_provider_models)
     monkeypatch.setattr(routes, "create_model", _create_model)
     monkeypatch.setattr(routes.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
     monkeypatch.setattr(
@@ -197,6 +215,30 @@ def test_user_can_revoke_personal_credential(client):
     assert body["credential"]["id"] == credential["id"]
     assert body["credential"]["is_active"] is False
     assert body["affected_model_count"] == 0
+
+
+def test_user_can_discover_cloud_provider_models_with_credential(client):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="u6@example.com",
+        username="user6",
+        password_hash=hash_password("pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _token(test_client, user["username"], "pass-123")
+
+    response = test_client.get(
+        "/v1/modelops/discovery/cloud?provider=openai_compatible&credential_id=cred-1",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["provider"] == "openai_compatible"
+    assert body["credential_id"] == "cred-1"
+    assert body["models"][0]["provider_model_id"] == "gpt-4.1"
 
 
 def test_register_external_model_requires_validation_path(client):

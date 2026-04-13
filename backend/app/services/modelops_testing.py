@@ -11,7 +11,7 @@ from ..repositories.model_credentials import get_active_credential_secret_by_id
 from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model, serialize_model_test_run
-from .platform_adapters import http_json_request
+from .platform_adapters import build_credential_openai_compatible_llm_adapter, http_json_request
 from .platform_service import (
     _effective_local_slot,
     ensure_platform_bootstrap_state,
@@ -136,19 +136,26 @@ def _execute_cloud_llm_test(
     if not provider_model_id:
         raise ModelOpsError("missing_config", "Cloud model is missing provider_model_id", status_code=400)
 
-    request_payload = {
-        "model": provider_model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0,
-        "max_tokens": 64,
-    }
-    started_at = perf_counter()
-    payload, status_code = http_json_request(
-        f"{api_base_url}/chat/completions",
-        method="POST",
-        payload=request_payload,
-        headers={"Authorization": f"Bearer {str(secret.get('api_key') or '').strip()}"},
+    adapter = build_credential_openai_compatible_llm_adapter(
+        api_base_url=api_base_url,
+        api_key=str(secret.get("api_key") or "").strip(),
+        provider_slug=str(secret.get("provider_slug") or row.get("provider") or "openai_compatible").strip(),
         timeout_seconds=8.0,
+    )
+    messages = [{"role": "user", "content": prompt}]
+    request_payload = adapter.build_chat_completion_payload(
+        model=provider_model_id,
+        max_tokens=64,
+        messages=messages,
+        temperature=0,
+    )
+    started_at = perf_counter()
+    payload, status_code = adapter.chat_completion(
+        model=provider_model_id,
+        messages=messages,
+        max_tokens=64,
+        temperature=0,
+        allow_local_fallback=False,
     )
     latency_ms = (perf_counter() - started_at) * 1000
     response_payload = payload if isinstance(payload, dict) else {}

@@ -67,8 +67,8 @@ class ProviderBinding:
                 or ""
             ).strip(),
             provider_description=str(row.get("provider_description") or row.get("description") or "").strip(),
-            endpoint_url=str(row.get("endpoint_url", "")).strip(),
-            healthcheck_url=str(row.get("healthcheck_url", "")).strip() or None,
+            endpoint_url=_optional_text(row.get("endpoint_url")) or "",
+            healthcheck_url=_optional_text(row.get("healthcheck_url")),
             enabled=bool(row.get("enabled", True)),
             adapter_kind=str(row.get("adapter_kind", "")).strip().lower(),
             config=dict(row.get("config_json") or row.get("config") or {}),
@@ -81,6 +81,13 @@ class ProviderBinding:
             deployment_profile_slug=str(row.get("deployment_profile_slug", "")).strip(),
             deployment_profile_display_name=str(row.get("deployment_profile_display_name", "")).strip(),
         )
+
+
+def _optional_text(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized or normalized.lower() in {"none", "null"}:
+        return None
+    return normalized
 
 
 @dataclass(frozen=True)

@@ -10,6 +10,7 @@ from uuid import NAMESPACE_URL, uuid5
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .openai_compatible_generation import add_openai_compatible_chat_generation_options
 from .platform_types import PlatformControlPlaneError, ProviderBinding
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
@@ -39,11 +40,25 @@ def http_json_request(
         request_headers.setdefault("Content-Type", "application/json")
         data = dumps(payload).encode("utf-8")
 
-    req = Request(url, data=data, headers=request_headers, method=method.upper())
+    normalized_url = str(url or "").strip()
+    if not normalized_url or normalized_url.lower() in {"none", "null"} or "://" not in normalized_url:
+        return {"error": "invalid_url", "message": "Provider URL is missing or invalid"}, 400
+
+    req = Request(normalized_url, data=data, headers=request_headers, method=method.upper())
     try:
         with urlopen(req, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
-            return (loads(raw) if raw else {}), int(response.status)
+            if not raw:
+                return {}, int(response.status)
+            try:
+                return loads(raw), int(response.status)
+            except ValueError:
+                return {
+                    "error": "invalid_json",
+                    "message": "Provider returned a non-JSON response",
+                    "body": raw[:500],
+                    "upstream_status_code": int(response.status),
+                }, 502
     except TimeoutError:
         return None, 504
     except HTTPError as exc:
@@ -423,11 +438,12 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         allow_local_fallback: bool,
     ) -> tuple[dict[str, Any] | None, int]:
         effective_model = model or str(self.binding.config.get("forced_model_id", "")).strip()
-        payload: dict[str, Any] = self._build_chat_payload(model=effective_model, messages=messages)
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
-        if temperature is not None:
-            payload["temperature"] = temperature
+        payload = self.build_chat_completion_payload(
+            model=effective_model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
 
         response_payload, status_code = http_json_request(
             self._chat_url(),
@@ -450,8 +466,14 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 effective_model,
                 self.binding.provider_slug,
             )
-            fallback_payload = dict(payload)
-            fallback_payload["model"] = fallback_model_id
+            fallback_payload = self._build_chat_payload(model=fallback_model_id, messages=messages)
+            add_openai_compatible_chat_generation_options(
+                fallback_payload,
+                model=fallback_model_id,
+                request_format=self._request_format(),
+                token_budget=max_tokens,
+                temperature=temperature,
+            )
             fallback_response, fallback_status = http_json_request(
                 self._chat_url(),
                 method="POST",
@@ -472,11 +494,13 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         allow_local_fallback: bool,
     ) -> Iterator[dict[str, Any]]:
         effective_model = model or str(self.binding.config.get("forced_model_id", "")).strip()
-        payload: dict[str, Any] = self._build_chat_payload(model=effective_model, messages=messages)
-        if max_tokens is not None:
-            payload["max_tokens"] = max_tokens
-        if temperature is not None:
-            payload["temperature"] = temperature
+        request_format = self._request_format()
+        payload = self.build_chat_completion_payload(
+            model=effective_model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
         payload["stream"] = True
 
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
@@ -566,8 +590,15 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         else:
             return
 
-        fallback_payload = dict(payload)
-        fallback_payload["model"] = fallback_model_id
+        fallback_payload = self._build_chat_payload(model=fallback_model_id, messages=messages)
+        add_openai_compatible_chat_generation_options(
+            fallback_payload,
+            model=fallback_model_id,
+            request_format=request_format,
+            token_budget=max_tokens,
+            temperature=temperature,
+        )
+        fallback_payload["stream"] = True
         try:
             yield from _stream_attempt(fallback_payload)
         except StreamRequestError as exc:
@@ -588,6 +619,59 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             "model": model,
             "input": messages,
         }
+
+    def build_chat_completion_payload(
+        self,
+        *,
+        model: str,
+        messages: list[dict[str, Any]],
+        max_tokens: int | None,
+        temperature: float | None,
+    ) -> dict[str, Any]:
+        request_format = self._request_format()
+        payload = self._build_chat_payload(model=model, messages=messages)
+        add_openai_compatible_chat_generation_options(
+            payload,
+            model=model,
+            request_format=request_format,
+            token_budget=max_tokens,
+            temperature=temperature,
+        )
+        return payload
+
+
+def build_credential_openai_compatible_llm_adapter(
+    *,
+    api_base_url: str,
+    api_key: str,
+    provider_slug: str,
+    timeout_seconds: float,
+) -> OpenAICompatibleLlmAdapter:
+    return OpenAICompatibleLlmAdapter(
+        ProviderBinding(
+            capability_key="llm_inference",
+            provider_instance_id="modelops-credential",
+            provider_slug=provider_slug,
+            provider_key="openai_compatible_cloud_llm",
+            provider_display_name=provider_slug,
+            provider_description="Credential-backed OpenAI-compatible LLM",
+            endpoint_url=api_base_url.rstrip("/"),
+            healthcheck_url=None,
+            enabled=True,
+            adapter_kind="openai_compatible_llm",
+            config={
+                "chat_completion_path": "/chat/completions",
+                "models_path": "/models",
+                "request_format": "openai_chat",
+                "request_timeout_seconds": timeout_seconds,
+                "secret_refs": {"api_key": api_key},
+            },
+            binding_config={},
+            deployment_profile_id="modelops-credential",
+            deployment_profile_slug="modelops-credential",
+            deployment_profile_display_name="ModelOps credential",
+        )
+    )
 
 
 class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):

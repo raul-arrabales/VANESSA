@@ -83,6 +83,106 @@ def test_create_model_accepts_extensible_task_key(monkeypatch: pytest.MonkeyPatc
     assert model["owner_type"] == "user"
 
 
+def test_create_model_accepts_platform_cloud_model_with_platform_visibility(
+    monkeypatch: pytest.MonkeyPatch,
+    config: AuthConfig,
+):
+    captured: dict[str, object] = {}
+
+    def _upsert_model_record(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "model_id": kwargs["model_id"],
+            "global_model_id": f"{kwargs['node_id']}:{kwargs['model_id']}",
+            "node_id": kwargs["node_id"],
+            "name": kwargs["name"],
+            "provider": kwargs["provider"],
+            "provider_model_id": kwargs.get("provider_model_id"),
+            "backend_kind": kwargs["backend_kind"],
+            "hosting_kind": "cloud",
+            "source_kind": kwargs["source_kind"],
+            "availability": kwargs["availability"],
+            "runtime_mode_policy": "online_only",
+            "visibility_scope": kwargs["visibility_scope"],
+            "owner_type": kwargs["owner_type"],
+            "owner_user_id": kwargs["owner_user_id"],
+            "task_key": kwargs["task_key"],
+            "category": kwargs["category"],
+            "lifecycle_state": kwargs["lifecycle_state"],
+            "is_validation_current": False,
+            "last_validation_status": None,
+            "last_validated_at": None,
+            "last_validation_error": {},
+            "metadata": {},
+            "artifact": {},
+            "dependencies": [],
+        }
+
+    monkeypatch.setattr(modelops_lifecycle.modelops_repo, "upsert_model_record", _upsert_model_record)
+    monkeypatch.setattr(modelops_lifecycle.modelops_repo, "append_audit_event", lambda *args, **kwargs: None)
+
+    model = modelops_lifecycle.create_model(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=7,
+        actor_role="superadmin",
+        payload={
+            "id": "gpt-platform",
+            "name": "GPT Platform",
+            "provider": "openai_compatible",
+            "backend": "external_api",
+            "owner_type": "platform",
+            "visibility_scope": "platform",
+            "provider_model_id": "gpt-4.1",
+            "task_key": "llm",
+        },
+    )
+
+    assert captured["owner_type"] == "platform"
+    assert captured["visibility_scope"] == "platform"
+    assert captured["owner_user_id"] is None
+    assert model["owner_type"] == "platform"
+    assert model["visibility_scope"] == "platform"
+
+
+@pytest.mark.parametrize(
+    ("owner_type", "visibility_scope", "expected_message"),
+    [
+        ("user", "platform", "Personal models must use private visibility"),
+        ("platform", "private", "Platform models must use platform visibility"),
+        ("platform", "user", "Platform models must use platform visibility"),
+        ("platform", "group", "Platform models must use platform visibility"),
+    ],
+)
+def test_create_model_rejects_incoherent_owner_visibility_pairs(
+    owner_type: str,
+    visibility_scope: str,
+    expected_message: str,
+    config: AuthConfig,
+):
+    with pytest.raises(ModelOpsError) as exc_info:
+        modelops_lifecycle.create_model(
+            "postgresql://ignored",
+            config=config,
+            actor_user_id=7,
+            actor_role="superadmin",
+            payload={
+                "id": f"{owner_type}-{visibility_scope}",
+                "name": "Bad access pairing",
+                "provider": "openai_compatible",
+                "backend": "external_api",
+                "owner_type": owner_type,
+                "visibility_scope": visibility_scope,
+                "provider_model_id": "gpt-4.1",
+                "credential_id": "cred-1",
+                "task_key": "llm",
+            },
+        )
+
+    assert exc_info.value.status_code == 400
+    assert str(exc_info.value) == expected_message
+
+
 def test_activate_model_requires_current_successful_validation(monkeypatch: pytest.MonkeyPatch, config: AuthConfig):
     monkeypatch.setattr(
         modelops_lifecycle,

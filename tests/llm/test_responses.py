@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import importlib
+from json import loads
 import sys
-import types
 from pathlib import Path
 from urllib.error import HTTPError
 
@@ -11,21 +12,58 @@ from pydantic import ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LLM_PATH = PROJECT_ROOT / "llm"
-for module_name in list(sys.modules):
-    if module_name == "app" or module_name.startswith("app."):
-        del sys.modules[module_name]
-if str(LLM_PATH) in sys.path:
-    sys.path.remove(str(LLM_PATH))
-sys.path.insert(0, str(LLM_PATH))
-llm_app_package = types.ModuleType("app")
-llm_app_package.__path__ = [str(LLM_PATH / "app")]
-sys.modules["app"] = llm_app_package
 
-from app.main import _iter_streaming_response_chunks, create_chat_completion, create_embeddings, create_response  # noqa: E402
-from app.providers.openai_compat import OpenAICompatibleProvider  # noqa: E402
-from app.providers.base import ProviderError  # noqa: E402
-from app.registry import registry  # noqa: E402
-from app.schemas import EmbeddingRequest, ResponseRequest  # noqa: E402
+
+def _load_llm_response_symbols():
+    original_sys_path = list(sys.path)
+    original_app_modules = {
+        name: module
+        for name, module in sys.modules.items()
+        if name == "app" or name.startswith("app.")
+    }
+    try:
+        if str(LLM_PATH) in sys.path:
+            sys.path.remove(str(LLM_PATH))
+        sys.path.insert(0, str(LLM_PATH))
+        for module_name in list(sys.modules):
+            if module_name == "app" or module_name.startswith("app."):
+                del sys.modules[module_name]
+        main_module = importlib.import_module("app.main")
+        openai_compat_module = importlib.import_module("app.providers.openai_compat")
+        base_module = importlib.import_module("app.providers.base")
+        registry_module = importlib.import_module("app.registry")
+        schemas_module = importlib.import_module("app.schemas")
+        return {
+            "_iter_streaming_response_chunks": main_module._iter_streaming_response_chunks,
+            "create_chat_completion": main_module.create_chat_completion,
+            "create_embeddings": main_module.create_embeddings,
+            "create_response": main_module.create_response,
+            "OpenAICompatibleProvider": openai_compat_module.OpenAICompatibleProvider,
+            "openai_compat_module": openai_compat_module,
+            "ProviderError": base_module.ProviderError,
+            "registry": registry_module.registry,
+            "EmbeddingRequest": schemas_module.EmbeddingRequest,
+            "ResponseRequest": schemas_module.ResponseRequest,
+        }
+    finally:
+        for module_name in list(sys.modules):
+            if module_name == "app" or module_name.startswith("app."):
+                del sys.modules[module_name]
+        sys.modules.update(original_app_modules)
+        sys.path[:] = original_sys_path
+
+
+_llm_symbols = _load_llm_response_symbols()
+_iter_streaming_response_chunks = _llm_symbols["_iter_streaming_response_chunks"]
+create_chat_completion = _llm_symbols["create_chat_completion"]
+create_embeddings = _llm_symbols["create_embeddings"]
+create_response = _llm_symbols["create_response"]
+OpenAICompatibleProvider = _llm_symbols["OpenAICompatibleProvider"]
+openai_compat_module = _llm_symbols["openai_compat_module"]
+ProviderError = _llm_symbols["ProviderError"]
+registry = _llm_symbols["registry"]
+EmbeddingRequest = _llm_symbols["EmbeddingRequest"]
+ResponseRequest = _llm_symbols["ResponseRequest"]
 
 
 def test_unknown_model_returns_not_found() -> None:
@@ -174,7 +212,7 @@ def test_embeddings_maps_openai_error_payloads_even_when_upstream_returns_200(mo
                 b'{"object":"error","message":"The model does not support Embeddings API","type":"BadRequestError","code":400}'
             )
 
-    monkeypatch.setattr("app.providers.openai_compat.urlopen", lambda *args, **kwargs: _FakeResponse())
+    monkeypatch.setattr(openai_compat_module, "urlopen", lambda *args, **kwargs: _FakeResponse())
 
     with pytest.raises(ProviderError) as exc_info:
         provider.embed(
@@ -214,7 +252,7 @@ def test_embeddings_preserve_fastapi_detail_messages_from_upstream_http_errors(m
     def _raise_http_error(*_args, **_kwargs):
         raise _FakeHTTPError()
 
-    monkeypatch.setattr("app.providers.openai_compat.urlopen", _raise_http_error)
+    monkeypatch.setattr(openai_compat_module, "urlopen", _raise_http_error)
 
     with pytest.raises(ProviderError) as exc_info:
         provider.embed(
@@ -270,6 +308,54 @@ def test_chat_completion_normalizes_provider_tool_calls(monkeypatch: pytest.Monk
 
     assert response.output[0].tool_calls[0].function.name == "web_search"
     assert response.output[0].content == []
+
+
+def test_openai_compatible_provider_uses_completion_token_budget_for_gpt5(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = OpenAICompatibleProvider(
+        base_url="http://example.test/v1",
+        auth_header_value=None,
+        provider_code_prefix="openai",
+        timeout_seconds=5,
+    )
+    request = ResponseRequest(
+        model="gpt-5-nano",
+        input=[{"role": "user", "content": [{"type": "text", "text": "Hi"}]}],
+        temperature=0,
+        max_tokens=12,
+    )
+    seen_payloads: list[dict[str, object]] = []
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self) -> bytes:
+            return b'{"choices":[{"message":{"content":"hello"}}],"usage":{"prompt_tokens":3,"completion_tokens":2}}'
+
+    def _urlopen(req, *args, **kwargs):
+        del args, kwargs
+        seen_payloads.append(loads(req.data.decode("utf-8")))
+        return FakeResponse()
+
+    monkeypatch.setattr(openai_compat_module, "urlopen", _urlopen)
+
+    result = provider.generate(request, upstream_model="gpt-5-nano")
+
+    assert seen_payloads == [
+        {
+            "model": "gpt-5-nano",
+            "messages": [{"role": "user", "content": "Hi"}],
+            "max_completion_tokens": 12,
+        }
+    ]
+    assert result.output_text == "hello"
 
 
 def test_streaming_response_chunks_emit_delta_then_complete() -> None:
@@ -347,7 +433,7 @@ def test_openai_compatible_provider_parses_streamed_sse_deltas(monkeypatch: pyte
             _ = (exc_type, exc, tb)
             return False
 
-    monkeypatch.setattr("app.providers.openai_compat.urlopen", lambda *_args, **_kwargs: FakeResponse())
+    monkeypatch.setattr(openai_compat_module, "urlopen", lambda *_args, **_kwargs: FakeResponse())
 
     events = list(provider.generate_stream(request, upstream_model="dummy"))
 

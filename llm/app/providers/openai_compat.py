@@ -11,6 +11,7 @@ from app.registry import EmbeddingResult, ProviderResult
 from app.schemas import EmbeddingRequest, ImageInputObject, ImageUrlPart, ResponseRequest, TextPart
 
 from .base import ProviderError
+from .openai_compatible_generation import add_openai_compatible_chat_generation_options
 
 
 def _coerce_openai_message_content(request: ResponseRequest) -> list[dict[str, Any]]:
@@ -292,10 +293,12 @@ class OpenAICompatibleProvider:
             "model": upstream_model,
             "messages": _coerce_openai_message_content(request),
         }
-        if request.temperature is not None:
-            payload["temperature"] = request.temperature
-        if request.max_tokens is not None:
-            payload["max_tokens"] = request.max_tokens
+        add_openai_compatible_chat_generation_options(
+            payload,
+            model=upstream_model,
+            token_budget=request.max_tokens,
+            temperature=request.temperature,
+        )
         if request.tools:
             payload["tools"] = [
                 {
@@ -389,10 +392,12 @@ class OpenAICompatibleProvider:
             "messages": _coerce_openai_message_content(request),
             "stream": True,
         }
-        if request.temperature is not None:
-            payload["temperature"] = request.temperature
-        if request.max_tokens is not None:
-            payload["max_tokens"] = request.max_tokens
+        add_openai_compatible_chat_generation_options(
+            payload,
+            model=upstream_model,
+            token_budget=request.max_tokens,
+            temperature=request.temperature,
+        )
         if request.tools:
             payload["tools"] = [
                 {

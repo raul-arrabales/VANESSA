@@ -1,6 +1,7 @@
 import { requestJson } from "./request";
 import type {
   ChatHistoryItem,
+  CloudDiscoveredModel,
   InferenceResult,
   ManagedModel,
   ModelCatalogItem,
@@ -61,6 +62,22 @@ export async function registerManagedModel(
     body: payload,
   });
   return result.model;
+}
+
+export async function discoverCloudProviderModels(
+  provider: string,
+  credentialId: string,
+  token: string,
+): Promise<CloudDiscoveredModel[]> {
+  const params = new URLSearchParams({
+    provider,
+    credential_id: credentialId,
+  });
+  const result = await requestJson<{ models: CloudDiscoveredModel[] }>(
+    `/v1/modelops/discovery/cloud?${params.toString()}`,
+    { token },
+  );
+  return result.models;
 }
 
 export async function listAvailableManagedModels(token: string): Promise<ManagedModel[]> {

@@ -993,7 +993,8 @@
   "modelOps": {
     "eyebrow": "ModelOps",
     "states": {
-      "loading": "Loading ModelOps data..."
+      "loading": "Loading ModelOps data...",
+      "unknown": "Unknown"
     },
     "workspace": {
       "title": "ModelOps",
@@ -1032,6 +1033,7 @@
       "modelId": "Model id",
       "modelName": "Model name",
       "ownerType": "Owner type",
+      "accessMode": "Access mode",
       "visibilityScope": "Visibility",
       "providerModelId": "Provider model id",
       "credential": "Credential",
@@ -1088,6 +1090,11 @@
       "newCredentialTitle": "Save new credential",
       "registrationTitle": "Register cloud model",
       "recentTitle": "Recently registered cloud models",
+      "providerStepTitle": "Choose provider",
+      "credentialStepTitle": "Choose credential",
+      "accessStepTitle": "Set access",
+      "discoveryStepTitle": "Browse models",
+      "reviewStepTitle": "Review registration",
       "views": {
         "aria": "Cloud model registration sections",
         "credentials": "Credentials",
@@ -1097,8 +1104,38 @@
       "savedCredentialsListAria": "Saved cloud credentials",
       "emptyCredentials": "No credentials have been saved yet.",
       "emptyRecent": "No cloud models have been registered yet.",
+      "selectProvider": "Select provider",
       "selectCredential": "Select credential",
       "noCredentialsForProvider": "No credentials saved for the selected provider.",
+      "saveCredentialForProvider": "Save credential for {{provider}}",
+      "personalPrivateAccess": "This model will be personal and private.",
+      "accessModes": {
+        "personalPrivate": "Personal/private",
+        "platformShared": "Platform/shared"
+      },
+      "accessModeDescriptions": {
+        "personal_private": "Only you can use and manage this model.",
+        "platform_shared": "Platform model available for shared access management."
+      },
+      "browseProviderModels": "Browse provider models",
+      "browsingProviderModels": "Browsing provider models...",
+      "noDiscoveredModels": "No provider models were returned for this credential.",
+      "discoveredModelsListAria": "Discovered provider models",
+      "searchModels": "Search models",
+      "ownerFilter": "Owner",
+      "taskFilter": "Task",
+      "categoryFilter": "Category",
+      "allOwners": "All owners",
+      "allTasks": "All tasks",
+      "allCategories": "All categories",
+      "modelFilterResultCount": "{{count}} of {{total}} models",
+      "noFilteredModels": "No models match the current filters.",
+      "selectProviderModel": "Select model",
+      "selectedProviderModel": "Selected",
+      "discoveredModelSummary": "Owner: {{owner}} · Task: {{task}} · Category: {{category}}",
+      "generatedModelId": "Generated model id",
+      "inferredTask": "Inferred task",
+      "taskReviewHint": "Check the task before registering if this provider model is not a text-generation model.",
       "revokeCredential": "Revoke",
       "revokeCredentialDialog": {
         "title": "Revoke credential",
@@ -1111,6 +1148,8 @@
       "credentialSaveFailed": "Unable to save credential.",
       "credentialRevoked": "Credential revoked.",
       "credentialRevokeFailed": "Unable to revoke credential.",
+      "discoveryUnsupported": "Provider model browsing is not supported for the selected provider yet.",
+      "discoveryFailed": "Unable to browse provider models.",
       "modelRegistered": "Model registered.",
       "modelRegisterFailed": "Unable to register cloud model."
     },

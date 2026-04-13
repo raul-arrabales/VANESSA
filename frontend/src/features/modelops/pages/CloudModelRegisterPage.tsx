@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
@@ -9,7 +9,7 @@ import ModelCatalogList from "../components/ModelCatalogList";
 import CloudCredentialList from "../components/CloudCredentialList";
 import CloudCredentialForm from "../components/CloudCredentialForm";
 import CloudModelRegistrationForm from "../components/CloudModelRegistrationForm";
-import { TASK_OPTIONS } from "../domain";
+import { CLOUD_PROVIDER_OPTIONS, TASK_OPTIONS } from "../domain";
 import { useCloudRegistrationFlow } from "../hooks/useCloudRegistrationFlow";
 
 type CredentialFormState = {
@@ -24,8 +24,7 @@ type CloudModelState = {
   id: string;
   name: string;
   provider: string;
-  ownerType: "platform" | "user";
-  visibilityScope: "private" | "user" | "group" | "platform";
+  accessMode: "personal_private" | "platform_shared";
   providerModelId: string;
   credentialId: string;
   taskKey: string;
@@ -47,16 +46,33 @@ function resolveCloudModelRegisterView(value: string | null): CloudModelRegister
   return "register";
 }
 
+function resolveCloudProvider(value: string | null): string {
+  return CLOUD_PROVIDER_OPTIONS.some((option) => option.value === value) ? String(value) : "openai_compatible";
+}
+
 export default function CloudModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
-  const { credentials, recentCloudModels, isLoading, isSaving, saveCredential, revokeCredential, registerCloudModel } =
+  const {
+    credentials,
+    recentCloudModels,
+    discoveredCloudModels,
+    isLoading,
+    isSaving,
+    isDiscovering,
+    clearCloudDiscovery,
+    saveCredential,
+    revokeCredential,
+    discoverProviderModels,
+    registerCloudModel,
+  } =
     useCloudRegistrationFlow(token);
   const isSuperadmin = user?.role === "superadmin";
   const canTest = user?.role === "admin" || user?.role === "superadmin";
   const [lastRegisteredModelId, setLastRegisteredModelId] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = resolveCloudModelRegisterView(searchParams.get("view"));
+  const requestedProvider = resolveCloudProvider(searchParams.get("provider"));
   const submenuItems = CLOUD_MODEL_REGISTER_VIEW_ORDER.map((view) => ({
     id: view,
     label: t(`modelOps.cloud.views.${view}`),
@@ -65,7 +81,7 @@ export default function CloudModelRegisterPage(): JSX.Element {
   }));
 
   const [credentialState, setCredentialState] = useState<CredentialFormState>({
-    provider: "openai_compatible",
+    provider: requestedProvider,
     credentialScope: "personal" as const,
     displayName: "",
     apiBaseUrl: "https://api.openai.com/v1",
@@ -75,9 +91,8 @@ export default function CloudModelRegisterPage(): JSX.Element {
   const [modelState, setModelState] = useState<CloudModelState>({
     id: "",
     name: "",
-    provider: "openai_compatible",
-    ownerType: "user" as const,
-    visibilityScope: "private" as const,
+    provider: "",
+    accessMode: "personal_private" as const,
     providerModelId: "",
     credentialId: "",
     taskKey: "llm",
@@ -88,6 +103,16 @@ export default function CloudModelRegisterPage(): JSX.Element {
     () => recentCloudModels as ManagedModel[],
     [recentCloudModels],
   );
+  const selectedDiscoveredModel = useMemo(
+    () => discoveredCloudModels.find((model) => model.provider_model_id === modelState.providerModelId) ?? null,
+    [discoveredCloudModels, modelState.providerModelId],
+  );
+
+  useEffect(() => {
+    if (activeView === "credentials") {
+      setCredentialState((current) => ({ ...current, provider: requestedProvider }));
+    }
+  }, [activeView, requestedProvider]);
 
   function handleChangeView(view: CloudModelRegisterView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -134,29 +159,49 @@ export default function CloudModelRegisterPage(): JSX.Element {
               credentials={credentials}
               isLoading={isLoading}
               isSaving={isSaving}
+              isDiscovering={isDiscovering}
+              discoveredModels={discoveredCloudModels}
               allowPlatformOwnership={isSuperadmin}
+              actorUserId={user?.id}
               onChange={setModelState}
+              onDiscover={discoverProviderModels}
+              onClearDiscovery={clearCloudDiscovery}
               onSubmit={async () => {
-                const category = TASK_OPTIONS.find((option) => option.value === modelState.taskKey)?.category ?? "generative";
+                const category = selectedDiscoveredModel?.category ?? TASK_OPTIONS.find((option) => option.value === modelState.taskKey)?.category ?? "generative";
+                const accessMode = isSuperadmin ? modelState.accessMode : "personal_private";
+                const ownerType = accessMode === "platform_shared" ? "platform" : "user";
                 const created = await registerCloudModel({
                   id: modelState.id.trim(),
                   name: modelState.name.trim(),
                   provider: modelState.provider,
-                  owner_type: isSuperadmin ? modelState.ownerType : "user",
-                  visibility_scope: isSuperadmin ? modelState.visibilityScope : "private",
+                  owner_type: ownerType,
+                  visibility_scope: ownerType === "platform" ? "platform" : "private",
                   provider_model_id: modelState.providerModelId.trim(),
                   credential_id: modelState.credentialId || undefined,
                   task_key: modelState.taskKey,
                   category,
+                  source_id: modelState.providerModelId.trim(),
+                  metadata: {
+                    provider_discovery: {
+                      provider: modelState.provider,
+                      provider_model_id: selectedDiscoveredModel?.provider_model_id ?? modelState.providerModelId.trim(),
+                      name: selectedDiscoveredModel?.name ?? modelState.name.trim(),
+                      owned_by: selectedDiscoveredModel?.owned_by ?? null,
+                      created_at: selectedDiscoveredModel?.created_at ?? null,
+                      task_key: modelState.taskKey,
+                      category,
+                      metadata: selectedDiscoveredModel?.metadata ?? {},
+                    },
+                  },
                   comment: modelState.comment.trim() || undefined,
                 });
                 setLastRegisteredModelId(created?.id ?? "");
+                clearCloudDiscovery();
                 setModelState({
                   id: "",
                   name: "",
-                  provider: modelState.provider,
-                  ownerType: "user",
-                  visibilityScope: "private",
+                  provider: "",
+                  accessMode: "personal_private",
                   providerModelId: "",
                   credentialId: "",
                   taskKey: "llm",

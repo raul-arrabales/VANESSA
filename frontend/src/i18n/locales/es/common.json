@@ -985,7 +985,8 @@
   "modelOps": {
     "eyebrow": "ModelOps",
     "states": {
-      "loading": "Cargando datos de ModelOps..."
+      "loading": "Cargando datos de ModelOps...",
+      "unknown": "Desconocido"
     },
     "workspace": {
       "title": "ModelOps",
@@ -1024,6 +1025,7 @@
       "modelId": "Id del modelo",
       "modelName": "Nombre del modelo",
       "ownerType": "Tipo de propietario",
+      "accessMode": "Modo de acceso",
       "visibilityScope": "Visibilidad",
       "providerModelId": "Id del modelo en proveedor",
       "credential": "Credencial",
@@ -1080,6 +1082,11 @@
       "newCredentialTitle": "Guardar nueva credencial",
       "registrationTitle": "Registrar modelo cloud",
       "recentTitle": "Modelos cloud registrados recientemente",
+      "providerStepTitle": "Elegir proveedor",
+      "credentialStepTitle": "Elegir credencial",
+      "accessStepTitle": "Definir acceso",
+      "discoveryStepTitle": "Buscar modelos",
+      "reviewStepTitle": "Revisar registro",
       "views": {
         "aria": "Secciones del registro de modelos cloud",
         "credentials": "Credenciales",
@@ -1089,8 +1096,38 @@
       "savedCredentialsListAria": "Credenciales cloud guardadas",
       "emptyCredentials": "Todavia no se han guardado credenciales.",
       "emptyRecent": "Todavia no hay modelos cloud registrados.",
+      "selectProvider": "Selecciona un proveedor",
       "selectCredential": "Selecciona una credencial",
       "noCredentialsForProvider": "No hay credenciales guardadas para el proveedor seleccionado.",
+      "saveCredentialForProvider": "Guardar credencial para {{provider}}",
+      "personalPrivateAccess": "Este modelo sera personal y privado.",
+      "accessModes": {
+        "personalPrivate": "Personal/privado",
+        "platformShared": "Plataforma/compartido"
+      },
+      "accessModeDescriptions": {
+        "personal_private": "Solo tu puedes usar y gestionar este modelo.",
+        "platform_shared": "Modelo de plataforma disponible para gestionar como acceso compartido."
+      },
+      "browseProviderModels": "Buscar modelos del proveedor",
+      "browsingProviderModels": "Buscando modelos del proveedor...",
+      "noDiscoveredModels": "La credencial no devolvio modelos del proveedor.",
+      "discoveredModelsListAria": "Modelos descubiertos del proveedor",
+      "searchModels": "Buscar modelos",
+      "ownerFilter": "Propietario",
+      "taskFilter": "Tarea",
+      "categoryFilter": "Categoria",
+      "allOwners": "Todos los propietarios",
+      "allTasks": "Todas las tareas",
+      "allCategories": "Todas las categorias",
+      "modelFilterResultCount": "{{count}} de {{total}} modelos",
+      "noFilteredModels": "Ningun modelo coincide con los filtros actuales.",
+      "selectProviderModel": "Seleccionar modelo",
+      "selectedProviderModel": "Seleccionado",
+      "discoveredModelSummary": "Propietario: {{owner}} · Tarea: {{task}} · Categoria: {{category}}",
+      "generatedModelId": "Id de modelo generado",
+      "inferredTask": "Tarea inferida",
+      "taskReviewHint": "Revisa la tarea antes de registrar si este modelo del proveedor no es de generacion de texto.",
       "revokeCredential": "Revocar",
       "revokeCredentialDialog": {
         "title": "Revocar credencial",
@@ -1103,6 +1140,8 @@
       "credentialSaveFailed": "No se pudo guardar la credencial.",
       "credentialRevoked": "Credencial revocada.",
       "credentialRevokeFailed": "No se pudo revocar la credencial.",
+      "discoveryUnsupported": "La busqueda de modelos no esta disponible todavia para el proveedor seleccionado.",
+      "discoveryFailed": "No se pudieron buscar modelos del proveedor.",
       "modelRegistered": "Modelo registrado.",
       "modelRegisterFailed": "No se pudo registrar el modelo cloud."
     },
