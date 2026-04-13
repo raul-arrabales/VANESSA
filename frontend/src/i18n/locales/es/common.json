@@ -1091,18 +1091,18 @@
       "emptyRecent": "Todavia no hay modelos cloud registrados.",
       "selectCredential": "Selecciona una credencial",
       "noCredentialsForProvider": "No hay credenciales guardadas para el proveedor seleccionado.",
-      "deleteCredential": "Eliminar",
-      "deleteCredentialDialog": {
-        "title": "Eliminar credencial",
-        "description": "Eliminar {{name}}? Los modelos que usen esta credencial pueden necesitar una nueva antes de poder probarse o usarse.",
+      "revokeCredential": "Revocar",
+      "revokeCredentialDialog": {
+        "title": "Revocar credencial",
+        "description": "Revocar {{name}}? Los modelos que usen esta credencial necesitaran una nueva antes de poder probarse o usarse.",
         "cancel": "Cancelar",
-        "confirm": "Eliminar credencial"
+        "confirm": "Revocar credencial"
       },
       "loadFailed": "No se pudieron cargar los datos del registro cloud.",
       "credentialSaved": "Credencial guardada.",
       "credentialSaveFailed": "No se pudo guardar la credencial.",
-      "credentialDeleted": "Credencial eliminada.",
-      "credentialDeleteFailed": "No se pudo eliminar la credencial.",
+      "credentialRevoked": "Credencial revocada.",
+      "credentialRevokeFailed": "No se pudo revocar la credencial.",
       "modelRegistered": "Modelo registrado.",
       "modelRegisterFailed": "No se pudo registrar el modelo cloud."
     },
@@ -1204,7 +1204,7 @@
       "credentialStatusLabel": "Estado de credencial",
       "credentialStatuses": {
         "active": "Activa",
-        "revoked": "Eliminada",
+        "revoked": "Revocada",
         "missing": "Ausente",
         "not_required": "No requerida"
       },

@@ -26,8 +26,8 @@ export async function createModelCredential(
 }
 
 export async function revokeModelCredential(credentialId: string, token: string): Promise<ModelCredential> {
-  const result = await requestJson<{ credential: ModelCredential }>(`/v1/modelops/credentials/${encodeURIComponent(credentialId)}`, {
-    method: "DELETE",
+  const result = await requestJson<{ credential: ModelCredential }>(`/v1/modelops/credentials/${encodeURIComponent(credentialId)}/revoke`, {
+    method: "POST",
     token,
   });
   return result.credential;

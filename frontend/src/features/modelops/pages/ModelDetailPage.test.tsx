@@ -280,7 +280,7 @@ describe("ModelDetailPage", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "Credential" })).toBeVisible();
-    expect(screen.getByText("Credential status: Deleted")).toBeVisible();
+    expect(screen.getByText("Credential status: Revoked")).toBeVisible();
     expect(screen.getByText("Assign a saved credential, then test and validate the model again.")).toBeVisible();
     expect(screen.getByRole("option", { name: "New key · ****2222" })).toBeVisible();
   });

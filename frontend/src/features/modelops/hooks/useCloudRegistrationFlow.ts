@@ -20,7 +20,7 @@ export function useCloudRegistrationFlow(
     api_key: string;
     credential_scope?: "platform" | "personal";
   }) => Promise<void>;
-  deleteCredential: (credentialId: string) => Promise<void>;
+  revokeCredential: (credentialId: string) => Promise<void>;
   registerCloudModel: (payload: {
     id: string;
     name: string;
@@ -92,19 +92,19 @@ export function useCloudRegistrationFlow(
     }
   }, [refresh, showErrorFeedback, showSuccessFeedback, t, token]);
 
-  const deleteCredential = useCallback(async (credentialId: string): Promise<void> => {
+  const revokeCredential = useCallback(async (credentialId: string): Promise<void> => {
     if (!token) {
       return;
     }
     setIsSaving(true);
     try {
       await revokeModelCredential(credentialId, token);
-      showSuccessFeedback(t("modelOps.cloud.credentialDeleted"), {
+      showSuccessFeedback(t("modelOps.cloud.credentialRevoked"), {
         titleKey: "modelOps.cloud.credentialsTitle",
       });
       await refresh();
     } catch (requestError) {
-      showErrorFeedback(requestError, t("modelOps.cloud.credentialDeleteFailed"), {
+      showErrorFeedback(requestError, t("modelOps.cloud.credentialRevokeFailed"), {
         titleKey: "modelOps.cloud.credentialsTitle",
       });
     } finally {
@@ -169,7 +169,7 @@ export function useCloudRegistrationFlow(
     isSaving,
     refresh,
     saveCredential,
-    deleteCredential,
+    revokeCredential,
     registerCloudModel,
   };
 }

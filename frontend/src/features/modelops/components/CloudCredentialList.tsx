@@ -7,18 +7,18 @@ import { CLOUD_PROVIDER_OPTIONS } from "../domain";
 type CloudCredentialListProps = {
   credentials: ModelCredential[];
   isLoading: boolean;
-  isDeleting: boolean;
-  onDelete: (credentialId: string) => Promise<void>;
+  isRevoking: boolean;
+  onRevoke: (credentialId: string) => Promise<void>;
 };
 
 export default function CloudCredentialList({
   credentials,
   isLoading,
-  isDeleting,
-  onDelete,
+  isRevoking,
+  onRevoke,
 }: CloudCredentialListProps): JSX.Element {
   const { t } = useTranslation("common");
-  const [credentialToDelete, setCredentialToDelete] = useState<ModelCredential | null>(null);
+  const [credentialToRevoke, setCredentialToRevoke] = useState<ModelCredential | null>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const getProviderLabel = (provider: string): string => {
@@ -44,9 +44,9 @@ export default function CloudCredentialList({
                   <button
                     type="button"
                     className="btn btn-danger"
-                    onClick={() => setCredentialToDelete(credential)}
+                    onClick={() => setCredentialToRevoke(credential)}
                   >
-                    {t("modelOps.cloud.deleteCredential")}
+                    {t("modelOps.cloud.revokeCredential")}
                   </button>
                 </div>
               </div>
@@ -65,35 +65,35 @@ export default function CloudCredentialList({
           ))}
         </ul>
       ) : null}
-      {credentialToDelete ? (
+      {credentialToRevoke ? (
         <ModalDialog
-          title={t("modelOps.cloud.deleteCredentialDialog.title")}
-          description={t("modelOps.cloud.deleteCredentialDialog.description", {
-            name: credentialToDelete.display_name,
+          title={t("modelOps.cloud.revokeCredentialDialog.title")}
+          description={t("modelOps.cloud.revokeCredentialDialog.description", {
+            name: credentialToRevoke.display_name,
           })}
-          onClose={() => setCredentialToDelete(null)}
-          closeDisabled={isDeleting}
+          onClose={() => setCredentialToRevoke(null)}
+          closeDisabled={isRevoking}
           initialFocusRef={confirmButtonRef}
           actions={(
             <>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setCredentialToDelete(null)}
-                disabled={isDeleting}
+                onClick={() => setCredentialToRevoke(null)}
+                disabled={isRevoking}
               >
-                {t("modelOps.cloud.deleteCredentialDialog.cancel")}
+                {t("modelOps.cloud.revokeCredentialDialog.cancel")}
               </button>
               <button
                 ref={confirmButtonRef}
                 type="button"
                 className="btn btn-danger"
                 onClick={() => {
-                  void onDelete(credentialToDelete.id).then(() => setCredentialToDelete(null));
+                  void onRevoke(credentialToRevoke.id).then(() => setCredentialToRevoke(null));
                 }}
-                disabled={isDeleting}
+                disabled={isRevoking}
               >
-                {t("modelOps.cloud.deleteCredentialDialog.confirm")}
+                {t("modelOps.cloud.revokeCredentialDialog.confirm")}
               </button>
             </>
           )}

@@ -1099,18 +1099,18 @@
       "emptyRecent": "No cloud models have been registered yet.",
       "selectCredential": "Select credential",
       "noCredentialsForProvider": "No credentials saved for the selected provider.",
-      "deleteCredential": "Delete",
-      "deleteCredentialDialog": {
-        "title": "Delete credential",
-        "description": "Delete {{name}}? Models using this credential may need a new credential before they can be tested or used.",
+      "revokeCredential": "Revoke",
+      "revokeCredentialDialog": {
+        "title": "Revoke credential",
+        "description": "Revoke {{name}}? Models using this credential will need a new credential before they can be tested or used.",
         "cancel": "Cancel",
-        "confirm": "Delete credential"
+        "confirm": "Revoke credential"
       },
       "loadFailed": "Unable to load cloud registration data.",
       "credentialSaved": "Credential saved.",
       "credentialSaveFailed": "Unable to save credential.",
-      "credentialDeleted": "Credential deleted.",
-      "credentialDeleteFailed": "Unable to delete credential.",
+      "credentialRevoked": "Credential revoked.",
+      "credentialRevokeFailed": "Unable to revoke credential.",
       "modelRegistered": "Model registered.",
       "modelRegisterFailed": "Unable to register cloud model."
     },
@@ -1212,7 +1212,7 @@
       "credentialStatusLabel": "Credential status",
       "credentialStatuses": {
         "active": "Active",
-        "revoked": "Deleted",
+        "revoked": "Revoked",
         "missing": "Missing",
         "not_required": "Not required"
       },

@@ -164,6 +164,41 @@ def test_non_superadmin_cannot_create_platform_credential(client):
     assert response.status_code == 403
 
 
+def test_user_can_revoke_personal_credential(client):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="u5@example.com",
+        username="user5",
+        password_hash=hash_password("pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _token(test_client, user["username"], "pass-123")
+
+    credential = test_client.post(
+        "/v1/modelops/credentials",
+        headers=_auth(token),
+        json={
+            "provider": "openai_compatible",
+            "display_name": "my-key",
+            "api_base_url": "https://api.example.com/v1",
+            "api_key": "sk-user-secret",
+        },
+    ).get_json()["credential"]
+
+    revoked = test_client.post(
+        f"/v1/modelops/credentials/{credential['id']}/revoke",
+        headers=_auth(token),
+    )
+
+    assert revoked.status_code == 200
+    body = revoked.get_json()
+    assert body["credential"]["id"] == credential["id"]
+    assert body["credential"]["is_active"] is False
+    assert body["affected_model_count"] == 0
+
+
 def test_register_external_model_requires_validation_path(client):
     test_client, user_store = client
     user = user_store.create_user(

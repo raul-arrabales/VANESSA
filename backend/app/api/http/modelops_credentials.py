@@ -61,9 +61,9 @@ def register_modelops_credentials_routes(
         )
         return jsonify({"credential": serialize_credential_fn(created)}), 201
 
-    @bp.delete("/v1/modelops/credentials/<credential_id>")
+    @bp.post("/v1/modelops/credentials/<credential_id>/revoke")
     @require_role("user")
-    def delete_modelops_credential_route(credential_id: str):
+    def revoke_modelops_credential_route(credential_id: str):
         try:
             revoke_result = revoke_credential_fn(
                 config_getter().database_url,

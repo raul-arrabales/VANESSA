@@ -50,7 +50,7 @@ function resolveCloudModelRegisterView(value: string | null): CloudModelRegister
 export default function CloudModelRegisterPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
-  const { credentials, recentCloudModels, isLoading, isSaving, saveCredential, deleteCredential, registerCloudModel } =
+  const { credentials, recentCloudModels, isLoading, isSaving, saveCredential, revokeCredential, registerCloudModel } =
     useCloudRegistrationFlow(token);
   const isSuperadmin = user?.role === "superadmin";
   const canTest = user?.role === "admin" || user?.role === "superadmin";
@@ -105,8 +105,8 @@ export default function CloudModelRegisterPage(): JSX.Element {
             <CloudCredentialList
               credentials={credentials}
               isLoading={isLoading}
-              isDeleting={isSaving}
-              onDelete={deleteCredential}
+              isRevoking={isSaving}
+              onRevoke={revokeCredential}
             />
             <CloudCredentialForm
               state={credentialState}

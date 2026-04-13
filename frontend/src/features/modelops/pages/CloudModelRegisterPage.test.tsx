@@ -102,37 +102,37 @@ describe("CloudModelRegisterPage", () => {
     expect(within(credentialList).getByText("Personal")).toBeVisible();
     expect(within(credentialList).getByText("https://api.openai.com/v1")).toBeVisible();
     expect(within(credentialList).getByText("****1234")).toBeVisible();
-    expect(within(credentialList).getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(within(credentialList).getByRole("button", { name: "Revoke" })).toBeVisible();
   });
 
-  it("closes the credential delete confirmation without deleting when canceled", async () => {
+  it("closes the credential revoke confirmation without revoking when canceled", async () => {
     mockRole = "superadmin";
     const user = userEvent.setup();
     await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
 
     const credentialList = await screen.findByRole("list", { name: "Saved cloud credentials" });
-    await user.click(within(credentialList).getByRole("button", { name: "Delete" }));
+    await user.click(within(credentialList).getByRole("button", { name: "Revoke" }));
 
-    expect(await screen.findByRole("dialog", { name: "Delete credential" })).toBeVisible();
-    expect(screen.getByText("Delete My key? Models using this credential may need a new credential before they can be tested or used.")).toBeVisible();
+    expect(await screen.findByRole("dialog", { name: "Revoke credential" })).toBeVisible();
+    expect(screen.getByText("Revoke My key? Models using this credential will need a new credential before they can be tested or used.")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    expect(screen.queryByRole("dialog", { name: "Delete credential" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Revoke credential" })).not.toBeInTheDocument();
     expect(modelApiMocks.revokeModelCredential).not.toHaveBeenCalled();
   });
 
-  it("deletes a saved credential after confirmation", async () => {
+  it("revokes a saved credential after confirmation", async () => {
     mockRole = "superadmin";
     const user = userEvent.setup();
     await renderWithAppProviders(<CloudModelRegisterPage />, { route: "/control/models/cloud/register?view=credentials" });
 
     const credentialList = await screen.findByRole("list", { name: "Saved cloud credentials" });
-    await user.click(within(credentialList).getByRole("button", { name: "Delete" }));
-    await user.click(await screen.findByRole("button", { name: "Delete credential" }));
+    await user.click(within(credentialList).getByRole("button", { name: "Revoke" }));
+    await user.click(await screen.findByRole("button", { name: "Revoke credential" }));
 
     expect(modelApiMocks.revokeModelCredential).toHaveBeenCalledWith("cred-1", "token");
     expect(await screen.findByRole("dialog", { name: "Credentials" })).toBeVisible();
-    expect(screen.getAllByText("Credential deleted.")).toHaveLength(1);
+    expect(screen.getAllByText("Credential revoked.")).toHaveLength(1);
   });
 
   it("shows an empty saved credential state above the new credential form", async () => {
