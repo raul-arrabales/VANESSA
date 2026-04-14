@@ -45,6 +45,54 @@
   gap: var(--space-4);
 }
 
+.platform-capability-list {
+  grid-template-columns: 1fr;
+}
+
+.platform-capability-row {
+  grid-template-columns: minmax(12rem, 0.85fr) minmax(0, 1.6fr) auto;
+  align-items: start;
+}
+
+.platform-capability-summary,
+.platform-capability-details,
+.platform-capability-actions {
+  min-width: 0;
+}
+
+.platform-capability-description,
+.platform-capability-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.platform-capability-details {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.platform-capability-detail {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: minmax(9rem, 0.42fr) minmax(0, 1fr);
+  align-items: baseline;
+}
+
+.platform-capability-code {
+  max-width: min(100%, 24rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.platform-capability-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
 .provider-load-panel {
   position: fixed;
   right: var(--space-4);
@@ -241,9 +289,21 @@
     bottom: var(--space-3);
     width: auto;
   }
+
+  .platform-capability-detail {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 880px) {
+  .platform-capability-row {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-capability-actions {
+    justify-content: flex-start;
+  }
+
   .deployment-identity-row,
   .deployment-binding-row {
     grid-template-columns: repeat(2, minmax(220px, 1fr));

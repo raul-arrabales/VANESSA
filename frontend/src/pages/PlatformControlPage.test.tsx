@@ -68,6 +68,7 @@ describe("PlatformControlPage", () => {
     expect(within(sectionTabs).getByRole("link", { name: await t("platformControl.navigation.providers") })).toBeVisible();
     expect(within(sectionTabs).getByRole("link", { name: await t("platformControl.navigation.deployments") })).toBeVisible();
     expect(await screen.findByText(await t("platformControl.sections.capabilities"))).toBeVisible();
+    expect(document.querySelector(".platform-capability-grid")).toHaveClass("platform-capability-list");
     expect((await screen.findAllByText(await t("platformControl.capabilities.servedArtifacts"))).length).toBeGreaterThan(0);
     expect(await screen.findByText("GPT-5 (+1)")).toBeVisible();
     const providerLinks = await screen.findAllByRole("link", { name: await t("platformControl.home.providersTitle") });

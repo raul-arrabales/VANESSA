@@ -35,47 +35,51 @@ export default function PlatformCapabilitiesOverview({
       {capabilities.length === 0 ? (
         <p className="status-text">{t("platformControl.capabilities.empty")}</p>
       ) : (
-        <div className="platform-capability-grid">
+        <div className="platform-capability-grid platform-capability-list">
           {capabilities.map((capability) => {
             const binding = bindingByCapability.get(capability.capability);
             const provider = capability.active_provider;
             return (
-              <article key={capability.capability} className="platform-capability-card">
-                <div className="platform-card-header">
+              <article key={capability.capability} className="platform-capability-card platform-capability-row">
+                <div className="platform-capability-summary">
                   <div className="status-row">
                     <h4 className="section-title">{capability.display_name}</h4>
                     <span className="platform-badge" data-tone={capability.required ? "required" : "active"}>
                       {capability.required ? t("platformControl.badges.required") : t("platformControl.badges.optional")}
                     </span>
                   </div>
+                  <p className="status-text platform-capability-description">{capability.description}</p>
                 </div>
-                <p className="status-text">{capability.description}</p>
                 {provider ? (
                   <>
-                    <div className="status-row">
-                      <span className="field-label">{t("platformControl.capabilities.activeProvider")}</span>
-                      <strong>{provider.display_name}</strong>
-                      <span className="status-text">
-                        <code className="code-inline">{provider.slug}</code>
-                      </span>
-                    </div>
-                    {binding ? (
-                      <>
-                        <div className="status-row">
-                          <span className="field-label">{t("platformControl.capabilities.runtime")}</span>
-                          <span className="status-text">{binding.provider.adapter_kind}</span>
-                        </div>
-                        {capabilityRequiresModelResource(capability.capability) ? (
-                          <div className="status-row">
-                            <span className="field-label">{t("platformControl.capabilities.servedArtifacts")}</span>
-                            <span className="status-text">
-                              {summarizeBindingResources(binding, t("platformControl.summary.none"))}
-                            </span>
+                    <div className="platform-capability-details">
+                      <div className="platform-capability-detail">
+                        <span className="field-label">{t("platformControl.capabilities.activeProvider")}</span>
+                        <span className="platform-capability-value">
+                          <strong>{provider.display_name}</strong>{" "}
+                          <code className="code-inline platform-capability-code" title={provider.slug}>
+                            {provider.slug}
+                          </code>
+                        </span>
+                      </div>
+                      {binding ? (
+                        <>
+                          <div className="platform-capability-detail">
+                            <span className="field-label">{t("platformControl.capabilities.runtime")}</span>
+                            <span className="platform-capability-value">{binding.provider.adapter_kind}</span>
                           </div>
-                        ) : null}
-                      </>
-                    ) : null}
-                    <div className="inline-meta-list">
+                          {capabilityRequiresModelResource(capability.capability) ? (
+                            <div className="platform-capability-detail">
+                              <span className="field-label">{t("platformControl.capabilities.servedArtifacts")}</span>
+                              <span className="platform-capability-value">
+                                {summarizeBindingResources(binding, t("platformControl.summary.none"))}
+                              </span>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="inline-meta-list platform-capability-actions">
                       <Link className="btn btn-secondary" to={`/control/platform/providers/${provider.id}`}>
                         {t("platformControl.actions.openProvider")}
                       </Link>
@@ -88,8 +92,8 @@ export default function PlatformCapabilitiesOverview({
                   </>
                 ) : (
                   <>
-                    <p className="status-text">{t("platformControl.capabilities.unbound")}</p>
-                    <div className="inline-meta-list">
+                    <p className="status-text platform-capability-value">{t("platformControl.capabilities.unbound")}</p>
+                    <div className="inline-meta-list platform-capability-actions">
                       <Link className="btn btn-secondary" to="/control/platform/deployments">
                         {t("platformControl.actions.viewDeployments")}
                       </Link>
