@@ -2,11 +2,13 @@ import { type FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
+import ModelCatalogSubmenu from "../components/ModelCatalogSubmenu";
 import ModelLifecycleActions from "../components/ModelLifecycleActions";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
-import { CLOUD_PROVIDER_OPTIONS, canAccessModelTesting, getModelLifecyclePermissions } from "../domain";
+import { CLOUD_PROVIDER_OPTIONS, canAccessModelTesting, getModelLifecyclePermissions, isModelTestEligible } from "../domain";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -16,17 +18,33 @@ export default function ModelDetailPage(): JSX.Element {
   const permissions = getModelLifecyclePermissions(user, detail.model);
   const canTest = canAccessModelTesting(user);
   const [replacementCredentialId, setReplacementCredentialId] = useState("");
+  const modelName = detail.model?.name ?? modelId ?? "";
+  const modelDetailSubmenu = (
+    <ModelCatalogSubmenu
+      activeView="detail"
+      modelId={detail.model?.id ?? modelId}
+      modelName={modelName}
+      showDetailView
+      showTestView={Boolean(detail.model && canTest && isModelTestEligible(detail.model))}
+    />
+  );
 
   if (detail.isLoading) {
-    return <p className="status-text">{t("modelOps.states.loading")}</p>;
+    return (
+      <ModelOpsWorkspaceFrame secondaryNavigation={modelDetailSubmenu}>
+        <p className="status-text">{t("modelOps.states.loading")}</p>
+      </ModelOpsWorkspaceFrame>
+    );
   }
 
   if (!detail.model) {
     return (
-      <section className="panel card-stack">
-        <h2 className="section-title">{t("modelOps.detail.title")}</h2>
-        <p className="status-text">{t("modelOps.detail.notFound")}</p>
-      </section>
+      <ModelOpsWorkspaceFrame secondaryNavigation={modelDetailSubmenu}>
+        <section className="panel card-stack">
+          <h2 className="section-title">{t("modelOps.detail.title")}</h2>
+          <p className="status-text">{t("modelOps.detail.notFound")}</p>
+        </section>
+      </ModelOpsWorkspaceFrame>
     );
   }
 
@@ -48,7 +66,8 @@ export default function ModelDetailPage(): JSX.Element {
   }
 
   return (
-    <section className="card-stack">
+    <ModelOpsWorkspaceFrame secondaryNavigation={modelDetailSubmenu}>
+      <section className="card-stack">
       <article className="panel card-stack">
         <div className="modelops-card-header">
           <div className="card-stack">
@@ -56,11 +75,6 @@ export default function ModelDetailPage(): JSX.Element {
             <p className="status-text">{model.id}</p>
           </div>
           <div className="button-row">
-            {canTest && (
-              <Link className="btn btn-primary" to={`/control/models/${encodeURIComponent(model.id)}/test`}>
-                {t("modelOps.actions.testModel")}
-              </Link>
-            )}
             {(user?.role === "admin" || user?.role === "superadmin") && (
               <Link className="btn btn-secondary" to={`/control/models/access?modelId=${encodeURIComponent(model.id)}`}>
                 {t("modelOps.actions.manageAccess")}
@@ -150,6 +164,7 @@ export default function ModelDetailPage(): JSX.Element {
 
       <UsageSummaryPanel usage={detail.usage} />
       <ValidationHistoryPanel validations={detail.validations} />
-    </section>
+      </section>
+    </ModelOpsWorkspaceFrame>
   );
 }

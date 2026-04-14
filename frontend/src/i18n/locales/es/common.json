@@ -1068,6 +1068,12 @@
     "catalog": {
       "title": "Catalogo de modelos",
       "description": "Explora los modelos visibles para tu rol y entra a paginas de detalle para el trabajo de ciclo de vida.",
+      "views": {
+        "aria": "Secciones del catalogo de modelos",
+        "catalog": "Catalogo de modelos",
+        "modelDetails": "Detalles del modelo: {{name}}",
+        "testModel": "Probar modelo: {{name}}"
+      },
       "loadFailed": "No se pudieron cargar los modelos.",
       "empty": "Ningun modelo coincide con los filtros actuales.",
       "validatedBadge": "Validado",

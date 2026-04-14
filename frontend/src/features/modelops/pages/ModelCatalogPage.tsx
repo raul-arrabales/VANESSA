@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ModelCatalogFilters from "../components/ModelCatalogFilters";
 import ModelCatalogList from "../components/ModelCatalogList";
+import ModelCatalogSubmenu from "../components/ModelCatalogSubmenu";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import { useModelCatalog } from "../hooks/useModelCatalog";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -33,7 +34,7 @@ export default function ModelCatalogPage(): JSX.Element {
   const canTest = canAccessModelTesting(user);
 
   return (
-    <ModelOpsWorkspaceFrame>
+    <ModelOpsWorkspaceFrame secondaryNavigation={<ModelCatalogSubmenu activeView="catalog" />}>
       <article className="panel card-stack">
         <h2 className="section-title">{t("modelOps.catalog.title")}</h2>
         <p className="status-text">{t("modelOps.catalog.description")}</p>

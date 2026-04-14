@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ModelCatalogPage from "./ModelCatalogPage";
 import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
@@ -41,7 +41,10 @@ describe("ModelCatalogPage", () => {
     await renderWithAppProviders(<ModelCatalogPage />, { route: "/control/models/catalog" });
 
     expect(screen.getByRole("heading", { name: "ModelOps" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
+    const workspaceNav = screen.getByRole("navigation", { name: "ModelOps workspace navigation" });
+    expect(within(workspaceNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
+    const viewNav = screen.getByRole("navigation", { name: "Model catalog sections" });
+    expect(within(viewNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "Model catalog" })).toBeVisible();
     expect(await screen.findByText("Alpha")).toBeVisible();
   });

@@ -1076,6 +1076,12 @@
     "catalog": {
       "title": "Model catalog",
       "description": "Browse the models visible to your current role and move into detail pages for lifecycle work.",
+      "views": {
+        "aria": "Model catalog sections",
+        "catalog": "Model catalog",
+        "modelDetails": "Model details: {{name}}",
+        "testModel": "Test model: {{name}}"
+      },
       "loadFailed": "Unable to load models.",
       "empty": "No models matched the current filters.",
       "validatedBadge": "Validated",

@@ -56,6 +56,11 @@ export function canAccessModelOpsWorkspaceSection(
 }
 
 export function isModelOpsWorkspacePathActive(currentPathname: string, itemPath: string): boolean {
+  const isCatalogChildPath = /^\/control\/models\/(?!(access|catalog|cloud|local)(\/|$))[^/]+(\/test)?$/.test(currentPathname);
+  if (itemPath === "/control/models/catalog" && isCatalogChildPath) {
+    return true;
+  }
+
   return itemPath === "/control/models"
     ? currentPathname === itemPath
     : currentPathname === itemPath || currentPathname.startsWith(`${itemPath}/`);

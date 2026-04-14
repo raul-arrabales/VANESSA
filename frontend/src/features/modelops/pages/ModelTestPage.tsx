@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
 import { listManagedModelTestRuntimes } from "../../../api/modelops/testing";
 import type { ManagedModelTestRuntime } from "../../../api/modelops/types";
+import ModelCatalogSubmenu from "../components/ModelCatalogSubmenu";
+import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import ModelTestDebugPanel from "../testing/components/ModelTestDebugPanel";
 import ModelTestHeader from "../testing/components/ModelTestHeader";
 import ModelTestResultPanel from "../testing/components/ModelTestResultPanel";
@@ -27,6 +29,16 @@ export default function ModelTestPage(): JSX.Element {
     isSuperadmin
     && testState.model?.backend === "local"
     && (testState.model?.task_key === "llm" || testState.model?.task_key === "embeddings"),
+  );
+  const modelName = testState.model?.name ?? modelId ?? "";
+  const modelTestSubmenu = (
+    <ModelCatalogSubmenu
+      activeView="test"
+      modelId={testState.model?.id ?? modelId}
+      modelName={modelName}
+      showDetailView
+      showTestView
+    />
   );
 
   useEffect(() => {
@@ -69,15 +81,21 @@ export default function ModelTestPage(): JSX.Element {
   }, [modelId, needsRuntimeSelection, t, token]);
 
   if (testState.isLoading) {
-    return <p className="status-text">{t("modelOps.states.loading")}</p>;
+    return (
+      <ModelOpsWorkspaceFrame secondaryNavigation={modelTestSubmenu}>
+        <p className="status-text">{t("modelOps.states.loading")}</p>
+      </ModelOpsWorkspaceFrame>
+    );
   }
 
   if (!testState.model) {
     return (
-      <section className="panel card-stack">
-        <h2 className="section-title">{t("modelOps.testing.title")}</h2>
-        <p className="status-text">{t("modelOps.detail.notFound")}</p>
-      </section>
+      <ModelOpsWorkspaceFrame secondaryNavigation={modelTestSubmenu}>
+        <section className="panel card-stack">
+          <h2 className="section-title">{t("modelOps.testing.title")}</h2>
+          <p className="status-text">{t("modelOps.detail.notFound")}</p>
+        </section>
+      </ModelOpsWorkspaceFrame>
     );
   }
 
@@ -114,13 +132,8 @@ export default function ModelTestPage(): JSX.Element {
     || testState.model.id;
 
   return (
-    <section className="card-stack">
-      <div className="button-row">
-        <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(testState.model.id)}`}>
-          {t("modelOps.actions.openDetail")}
-        </Link>
-      </div>
-
+    <ModelOpsWorkspaceFrame secondaryNavigation={modelTestSubmenu}>
+      <section className="card-stack">
       <ModelTestHeader model={testState.model} latestTest={latestTest} />
 
       {runtimeSelectionRequired && (
@@ -236,6 +249,7 @@ export default function ModelTestPage(): JSX.Element {
         requestPayload={debugPayload.requestPayload}
         responsePayload={debugPayload.responsePayload}
       />
-    </section>
+      </section>
+    </ModelOpsWorkspaceFrame>
   );
 }
