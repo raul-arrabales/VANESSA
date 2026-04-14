@@ -133,6 +133,17 @@ describe("PlatformProviderDetailPage", () => {
       { route: "/control/platform/providers/provider-1" },
     );
 
+    const viewNav = await screen.findByRole("navigation", { name: await t("platformControl.providers.views.aria") });
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.providers.views.providers") })).toHaveAttribute(
+      "href",
+      "/control/platform/providers",
+    );
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.providers.views.create") })).toHaveAttribute(
+      "href",
+      "/control/platform/providers?view=create",
+    );
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.providers.views.providerDetail", { name: "vLLM local gateway" }) })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: await t("platformControl.actions.viewProviders") })).not.toBeInTheDocument();
     expect(await screen.findByText(await t("platformControl.sections.usage"))).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Local Default", level: 4 })).toBeVisible();
 

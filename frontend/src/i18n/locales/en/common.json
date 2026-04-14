@@ -1495,7 +1495,8 @@
       "views": {
         "aria": "Provider management sections",
         "providers": "Platform providers",
-        "create": "Create provider"
+        "create": "Create provider",
+        "providerDetail": "Provider: {{name}}"
       },
       "columns": {
         "provider": "Provider",

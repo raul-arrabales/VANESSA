@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import PlatformPageLayout from "../components/PlatformPageLayout";
 import PlatformProviderDangerSection from "../components/PlatformProviderDangerSection";
@@ -57,17 +58,36 @@ export default function PlatformProviderDetailPage(): JSX.Element {
     providerId,
     token,
   });
+  const providerViewLabel = provider
+    ? t("platformControl.providers.views.providerDetail", { name: provider.display_name })
+    : t("platformControl.providers.detailTitle");
+  const submenuItems = [
+    {
+      id: "providers",
+      label: t("platformControl.providers.views.providers"),
+      isActive: false,
+      to: "/control/platform/providers",
+    },
+    {
+      id: "create",
+      label: t("platformControl.providers.views.create"),
+      isActive: false,
+      to: "/control/platform/providers?view=create",
+    },
+    {
+      id: "provider-detail",
+      label: providerViewLabel,
+      isActive: true,
+      to: provider ? `/control/platform/providers/${provider.id}` : undefined,
+    },
+  ];
 
   return (
     <PlatformPageLayout
       title={provider?.display_name ?? t("platformControl.providers.detailTitle")}
       description={provider ? t("platformControl.providers.detailDescription") : t("platformControl.providers.notFound")}
       errorMessage={errorMessage || loadErrorMessage}
-      actions={(
-        <Link className="btn btn-secondary" to="/control/platform/providers">
-          {t("platformControl.actions.viewProviders")}
-        </Link>
-      )}
+      secondaryNavigation={<PageSubmenuBar items={submenuItems} ariaLabel={t("platformControl.providers.views.aria")} />}
     >
       {state === "success" && !provider ? (
         <article className="panel card-stack">

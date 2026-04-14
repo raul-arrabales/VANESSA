@@ -1483,7 +1483,8 @@
       "views": {
         "aria": "Secciones de gestion de proveedores",
         "providers": "Proveedores de plataforma",
-        "create": "Crear proveedor"
+        "create": "Crear proveedor",
+        "providerDetail": "Proveedor: {{name}}"
       },
       "columns": {
         "provider": "Proveedor",
