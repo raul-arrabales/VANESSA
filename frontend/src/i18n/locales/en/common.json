@@ -1529,6 +1529,12 @@
       "recentActivations": "Recent activations for this deployment",
       "recentActivationsDescription": "Review when this deployment profile was promoted and what it replaced.",
       "notFound": "The requested deployment profile could not be found.",
+      "views": {
+        "aria": "Deployment management sections",
+        "profiles": "Deployment profiles",
+        "history": "Activation history",
+        "create": "Create deployment"
+      },
       "columns": {
         "capability": "Capability",
         "provider": "Provider",

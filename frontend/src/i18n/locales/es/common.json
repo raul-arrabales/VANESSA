@@ -1517,6 +1517,12 @@
       "recentActivations": "Activaciones recientes de este despliegue",
       "recentActivationsDescription": "Revisa cuando se promovio este perfil y que reemplazo.",
       "notFound": "No se pudo encontrar el perfil de despliegue solicitado.",
+      "views": {
+        "aria": "Secciones de gestion de despliegues",
+        "profiles": "Perfiles de despliegue",
+        "history": "Historial de activacion",
+        "create": "Crear despliegue"
+      },
       "columns": {
         "capability": "Capacidad",
         "provider": "Proveedor",

@@ -8,6 +8,7 @@ type PlatformPageLayoutProps = {
   title: string;
   description: string;
   actions?: ReactNode;
+  secondaryNavigation?: ReactNode;
   errorMessage?: string;
   children: ReactNode;
 };
@@ -16,6 +17,7 @@ export default function PlatformPageLayout({
   title,
   description,
   actions,
+  secondaryNavigation,
   errorMessage,
   children,
 }: PlatformPageLayoutProps): JSX.Element {
@@ -38,6 +40,7 @@ export default function PlatformPageLayout({
       tabs={tabItems}
       ariaLabel={t("platformControl.navigation.aria")}
       actions={actions}
+      secondaryNavigation={secondaryNavigation}
     >
       {errorMessage ? <p className="status-text error-text">{`${t("platformControl.feedback.prefix")} ${errorMessage}`}</p> : null}
       {children}
