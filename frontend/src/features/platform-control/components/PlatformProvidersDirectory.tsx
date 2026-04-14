@@ -23,19 +23,19 @@ export default function PlatformProvidersDirectory({
   }
 
   return (
-    <div className="platform-directory-grid">
+    <div className="platform-directory-grid platform-provider-list">
       {providers.map((provider) => {
         const family = providerFamilyByKey.get(provider.provider_key);
         const usageEntries = getProviderUsageEntries(provider.id, deployments);
         const usesActiveDeployment = usageEntries.some((entry) => entry.deployment.is_active);
         return (
-          <article key={provider.id} className="platform-deployment-card">
-            <div className="platform-card-header">
+          <article key={provider.id} className="platform-deployment-card platform-provider-row">
+            <div className="platform-provider-summary">
               <div className="status-row">
                 <h3 className="section-title">{provider.display_name}</h3>
-                <span className="status-text">
-                  <code className="code-inline">{provider.slug}</code>
-                </span>
+                <code className="code-inline platform-provider-code" title={provider.slug}>
+                  {provider.slug}
+                </code>
               </div>
               <div className="inline-meta-list">
                 <span className="platform-badge" data-tone={provider.enabled ? "enabled" : "disabled"}>
@@ -47,40 +47,48 @@ export default function PlatformProvidersDirectory({
                   </span>
                 ) : null}
               </div>
+              <p className="status-text platform-provider-description">
+                {provider.description || t("platformControl.providers.noDescription")}
+              </p>
             </div>
-            <p className="status-text">{provider.description || t("platformControl.providers.noDescription")}</p>
-            <div className="status-row">
-              <span className="field-label">{t("platformControl.providers.familyLabel")}</span>
-              <span className="status-text">{family?.display_name ?? provider.provider_key}</span>
-            </div>
-            <div className="status-row">
-              <span className="field-label">{t("platformControl.providers.capabilityLabel")}</span>
-              <span className="status-text">{provider.capability}</span>
-            </div>
-            <div className="status-row">
-              <span className="field-label">{t("platformControl.providers.endpointLabel")}</span>
-              <code className="code-inline">{provider.endpoint_url}</code>
-            </div>
-            <div className="status-row">
-              <span className="field-label">{t("platformControl.providers.usedByDeployments")}</span>
-              <span className="status-text">{usageEntries.length}</span>
-            </div>
-            {usageEntries.length > 0 ? (
-              <div className="inline-meta-list">
-                {usageEntries.slice(0, 2).map((entry) => (
-                  <span key={entry.deployment.id} className="status-text">
-                    {entry.deployment.display_name}
-                    {activeDeployment?.id === entry.deployment.id ? ` (${t("platformControl.providers.activeReference")})` : ""}
-                  </span>
-                ))}
-                {usageEntries.length > 2 ? (
-                  <span className="status-text">
-                    {t("platformControl.providers.moreDeployments", { count: usageEntries.length - 2 })}
-                  </span>
-                ) : null}
+            <div className="platform-provider-details">
+              <div className="platform-provider-detail">
+                <span className="field-label">{t("platformControl.providers.familyLabel")}</span>
+                <span className="platform-provider-value">{family?.display_name ?? provider.provider_key}</span>
               </div>
-            ) : null}
-            <div className="inline-meta-list">
+              <div className="platform-provider-detail">
+                <span className="field-label">{t("platformControl.providers.capabilityLabel")}</span>
+                <span className="platform-provider-value">{provider.capability}</span>
+              </div>
+              <div className="platform-provider-detail">
+                <span className="field-label">{t("platformControl.providers.endpointLabel")}</span>
+                <code className="code-inline platform-provider-code" title={provider.endpoint_url}>
+                  {provider.endpoint_url}
+                </code>
+              </div>
+              <div className="platform-provider-detail">
+                <span className="field-label">{t("platformControl.providers.usedByDeployments")}</span>
+                <div className="platform-provider-value">
+                  <span>{usageEntries.length}</span>
+                  {usageEntries.length > 0 ? (
+                    <div className="inline-meta-list platform-provider-usage-list">
+                      {usageEntries.slice(0, 2).map((entry) => (
+                        <span key={entry.deployment.id} className="status-text">
+                          {entry.deployment.display_name}
+                          {activeDeployment?.id === entry.deployment.id ? ` (${t("platformControl.providers.activeReference")})` : ""}
+                        </span>
+                      ))}
+                      {usageEntries.length > 2 ? (
+                        <span className="status-text">
+                          {t("platformControl.providers.moreDeployments", { count: usageEntries.length - 2 })}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <div className="inline-meta-list platform-provider-actions">
               <Link className="btn btn-secondary" to={`/control/platform/providers/${provider.id}`}>
                 {t("platformControl.actions.openProvider")}
               </Link>

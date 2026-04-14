@@ -49,14 +49,29 @@
   grid-template-columns: 1fr;
 }
 
+.platform-provider-list {
+  grid-template-columns: 1fr;
+}
+
 .platform-capability-row {
   grid-template-columns: minmax(12rem, 0.85fr) minmax(0, 1.6fr) auto;
+  align-items: start;
+}
+
+.platform-provider-row {
+  grid-template-columns: minmax(12rem, 0.85fr) minmax(0, 1.8fr) auto;
   align-items: start;
 }
 
 .platform-capability-summary,
 .platform-capability-details,
 .platform-capability-actions {
+  min-width: 0;
+}
+
+.platform-provider-summary,
+.platform-provider-details,
+.platform-provider-actions {
   min-width: 0;
 }
 
@@ -67,7 +82,19 @@
   word-break: break-word;
 }
 
+.platform-provider-description,
+.platform-provider-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .platform-capability-details {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.platform-provider-details {
   display: grid;
   gap: var(--space-3);
 }
@@ -80,7 +107,16 @@
   align-items: baseline;
 }
 
-.platform-capability-code {
+.platform-provider-detail {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: minmax(9rem, 0.42fr) minmax(0, 1fr);
+  align-items: baseline;
+}
+
+.platform-capability-code,
+.platform-provider-code {
   max-width: min(100%, 24rem);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,7 +124,16 @@
   vertical-align: middle;
 }
 
+.platform-provider-usage-list {
+  margin-top: var(--space-1);
+}
+
 .platform-capability-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.platform-provider-actions {
   justify-content: flex-end;
   margin-top: 0;
 }
@@ -293,6 +338,10 @@
   .platform-capability-detail {
     grid-template-columns: 1fr;
   }
+
+  .platform-provider-detail {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 880px) {
@@ -300,7 +349,15 @@
     grid-template-columns: 1fr;
   }
 
+  .platform-provider-row {
+    grid-template-columns: 1fr;
+  }
+
   .platform-capability-actions {
+    justify-content: flex-start;
+  }
+
+  .platform-provider-actions {
     justify-content: flex-start;
   }
 

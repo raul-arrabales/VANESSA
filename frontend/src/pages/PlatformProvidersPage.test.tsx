@@ -55,6 +55,7 @@ describe("PlatformProvidersPage", () => {
       "/control/platform/providers/new",
     );
     expect((await screen.findAllByText(await t("platformControl.providers.usedByDeployments"))).length).toBeGreaterThan(0);
+    expect(document.querySelector(".platform-directory-grid")).toHaveClass("platform-provider-list");
     expect(screen.queryByLabelText(await t("platformControl.forms.provider.slug"))).not.toBeInTheDocument();
   });
 
