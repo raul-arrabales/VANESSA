@@ -1492,6 +1492,11 @@
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
       "editing": "Editing provider {{slug}}.",
+      "views": {
+        "aria": "Provider management sections",
+        "providers": "Platform providers",
+        "create": "Create provider"
+      },
       "columns": {
         "provider": "Provider",
         "capability": "Capability",

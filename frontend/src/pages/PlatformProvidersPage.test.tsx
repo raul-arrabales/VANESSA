@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
@@ -24,6 +24,7 @@ vi.mock("../api/platform", () => ({
   listPlatformProviders: vi.fn(),
   listPlatformDeployments: vi.fn(),
   listPlatformActivationAudit: vi.fn(),
+  createPlatformProvider: vi.fn(),
 }));
 
 vi.mock("../api/modelops", () => ({
@@ -51,10 +52,10 @@ describe("PlatformProvidersPage", () => {
     await renderWithAppProviders(<PlatformProvidersPage />);
 
     expect(await screen.findByRole("heading", { name: await t("platformControl.providers.title") })).toBeVisible();
-    expect(await screen.findByRole("link", { name: await t("platformControl.actions.createProvider") })).toHaveAttribute(
-      "href",
-      "/control/platform/providers/new",
-    );
+    const viewNav = screen.getByRole("navigation", { name: await t("platformControl.providers.views.aria") });
+    expect(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.providers") })).toHaveAttribute("aria-pressed", "true");
+    expect(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.create") })).toBeVisible();
+    expect(screen.queryByRole("link", { name: await t("platformControl.actions.createProvider") })).not.toBeInTheDocument();
     expect((await screen.findAllByText(await t("platformControl.providers.usedByDeployments"))).length).toBeGreaterThan(0);
     expect(document.querySelector(".platform-directory-grid")).toHaveClass("platform-provider-list");
     expect(screen.getAllByText(await t("platformControl.badges.local")).length).toBeGreaterThan(0);
@@ -87,5 +88,34 @@ describe("PlatformProvidersPage", () => {
 
     expect(screen.getByRole("heading", { name: "Weaviate local" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "vLLM local gateway" })).not.toBeInTheDocument();
+  });
+
+  it("switches between provider page views", async () => {
+    const user = userEvent.setup();
+    await renderWithAppProviders(<PlatformProvidersPage />, { route: "/control/platform/providers" });
+
+    const viewNav = await screen.findByRole("navigation", { name: await t("platformControl.providers.views.aria") });
+    await user.click(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.create") }));
+
+    expect(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.create") })).toHaveAttribute("aria-pressed", "true");
+    const createHelp = await screen.findByText(await t("platformControl.providers.createHelp"));
+    expect(createHelp).toBeVisible();
+    const createForm = createHelp.closest("form");
+    expect(createForm).not.toBeNull();
+    expect(within(createForm as HTMLElement).getByRole("button", { name: await t("platformControl.actions.createProvider") })).toBeVisible();
+    expect(screen.queryByText(await t("platformControl.providers.usedByDeployments"))).not.toBeInTheDocument();
+
+    await user.click(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.providers") }));
+
+    expect(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.providers") })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByLabelText(await t("platformControl.filters.search"))).toBeVisible();
+  });
+
+  it("falls back to platform providers for invalid views", async () => {
+    await renderWithAppProviders(<PlatformProvidersPage />, { route: "/control/platform/providers?view=unknown" });
+
+    const viewNav = await screen.findByRole("navigation", { name: await t("platformControl.providers.views.aria") });
+    expect(within(viewNav).getByRole("button", { name: await t("platformControl.providers.views.providers") })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByLabelText(await t("platformControl.filters.search"))).toBeVisible();
   });
 });

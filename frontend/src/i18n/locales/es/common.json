@@ -1480,6 +1480,11 @@
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
       "editing": "Editando proveedor {{slug}}.",
+      "views": {
+        "aria": "Secciones de gestion de proveedores",
+        "providers": "Proveedores de plataforma",
+        "create": "Crear proveedor"
+      },
       "columns": {
         "provider": "Proveedor",
         "capability": "Capacidad",
