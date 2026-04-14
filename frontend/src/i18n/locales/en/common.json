@@ -1539,7 +1539,8 @@
         "aria": "Deployment management sections",
         "profiles": "Deployment profiles",
         "history": "Activation history",
-        "create": "Create deployment"
+        "create": "Create deployment",
+        "deploymentDetail": "Deployment: {{name}}"
       },
       "columns": {
         "capability": "Capability",

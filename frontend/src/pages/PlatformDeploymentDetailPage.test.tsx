@@ -92,6 +92,21 @@ describe("PlatformDeploymentDetailPage", () => {
       { route: "/control/platform/deployments/deployment-2" },
     );
 
+    const viewNav = await screen.findByRole("navigation", { name: await t("platformControl.deployments.views.aria") });
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.deployments.views.profiles") })).toHaveAttribute(
+      "href",
+      "/control/platform/deployments",
+    );
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.deployments.views.history") })).toHaveAttribute(
+      "href",
+      "/control/platform/deployments?view=history",
+    );
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.deployments.views.create") })).toHaveAttribute(
+      "href",
+      "/control/platform/deployments?view=create",
+    );
+    expect(within(viewNav).getByRole("link", { name: await t("platformControl.deployments.views.deploymentDetail", { name: "Staging Profile" }) })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: await t("platformControl.actions.viewDeployments") })).not.toBeInTheDocument();
     const topologyTable = await screen.findByRole("table", {
       name: await t("platformControl.deployments.tableAria", { name: "Staging Profile" }),
     });

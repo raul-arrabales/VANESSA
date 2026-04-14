@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import PlatformDeploymentAuditTable from "../components/PlatformDeploymentAuditTable";
 import PlatformDeploymentActivationDialog from "../components/PlatformDeploymentActivationDialog";
@@ -49,17 +50,42 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     token,
   });
   const activeDeployment = deployments.find((item) => item.is_active) ?? null;
+  const deploymentViewLabel = deployment
+    ? t("platformControl.deployments.views.deploymentDetail", { name: deployment.display_name })
+    : t("platformControl.deployments.detailTitle");
+  const submenuItems = [
+    {
+      id: "profiles",
+      label: t("platformControl.deployments.views.profiles"),
+      isActive: false,
+      to: "/control/platform/deployments",
+    },
+    {
+      id: "history",
+      label: t("platformControl.deployments.views.history"),
+      isActive: false,
+      to: "/control/platform/deployments?view=history",
+    },
+    {
+      id: "create",
+      label: t("platformControl.deployments.views.create"),
+      isActive: false,
+      to: "/control/platform/deployments?view=create",
+    },
+    {
+      id: "deployment-detail",
+      label: deploymentViewLabel,
+      isActive: true,
+      to: deployment ? `/control/platform/deployments/${deployment.id}` : undefined,
+    },
+  ];
 
   return (
     <PlatformPageLayout
       title={deployment?.display_name ?? t("platformControl.deployments.detailTitle")}
       description={deployment ? t("platformControl.deployments.detailDescription") : t("platformControl.deployments.notFound")}
       errorMessage={errorMessage || loadErrorMessage}
-      actions={(
-        <Link className="btn btn-secondary" to="/control/platform/deployments">
-          {t("platformControl.actions.viewDeployments")}
-        </Link>
-      )}
+      secondaryNavigation={<PageSubmenuBar items={submenuItems} ariaLabel={t("platformControl.deployments.views.aria")} />}
     >
       {state === "success" && !deployment ? (
         <article className="panel card-stack">

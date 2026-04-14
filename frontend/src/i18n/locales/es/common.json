@@ -1527,7 +1527,8 @@
         "aria": "Secciones de gestion de despliegues",
         "profiles": "Perfiles de despliegue",
         "history": "Historial de activacion",
-        "create": "Crear despliegue"
+        "create": "Crear despliegue",
+        "deploymentDetail": "Despliegue: {{name}}"
       },
       "columns": {
         "capability": "Capacidad",
