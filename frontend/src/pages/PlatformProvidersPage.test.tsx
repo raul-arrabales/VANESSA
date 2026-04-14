@@ -5,7 +5,8 @@ import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import PlatformProvidersPage from "./PlatformProvidersPage";
-import { primePlatformControlMocks } from "../test/platformControlFixtures";
+import * as platformApi from "../api/platform";
+import { primePlatformControlMocks, providersFixture } from "../test/platformControlFixtures";
 
 let mockUser: AuthUser | null = null;
 
@@ -56,7 +57,27 @@ describe("PlatformProvidersPage", () => {
     );
     expect((await screen.findAllByText(await t("platformControl.providers.usedByDeployments"))).length).toBeGreaterThan(0);
     expect(document.querySelector(".platform-directory-grid")).toHaveClass("platform-provider-list");
+    expect(screen.getAllByText(await t("platformControl.badges.local")).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(await t("platformControl.forms.provider.slug"))).not.toBeInTheDocument();
+  });
+
+  it("labels cloud providers distinctly from local providers", async () => {
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([
+      ...providersFixture,
+      {
+        ...providersFixture[0],
+        id: "provider-cloud",
+        slug: "openai-cloud-llm",
+        provider_key: "openai_compatible_cloud_llm",
+        display_name: "OpenAI-compatible cloud LLM",
+        endpoint_url: "https://api.example.com/v1",
+      },
+    ]);
+
+    await renderWithAppProviders(<PlatformProvidersPage />);
+
+    expect(await screen.findByRole("heading", { name: "OpenAI-compatible cloud LLM" })).toBeVisible();
+    expect(screen.getByText(await t("platformControl.badges.cloud"))).toBeVisible();
   });
 
   it("filters the provider directory by search text", async () => {

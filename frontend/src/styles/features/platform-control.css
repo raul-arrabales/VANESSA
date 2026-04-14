@@ -40,6 +40,18 @@
   background: color-mix(in oklab, var(--accent-primary) 12%, var(--bg-surface));
 }
 
+.platform-badge[data-tone="local"] {
+  color: var(--accent-primary);
+  border-color: color-mix(in oklab, var(--accent-primary) 42%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-primary) 10%, var(--bg-surface));
+}
+
+.platform-badge[data-tone="cloud"] {
+  color: var(--accent-secondary);
+  border-color: color-mix(in oklab, var(--accent-secondary) 42%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-secondary) 10%, var(--bg-surface));
+}
+
 .platform-deployment-list {
   display: grid;
   gap: var(--space-4);

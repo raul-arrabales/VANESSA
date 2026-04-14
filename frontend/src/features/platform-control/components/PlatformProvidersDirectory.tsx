@@ -9,6 +9,11 @@ type PlatformProvidersDirectoryProps = {
   deployments: PlatformDeploymentProfile[];
 };
 
+function providerOrigin(providerKey: string): "cloud" | "local" {
+  const normalizedProviderKey = providerKey.trim().toLowerCase();
+  return normalizedProviderKey.includes("_cloud") || normalizedProviderKey.endsWith("_cloud") ? "cloud" : "local";
+}
+
 export default function PlatformProvidersDirectory({
   providers,
   providerFamilies,
@@ -28,6 +33,7 @@ export default function PlatformProvidersDirectory({
         const family = providerFamilyByKey.get(provider.provider_key);
         const usageEntries = getProviderUsageEntries(provider.id, deployments);
         const usesActiveDeployment = usageEntries.some((entry) => entry.deployment.is_active);
+        const origin = providerOrigin(provider.provider_key);
         return (
           <article key={provider.id} className="platform-deployment-card platform-provider-row">
             <div className="platform-provider-summary">
@@ -40,6 +46,9 @@ export default function PlatformProvidersDirectory({
               <div className="inline-meta-list">
                 <span className="platform-badge" data-tone={provider.enabled ? "enabled" : "disabled"}>
                   {provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled")}
+                </span>
+                <span className="platform-badge" data-tone={origin}>
+                  {t(`platformControl.badges.${origin}`)}
                 </span>
                 {usesActiveDeployment ? (
                   <span className="platform-badge" data-tone="active">

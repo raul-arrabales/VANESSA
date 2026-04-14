@@ -1588,6 +1588,8 @@
       "disabled": "Disabled",
       "ready": "Ready",
       "incomplete": "Incomplete",
+      "local": "Local",
+      "cloud": "Cloud",
       "activeDeployment": "Active deployment"
     },
     "feedback": {
