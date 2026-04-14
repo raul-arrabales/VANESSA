@@ -99,6 +99,15 @@ describe("PlatformDeploymentDetailPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.activate") }));
 
+    const activationDialog = await screen.findByRole("dialog", {
+      name: await t("platformControl.deployments.activationDialogTitle"),
+    });
+    expect(within(activationDialog).getByText("Local Default")).toBeVisible();
+    expect(within(activationDialog).getByText("Staging Profile")).toBeVisible();
+    expect(platformApi.activateDeploymentProfile).not.toHaveBeenCalled();
+
+    await userEvent.click(within(activationDialog).getByRole("button", { name: await t("platformControl.actions.confirmActivate") }));
+
     await waitFor(() => {
       expect(platformApi.activateDeploymentProfile).toHaveBeenCalledWith("deployment-2", "token");
     });

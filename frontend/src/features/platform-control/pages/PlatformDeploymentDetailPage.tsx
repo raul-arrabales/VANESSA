@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../../auth/AuthProvider";
 import PlatformDeploymentAuditTable from "../components/PlatformDeploymentAuditTable";
+import PlatformDeploymentActivationDialog from "../components/PlatformDeploymentActivationDialog";
 import PlatformDeploymentCloneSection from "../components/PlatformDeploymentCloneSection";
 import PlatformDeploymentDangerSection from "../components/PlatformDeploymentDangerSection";
 import PlatformDeploymentForm from "../components/PlatformDeploymentForm";
@@ -18,9 +19,11 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     capabilityLabelByKey,
     cloneForm,
     cloning,
+    confirmActivate,
     confirmDelete,
     deployment,
     deploymentAudit,
+    deployments,
     errorMessage,
     form,
     handleActivate,
@@ -37,6 +40,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     savingCapabilityKeys,
     savingIdentity,
     setCloneForm,
+    setConfirmActivate,
     setConfirmDelete,
     setForm,
     state,
@@ -44,6 +48,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     deploymentId,
     token,
   });
+  const activeDeployment = deployments.find((item) => item.is_active) ?? null;
 
   return (
     <PlatformPageLayout
@@ -68,8 +73,21 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
             activating={activating}
             capabilityLabelByKey={capabilityLabelByKey}
             deployment={deployment}
-            onActivate={() => void handleActivate()}
+            onActivate={() => setConfirmActivate(true)}
           />
+
+          {confirmActivate && !deployment.is_active ? (
+            <PlatformDeploymentActivationDialog
+              activeDeployment={activeDeployment}
+              deployment={deployment}
+              isPending={activating}
+              onCancel={() => setConfirmActivate(false)}
+              onConfirm={() => {
+                setConfirmActivate(false);
+                void handleActivate();
+              }}
+            />
+          ) : null}
 
           {form ? (
             <article className="panel card-stack">

@@ -41,7 +41,9 @@ type UsePlatformDeploymentDetailMutationsResult = {
   savingCapabilityKeys: Record<string, boolean>;
   cloning: boolean;
   activating: boolean;
+  confirmActivate: boolean;
   confirmDelete: boolean;
+  setConfirmActivate: React.Dispatch<React.SetStateAction<boolean>>;
   setConfirmDelete: React.Dispatch<React.SetStateAction<boolean>>;
   handleSaveIdentity: () => Promise<void>;
   handleSaveCapability: (capabilityKey: string) => Promise<void>;
@@ -69,6 +71,7 @@ export function usePlatformDeploymentDetailMutations({
   const [savingCapabilityKeys, setSavingCapabilityKeys] = useState<Record<string, boolean>>({});
   const [cloning, setCloning] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [confirmActivate, setConfirmActivate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function handleSaveIdentity(): Promise<void> {
@@ -209,7 +212,9 @@ export function usePlatformDeploymentDetailMutations({
     savingCapabilityKeys,
     cloning,
     activating,
+    confirmActivate,
     confirmDelete,
+    setConfirmActivate,
     setConfirmDelete,
     handleSaveIdentity,
     handleSaveCapability,
