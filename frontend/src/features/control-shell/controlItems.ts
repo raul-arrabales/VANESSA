@@ -52,7 +52,7 @@ export const controlCardDefinitions: ControlCardDefinition[] = [
     titleKey: "control.items.platform.title",
     descriptionKey: "control.items.platform.description",
     to: "/control/platform",
-    icon: "adminPage",
+    icon: "settings",
     minimumRole: "superadmin",
   },
   {

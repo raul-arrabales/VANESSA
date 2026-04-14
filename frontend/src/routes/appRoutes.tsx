@@ -152,7 +152,7 @@ export const appRoutes: AppRouteDefinition[] = [
     navGroup: "userMenu",
     navAudience: "authenticated",
     sidebar: {
-      icon: "adminPage",
+      icon: "settings",
       order: 50,
     },
     element: <ControlShellPage />,

@@ -42,8 +42,10 @@ describe("app-shell navigation", () => {
       translate,
     );
     const userMenuItems = buildUserMenuItems(true, translate);
+    const controlItem = sidebarItems.find((item) => item.to === "/control");
 
-    expect(sidebarItems.some((item) => item.to === "/control" && item.isActive)).toBe(true);
+    expect(controlItem?.isActive).toBe(true);
+    expect(controlItem?.icon).toBe("settings");
     expect(userMenuItems.some((item) => item.to === "/control")).toBe(true);
   });
 

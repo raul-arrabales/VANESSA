@@ -5,6 +5,7 @@ export type AppNavIconName =
   | "vanessa"
   | "approvals"
   | "health"
+  | "settings"
   | "userPage"
   | "adminPage"
   | "models"
@@ -43,6 +44,11 @@ const iconByName: Record<AppNavIconName, JSX.Element> = {
   health: (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <path d="M3 13h4l2-4 3 8 2-4h7v-2h-6l-3 6-3-8-3 6H3v-2Z" />
+    </svg>
+  ),
+  settings: (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65-2-3.46-2.49 1a7.18 7.18 0 0 0-1.69-.98L15 3.29h-4l-.36 2.64c-.6.24-1.16.57-1.69.98l-2.49-1-2 3.46 2.11 1.65c-.05.32-.07.65-.07.98s.02.66.07.98l-2.11 1.65 2 3.46 2.49-1c.53.41 1.09.74 1.69.98L11 20.71h4l.36-2.64c.6-.24 1.16-.57 1.69-.98l2.49 1 2-3.46-2.11-1.65ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" />
     </svg>
   ),
   userPage: (

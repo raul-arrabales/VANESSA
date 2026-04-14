@@ -4,6 +4,7 @@ import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import ControlPage from "./ControlPage";
+import { controlCardDefinitions } from "../features/control-shell/controlItems";
 
 let mockUser: AuthUser | null = null;
 
@@ -84,6 +85,7 @@ describe("ControlPage", () => {
     expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
     expect(screen.getByRole("link", { name: await t("control.items.systemHealth.title") })).toHaveAttribute("href", "/control/system-health");
     expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
+    expect(controlCardDefinitions.find((item) => item.id === "platform")?.icon).toBe("settings");
     expect(screen.getByRole("link", { name: await t("control.items.catalog.title") })).toHaveAttribute("href", "/control/catalog");
   });
 });
