@@ -10,6 +10,7 @@ function buildProvider(overrides: Partial<PlatformProvider> = {}): PlatformProvi
     id: "provider-1",
     slug: "provider-1",
     provider_key: "vllm_embeddings_local",
+    provider_origin: "local",
     capability: "embeddings",
     adapter_kind: "openai_compatible_embeddings",
     display_name: "vLLM embeddings local",

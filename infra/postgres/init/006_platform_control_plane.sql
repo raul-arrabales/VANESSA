@@ -11,11 +11,29 @@ CREATE TABLE IF NOT EXISTS platform_provider_families (
     provider_key TEXT PRIMARY KEY,
     capability_key TEXT NOT NULL REFERENCES platform_capabilities(capability_key) ON DELETE CASCADE,
     adapter_kind TEXT NOT NULL,
+    provider_origin TEXT NOT NULL DEFAULT 'local',
     display_name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT platform_provider_families_provider_origin_check CHECK (provider_origin IN ('local', 'cloud'))
 );
+
+ALTER TABLE platform_provider_families
+    ADD COLUMN IF NOT EXISTS provider_origin TEXT NOT NULL DEFAULT 'local';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'platform_provider_families_provider_origin_check'
+    ) THEN
+        ALTER TABLE platform_provider_families
+            ADD CONSTRAINT platform_provider_families_provider_origin_check
+            CHECK (provider_origin IN ('local', 'cloud'));
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS platform_provider_families_capability_idx
     ON platform_provider_families (capability_key);

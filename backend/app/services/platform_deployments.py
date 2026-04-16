@@ -11,8 +11,10 @@ from .platform_bindings import (
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
 from .platform_deployment_status import serialize_deployment_profile_with_status
+from .provider_origin_policy import assert_bindings_allowed_for_runtime_profile
 from .platform_serialization import _serialize_activation_audit_row
 from .platform_types import PlatformControlPlaneError
+from .runtime_profile_service import resolve_runtime_profile
 
 
 def list_deployment_profiles(database_url: str, config: AuthConfig) -> list[dict[str, object]]:
@@ -269,6 +271,10 @@ def activate_deployment_profile(
     if profile is None:
         raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
     bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=deployment_profile_id)
+    assert_bindings_allowed_for_runtime_profile(
+        runtime_profile=resolve_runtime_profile(database_url),
+        bindings=bindings,
+    )
     for binding in bindings:
         if not bool(binding.get("enabled", True)):
             raise PlatformControlPlaneError(

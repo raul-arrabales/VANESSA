@@ -20,8 +20,9 @@ VANESSA is a modular, containerized AI assistant stack with:
 The backend also owns a GenAI control plane that distinguishes:
 
 - `capabilities` such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`
-- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`
+- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, and OpenAI-compatible cloud families
 - `deployment profiles` that bind capabilities to active providers
+- provider origin, persisted on provider families as `local` or `cloud` and inherited by provider instances and runtime snapshots
 
 The product-facing AI surface is now split into explicit domains:
 
@@ -229,6 +230,7 @@ VANESSA currently uses **global runtime profile semantics** for safety gates and
 - `GET /v1/runtime/profile` is available to authenticated users for visibility.
 - `PUT /v1/runtime/profile` is restricted to `superadmin` users.
 - Frontend settings show the runtime profile toggle to all authenticated users, but only superadmins can modify it.
+- Cloud platform providers are never valid execution targets in `offline`. Backend blocks cloud provider validation, deployment activation, active runtime resolution, and runtime invocation before any provider client or network call can be created.
 - Agent tool access also uses this same global runtime profile. For example, MCP-backed web search is blocked outside `online`, while sandbox-backed Python execution can remain available in `offline` when the sandbox runtime capability is active. Legacy `air_gapped` values are normalized to `offline`.
 
 When adding new safety/tool gates, use this same global runtime profile contract instead of creating per-user overrides unless the platform semantics are explicitly revised.
@@ -309,7 +311,7 @@ Current bootstrapped local providers:
 - `weaviate_local`
 - `qdrant_local`
 
-Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider instances own endpoint/auth configuration, while deployment bindings now select capability `resources` from the managed model inventory and provider-native inventory.
+Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider families persist `provider_origin`, provider instances inherit that origin, and deployment/runtime APIs serialize it so clients do not infer locality from naming. Provider instances own endpoint/auth configuration, while deployment bindings now select capability `resources` from the managed model inventory and provider-native inventory.
 
 The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve embeddings, ensure, upsert, query, and delete through the active `embeddings` and `vector_store` bindings using provider-agnostic payloads.
 

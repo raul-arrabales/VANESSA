@@ -42,6 +42,7 @@ function buildProvider(overrides: Partial<PlatformProvider> = {}): PlatformProvi
     id: "provider-1",
     slug: "provider-1",
     provider_key: "vllm_local",
+    provider_origin: "local",
     capability: "llm_inference",
     adapter_kind: "openai_compatible_llm",
     display_name: "vLLM local gateway",

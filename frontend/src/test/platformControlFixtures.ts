@@ -1,12 +1,12 @@
 import { vi } from "vitest";
 import type { KnowledgeBase } from "../api/context";
 import type { ManagedModel } from "../api/modelops";
-import type { PlatformDeploymentProfile } from "../api/platform";
+import type { PlatformCapability, PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../api/platform";
 import * as contextApi from "../api/context";
 import * as modelsApi from "../api/modelops";
 import * as platformApi from "../api/platform";
 
-export const capabilitiesFixture = [
+export const capabilitiesFixture: PlatformCapability[] = [
   {
     capability: "llm_inference",
     display_name: "LLM inference",
@@ -16,6 +16,7 @@ export const capabilitiesFixture = [
       id: "provider-1",
       slug: "vllm-local-gateway",
       provider_key: "vllm_local",
+      provider_origin: "local",
       display_name: "vLLM local gateway",
       deployment_profile_id: "deployment-1",
       deployment_profile_slug: "local-default",
@@ -30,6 +31,7 @@ export const capabilitiesFixture = [
       id: "provider-embeddings",
       slug: "vllm-embeddings-local",
       provider_key: "vllm_embeddings_local",
+      provider_origin: "local",
       display_name: "vLLM embeddings local",
       deployment_profile_id: "deployment-1",
       deployment_profile_slug: "local-default",
@@ -44,6 +46,7 @@ export const capabilitiesFixture = [
       id: "provider-2",
       slug: "weaviate-local",
       provider_key: "weaviate_local",
+      provider_origin: "local",
       display_name: "Weaviate local",
       deployment_profile_id: "deployment-1",
       deployment_profile_slug: "local-default",
@@ -51,9 +54,10 @@ export const capabilitiesFixture = [
   },
 ];
 
-export const providerFamiliesFixture = [
+export const providerFamiliesFixture: PlatformProviderFamily[] = [
   {
     provider_key: "vllm_local",
+    provider_origin: "local",
     capability: "llm_inference",
     adapter_kind: "openai_compatible_llm",
     display_name: "vLLM local gateway",
@@ -61,6 +65,7 @@ export const providerFamiliesFixture = [
   },
   {
     provider_key: "vllm_embeddings_local",
+    provider_origin: "local",
     capability: "embeddings",
     adapter_kind: "openai_compatible_embeddings",
     display_name: "vLLM embeddings local",
@@ -68,6 +73,7 @@ export const providerFamiliesFixture = [
   },
   {
     provider_key: "weaviate_local",
+    provider_origin: "local",
     capability: "vector_store",
     adapter_kind: "weaviate_http",
     display_name: "Weaviate local",
@@ -75,11 +81,12 @@ export const providerFamiliesFixture = [
   },
 ];
 
-export const providersFixture = [
+export const providersFixture: PlatformProvider[] = [
   {
     id: "provider-1",
     slug: "vllm-local-gateway",
     provider_key: "vllm_local",
+    provider_origin: "local",
     capability: "llm_inference",
     adapter_kind: "openai_compatible_llm",
     display_name: "vLLM local gateway",
@@ -94,6 +101,7 @@ export const providersFixture = [
     id: "provider-embeddings",
     slug: "vllm-embeddings-local",
     provider_key: "vllm_embeddings_local",
+    provider_origin: "local",
     capability: "embeddings",
     adapter_kind: "openai_compatible_embeddings",
     display_name: "vLLM embeddings local",
@@ -108,6 +116,7 @@ export const providersFixture = [
     id: "provider-2",
     slug: "weaviate-local",
     provider_key: "weaviate_local",
+    provider_origin: "local",
     capability: "vector_store",
     adapter_kind: "weaviate_http",
     display_name: "Weaviate local",

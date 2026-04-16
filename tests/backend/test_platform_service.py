@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import platform_adapters, platform_bootstrap, platform_deployment_status, platform_service  # noqa: E402
+from app.services import (  # noqa: E402
+    platform_adapters,
+    platform_bootstrap,
+    platform_deployment_status,
+    platform_service,
+    provider_origin_policy,
+)
 from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
 
 
@@ -32,6 +38,7 @@ def _provider_rows_by_id() -> dict[str, dict[str, object]]:
             "id": "provider-llm",
             "slug": "vllm-local-gateway",
             "provider_key": "vllm_local",
+            "provider_origin": "local",
             "capability_key": "llm_inference",
             "display_name": "vLLM local gateway",
             "description": "desc",
@@ -44,6 +51,7 @@ def _provider_rows_by_id() -> dict[str, dict[str, object]]:
             "id": "provider-embeddings",
             "slug": "vllm-embeddings-local",
             "provider_key": "vllm_embeddings_local",
+            "provider_origin": "local",
             "capability_key": "embeddings",
             "display_name": "vLLM embeddings local",
             "description": "desc",
@@ -56,6 +64,7 @@ def _provider_rows_by_id() -> dict[str, dict[str, object]]:
             "id": "provider-vector",
             "slug": "weaviate-local",
             "provider_key": "weaviate_local",
+            "provider_origin": "local",
             "capability_key": "vector_store",
             "display_name": "Weaviate local",
             "description": "desc",
@@ -80,6 +89,7 @@ def _resolved_binding_row(
         "provider_instance_id": binding["provider_instance_id"],
         "provider_slug": provider["slug"],
         "provider_key": provider["provider_key"],
+        "provider_origin": provider.get("provider_origin", "local"),
         "provider_display_name": provider["display_name"],
         "provider_description": provider["description"],
         "endpoint_url": provider["endpoint_url"],
@@ -266,6 +276,7 @@ def test_validate_cloud_provider_can_use_byok_credential(monkeypatch: pytest.Mon
     seen_requests: list[dict[str, object]] = []
 
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(provider_origin_policy, "resolve_runtime_profile", lambda _db: "online")
     monkeypatch.setattr(
         platform_service.platform_repo,
         "get_provider_instance",
@@ -273,6 +284,7 @@ def test_validate_cloud_provider_can_use_byok_credential(monkeypatch: pytest.Mon
             "id": provider_instance_id,
             "slug": "openai-cloud",
             "provider_key": "openai_compatible_cloud_llm",
+            "provider_origin": "cloud",
             "capability_key": "llm_inference",
             "adapter_kind": "openai_compatible_llm",
             "display_name": "OpenAI cloud",
@@ -329,6 +341,50 @@ def test_validate_cloud_provider_can_use_byok_credential(monkeypatch: pytest.Mon
     assert result["validation"]["resources_reachable"] is True
 
 
+def test_validate_provider_blocks_cloud_provider_offline_before_endpoint_calls(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(provider_origin_policy, "resolve_runtime_profile", lambda _db: "offline")
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "provider_origin": "cloud",
+            "capability_key": "llm_inference",
+            "adapter_kind": "openai_compatible_llm",
+            "display_name": "OpenAI cloud",
+            "description": "desc",
+            "endpoint_url": "https://api.openai.com/v1",
+            "healthcheck_url": None,
+            "enabled": True,
+            "config_json": {"models_path": "/models"},
+        },
+    )
+    monkeypatch.setattr(
+        platform_service,
+        "_adapter_from_binding",
+        lambda _binding: pytest.fail("cloud provider validation should be blocked before adapter creation"),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.validate_provider(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            provider_instance_id="provider-openai",
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.code == "offline_provider_blocked"
+    assert exc_info.value.details == {
+        "runtime_profile": "offline",
+        "provider_origin": "cloud",
+        "provider_key": "openai_compatible_cloud_llm",
+        "provider_instance_id": "provider-openai",
+    }
+
+
 def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
@@ -339,6 +395,7 @@ def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.M
             "provider_instance_id": "provider-1",
             "provider_slug": "vllm-local-gateway",
             "provider_key": "vllm_local",
+            "provider_origin": "local",
             "provider_display_name": "vLLM local gateway",
             "provider_description": "desc",
             "endpoint_url": "http://llm:8000",
@@ -357,6 +414,48 @@ def test_resolve_llm_inference_adapter_uses_active_binding(monkeypatch: pytest.M
 
     assert isinstance(adapter, platform_adapters.OpenAICompatibleLlmAdapter)
     assert adapter.binding.provider_slug == "vllm-local-gateway"
+
+
+def test_resolve_runtime_blocks_cloud_active_binding_offline_before_adapter_creation(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(provider_origin_policy, "resolve_runtime_profile", lambda _db: "offline")
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_active_binding_for_capability",
+        lambda _db, *, capability_key: {
+            "capability_key": capability_key,
+            "provider_instance_id": "provider-openai",
+            "provider_slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "provider_origin": "cloud",
+            "provider_display_name": "OpenAI cloud",
+            "provider_description": "desc",
+            "endpoint_url": "https://api.openai.com/v1",
+            "healthcheck_url": None,
+            "enabled": True,
+            "config_json": {"chat_completion_path": "/v1/chat/completions"},
+            "binding_config": {},
+            "adapter_kind": "openai_compatible_llm",
+            "deployment_profile_id": "deployment-1",
+            "deployment_profile_slug": "cloud-default",
+            "deployment_profile_display_name": "Cloud Default",
+        },
+    )
+    monkeypatch.setattr(
+        platform_service._platform_runtime_module,
+        "OpenAICompatibleLlmAdapter",
+        lambda _binding: pytest.fail("cloud runtime should be blocked before adapter creation"),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.resolve_llm_inference_adapter("ignored", object())  # type: ignore[arg-type]
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.code == "offline_provider_blocked"
+    assert exc_info.value.details["runtime_profile"] == "offline"
+    assert exc_info.value.details["provider_origin"] == "cloud"
+    assert exc_info.value.details["provider_key"] == "openai_compatible_cloud_llm"
+    assert exc_info.value.details["provider_instance_id"] == "provider-openai"
 
 
 def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypatch: pytest.MonkeyPatch):
@@ -820,6 +919,62 @@ def test_activate_deployment_profile_allows_incomplete_required_capabilities(mon
 
     assert deployment["configuration_status"]["is_ready"] is False
     assert deployment["configuration_status"]["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+
+
+def test_activate_deployment_profile_rejects_cloud_provider_when_offline(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
+    monkeypatch.setattr(platform_service._platform_deployments_module, "resolve_runtime_profile", lambda _db: "offline")
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "get_deployment_profile",
+        lambda _db, deployment_profile_id: {
+            "id": deployment_profile_id,
+            "slug": "cloud-profile",
+            "display_name": "Cloud Profile",
+            "description": "",
+            "is_active": False,
+        },
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "list_deployment_bindings",
+        lambda _db, *, deployment_profile_id: [
+            {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-openai",
+                "provider_slug": "openai-cloud",
+                "provider_key": "openai_compatible_cloud_llm",
+                "provider_origin": "cloud",
+                "enabled": True,
+                "adapter_kind": "openai_compatible_llm",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "activate_deployment_profile",
+        lambda *_args, **_kwargs: pytest.fail("cloud deployment should not be activated while offline"),
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service.activate_deployment_profile(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            deployment_profile_id="deployment-cloud",
+            activated_by_user_id=1,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.code == "offline_provider_blocked"
+    assert exc_info.value.details == {
+        "runtime_profile": "offline",
+        "provider_origin": "cloud",
+        "provider_key": "openai_compatible_cloud_llm",
+        "provider_instance_id": "provider-openai",
+    }
 
 
 def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeypatch: pytest.MonkeyPatch):
@@ -1983,6 +2138,47 @@ def test_ensure_platform_bootstrap_state_seeds_llama_cpp_profile_when_configured
     assert ("local-llama-cpp-id", "vector_store", "weaviate-local-id") in binding_calls
 
 
+def test_ensure_platform_bootstrap_state_seeds_provider_family_origins(monkeypatch: pytest.MonkeyPatch):
+    family_origins: dict[str, str] = {}
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        platform_service.platform_repo,
+        "ensure_provider_family",
+        lambda _db, **kwargs: family_origins.update({kwargs["provider_key"]: kwargs["provider_origin"]}) or {},
+    )
+    monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
+    monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_bootstrap, "reconcile_local_provider_slots", lambda _db, *, provider_rows: provider_rows)
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", lambda _db, **kwargs: {"id": f"{kwargs['slug']}-id"})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_deployment_profile", lambda _db, *, slug, **kwargs: {"id": f"{slug}-id"})
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+        qdrant_url="",
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert family_origins == {
+        "vllm_local": "local",
+        "llama_cpp_local": "local",
+        "vllm_embeddings_local": "local",
+        "openai_compatible_cloud_llm": "cloud",
+        "openai_compatible_cloud_embeddings": "cloud",
+        "weaviate_local": "local",
+        "qdrant_local": "local",
+        "mcp_gateway_local": "local",
+        "sandbox_local": "local",
+    }
+
+
 def test_ensure_platform_bootstrap_state_reconciles_local_provider_slots(monkeypatch: pytest.MonkeyPatch):
     reconciled_provider_ids: list[str] = []
 
@@ -2711,6 +2907,7 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "id": "provider-1",
                 "slug": "llm-provider",
                 "provider_key": llm_provider_key,
+                "provider_origin": "local",
                 "display_name": "LLM Provider",
                 "description": "desc",
                 "adapter_kind": "openai_compatible_llm",
@@ -2728,6 +2925,7 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "id": "provider-embeddings",
                 "slug": "vllm-embeddings-local",
                 "provider_key": "vllm_embeddings_local",
+                "provider_origin": "local",
                 "display_name": "vLLM embeddings local",
                 "description": "desc",
                 "adapter_kind": "openai_compatible_embeddings",
@@ -2799,6 +2997,7 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "id": "provider-2",
                 "slug": "weaviate-local" if vector_provider_key == "weaviate_local" else "qdrant-local",
                 "provider_key": vector_provider_key,
+                "provider_origin": "local",
                 "display_name": "Weaviate local" if vector_provider_key == "weaviate_local" else "Qdrant local",
                 "description": "desc",
                 "adapter_kind": vector_adapter_kind,

@@ -167,12 +167,13 @@ Key terms:
 
 - `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
 - `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`
+- `provider_origin`: family-owned origin classification, `local` or `cloud`, inherited by provider instances and serialized in provider, deployment-binding, runtime, and active-provider payloads
 - `deployment profile`: named set of active capability bindings
 - `binding resource`: capability-scoped resource explicitly bound at the deployment-binding layer, such as a ModelOps-managed model or a vector-store index
 - `adapter`: capability-specific backend client used by runtime paths
 
 This layer stays separate from user-facing model/provider governance. Model governance decides which models users can access; the platform control plane decides which infrastructure implementation powers a capability.
-For shared cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed managed-model resources plus one default.
+For shared cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed managed-model resources plus one default. Provider origin is not editable per instance; changing locality means choosing a different provider family.
 
 Bootstrap defaults:
 
@@ -181,7 +182,7 @@ Bootstrap defaults:
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - `sandbox_local` is seeded from `SANDBOX_URL` and bound as optional `sandbox_execution` into local deployment profiles when available.
 - `mcp_gateway_local` is seeded only when `MCP_GATEWAY_URL` is configured and bound as optional `mcp_runtime` into local deployment profiles when available.
-- OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code.
+- OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code. Built-in families seed explicit `provider_origin`; only the OpenAI-compatible cloud LLM and embeddings families are `cloud`.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Model-bearing deployment bindings now require a selected provider, but may be saved temporarily with zero resources and no default until the capability is fully configured.
 - Deployment bindings may reference only ModelOps models that are already `active`, `is_validation_current=true`, and `last_validation_status=success`.
@@ -193,6 +194,7 @@ Bootstrap defaults:
 - `POST /v1/platform/providers/{id}/loaded-model` and `DELETE /v1/platform/providers/{id}/loaded-model` are the superadmin control-plane APIs for setting or clearing that local slot intent, and now immediately apply that change to the matching local runtime controller.
 - Superadmin-only embeddings and vector proof routes exercise the real `embeddings` and `vector_store` data planes through the active provider bindings without exposing provider-specific payloads.
 - Backend also resolves an execution-scoped `platform_runtime` snapshot from the active bindings and sends it to `agent_engine` for real model execution, while keeping the control plane itself backend-owned.
+- Offline runtime enforcement is fail-closed for platform providers. When the effective runtime profile is not `online`, backend rejects cloud provider validation, deployment activation, runtime-profile switches to `offline` with active cloud bindings, active runtime resolution, and runtime adapter dispatch with `offline_provider_blocked` and conflict status `409`.
 - Backend owns product/public retrieval request shaping, active KB selection, deployment-runtime resolution, and knowledge-chat/source projection. It forwards canonical `input.retrieval` payloads to `agent_engine`, which executes semantic / keyword / hybrid retrieval against the active runtime bindings.
 - Canonical backend ↔ agent-engine retrieval semantics are documented in [Retrieval Contract](retrieval_contract.md).
 - Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.

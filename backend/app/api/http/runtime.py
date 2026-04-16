@@ -19,8 +19,11 @@ resolve_runtime_profile_state = _resolve_runtime_profile_state
 update_runtime_profile = _update_runtime_profile
 
 
-def _json_error(status: int, code: str, message: str):
-    return jsonify({"error": code, "message": message}), status
+def _json_error(status: int, code: str, message: str, *, details: dict | None = None):
+    payload = {"error": code, "message": message}
+    if details:
+        payload["details"] = details
+    return jsonify(payload), status
 
 
 def _config():
@@ -52,7 +55,7 @@ def set_runtime_profile_route():
             update_runtime_profile_fn=update_runtime_profile,
         )
     except RuntimeProfileRequestError as exc:
-        return _json_error(exc.status_code, exc.code, exc.message)
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
 
     return jsonify(payload), 200
 

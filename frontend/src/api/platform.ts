@@ -17,6 +17,7 @@ export type PlatformCapability = {
     id: string;
     slug: string;
     provider_key: string;
+    provider_origin?: "local" | "cloud";
     display_name: string;
     deployment_profile_id: string;
     deployment_profile_slug: string;
@@ -27,6 +28,7 @@ export type PlatformProvider = {
   id: string;
   slug: string;
   provider_key: string;
+  provider_origin: "local" | "cloud";
   capability: string;
   adapter_kind: string;
   display_name: string;
@@ -47,6 +49,7 @@ export type PlatformProvider = {
 
 export type PlatformProviderFamily = {
   provider_key: string;
+  provider_origin: "local" | "cloud";
   capability: string;
   adapter_kind: string;
   display_name: string;
@@ -59,10 +62,11 @@ export type PlatformDeploymentBinding = {
     id: string;
     slug: string;
     provider_key: string;
+    provider_origin?: "local" | "cloud";
     display_name: string;
     endpoint_url: string;
-      enabled: boolean;
-      adapter_kind: string;
+    enabled: boolean;
+    adapter_kind: string;
   };
   resources: Array<{
     id: string;

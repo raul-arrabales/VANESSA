@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .platform_local_slots import _effective_local_slot
-from .platform_service_types import _CLOUD_PROVIDER_KEYS, _LOCAL_SLOT_CONFIG_KEYS
+from .platform_service_types import _LOCAL_SLOT_CONFIG_KEYS
 from .platform_types import ProviderBinding
 
 
@@ -23,8 +23,7 @@ def _runtime_model_identifier(model_row: dict[str, Any]) -> str:
 
 
 def _is_cloud_provider_row(provider_row: dict[str, Any]) -> bool:
-    provider_key = str(provider_row.get("provider_key", "")).strip().lower()
-    return provider_key in _CLOUD_PROVIDER_KEYS
+    return str(provider_row.get("provider_origin") or "local").strip().lower() == "cloud"
 
 
 def _build_model_binding_resource(model_row: dict[str, Any], *, provider_resource_id: str) -> dict[str, Any]:
@@ -87,6 +86,7 @@ def _serialize_provider_family_row(row: dict[str, Any]) -> dict[str, Any]:
         "provider_key": row["provider_key"],
         "capability": row["capability_key"],
         "adapter_kind": row["adapter_kind"],
+        "provider_origin": row.get("provider_origin") or "local",
         "display_name": row["display_name"],
         "description": row["description"],
     }
@@ -109,6 +109,7 @@ def _serialize_provider_row(row: dict[str, Any]) -> dict[str, Any]:
         "provider_key": row["provider_key"],
         "capability": row["capability_key"],
         "adapter_kind": row["adapter_kind"],
+        "provider_origin": row.get("provider_origin") or "local",
         "display_name": row["display_name"],
         "description": row["description"],
         "endpoint_url": row["endpoint_url"],
@@ -126,6 +127,7 @@ def _serialize_runtime_binding(binding: ProviderBinding) -> dict[str, Any]:
         "id": binding.provider_instance_id,
         "slug": binding.provider_slug,
         "provider_key": binding.provider_key,
+        "provider_origin": binding.provider_origin,
         "display_name": binding.provider_display_name,
         "description": binding.provider_description,
         "adapter_kind": binding.adapter_kind,
@@ -163,6 +165,7 @@ def _serialize_deployment_profile(profile: dict[str, Any], bindings: list[dict[s
                     "id": str(binding["provider_instance_id"]),
                     "slug": binding["provider_slug"],
                     "provider_key": binding["provider_key"],
+                    "provider_origin": binding.get("provider_origin") or "local",
                     "display_name": binding["provider_display_name"],
                     "endpoint_url": binding["endpoint_url"],
                     "enabled": bool(binding["enabled"]),

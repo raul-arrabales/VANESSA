@@ -60,6 +60,7 @@ Use these terms consistently:
 
 - `provider`
   - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`.
+  - Provider families own `provider_origin` (`local` or `cloud`); provider instances inherit that value and must not override it.
 
 - `adapter`
   - Capability-specific backend client used to talk to a provider.
@@ -108,6 +109,7 @@ For model-bearing capabilities:
 - `llm_inference` and `embeddings` bindings use managed-model `resources` plus `default_resource_id`.
 - Requested models must belong to the active binding.
 - If no model is requested, the binding default is used.
+- In `offline` runtime profile, any provider with `provider_origin="cloud"` must be blocked before validation, activation, runtime resolution, adapter creation, or provider invocation.
 
 ### 2.4. Containers and service boundaries
 

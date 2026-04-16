@@ -54,6 +54,7 @@ The runtime architecture now distinguishes container topology from capability bi
 
 - `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
 - `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`
+- `provider_origin`: a backend-owned family classification, either `local` or `cloud`, inherited by provider instances and serialized into provider, deployment, and runtime payloads
 - `deployment profile`: the named set of active capability-to-provider bindings, plus any binding-level resource selection required by that capability
 - `adapter`: the capability-specific backend client that talks to a provider
 - `resource`: the deployment-bound capability resource chosen by a binding, including managed models and provider-native resources such as vector indexes
@@ -89,6 +90,7 @@ Current provider proof state:
 - When `SANDBOX_URL` is configured, deployment profiles also bind `sandbox_execution -> sandbox_local`.
 - When `MCP_GATEWAY_URL` is configured, deployment profiles also bind `mcp_runtime -> mcp_gateway_local`.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; provider instances hold endpoint/auth config while deployment bindings choose explicit managed-model resources.
+- Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
 - `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.
 - Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain optional and are enforced per execution when an agent references tools that need them.

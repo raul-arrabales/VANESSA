@@ -17,6 +17,7 @@ from .platform_bootstrap import ensure_platform_bootstrap_state
 from .platform_local_slots import assign_provider_loaded_model as _assign_provider_loaded_model
 from .platform_local_slots import clear_provider_loaded_model as _clear_provider_loaded_model
 from .platform_local_slots import _is_local_model_slot_provider
+from .provider_origin_policy import assert_provider_allowed_for_current_runtime
 from .platform_runtime import (
     resolve_mcp_runtime_adapter,
     resolve_sandbox_execution_adapter,
@@ -68,6 +69,7 @@ def list_capabilities(database_url: str, config: AuthConfig) -> list[dict[str, A
                         "id": str(active_binding["provider_instance_id"]),
                         "slug": active_binding["provider_slug"],
                         "provider_key": active_binding["provider_key"],
+                        "provider_origin": active_binding.get("provider_origin") or "local",
                         "display_name": active_binding["provider_display_name"],
                         "deployment_profile_id": str(active_binding["deployment_profile_id"]),
                         "deployment_profile_slug": active_binding["deployment_profile_slug"],
@@ -212,6 +214,7 @@ def validate_provider(
     provider_row = platform_repo.get_provider_instance(database_url, provider_instance_id)
     if provider_row is None:
         raise PlatformControlPlaneError("provider_not_found", "Provider instance not found", status_code=404)
+    assert_provider_allowed_for_current_runtime(database_url, provider_row)
 
     binding_row = platform_repo.get_active_binding_for_provider_instance(database_url, provider_instance_id=provider_instance_id)
     binding = ProviderBinding.from_row(binding_row or provider_row)

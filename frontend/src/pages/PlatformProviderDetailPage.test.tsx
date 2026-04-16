@@ -87,6 +87,7 @@ function buildCloudProvider(
     id: "provider-cloud",
     slug: "openai-compatible-cloud",
     provider_key: "openai_compatible_cloud_llm",
+    provider_origin: "cloud",
     capability: "llm_inference",
     adapter_kind: "openai_compatible_llm",
     display_name: "OpenAI-compatible cloud",

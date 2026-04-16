@@ -150,15 +150,87 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_MCP_RUNTIME, display_name="MCP runtime", description="Gateway capability for MCP-hosted tool execution.", is_required=False)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_SANDBOX_EXECUTION, display_name="Sandbox execution", description="Isolated code-execution capability for agent tools.", is_required=False)
 
-    platform_repo.ensure_provider_family(database_url, provider_key="vllm_local", capability_key=CAPABILITY_LLM_INFERENCE, adapter_kind="openai_compatible_llm", display_name="vLLM local gateway", description="Current local-first LLM gateway backed by llm -> llm_runtime.")
-    platform_repo.ensure_provider_family(database_url, provider_key="llama_cpp_local", capability_key=CAPABILITY_LLM_INFERENCE, adapter_kind="openai_compatible_llm", display_name="llama.cpp local", description="OpenAI-compatible llama.cpp inference endpoint for local deployments.")
-    platform_repo.ensure_provider_family(database_url, provider_key="vllm_embeddings_local", capability_key=CAPABILITY_EMBEDDINGS, adapter_kind="openai_compatible_embeddings", display_name="vLLM embeddings local", description="Local embeddings provider exposed through the llm gateway.")
-    platform_repo.ensure_provider_family(database_url, provider_key="openai_compatible_cloud_llm", capability_key=CAPABILITY_LLM_INFERENCE, adapter_kind="openai_compatible_llm", display_name="OpenAI-compatible cloud LLM", description="Shared cloud LLM endpoint using OpenAI-compatible APIs and platform secret refs.")
-    platform_repo.ensure_provider_family(database_url, provider_key="openai_compatible_cloud_embeddings", capability_key=CAPABILITY_EMBEDDINGS, adapter_kind="openai_compatible_embeddings", display_name="OpenAI-compatible cloud embeddings", description="Shared cloud embeddings endpoint using OpenAI-compatible APIs and platform secret refs.")
-    platform_repo.ensure_provider_family(database_url, provider_key="weaviate_local", capability_key=CAPABILITY_VECTOR_STORE, adapter_kind="weaviate_http", display_name="Weaviate local", description="Local Weaviate semantic index endpoint.")
-    platform_repo.ensure_provider_family(database_url, provider_key="qdrant_local", capability_key=CAPABILITY_VECTOR_STORE, adapter_kind="qdrant_http", display_name="Qdrant local", description="Optional local Qdrant semantic index endpoint.")
-    platform_repo.ensure_provider_family(database_url, provider_key="mcp_gateway_local", capability_key=CAPABILITY_MCP_RUNTIME, adapter_kind="mcp_http", display_name="MCP gateway local", description="Optional local MCP runtime gateway for remote and general-purpose tools.")
-    platform_repo.ensure_provider_family(database_url, provider_key="sandbox_local", capability_key=CAPABILITY_SANDBOX_EXECUTION, adapter_kind="sandbox_http", display_name="Sandbox local", description="Local sandbox execution runtime for agent tools.")
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="vllm_local",
+        capability_key=CAPABILITY_LLM_INFERENCE,
+        adapter_kind="openai_compatible_llm",
+        provider_origin="local",
+        display_name="vLLM local gateway",
+        description="Current local-first LLM gateway backed by llm -> llm_runtime.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="llama_cpp_local",
+        capability_key=CAPABILITY_LLM_INFERENCE,
+        adapter_kind="openai_compatible_llm",
+        provider_origin="local",
+        display_name="llama.cpp local",
+        description="OpenAI-compatible llama.cpp inference endpoint for local deployments.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="vllm_embeddings_local",
+        capability_key=CAPABILITY_EMBEDDINGS,
+        adapter_kind="openai_compatible_embeddings",
+        provider_origin="local",
+        display_name="vLLM embeddings local",
+        description="Local embeddings provider exposed through the llm gateway.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="openai_compatible_cloud_llm",
+        capability_key=CAPABILITY_LLM_INFERENCE,
+        adapter_kind="openai_compatible_llm",
+        provider_origin="cloud",
+        display_name="OpenAI-compatible cloud LLM",
+        description="Shared cloud LLM endpoint using OpenAI-compatible APIs and platform secret refs.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="openai_compatible_cloud_embeddings",
+        capability_key=CAPABILITY_EMBEDDINGS,
+        adapter_kind="openai_compatible_embeddings",
+        provider_origin="cloud",
+        display_name="OpenAI-compatible cloud embeddings",
+        description="Shared cloud embeddings endpoint using OpenAI-compatible APIs and platform secret refs.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="weaviate_local",
+        capability_key=CAPABILITY_VECTOR_STORE,
+        adapter_kind="weaviate_http",
+        provider_origin="local",
+        display_name="Weaviate local",
+        description="Local Weaviate semantic index endpoint.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="qdrant_local",
+        capability_key=CAPABILITY_VECTOR_STORE,
+        adapter_kind="qdrant_http",
+        provider_origin="local",
+        display_name="Qdrant local",
+        description="Optional local Qdrant semantic index endpoint.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="mcp_gateway_local",
+        capability_key=CAPABILITY_MCP_RUNTIME,
+        adapter_kind="mcp_http",
+        provider_origin="local",
+        display_name="MCP gateway local",
+        description="Optional local MCP runtime gateway for remote and general-purpose tools.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="sandbox_local",
+        capability_key=CAPABILITY_SANDBOX_EXECUTION,
+        adapter_kind="sandbox_http",
+        provider_origin="local",
+        display_name="Sandbox local",
+        description="Local sandbox execution runtime for agent tools.",
+    )
 
     vllm_provider = platform_repo.ensure_provider_instance(
         database_url,

@@ -44,6 +44,7 @@ class ProviderBinding:
     resources: list[dict[str, Any]] = field(default_factory=list)
     default_resource_id: str | None = None
     default_resource: dict[str, Any] | None = None
+    provider_origin: str = "local"
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> "ProviderBinding":
@@ -59,6 +60,7 @@ class ProviderBinding:
             provider_instance_id=str(row.get("provider_instance_id") or row.get("id") or "").strip(),
             provider_slug=str(row.get("provider_slug") or row.get("slug") or "").strip(),
             provider_key=str(row.get("provider_key", "")).strip().lower(),
+            provider_origin=str(row.get("provider_origin") or "local").strip().lower(),
             provider_display_name=str(
                 row.get("provider_display_name")
                 or row.get("display_name")

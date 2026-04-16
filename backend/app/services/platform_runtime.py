@@ -18,6 +18,7 @@ from .platform_adapters import (
     WeaviateVectorStoreAdapter,
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
+from .provider_origin_policy import assert_provider_allowed_for_current_runtime
 from .platform_serialization import _serialize_runtime_binding, _serialize_runtime_deployment_profile
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
@@ -51,6 +52,7 @@ def _resolve_provider_binding(
                 "Provider instance does not implement the requested capability",
                 status_code=400,
             )
+        assert_provider_allowed_for_current_runtime(database_url, row)
         return ProviderBinding.from_row(row)
 
     row = platform_repo.get_active_binding_for_capability(database_url, capability_key=capability_key)
@@ -67,6 +69,7 @@ def _resolve_provider_binding(
             f"Active provider '{binding.provider_slug}' is disabled",
             status_code=503,
         )
+    assert_provider_allowed_for_current_runtime(database_url, row)
     return binding
 
 
@@ -229,6 +232,7 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                 "id": llm_adapter.binding.provider_instance_id,
                 "slug": llm_adapter.binding.provider_slug,
                 "provider_key": llm_adapter.binding.provider_key,
+                "provider_origin": llm_adapter.binding.provider_origin,
                 "display_name": llm_adapter.binding.provider_display_name,
             },
             "deployment_profile": {
@@ -248,6 +252,7 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                 "id": embeddings_adapter.binding.provider_instance_id,
                 "slug": embeddings_adapter.binding.provider_slug,
                 "provider_key": embeddings_adapter.binding.provider_key,
+                "provider_origin": embeddings_adapter.binding.provider_origin,
                 "display_name": embeddings_adapter.binding.provider_display_name,
             },
             "deployment_profile": {
@@ -267,6 +272,7 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                 "id": vector_adapter.binding.provider_instance_id,
                 "slug": vector_adapter.binding.provider_slug,
                 "provider_key": vector_adapter.binding.provider_key,
+                "provider_origin": vector_adapter.binding.provider_origin,
                 "display_name": vector_adapter.binding.provider_display_name,
             },
             "deployment_profile": {
@@ -287,6 +293,7 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                     "id": sandbox_adapter.binding.provider_instance_id,
                     "slug": sandbox_adapter.binding.provider_slug,
                     "provider_key": sandbox_adapter.binding.provider_key,
+                    "provider_origin": sandbox_adapter.binding.provider_origin,
                     "display_name": sandbox_adapter.binding.provider_display_name,
                 },
                 "deployment_profile": {
@@ -310,6 +317,7 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                     "id": mcp_adapter.binding.provider_instance_id,
                     "slug": mcp_adapter.binding.provider_slug,
                     "provider_key": mcp_adapter.binding.provider_key,
+                    "provider_origin": mcp_adapter.binding.provider_origin,
                     "display_name": mcp_adapter.binding.provider_display_name,
                 },
                 "deployment_profile": {

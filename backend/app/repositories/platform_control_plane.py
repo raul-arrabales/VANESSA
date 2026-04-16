@@ -68,7 +68,11 @@ def ensure_provider_family(
     adapter_kind: str,
     display_name: str,
     description: str,
+    provider_origin: str = "local",
 ) -> dict[str, Any]:
+    normalized_origin = provider_origin.strip().lower()
+    if normalized_origin not in {"local", "cloud"}:
+        raise ValueError("invalid_provider_origin")
     with get_connection(database_url) as connection:
         row = connection.execute(
             """
@@ -76,14 +80,16 @@ def ensure_provider_family(
                 provider_key,
                 capability_key,
                 adapter_kind,
+                provider_origin,
                 display_name,
                 description
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (provider_key)
             DO UPDATE SET
               capability_key = EXCLUDED.capability_key,
               adapter_kind = EXCLUDED.adapter_kind,
+              provider_origin = EXCLUDED.provider_origin,
               display_name = EXCLUDED.display_name,
               description = EXCLUDED.description,
               updated_at = NOW()
@@ -93,6 +99,7 @@ def ensure_provider_family(
                 provider_key.strip().lower(),
                 capability_key.strip().lower(),
                 adapter_kind.strip().lower(),
+                normalized_origin,
                 display_name.strip(),
                 description.strip(),
             ),
@@ -110,6 +117,7 @@ def list_provider_families(database_url: str) -> list[dict[str, Any]]:
               provider_key,
               capability_key,
               adapter_kind,
+              provider_origin,
               display_name,
               description,
               created_at,
@@ -129,6 +137,7 @@ def get_provider_family(database_url: str, provider_key: str) -> dict[str, Any] 
               provider_key,
               capability_key,
               adapter_kind,
+              provider_origin,
               display_name,
               description,
               created_at,
@@ -317,6 +326,7 @@ def list_provider_instances(database_url: str) -> list[dict[str, Any]]:
               i.provider_key,
               f.capability_key,
               f.adapter_kind,
+              f.provider_origin,
               i.display_name,
               i.description,
               i.endpoint_url,
@@ -343,6 +353,7 @@ def get_provider_instance(database_url: str, provider_instance_id: str) -> dict[
               i.provider_key,
               f.capability_key,
               f.adapter_kind,
+              f.provider_origin,
               i.display_name,
               i.description,
               i.endpoint_url,
@@ -744,7 +755,8 @@ def list_deployment_bindings(database_url: str, *, deployment_profile_id: str) -
               i.healthcheck_url,
               i.enabled,
               i.config_json,
-              f.adapter_kind
+              f.adapter_kind,
+              f.provider_origin
             FROM platform_deployment_bindings b
             JOIN platform_provider_instances i ON i.id = b.provider_instance_id
             JOIN platform_provider_families f ON f.provider_key = i.provider_key
@@ -800,6 +812,7 @@ def get_active_binding_for_capability(database_url: str, *, capability_key: str)
               i.enabled,
               i.config_json,
               f.adapter_kind,
+              f.provider_origin,
               p.id AS deployment_profile_id,
               p.slug AS deployment_profile_slug,
               p.display_name AS deployment_profile_display_name
@@ -836,6 +849,7 @@ def get_active_binding_for_provider_instance(database_url: str, *, provider_inst
               i.enabled,
               i.config_json,
               f.adapter_kind,
+              f.provider_origin,
               p.id AS deployment_profile_id,
               p.slug AS deployment_profile_slug,
               p.display_name AS deployment_profile_display_name

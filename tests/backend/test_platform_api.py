@@ -56,6 +56,7 @@ def test_platform_capabilities_returns_active_provider_summary(client, monkeypat
                     "id": "provider-1",
                     "slug": "vllm-local-gateway",
                     "provider_key": "vllm_local",
+                    "provider_origin": "local",
                     "display_name": "vLLM local gateway",
                     "deployment_profile_id": "deployment-1",
                     "deployment_profile_slug": "local-default",
@@ -159,6 +160,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
         lambda _db, _config: [
             {
                 "provider_key": "vllm_local",
+                "provider_origin": "local",
                 "capability": "llm_inference",
                 "adapter_kind": "openai_compatible_llm",
                 "display_name": "vLLM local gateway",
@@ -174,6 +176,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
                 "id": "provider-1",
                 "slug": "vllm-local-gateway",
                 "provider_key": "vllm_local",
+                "provider_origin": "local",
                 "capability": "llm_inference",
                 "adapter_kind": "openai_compatible_llm",
                 "display_name": "vLLM local gateway",
@@ -193,6 +196,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "id": "provider-2",
             "slug": payload["slug"],
             "provider_key": payload["provider_key"],
+            "provider_origin": "local",
             "capability": "llm_inference",
             "adapter_kind": "openai_compatible_llm",
             "display_name": payload["display_name"],
@@ -211,6 +215,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "id": provider_instance_id,
             "slug": payload["slug"],
             "provider_key": "vllm_local",
+            "provider_origin": "local",
             "capability": "llm_inference",
             "adapter_kind": "openai_compatible_llm",
             "display_name": payload["display_name"],
@@ -229,6 +234,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "id": provider_instance_id,
             "slug": "vllm-embeddings-local",
             "provider_key": "vllm_embeddings_local",
+            "provider_origin": "local",
             "capability": "embeddings",
             "adapter_kind": "openai_compatible_embeddings",
             "display_name": "vLLM embeddings local",
@@ -252,6 +258,7 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
             "id": provider_instance_id,
             "slug": "vllm-embeddings-local",
             "provider_key": "vllm_embeddings_local",
+            "provider_origin": "local",
             "capability": "embeddings",
             "adapter_kind": "openai_compatible_embeddings",
             "display_name": "vLLM embeddings local",
@@ -584,8 +591,10 @@ def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.
 
     assert providers.status_code == 200
     assert providers.get_json()["providers"][0]["slug"] == "vllm-local-gateway"
+    assert providers.get_json()["providers"][0]["provider_origin"] == "local"
     assert provider_families.status_code == 200
     assert provider_families.get_json()["provider_families"][0]["provider_key"] == "vllm_local"
+    assert provider_families.get_json()["provider_families"][0]["provider_origin"] == "local"
     assert activation_audit.status_code == 200
     assert activation_audit.get_json()["activation_audit"][0]["deployment_profile"]["slug"] == "local-default"
     assert create_provider_response.status_code == 201

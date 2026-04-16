@@ -226,6 +226,7 @@ vi.mock("./api/platform", () => ({
         id: "provider-1",
         slug: "vllm-local-gateway",
         provider_key: "vllm_local",
+        provider_origin: "local",
         display_name: "vLLM local gateway",
         deployment_profile_id: "deployment-1",
         deployment_profile_slug: "local-default",
@@ -235,6 +236,7 @@ vi.mock("./api/platform", () => ({
   listPlatformProviderFamilies: vi.fn(async () => [
     {
       provider_key: "vllm_local",
+      provider_origin: "local",
       capability: "llm_inference",
       adapter_kind: "openai_compatible_llm",
       display_name: "vLLM local gateway",
@@ -246,6 +248,7 @@ vi.mock("./api/platform", () => ({
       id: "provider-1",
       slug: "vllm-local-gateway",
       provider_key: "vllm_local",
+      provider_origin: "local",
       capability: "llm_inference",
       adapter_kind: "openai_compatible_llm",
       display_name: "vLLM local gateway",
