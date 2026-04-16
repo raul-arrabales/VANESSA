@@ -1,7 +1,8 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import type { ModelCredential } from "../../../api/modelops/types";
 import type { PlatformProviderFamily } from "../../../api/platform";
-import type { ProviderFormState } from "../providerForm";
+import { updateSecretRefsCredential, type ProviderFormState } from "../providerForm";
 
 type PlatformProviderFormProps = {
   value: ProviderFormState;
@@ -11,6 +12,9 @@ type PlatformProviderFormProps = {
   isSubmitting: boolean;
   submitLabel: string;
   submitBusyLabel: string;
+  credentials?: ModelCredential[];
+  credentialsLoading?: boolean;
+  supportsSavedCredentials?: boolean;
   secondaryAction?: {
     label: string;
     onClick: () => void;
@@ -27,11 +31,22 @@ export default function PlatformProviderForm({
   isSubmitting,
   submitLabel,
   submitBusyLabel,
+  credentials = [],
+  credentialsLoading = false,
+  supportsSavedCredentials = false,
   secondaryAction,
   onChange,
   onSubmit,
 }: PlatformProviderFormProps): JSX.Element {
   const { t } = useTranslation("common");
+
+  function handleCredentialChange(credentialId: string): void {
+    onChange({
+      ...value,
+      credentialId,
+      secretRefsText: updateSecretRefsCredential(value.secretRefsText, credentialId),
+    });
+  }
 
   return (
     <form className="card-stack" onSubmit={onSubmit}>
@@ -96,6 +111,32 @@ export default function PlatformProviderForm({
           </select>
         </label>
       </div>
+      {supportsSavedCredentials ? (
+        <label className="card-stack">
+          <span className="field-label">{t("platformControl.forms.provider.savedCredential")}</span>
+          <select
+            className="field-input"
+            aria-label={t("platformControl.forms.provider.savedCredential")}
+            value={value.credentialId}
+            disabled={credentialsLoading}
+            onChange={(event) => handleCredentialChange(event.target.value)}
+          >
+            <option value="">{t("platformControl.forms.provider.savedCredentialProviderSecrets")}</option>
+            {credentials.map((credential) => (
+              <option key={credential.id} value={credential.id}>
+                {`${credential.display_name} · ${credential.provider} · saved ****${credential.api_key_last4}`}
+              </option>
+            ))}
+          </select>
+          <span className="status-text">
+            {credentialsLoading
+              ? t("platformControl.providers.validationCredentialsLoading")
+              : credentials.length
+                ? t("platformControl.forms.provider.savedCredentialHelp")
+                : t("platformControl.providers.validationNoCredentials")}
+          </span>
+        </label>
+      ) : null}
       <label className="card-stack">
         <span className="field-label">{t("platformControl.forms.provider.description")}</span>
         <textarea

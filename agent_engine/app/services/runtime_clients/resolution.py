@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .base import EmbeddingsRuntimeClientError, LlmRuntimeClientError, RuntimeClientError
+from .secrets import openai_compatible_headers
 from .transport import DEFAULT_HTTP_TIMEOUT_SECONDS, JsonRequestFn
 
 
@@ -189,6 +190,7 @@ def resolve_local_runtime_model_identifier(
     models_payload, status_code = request_json(
         models_url(binding),
         method="GET",
+        headers=openai_compatible_headers(binding, error_cls=error_cls),
         timeout_seconds=binding_timeout_seconds(binding),
     )
     if models_payload is None or not 200 <= status_code < 300:

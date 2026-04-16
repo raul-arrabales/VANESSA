@@ -4,6 +4,7 @@ from typing import Any
 
 from .base import EmbeddingsRuntimeClient, EmbeddingsRuntimeClientError
 from .resolution import binding_timeout_seconds, resolve_effective_embedding_model
+from .secrets import openai_compatible_headers
 from .transport import JsonRequestFn, request_json_or_raise
 
 
@@ -45,6 +46,7 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
                 "model": runtime_model_id,
                 "input": texts,
             },
+            headers=openai_compatible_headers(self.embeddings_binding, error_cls=EmbeddingsRuntimeClientError),
             timeout_seconds=binding_timeout_seconds(self.embeddings_binding),
             unavailable_code="embeddings_runtime_unreachable",
             unavailable_message="Embeddings runtime unavailable",

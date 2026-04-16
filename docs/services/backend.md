@@ -173,7 +173,7 @@ Key terms:
 - `adapter`: capability-specific backend client used by runtime paths
 
 This layer stays separate from user-facing model/provider governance. Model governance decides which models users can access; the platform control plane decides which infrastructure implementation powers a capability.
-For shared cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed managed-model resources plus one default. Provider origin is not editable per instance; changing locality means choosing a different provider family.
+For shared OpenAI-compatible cloud providers, endpoint/auth stay on the provider instance via `secret_refs`, while the deployment binding chooses the allowed managed-model resources plus one default. Provider secret refs may point at ModelOps saved credentials with `modelops://credential/<credential-id>`; backend resolves those encrypted credentials only for provider validation, deployment preflight, and internal runtime dispatch. Provider origin is not editable per instance; changing locality means choosing a different provider family.
 
 Bootstrap defaults:
 

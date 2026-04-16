@@ -311,7 +311,7 @@ Current bootstrapped local providers:
 - `weaviate_local`
 - `qdrant_local`
 
-Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider families persist `provider_origin`, provider instances inherit that origin, and deployment/runtime APIs serialize it so clients do not infer locality from naming. Provider instances own endpoint/auth configuration, while deployment bindings now select capability `resources` from the managed model inventory and provider-native inventory.
+Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider families persist `provider_origin`, provider instances inherit that origin, and deployment/runtime APIs serialize it so clients do not infer locality from naming. OpenAI-compatible cloud provider instances own endpoint/auth configuration, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings now select capability `resources` from the managed model inventory and provider-native inventory.
 
 The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve embeddings, ensure, upsert, query, and delete through the active `embeddings` and `vector_store` bindings using provider-agnostic payloads.
 

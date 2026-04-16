@@ -14,6 +14,7 @@ from .platform_adapters import (
     QdrantVectorStoreAdapter,
     WeaviateVectorStoreAdapter,
 )
+from .platform_credential_refs import resolve_binding_modelops_credential
 from .platform_serialization import (
     _build_model_binding_resource,
     _is_cloud_provider_row,
@@ -240,12 +241,16 @@ def _validate_deployment_profile_bindings(
     config: Any,
     bindings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    del database_url, config
     failures: list[dict[str, Any]] = []
     non_blocking_binding_errors = {"default_resource_required"}
     non_blocking_resource_errors = {"resource_required"}
     for binding in bindings:
         provider_binding = ProviderBinding.from_row(binding)
+        provider_binding, _credential_summary = resolve_binding_modelops_credential(
+            database_url,
+            config=config,
+            binding=provider_binding,
+        )
         validation = _validate_provider_binding(provider_binding)
         result = {
             "provider": {

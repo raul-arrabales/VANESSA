@@ -193,6 +193,32 @@ def test_openai_compatible_runtime_client_supports_vanessa_gateway_payloads(monk
     assert seen_timeouts == [60.0]
 
 
+def test_openai_compatible_runtime_client_sends_runtime_secret_headers(monkeypatch: pytest.MonkeyPatch):
+    seen_headers: list[dict[str, str]] = []
+    runtime = _platform_runtime(provider_key="openai_compatible_cloud_llm")
+    llm = runtime["capabilities"]["llm_inference"]
+    assert isinstance(llm, dict)
+    config = llm["config"]
+    assert isinstance(config, dict)
+    config["secret_refs"] = {"api_key": "sk-runtime"}
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del url, method, payload, timeout_seconds
+        seen_headers.append(dict(headers or {}))
+        return {"output": [{"role": "assistant", "content": [{"type": "text", "text": "cloud reply"}]}]}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_llm_runtime_client(runtime)
+
+    payload = client.chat_completion(
+        requested_model="model.alpha",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+    )
+
+    assert payload["output_text"] == "cloud reply"
+    assert seen_headers == [{"Authorization": "Bearer sk-runtime"}]
+
+
 def test_openai_compatible_runtime_client_supports_openai_chat_responses(monkeypatch: pytest.MonkeyPatch):
     seen_payloads: list[dict[str, object]] = []
 

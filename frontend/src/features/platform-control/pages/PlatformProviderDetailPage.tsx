@@ -148,6 +148,9 @@ export default function PlatformProviderDetailPage(): JSX.Element {
                 isSubmitting={saving}
                 submitLabel={t("platformControl.actions.saveProvider")}
                 submitBusyLabel={t("platformControl.actions.saving")}
+                credentials={validationCredentials}
+                credentialsLoading={credentialsLoading}
+                supportsSavedCredentials={supportsByokValidation}
                 secondaryAction={{
                   label: t("platformControl.actions.reset"),
                   onClick: resetProviderForm,

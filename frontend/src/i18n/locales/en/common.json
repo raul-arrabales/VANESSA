@@ -1387,6 +1387,9 @@
         "endpoint": "Endpoint URL",
         "healthcheck": "Healthcheck URL",
         "enabled": "Enabled state",
+        "savedCredential": "Saved credential",
+        "savedCredentialProviderSecrets": "Use provider secret refs",
+        "savedCredentialHelp": "The provider will use the selected saved credential for runtime calls.",
         "config": "Config JSON",
         "secretRefs": "Secret refs JSON"
       },

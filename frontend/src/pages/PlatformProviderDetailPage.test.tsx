@@ -246,6 +246,52 @@ describe("PlatformProviderDetailPage", () => {
     });
   });
 
+  it("saves a cloud provider with a selected saved credential reference", async () => {
+    const user = userEvent.setup();
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([buildCloudProvider()]);
+    vi.mocked(modelOpsCredentialsApi.listModelCredentials).mockResolvedValue([
+      {
+        id: "00000000-0000-0000-0000-000000000001",
+        owner_user_id: 1,
+        credential_scope: "platform",
+        provider: "openai",
+        display_name: "OpenAI key",
+        api_base_url: "https://api.openai.com/v1",
+        api_key_last4: "1234",
+        is_active: true,
+        revoked_at: null,
+      },
+    ]);
+    vi.mocked(platformApi.updatePlatformProvider).mockResolvedValue(buildCloudProvider({
+      secret_refs: { api_key: "modelops://credential/00000000-0000-0000-0000-000000000001" },
+    }));
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/providers/:providerId" element={<PlatformProviderDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/providers/provider-cloud" },
+    );
+
+    await user.selectOptions(
+      await screen.findByLabelText(await t("platformControl.forms.provider.savedCredential")),
+      "00000000-0000-0000-0000-000000000001",
+    );
+    await user.click(screen.getByRole("button", { name: await t("platformControl.actions.saveProvider") }));
+
+    await waitFor(() => {
+      expect(platformApi.updatePlatformProvider).toHaveBeenCalledWith(
+        "provider-cloud",
+        expect.objectContaining({
+          secret_refs: {
+            api_key: "modelops://credential/00000000-0000-0000-0000-000000000001",
+          },
+        }),
+        "token",
+      );
+    });
+  });
+
   it("shows validation failures in the shared action-feedback dialog", async () => {
     const user = userEvent.setup();
     vi.mocked(platformApi.validatePlatformProvider).mockRejectedValue(

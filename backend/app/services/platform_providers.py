@@ -14,6 +14,7 @@ from .platform_bindings import (
     _validate_provider_binding,
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
+from .platform_credential_refs import resolve_binding_modelops_credential
 from .platform_local_slots import assign_provider_loaded_model as _assign_provider_loaded_model
 from .platform_local_slots import clear_provider_loaded_model as _clear_provider_loaded_model
 from .platform_local_slots import _is_local_model_slot_provider
@@ -230,6 +231,8 @@ def validate_provider(
             actor_user_id=actor_user_id,
             actor_role=actor_role,
         )
+    else:
+        binding, credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.capability_key == CAPABILITY_LLM_INFERENCE:
         adapter = _adapter_from_binding(binding)
         health = adapter.health()

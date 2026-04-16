@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+from collections.abc import Callable
 from typing import Any
 
 from ..config import AuthConfig
@@ -18,7 +20,7 @@ from .platform_adapters import (
     WeaviateVectorStoreAdapter,
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
-from .provider_origin_policy import assert_provider_allowed_for_current_runtime
+from .platform_credential_refs import resolve_binding_modelops_credential
 from .platform_serialization import _serialize_runtime_binding, _serialize_runtime_deployment_profile
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
@@ -30,6 +32,7 @@ from .platform_types import (
     PlatformControlPlaneError,
     ProviderBinding,
 )
+from .provider_origin_policy import assert_provider_allowed_for_current_runtime
 
 
 def _resolve_provider_binding(
@@ -85,6 +88,7 @@ def resolve_llm_inference_adapter(
         capability_key=CAPABILITY_LLM_INFERENCE,
         provider_instance_id=provider_instance_id,
     )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.adapter_kind == "openai_compatible_llm":
         return OpenAICompatibleLlmAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported LLM adapter kind", status_code=500)
@@ -102,6 +106,7 @@ def resolve_embeddings_adapter(
         capability_key=CAPABILITY_EMBEDDINGS,
         provider_instance_id=provider_instance_id,
     )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.adapter_kind == "openai_compatible_embeddings":
         return OpenAICompatibleEmbeddingsAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported embeddings adapter kind", status_code=500)
@@ -119,6 +124,7 @@ def resolve_vector_store_adapter(
         capability_key=CAPABILITY_VECTOR_STORE,
         provider_instance_id=provider_instance_id,
     )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.adapter_kind == "weaviate_http":
         return WeaviateVectorStoreAdapter(binding)
     if binding.adapter_kind == "qdrant_http":
@@ -138,6 +144,7 @@ def resolve_sandbox_execution_adapter(
         capability_key=CAPABILITY_SANDBOX_EXECUTION,
         provider_instance_id=provider_instance_id,
     )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.adapter_kind == "sandbox_http":
         return HttpSandboxExecutionAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported sandbox adapter kind", status_code=500)
@@ -155,12 +162,18 @@ def resolve_mcp_runtime_adapter(
         capability_key=CAPABILITY_MCP_RUNTIME,
         provider_instance_id=provider_instance_id,
     )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
     if binding.adapter_kind == "mcp_http":
         return HttpMcpRuntimeAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported MCP adapter kind", status_code=500)
 
 
-def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[str, Any]:
+def get_active_platform_runtime(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    include_runtime_secrets: bool = False,
+) -> dict[str, Any]:
     ensure_platform_bootstrap_state(database_url, config)
     required_bindings = {
         CAPABILITY_LLM_INFERENCE: _resolve_provider_binding(
@@ -189,9 +202,13 @@ def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[s
             status_code=503,
         )
 
+    if include_runtime_secrets:
+        required_bindings = {
+            capability_key: resolve_binding_modelops_credential(database_url, config=config, binding=binding)[0]
+            for capability_key, binding in required_bindings.items()
+        }
     active_capabilities: dict[str, dict[str, Any]] = {
-        capability_key: _serialize_runtime_binding(binding)
-        for capability_key, binding in required_bindings.items()
+        capability_key: _serialize_runtime_binding(binding) for capability_key, binding in required_bindings.items()
     }
     deployment_binding = next(iter(required_bindings.values()))
     for capability_key in OPTIONAL_CAPABILITIES:
@@ -212,12 +229,43 @@ def get_active_platform_runtime(database_url: str, config: AuthConfig) -> dict[s
                 "Active capability bindings do not point to the same deployment profile",
                 status_code=503,
             )
+        if include_runtime_secrets:
+            optional_binding, _credential_summary = resolve_binding_modelops_credential(
+                database_url,
+                config=config,
+                binding=optional_binding,
+            )
         active_capabilities[capability_key] = _serialize_runtime_binding(optional_binding)
 
     return {
         "deployment_profile": _serialize_runtime_deployment_profile(deployment_binding),
         "capabilities": active_capabilities,
     }
+
+
+def get_active_platform_runtime_for_dispatch(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    get_active_platform_runtime_fn: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    resolver = get_active_platform_runtime_fn or get_active_platform_runtime
+    if _accepts_include_runtime_secrets(resolver):
+        return resolver(database_url, config, include_runtime_secrets=True)
+    return resolver(database_url, config)
+
+
+def _accepts_include_runtime_secrets(resolver: Callable[..., dict[str, Any]]) -> bool:
+    try:
+        signature = inspect.signature(resolver)
+    except (TypeError, ValueError):
+        return True
+    for parameter in signature.parameters.values():
+        if parameter.kind == inspect.Parameter.VAR_KEYWORD:
+            return True
+        if parameter.name == "include_runtime_secrets":
+            return True
+    return False
 
 
 def get_active_capability_statuses(database_url: str, config: AuthConfig) -> list[dict[str, Any]]:

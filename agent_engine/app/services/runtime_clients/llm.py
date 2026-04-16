@@ -5,6 +5,7 @@ from typing import Any
 
 from .base import LlmRuntimeClient, LlmRuntimeClientError
 from .resolution import binding_timeout_seconds, resolve_effective_model
+from .secrets import openai_compatible_headers
 from .transport import JsonRequestFn, request_json_or_raise
 
 
@@ -47,6 +48,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             url=self._chat_url(),
             method="POST",
             payload=payload,
+            headers=openai_compatible_headers(self.llm_binding, error_cls=LlmRuntimeClientError),
             timeout_seconds=binding_timeout_seconds(self.llm_binding),
             unavailable_code="runtime_unreachable",
             unavailable_message="LLM runtime unavailable",

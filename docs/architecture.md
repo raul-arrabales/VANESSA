@@ -89,7 +89,7 @@ Current provider proof state:
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
 - When `SANDBOX_URL` is configured, deployment profiles also bind `sandbox_execution -> sandbox_local`.
 - When `MCP_GATEWAY_URL` is configured, deployment profiles also bind `mcp_runtime -> mcp_gateway_local`.
-- Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; provider instances hold endpoint/auth config while deployment bindings choose explicit managed-model resources.
+- Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; OpenAI-compatible cloud provider instances hold endpoint/auth config, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings choose explicit managed-model resources.
 - Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
 - `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.

@@ -8,6 +8,7 @@ from ..services.agent_engine_client import (
     create_execution as _create_execution,
     get_execution as _get_execution,
 )
+from ..services.platform_runtime import get_active_platform_runtime_for_dispatch
 from ..services.platform_service import get_active_platform_runtime as _get_active_platform_runtime
 from ..services.runtime_profile_service import resolve_runtime_profile as _resolve_runtime_profile
 
@@ -91,7 +92,11 @@ def create_agent_execution_response(
 
     org_id = str(payload.get("org_id", "")).strip() or None
     group_id = str(payload.get("group_id", "")).strip() or None
-    platform_runtime = get_active_platform_runtime_fn(database_url, config)
+    platform_runtime = get_active_platform_runtime_for_dispatch(
+        database_url,
+        config,
+        get_active_platform_runtime_fn=get_active_platform_runtime_fn,
+    )
 
     try:
         return create_execution_fn(

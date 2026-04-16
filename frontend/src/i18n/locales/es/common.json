@@ -1375,6 +1375,9 @@
         "endpoint": "URL del endpoint",
         "healthcheck": "URL de healthcheck",
         "enabled": "Estado habilitado",
+        "savedCredential": "Credencial guardada",
+        "savedCredentialProviderSecrets": "Usar referencias secretas del proveedor",
+        "savedCredentialHelp": "El proveedor usara la credencial guardada seleccionada para llamadas de runtime.",
         "config": "JSON de configuracion",
         "secretRefs": "JSON de referencias secretas"
       },

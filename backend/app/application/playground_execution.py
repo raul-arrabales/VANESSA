@@ -12,6 +12,7 @@ from ..services.modelops_common import ModelOpsError
 from ..services.modelops_runtime import ensure_model_invokable
 from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
+from ..services.platform_runtime import get_active_platform_runtime_for_dispatch
 from ..services.retrieval_result_projection import normalize_execution_retrieval
 from ..services.runtime_profile_service import resolve_runtime_profile
 
@@ -195,7 +196,11 @@ def execute_knowledge_request(
         requested_model_id=request.model_id,
     )
     ensure_knowledge_chat_agent_impl(database_url)
-    platform_runtime = get_active_platform_runtime_impl(database_url, config)
+    platform_runtime = get_active_platform_runtime_for_dispatch(
+        database_url,
+        config,
+        get_active_platform_runtime_fn=get_active_platform_runtime_impl,
+    )
     selected_knowledge_base = resolve_runtime_knowledge_base_selection(
         platform_runtime,
         database_url=database_url,
