@@ -311,7 +311,7 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("heading", { name: await t("modelOps.home.title") })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("modelOps.home.summaryTitle") })).toBeVisible();
   });
 
   it("renders the model test page for admin", async () => {
@@ -339,15 +339,15 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/control/models" });
 
-    expect(await screen.findByRole("heading", { name: await t("modelOps.home.title") })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: await t("modelOps.home.summaryTitle") })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("link", { name: "Browse catalog" }));
+    await userEvent.click(screen.getByRole("link", { name: "Model catalog" }));
     expect(await screen.findByRole("heading", { name: await t("modelOps.catalog.title") })).toBeVisible();
 
     await userEvent.click(screen.getByRole("link", { name: "Open details" }));
     expect(await screen.findByRole("heading", { name: "GPT-4" })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("link", { name: "Test model" }));
+    await userEvent.click(screen.getByRole("link", { name: "Test model: GPT-4" }));
     expect(await screen.findByLabelText("Prompt")).toBeVisible();
     expect(screen.getByRole("button", { name: "Mark as validated" })).toBeDisabled();
   });

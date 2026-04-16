@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
 import { listManagedModelTestRuntimes } from "../../../api/modelops/testing";
 import type { ManagedModelTestRuntime } from "../../../api/modelops/types";
-import ModelCatalogSubmenu from "../components/ModelCatalogSubmenu";
+import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import ModelTestDebugPanel from "../testing/components/ModelTestDebugPanel";
 import ModelTestHeader from "../testing/components/ModelTestHeader";
@@ -32,7 +32,7 @@ export default function ModelTestPage(): JSX.Element {
   );
   const modelName = testState.model?.name ?? modelId ?? "";
   const modelTestSubmenu = (
-    <ModelCatalogSubmenu
+    <ModelOpsModelsSubmenu
       activeView="test"
       modelId={testState.model?.id ?? modelId}
       modelName={modelName}

@@ -35,8 +35,8 @@ describe("ModelOpsWorkspaceFrame", () => {
     expect(screen.getByRole("heading", { name: "ModelOps" })).toBeVisible();
     expect(screen.getByText("workspace-child")).toBeVisible();
     expect(screen.getByRole("heading", { name: "ModelOps" }).closest(".tabbed-workspace-layout")).not.toBeNull();
-    expect(screen.getByRole("link", { name: "Models" })).toHaveAttribute("href", "/control/models");
-    expect(screen.getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Model catalog" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Register cloud model" })).toHaveAttribute("href", "/control/models/cloud/register");
     expect(screen.queryByRole("link", { name: "Model access" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Register local model" })).not.toBeInTheDocument();

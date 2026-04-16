@@ -1073,6 +1073,15 @@
         "savedCredentials": "Saved credentials"
       }
     },
+    "models": {
+      "views": {
+        "aria": "Models sections",
+        "summary": "Summary",
+        "catalog": "Model catalog",
+        "modelDetails": "Model details: {{name}}",
+        "testModel": "Test model: {{name}}"
+      }
+    },
     "catalog": {
       "title": "Model catalog",
       "description": "Browse the models visible to your current role and move into detail pages for lifecycle work.",

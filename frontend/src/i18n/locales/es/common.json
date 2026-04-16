@@ -1065,6 +1065,15 @@
         "savedCredentials": "Credenciales guardadas"
       }
     },
+    "models": {
+      "views": {
+        "aria": "Secciones de modelos",
+        "summary": "Resumen",
+        "catalog": "Catalogo de modelos",
+        "modelDetails": "Detalles del modelo: {{name}}",
+        "testModel": "Probar modelo: {{name}}"
+      }
+    },
     "catalog": {
       "title": "Catalogo de modelos",
       "description": "Explora los modelos visibles para tu rol y entra a paginas de detalle para el trabajo de ciclo de vida.",

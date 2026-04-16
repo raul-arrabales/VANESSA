@@ -183,9 +183,11 @@ describe("ModelDetailPage", () => {
       { route: "/control/models/gpt-private" },
     );
 
-    const viewNav = await screen.findByRole("navigation", { name: "Model catalog sections" });
+    const viewNav = await screen.findByRole("navigation", { name: "Models sections" });
     const workspaceNav = screen.getByRole("navigation", { name: "ModelOps workspace navigation" });
-    expect(within(workspaceNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
+    expect(within(workspaceNav).getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");
+    expect(within(workspaceNav).queryByRole("link", { name: "Model catalog" })).not.toBeInTheDocument();
+    expect(within(viewNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("href", "/control/models/catalog");
     expect(within(viewNav).getByRole("link", { name: "Model details: GPT Private" })).toHaveAttribute("aria-current", "page");
     expect(within(viewNav).getByRole("link", { name: "Test model: GPT Private" })).toHaveAttribute(
       "href",

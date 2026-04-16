@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ModelOpsHomePage from "./ModelOpsHomePage";
 import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
@@ -72,8 +72,12 @@ describe("ModelOpsHomePage", () => {
   it("renders translated summary card labels", async () => {
     await renderWithAppProviders(<ModelOpsHomePage />, { language: "es", route: "/control/models" });
 
-    expect(screen.getByRole("link", { name: "Modelos" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Catalogo de modelos" })).toHaveAttribute("href", "/control/models/catalog");
+    const workspaceNav = screen.getByRole("navigation", { name: "Navegacion del espacio de trabajo de ModelOps" });
+    expect(within(workspaceNav).getByRole("link", { name: "Modelos" })).toHaveAttribute("aria-current", "page");
+    expect(within(workspaceNav).queryByRole("link", { name: "Catalogo de modelos" })).not.toBeInTheDocument();
+    const viewNav = screen.getByRole("navigation", { name: "Secciones de modelos" });
+    expect(within(viewNav).getByRole("link", { name: "Resumen" })).toHaveAttribute("aria-current", "page");
+    expect(within(viewNav).getByRole("link", { name: "Catalogo de modelos" })).toHaveAttribute("href", "/control/models/catalog");
     expect(screen.queryByRole("heading", { name: "Flujos" })).not.toBeInTheDocument();
     expect(await screen.findByText("Modelos totales")).toBeVisible();
     expect(screen.getByText("Modelos activos")).toBeVisible();

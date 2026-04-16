@@ -42,8 +42,10 @@ describe("ModelCatalogPage", () => {
 
     expect(screen.getByRole("heading", { name: "ModelOps" })).toBeVisible();
     const workspaceNav = screen.getByRole("navigation", { name: "ModelOps workspace navigation" });
-    expect(within(workspaceNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
-    const viewNav = screen.getByRole("navigation", { name: "Model catalog sections" });
+    expect(within(workspaceNav).getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");
+    expect(within(workspaceNav).queryByRole("link", { name: "Model catalog" })).not.toBeInTheDocument();
+    const viewNav = screen.getByRole("navigation", { name: "Models sections" });
+    expect(within(viewNav).getByRole("link", { name: "Summary" })).toHaveAttribute("href", "/control/models");
     expect(within(viewNav).getByRole("link", { name: "Model catalog" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "Model catalog" })).toBeVisible();
     expect(await screen.findByText("Alpha")).toBeVisible();

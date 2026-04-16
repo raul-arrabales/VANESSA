@@ -1,6 +1,5 @@
 export type ModelOpsWorkspaceSection =
   | "overview"
-  | "catalog"
   | "cloud"
   | "access"
   | "local-register";
@@ -17,11 +16,6 @@ export const MODEL_OPS_WORKSPACE_NAV_ITEMS: ModelOpsWorkspaceNavItem[] = [
     section: "overview",
     path: "/control/models",
     labelKey: "nav.models",
-  },
-  {
-    section: "catalog",
-    path: "/control/models/catalog",
-    labelKey: "nav.modelsCatalog",
   },
   {
     section: "cloud",
@@ -56,12 +50,10 @@ export function canAccessModelOpsWorkspaceSection(
 }
 
 export function isModelOpsWorkspacePathActive(currentPathname: string, itemPath: string): boolean {
-  const isCatalogChildPath = /^\/control\/models\/(?!(access|catalog|cloud|local)(\/|$))[^/]+(\/test)?$/.test(currentPathname);
-  if (itemPath === "/control/models/catalog" && isCatalogChildPath) {
-    return true;
+  if (itemPath === "/control/models") {
+    const isModelDetailPath = /^\/control\/models\/(?!(access|cloud|local)(\/|$))[^/]+(\/test)?$/.test(currentPathname);
+    return currentPathname === itemPath || currentPathname === "/control/models/catalog" || isModelDetailPath;
   }
 
-  return itemPath === "/control/models"
-    ? currentPathname === itemPath
-    : currentPathname === itemPath || currentPathname.startsWith(`${itemPath}/`);
+  return currentPathname === itemPath || currentPathname.startsWith(`${itemPath}/`);
 }

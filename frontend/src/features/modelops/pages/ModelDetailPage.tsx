@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
-import ModelCatalogSubmenu from "../components/ModelCatalogSubmenu";
+import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
 import UsageSummaryPanel from "../components/UsageSummaryPanel";
@@ -20,7 +20,7 @@ export default function ModelDetailPage(): JSX.Element {
   const [replacementCredentialId, setReplacementCredentialId] = useState("");
   const modelName = detail.model?.name ?? modelId ?? "";
   const modelDetailSubmenu = (
-    <ModelCatalogSubmenu
+    <ModelOpsModelsSubmenu
       activeView="detail"
       modelId={detail.model?.id ?? modelId}
       modelName={modelName}
