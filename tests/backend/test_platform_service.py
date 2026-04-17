@@ -654,6 +654,30 @@ def test_resolve_runtime_blocks_cloud_active_binding_offline_before_adapter_crea
     assert exc_info.value.details["provider_instance_id"] == "provider-openai"
 
 
+def test_platform_service_runtime_wrapper_forwards_dispatch_secret_flag(monkeypatch: pytest.MonkeyPatch):
+    captured: dict[str, object] = {}
+
+    def _get_active_platform_runtime(_database_url: str, _config: object, *, include_runtime_secrets: bool = False):
+        captured["include_runtime_secrets"] = include_runtime_secrets
+        return {"capabilities": {}}
+
+    monkeypatch.setattr(platform_service, "_sync_platform_helpers", lambda: None)
+    monkeypatch.setattr(
+        platform_service._platform_runtime_module,
+        "get_active_platform_runtime",
+        _get_active_platform_runtime,
+    )
+
+    payload = platform_service.get_active_platform_runtime(
+        "ignored",
+        object(),
+        include_runtime_secrets=True,
+    )
+
+    assert payload == {"capabilities": {}}
+    assert captured == {"include_runtime_secrets": True}
+
+
 def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store"})

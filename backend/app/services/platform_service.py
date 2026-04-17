@@ -375,9 +375,13 @@ def resolve_mcp_runtime_adapter(database_url: str, config, *, provider_instance_
     )
 
 
-def get_active_platform_runtime(database_url: str, config):
+def get_active_platform_runtime(database_url: str, config, *, include_runtime_secrets: bool = False):
     _sync_platform_helpers()
-    return _platform_runtime_module.get_active_platform_runtime(database_url, config)
+    return _platform_runtime_module.get_active_platform_runtime(
+        database_url,
+        config,
+        include_runtime_secrets=include_runtime_secrets,
+    )
 
 
 def get_active_capability_statuses(database_url: str, config):
