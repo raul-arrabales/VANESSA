@@ -4,7 +4,8 @@ import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
 import type { PlatformCapability, PlatformDeploymentBinding, PlatformProvider } from "../../../api/platform";
 import type { DeploymentFormState } from "../deploymentEditor";
-import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
+import { buildDeploymentCapabilitySectionState, filterModelsForProviderOrigin } from "../deploymentFormSections";
+import { capabilityRequiresModelResource } from "../capabilities";
 import PlatformDeploymentCapabilitySection from "./PlatformDeploymentCapabilitySection";
 
 type PlatformDeploymentFormProps = {
@@ -58,11 +59,29 @@ export default function PlatformDeploymentForm({
   const { t } = useTranslation("common");
 
   const updateCapabilityProvider = (capability: string, providerId: string): void => {
+    const nextProvider = (providersByCapability[capability] ?? []).find((provider) => provider.id === providerId) ?? null;
+    const compatibleModelIds = new Set(
+      filterModelsForProviderOrigin(modelResourcesByCapability[capability] ?? [], nextProvider).map((model) => model.id),
+    );
+    const previousResourceIds = value.resourceIdsByCapability[capability] ?? [];
+    const nextResourceIds = capabilityRequiresModelResource(capability)
+      ? previousResourceIds.filter((resourceId) => compatibleModelIds.has(resourceId))
+      : previousResourceIds;
+    const previousDefault = value.defaultResourceIdsByCapability[capability] ?? "";
+    const nextDefault = nextResourceIds.includes(previousDefault) ? previousDefault : (nextResourceIds[0] ?? "");
     onChange({
       ...value,
       providerIdsByCapability: {
         ...value.providerIdsByCapability,
         [capability]: providerId,
+      },
+      resourceIdsByCapability: {
+        ...value.resourceIdsByCapability,
+        [capability]: nextResourceIds,
+      },
+      defaultResourceIdsByCapability: {
+        ...value.defaultResourceIdsByCapability,
+        [capability]: nextDefault,
       },
     });
   };

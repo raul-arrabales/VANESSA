@@ -58,12 +58,12 @@ function buildProvider(overrides: Partial<PlatformProvider> = {}): PlatformProvi
 
 function buildModel(overrides: Partial<ManagedModel> = {}): ManagedModel {
   return {
-    id: "gpt-5",
-    name: "GPT-5",
-    provider: "openai",
-    backend: "external_api",
-    source: "external_provider",
-    availability: "online_only",
+    id: "qwen-local",
+    name: "Qwen local",
+    provider: "huggingface",
+    backend: "local",
+    source: "huggingface",
+    availability: "offline_ready",
     task_key: "llm",
     category: "generative",
     lifecycle_state: "active",
@@ -139,7 +139,7 @@ describe("buildDeploymentCapabilitySectionState", () => {
       }),
       providersByCapability: { llm_inference: [buildProvider()] },
       modelResourcesByCapability: {
-        llm_inference: [buildModel(), buildModel({ id: "gpt-4.1", name: "GPT-4.1" })],
+        llm_inference: [buildModel({ id: "gpt-5", name: "GPT-5" }), buildModel({ id: "gpt-4.1", name: "GPT-4.1" })],
       },
       knowledgeBases: [],
       t: translate,
@@ -155,6 +155,44 @@ describe("buildDeploymentCapabilitySectionState", () => {
     expect(state.resourcePickerSummary).toBe("GPT-5");
     expect(state.loadedModelEligibilityHint).toBeNull();
     expect(state.noEligibleResourcesHint).toBeNull();
+  });
+
+  it("filters model resources by selected provider origin", () => {
+    const capability = buildCapability();
+    const localModel = buildModel({ id: "qwen-local", name: "Qwen local", backend: "local", availability: "offline_ready" });
+    const cloudModel = buildModel({
+      id: "gpt-cloud",
+      name: "GPT cloud",
+      provider: "openai",
+      backend: "external_api",
+      hosting: "cloud",
+      source: "external_provider",
+      availability: "online_only",
+    });
+
+    const localState = buildDeploymentCapabilitySectionState({
+      capability,
+      value: buildFormState({
+        providerIdsByCapability: { llm_inference: "provider-local" },
+      }),
+      providersByCapability: { llm_inference: [buildProvider({ id: "provider-local", provider_origin: "local" })] },
+      modelResourcesByCapability: { llm_inference: [localModel, cloudModel] },
+      knowledgeBases: [],
+      t: translate,
+    });
+    const cloudState = buildDeploymentCapabilitySectionState({
+      capability,
+      value: buildFormState({
+        providerIdsByCapability: { llm_inference: "provider-cloud" },
+      }),
+      providersByCapability: { llm_inference: [buildProvider({ id: "provider-cloud", provider_origin: "cloud" })] },
+      modelResourcesByCapability: { llm_inference: [localModel, cloudModel] },
+      knowledgeBases: [],
+      t: translate,
+    });
+
+    expect(localState.modelOptions.map((model) => model.id)).toEqual(["qwen-local"]);
+    expect(cloudState.modelOptions.map((model) => model.id)).toEqual(["gpt-cloud"]);
   });
 
   it("builds a loaded-but-ineligible hint when the selected provider has a loaded model but no eligible resources", () => {

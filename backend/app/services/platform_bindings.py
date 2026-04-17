@@ -687,11 +687,10 @@ def _validate_model_binding_resource(
         return _build_model_binding_resource(model_row, provider_resource_id=provider_resource_id)
 
     backend_kind = str(model_row.get("backend_kind", "")).strip().lower()
-    availability = str(model_row.get("availability", "")).strip().lower()
-    if backend_kind != "local" and availability != "offline_ready":
+    if backend_kind != "local":
         raise PlatformControlPlaneError(
             "resource_backend_mismatch",
-            "Local providers require a local or offline-ready model",
+            "Local providers require a local model",
             status_code=400,
             details={"resource_id": resource.get("id"), "managed_model_id": managed_model_id},
         )

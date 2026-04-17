@@ -1095,6 +1095,75 @@ def test_resolve_deployment_bindings_keeps_cross_capability_kb_checks_out_of_sav
     ]
 
 
+def test_model_binding_rejects_cloud_model_for_local_provider(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        platform_service._platform_bindings_module,
+        "get_model_by_id",
+        lambda _db, model_id: {
+            "id": model_id,
+            "model_id": model_id,
+            "name": "GPT cloud",
+            "provider": "openai",
+            "provider_model_id": "gpt-5-nano",
+            "source_id": "openai/gpt-5-nano",
+            "backend_kind": "external_api",
+            "availability": "online_only",
+            "task_key": "llm",
+            "lifecycle_state": "active",
+            "is_validation_current": True,
+            "last_validation_status": "success",
+            "credential_id": "credential-1",
+            "credential_is_active": True,
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service._platform_bindings_module._validate_model_binding_resource(
+            "ignored",
+            provider_row={
+                "id": "provider-local",
+                "provider_key": "vllm_local",
+                "provider_origin": "local",
+            },
+            capability_key="llm_inference",
+            resource={"id": "gpt-cloud", "managed_model_id": "gpt-cloud"},
+        )
+
+    assert exc_info.value.code == "resource_backend_mismatch"
+    assert exc_info.value.message == "Local providers require a local model"
+
+
+def test_model_binding_rejects_local_model_for_cloud_provider(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        platform_service._platform_bindings_module,
+        "get_model_by_id",
+        lambda _db, model_id: {
+            **_db_shaped_embeddings_model_row(),
+            "id": model_id,
+            "model_id": model_id,
+            "task_key": "llm",
+            "backend_kind": "local",
+            "availability": "offline_ready",
+            "local_path": "/models/llm/Qwen--Qwen2.5-0.5B-Instruct",
+        },
+    )
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_service._platform_bindings_module._validate_model_binding_resource(
+            "ignored",
+            provider_row={
+                "id": "provider-cloud",
+                "provider_key": "openai_compatible_cloud_llm",
+                "provider_origin": "cloud",
+            },
+            capability_key="llm_inference",
+            resource={"id": "local-model", "managed_model_id": "local-model"},
+        )
+
+    assert exc_info.value.code == "resource_backend_mismatch"
+    assert exc_info.value.message == "Cloud providers require an external_api model"
+
+
 def test_activate_deployment_profile_allows_incomplete_required_capabilities(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(

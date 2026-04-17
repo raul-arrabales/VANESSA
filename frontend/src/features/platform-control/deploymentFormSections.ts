@@ -93,6 +93,23 @@ function buildResourcePickerSummary(
   });
 }
 
+export function modelMatchesProviderOrigin(model: ManagedModel, provider: PlatformProvider | null): boolean {
+  if (!provider) {
+    return true;
+  }
+  if (provider.provider_origin === "cloud") {
+    return model.backend === "external_api" || model.hosting === "cloud";
+  }
+  return model.backend === "local" || model.hosting === "local";
+}
+
+export function filterModelsForProviderOrigin(
+  models: ManagedModel[],
+  provider: PlatformProvider | null,
+): ManagedModel[] {
+  return models.filter((model) => modelMatchesProviderOrigin(model, provider));
+}
+
 export function buildDeploymentCapabilitySectionState({
   capability,
   value,
@@ -107,7 +124,8 @@ export function buildDeploymentCapabilitySectionState({
   const capabilityProviders = providersByCapability[capabilityKey] ?? [];
   const selectedProviderId = value.providerIdsByCapability[capabilityKey] ?? "";
   const selectedProvider = capabilityProviders.find((provider) => provider.id === selectedProviderId) ?? null;
-  const modelOptions = capabilityMode === "model" ? (modelResourcesByCapability[capabilityKey] ?? []) : [];
+  const allModelOptions = capabilityMode === "model" ? (modelResourcesByCapability[capabilityKey] ?? []) : [];
+  const modelOptions = filterModelsForProviderOrigin(allModelOptions, selectedProvider);
   const selectedResourceIds = value.resourceIdsByCapability[capabilityKey] ?? [];
   const modelCheckboxOptions = modelOptions.map((model) => ({
     id: model.id,
