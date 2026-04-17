@@ -506,6 +506,22 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
 
         def _stream_attempt(stream_payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+            openai_chat_parts: list[str] = []
+
+            def _openai_chat_complete_event() -> dict[str, Any]:
+                return {
+                    "type": "complete",
+                    "response": {
+                        "output": [
+                            {
+                                "role": "assistant",
+                                "content": [{"type": "text", "text": "".join(openai_chat_parts)}],
+                            }
+                        ]
+                    },
+                    "status_code": 200,
+                }
+
             for event_name, event_payload in stream_sse_request(
                 self._chat_url(),
                 method="POST",
@@ -514,6 +530,33 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 timeout_seconds=self._request_timeout_seconds(),
             ):
                 normalized_event_name = event_name.strip().lower()
+                if normalized_event_name == "message":
+                    if str(event_payload.get("raw") or "").strip() == "[DONE]":
+                        yield _openai_chat_complete_event()
+                        return
+                    error_payload = event_payload.get("error")
+                    if isinstance(error_payload, dict):
+                        yield {
+                            "type": "error",
+                            "payload": error_payload,
+                            "status_code": int(error_payload.get("status_code", 502) or 502),
+                        }
+                        return
+                    choices = event_payload.get("choices")
+                    first_choice = choices[0] if isinstance(choices, list) and choices else None
+                    if not isinstance(first_choice, dict):
+                        continue
+                    delta = first_choice.get("delta")
+                    if isinstance(delta, dict):
+                        content = delta.get("content")
+                        if isinstance(content, str) and content:
+                            openai_chat_parts.append(content)
+                            yield {"type": "delta", "text": content}
+                            continue
+                    if str(first_choice.get("finish_reason") or "").strip():
+                        yield _openai_chat_complete_event()
+                        return
+                    continue
                 if normalized_event_name == "delta":
                     text = str(event_payload.get("text", ""))
                     if text:

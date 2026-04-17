@@ -273,6 +273,86 @@ def test_openai_adapter_uses_models_url_when_healthcheck_is_null(monkeypatch: py
     assert health["reachable"] is True
 
 
+def test_openai_adapter_normalizes_openai_chat_stream(monkeypatch: pytest.MonkeyPatch):
+    seen_requests: list[dict[str, object]] = []
+
+    def _stream(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        seen_requests.append(
+            {
+                "url": url,
+                "method": method,
+                "payload": dict(payload or {}),
+                "headers": dict(headers or {}),
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        yield "message", {"choices": [{"delta": {"content": "Hello"}}]}
+        yield "message", {"choices": [{"delta": {"content": " there"}}]}
+        yield "message", {"raw": "[DONE]"}
+
+    monkeypatch.setattr(platform_adapters, "stream_sse_request", _stream)
+    binding = platform_service.ProviderBinding.from_row(
+        {
+            "id": "provider-openai",
+            "capability_key": "llm_inference",
+            "provider_slug": "openai-cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "display_name": "OpenAI cloud",
+            "description": "desc",
+            "endpoint_url": "https://api.openai.com/v1",
+            "healthcheck_url": None,
+            "enabled": True,
+            "adapter_kind": "openai_compatible_llm",
+            "config": {
+                "chat_completion_path": "/chat/completions",
+                "request_format": "openai_chat",
+                "request_timeout_seconds": 60,
+                "secret_refs": {"api_key": "sk-test"},
+            },
+        }
+    )
+
+    events = list(
+        platform_adapters.OpenAICompatibleLlmAdapter(binding).chat_completion_stream(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": [{"type": "text", "text": "Hi"}]}],
+            max_tokens=None,
+            temperature=None,
+            allow_local_fallback=False,
+        )
+    )
+
+    assert seen_requests == [
+        {
+            "url": "https://api.openai.com/v1/chat/completions",
+            "method": "POST",
+            "payload": {
+                "model": "gpt-5-nano",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "stream": True,
+            },
+            "headers": {"Authorization": "Bearer sk-test"},
+            "timeout_seconds": 60.0,
+        }
+    ]
+    assert events == [
+        {"type": "delta", "text": "Hello"},
+        {"type": "delta", "text": " there"},
+        {
+            "type": "complete",
+            "response": {
+                "output": [
+                    {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": "Hello there"}],
+                    }
+                ]
+            },
+            "status_code": 200,
+        },
+    ]
+
+
 def test_validate_cloud_provider_can_use_byok_credential(monkeypatch: pytest.MonkeyPatch):
     seen_requests: list[dict[str, object]] = []
 
@@ -408,6 +488,53 @@ def test_validate_cloud_provider_resolves_saved_modelops_credential(monkeypatch:
         "display_name": "OpenAI key",
         "api_base_url": "https://api.openai.com/v1",
     }
+
+
+def test_saved_openai_credential_applies_cloud_runtime_defaults(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        platform_credential_refs,
+        "get_active_credential_secret_by_id",
+        lambda *args, **kwargs: {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "provider_slug": "openai",
+            "display_name": "OpenAI key",
+            "api_base_url": "https://api.openai.com/v1",
+            "api_key": "sk-test",
+        },
+    )
+    binding = platform_service.ProviderBinding(
+        capability_key="llm_inference",
+        provider_instance_id="provider-openai",
+        provider_slug="openai-cloud",
+        provider_key="openai_compatible_cloud_llm",
+        provider_display_name="OpenAI cloud",
+        provider_description="desc",
+        endpoint_url="https://wrong.example/v1",
+        healthcheck_url=None,
+        enabled=True,
+        adapter_kind="openai_compatible_llm",
+        config={
+            "models_path": "/models",
+            "secret_refs": {"api_key": "modelops://credential/00000000-0000-0000-0000-000000000001"},
+        },
+        binding_config={},
+        deployment_profile_id="deployment-1",
+        deployment_profile_slug="oai-cloud",
+        deployment_profile_display_name="OpenAI Cloud",
+    )
+
+    resolved, _summary = platform_credential_refs.resolve_binding_modelops_credential(
+        "ignored",
+        config=type("Config", (), {"model_credentials_encryption_key": "key", "llm_request_timeout_seconds": 60})(),
+        binding=binding,
+    )
+
+    assert resolved.endpoint_url == "https://api.openai.com/v1"
+    assert resolved.config["models_path"] == "/models"
+    assert resolved.config["chat_completion_path"] == "/chat/completions"
+    assert resolved.config["request_format"] == "openai_chat"
+    assert resolved.config["request_timeout_seconds"] == 60
+    assert resolved.config["secret_refs"]["api_key"] == "sk-test"
 
 
 def test_validate_provider_blocks_cloud_provider_offline_before_endpoint_calls(monkeypatch: pytest.MonkeyPatch):

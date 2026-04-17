@@ -89,6 +89,14 @@ def resolve_binding_modelops_credential(
     resolved_secret_refs = dict(raw_resolved_secret_refs) if isinstance(raw_resolved_secret_refs, dict) else {}
     resolved_secret_refs["api_key"] = str(secret.get("api_key") or "").strip()
     next_config["secret_refs"] = resolved_secret_refs
+    next_config.setdefault("request_timeout_seconds", getattr(config, "llm_request_timeout_seconds", 60))
+    if binding.provider_key == "openai_compatible_cloud_llm" and credential_provider == "openai":
+        next_config.setdefault("models_path", "/models")
+        next_config.setdefault("chat_completion_path", "/chat/completions")
+        next_config.setdefault("request_format", "openai_chat")
+    if binding.provider_key == "openai_compatible_cloud_embeddings" and credential_provider == "openai":
+        next_config.setdefault("models_path", "/models")
+        next_config.setdefault("embeddings_path", "/embeddings")
     summary = {
         "id": str(secret.get("id") or credential_id),
         "provider": credential_provider,
