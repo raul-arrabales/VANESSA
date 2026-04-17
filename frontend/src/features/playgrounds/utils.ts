@@ -107,3 +107,16 @@ export function createDraftSession(
     persistence: "draft",
   };
 }
+
+export function createTemporarySession(
+  config: PlaygroundWorkspaceConfig,
+  options: PlaygroundWorkspaceOptions,
+  source?: PlaygroundSessionViewModel | null,
+): PlaygroundSessionViewModel {
+  return {
+    ...createDraftSession(config, options, source),
+    id: createTransientMessageId(`temporary-${config.playgroundKind}`),
+    title: config.temporarySessionTitle,
+    persistence: "temporary",
+  };
+}

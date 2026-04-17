@@ -348,6 +348,63 @@ def test_send_playground_message_persists_structured_knowledge_metadata(monkeypa
     assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 1}
 
 
+def test_send_temporary_playground_message_does_not_persist(monkeypatch):
+    monkeypatch.setattr(
+        playgrounds_service,
+        "chat_completion_with_allowed_model",
+        lambda **_kwargs: (
+            {
+                "output": [
+                    {
+                        "content": [{"type": "text", "text": "temporary answer"}],
+                    }
+                ]
+            },
+            200,
+        ),
+    )
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "append_message_pair",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("temporary chat must not persist messages")),
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    payload = playgrounds_service.send_temporary_playground_message(
+        "postgresql://ignored",
+        config=config,
+        request_id="req-temporary",
+        owner_user_id=10,
+        owner_role="user",
+        payload={
+            "session_id": "temporary-chat-1",
+            "playground_kind": "chat",
+            "model_selection": {"model_id": "safe-small"},
+            "knowledge_binding": {"knowledge_base_id": None},
+            "messages": [{"role": "user", "content": "earlier"}],
+            "prompt": "hello temporary",
+        },
+    )
+
+    assert payload["output"] == "temporary answer"
+    assert payload["session"]["id"] == "temporary-chat-1"
+    assert payload["session"]["message_count"] == 3
+    assert payload["session"]["messages"][0]["content"] == "earlier"
+    assert payload["messages"][1]["content"] == "temporary answer"
+
+
 def test_update_playground_session_preserves_unchanged_fields_when_binding_kb(monkeypatch):
     session_row = {
         "id": "sess-knowledge",

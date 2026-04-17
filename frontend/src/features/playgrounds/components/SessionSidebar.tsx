@@ -8,6 +8,7 @@ type SessionSidebarProps = {
   introText: string;
   historyLoadingText: string;
   newSessionLabel: string;
+  temporarySessionLabel: string;
   sessions: PlaygroundSessionViewModel[];
   activeSessionId: string | null;
   canCreateSession: boolean;
@@ -17,6 +18,7 @@ type SessionSidebarProps = {
   historyError: string;
   onToggleCollapsed: () => void;
   onCreateSession: () => void;
+  onCreateTemporarySession: () => void;
   onSelectSession: (sessionId: string) => void;
   onRenameSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
@@ -29,6 +31,7 @@ export default function SessionSidebar({
   introText,
   historyLoadingText,
   newSessionLabel,
+  temporarySessionLabel,
   sessions,
   activeSessionId,
   canCreateSession,
@@ -38,6 +41,7 @@ export default function SessionSidebar({
   historyError,
   onToggleCollapsed,
   onCreateSession,
+  onCreateTemporarySession,
   onSelectSession,
   onRenameSession,
   onDeleteSession,
@@ -93,6 +97,20 @@ export default function SessionSidebar({
             <span className="chatbot-sidebar-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
                 <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" />
+              </svg>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="chatbot-sidebar-icon-button chatbot-sidebar-temporary-button"
+            onClick={onCreateTemporarySession}
+            aria-label={temporarySessionLabel}
+            title={temporarySessionLabel}
+            disabled={!canCreateSession || isInteractionLocked}
+          >
+            <span className="chatbot-sidebar-icon chatbot-sidebar-icon-outline" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v6.5a2.5 2.5 0 0 1-2.5 2.5h-5.2L8 20v-3H6.5A2.5 2.5 0 0 1 4 14.5V8a2.5 2.5 0 0 1 2.5-2.5Z" />
               </svg>
             </span>
           </button>

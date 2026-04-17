@@ -40,6 +40,7 @@ from .playground_execution import (
 DEFAULT_TITLE_SOURCE = "auto"
 DEFAULT_CHAT_TITLE = "New chat session"
 DEFAULT_KNOWLEDGE_TITLE = "New knowledge session"
+TEMPORARY_CHAT_TITLE = "Temporary chat"
 SESSION_UNSET = playgrounds_repository.UNSET
 
 PlaygroundSessionValidationError = PlaygroundExecutionValidationError
@@ -242,6 +243,54 @@ def stream_playground_message(
     )
 
 
+def send_temporary_playground_message(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    request_id: str,
+    owner_user_id: int,
+    owner_role: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    request = _build_temporary_execution_request(payload=payload)
+    result = _execute_request(
+        database_url,
+        config=config,
+        request_id=request_id,
+        owner_user_id=owner_user_id,
+        owner_role=owner_role,
+        request=request,
+    )
+    return _serialize_temporary_execution_response(request=request, result=result)
+
+
+def stream_temporary_playground_message(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    request_id: str,
+    owner_user_id: int,
+    owner_role: str,
+    payload: dict[str, Any],
+) -> Iterator[dict[str, Any]]:
+    request = _build_temporary_execution_request(payload=payload)
+    if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
+        return iter([
+            {
+                "event": "complete",
+                "data": send_temporary_playground_message(
+                    database_url,
+                    config=config,
+                    request_id=request_id,
+                    owner_user_id=owner_user_id,
+                    owner_role=owner_role,
+                    payload=payload,
+                ),
+            }
+        ])
+    return _stream_temporary_chat_request(request)
+
+
 def get_playground_options(
     database_url: str,
     *,
@@ -347,6 +396,50 @@ def _build_execution_request(
         conversation_title=conversation_title,
         title_source=title_source,
     )
+
+
+def _build_temporary_execution_request(*, payload: dict[str, Any]) -> PlaygroundExecutionRequest:
+    playground_kind = _normalize_playground_kind(payload.get("playground_kind"))
+    prompt_text = normalize_prompt(payload.get("prompt"))
+    history_messages = _normalize_temporary_history(payload.get("messages"))
+    return PlaygroundExecutionRequest(
+        playground_kind=playground_kind,
+        session_id=string_or_none(payload.get("session_id")) or "temporary",
+        conversation_kind=conversation_kind_for_playground_kind(playground_kind),
+        assistant_ref=_normalize_assistant_ref(payload.get("assistant_ref"), playground_kind=playground_kind),
+        model_id=_normalize_model_id(payload.get("model_selection", payload.get("model_id"))),
+        knowledge_base_id=_normalize_knowledge_base_id(payload.get("knowledge_binding", payload.get("knowledge_base_id"))),
+        prompt=prompt_text,
+        history=history_messages,
+        conversation_title=_temporary_title(payload, prompt_text, history_messages),
+        title_source=DEFAULT_TITLE_SOURCE,
+    )
+
+
+def _normalize_temporary_history(raw_messages: Any) -> list[dict[str, Any]]:
+    if raw_messages is None:
+        return []
+    if not isinstance(raw_messages, list):
+        raise PlaygroundSessionValidationError("invalid_messages", "messages must be a list")
+    messages: list[dict[str, Any]] = []
+    for item in raw_messages:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        messages.append({"role": role, "content": content})
+    return messages
+
+
+def _temporary_title(payload: dict[str, Any], prompt: str, history_messages: Sequence[dict[str, Any]]) -> str:
+    raw_title = string_or_none(payload.get("title"))
+    if raw_title and raw_title != TEMPORARY_CHAT_TITLE:
+        return raw_title
+    if history_messages:
+        return raw_title or TEMPORARY_CHAT_TITLE
+    return auto_title_from_prompt(prompt)
 
 
 def _execute_request(
@@ -541,6 +634,84 @@ def _stream_chat_request(
     return _stream()
 
 
+def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Iterator[dict[str, Any]]:
+    if not request.model_id:
+        raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
+
+    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+        requested_model_id=request.model_id,
+        org_id=None,
+        group_id=None,
+        messages=build_context_messages(request.history, prompt=request.prompt),
+        max_tokens=None,
+        temperature=None,
+    )
+    if error_payload is not None or stream is None:
+        raise PlaygroundChatExecutionError(
+            error_payload if isinstance(error_payload, dict) else {"error": "llm_unreachable"},
+            status_code,
+        )
+
+    def _stream() -> Iterator[dict[str, Any]]:
+        assistant_output_parts: list[str] = []
+        for event in stream:
+            event_type = str(event.get("type", "")).strip().lower()
+            if event_type == "delta":
+                text = str(event.get("text", ""))
+                if text:
+                    assistant_output_parts.append(text)
+                    yield {"event": "delta", "data": {"text": text}}
+                continue
+
+            if event_type == "error":
+                payload = event.get("payload")
+                yield {
+                    "event": "error",
+                    "data": public_stream_error_payload(
+                        payload if isinstance(payload, dict) else None,
+                        fallback_error="playground_chat_failed",
+                        fallback_message="LLM stream failed",
+                    ),
+                }
+                return
+
+            if event_type != "complete":
+                continue
+
+            llm_response = event.get("response")
+            if not isinstance(llm_response, dict):
+                llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
+            output = extract_output_text(llm_response) or "".join(assistant_output_parts)
+            if not output:
+                yield {
+                    "event": "error",
+                    "data": {
+                        "error": "empty_response",
+                        "message": "LLM stream completed without assistant output",
+                    },
+                }
+                return
+
+            yield {
+                "event": "complete",
+                "data": _serialize_temporary_execution_response(
+                    request=request,
+                    result=PlaygroundExecutionResult(output=output, response=llm_response),
+                ),
+            }
+            return
+
+        yield {
+            "event": "error",
+            "data": {
+                "error": "stream_incomplete",
+                "message": "LLM stream ended before completion",
+            },
+        }
+
+    return _stream()
+
+
 def _serialize_execution_response(
     *,
     session: dict[str, Any],
@@ -554,6 +725,70 @@ def _serialize_execution_response(
         "response": result.response,
         "sources": result.sources,
         "retrieval": result.retrieval,
+    }
+
+
+def _serialize_temporary_execution_response(
+    *,
+    request: PlaygroundExecutionRequest,
+    result: PlaygroundExecutionResult,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
+        metadata = {
+            "response": result.response,
+            "sources": result.sources,
+            "retrieval": result.retrieval,
+            "knowledge_base_id": result.knowledge_base_id,
+        }
+    messages = [
+        *_temporary_history_to_messages(request.history),
+        _temporary_message("temporary-user", "user", request.prompt),
+        _temporary_message("temporary-assistant", "assistant", result.output, metadata=metadata),
+    ]
+    session = {
+        "id": request.session_id,
+        "playground_kind": request.playground_kind,
+        "assistant_ref": request.assistant_ref or default_assistant_ref_for_kind(request.playground_kind),
+        "title": request.conversation_title or TEMPORARY_CHAT_TITLE,
+        "title_source": DEFAULT_TITLE_SOURCE,
+        "model_selection": {"model_id": request.model_id},
+        "knowledge_binding": {"knowledge_base_id": request.knowledge_base_id},
+        "message_count": len(messages),
+        "created_at": None,
+        "updated_at": None,
+        "messages": messages,
+    }
+    return {
+        "session": session,
+        "messages": messages[-2:],
+        "output": result.output,
+        "response": result.response,
+        "sources": result.sources,
+        "retrieval": result.retrieval,
+    }
+
+
+def _temporary_history_to_messages(history: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        _temporary_message(f"temporary-history-{index}", str(item.get("role") or ""), str(item.get("content") or ""))
+        for index, item in enumerate(history)
+    ]
+
+
+def _temporary_message(
+    message_id: str,
+    role: str,
+    content: str,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": message_id,
+        "role": role,
+        "content": content,
+        "metadata": metadata or {},
+        "createdAt": None,
     }
 
 

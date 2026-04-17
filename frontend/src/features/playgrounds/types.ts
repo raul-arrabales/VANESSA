@@ -19,7 +19,7 @@ export type PlaygroundMessageViewModel = PlaygroundMessage & {
   isTransient?: boolean;
 };
 
-export type PlaygroundSessionPersistence = "draft" | "saved";
+export type PlaygroundSessionPersistence = "draft" | "saved" | "temporary";
 
 export type PlaygroundSessionViewModel = {
   id: string;
@@ -45,6 +45,8 @@ export type PlaygroundWorkspaceConfig = {
   emptyStateText: string;
   newSessionLabel: string;
   emptySessionTitle: string;
+  temporarySessionLabel: string;
+  temporarySessionTitle: string;
   draftPlaceholder: string;
   selectors: {
     model: boolean;

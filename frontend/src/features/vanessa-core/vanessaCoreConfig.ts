@@ -12,6 +12,8 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   emptyStateText: "No messages yet. Start a Vanessa conversation to build the thread.",
   newSessionLabel: "New chat",
   emptySessionTitle: "Vanessa Core",
+  temporarySessionLabel: "Temporary chat",
+  temporarySessionTitle: "Temporary chat",
   draftPlaceholder: "Ask Vanessa anything",
   selectors: {
     model: true,

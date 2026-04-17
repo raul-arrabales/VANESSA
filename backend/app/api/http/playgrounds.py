@@ -17,7 +17,9 @@ from ...application.playgrounds_service import (
     get_playground_session_detail,
     list_playground_sessions,
     send_playground_message,
+    send_temporary_playground_message,
     stream_playground_message,
+    stream_temporary_playground_message,
     update_playground_session,
 )
 from ...authz import require_role
@@ -164,6 +166,34 @@ def post_playground_message_route(session_id: str):
     return jsonify(response_payload), 200
 
 
+@bp.post("/v1/playgrounds/temporary/messages")
+@require_role("user")
+def post_temporary_playground_message_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+    try:
+        response_payload = send_temporary_playground_message(
+            _database_url(),
+            config=_config(),
+            request_id=_request_id(),
+            owner_user_id=int(g.current_user["id"]),
+            owner_role=str(g.current_user.get("role", "user")),
+            payload=payload,
+        )
+    except PlaygroundSessionValidationError as exc:
+        return _json_error(400, exc.code, exc.message)
+    except PlaygroundChatExecutionError as exc:
+        payload = exc.payload if isinstance(exc.payload, dict) else {}
+        return jsonify({"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc))}), exc.status_code
+    except AgentEngineClientError as exc:
+        return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
+    except Exception as exc:  # pragma: no cover
+        current_app.logger.exception("Temporary playground message request failed: %s", exc)
+        return _json_error(500, "playground_message_failed", "Playground message request failed.")
+    return jsonify(response_payload), 200
+
+
 @bp.post("/v1/playgrounds/sessions/<session_id>/messages/stream")
 @require_role("user")
 def post_playground_message_stream_route(session_id: str):
@@ -182,6 +212,43 @@ def post_playground_message_stream_route(session_id: str):
         )
     except PlaygroundSessionNotFoundError:
         return _json_error(404, "session_not_found", "Playground session not found")
+    except PlaygroundSessionValidationError as exc:
+        return _json_error(400, exc.code, exc.message)
+    except PlaygroundChatExecutionError as exc:
+        payload = exc.payload if isinstance(exc.payload, dict) else {}
+        return jsonify({"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc))}), exc.status_code
+    except AgentEngineClientError as exc:
+        return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
+
+    def _response_stream():
+        for event in stream:
+            yield _format_sse_event(str(event["event"]), dict(event["data"]))
+
+    return Response(
+        stream_with_context(_response_stream()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@bp.post("/v1/playgrounds/temporary/messages/stream")
+@require_role("user")
+def post_temporary_playground_message_stream_route():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _json_error(400, "invalid_payload", "Expected JSON object")
+    try:
+        stream = stream_temporary_playground_message(
+            _database_url(),
+            config=_config(),
+            request_id=_request_id(),
+            owner_user_id=int(g.current_user["id"]),
+            owner_role=str(g.current_user.get("role", "user")),
+            payload=payload,
+        )
     except PlaygroundSessionValidationError as exc:
         return _json_error(400, exc.code, exc.message)
     except PlaygroundChatExecutionError as exc:

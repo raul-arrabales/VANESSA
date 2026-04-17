@@ -4,7 +4,9 @@ import {
   createPlaygroundSession,
   deletePlaygroundSession,
   sendPlaygroundMessage,
+  sendTemporaryPlaygroundMessage,
   streamPlaygroundMessage,
+  streamTemporaryPlaygroundMessage,
   updatePlaygroundSession,
 } from "../../../api/playgrounds";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
@@ -17,6 +19,7 @@ import type {
 import { mapPlaygroundSessionDetail, mapPlaygroundSessionSummary } from "../types";
 import {
   createDraftSession,
+  createTemporarySession,
   createOptimisticMessages,
   createTransientMessageId,
   removeSession,
@@ -41,6 +44,27 @@ type UsePlaygroundSessionActionsParams = {
   setIsSessionBusy: (value: boolean) => void;
   pinToBottomOnNextUpdate: (behavior?: ScrollBehavior) => void;
 };
+
+function buildTemporaryMessagePayload(
+  session: PlaygroundSessionViewModel,
+  prompt: string,
+) {
+  return {
+    session_id: session.id,
+    playground_kind: session.playgroundKind,
+    title: session.title,
+    assistant_ref: session.selectorState.assistantRef,
+    model_selection: { model_id: session.selectorState.modelId },
+    knowledge_binding: { knowledge_base_id: session.selectorState.knowledgeBaseId },
+    messages: session.messages
+      .filter((message) => message.role === "user" || message.role === "assistant")
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    prompt,
+  };
+}
 
 export function usePlaygroundSessionActions({
   token,
@@ -68,6 +92,15 @@ export function usePlaygroundSessionActions({
     setDraft("");
     setError("");
     return nextDraft;
+  };
+
+  const createTemporaryChat = (): PlaygroundSessionViewModel => {
+    const nextTemporary = createTemporarySession(config, options, activeSession);
+    setActiveSessionId(nextTemporary.id);
+    setActiveSession(nextTemporary);
+    setDraft("");
+    setError("");
+    return nextTemporary;
   };
 
   const createSession = async (): Promise<void> => {
@@ -123,7 +156,7 @@ export function usePlaygroundSessionActions({
       return;
     }
 
-    if (activeSession.persistence === "draft" && activeSession.id === sessionId) {
+    if (activeSession.id === sessionId && activeSession.persistence !== "saved") {
       setError("");
       setActiveSession((current) => (
         current && current.id === sessionId
@@ -310,6 +343,7 @@ export function usePlaygroundSessionActions({
 
     const prompt = draft.trim();
     const isDraftSession = activeSession.persistence === "draft";
+    const isTemporarySession = activeSession.persistence === "temporary";
     const draftSnapshot = isDraftSession ? { ...activeSession, messages: [...activeSession.messages] } : null;
     let targetSession = activeSession;
     let createdFromDraft: PlaygroundSessionViewModel | null = null;
@@ -343,27 +377,38 @@ export function usePlaygroundSessionActions({
       ));
 
       try {
-        const result = await streamPlaygroundMessage(
-          sessionId,
-          { prompt },
-          token,
-          {
-            signal: controller.signal,
-            onDelta: (text) => {
-              setActiveSession((current) => (
-                current && current.id === sessionId
-                  ? {
-                    ...current,
-                    messages: updateTransientAssistantMessage(current.messages, assistantMessageId, text),
-                  }
-                  : current
-              ));
-            },
+        const streamOptions = {
+          signal: controller.signal,
+          onDelta: (text: string) => {
+            setActiveSession((current) => (
+              current && current.id === sessionId
+                ? {
+                  ...current,
+                  messages: updateTransientAssistantMessage(current.messages, assistantMessageId, text),
+                }
+                : current
+            ));
           },
-        );
+        };
+        const result = isTemporarySession
+          ? await streamTemporaryPlaygroundMessage(
+            buildTemporaryMessagePayload(targetSession, prompt),
+            token,
+            streamOptions,
+          )
+          : await streamPlaygroundMessage(
+            sessionId,
+            { prompt },
+            token,
+            streamOptions,
+          );
         const nextSession = mapPlaygroundSessionDetail(result.session);
-        setSavedSessions((existing) => upsertSession(existing, nextSession));
-        setActiveSession(nextSession);
+        if (isTemporarySession) {
+          setActiveSession({ ...nextSession, persistence: "temporary" });
+        } else {
+          setSavedSessions((existing) => upsertSession(existing, nextSession));
+          setActiveSession(nextSession);
+        }
       } catch (requestError) {
         if (controller.signal.aborted) {
           return;
@@ -387,14 +432,20 @@ export function usePlaygroundSessionActions({
     }
 
     try {
-      const result = await sendPlaygroundMessage(
-        sessionId,
-        { prompt },
-        token,
-      );
+      const result = isTemporarySession
+        ? await sendTemporaryPlaygroundMessage(buildTemporaryMessagePayload(targetSession, prompt), token)
+        : await sendPlaygroundMessage(
+          sessionId,
+          { prompt },
+          token,
+        );
       const nextSession = mapPlaygroundSessionDetail(result.session);
-      setSavedSessions((existing) => upsertSession(existing, nextSession));
-      setActiveSession(nextSession);
+      if (isTemporarySession) {
+        setActiveSession({ ...nextSession, persistence: "temporary" });
+      } else {
+        setSavedSessions((existing) => upsertSession(existing, nextSession));
+        setActiveSession(nextSession);
+      }
       setDraft("");
       pinToBottomOnNextUpdate("smooth");
     } catch (requestError) {
@@ -411,6 +462,7 @@ export function usePlaygroundSessionActions({
 
   return {
     createSession,
+    createTemporaryChat,
     renameSession,
     deleteSession,
     sendPrompt,

@@ -198,6 +198,51 @@ def test_stream_playground_message_route_returns_sse_events(client, monkeypatch:
     assert '"output": "Hi"' in body
 
 
+def test_post_temporary_playground_message_route_returns_service_payload(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="temp@example.com",
+        username="temp-user",
+        password_hash=hash_password("temp-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "temp-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _send_temporary(*_args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "session": _session_detail("temporary-chat-1"),
+            "messages": [
+                {"id": "m1", "role": "user", "content": "hello", "metadata": {}, "createdAt": None},
+                {"id": "m2", "role": "assistant", "content": "answer", "metadata": {}, "createdAt": None},
+            ],
+            "output": "answer",
+        }
+
+    monkeypatch.setattr(playground_routes, "send_temporary_playground_message", _send_temporary)
+
+    response = test_client.post(
+        "/v1/playgrounds/temporary/messages",
+        headers=_auth(token),
+        json={
+            "session_id": "temporary-chat-1",
+            "playground_kind": "chat",
+            "model_selection": {"model_id": "safe-small"},
+            "knowledge_binding": {"knowledge_base_id": None},
+            "messages": [],
+            "prompt": "hello",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["output"] == "answer"
+    assert captured["payload"]["session_id"] == "temporary-chat-1"
+
+
 def test_get_playground_options_route_returns_configuration_payload(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     user = users.create_user(

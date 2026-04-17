@@ -184,6 +184,20 @@ export type StreamPlaygroundMessageOptions = {
   signal?: AbortSignal;
 };
 
+export type TemporaryPlaygroundMessagePayload = {
+  session_id: string;
+  playground_kind: PlaygroundKind;
+  title?: string;
+  assistant_ref?: string | null;
+  model_selection: { model_id: string | null };
+  knowledge_binding: { knowledge_base_id: string | null };
+  messages: Array<{
+    role: "user" | "assistant";
+    content: string;
+  }>;
+  prompt: string;
+};
+
 export async function listPlaygroundSessions(
   playgroundKind: PlaygroundKind,
   token: string,
@@ -267,26 +281,35 @@ export async function sendPlaygroundMessage(
   );
 }
 
+export async function sendTemporaryPlaygroundMessage(
+  payload: TemporaryPlaygroundMessagePayload,
+  token: string,
+): Promise<SendPlaygroundMessageResult> {
+  return requestJson<SendPlaygroundMessageResult>("/v1/playgrounds/temporary/messages", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
 export async function streamPlaygroundMessage(
   sessionId: string,
   payload: { prompt: string },
   token: string,
   options: StreamPlaygroundMessageOptions = {},
 ): Promise<SendPlaygroundMessageResult> {
-  const response = await fetch(
-    buildUrl(`/v1/playgrounds/sessions/${encodeURIComponent(sessionId)}/messages/stream`),
-    {
-      method: "POST",
-      headers: {
-        Accept: "text/event-stream",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(payload),
-      signal: options.signal,
-    },
+  return streamPlaygroundMessageFromUrl(
+    `/v1/playgrounds/sessions/${encodeURIComponent(sessionId)}/messages/stream`,
+    payload,
+    token,
+    options,
   );
+}
 
+async function readPlaygroundMessageStream(
+  response: Response,
+  options: StreamPlaygroundMessageOptions,
+): Promise<SendPlaygroundMessageResult> {
   if (!response.ok) {
     const raw = await response.text();
     const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : {};
@@ -344,6 +367,39 @@ export async function streamPlaygroundMessage(
   }
 
   return completed;
+}
+
+export async function streamTemporaryPlaygroundMessage(
+  payload: TemporaryPlaygroundMessagePayload,
+  token: string,
+  options: StreamPlaygroundMessageOptions = {},
+): Promise<SendPlaygroundMessageResult> {
+  return streamPlaygroundMessageFromUrl(
+    "/v1/playgrounds/temporary/messages/stream",
+    payload,
+    token,
+    options,
+  );
+}
+
+async function streamPlaygroundMessageFromUrl(
+  url: string,
+  payload: unknown,
+  token: string,
+  options: StreamPlaygroundMessageOptions,
+): Promise<SendPlaygroundMessageResult> {
+  const response = await fetch(buildUrl(url), {
+    method: "POST",
+    headers: {
+      Accept: "text/event-stream",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+    signal: options.signal,
+  });
+
+  return readPlaygroundMessageStream(response, options);
 }
 
 export async function getPlaygroundOptions(token: string): Promise<PlaygroundOptions> {

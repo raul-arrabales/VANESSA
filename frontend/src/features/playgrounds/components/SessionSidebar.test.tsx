@@ -11,6 +11,7 @@ describe("SessionSidebar", () => {
         introText="Texto"
         historyLoadingText="Cargando"
         newSessionLabel="Nuevo chat"
+        temporarySessionLabel="Chat temporal"
         sessions={[
           {
             id: "session-1",
@@ -37,6 +38,7 @@ describe("SessionSidebar", () => {
         historyError=""
         onToggleCollapsed={vi.fn()}
         onCreateSession={vi.fn()}
+        onCreateTemporarySession={vi.fn()}
         onSelectSession={vi.fn()}
         onRenameSession={vi.fn()}
         onDeleteSession={vi.fn()}

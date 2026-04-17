@@ -11,6 +11,8 @@ export const chatPlaygroundConfig: PlaygroundWorkspaceConfig = {
   emptyStateText: "No messages yet. Start chatting to build context memory.",
   newSessionLabel: "New chat",
   emptySessionTitle: "New conversation",
+  temporarySessionLabel: "Temporary chat",
+  temporarySessionTitle: "Temporary chat",
   draftPlaceholder: "Type your message",
   selectors: {
     model: true,
@@ -63,6 +65,8 @@ export const knowledgePlaygroundConfig: PlaygroundWorkspaceConfig = {
   emptyStateText: "No messages yet. Ask the knowledge playground to search the active corpus.",
   newSessionLabel: "New chat",
   emptySessionTitle: "Knowledge playground",
+  temporarySessionLabel: "Temporary chat",
+  temporarySessionTitle: "Temporary chat",
   draftPlaceholder: "Ask about the knowledge base",
   selectors: {
     model: true,

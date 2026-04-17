@@ -206,7 +206,7 @@ export function usePlaygroundSessions({
     if (isOptionsLoading || !hasLoadedOptions) {
       return;
     }
-    if (activeSession?.id === activeSessionId && activeSession.persistence === "draft") {
+    if (activeSession?.id === activeSessionId && activeSession.persistence !== "saved") {
       setIsActiveSessionLoading(false);
       return;
     }

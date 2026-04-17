@@ -135,6 +135,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         introText={config.introText}
         historyLoadingText={config.sessionBootstrap.historyLoadingText}
         newSessionLabel={config.newSessionLabel}
+        temporarySessionLabel={config.temporarySessionLabel}
         sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
         canCreateSession={sessionState.canCreateSession}
@@ -144,6 +145,10 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         historyError={sessionState.historyError}
         onToggleCollapsed={preferences.toggleSidebar}
         onCreateSession={() => void actions.createSession()}
+        onCreateTemporarySession={() => {
+          pinToBottomOnNextUpdate("auto");
+          actions.createTemporaryChat();
+        }}
         onSelectSession={(sessionId) => {
           pinToBottomOnNextUpdate("auto");
           sessionState.setActiveSessionId(sessionId);
