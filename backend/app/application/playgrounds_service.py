@@ -22,6 +22,7 @@ from ..services.chat_inference import (
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_queries import list_model_picker_options
 from ..services.platform_types import PlatformControlPlaneError
+from ..services.stream_errors import public_stream_error_payload
 from .playground_execution import (
     PlaygroundExecutionRequest,
     PlaygroundExecutionResult,
@@ -480,17 +481,13 @@ def _stream_chat_request(
 
             if event_type == "error":
                 payload = event.get("payload")
-                if not isinstance(payload, dict):
-                    payload = {
-                        "error": "playground_chat_failed",
-                        "message": "LLM stream failed",
-                    }
                 yield {
                     "event": "error",
-                    "data": {
-                        "error": str(payload.get("error") or "playground_chat_failed"),
-                        "message": str(payload.get("message") or "LLM stream failed"),
-                    },
+                    "data": public_stream_error_payload(
+                        payload if isinstance(payload, dict) else None,
+                        fallback_error="playground_chat_failed",
+                        fallback_message="LLM stream failed",
+                    ),
                 }
                 return
 

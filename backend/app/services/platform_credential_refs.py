@@ -89,14 +89,12 @@ def resolve_binding_modelops_credential(
     resolved_secret_refs = dict(raw_resolved_secret_refs) if isinstance(raw_resolved_secret_refs, dict) else {}
     resolved_secret_refs["api_key"] = str(secret.get("api_key") or "").strip()
     next_config["secret_refs"] = resolved_secret_refs
-    next_config.setdefault("request_timeout_seconds", getattr(config, "llm_request_timeout_seconds", 60))
-    if binding.provider_key == "openai_compatible_cloud_llm" and credential_provider == "openai":
-        next_config.setdefault("models_path", "/models")
-        next_config.setdefault("chat_completion_path", "/chat/completions")
-        next_config.setdefault("request_format", "openai_chat")
-    if binding.provider_key == "openai_compatible_cloud_embeddings" and credential_provider == "openai":
-        next_config.setdefault("models_path", "/models")
-        next_config.setdefault("embeddings_path", "/embeddings")
+    next_config = apply_provider_credential_runtime_defaults(
+        provider_key=binding.provider_key,
+        credential_provider=credential_provider,
+        provider_config=next_config,
+        service_config=config,
+    )
     summary = {
         "id": str(secret.get("id") or credential_id),
         "provider": credential_provider,
@@ -104,3 +102,36 @@ def resolve_binding_modelops_credential(
         "api_base_url": credential_base_url or None,
     }
     return replace(binding, endpoint_url=endpoint_url, healthcheck_url=None, config=next_config), summary
+
+
+def apply_provider_credential_runtime_defaults(
+    *,
+    provider_key: str,
+    credential_provider: str,
+    provider_config: dict[str, Any],
+    service_config: AuthConfig,
+) -> dict[str, Any]:
+    next_config = dict(provider_config)
+    if credential_provider != "openai":
+        return next_config
+    next_config.setdefault("request_timeout_seconds", getattr(service_config, "llm_request_timeout_seconds", 60))
+    if provider_key == "openai_compatible_cloud_llm":
+        return apply_openai_chat_runtime_defaults(next_config)
+    if provider_key == "openai_compatible_cloud_embeddings":
+        return apply_openai_embeddings_runtime_defaults(next_config)
+    return next_config
+
+
+def apply_openai_chat_runtime_defaults(provider_config: dict[str, Any]) -> dict[str, Any]:
+    next_config = dict(provider_config)
+    next_config.setdefault("models_path", "/models")
+    next_config.setdefault("chat_completion_path", "/chat/completions")
+    next_config.setdefault("request_format", "openai_chat")
+    return next_config
+
+
+def apply_openai_embeddings_runtime_defaults(provider_config: dict[str, Any]) -> dict[str, Any]:
+    next_config = dict(provider_config)
+    next_config.setdefault("models_path", "/models")
+    next_config.setdefault("embeddings_path", "/embeddings")
+    return next_config

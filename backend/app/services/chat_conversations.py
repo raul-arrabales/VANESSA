@@ -9,6 +9,7 @@ from .chat_inference import (
     chat_completion_with_allowed_model,
     extract_output_text,
 )
+from .stream_errors import public_stream_error_payload
 from ..repositories import chat_conversations as chat_repository
 
 DEFAULT_CONVERSATION_TITLE = "New conversation"
@@ -222,17 +223,13 @@ def stream_plain_message(
 
             if event_type == "error":
                 payload = event.get("payload")
-                if not isinstance(payload, dict):
-                    payload = {
-                        "error": "chat_inference_failed",
-                        "message": "LLM stream failed",
-                    }
                 yield {
                     "event": "error",
-                    "data": {
-                        "error": str(payload.get("error") or "chat_inference_failed"),
-                        "message": str(payload.get("message") or "LLM stream failed"),
-                    },
+                    "data": public_stream_error_payload(
+                        payload if isinstance(payload, dict) else None,
+                        fallback_error="chat_inference_failed",
+                        fallback_message="LLM stream failed",
+                    ),
                 }
                 return
 
