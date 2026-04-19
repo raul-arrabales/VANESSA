@@ -54,6 +54,27 @@ def _normalize_embedding_resource(resource: dict[str, Any]) -> dict[str, Any] | 
     return normalized
 
 
+def _normalize_options_resource(
+    database_url: str,
+    *,
+    provider_row: dict[str, Any],
+    resource: dict[str, Any],
+) -> dict[str, Any] | None:
+    normalized = _normalize_embedding_resource(resource)
+    if normalized is None:
+        return None
+    serialized_constraints = serialize_embeddings_chunking_constraints(
+        resolve_embedding_resource_chunking_constraints(
+            database_url,
+            provider_row=provider_row,
+            resource=normalized,
+        )
+    )
+    if serialized_constraints is not None:
+        normalized["chunking_constraints"] = serialized_constraints
+    return normalized
+
+
 def _vectorization_json_payload(
     *,
     supports_named_vectors: bool,
@@ -79,12 +100,26 @@ def _vectorization_json_payload(
 def _normalize_options_provider(
     database_url: str,
     provider_row: dict[str, Any],
-    resources: list[dict[str, Any]],
+    discovered_resources: list[dict[str, Any]],
 ) -> dict[str, Any]:
     active_binding = platform_repo.get_active_binding_for_provider_instance(
         database_url,
         provider_instance_id=str(provider_row["id"]),
     )
+    active_binding_resources = (
+        [
+            normalized
+            for resource in active_binding.get("resources", [])
+            if isinstance(resource, dict)
+            for normalized in [
+                _normalize_options_resource(database_url, provider_row=provider_row, resource=resource)
+            ]
+            if normalized is not None
+        ]
+        if isinstance(active_binding, dict)
+        else []
+    )
+    resources = active_binding_resources or discovered_resources
     default_resource_id = None
     if isinstance(active_binding, dict) and isinstance(active_binding.get("default_resource"), dict):
         default_resource_id = _runtime_identifier_for_resource(active_binding["default_resource"]) or None
@@ -154,29 +189,13 @@ def list_vectorization_options(
         if not 200 <= status_code < 300:
             continue
         resources = [
-            {
-                **normalized,
-                **(
-                    {
-                        "chunking_constraints": serialized_constraints,
-                    }
-                    if serialized_constraints is not None
-                    else {}
-                ),
-            }
+            normalized
             for item in resources_payload
             if isinstance(item, dict)
-            for normalized in [_normalize_embedding_resource(item)]
-            if normalized is not None
-            for serialized_constraints in [
-                serialize_embeddings_chunking_constraints(
-                    resolve_embedding_resource_chunking_constraints(
-                        database_url,
-                        provider_row=provider,
-                        resource=normalized,
-                    )
-                )
+            for normalized in [
+                _normalize_options_resource(database_url, provider_row=provider, resource=item)
             ]
+            if normalized is not None
         ]
         embedding_providers.append(_normalize_options_provider(database_url, provider, resources))
 

@@ -197,6 +197,106 @@ def test_list_vectorization_options_returns_ready_embeddings_provider_with_adver
     ]
 
 
+def test_list_vectorization_options_uses_active_binding_resources_when_discovery_is_empty(monkeypatch):
+    monkeypatch.setattr(
+        context_management_vectorization.platform_repo,
+        "get_provider_instance",
+        lambda _db, provider_instance_id: {
+            "id": provider_instance_id,
+            "provider_key": "weaviate_local",
+            "capability_key": "vector_store",
+            "display_name": "Weaviate local",
+            "enabled": True,
+        },
+    )
+    monkeypatch.setattr(
+        context_management_vectorization.platform_repo,
+        "list_provider_instances",
+        lambda _db: [
+            {
+                "id": "embedding-provider-1",
+                "slug": "openai-cloud-embeddings",
+                "provider_key": "openai_compatible_cloud_embeddings",
+                "capability_key": "embeddings",
+                "display_name": "OpenAI Cloud Embeddings",
+                "enabled": True,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_vectorization.platform_repo,
+        "get_active_binding_for_provider_instance",
+        lambda *_args, **_kwargs: {
+            "default_resource": {
+                "id": "openai-user-1-text-embedding-3-small",
+                "provider_resource_id": "text-embedding-3-small",
+                "display_name": "text-embedding-3-small",
+                "metadata": {"provider_model_id": "text-embedding-3-small"},
+            },
+            "resources": [
+                {
+                    "id": "openai-user-1-text-embedding-3-small",
+                    "provider_resource_id": "text-embedding-3-small",
+                    "display_name": "text-embedding-3-small",
+                    "metadata": {"provider_model_id": "text-embedding-3-small"},
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        context_management_vectorization,
+        "resolve_embedding_resource_chunking_constraints",
+        lambda *_args, **_kwargs: context_management_chunking_compatibility.EmbeddingsChunkingConstraints(
+            max_input_tokens=8191,
+            special_tokens_per_input=0,
+            safe_chunk_length_max=8191,
+        ),
+    )
+
+    class _Adapter:
+        def list_resources(self):
+            return [], 200
+
+    monkeypatch.setattr(
+        platform_service,
+        "resolve_embeddings_adapter",
+        lambda *_args, **_kwargs: _Adapter(),
+    )
+
+    payload = context_management_vectorization.list_vectorization_options(
+        "postgresql://ignored",
+        config=SimpleNamespace(),
+        backing_provider_instance_id="vector-provider-1",
+    )
+
+    assert payload["embedding_providers"] == [
+        {
+            "id": "embedding-provider-1",
+            "slug": "openai-cloud-embeddings",
+            "provider_key": "openai_compatible_cloud_embeddings",
+            "display_name": "OpenAI Cloud Embeddings",
+            "enabled": True,
+            "capability": "embeddings",
+            "resources": [
+                {
+                    "id": "text-embedding-3-small",
+                    "provider_resource_id": "text-embedding-3-small",
+                    "display_name": "text-embedding-3-small",
+                    "metadata": {"provider_model_id": "text-embedding-3-small"},
+                    "chunking_constraints": {
+                        "max_input_tokens": 8191,
+                        "special_tokens_per_input": 0,
+                        "safe_chunk_length_max": 8191,
+                    },
+                }
+            ],
+            "default_resource_id": "text-embedding-3-small",
+            "is_ready": True,
+            "unavailable_reason": None,
+        }
+    ]
+
+
 def test_list_vectorization_options_skips_embeddings_provider_when_resolution_fails(monkeypatch):
     monkeypatch.setattr(
         context_management_vectorization.platform_repo,
