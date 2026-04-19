@@ -28,6 +28,20 @@ def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases
     )
     monkeypatch.setattr(
         playgrounds_service,
+        "get_active_platform_runtime",
+        lambda *_args, **_kwargs: {
+            "capabilities": {
+                "llm_inference": {
+                    "resources": [
+                        {"id": "safe-small", "display_name": "Safe Small"},
+                        {"id": "safe-large", "display_name": "Safe Large"},
+                    ]
+                }
+            }
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
         "list_knowledge_chat_knowledge_bases",
         lambda **_kwargs: (
             {
@@ -81,6 +95,20 @@ def test_get_playground_model_options_returns_lightweight_models_and_filtered_as
     )
     monkeypatch.setattr(
         playgrounds_service,
+        "get_active_platform_runtime",
+        lambda *_args, **_kwargs: {
+            "capabilities": {
+                "llm_inference": {
+                    "resources": [
+                        {"id": "safe-small", "display_name": "Safe Small"},
+                        {"id": "safe-large", "display_name": "Safe Large"},
+                    ]
+                }
+            }
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
         "list_knowledge_chat_knowledge_bases",
         lambda **_kwargs: (_ for _ in ()).throw(AssertionError("knowledge bases should not be loaded")),
     )
@@ -95,6 +123,65 @@ def test_get_playground_model_options_returns_lightweight_models_and_filtered_as
 
     assert payload["models"][0]["display_name"] == "Safe Small"
     assert {assistant["assistant_ref"] for assistant in payload["assistants"]} == {"agent.knowledge_chat"}
+
+
+def test_get_playground_model_options_excludes_models_not_bound_to_active_deployment(monkeypatch):
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    monkeypatch.setattr(
+        playgrounds_service,
+        "list_model_picker_options",
+        lambda *_args, **_kwargs: [
+            {"id": "Qwen--Qwen2.5-0.5B-Instruct", "display_name": "Qwen2.5-0.5B-Instruct", "task_key": "llm"},
+            {"id": "openai-gpt-5-nano", "display_name": "gpt-5-nano", "task_key": "llm"},
+        ],
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_active_platform_runtime",
+        lambda *_args, **_kwargs: {
+            "capabilities": {
+                "llm_inference": {
+                    "resources": [
+                        {
+                            "id": "openai-gpt-5-nano",
+                            "display_name": "gpt-5-nano",
+                            "provider_resource_id": "gpt-5-nano",
+                        }
+                    ]
+                }
+            }
+        },
+    )
+
+    chat_payload = playgrounds_service.get_playground_model_options(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=10,
+        actor_role="user",
+        playground_kind="chat",
+    )
+    knowledge_payload = playgrounds_service.get_playground_model_options(
+        "postgresql://ignored",
+        config=config,
+        actor_user_id=10,
+        actor_role="user",
+        playground_kind="knowledge",
+    )
+
+    assert chat_payload["models"] == [{"id": "openai-gpt-5-nano", "display_name": "gpt-5-nano", "task_key": "llm"}]
+    assert knowledge_payload["models"] == [{"id": "openai-gpt-5-nano", "display_name": "gpt-5-nano", "task_key": "llm"}]
 
 
 def test_get_playground_knowledge_base_options_returns_fallback_configuration_message(monkeypatch):

@@ -21,6 +21,7 @@ from ..services.chat_inference import (
 )
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_queries import list_model_picker_options
+from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
 from ..services.stream_errors import public_stream_error_payload
 from .playground_execution import (
@@ -327,13 +328,17 @@ def get_playground_model_options(
     playground_kind: str | None = None,
 ) -> dict[str, Any]:
     normalized_playground_kind = _normalize_playground_kind(playground_kind) if playground_kind is not None else None
-    models = list_model_picker_options(
+    accessible_models = list_model_picker_options(
         database_url,
         config=config,
         actor_user_id=actor_user_id,
         actor_role=actor_role,
         require_active=True,
         capability_key="llm_inference",
+    )
+    models = _active_llm_model_options(
+        get_active_platform_runtime(database_url, config),
+        accessible_models=accessible_models,
     )
     assistants = [
         assistant
@@ -344,6 +349,37 @@ def get_playground_model_options(
         "assistants": assistants,
         "models": models,
     }
+
+
+def _active_llm_model_options(
+    platform_runtime: dict[str, Any],
+    *,
+    accessible_models: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    accessible_by_id = {
+        str(model.get("id") or "").strip(): model
+        for model in accessible_models
+        if str(model.get("id") or "").strip()
+    }
+    capabilities = platform_runtime.get("capabilities") if isinstance(platform_runtime.get("capabilities"), dict) else {}
+    llm_binding = capabilities.get("llm_inference") if isinstance(capabilities.get("llm_inference"), dict) else {}
+    resources = llm_binding.get("resources") if isinstance(llm_binding.get("resources"), list) else []
+    options: list[dict[str, Any]] = []
+    for resource in resources:
+        if not isinstance(resource, dict):
+            continue
+        resource_id = str(resource.get("id") or "").strip()
+        if not resource_id or resource_id not in accessible_by_id:
+            continue
+        accessible_model = accessible_by_id[resource_id]
+        options.append(
+            {
+                "id": resource_id,
+                "display_name": str(resource.get("display_name") or accessible_model.get("display_name") or resource_id),
+                "task_key": str(accessible_model.get("task_key") or resource.get("task_key") or "llm_inference"),
+            }
+        )
+    return options
 
 
 def get_playground_knowledge_base_options(
