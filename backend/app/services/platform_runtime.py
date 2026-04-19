@@ -41,8 +41,10 @@ def _resolve_provider_binding(
     *,
     capability_key: str,
     provider_instance_id: str | None,
+    ensure_bootstrap: bool = True,
 ) -> ProviderBinding:
-    ensure_platform_bootstrap_state(database_url, config)
+    if ensure_bootstrap:
+        ensure_platform_bootstrap_state(database_url, config)
     if provider_instance_id:
         row = platform_repo.get_active_binding_for_provider_instance(database_url, provider_instance_id=provider_instance_id)
         if row is None:
@@ -181,18 +183,21 @@ def get_active_platform_runtime(
             config,
             capability_key=CAPABILITY_LLM_INFERENCE,
             provider_instance_id=None,
+            ensure_bootstrap=False,
         ),
         CAPABILITY_EMBEDDINGS: _resolve_provider_binding(
             database_url,
             config,
             capability_key=CAPABILITY_EMBEDDINGS,
             provider_instance_id=None,
+            ensure_bootstrap=False,
         ),
         CAPABILITY_VECTOR_STORE: _resolve_provider_binding(
             database_url,
             config,
             capability_key=CAPABILITY_VECTOR_STORE,
             provider_instance_id=None,
+            ensure_bootstrap=False,
         ),
     }
     if len({binding.deployment_profile_id for binding in required_bindings.values()}) != 1:
@@ -218,6 +223,7 @@ def get_active_platform_runtime(
                 config,
                 capability_key=capability_key,
                 provider_instance_id=None,
+                ensure_bootstrap=False,
             )
         except PlatformControlPlaneError as exc:
             if exc.code == "active_binding_not_found":

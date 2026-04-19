@@ -3522,3 +3522,76 @@ def test_get_active_platform_runtime_includes_optional_tool_runtime_bindings(mon
     payload = platform_service.get_active_platform_runtime("ignored", object())  # type: ignore[arg-type]
 
     assert payload["capabilities"]["sandbox_execution"]["provider_key"] == "sandbox_local"
+
+
+def test_get_active_platform_runtime_bootstraps_once_for_runtime_snapshot(monkeypatch: pytest.MonkeyPatch):
+    bootstrap_calls = 0
+
+    def _ensure_platform_bootstrap_state(_db, _config):
+        nonlocal bootstrap_calls
+        bootstrap_calls += 1
+
+    def _active_binding(_db, *, capability_key):
+        rows = {
+            "llm_inference": {
+                "capability_key": "llm_inference",
+                "provider_instance_id": "provider-llm",
+                "provider_slug": "llm-provider",
+                "provider_key": "vllm_local",
+                "provider_display_name": "LLM Provider",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_llm",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "embeddings": {
+                "capability_key": "embeddings",
+                "provider_instance_id": "provider-embeddings",
+                "provider_slug": "embeddings-provider",
+                "provider_key": "vllm_embeddings_local",
+                "provider_display_name": "Embeddings Provider",
+                "provider_description": "desc",
+                "endpoint_url": "http://llm:8000",
+                "healthcheck_url": "http://llm:8000/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "openai_compatible_embeddings",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "vector_store": {
+                "capability_key": "vector_store",
+                "provider_instance_id": "provider-vector",
+                "provider_slug": "weaviate-local",
+                "provider_key": "weaviate_local",
+                "provider_display_name": "Weaviate local",
+                "provider_description": "desc",
+                "endpoint_url": "http://weaviate:8080",
+                "healthcheck_url": "http://weaviate:8080/v1/.well-known/ready",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "weaviate_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
+            "sandbox_execution": None,
+            "mcp_runtime": None,
+        }
+        return rows.get(capability_key)
+
+    monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", _ensure_platform_bootstrap_state)
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_binding_for_capability", _active_binding)
+
+    platform_service.get_active_platform_runtime("ignored", object())  # type: ignore[arg-type]
+
+    assert bootstrap_calls == 1
