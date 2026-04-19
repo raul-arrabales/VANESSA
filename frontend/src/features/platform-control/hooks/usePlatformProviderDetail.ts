@@ -14,7 +14,13 @@ import { listModelCredentials } from "../../../api/modelops/credentials";
 import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { getActiveDeployment } from "../platformTopology";
-import { buildProviderForm, normalizeOptionalUrl, parseJsonObject, type ProviderFormState } from "../providerForm";
+import {
+  buildProviderForm,
+  buildProviderUpdateMutationInput,
+  supportsLocalModelSlot,
+  supportsSavedCredentials,
+  type ProviderFormState,
+} from "../providerForm";
 import { buildProviderLoadDisplayData, type StoredProviderLoadStatus } from "../providerLoad";
 import { usePlatformProviderLoadState } from "./usePlatformProviderLoadState";
 import { usePlatformProvidersData } from "./usePlatformProvidersData";
@@ -66,15 +72,8 @@ export function usePlatformProviderDetail({
     ),
     [deployments, providerId],
   );
-  const supportsLocalSlot = provider
-    ? (provider.capability === "llm_inference" || provider.capability === "embeddings")
-      && provider.provider_key !== "openai_compatible_cloud_llm"
-      && provider.provider_key !== "openai_compatible_cloud_embeddings"
-    : false;
-  const supportsByokValidation = provider
-    ? provider.provider_key === "openai_compatible_cloud_llm"
-      || provider.provider_key === "openai_compatible_cloud_embeddings"
-    : false;
+  const supportsLocalSlot = supportsLocalModelSlot(provider);
+  const supportsByokValidation = supportsSavedCredentials(provider?.provider_key ?? "");
   const validationCredentials = useMemo(
     () => credentials.filter((credential) => credential.provider === "openai" || credential.provider === "openai_compatible"),
     [credentials],
@@ -180,26 +179,13 @@ export function usePlatformProviderDetail({
     setSaving(true);
     setErrorMessage("");
     try {
-      const config = parseJsonObject(
-        form.configText,
-        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.config") }),
-      );
-      const secretRefs = parseJsonObject(
-        form.secretRefsText,
-        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.secretRefs") }),
-      ) as Record<string, string>;
+      const input = buildProviderUpdateMutationInput(form, {
+        configErrorMessage: t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.config") }),
+        secretRefsErrorMessage: t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.secretRefs") }),
+      });
       await updatePlatformProvider(
         provider.id,
-        {
-          slug: form.slug,
-          display_name: form.displayName,
-          description: form.description,
-          endpoint_url: form.endpointUrl,
-          healthcheck_url: normalizeOptionalUrl(form.healthcheckUrl),
-          enabled: form.enabled,
-          config,
-          secret_refs: secretRefs,
-        },
+        input,
         token,
       );
       showSuccessFeedback(t("platformControl.feedback.providerUpdated", { name: form.displayName }));

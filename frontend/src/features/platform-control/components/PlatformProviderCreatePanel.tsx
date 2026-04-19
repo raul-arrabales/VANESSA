@@ -7,7 +7,12 @@ import type { ModelCredential } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { usePlatformProvidersData } from "../hooks/usePlatformProvidersData";
-import { DEFAULT_PROVIDER_FORM, normalizeOptionalUrl, parseJsonObject, updateSecretRefsCredential } from "../providerForm";
+import {
+  buildProviderMutationInput,
+  DEFAULT_PROVIDER_FORM,
+  supportsSavedCredentials,
+  updateSecretRefsCredential,
+} from "../providerForm";
 import PlatformProviderForm from "./PlatformProviderForm";
 
 export default function PlatformProviderCreatePanel(): JSX.Element {
@@ -20,18 +25,14 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
-  const selectedFamily = providerFamilies.find((family) => family.provider_key === form.providerKey) ?? null;
-  const supportsSavedCredentials = selectedFamily
-    ? selectedFamily.provider_key === "openai_compatible_cloud_llm"
-      || selectedFamily.provider_key === "openai_compatible_cloud_embeddings"
-    : false;
+  const providerSupportsSavedCredentials = supportsSavedCredentials(form.providerKey);
   const providerCredentials = useMemo(
     () => credentials.filter((credential) => credential.provider === "openai" || credential.provider === "openai_compatible"),
     [credentials],
   );
 
   useEffect(() => {
-    if (!token || !supportsSavedCredentials) {
+    if (!token || !providerSupportsSavedCredentials) {
       setCredentials([]);
       setCredentialsLoading(false);
       return;
@@ -57,10 +58,10 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
     return () => {
       isActive = false;
     };
-  }, [supportsSavedCredentials, token]);
+  }, [providerSupportsSavedCredentials, token]);
 
   useEffect(() => {
-    if (supportsSavedCredentials || !form.credentialId) {
+    if (providerSupportsSavedCredentials || !form.credentialId) {
       return;
     }
     setForm((current) => ({
@@ -68,7 +69,7 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
       credentialId: "",
       secretRefsText: updateSecretRefsCredential(current.secretRefsText, ""),
     }));
-  }, [form.credentialId, supportsSavedCredentials]);
+  }, [form.credentialId, providerSupportsSavedCredentials]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -78,26 +79,11 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
 
     setSaving(true);
     try {
-      const config = parseJsonObject(
-        form.configText,
-        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.config") }),
-      );
-      const secretRefs = parseJsonObject(
-        form.secretRefsText,
-        t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.secretRefs") }),
-      ) as Record<string, string>;
       const provider = await createPlatformProvider(
-        {
-          provider_key: form.providerKey,
-          slug: form.slug,
-          display_name: form.displayName,
-          description: form.description,
-          endpoint_url: form.endpointUrl,
-          healthcheck_url: normalizeOptionalUrl(form.healthcheckUrl),
-          enabled: form.enabled,
-          config,
-          secret_refs: secretRefs,
-        },
+        buildProviderMutationInput(form, {
+          configErrorMessage: t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.config") }),
+          secretRefsErrorMessage: t("platformControl.feedback.invalidJson", { field: t("platformControl.forms.provider.secretRefs") }),
+        }),
         token,
       );
       navigate(`/control/platform/providers/${provider.id}`, {
@@ -126,7 +112,7 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
           submitBusyLabel={t("platformControl.actions.saving")}
           credentials={providerCredentials}
           credentialsLoading={credentialsLoading}
-          supportsSavedCredentials={supportsSavedCredentials}
+          supportsSavedCredentials={providerSupportsSavedCredentials}
           onChange={setForm}
           onSubmit={(event) => void handleSubmit(event)}
         />

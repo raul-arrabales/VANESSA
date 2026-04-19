@@ -1,4 +1,4 @@
-import type { PlatformProvider } from "../../api/platform";
+import type { PlatformProvider, PlatformProviderMutationInput } from "../../api/platform";
 
 export const MODEL_CREDENTIAL_SECRET_REF_PREFIX = "modelops://credential/";
 
@@ -49,6 +49,18 @@ export function isOpenAICompatibleCloudProvider(providerKey: string): boolean {
   return OPENAI_COMPATIBLE_CLOUD_PROVIDER_KEYS.has(providerKey.trim().toLowerCase());
 }
 
+export function supportsSavedCredentials(providerKey: string): boolean {
+  return isOpenAICompatibleCloudProvider(providerKey);
+}
+
+export function supportsLocalModelSlot(provider: Pick<PlatformProvider, "capability" | "provider_key"> | null): boolean {
+  if (!provider) {
+    return false;
+  }
+  return (provider.capability === "llm_inference" || provider.capability === "embeddings")
+    && !isOpenAICompatibleCloudProvider(provider.provider_key);
+}
+
 export function applyProviderFamilyDefaults(form: ProviderFormState, providerKey: string): ProviderFormState {
   if (!isOpenAICompatibleCloudProvider(providerKey)) {
     return {
@@ -90,6 +102,48 @@ export function parseJsonObject(text: string, errorMessage: string): Record<stri
   }
 
   return parsed as Record<string, unknown>;
+}
+
+export function buildProviderMutationInput(
+  form: ProviderFormState,
+  options: {
+    configErrorMessage: string;
+    secretRefsErrorMessage: string;
+  },
+): PlatformProviderMutationInput {
+  const config = parseJsonObject(form.configText, options.configErrorMessage);
+  const secretRefs = parseJsonObject(form.secretRefsText, options.secretRefsErrorMessage) as Record<string, string>;
+  return {
+    provider_key: form.providerKey,
+    slug: form.slug,
+    display_name: form.displayName,
+    description: form.description,
+    endpoint_url: form.endpointUrl,
+    healthcheck_url: normalizeOptionalUrl(form.healthcheckUrl),
+    enabled: form.enabled,
+    config,
+    secret_refs: secretRefs,
+  };
+}
+
+export function buildProviderUpdateMutationInput(
+  form: ProviderFormState,
+  options: {
+    configErrorMessage: string;
+    secretRefsErrorMessage: string;
+  },
+): Omit<PlatformProviderMutationInput, "provider_key"> {
+  const input = buildProviderMutationInput(form, options);
+  return {
+    slug: input.slug,
+    display_name: input.display_name,
+    description: input.description,
+    endpoint_url: input.endpoint_url,
+    healthcheck_url: input.healthcheck_url,
+    enabled: input.enabled,
+    config: input.config,
+    secret_refs: input.secret_refs,
+  };
 }
 
 export function modelCredentialSecretRef(credentialId: string): string {
