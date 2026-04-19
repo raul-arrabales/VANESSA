@@ -9,6 +9,7 @@ import type {
   PlatformProvider,
 } from "../../api/platform";
 import { capabilityRequiresModelResource, capabilitySupportsResources } from "./capabilities";
+import { filterModelsForProviderOrigin } from "./deploymentModelCompatibility";
 
 export type DeploymentFormState = {
   slug: string;
@@ -34,6 +35,19 @@ export const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
   resourceIdsByCapability: {},
   defaultResourceIdsByCapability: {},
   resourcePolicyByCapability: {},
+};
+
+type DeploymentFormValidationOptions = {
+  bindingRequiredMessage: string;
+  resourceRequiredMessage?: (capability: PlatformCapability) => string;
+  defaultResourceRequiredMessage?: (capability: PlatformCapability) => string;
+  resourceCompatibilityMessage?: (
+    capability: PlatformCapability,
+    provider: PlatformProvider,
+    resourceNames: string[],
+  ) => string;
+  providersByCapability?: Record<string, PlatformProvider[]>;
+  modelResourcesByCapability?: Record<string, ManagedModel[]>;
 };
 
 export function buildDeploymentForm(deployment: PlatformDeploymentProfile): DeploymentFormState {
@@ -89,13 +103,59 @@ export function getManagedModelsByCapability(
 export function validateDeploymentForm(
   requiredCapabilities: PlatformCapability[],
   form: DeploymentFormState,
-  options: {
-    bindingRequiredMessage: string;
-  },
+  options: DeploymentFormValidationOptions,
 ): string | null {
   const missingBinding = requiredCapabilities.find((capability) => !form.providerIdsByCapability[capability.capability]);
   if (missingBinding) {
     return options.bindingRequiredMessage;
+  }
+
+  const incompleteModelBinding = requiredCapabilities.find((capability) => {
+    if (!capabilityRequiresModelResource(capability.capability)) {
+      return false;
+    }
+    return (form.resourceIdsByCapability[capability.capability] ?? []).length === 0;
+  });
+  if (incompleteModelBinding) {
+    return options.resourceRequiredMessage?.(incompleteModelBinding)
+      ?? `${incompleteModelBinding.display_name} requires at least one bound resource.`;
+  }
+
+  const missingDefaultModelBinding = requiredCapabilities.find((capability) => {
+    if (!capabilityRequiresModelResource(capability.capability)) {
+      return false;
+    }
+    const resourceIds = form.resourceIdsByCapability[capability.capability] ?? [];
+    const defaultResourceId = form.defaultResourceIdsByCapability[capability.capability] ?? "";
+    return !defaultResourceId || !resourceIds.includes(defaultResourceId);
+  });
+  if (missingDefaultModelBinding) {
+    return options.defaultResourceRequiredMessage?.(missingDefaultModelBinding)
+      ?? `${missingDefaultModelBinding.display_name} requires a default resource.`;
+  }
+
+  if (options.providersByCapability && options.modelResourcesByCapability) {
+    for (const capability of requiredCapabilities) {
+      if (!capabilityRequiresModelResource(capability.capability)) {
+        continue;
+      }
+      const providerId = form.providerIdsByCapability[capability.capability] ?? "";
+      const provider = (options.providersByCapability[capability.capability] ?? [])
+        .find((item) => item.id === providerId);
+      if (!provider) {
+        continue;
+      }
+      const models = options.modelResourcesByCapability[capability.capability] ?? [];
+      const modelsById = new Map(models.map((model) => [model.id, model]));
+      const compatibleModelIds = new Set(filterModelsForProviderOrigin(models, provider).map((model) => model.id));
+      const incompatibleResourceNames = (form.resourceIdsByCapability[capability.capability] ?? [])
+        .filter((resourceId) => !compatibleModelIds.has(resourceId))
+        .map((resourceId) => modelsById.get(resourceId)?.name || resourceId);
+      if (incompatibleResourceNames.length > 0) {
+        return options.resourceCompatibilityMessage?.(capability, provider, incompatibleResourceNames)
+          ?? `${capability.display_name} has resources that cannot be served by ${provider.display_name}.`;
+      }
+    }
   }
 
   const invalidVectorBinding = requiredCapabilities.find((capability) => {

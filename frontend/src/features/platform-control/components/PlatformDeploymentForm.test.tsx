@@ -22,7 +22,13 @@ function buildProvidersByCapability(capabilities: PlatformCapability[], provider
   return Object.fromEntries(
     capabilities.map((capability) => [
       capability.capability,
-      providers.filter((provider) => provider.capability === capability.capability),
+      providers
+        .filter((provider) => provider.capability === capability.capability)
+        .map((provider) =>
+          provider.capability === "llm_inference" || provider.capability === "embeddings"
+            ? { ...provider, provider_origin: "cloud" as const }
+            : provider,
+        ),
     ]),
   );
 }

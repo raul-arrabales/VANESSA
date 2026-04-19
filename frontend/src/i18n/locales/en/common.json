@@ -1632,6 +1632,7 @@
       "capabilityProviderRequired": "{{capability}} requires a selected provider before it can be saved.",
       "resourceRequired": "{{capability}} requires at least one bound resource.",
       "defaultResourceRequired": "{{capability}} requires a default resource.",
+      "resourceProviderMismatch": "{{capability}} uses {{provider}} ({{origin}}), so these resources cannot be bound here: {{resources}}.",
       "validationSuccess": "Validated provider {{slug}}.",
       "validationFailed": "Unable to validate provider.",
       "providerCreated": "Created provider {{name}}.",

@@ -4,8 +4,9 @@ import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
 import type { PlatformCapability, PlatformDeploymentBinding, PlatformProvider } from "../../../api/platform";
 import type { DeploymentFormState } from "../deploymentEditor";
-import { buildDeploymentCapabilitySectionState, filterModelsForProviderOrigin } from "../deploymentFormSections";
+import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
 import { capabilityRequiresModelResource } from "../capabilities";
+import { filterModelsForProviderOrigin } from "../deploymentModelCompatibility";
 import PlatformDeploymentCapabilitySection from "./PlatformDeploymentCapabilitySection";
 
 type PlatformDeploymentFormProps = {

@@ -9,6 +9,7 @@ import {
   upsertDeploymentBinding,
   type PlatformCapability,
   type PlatformDeploymentProfile,
+  type PlatformProvider,
 } from "../../../api/platform";
 import type { KnowledgeBase } from "../../../api/context";
 import { withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
@@ -16,9 +17,11 @@ import { withDeploymentSeedState } from "../deploymentRouteState";
 import {
   buildDeploymentBindingMutationInput,
   buildDeploymentIdentityMutationInput,
+  validateDeploymentForm,
   type DeploymentCloneFormState,
   type DeploymentFormState,
 } from "../deploymentEditor";
+import type { ManagedModel } from "../../../api/modelops";
 
 type UsePlatformDeploymentDetailMutationsParams = {
   token: string;
@@ -27,6 +30,8 @@ type UsePlatformDeploymentDetailMutationsParams = {
   cloneForm: DeploymentCloneFormState | null;
   knowledgeBases: KnowledgeBase[];
   requiredCapabilities: PlatformCapability[];
+  providersByCapability: Record<string, PlatformProvider[]>;
+  modelResourcesByCapability: Record<string, ManagedModel[]>;
   setLocalDeployment: React.Dispatch<React.SetStateAction<PlatformDeploymentProfile | null>>;
   reload: () => Promise<void>;
   navigate: NavigateFunction;
@@ -59,6 +64,8 @@ export function usePlatformDeploymentDetailMutations({
   cloneForm,
   knowledgeBases,
   requiredCapabilities,
+  providersByCapability,
+  modelResourcesByCapability,
   setLocalDeployment,
   reload,
   navigate,
@@ -109,6 +116,26 @@ export function usePlatformDeploymentDetailMutations({
         t("platformControl.feedback.capabilityProviderRequired", { capability: capability.display_name }),
         t("platformControl.feedback.deploymentSaveFailed"),
       );
+      return;
+    }
+    const validationError = validateDeploymentForm([capability], form, {
+      bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
+      resourceRequiredMessage: (item) =>
+        t("platformControl.feedback.resourceRequired", { capability: item.display_name }),
+      defaultResourceRequiredMessage: (item) =>
+        t("platformControl.feedback.defaultResourceRequired", { capability: item.display_name }),
+      resourceCompatibilityMessage: (item, provider, resourceNames) =>
+        t("platformControl.feedback.resourceProviderMismatch", {
+          capability: item.display_name,
+          provider: provider.display_name,
+          origin: t(`platformControl.badges.${provider.provider_origin}`),
+          resources: resourceNames.join(", "),
+        }),
+      providersByCapability,
+      modelResourcesByCapability,
+    });
+    if (validationError) {
+      showErrorFeedback(validationError, t("platformControl.feedback.deploymentSaveFailed"));
       return;
     }
 

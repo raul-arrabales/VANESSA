@@ -3,6 +3,7 @@ import type { KnowledgeBase } from "../../api/context";
 import type { PlatformCapability, PlatformProvider } from "../../api/platform";
 import type { DeploymentFormState } from "./deploymentEditor";
 import { getDeploymentCapabilityMode } from "./capabilities";
+import { filterModelsForProviderOrigin } from "./deploymentModelCompatibility";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -91,23 +92,6 @@ function buildResourcePickerSummary(
     first: selectedNames[0],
     count: selectedNames.length - 1,
   });
-}
-
-export function modelMatchesProviderOrigin(model: ManagedModel, provider: PlatformProvider | null): boolean {
-  if (!provider) {
-    return true;
-  }
-  if (provider.provider_origin === "cloud") {
-    return model.backend === "external_api" || model.hosting === "cloud";
-  }
-  return model.backend === "local" || model.hosting === "local";
-}
-
-export function filterModelsForProviderOrigin(
-  models: ManagedModel[],
-  provider: PlatformProvider | null,
-): ManagedModel[] {
-  return models.filter((model) => modelMatchesProviderOrigin(model, provider));
 }
 
 export function buildDeploymentCapabilitySectionState({

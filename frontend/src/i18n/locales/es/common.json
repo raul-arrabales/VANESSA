@@ -1618,6 +1618,7 @@
       "capabilityProviderRequired": "{{capability}} requiere un proveedor seleccionado antes de poder guardarse.",
       "resourceRequired": "{{capability}} requiere al menos un recurso enlazado.",
       "defaultResourceRequired": "{{capability}} requiere un recurso por defecto.",
+      "resourceProviderMismatch": "{{capability}} usa {{provider}} ({{origin}}), asi que estos recursos no pueden enlazarse aqui: {{resources}}.",
       "validationSuccess": "Proveedor {{slug}} validado.",
       "validationFailed": "No se pudo validar el proveedor.",
       "providerCreated": "Proveedor {{name}} creado.",

@@ -82,6 +82,19 @@ export function usePlatformDeploymentEditor({
     (form: DeploymentFormState) => {
       const validationError = validateDeploymentForm(requiredCapabilities, form, {
         bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
+        resourceRequiredMessage: (capability) =>
+          t("platformControl.feedback.resourceRequired", { capability: capability.display_name }),
+        defaultResourceRequiredMessage: (capability) =>
+          t("platformControl.feedback.defaultResourceRequired", { capability: capability.display_name }),
+        resourceCompatibilityMessage: (capability, provider, resourceNames) =>
+          t("platformControl.feedback.resourceProviderMismatch", {
+            capability: capability.display_name,
+            provider: provider.display_name,
+            origin: t(`platformControl.badges.${provider.provider_origin}`),
+            resources: resourceNames.join(", "),
+          }),
+        providersByCapability,
+        modelResourcesByCapability,
       });
 
       return {
@@ -89,7 +102,7 @@ export function usePlatformDeploymentEditor({
         mutationInput: validationError ? null : buildDeploymentMutationInput(requiredCapabilities, form, knowledgeBases),
       };
     },
-    [knowledgeBases, requiredCapabilities, t],
+    [knowledgeBases, modelResourcesByCapability, providersByCapability, requiredCapabilities, t],
   );
 
   return {

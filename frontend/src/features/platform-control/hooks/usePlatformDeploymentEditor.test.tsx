@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { PlatformDeploymentProfile } from "../../../api/platform";
+import type { ManagedModel } from "../../../api/modelops";
+import type { PlatformDeploymentProfile, PlatformProvider } from "../../../api/platform";
 import {
   capabilitiesFixture,
   deploymentsFixture,
@@ -24,28 +25,43 @@ function translate(key: string, options: Record<string, unknown> = {}): string {
   if (key === "platformControl.feedback.defaultResourceRequired") {
     return `Select a default ${String(options.capability ?? "")} resource.`;
   }
+  if (key === "platformControl.feedback.resourceProviderMismatch") {
+    return `${String(options.provider ?? "")} cannot serve ${String(options.resources ?? "")}.`;
+  }
   return key;
+}
+
+function cloudModelProviders(): PlatformProvider[] {
+  return providersFixture.map((provider) =>
+    provider.capability === "llm_inference" || provider.capability === "embeddings"
+      ? { ...provider, provider_origin: "cloud" as const }
+      : provider,
+  );
 }
 
 type HookHarnessProps = {
   mode: "create" | "edit";
   deployment?: PlatformDeploymentProfile | null;
   formToValidate?: DeploymentFormState;
+  providers?: PlatformProvider[];
+  eligibleModelsByCapability?: Record<string, ManagedModel[]>;
 };
 
 function HookHarness({
   mode,
   deployment = null,
   formToValidate,
+  providers = cloudModelProviders(),
+  eligibleModelsByCapability = {
+    llm_inference: llmModelsFixture,
+    embeddings: embeddingsModelsFixture,
+  },
 }: HookHarnessProps): JSX.Element {
   const editor = usePlatformDeploymentEditor({
     mode,
     capabilities: capabilitiesFixture,
-    providers: providersFixture,
-    eligibleModelsByCapability: {
-      llm_inference: llmModelsFixture,
-      embeddings: embeddingsModelsFixture,
-    },
+    providers,
+    eligibleModelsByCapability,
     knowledgeBases: knowledgeBasesFixture,
     deployment,
     t: translate as never,
@@ -163,6 +179,56 @@ describe("usePlatformDeploymentEditor", () => {
     expect(screen.getByTestId("initial-form")).toHaveTextContent('"slug":"local-default"');
     expect(screen.getByTestId("initial-clone")).toHaveTextContent('"slug":"local-default-copy"');
     expect(screen.getByTestId("validation-error")).toHaveTextContent("Select a default Embeddings resource.");
+    expect(screen.getByTestId("mutation-input")).toHaveTextContent("null");
+  });
+
+  it("rejects model resources that do not match the selected provider origin", () => {
+    const localLlmModel: ManagedModel = {
+      ...llmModelsFixture[0],
+      id: "qwen-local",
+      name: "Qwen local",
+      backend: "local",
+      hosting: "local",
+      availability: "offline_ready",
+    };
+    const formToValidate: DeploymentFormState = {
+      slug: "cloud-profile",
+      displayName: "Cloud Profile",
+      description: "",
+      providerIdsByCapability: {
+        llm_inference: "provider-1",
+        embeddings: "provider-embeddings",
+        vector_store: "provider-2",
+      },
+      resourceIdsByCapability: {
+        llm_inference: ["qwen-local"],
+        embeddings: ["text-embedding-3-small"],
+        vector_store: ["kb_primary"],
+      },
+      defaultResourceIdsByCapability: {
+        llm_inference: "qwen-local",
+        embeddings: "text-embedding-3-small",
+      },
+      resourcePolicyByCapability: {
+        vector_store: {
+          selection_mode: "explicit",
+        },
+      },
+    };
+
+    render(
+      <HookHarness
+        mode="create"
+        formToValidate={formToValidate}
+        providers={cloudModelProviders()}
+        eligibleModelsByCapability={{
+          llm_inference: [localLlmModel],
+          embeddings: embeddingsModelsFixture,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent("vLLM local gateway cannot serve Qwen local.");
     expect(screen.getByTestId("mutation-input")).toHaveTextContent("null");
   });
 });
