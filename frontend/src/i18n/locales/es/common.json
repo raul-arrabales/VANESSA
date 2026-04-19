@@ -584,7 +584,7 @@
       "loadingVectorizationOptions": "Cargando opciones de vectorizacion...",
       "noSchemaProfiles": "Todavia no hay perfiles de esquema reutilizables para este proveedor. Aun puedes definir uno abajo.",
       "customSchemaDraft": "Estas editando un esquema personalizado derivado del perfil seleccionado.",
-      "weaviateSystemFields": "Weaviate agrega automaticamente campos del sistema como document_id, text y metadata_json. No los dupliques en el esquema personalizado.",
+      "weaviateSystemFields": "VANESSA indexa automaticamente campos integrados de fragmento como document_id, chunk_index, title, uri, text, metadata_json y page_number para PDF. No los dupliques en el esquema personalizado.",
       "empty": "Todavia no se han creado bases de conocimiento.",
       "noDocuments": "Todavia no se han agregado documentos.",
       "noSources": "Todavia no se han configurado fuentes gestionadas.",

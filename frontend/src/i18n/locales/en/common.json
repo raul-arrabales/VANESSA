@@ -594,7 +594,7 @@
       "loadingVectorizationOptions": "Loading vectorization options...",
       "noSchemaProfiles": "No reusable schema profiles are available for this provider yet. You can still define one below.",
       "customSchemaDraft": "You are editing a custom schema derived from the selected profile.",
-      "weaviateSystemFields": "Weaviate automatically adds system fields such as document_id, text, and metadata_json. Do not duplicate them in the custom schema.",
+      "weaviateSystemFields": "VANESSA automatically indexes built-in chunk fields such as document_id, chunk_index, title, uri, text, metadata_json, and PDF page_number. Do not duplicate them in the custom schema.",
       "empty": "No knowledge bases have been created yet.",
       "noDocuments": "No documents have been added yet.",
       "noManualDocuments": "No manual documents are available yet.",

@@ -111,6 +111,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                                             "title": "Architecture Overview",
                                             "uri": "https://example.com/architecture",
                                             "source_type": "doc",
+                                            "page_number": 4,
                                         },
                                         "score": 0.92,
                                         "score_kind": "similarity",
@@ -160,6 +161,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
                 "title": "Architecture Overview",
                 "uri": "https://example.com/architecture",
                 "source_type": "doc",
+                "page_number": 4,
             },
             "score": 0.92,
             "score_kind": "similarity",
@@ -177,7 +179,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             "description": "doc",
             "uri": "https://example.com/architecture",
             "file_reference": "https://example.com/architecture",
-            "pages": [],
+            "pages": [4],
             "source_ids": ["doc-1"],
         }
     ]

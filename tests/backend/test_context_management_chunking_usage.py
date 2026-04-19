@@ -49,7 +49,7 @@ def test_create_knowledge_base_document_uses_chunking_context(monkeypatch):
     monkeypatch.setattr(
         context_management_documents,
         "_chunk_knowledge_base_text",
-        lambda *_args, **kwargs: ["chunk-1", "chunk-2"] if kwargs["text"] == "Hello world" else [],
+        lambda *_args, **kwargs: [{"text": "chunk-1"}, {"text": "chunk-2"}] if kwargs["text"] == "Hello world" else [],
     )
 
     def _create_document(_database_url: str, **kwargs):
@@ -98,7 +98,7 @@ def test_create_knowledge_base_document_uses_chunking_context(monkeypatch):
         "category": "guide",
         "published": True,
     }
-    assert upserted["chunks"] == ["chunk-1", "chunk-2"]
+    assert upserted["chunks"] == [{"text": "chunk-1"}, {"text": "chunk-2"}]
     assert document["chunk_count"] == 2
 
 
@@ -129,7 +129,11 @@ def test_update_knowledge_base_document_uses_chunking_context(monkeypatch):
     monkeypatch.setattr(
         context_management_documents,
         "_chunk_knowledge_base_text",
-        lambda *_args, **kwargs: ["chunk-1", "chunk-2", "chunk-3"] if kwargs["text"] == "Updated text" else [],
+        lambda *_args, **kwargs: (
+            [{"text": "chunk-1"}, {"text": "chunk-2"}, {"text": "chunk-3"}]
+            if kwargs["text"] == "Updated text"
+            else []
+        ),
     )
 
     def _update_document(_database_url: str, **kwargs):
@@ -178,7 +182,7 @@ def test_update_knowledge_base_document_uses_chunking_context(monkeypatch):
         "category": "reference",
         "published": True,
     }
-    assert upserted["chunks"] == ["chunk-1", "chunk-2", "chunk-3"]
+    assert upserted["chunks"] == [{"text": "chunk-1"}, {"text": "chunk-2"}, {"text": "chunk-3"}]
     assert document["chunk_count"] == 3
 
 
@@ -260,7 +264,7 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
     knowledge_base = _knowledge_base()
     chunk_texts: list[str] = []
     updated_counts: list[int] = []
-    upserted_chunk_lists: list[list[str]] = []
+    upserted_chunk_lists: list[list[dict[str, object]]] = []
     upserted_documents: list[dict[str, object]] = []
 
     monkeypatch.setattr(context_management_documents, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
@@ -296,8 +300,8 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
     def _chunk_knowledge_base_text(_database_url: str, *, knowledge_base, text: str):
         chunk_texts.append(text)
         if text == "Alpha text":
-            return ["alpha-1", "alpha-2"]
-        return ["beta-1"]
+            return [{"text": "alpha-1"}, {"text": "alpha-2"}]
+        return [{"text": "beta-1"}]
 
     monkeypatch.setattr(context_management_documents, "_chunk_knowledge_base_text", _chunk_knowledge_base_text)
 
@@ -331,7 +335,7 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
 
     assert chunk_texts == ["Alpha text", "Beta text"]
     assert updated_counts == [2, 1]
-    assert upserted_chunk_lists == [["alpha-1", "alpha-2"], ["beta-1"]]
+    assert upserted_chunk_lists == [[{"text": "alpha-1"}, {"text": "alpha-2"}], [{"text": "beta-1"}]]
     assert [document["metadata_json"] for document in upserted_documents] == [  # type: ignore[index]
         {"category": "guide"},
         {"category": "faq"},
@@ -341,7 +345,7 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
 
 def test_source_sync_uses_chunking_context(monkeypatch):
     created_documents: list[dict[str, object]] = []
-    upserted_chunk_lists: list[list[str]] = []
+    upserted_chunk_lists: list[list[dict[str, object]]] = []
     upserted_documents: list[dict[str, object]] = []
 
     monkeypatch.setattr(
@@ -375,7 +379,11 @@ def test_source_sync_uses_chunking_context(monkeypatch):
     monkeypatch.setattr(
         context_management_sources,
         "_chunk_knowledge_base_text",
-        lambda *_args, **kwargs: ["source-1", "source-2"] if kwargs["text"] == "Chunk this source document" else [],
+        lambda *_args, **kwargs: (
+            [{"text": "source-1"}, {"text": "source-2"}]
+            if kwargs["text"] == "Chunk this source document"
+            else []
+        ),
     )
     monkeypatch.setattr(
         context_management_sources.context_repo,
@@ -417,7 +425,7 @@ def test_source_sync_uses_chunking_context(monkeypatch):
         "source_path": "docs/source.txt",
         "source_display_name": "Docs folder",
     }
-    assert upserted_chunk_lists == [["source-1", "source-2"]]
+    assert upserted_chunk_lists == [[{"text": "source-1"}, {"text": "source-2"}]]
     assert upserted_documents[0]["metadata_json"] == {  # type: ignore[index]
         "category": "guide",
         "source_path": "docs/source.txt",

@@ -12,7 +12,12 @@ from .context_management_ingestion import (
     _source_document_id,
     _source_document_key,
 )
-from .context_management_serialization import _normalize_knowledge_source_payload, _serialize_knowledge_base, _serialize_knowledge_source, _serialize_sync_run
+from .context_management_serialization import (
+    _normalize_knowledge_source_payload,
+    _serialize_knowledge_base,
+    _serialize_knowledge_source,
+    _serialize_sync_run,
+)
 from .context_management_shared import (
     _chunk_knowledge_base_page_texts,
     _chunk_knowledge_base_text,
@@ -29,7 +34,12 @@ from .context_management_shared import (
     _resolve_source_directory,
     _upsert_document_chunks,
 )
-from .context_management_types import SourceSyncSummary
+from .context_management_types import (
+    KnowledgeBaseRecord,
+    KnowledgeTextChunk,
+    ParsedIngestionDocument,
+    SourceSyncSummary,
+)
 from .context_management_vectorization import require_knowledge_base_text_ingestion_supported
 from .platform_types import PlatformControlPlaneError
 
@@ -393,7 +403,7 @@ def _sync_knowledge_source_documents(
     database_url: str,
     config: AuthConfig,
     *,
-    knowledge_base: dict[str, Any],
+    knowledge_base: KnowledgeBaseRecord,
     source: dict[str, Any],
     source_directory: Path,
     updated_by_user_id: int | None,
@@ -523,15 +533,15 @@ def _sync_knowledge_source_documents(
 def _chunk_source_document(
     database_url: str,
     *,
-    knowledge_base: dict[str, Any],
-    parsed_document: dict[str, Any],
-):
+    knowledge_base: KnowledgeBaseRecord,
+    parsed_document: ParsedIngestionDocument,
+) -> list[KnowledgeTextChunk]:
     page_texts = parsed_document.get("page_texts")
     if isinstance(page_texts, list) and page_texts:
         page_chunks = _chunk_knowledge_base_page_texts(
             database_url,
             knowledge_base=knowledge_base,
-            page_texts=page_texts,
+            page_texts=[page for page in page_texts if isinstance(page, dict)],
         )
         if page_chunks:
             return page_chunks

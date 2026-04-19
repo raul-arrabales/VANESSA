@@ -163,7 +163,7 @@ def test_create_and_ingest_validation_share_the_same_core_chunking_error(monkeyp
                 "source_name": "Patient Guides",
                 "source_id": "source-1",
             },
-            chunks=["chunk-1"],
+            chunks=[{"text": "chunk-1"}],
         )
 
     create_core = {
@@ -239,7 +239,7 @@ def test_upsert_document_chunks_propagates_document_metadata_into_chunk_metadata
                 "published": True,
             },
         },
-        chunks=["chunk-1"],
+        chunks=[{"text": "chunk-1"}],
     )
 
     assert captured_upsert["index_name"] == "kb_product_docs"
@@ -388,7 +388,7 @@ def test_upsert_document_chunks_keeps_built_in_chunk_metadata_when_document_meta
                 "chunk_index": 999,
             },
         },
-        chunks=["chunk-1"],
+        chunks=[{"text": "chunk-1"}],
     )
 
     metadata = captured_upsert["documents"][0]["metadata"]  # type: ignore[index]

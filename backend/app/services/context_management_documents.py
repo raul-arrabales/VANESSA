@@ -24,7 +24,12 @@ from .context_management_shared import (
     _resolve_knowledge_base_vector_adapter,
     _upsert_document_chunks,
 )
-from .context_management_types import _MAX_UPLOAD_DOCUMENTS, _MAX_UPLOAD_FILES
+from .context_management_types import (
+    KnowledgeBaseRecord,
+    KnowledgeTextChunk,
+    _MAX_UPLOAD_DOCUMENTS,
+    _MAX_UPLOAD_FILES,
+)
 from .context_management_vectorization import require_knowledge_base_text_ingestion_supported
 from .platform_types import PlatformControlPlaneError
 
@@ -274,15 +279,15 @@ def upload_knowledge_base_documents(
 def _chunk_document_payload(
     database_url: str,
     *,
-    knowledge_base: dict[str, Any],
+    knowledge_base: KnowledgeBaseRecord,
     text: str,
     page_texts: Any,
-):
+) -> list[KnowledgeTextChunk]:
     if isinstance(page_texts, list) and page_texts:
         page_chunks = _chunk_knowledge_base_page_texts(
             database_url,
             knowledge_base=knowledge_base,
-            page_texts=page_texts,
+            page_texts=[page for page in page_texts if isinstance(page, dict)],
         )
         if page_chunks:
             return page_chunks

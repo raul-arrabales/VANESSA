@@ -43,12 +43,13 @@ def _chunk_knowledge_base_text(
     *,
     knowledge_base: KnowledgeBaseRecord,
     text: str,
-) -> list[str]:
-    return chunk_text(
+) -> list[KnowledgeTextChunk]:
+    chunks = chunk_text(
         text,
         chunking=build_chunking_state(knowledge_base),
         tokenizer=resolve_knowledge_base_tokenizer(database_url, knowledge_base=knowledge_base),
     )
+    return [{"text": chunk} for chunk in chunks]
 
 
 def _chunk_knowledge_base_page_texts(
@@ -65,8 +66,11 @@ def _chunk_knowledge_base_page_texts(
             continue
         for chunk in _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=page_text):
             chunks.append({
-                "text": chunk,
-                "metadata": {"page_number": page_number},
+                "text": chunk["text"],
+                "metadata": {
+                    **dict(chunk.get("metadata") or {}),
+                    "page_number": page_number,
+                },
             })
     return chunks
 
@@ -245,7 +249,7 @@ def _upsert_document_chunks(
     *,
     knowledge_base: KnowledgeBaseRecord,
     document: KnowledgeDocumentRecord,
-    chunks: list[str | KnowledgeTextChunk],
+    chunks: list[KnowledgeTextChunk],
 ) -> None:
     if not chunks:
         raise PlatformControlPlaneError("invalid_document_text", "text is required", status_code=400)
@@ -296,9 +300,7 @@ def _upsert_document_chunks(
     adapter.upsert(index_name=str(knowledge_base["index_name"]), documents=documents)
 
 
-def _normalize_knowledge_text_chunk(chunk: str | KnowledgeTextChunk) -> KnowledgeTextChunk:
-    if isinstance(chunk, str):
-        return {"text": chunk}
+def _normalize_knowledge_text_chunk(chunk: KnowledgeTextChunk) -> KnowledgeTextChunk:
     return {
         "text": str(chunk.get("text") or "").strip(),
         "metadata": dict(chunk.get("metadata") or {}),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services import context_management_ingestion
+from app.services import context_management_parsers
 
 
 def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
@@ -19,12 +19,12 @@ def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
             pass
 
     monkeypatch.setattr(
-        context_management_ingestion,
-        "_get_pdf_reader_dependencies",
+        context_management_parsers,
+        "get_pdf_reader_dependencies",
         lambda: (_FakeReader, (ValueError,)),
     )
 
-    document = context_management_ingestion._extract_pdf_document(  # type: ignore[attr-defined]
+    document = context_management_parsers.extract_pdf_document(
         "architecture.pdf",
         b"%PDF",
         default_source_type="upload",

@@ -120,6 +120,22 @@ Canonical result example:
 }
 ```
 
+## Built-In Chunk Metadata
+
+Knowledge-base ingestion stores these built-in metadata fields on every indexed chunk:
+
+- `knowledge_base_id`
+- `document_id`
+- `chunk_index`
+- `title`
+- `source_type`
+- `source_name`
+- `uri`
+
+PDF ingestion also stores `page_number` on each chunk when the original page is known. `page_number` is chunk-level metadata and is safe to use for source references and retrieval filters. It is not inferred from `page_count`; `page_count` remains document-level metadata when the parser can determine it.
+
+Vector-store schemas must reserve these built-in fields, including `page_number`, so custom schema properties should not duplicate them.
+
 ## Scoring Semantics
 
 - `semantic`

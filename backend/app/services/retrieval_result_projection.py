@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-URI_METADATA_KEYS = ("uri", "file_uri", "source_uri", "url", "source_url")
-PATH_METADATA_KEYS = ("source_path", "source_filename", "file_path", "filename")
-PAGE_METADATA_KEYS = ("page", "page_number", "page_numbers", "pages")
+from .retrieval_reference_identity import (
+    first_metadata_string,
+    metadata_page_numbers,
+    reference_description,
+    reference_file_value,
+    reference_group_key,
+    reference_title,
+    string_or_none,
+    URI_METADATA_KEYS,
+)
 
 
 def trim_retrieval_snippet(text: str, limit: int = 220) -> str:
@@ -56,19 +63,19 @@ def build_retrieval_references(
 
     for result in results:
         metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
-        group_key = _reference_group_key(result, metadata)
+        group_key = reference_group_key(result, metadata)
         if group_key not in grouped:
             order.append(group_key)
             grouped[group_key] = {
-                "title": _reference_title(result, metadata),
-                "description": _reference_description(result, metadata),
-                "uri": _first_metadata_string(metadata, URI_METADATA_KEYS),
-                "file_reference": _reference_file_value(metadata, result),
+                "title": reference_title(result, metadata),
+                "description": reference_description(result, metadata),
+                "uri": first_metadata_string(metadata, URI_METADATA_KEYS),
+                "file_reference": reference_file_value(metadata, result),
                 "pages": set(),
                 "source_ids": [],
             }
         grouped[group_key]["source_ids"].append(str(result.get("id", "")).strip())
-        grouped[group_key]["pages"].update(_metadata_page_numbers(metadata))
+        grouped[group_key]["pages"].update(metadata_page_numbers(metadata))
 
     references: list[dict[str, Any]] = []
     source_reference_lookup: dict[str, dict[str, str]] = {}
@@ -139,141 +146,3 @@ def normalize_execution_retrieval(
     retrieval_calls = result.get("retrieval_calls") if isinstance(result.get("retrieval_calls"), list) else []
     first_call = retrieval_calls[0] if retrieval_calls and isinstance(retrieval_calls[0], dict) else {}
     return project_retrieval_call(first_call)
-
-
-def string_or_none(value: Any) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip()
-    return normalized or None
-
-
-def _first_metadata_string(metadata: dict[str, Any], keys: tuple[str, ...]) -> str | None:
-    for key in keys:
-        normalized = string_or_none(metadata.get(key))
-        if normalized:
-            return normalized
-    return None
-
-
-def _reference_group_key(result: dict[str, Any], metadata: dict[str, Any]) -> str:
-    for value in (
-        _first_metadata_string(metadata, URI_METADATA_KEYS),
-        _first_metadata_string(metadata, PATH_METADATA_KEYS),
-        string_or_none(metadata.get("document_id")),
-        string_or_none(metadata.get("title")),
-        string_or_none(result.get("id")),
-    ):
-        if value:
-            return value
-    return "unknown-source"
-
-
-def _reference_title(result: dict[str, Any], metadata: dict[str, Any]) -> str:
-    return (
-        string_or_none(metadata.get("title"))
-        or string_or_none(metadata.get("source_display_name"))
-        or string_or_none(metadata.get("source_name"))
-        or string_or_none(metadata.get("source_filename"))
-        or string_or_none(metadata.get("source_path"))
-        or string_or_none(result.get("id"))
-        or "Source"
-    )
-
-
-def _reference_description(result: dict[str, Any], metadata: dict[str, Any]) -> str:
-    return (
-        string_or_none(metadata.get("description"))
-        or string_or_none(metadata.get("source_description"))
-        or string_or_none(metadata.get("source_display_name"))
-        or string_or_none(metadata.get("source_name"))
-        or string_or_none(metadata.get("source_type"))
-        or _reference_title(result, metadata)
-    )
-
-
-def _reference_file_value(metadata: dict[str, Any], result: dict[str, Any]) -> str | None:
-    return (
-        _first_metadata_string(metadata, URI_METADATA_KEYS)
-        or _first_metadata_string(metadata, PATH_METADATA_KEYS)
-        or string_or_none(metadata.get("document_id"))
-        or string_or_none(result.get("id"))
-    )
-
-
-def _metadata_page_numbers(metadata: dict[str, Any]) -> set[int]:
-    pages: set[int] = set()
-    for key in PAGE_METADATA_KEYS:
-        pages.update(_coerce_page_numbers(metadata.get(key)))
-
-    start = _first_page_number(metadata.get("page_start"))
-    end = _first_page_number(metadata.get("page_end"))
-    if start is not None and end is not None:
-        lower = min(start, end)
-        upper = max(start, end)
-        if upper - lower <= 50:
-            pages.update(range(lower, upper + 1))
-        else:
-            pages.update({lower, upper})
-    elif start is not None:
-        pages.add(start)
-    elif end is not None:
-        pages.add(end)
-
-    return pages
-
-
-def _coerce_page_numbers(value: Any) -> set[int]:
-    if value is None or isinstance(value, bool):
-        return set()
-    if isinstance(value, int):
-        return {value} if value > 0 else set()
-    if isinstance(value, float):
-        return {int(value)} if value.is_integer() and value > 0 else set()
-    if isinstance(value, str):
-        pages: set[int] = set()
-        for part in value.replace(";", ",").split(","):
-            part = part.strip()
-            if not part:
-                continue
-            if "-" in part:
-                start_raw, end_raw = part.split("-", 1)
-                start = _parse_positive_int(start_raw)
-                end = _parse_positive_int(end_raw)
-                if start is not None and end is not None:
-                    lower = min(start, end)
-                    upper = max(start, end)
-                    if upper - lower <= 50:
-                        pages.update(range(lower, upper + 1))
-                    else:
-                        pages.update({lower, upper})
-                continue
-            page = _parse_positive_int(part)
-            if page is not None:
-                pages.add(page)
-        return pages
-    if isinstance(value, list):
-        pages: set[int] = set()
-        for item in value:
-            pages.update(_coerce_page_numbers(item))
-        return pages
-    return set()
-
-
-def _first_page_number(value: Any) -> int | None:
-    pages = _coerce_page_numbers(value)
-    return min(pages) if pages else None
-
-
-def _parse_positive_int(value: Any) -> int | None:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value if value > 0 else None
-    if isinstance(value, float):
-        return int(value) if value.is_integer() and value > 0 else None
-    normalized = str(value).strip()
-    if not normalized.isdigit():
-        return None
-    parsed = int(normalized)
-    return parsed if parsed > 0 else None
