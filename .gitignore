@@ -19,3 +19,6 @@ site/
 # Playwright MCP
 .playwright-mcp/
 
+# KB Context Sources
+context_sources/
+
