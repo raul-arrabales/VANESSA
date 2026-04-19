@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -49,6 +50,7 @@ class PlaygroundExecutionResult:
     output: str
     response: dict[str, Any] | None = None
     sources: list[dict[str, Any]] = field(default_factory=list)
+    references: list[dict[str, Any]] = field(default_factory=list)
     retrieval: dict[str, Any] | None = None
     knowledge_base_id: str | None = None
 
@@ -147,6 +149,18 @@ def build_engine_messages(*, prompt: str, history_payload: Any) -> list[dict[str
     ]
 
 
+_CITATION_MARKER_RE = re.compile(r"\[(?:\d+(?:\s*,\s*\d+)*)\]")
+
+
+def add_missing_reference_citation(output: str, references: list[dict[str, Any]]) -> str:
+    normalized = output.strip()
+    if not normalized or not references or _CITATION_MARKER_RE.search(normalized):
+        return normalized
+
+    citation_numbers = ", ".join(str(index) for index in range(1, min(len(references), 3) + 1))
+    return f"{normalized} [{citation_numbers}]"
+
+
 def resolve_model_for_inference(
     database_url: str,
     *,
@@ -233,7 +247,7 @@ def execute_knowledge_request(
     )
     execution_payload = response_payload.get("execution") if isinstance(response_payload.get("execution"), dict) else {}
     result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
-    sources, retrieval = normalize_execution_retrieval(execution_payload)
+    sources, retrieval, references = normalize_execution_retrieval(execution_payload)
     if not 200 <= execution_status < 300:
         raise AgentEngineClientError(
             code="knowledge_chat_failed",
@@ -241,10 +255,12 @@ def execute_knowledge_request(
             status_code=execution_status,
             details=response_payload,
         )
+    output = add_missing_reference_citation(str(result_payload.get("output_text", "")).strip(), references)
     return PlaygroundExecutionResult(
-        output=str(result_payload.get("output_text", "")).strip(),
+        output=output,
         response=execution_payload,
         sources=sources,
+        references=references,
         retrieval=retrieval,
         knowledge_base_id=str(selected_knowledge_base["id"]),
     )

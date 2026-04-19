@@ -264,6 +264,87 @@ def test_upsert_document_chunks_propagates_document_metadata_into_chunk_metadata
     ]
 
 
+def test_upsert_document_chunks_adds_per_chunk_page_number_metadata(monkeypatch: pytest.MonkeyPatch):
+    captured_upsert: dict[str, object] = {}
+
+    monkeypatch.setattr(context_management_shared, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_shared, "assert_knowledge_base_chunking_compatible", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_shared,
+        "_resolve_knowledge_base_vector_adapter",
+        lambda *_args, **_kwargs: type(
+            "_Adapter",
+            (),
+            {
+                "ensure_index": lambda self, **_kwargs: None,
+                "upsert": lambda self, **_kwargs: captured_upsert.update(_kwargs),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        context_management_shared,
+        "embed_knowledge_base_texts",
+        lambda *_args, **_kwargs: {"embeddings": [[0.1, 0.2], [0.3, 0.4]]},
+    )
+
+    context_management_shared._upsert_document_chunks(  # type: ignore[attr-defined]
+        "postgresql://ignored",
+        object(),
+        knowledge_base={
+            "id": "kb-primary",
+            "index_name": "kb_product_docs",
+            "schema_json": {"properties": [{"name": "page_number", "data_type": "int"}]},
+        },
+        document={
+            "id": "doc-1",
+            "title": "Architecture Overview",
+            "source_type": "upload",
+            "source_name": "architecture.pdf",
+            "uri": None,
+            "metadata_json": {"page_count": 2, "page_number": 999},
+        },
+        chunks=[
+            {"text": "page one chunk", "metadata": {"page_number": 1}},
+            {"text": "page two chunk", "metadata": {"page_number": 2}},
+        ],
+    )
+
+    assert captured_upsert["documents"] == [
+        {
+            "id": "doc-1::chunk::0",
+            "text": "page one chunk",
+            "embedding": [0.1, 0.2],
+            "metadata": {
+                "page_count": 2,
+                "page_number": 1,
+                "knowledge_base_id": "kb-primary",
+                "document_id": "doc-1",
+                "chunk_index": 0,
+                "title": "Architecture Overview",
+                "source_type": "upload",
+                "source_name": "architecture.pdf",
+                "uri": None,
+            },
+        },
+        {
+            "id": "doc-1::chunk::1",
+            "text": "page two chunk",
+            "embedding": [0.3, 0.4],
+            "metadata": {
+                "page_count": 2,
+                "page_number": 2,
+                "knowledge_base_id": "kb-primary",
+                "document_id": "doc-1",
+                "chunk_index": 1,
+                "title": "Architecture Overview",
+                "source_type": "upload",
+                "source_name": "architecture.pdf",
+                "uri": None,
+            },
+        },
+    ]
+
+
 def test_upsert_document_chunks_keeps_built_in_chunk_metadata_when_document_metadata_conflicts(monkeypatch: pytest.MonkeyPatch):
     captured_upsert: dict[str, object] = {}
 

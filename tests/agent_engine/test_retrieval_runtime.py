@@ -12,6 +12,41 @@ if str(PROJECT_ROOT) not in sys.path:
 from agent_engine.app.retrieval import runtime as retrieval_runtime  # noqa: E402
 
 
+def test_prepend_retrieval_context_uses_deduplicated_reference_citations():
+    messages = [{"role": "user", "content": [{"type": "text", "text": "What is retrieval?"}]}]
+
+    effective_messages = retrieval_runtime.prepend_retrieval_context(
+        messages,
+        retrieval_results=[
+            {
+                "id": "doc-1#0",
+                "text": "First chunk",
+                "metadata": {"title": "Guide", "source_path": "docs/guide.md"},
+            },
+            {
+                "id": "doc-1#1",
+                "text": "Second chunk",
+                "metadata": {"title": "Guide", "source_path": "docs/guide.md"},
+            },
+            {
+                "id": "doc-2#0",
+                "text": "Other chunk",
+                "metadata": {"title": "FAQ", "uri": "file:///docs/faq.pdf"},
+            },
+        ],
+    )
+
+    context_text = effective_messages[0]["content"][0]["text"]
+    assert "bracketed numeric citations such as [1] or [1, 2]" in context_text
+    assert context_text.count("Reference [1]") == 1
+    assert context_text.count("Reference [2]") == 1
+    assert "Chunk id=doc-1#0" in context_text
+    assert "Chunk id=doc-1#1" in context_text
+    assert "file=docs/guide.md" in context_text
+    assert "file=file:///docs/faq.pdf" in context_text
+    assert effective_messages[1:] == messages
+
+
 def _runtime_snapshot() -> dict[str, object]:
     return {
         "deployment_profile": {"slug": "local-default"},

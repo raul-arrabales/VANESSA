@@ -18,10 +18,24 @@ export type PlaygroundKnowledgeSource = {
   } | null;
   uri?: string | null;
   source_type?: string | null;
+  reference_id?: string | null;
+  citation_label?: string | null;
+};
+
+export type PlaygroundKnowledgeReference = {
+  id: string;
+  citation_label: string;
+  title: string;
+  description?: string | null;
+  uri?: string | null;
+  file_reference?: string | null;
+  pages?: number[];
+  source_ids?: string[];
 };
 
 export type PlaygroundMessageMetadata = Record<string, unknown> & {
   sources?: PlaygroundKnowledgeSource[];
+  references?: PlaygroundKnowledgeReference[];
 };
 
 export type PlaygroundMessage = {
@@ -105,6 +119,7 @@ export type SendPlaygroundMessageResult = {
   output: string;
   response?: Record<string, unknown>;
   sources?: PlaygroundKnowledgeSource[];
+  references?: PlaygroundKnowledgeReference[];
   retrieval?: {
     index: string;
     result_count: number;
@@ -175,6 +190,59 @@ export function getPlaygroundMessageSources(
       relevance_components: relevanceComponents,
       uri: stringOrNull(rawSource.uri),
       source_type: stringOrNull(rawSource.source_type),
+      reference_id: stringOrNull(rawSource.reference_id),
+      citation_label: stringOrNull(rawSource.citation_label),
+    }];
+  });
+}
+
+function numberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    if (typeof item !== "number" || !Number.isFinite(item)) {
+      return [];
+    }
+    return [item];
+  });
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    const normalized = String(item ?? "").trim();
+    return normalized ? [normalized] : [];
+  });
+}
+
+export function getPlaygroundMessageReferences(
+  metadata: PlaygroundMessageMetadata | Record<string, unknown> | null | undefined,
+): PlaygroundKnowledgeReference[] {
+  const rawReferences = Array.isArray(metadata?.references) ? metadata.references : [];
+
+  return rawReferences.flatMap((reference) => {
+    if (!reference || typeof reference !== "object") {
+      return [];
+    }
+    const rawReference = reference as Record<string, unknown>;
+    const id = String(rawReference.id ?? rawReference.reference_id ?? "").trim();
+    const citationLabel = String(rawReference.citation_label ?? "").trim();
+    const title = String(rawReference.title ?? rawReference.file_reference ?? id).trim();
+    if (!id || !citationLabel || !title) {
+      return [];
+    }
+    return [{
+      id,
+      citation_label: citationLabel,
+      title,
+      description: stringOrNull(rawReference.description),
+      uri: stringOrNull(rawReference.uri),
+      file_reference: stringOrNull(rawReference.file_reference),
+      pages: numberArray(rawReference.pages),
+      source_ids: stringArray(rawReference.source_ids),
     }];
   });
 }

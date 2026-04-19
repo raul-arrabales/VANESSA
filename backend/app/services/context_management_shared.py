@@ -15,9 +15,11 @@ from .context_management_chunking import (
 )
 from .context_management_chunking_compatibility import assert_knowledge_base_chunking_compatible
 from .context_management_types import (
+    KnowledgeTextChunk,
     KnowledgeBaseRecord,
     KnowledgeDocumentRecord,
     KnowledgeSourceRecord,
+    ParsedIngestionPage,
 )
 from .context_management_vectorization import (
     embed_knowledge_base_texts,
@@ -47,6 +49,26 @@ def _chunk_knowledge_base_text(
         chunking=build_chunking_state(knowledge_base),
         tokenizer=resolve_knowledge_base_tokenizer(database_url, knowledge_base=knowledge_base),
     )
+
+
+def _chunk_knowledge_base_page_texts(
+    database_url: str,
+    *,
+    knowledge_base: KnowledgeBaseRecord,
+    page_texts: list[ParsedIngestionPage],
+) -> list[KnowledgeTextChunk]:
+    chunks: list[KnowledgeTextChunk] = []
+    for page in page_texts:
+        page_number = _positive_int_or_none(page.get("page_number"))
+        page_text = str(page.get("text") or "").strip()
+        if page_number is None or not page_text:
+            continue
+        for chunk in _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=page_text):
+            chunks.append({
+                "text": chunk,
+                "metadata": {"page_number": page_number},
+            })
+    return chunks
 
 
 def _normalize_source_relative_path(value: str) -> str:
@@ -153,6 +175,7 @@ def _build_chunk_metadata(
     knowledge_base: KnowledgeBaseRecord,
     document: KnowledgeDocumentRecord,
     chunk_index: int,
+    chunk_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     document_metadata = dict(document.get("metadata_json") or document.get("metadata") or {})
     built_in_metadata = {
@@ -166,6 +189,7 @@ def _build_chunk_metadata(
     }
     return {
         **document_metadata,
+        **dict(chunk_metadata or {}),
         **built_in_metadata,
     }
 
@@ -221,7 +245,7 @@ def _upsert_document_chunks(
     *,
     knowledge_base: KnowledgeBaseRecord,
     document: KnowledgeDocumentRecord,
-    chunks: list[str],
+    chunks: list[str | KnowledgeTextChunk],
 ) -> None:
     if not chunks:
         raise PlatformControlPlaneError("invalid_document_text", "text is required", status_code=400)
@@ -246,27 +270,49 @@ def _upsert_document_chunks(
     )
     adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
     adapter.ensure_index(index_name=str(knowledge_base["index_name"]), schema=dict(knowledge_base.get("schema_json") or {}))
+    chunk_records = [_normalize_knowledge_text_chunk(chunk) for chunk in chunks]
+    chunk_texts = [chunk["text"] for chunk in chunk_records]
     embeddings_payload = embed_knowledge_base_texts(
         database_url,
         config=config,
         knowledge_base=knowledge_base,
-        texts=chunks,
+        texts=chunk_texts,
     )
     embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload.get("embeddings"), list) else []
     documents = [
         {
             "id": _chunk_document_id(str(document["id"]), index),
-            "text": chunk,
+            "text": chunk["text"],
             "embedding": embeddings[index] if index < len(embeddings) else None,
             "metadata": _build_chunk_metadata(
                 knowledge_base=knowledge_base,
                 document=document,
                 chunk_index=index,
+                chunk_metadata=dict(chunk.get("metadata") or {}),
             ),
         }
-        for index, chunk in enumerate(chunks)
+        for index, chunk in enumerate(chunk_records)
     ]
     adapter.upsert(index_name=str(knowledge_base["index_name"]), documents=documents)
+
+
+def _normalize_knowledge_text_chunk(chunk: str | KnowledgeTextChunk) -> KnowledgeTextChunk:
+    if isinstance(chunk, str):
+        return {"text": chunk}
+    return {
+        "text": str(chunk.get("text") or "").strip(),
+        "metadata": dict(chunk.get("metadata") or {}),
+    }
+
+
+def _positive_int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
 
 
 def _delete_document_chunks(

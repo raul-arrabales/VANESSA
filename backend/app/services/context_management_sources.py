@@ -14,6 +14,7 @@ from .context_management_ingestion import (
 )
 from .context_management_serialization import _normalize_knowledge_source_payload, _serialize_knowledge_base, _serialize_knowledge_source, _serialize_sync_run
 from .context_management_shared import (
+    _chunk_knowledge_base_page_texts,
     _chunk_knowledge_base_text,
     _configured_source_roots,
     _delete_document_chunks,
@@ -424,10 +425,10 @@ def _sync_knowledge_source_documents(
                 source_id=source_id,
                 source_document_key=source_document_key,
             )
-            chunks = _chunk_knowledge_base_text(
+            chunks = _chunk_source_document(
                 database_url,
                 knowledge_base=knowledge_base,
-                text=parsed_document["text"],
+                parsed_document=parsed_document,
             )
             if existing is None:
                 document = context_repo.create_document(
@@ -517,3 +518,25 @@ def _sync_knowledge_source_documents(
         "updated_document_count": updated_document_count,
         "deleted_document_count": deleted_document_count,
     }
+
+
+def _chunk_source_document(
+    database_url: str,
+    *,
+    knowledge_base: dict[str, Any],
+    parsed_document: dict[str, Any],
+):
+    page_texts = parsed_document.get("page_texts")
+    if isinstance(page_texts, list) and page_texts:
+        page_chunks = _chunk_knowledge_base_page_texts(
+            database_url,
+            knowledge_base=knowledge_base,
+            page_texts=page_texts,
+        )
+        if page_chunks:
+            return page_chunks
+    return _chunk_knowledge_base_text(
+        database_url,
+        knowledge_base=knowledge_base,
+        text=str(parsed_document.get("text") or ""),
+    )

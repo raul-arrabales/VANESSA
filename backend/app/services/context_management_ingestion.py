@@ -8,6 +8,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from .context_management_types import (
+    ParsedIngestionPage,
     ParsedIngestionDocument,
     _MAX_FILE_SIZE_BYTES,
     _SUPPORTED_UPLOAD_EXTENSIONS,
@@ -253,12 +254,12 @@ def _extract_pdf_document(
         )
     pages = list(getattr(reader, "pages", []))
     page_count = len(pages)
-    extracted_pages: list[str] = []
-    for page in pages:
+    extracted_pages: list[ParsedIngestionPage] = []
+    for page_number, page in enumerate(pages, start=1):
         page_text = str(page.extract_text() or "").strip()
         if page_text:
-            extracted_pages.append(page_text)
-    text = "\n\n".join(extracted_pages).strip()
+            extracted_pages.append({"page_number": page_number, "text": page_text})
+    text = "\n\n".join(page["text"] for page in extracted_pages).strip()
     if not text:
         raise PlatformControlPlaneError(
             invalid_pdf_code,
@@ -276,6 +277,7 @@ def _extract_pdf_document(
             "page_count": page_count,
             "source_filename": Path(filename).name,
         },
+        "page_texts": extracted_pages,
     }
 
 

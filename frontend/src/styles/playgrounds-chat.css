@@ -626,6 +626,69 @@
   margin: 0;
 }
 
+.knowledge-chat-references {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--border-muted);
+  padding-top: var(--space-2);
+}
+
+.knowledge-chat-references-toggle {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.knowledge-chat-references-toggle:hover {
+  text-decoration: underline;
+}
+
+.knowledge-chat-references-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 80%, white);
+  outline-offset: 3px;
+}
+
+.knowledge-chat-reference-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.knowledge-chat-reference {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 76%, transparent);
+}
+
+.knowledge-chat-reference-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.knowledge-chat-reference-label {
+  font-weight: 800;
+}
+
+.knowledge-chat-reference-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-chat-reference-description,
+.knowledge-chat-reference-detail {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .chatbot-composer-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

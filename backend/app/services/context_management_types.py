@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict, TypeAlias
+from typing import Any, NotRequired, TypedDict, TypeAlias
 
 KnowledgeBaseRecord: TypeAlias = dict[str, Any]
 KnowledgeSchemaProfileRecord: TypeAlias = dict[str, Any]
@@ -18,6 +18,17 @@ class ParsedIngestionDocument(TypedDict):
     uri: str | None
     text: str
     metadata: dict[str, Any]
+    page_texts: NotRequired[list["ParsedIngestionPage"]]
+
+
+class ParsedIngestionPage(TypedDict):
+    page_number: int
+    text: str
+
+
+class KnowledgeTextChunk(TypedDict):
+    text: str
+    metadata: NotRequired[dict[str, Any]]
 
 
 class SourceSyncSummary(TypedDict):

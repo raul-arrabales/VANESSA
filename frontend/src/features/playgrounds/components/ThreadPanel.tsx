@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type R
 import { useTranslation } from "react-i18next";
 import ChatMessageBody from "../../../components/ChatMessageBody";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
-import { getPlaygroundMessageSources } from "../../../api/playgrounds";
-import KnowledgeSourcesList from "../../ai-shared/KnowledgeSourcesList";
-import { mapPlaygroundKnowledgeSourceToDisplayItem } from "../../ai-shared/retrieval";
+import { getPlaygroundMessageReferences, getPlaygroundMessageSources } from "../../../api/playgrounds";
+import KnowledgeReferencesList from "../../ai-shared/KnowledgeReferencesList";
+import { buildPlaygroundKnowledgeReferencesFromSources } from "../../ai-shared/retrieval";
 import type { PlaygroundSessionViewModel } from "../types";
 
 type ThreadPanelProps = {
@@ -85,8 +85,10 @@ export default function ThreadPanel({
       >
         {activeSession?.messages.length
           ? activeSession.messages.map((message) => {
-            const sourceItems = getPlaygroundMessageSources(message.metadata)
-              .map((source) => mapPlaygroundKnowledgeSourceToDisplayItem(source));
+            const storedReferences = getPlaygroundMessageReferences(message.metadata);
+            const references = storedReferences.length > 0
+              ? storedReferences
+              : buildPlaygroundKnowledgeReferencesFromSources(getPlaygroundMessageSources(message.metadata));
             return (
               <article
                 key={message.id}
@@ -97,8 +99,8 @@ export default function ThreadPanel({
                     content={message.content}
                     renderMarkdown={message.role === "assistant"}
                   />
-                  {message.role === "assistant" && sourceItems.length > 0 ? (
-                    <KnowledgeSourcesList items={sourceItems} />
+                  {message.role === "assistant" && references.length > 0 ? (
+                    <KnowledgeReferencesList references={references} messageId={message.id} />
                   ) : null}
                   {message.role === "assistant" ? (
                     <div

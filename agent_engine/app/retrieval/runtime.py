@@ -27,6 +27,9 @@ from .types import (
     RetrievalRequest,
 )
 
+_REFERENCE_URI_KEYS = ("uri", "file_uri", "source_uri", "url", "source_url")
+_REFERENCE_PATH_KEYS = ("source_path", "source_filename", "file_path", "filename")
+
 
 def _retrieval_dependency_error(exc: EmbeddingsRuntimeClientError) -> ExecutionBlockedError:
     upstream = exc.details.get("upstream") if isinstance(exc.details.get("upstream"), dict) else {}
@@ -383,14 +386,93 @@ def prepend_retrieval_context(
     if not retrieval_results:
         return messages
 
-    context_lines = ["Use the following retrieved context if it is relevant to the user's request."]
-    for index, result in enumerate(retrieval_results, start=1):
-        metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
-        metadata_json = dumps(metadata, sort_keys=True, separators=(",", ":"))
+    context_lines = [
+        "Use the following retrieved context if it is relevant to the user's request.",
+        (
+            "When you use retrieved context, cite the supporting reference inline with "
+            "bracketed numeric citations such as [1] or [1, 2]."
+        ),
+        "Do not cite a reference unless it supports the sentence that uses the citation.",
+    ]
+    grouped_results = _group_retrieval_results_for_citations(retrieval_results)
+    for index, group in enumerate(grouped_results, start=1):
         context_lines.append(
-            f"{index}. id={result.get('id', '')} metadata={metadata_json}\n{str(result.get('text', '')).strip()}"
+            f"Reference [{index}] title={group['title']} file={group['file_reference']}"
         )
+        for result in group["results"]:
+            metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+            metadata_json = dumps(metadata, sort_keys=True, separators=(",", ":"))
+            context_lines.append(
+                f"Chunk id={result.get('id', '')} metadata={metadata_json}\n{str(result.get('text', '')).strip()}"
+            )
     return [
         {"role": "system", "content": [{"type": "text", "text": "\n\n".join(context_lines)}]},
         *messages,
     ]
+
+
+def _group_retrieval_results_for_citations(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for result in results:
+        metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
+        group_key = _reference_group_key(result, metadata)
+        if group_key not in groups:
+            order.append(group_key)
+            groups[group_key] = {
+                "title": _reference_title(result, metadata),
+                "file_reference": _reference_file_value(metadata, result),
+                "results": [],
+            }
+        groups[group_key]["results"].append(result)
+    return [groups[group_key] for group_key in order]
+
+
+def _reference_group_key(result: dict[str, Any], metadata: dict[str, Any]) -> str:
+    for value in (
+        _first_metadata_string(metadata, _REFERENCE_URI_KEYS),
+        _first_metadata_string(metadata, _REFERENCE_PATH_KEYS),
+        _string_or_none(metadata.get("document_id")),
+        _string_or_none(metadata.get("title")),
+        _string_or_none(result.get("id")),
+    ):
+        if value:
+            return value
+    return "unknown-source"
+
+
+def _reference_title(result: dict[str, Any], metadata: dict[str, Any]) -> str:
+    return (
+        _string_or_none(metadata.get("title"))
+        or _string_or_none(metadata.get("source_display_name"))
+        or _string_or_none(metadata.get("source_name"))
+        or _string_or_none(metadata.get("source_filename"))
+        or _string_or_none(metadata.get("source_path"))
+        or _string_or_none(result.get("id"))
+        or "Source"
+    )
+
+
+def _reference_file_value(metadata: dict[str, Any], result: dict[str, Any]) -> str:
+    return (
+        _first_metadata_string(metadata, _REFERENCE_URI_KEYS)
+        or _first_metadata_string(metadata, _REFERENCE_PATH_KEYS)
+        or _string_or_none(metadata.get("document_id"))
+        or _string_or_none(result.get("id"))
+        or "Source"
+    )
+
+
+def _first_metadata_string(metadata: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        normalized = _string_or_none(metadata.get(key))
+        if normalized:
+            return normalized
+    return None
+
+
+def _string_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None

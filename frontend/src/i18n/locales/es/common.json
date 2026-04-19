@@ -331,6 +331,11 @@
       "copied": "Copiado",
       "copyFailed": "No se pudo copiar el contenido del mensaje."
     },
+    "references": {
+      "toggle": "Referencias ({{count}})",
+      "file": "Archivo",
+      "pages": "Paginas {{pages}}"
+    },
     "chat": {
       "title": "Espacio de chat",
       "description": "Inicia o continua una conversacion con modelos dentro del workspace compartido."

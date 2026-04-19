@@ -8,6 +8,7 @@ export type {
 } from "./presentation";
 export {
   buildOrdinalTitle,
+  buildPlaygroundKnowledgeReferencesFromSources,
   buildRetrievalPreview,
   formatRetrievalMetadataValue,
   getRetrievalComponentScoreRows,

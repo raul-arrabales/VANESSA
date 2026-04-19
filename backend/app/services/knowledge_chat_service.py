@@ -95,6 +95,7 @@ def run_knowledge_chat(
         "output": result.output,
         "response": result.response,
         "sources": result.sources,
+        "references": result.references,
         "retrieval": result.retrieval,
         "knowledge_base_id": result.knowledge_base_id,
     }, 200

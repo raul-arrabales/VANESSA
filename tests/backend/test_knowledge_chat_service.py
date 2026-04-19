@@ -12,9 +12,23 @@ if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
 
 from app.app import app  # noqa: E402
+from app.application.playground_execution import add_missing_reference_citation  # noqa: E402
 from app.config import AuthConfig  # noqa: E402
 from app.repositories import context_management as context_repo  # noqa: E402
 from app.services import knowledge_chat_bootstrap, knowledge_chat_service  # noqa: E402
+
+
+def test_add_missing_reference_citation_only_when_needed():
+    references = [
+        {"id": "ref-1", "citation_label": "[1]"},
+        {"id": "ref-2", "citation_label": "[2]"},
+        {"id": "ref-3", "citation_label": "[3]"},
+        {"id": "ref-4", "citation_label": "[4]"},
+    ]
+
+    assert add_missing_reference_citation("Answer without citations.", references) == "Answer without citations. [1, 2, 3]"
+    assert add_missing_reference_citation("Answer already cites [2].", references) == "Answer already cites [2]."
+    assert add_missing_reference_citation("Answer without sources.", []) == "Answer without sources."
 
 
 def _config(**overrides) -> AuthConfig:
@@ -126,7 +140,7 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
         )
 
     assert status_code == 200
-    assert payload["output"] == "retrieval answer"
+    assert payload["output"] == "retrieval answer [1]"
     assert payload["knowledge_base_id"] == "kb-primary"
     assert payload["retrieval"] == {
         "index": "knowledge_base",
@@ -151,6 +165,20 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             "score_kind": "similarity",
             "relevance_score": 0.92,
             "relevance_kind": "similarity",
+            "reference_id": "ref-1",
+            "citation_label": "[1]",
+        }
+    ]
+    assert payload["references"] == [
+        {
+            "id": "ref-1",
+            "citation_label": "[1]",
+            "title": "Architecture Overview",
+            "description": "doc",
+            "uri": "https://example.com/architecture",
+            "file_reference": "https://example.com/architecture",
+            "pages": [],
+            "source_ids": ["doc-1"],
         }
     ]
     assert seen_calls == [
@@ -275,6 +303,7 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
 
     assert status_code == 200
     assert payload["sources"] == []
+    assert payload["references"] == []
     assert payload["retrieval"] == {
         "index": "knowledge_base",
         "result_count": 0,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildKnowledgeBaseQueryResult } from "../../context-management/retrievalTestBuilders";
 import {
+  buildPlaygroundKnowledgeReferencesFromSources,
   buildRetrievalPreview,
   getRetrievalComponentScoreRows,
   getRetrievalScoreKind,
@@ -117,5 +118,62 @@ describe("retrieval presentation", () => {
     expect(item.displaySnippet).toBe("Shared snippet from retrieval projection.");
     expect(item.displayScoreKind).toBe("keyword_score");
     expect(item.displayMetadataEntries).toEqual([{ key: "source_name", value: "Docs folder" }]);
+  });
+
+  it("groups playground knowledge sources into file-level references", () => {
+    expect(
+      buildPlaygroundKnowledgeReferencesFromSources([
+        {
+          id: "doc-1#0",
+          title: "Architecture Overview",
+          snippet: "Chunk text should not become the reference description.",
+          metadata: {
+            source_path: "docs/architecture.md",
+            source_name: "Docs folder",
+            page_number: 2,
+          },
+        },
+        {
+          id: "doc-1#1",
+          title: "Architecture Overview",
+          metadata: {
+            source_path: "docs/architecture.md",
+            source_name: "Docs folder",
+            pages: "3, 2",
+          },
+        },
+        {
+          id: "doc-2#0",
+          title: "FAQ",
+          uri: "file:///docs/faq.pdf",
+          metadata: {
+            page_start: 5,
+            page_end: 6,
+            page_count: 20,
+          },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "ref-1",
+        citation_label: "[1]",
+        title: "Architecture Overview",
+        description: "Docs folder",
+        uri: null,
+        file_reference: "docs/architecture.md",
+        pages: [2, 3],
+        source_ids: ["doc-1#0", "doc-1#1"],
+      },
+      {
+        id: "ref-2",
+        citation_label: "[2]",
+        title: "FAQ",
+        description: null,
+        uri: "file:///docs/faq.pdf",
+        file_reference: "file:///docs/faq.pdf",
+        pages: [5, 6],
+        source_ids: ["doc-2#0"],
+      },
+    ]);
   });
 });

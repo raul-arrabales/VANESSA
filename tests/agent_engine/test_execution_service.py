@@ -459,6 +459,8 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     }
     assert seen_llm_messages[0][0]["role"] == "system"
     assert "retrieved text" in seen_llm_messages[0][0]["content"][0]["text"]
+    assert "Reference [1]" in seen_llm_messages[0][0]["content"][0]["text"]
+    assert "bracketed numeric citations such as [1] or [1, 2]" in seen_llm_messages[0][0]["content"][0]["text"]
 
 
 def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch: pytest.MonkeyPatch):

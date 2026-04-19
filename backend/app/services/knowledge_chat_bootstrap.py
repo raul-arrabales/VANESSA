@@ -7,7 +7,10 @@ KNOWLEDGE_CHAT_AGENT_ID = "agent.knowledge_chat"
 _KNOWLEDGE_CHAT_AGENT_SPEC = {
     "name": "Knowledge Chat",
     "description": "Product-facing knowledge-backed chat agent.",
-    "instructions": "Answer using retrieved knowledge when it is relevant and available.",
+    "instructions": (
+        "Answer using retrieved knowledge when it is relevant and available. "
+        "When retrieved sources support an answer, cite them inline with bracketed numeric citations such as [1] or [1, 2]."
+    ),
     "default_model_ref": None,
     "tool_refs": [],
     "runtime_constraints": {

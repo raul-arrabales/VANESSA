@@ -440,8 +440,12 @@ describe("KnowledgePlaygroundPage", () => {
     await userEvent.type(screen.getByLabelText("Message"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
-    expect(await screen.findByText("Architecture Overview")).toBeVisible();
-    expect(screen.getByText("Retrieval uses the shared knowledge corpus.")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "References (1)" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Architecture Overview")).not.toBeInTheDocument();
+    expect(screen.queryByText("Retrieval uses the shared knowledge corpus.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "References (1)" }));
+    expect(screen.getByText("Architecture Overview")).toBeVisible();
+    expect(screen.getByText("Docs folder")).toBeVisible();
     expect(screen.queryByText(/Similarity/i)).not.toBeInTheDocument();
   });
 
@@ -480,7 +484,7 @@ describe("KnowledgePlaygroundPage", () => {
     await userEvent.type(await screen.findByLabelText("Message"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
-    expect(await screen.findByText("Architecture Overview")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "References (1)" })).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: "Copy response" }));
 
     await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("knowledge answer"));

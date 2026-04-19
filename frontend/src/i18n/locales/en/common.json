@@ -336,6 +336,11 @@
       "copied": "Copied",
       "copyFailed": "Unable to copy message content."
     },
+    "references": {
+      "toggle": "References ({{count}})",
+      "file": "File",
+      "pages": "Pages {{pages}}"
+    },
     "chat": {
       "title": "Chat Workspace",
       "description": "Start or continue a model-backed conversation in the shared playground workspace."

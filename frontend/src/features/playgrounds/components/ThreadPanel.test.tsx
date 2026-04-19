@@ -46,6 +46,23 @@ function buildSession(): PlaygroundSessionViewModel {
               relevance_kind: "similarity",
               metadata: { source_name: "Docs folder", ignored_empty: "" },
             },
+            {
+              id: "doc-2",
+              title: "Architecture Overview",
+              text: "Another chunk from the same file that must not appear as a repeated reference.",
+              metadata: { source_path: "docs/architecture.md", page_number: 3 },
+            },
+          ],
+          references: [
+            {
+              id: "ref-1",
+              citation_label: "[1]",
+              title: "Architecture Overview",
+              description: "Docs folder",
+              file_reference: "docs/architecture.md",
+              pages: [2, 3],
+              source_ids: ["doc-1", "doc-2"],
+            },
           ],
         },
         createdAt: "2026-03-18T11:00:01Z",
@@ -85,9 +102,21 @@ describe("ThreadPanel", () => {
     );
 
     expect(screen.getAllByRole("button", { name: "Copy response" })).toHaveLength(1);
-    expect(screen.getByText("Architecture Overview")).toBeVisible();
-    expect(screen.getByText(/A longer retrieval-backed chunk/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "References (1)" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Architecture Overview")).not.toBeInTheDocument();
+    expect(screen.queryByText(/A longer retrieval-backed chunk/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Similarity/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "References (1)" }));
+    });
+
+    expect(screen.getByRole("button", { name: "References (1)" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Architecture Overview")).toBeVisible();
+    expect(screen.getByText("Docs folder")).toBeVisible();
+    expect(screen.getByText("docs/architecture.md")).toBeVisible();
+    expect(screen.getByText("Pages 2, 3")).toBeVisible();
+    expect(screen.queryByText(/A longer retrieval-backed chunk/)).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Copy response" }));

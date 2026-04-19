@@ -1,27 +1,50 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from app.services.context_management_ingestion import _parse_source_documents
+from app.services import context_management_ingestion
 
 
-def test_parse_source_documents_merges_source_metadata(tmp_path: Path) -> None:
-    source_file = tmp_path / "guide.txt"
-    source_file.write_text("Hello world", encoding="utf-8")
+def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
+    class _FakePage:
+        def __init__(self, text: str):
+            self._text = text
 
-    payload = _parse_source_documents(
-        source_file,
-        relative_path="guides/guide.txt",
-        source={
-            "display_name": "Docs folder",
-            "metadata_json": {
-                "category": "guide",
-                "published": True,
-            },
-        },
+        def extract_text(self) -> str:
+            return self._text
+
+    class _FakeReader:
+        is_encrypted = False
+        pages = [_FakePage("First page text"), _FakePage(""), _FakePage("Third page text")]
+
+        def __init__(self, _stream):
+            pass
+
+    monkeypatch.setattr(
+        context_management_ingestion,
+        "_get_pdf_reader_dependencies",
+        lambda: (_FakeReader, (ValueError,)),
     )
 
-    assert payload[0]["metadata"]["category"] == "guide"
-    assert payload[0]["metadata"]["published"] is True
-    assert payload[0]["metadata"]["source_path"] == "guides/guide.txt"
-    assert payload[0]["metadata"]["source_display_name"] == "Docs folder"
+    document = context_management_ingestion._extract_pdf_document(  # type: ignore[attr-defined]
+        "architecture.pdf",
+        b"%PDF",
+        default_source_type="upload",
+        default_source_name="architecture.pdf",
+        invalid_pdf_code="invalid_upload_pdf",
+        details_key="filename",
+    )
+
+    assert document == {
+        "title": "architecture",
+        "source_type": "upload",
+        "source_name": "architecture.pdf",
+        "uri": None,
+        "text": "First page text\n\nThird page text",
+        "metadata": {
+            "page_count": 3,
+            "source_filename": "architecture.pdf",
+        },
+        "page_texts": [
+            {"page_number": 1, "text": "First page text"},
+            {"page_number": 3, "text": "Third page text"},
+        ],
+    }

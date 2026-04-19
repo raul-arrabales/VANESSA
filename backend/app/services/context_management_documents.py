@@ -13,6 +13,7 @@ from .context_management_serialization import (
     _serialize_knowledge_base,
 )
 from .context_management_shared import (
+    _chunk_knowledge_base_page_texts,
     _chunk_knowledge_base_text,
     _delete_document_chunks,
     _mark_knowledge_base_sync_error,
@@ -55,7 +56,12 @@ def create_knowledge_base_document(
         dict(knowledge_base.get("schema_json") or {}),
         normalized["metadata"],
     )
-    chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
+    chunks = _chunk_document_payload(
+        database_url,
+        knowledge_base=knowledge_base,
+        text=normalized["text"],
+        page_texts=payload.get("page_texts"),
+    )
     document = context_repo.create_document(
         database_url,
         document_id=document_id,
@@ -125,7 +131,12 @@ def update_knowledge_base_document(
         normalized["metadata"],
         existing_metadata=dict(existing.get("metadata_json") or {}),
     )
-    chunks = _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=normalized["text"])
+    chunks = _chunk_document_payload(
+        database_url,
+        knowledge_base=knowledge_base,
+        text=normalized["text"],
+        page_texts=payload.get("page_texts"),
+    )
     try:
         _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
         updated = context_repo.update_document(
@@ -252,11 +263,30 @@ def upload_knowledge_base_documents(
                             **dict(parsed_document.get("metadata") or {}),
                             **normalized_batch_metadata,
                         },
+                        "page_texts": list(parsed_document.get("page_texts") or []),
                     },
                     created_by_user_id=created_by_user_id,
                 )
             )
     return {"documents": created_documents, "count": len(created_documents)}
+
+
+def _chunk_document_payload(
+    database_url: str,
+    *,
+    knowledge_base: dict[str, Any],
+    text: str,
+    page_texts: Any,
+):
+    if isinstance(page_texts, list) and page_texts:
+        page_chunks = _chunk_knowledge_base_page_texts(
+            database_url,
+            knowledge_base=knowledge_base,
+            page_texts=page_texts,
+        )
+        if page_chunks:
+            return page_chunks
+    return _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=text)
 
 
 def resync_knowledge_base(

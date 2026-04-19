@@ -306,6 +306,7 @@ def test_weaviate_vector_store_adapter_ensure_index_creates_schema(monkeypatch: 
                     {"name": "document_id", "dataType": ["text"]},
                     {"name": "text", "dataType": ["text"]},
                     {"name": "metadata_json", "dataType": ["text"]},
+                    {"name": "page_number", "dataType": ["int"]},
                     {"name": "category", "dataType": ["text"]},
                 ],
             },
@@ -591,6 +592,11 @@ def test_qdrant_vector_store_adapter_ensure_index_creates_collection_and_text_in
         (
             "http://qdrant:6333/collections/knowledge_base/index",
             "PUT",
+            {"field_name": "page_number", "field_schema": "integer"},
+        ),
+        (
+            "http://qdrant:6333/collections/knowledge_base/index",
+            "PUT",
             {
                 "field_name": "text",
                 "field_schema": {
@@ -705,7 +711,10 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
             }
         ],
     }
-    assert calls[2] == (
+    points_call = next(call for call in calls if call[0].endswith("/collections/knowledge_base/points") and call[1] == "PUT")
+    vector_search_call = next(call for call in calls if call[0].endswith("/collections/knowledge_base/points/search"))
+    text_scroll_call = next(call for call in calls if call[0].endswith("/collections/knowledge_base/points/scroll"))
+    assert points_call == (
         "http://qdrant:6333/collections/knowledge_base/points",
         "PUT",
         {
@@ -723,14 +732,14 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
             ]
         },
     )
-    assert calls[3][2] == {
+    assert vector_search_call[2] == {
         "vector": [0.1, 0.2],
         "limit": 3,
         "filter": {"must": [{"key": "tenant", "match": {"value": "ops"}}]},
         "with_payload": True,
         "with_vector": False,
     }
-    assert calls[4][2] == {
+    assert text_scroll_call[2] == {
         "limit": 2,
         "filter": {
             "must": [

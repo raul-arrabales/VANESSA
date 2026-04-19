@@ -1589,6 +1589,7 @@ def _build_weaviate_schema_properties(schema: dict[str, Any]) -> list[dict[str, 
         {"name": "document_id", "dataType": ["text"]},
         {"name": "text", "dataType": ["text"]},
         {"name": "metadata_json", "dataType": ["text"]},
+        {"name": "page_number", "dataType": ["int"]},
     ]
     raw_properties = schema.get("properties")
     if not isinstance(raw_properties, list):
@@ -1601,7 +1602,7 @@ def _build_weaviate_schema_properties(schema: dict[str, Any]) -> list[dict[str, 
         data_type = str(item.get("data_type", "text")).strip().lower() or "text"
         if data_type not in {"text", "number", "int", "boolean"}:
             raise PlatformControlPlaneError("invalid_schema_property_type", "Unsupported schema property type", status_code=400)
-        if name in {"document_id", "text", "metadata_json"}:
+        if name in {"document_id", "text", "metadata_json", "page_number"}:
             continue
         properties.append({"name": name, "dataType": [_weaviate_data_type(data_type)]})
     return properties
@@ -1836,6 +1837,7 @@ def _qdrant_result_ok(payload: dict[str, Any] | None, status_code: int) -> bool:
 
 def _qdrant_field_indexes(schema: dict[str, Any]) -> dict[str, Any]:
     field_indexes: dict[str, Any] = {
+        "page_number": "integer",
         "text": {
             "type": "text",
             "tokenizer": "word",
@@ -1847,7 +1849,7 @@ def _qdrant_field_indexes(schema: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(item, dict):
             continue
         field_name = _coerce_metadata_key(str(item.get("name", "")))
-        if field_name in {"document_id", "text", "metadata_json", "metadata"}:
+        if field_name in {"document_id", "text", "metadata_json", "metadata", "page_number"}:
             continue
         data_type = str(item.get("data_type", "text")).strip().lower() or "text"
         if data_type == "boolean":

@@ -554,6 +554,7 @@ def _persist_execution_result(
         assistant_metadata = {
             "response": result.response,
             "sources": result.sources,
+            "references": result.references,
             "retrieval": result.retrieval,
             "knowledge_base_id": result.knowledge_base_id,
         }
@@ -760,6 +761,7 @@ def _serialize_execution_response(
         "output": result.output,
         "response": result.response,
         "sources": result.sources,
+        "references": result.references,
         "retrieval": result.retrieval,
     }
 
@@ -774,6 +776,7 @@ def _serialize_temporary_execution_response(
         metadata = {
             "response": result.response,
             "sources": result.sources,
+            "references": result.references,
             "retrieval": result.retrieval,
             "knowledge_base_id": result.knowledge_base_id,
         }
@@ -801,6 +804,7 @@ def _serialize_temporary_execution_response(
         "output": result.output,
         "response": result.response,
         "sources": result.sources,
+        "references": result.references,
         "retrieval": result.retrieval,
     }
 

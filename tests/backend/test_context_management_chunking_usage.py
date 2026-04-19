@@ -15,6 +15,7 @@ def _knowledge_base() -> dict[str, object]:
                 {"name": "published", "data_type": "boolean"},
                 {"name": "source_path", "data_type": "text"},
                 {"name": "source_display_name", "data_type": "text"},
+                {"name": "page_count", "data_type": "int"},
             ]
         },
         "chunking_strategy": "fixed_length",
@@ -179,6 +180,80 @@ def test_update_knowledge_base_document_uses_chunking_context(monkeypatch):
     }
     assert upserted["chunks"] == ["chunk-1", "chunk-2", "chunk-3"]
     assert document["chunk_count"] == 3
+
+
+def test_upload_knowledge_base_documents_chunks_pdf_pages_with_page_metadata(monkeypatch):
+    created: dict[str, object] = {}
+    upserted: dict[str, object] = {}
+    knowledge_base = _knowledge_base()
+
+    monkeypatch.setattr(context_management_documents, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_documents, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_mark_knowledge_base_sync_ready", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_refresh_document_count", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents,
+        "_parse_upload_documents",
+        lambda _file_storage: [
+            {
+                "title": "PDF Doc",
+                "source_type": "upload",
+                "source_name": "guide.pdf",
+                "uri": None,
+                "text": "First page\n\nSecond page",
+                "metadata": {"page_count": 2},
+                "page_texts": [
+                    {"page_number": 1, "text": "First page"},
+                    {"page_number": 2, "text": "Second page"},
+                ],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_chunk_knowledge_base_page_texts",
+        lambda *_args, **_kwargs: [
+            {"text": "first-page-chunk", "metadata": {"page_number": 1}},
+            {"text": "second-page-chunk", "metadata": {"page_number": 2}},
+        ],
+    )
+
+    def _create_document(_database_url: str, **kwargs):
+        created.update(kwargs)
+        return {
+            "id": kwargs["document_id"],
+            "knowledge_base_id": kwargs["knowledge_base_id"],
+            "title": kwargs["title"],
+            "text": kwargs["text"],
+            "chunk_count": kwargs["chunk_count"],
+            "metadata_json": kwargs["metadata_json"],
+        }
+
+    monkeypatch.setattr(context_management_documents.context_repo, "create_document", _create_document)
+    monkeypatch.setattr(
+        context_management_documents,
+        "_upsert_document_chunks",
+        lambda _database_url, _config, *, knowledge_base, document, chunks: upserted.update(
+            {"knowledge_base": knowledge_base, "document": document, "chunks": chunks}
+        ),
+    )
+
+    payload = context_management_documents.upload_knowledge_base_documents(
+        "postgresql://ignored",
+        config=object(),
+        knowledge_base_id="kb-primary",
+        files=[object()],
+        metadata={},
+        created_by_user_id=7,
+    )
+
+    assert created["chunk_count"] == 2
+    assert upserted["chunks"] == [
+        {"text": "first-page-chunk", "metadata": {"page_number": 1}},
+        {"text": "second-page-chunk", "metadata": {"page_number": 2}},
+    ]
+    assert payload["count"] == 1
 
 
 def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
@@ -348,4 +423,80 @@ def test_source_sync_uses_chunking_context(monkeypatch):
         "source_path": "docs/source.txt",
         "source_display_name": "Docs folder",
     }
+    assert summary["created_document_count"] == 1
+
+
+def test_source_sync_chunks_pdf_pages_with_page_metadata(monkeypatch):
+    upserted_chunk_lists: list[list[object]] = []
+
+    monkeypatch.setattr(
+        context_management_sources,
+        "_iter_source_files",
+        lambda *_args, **_kwargs: [(Path("/tmp/source.pdf"), "docs/source.pdf")],
+    )
+    monkeypatch.setattr(
+        context_management_sources,
+        "_parse_source_documents",
+        lambda *_args, **_kwargs: [
+            {
+                "title": "Source PDF",
+                "source_type": "local_directory",
+                "source_name": "Docs folder",
+                "uri": None,
+                "text": "Page one\n\nPage two",
+                "metadata": {
+                    "category": "guide",
+                    "source_path": "docs/source.pdf",
+                },
+                "page_texts": [
+                    {"page_number": 1, "text": "Page one"},
+                    {"page_number": 2, "text": "Page two"},
+                ],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_sources,
+        "_chunk_knowledge_base_page_texts",
+        lambda *_args, **_kwargs: [
+            {"text": "page-one-chunk", "metadata": {"page_number": 1}},
+            {"text": "page-two-chunk", "metadata": {"page_number": 2}},
+        ],
+    )
+    monkeypatch.setattr(context_management_sources.context_repo, "get_document_by_source_key", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_sources.context_repo,
+        "create_document",
+        lambda _database_url, **kwargs: {
+            "id": kwargs["document_id"],
+            "chunk_count": kwargs["chunk_count"],
+            "metadata_json": kwargs["metadata_json"],
+        },
+    )
+    monkeypatch.setattr(
+        context_management_sources,
+        "_upsert_document_chunks",
+        lambda _database_url, _config, *, knowledge_base, document, chunks: upserted_chunk_lists.append(chunks),
+    )
+    monkeypatch.setattr(context_management_sources.context_repo, "list_source_documents", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(context_management_sources, "_refresh_document_count", lambda *_args, **_kwargs: None)
+
+    summary = context_management_sources._sync_knowledge_source_documents(
+        "postgresql://ignored",
+        object(),
+        knowledge_base=_knowledge_base(),
+        source={
+            "id": "source-1",
+            "display_name": "Docs folder",
+            "include_globs": ["**/*.pdf"],
+            "exclude_globs": [],
+        },
+        source_directory=Path("/tmp"),
+        updated_by_user_id=10,
+    )
+
+    assert upserted_chunk_lists == [[
+        {"text": "page-one-chunk", "metadata": {"page_number": 1}},
+        {"text": "page-two-chunk", "metadata": {"page_number": 2}},
+    ]]
     assert summary["created_document_count"] == 1
