@@ -7,7 +7,7 @@ import type { ModelCredential } from "../../../api/modelops/types";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { usePlatformProvidersData } from "../hooks/usePlatformProvidersData";
-import { DEFAULT_PROVIDER_FORM, parseJsonObject, updateSecretRefsCredential } from "../providerForm";
+import { DEFAULT_PROVIDER_FORM, normalizeOptionalUrl, parseJsonObject, updateSecretRefsCredential } from "../providerForm";
 import PlatformProviderForm from "./PlatformProviderForm";
 
 export default function PlatformProviderCreatePanel(): JSX.Element {
@@ -93,7 +93,7 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
           display_name: form.displayName,
           description: form.description,
           endpoint_url: form.endpointUrl,
-          healthcheck_url: form.healthcheckUrl || null,
+          healthcheck_url: normalizeOptionalUrl(form.healthcheckUrl),
           enabled: form.enabled,
           config,
           secret_refs: secretRefs,

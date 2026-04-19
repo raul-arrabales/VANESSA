@@ -14,7 +14,7 @@ import { listModelCredentials } from "../../../api/modelops/credentials";
 import type { ManagedModel, ModelCredential } from "../../../api/modelops/types";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { getActiveDeployment } from "../platformTopology";
-import { buildProviderForm, parseJsonObject, type ProviderFormState } from "../providerForm";
+import { buildProviderForm, normalizeOptionalUrl, parseJsonObject, type ProviderFormState } from "../providerForm";
 import { buildProviderLoadDisplayData, type StoredProviderLoadStatus } from "../providerLoad";
 import { usePlatformProviderLoadState } from "./usePlatformProviderLoadState";
 import { usePlatformProvidersData } from "./usePlatformProvidersData";
@@ -195,7 +195,7 @@ export function usePlatformProviderDetail({
           display_name: form.displayName,
           description: form.description,
           endpoint_url: form.endpointUrl,
-          healthcheck_url: form.healthcheckUrl || null,
+          healthcheck_url: normalizeOptionalUrl(form.healthcheckUrl),
           enabled: form.enabled,
           config,
           secret_refs: secretRefs,

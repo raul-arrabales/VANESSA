@@ -28,8 +28,48 @@ export const DEFAULT_PROVIDER_FORM: ProviderFormState = {
   secretRefsText: "{}",
 };
 
+const OPENAI_COMPATIBLE_CLOUD_PROVIDER_KEYS = new Set([
+  "openai_compatible_cloud_llm",
+  "openai_compatible_cloud_embeddings",
+]);
+
+export const OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS = {
+  endpointUrl: "https://api.openai.com/v1",
+  healthcheckUrl: "None",
+  configText: stringifyJson({
+    models_path: "/models",
+  }),
+};
+
 export function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
   return JSON.stringify(value, null, 2);
+}
+
+export function isOpenAICompatibleCloudProvider(providerKey: string): boolean {
+  return OPENAI_COMPATIBLE_CLOUD_PROVIDER_KEYS.has(providerKey.trim().toLowerCase());
+}
+
+export function applyProviderFamilyDefaults(form: ProviderFormState, providerKey: string): ProviderFormState {
+  if (!isOpenAICompatibleCloudProvider(providerKey)) {
+    return {
+      ...form,
+      providerKey,
+    };
+  }
+
+  return {
+    ...form,
+    providerKey,
+    ...OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  };
+}
+
+export function normalizeOptionalUrl(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized || normalized.toLowerCase() === "none" || normalized.toLowerCase() === "null") {
+    return null;
+  }
+  return normalized;
 }
 
 export function parseJsonObject(text: string, errorMessage: string): Record<string, unknown> {

@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ModelCredential } from "../../../api/modelops/types";
 import type { PlatformProviderFamily } from "../../../api/platform";
-import { updateSecretRefsCredential, type ProviderFormState } from "../providerForm";
+import { applyProviderFamilyDefaults, updateSecretRefsCredential, type ProviderFormState } from "../providerForm";
 
 type PlatformProviderFormProps = {
   value: ProviderFormState;
@@ -57,7 +57,7 @@ export default function PlatformProviderForm({
             className="field-input"
             value={value.providerKey}
             disabled={familyDisabled}
-            onChange={(event) => onChange({ ...value, providerKey: event.target.value })}
+            onChange={(event) => onChange(applyProviderFamilyDefaults(value, event.target.value))}
           >
             <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
             {providerFamilies.map((family) => (

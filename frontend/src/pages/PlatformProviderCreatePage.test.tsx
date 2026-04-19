@@ -124,19 +124,29 @@ describe("PlatformProviderCreatePage", () => {
       await screen.findByLabelText(await t("platformControl.forms.provider.family")),
       "openai_compatible_cloud_llm",
     );
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.endpoint"))).toHaveValue("https://api.openai.com/v1");
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.healthcheck"))).toHaveValue("None");
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.config"))).toHaveValue(
+      JSON.stringify({ models_path: "/models" }, null, 2),
+    );
+
     await userEvent.selectOptions(
       await screen.findByLabelText(await t("platformControl.forms.provider.savedCredential")),
       "00000000-0000-0000-0000-000000000001",
     );
     await userEvent.type(screen.getByLabelText(await t("platformControl.forms.provider.slug")), "openai-cloud");
     await userEvent.type(screen.getByLabelText(await t("platformControl.forms.provider.displayName")), "OpenAI Cloud");
-    await userEvent.type(screen.getByLabelText(await t("platformControl.forms.provider.endpoint")), "https://api.openai.com/v1");
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.createProvider") }));
 
     await waitFor(() => {
       expect(platformApi.createPlatformProvider).toHaveBeenCalledWith(
         expect.objectContaining({
           provider_key: "openai_compatible_cloud_llm",
+          endpoint_url: "https://api.openai.com/v1",
+          healthcheck_url: null,
+          config: {
+            models_path: "/models",
+          },
           secret_refs: {
             api_key: "modelops://credential/00000000-0000-0000-0000-000000000001",
           },
