@@ -56,6 +56,24 @@ def _binding_configuration_status(
             issues.append(_issue("resources_missing", "At least one model resource must be bound."))
         elif not default_resource_id:
             issues.append(_issue("default_resource_missing", "Select a default model resource."))
+        provider_origin = str(binding.get("provider_origin") or "local").strip().lower()
+        for resource in resources:
+            metadata = dict(resource.get("metadata") or {})
+            backend = str(metadata.get("backend") or "").strip().lower()
+            if provider_origin == "cloud" and backend and backend != "external_api":
+                issues.append(
+                    _issue(
+                        "resource_provider_origin_mismatch",
+                        f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is local and cannot be served by a cloud provider.",
+                    )
+                )
+            elif provider_origin != "cloud" and backend and backend != "local":
+                issues.append(
+                    _issue(
+                        "resource_provider_origin_mismatch",
+                        f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is cloud-hosted and cannot be served by a local provider.",
+                    )
+                )
     elif capability_key == CAPABILITY_VECTOR_STORE:
         resource_policy = dict(binding.get("resource_policy") or {})
         selection_mode = str(resource_policy.get("selection_mode") or "explicit").strip().lower()

@@ -2900,6 +2900,44 @@ def test_list_deployment_profiles_preserves_model_resources_during_bootstrap(
     assert binding["resources"][0]["managed_model_id"] == "model-1"
 
 
+def test_bootstrap_binding_preserves_existing_model_provider_with_resources(monkeypatch: pytest.MonkeyPatch):
+    captured: dict[str, object] = {}
+    resource = {
+        "id": "gpt-5-nano",
+        "resource_kind": "model",
+        "ref_type": "managed_model",
+        "managed_model_id": "gpt-5-nano",
+        "provider_resource_id": "gpt-5-nano",
+        "display_name": "GPT-5 nano",
+    }
+
+    def _upsert_deployment_binding(_db, **kwargs):
+        captured.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(platform_bootstrap.platform_repo, "upsert_deployment_binding", _upsert_deployment_binding)
+
+    platform_bootstrap._upsert_bootstrap_binding(  # type: ignore[attr-defined]
+        "ignored",
+        deployment_profile_id="local-default-id",
+        capability_key="llm_inference",
+        provider_instance_id="vllm-local-id",
+        resources=[],
+        default_resource_id=None,
+        binding_config={},
+        resource_policy={},
+        existing_binding={
+            "provider_instance_id": "openai-cloud-id",
+            "resources": [resource],
+            "default_resource_id": "gpt-5-nano",
+        },
+    )
+
+    assert captured["provider_instance_id"] == "openai-cloud-id"
+    assert captured["resources"] == [resource]
+    assert captured["default_resource_id"] == "gpt-5-nano"
+
+
 @pytest.mark.parametrize(
     ("existing_resources", "existing_default_resource_id", "existing_resource_policy"),
     [

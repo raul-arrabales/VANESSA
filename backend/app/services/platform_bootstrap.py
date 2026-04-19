@@ -41,9 +41,14 @@ def _upsert_bootstrap_binding(
     resource_policy: dict[str, Any],
     existing_binding: dict[str, Any] | None = None,
 ) -> None:
+    effective_provider_instance_id = provider_instance_id
     effective_resources = [dict(resource) for resource in resources if isinstance(resource, dict)]
     effective_default_resource_id = default_resource_id
     effective_resource_policy = dict(resource_policy)
+    if isinstance(existing_binding, dict):
+        existing_provider_instance_id = str(existing_binding.get("provider_instance_id") or "").strip()
+        if existing_provider_instance_id:
+            effective_provider_instance_id = existing_provider_instance_id
     if (
         capability_key in _MODEL_BEARING_CAPABILITIES
         and not effective_resources
@@ -77,7 +82,7 @@ def _upsert_bootstrap_binding(
         database_url,
         deployment_profile_id=deployment_profile_id,
         capability_key=capability_key,
-        provider_instance_id=provider_instance_id,
+        provider_instance_id=effective_provider_instance_id,
         resources=effective_resources,
         default_resource_id=effective_default_resource_id,
         binding_config=binding_config,

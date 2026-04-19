@@ -9,6 +9,7 @@ def _binding(
     capability_key: str,
     *,
     provider_instance_id: str | None = None,
+    provider_origin: str = "local",
     enabled: bool = True,
     resources: list[dict[str, object]] | None = None,
     default_resource_id: str | None = None,
@@ -20,6 +21,7 @@ def _binding(
         "provider_instance_id": provider_instance_id or f"{capability_key}-provider",
         "provider_slug": f"{capability_key}-provider",
         "provider_key": f"{capability_key}_provider",
+        "provider_origin": provider_origin,
         "provider_display_name": capability_key,
         "provider_description": "desc",
         "endpoint_url": "http://example.invalid",
@@ -45,6 +47,7 @@ def _model_resource(
     model_id: str,
     *,
     provider_resource_id: str,
+    backend: str = "local",
 ) -> dict[str, object]:
     return {
         "id": model_id,
@@ -54,6 +57,7 @@ def _model_resource(
         "provider_resource_id": provider_resource_id,
         "display_name": model_id,
         "metadata": {
+            "backend": backend,
             "provider_model_id": provider_resource_id,
             "task_key": "embeddings",
         },
@@ -100,6 +104,47 @@ def test_compute_status_marks_model_binding_incomplete_without_default():
 
     assert binding_statuses["embeddings"]["is_ready"] is False
     assert binding_statuses["embeddings"]["issues"][0]["code"] == "default_resource_missing"
+
+
+def test_compute_status_marks_local_provider_with_cloud_model_incomplete():
+    binding_statuses, deployment_status = platform_deployment_status.compute_deployment_configuration_status(
+        "ignored",
+        bindings=[
+            _binding(
+                "llm_inference",
+                provider_origin="local",
+                resources=[
+                    _model_resource("gpt-5-nano", provider_resource_id="gpt-5-nano", backend="external_api"),
+                ],
+                default_resource_id="gpt-5-nano",
+            ),
+        ],
+    )
+
+    issue_codes = {issue["code"] for issue in binding_statuses["llm_inference"]["issues"]}
+    assert "resource_provider_origin_mismatch" in issue_codes
+    assert binding_statuses["llm_inference"]["is_ready"] is False
+    assert deployment_status["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+
+
+def test_compute_status_marks_cloud_provider_with_local_model_incomplete():
+    binding_statuses, _deployment_status = platform_deployment_status.compute_deployment_configuration_status(
+        "ignored",
+        bindings=[
+            _binding(
+                "embeddings",
+                provider_origin="cloud",
+                resources=[
+                    _model_resource("minilm-local", provider_resource_id="/models/minilm", backend="local"),
+                ],
+                default_resource_id="minilm-local",
+            ),
+        ],
+    )
+
+    issue_codes = {issue["code"] for issue in binding_statuses["embeddings"]["issues"]}
+    assert "resource_provider_origin_mismatch" in issue_codes
+    assert binding_statuses["embeddings"]["is_ready"] is False
 
 
 def test_compute_status_marks_vector_binding_incomplete_without_kbs():
