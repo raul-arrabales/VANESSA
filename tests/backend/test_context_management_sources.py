@@ -172,6 +172,7 @@ def test_sync_knowledge_source_persists_and_raises_the_same_chunking_failure(mon
     assert str(exc_info.value) == "Unable to sync source 'Patient Guides': chunk length 300 exceeds the safe maximum 254 tokens."
     assert persisted["finished_run"]["error_summary"] == "Unable to sync source 'Patient Guides': chunk length 300 exceeds the safe maximum 254 tokens."
     assert persisted["source_result"]["last_sync_error"] == "Unable to sync source 'Patient Guides': chunk length 300 exceeds the safe maximum 254 tokens."
+    assert persisted["kb_error"]["summary"] == "Unable to sync source 'Patient Guides': chunk length 300 exceeds the safe maximum 254 tokens."
 
 
 def test_sync_knowledge_source_wraps_unexpected_exception_with_persisted_message(monkeypatch: pytest.MonkeyPatch):
@@ -240,6 +241,7 @@ def test_sync_knowledge_source_wraps_unexpected_exception_with_persisted_message
     assert exc_info.value.details["original_exception_message"] is None
     assert persisted["finished_run"]["error_summary"] == "Knowledge source sync failed."
     assert persisted["source_result"]["last_sync_error"] == "Knowledge source sync failed."
+    assert persisted["kb_error"]["summary"] == "Knowledge source sync failed."
 
 
 def test_sync_knowledge_source_persists_precise_embeddings_failure_message(monkeypatch: pytest.MonkeyPatch):
@@ -315,3 +317,4 @@ def test_sync_knowledge_source_persists_precise_embeddings_failure_message(monke
     )
     assert persisted["finished_run"]["error_summary"] == str(exc_info.value)
     assert persisted["source_result"]["last_sync_error"] == str(exc_info.value)
+    assert persisted["kb_error"]["summary"] == str(exc_info.value)

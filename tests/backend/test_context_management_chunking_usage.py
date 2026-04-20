@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services import context_management_documents, context_management_sources
+from app.services import context_management_documents, context_management_source_reparse, context_management_sources
 
 
 def _knowledge_base() -> dict[str, object]:
@@ -575,12 +575,12 @@ def test_full_resync_reparses_source_managed_pdf_pages_for_chunk_metadata(monkey
         },
     )
     monkeypatch.setattr(
-        context_management_documents,
+        context_management_source_reparse,
         "_resolve_source_directory",
         lambda *_args, **_kwargs: ("product_docs", Path("/tmp/product_docs")),
     )
     monkeypatch.setattr(
-        context_management_documents,
+        context_management_source_reparse,
         "_parse_source_documents",
         lambda *_args, **_kwargs: [
             {
@@ -598,7 +598,7 @@ def test_full_resync_reparses_source_managed_pdf_pages_for_chunk_metadata(monkey
         ],
     )
     monkeypatch.setattr(
-        context_management_documents,
+        context_management_source_reparse,
         "_chunk_knowledge_base_page_texts",
         lambda *_args, **_kwargs: [
             {"text": "page-one-chunk", "metadata": {"page_number": 1}},

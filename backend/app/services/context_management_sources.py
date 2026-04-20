@@ -419,7 +419,7 @@ def perform_knowledge_source_sync_run(
             database_url,
             knowledge_base_id=knowledge_base_id,
             updated_by_user_id=updated_by_user_id,
-            summary=f"Source '{source['display_name']}' sync failed.",
+            summary=normalized_failure.message,
         )
         raise PlatformControlPlaneError(
             normalized_failure.error.code,

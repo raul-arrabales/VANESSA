@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .context_management_types import ParsedIngestionDocument, ParsedIngestionPage, _SUPPORTED_UPLOAD_EXTENSIONS
+from .context_management_metadata import with_pdf_page_chunking_marker
 from .platform_types import PlatformControlPlaneError
 
 
@@ -206,11 +207,10 @@ def extract_pdf_document(
         "source_name": default_source_name,
         "uri": None,
         "text": text,
-        "metadata": {
+        "metadata": with_pdf_page_chunking_marker({
             "page_count": page_count,
             "source_filename": Path(filename).name,
-            "_page_chunking_version": 1,
-        },
+        }),
         "page_texts": extracted_pages,
     }
 

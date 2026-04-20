@@ -9,6 +9,7 @@ from .context_management_chunking import (
     serialize_knowledge_base_chunking,
 )
 from .context_management_chunking_compatibility import assert_knowledge_base_chunking_compatible
+from .context_management_metadata import is_internal_metadata_key
 from .context_management_shared import _is_knowledge_base_eligible, _normalize_source_relative_path
 from .context_management_types import (
     _KB_LIFECYCLE_STATES,
@@ -199,7 +200,7 @@ def _normalize_schema_managed_metadata(
     normalized: dict[str, Any] = {}
     for key, value in metadata.items():
         property_name = str(key or "").strip()
-        if property_name.startswith("_"):
+        if is_internal_metadata_key(property_name):
             normalized[property_name] = value
             continue
         property_type = schema_properties.get(property_name)

@@ -14,6 +14,8 @@ from .context_management_chunking import (
     resolve_knowledge_base_tokenizer,
 )
 from .context_management_chunking_compatibility import assert_knowledge_base_chunking_compatible
+from .context_management_metadata import public_chunk_metadata
+from .context_management_sync_errors import sync_error_summary
 from .context_management_types import (
     KnowledgeTextChunk,
     KnowledgeBaseRecord,
@@ -183,16 +185,8 @@ def _build_chunk_metadata(
     chunk_index: int,
     chunk_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    document_metadata = {
-        str(key): value
-        for key, value in dict(document.get("metadata_json") or document.get("metadata") or {}).items()
-        if not str(key).strip().startswith("_")
-    }
-    normalized_chunk_metadata = {
-        str(key): value
-        for key, value in dict(chunk_metadata or {}).items()
-        if not str(key).strip().startswith("_")
-    }
+    document_metadata = public_chunk_metadata(document.get("metadata_json") or document.get("metadata") or {})
+    normalized_chunk_metadata = public_chunk_metadata(chunk_metadata)
     built_in_metadata = {
         "knowledge_base_id": str(knowledge_base["id"]),
         "document_id": str(document["id"]),
@@ -226,7 +220,10 @@ def normalize_knowledge_source_sync_failure(
     sync_run_id: str,
     fallback_message: str = "Knowledge source sync failed.",
 ) -> SourceSyncFailure:
-    normalized_message = str(exc).strip() or fallback_message.strip() or "Knowledge source sync failed."
+    normalized_message = sync_error_summary(
+        exc,
+        fallback=fallback_message.strip() or "Knowledge source sync failed.",
+    )
     normalized_details = {
         "source_id": source_id,
         "source_display_name": source_display_name,
