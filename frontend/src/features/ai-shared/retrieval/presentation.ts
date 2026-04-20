@@ -32,6 +32,7 @@ export type RetrievalDisplaySource = {
   } | null;
   score?: number | null;
   score_kind?: string | null;
+  file_url?: string | null;
 };
 
 export type RetrievalDisplayItem<TSource extends RetrievalDisplaySource = RetrievalDisplaySource> = {
@@ -42,6 +43,7 @@ export type RetrievalDisplayItem<TSource extends RetrievalDisplaySource = Retrie
   displayScoreKind: RetrievalScoreKind;
   displayScoreValue: number | null;
   displayMetadataEntries: RetrievalMetadataEntry[];
+  displayPages: number[];
   displayOrdinal: number | null;
   displayComponentScoreRows: RetrievalComponentScoreRow[];
   isExpandable: boolean;
@@ -100,6 +102,7 @@ export function getVisibleRetrievalMetadataEntries(
   metadata: Record<string, unknown>,
 ): RetrievalMetadataEntry[] {
   return Object.entries(metadata)
+    .filter(([key]) => !key.startsWith("_"))
     .filter(([, value]) => value !== null && value !== undefined && !(typeof value === "string" && value.trim() === ""))
     .map(([key, value]) => ({ key, value: formatRetrievalMetadataValue(value) }))
     .filter(({ value }) => value !== undefined && value !== "undefined");
@@ -149,6 +152,7 @@ export function mapRetrievalSourceToDisplayItem<TSource extends RetrievalDisplay
     ? source.snippet
     : buildRetrievalPreview(text, options?.previewTokenCount);
   const metadata = source.metadata ?? {};
+  const displayPages = [...metadataPageNumbers(metadata)].sort((left, right) => left - right);
   const displayScoreValue = typeof source.relevance_score === "number"
     ? source.relevance_score
     : (typeof source.score === "number" ? source.score : null);
@@ -161,6 +165,7 @@ export function mapRetrievalSourceToDisplayItem<TSource extends RetrievalDisplay
     displayScoreKind: getRetrievalScoreKind(source),
     displayScoreValue,
     displayMetadataEntries: getVisibleRetrievalMetadataEntries(metadata),
+    displayPages,
     displayOrdinal,
     displayComponentScoreRows: getRetrievalComponentScoreRows(source),
     isExpandable: text.trim().length > 0,
@@ -194,6 +199,7 @@ export function buildPlaygroundKnowledgeReferencesFromSources(
     description: string | null;
     uri: string | null;
     fileReference: string | null;
+    fileUrl: string | null;
     pages: Set<number>;
     sourceIds: string[];
   }>();
@@ -207,6 +213,7 @@ export function buildPlaygroundKnowledgeReferencesFromSources(
         description: referenceDescription(source, metadata),
         uri: stringOrNull(source.uri) ?? firstMetadataString(metadata, REFERENCE_URI_KEYS),
         fileReference: referenceFileValue(source, metadata),
+        fileUrl: stringOrNull(source.file_url) ?? stringOrNull(metadata.file_url),
         pages: new Set<number>(),
         sourceIds: [],
       });
@@ -214,6 +221,9 @@ export function buildPlaygroundKnowledgeReferencesFromSources(
     const group = grouped.get(groupKey);
     if (!group) {
       return;
+    }
+    if (!group.fileUrl) {
+      group.fileUrl = stringOrNull(source.file_url) ?? stringOrNull(metadata.file_url);
     }
     group.sourceIds.push(source.id);
     metadataPageNumbers(metadata).forEach((page) => group.pages.add(page));
@@ -226,6 +236,7 @@ export function buildPlaygroundKnowledgeReferencesFromSources(
     description: group.description,
     uri: group.uri,
     file_reference: group.fileReference,
+    file_url: group.fileUrl,
     pages: [...group.pages].sort((left, right) => left - right),
     source_ids: group.sourceIds,
   }));
@@ -291,7 +302,7 @@ function firstMetadataString(
   return null;
 }
 
-function metadataPageNumbers(metadata: Record<string, unknown>): Set<number> {
+export function metadataPageNumbers(metadata: Record<string, unknown>): Set<number> {
   const pages = new Set<number>();
   ["page", "page_number", "page_numbers", "pages"].forEach((key) => {
     coercePageNumbers(metadata[key]).forEach((page) => pages.add(page));

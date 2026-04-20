@@ -37,7 +37,7 @@ def sync_worker_loop() -> None:
                 continue
             logger.error("Unknown knowledge sync operation type: %s", operation_type)
         except Exception as exc:  # noqa: BLE001
-            logger.error("Knowledge sync worker loop error: %s", exc)
+            logger.exception("Knowledge sync worker loop error: %s", exc)
             time.sleep(_SYNC_POLL_SECONDS)
 
 

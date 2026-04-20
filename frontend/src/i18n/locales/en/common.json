@@ -339,7 +339,11 @@
     "references": {
       "toggle": "References ({{count}})",
       "file": "File",
-      "pages": "Pages {{pages}}"
+      "pages": "Pages {{pages}}",
+      "openSource": "Open source",
+      "openSourceAuthRequired": "Sign in again to open this source file.",
+      "openSourceFailed": "Unable to open this source file.",
+      "openSourcePopupBlocked": "Allow pop-ups to open this source file."
     },
     "chat": {
       "title": "Chat Workspace",
@@ -562,6 +566,7 @@
       "chunkLength": "Chunk length",
       "chunkMetadata": "Chunk metadata",
       "chunkText": "Chunk text",
+      "pages": "Pages",
       "similarity": "Similarity",
       "semanticScore": "Semantic score",
       "keywordScore": "Keyword score",

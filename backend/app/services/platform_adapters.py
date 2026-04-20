@@ -1616,6 +1616,8 @@ def _build_weaviate_properties(document: dict[str, Any]) -> dict[str, Any]:
         "metadata_json": dumps(metadata, sort_keys=True),
     }
     for key, value in metadata.items():
+        if str(key).strip().startswith("_"):
+            continue
         normalized_key = _coerce_metadata_key(str(key))
         if normalized_key in {"document_id", "text", "metadata_json"}:
             continue
@@ -1800,7 +1802,10 @@ def _build_qdrant_payload(document: dict[str, Any]) -> dict[str, Any]:
         "metadata": metadata,
     }
     for key, value in metadata.items():
-        payload[_coerce_metadata_key(str(key))] = value
+        if str(key).strip().startswith("_"):
+            continue
+        normalized_key = _coerce_metadata_key(str(key))
+        payload[normalized_key] = value
     return payload
 
 

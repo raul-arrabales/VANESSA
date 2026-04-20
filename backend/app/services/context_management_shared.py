@@ -183,7 +183,16 @@ def _build_chunk_metadata(
     chunk_index: int,
     chunk_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    document_metadata = dict(document.get("metadata_json") or document.get("metadata") or {})
+    document_metadata = {
+        str(key): value
+        for key, value in dict(document.get("metadata_json") or document.get("metadata") or {}).items()
+        if not str(key).strip().startswith("_")
+    }
+    normalized_chunk_metadata = {
+        str(key): value
+        for key, value in dict(chunk_metadata or {}).items()
+        if not str(key).strip().startswith("_")
+    }
     built_in_metadata = {
         "knowledge_base_id": str(knowledge_base["id"]),
         "document_id": str(document["id"]),
@@ -193,9 +202,17 @@ def _build_chunk_metadata(
         "source_name": str(document.get("source_name") or "").strip() or None,
         "uri": str(document.get("uri") or "").strip() or None,
     }
+    source_id = str(document.get("source_id") or "").strip()
+    source_path = str(document.get("source_path") or "").strip()
+    if source_id:
+        built_in_metadata["source_id"] = source_id
+    if source_path:
+        built_in_metadata["source_path"] = source_path
+    if bool(document.get("managed_by_source")):
+        built_in_metadata["managed_by_source"] = True
     return {
         **document_metadata,
-        **dict(chunk_metadata or {}),
+        **normalized_chunk_metadata,
         **built_in_metadata,
     }
 

@@ -35,13 +35,18 @@ export function KnowledgeBaseRetrievalResultCard({
         onClick={onToggle}
       >
         <div className="context-retrieval-result-summary">
-            <div className="platform-card-header context-retrieval-result-header">
-              <div className="card-stack">
-                <h4 className="section-title">{item.displayTitle}</h4>
+          <div className="platform-card-header context-retrieval-result-header">
+            <div className="card-stack">
+              <h4 className="section-title">{item.displayTitle}</h4>
+              <p className="status-text">
+                {t(scoreLabelKey)}: {(item.displayScoreValue ?? 0).toFixed(3)}
+              </p>
+              {item.displayPages.length > 0 ? (
                 <p className="status-text">
-                  {t(scoreLabelKey)}: {(item.displayScoreValue ?? 0).toFixed(3)}
+                  {t("contextManagement.fields.pages")}: {item.displayPages.join(", ")}
                 </p>
-              </div>
+              ) : null}
+            </div>
             <span
               className="context-retrieval-result-expand-indicator"
               data-expanded={isExpanded ? "true" : "false"}
@@ -75,6 +80,11 @@ export function KnowledgeBaseRetrievalResultCard({
           <p className="status-text">
             {t("contextManagement.fields.chunkLength")}: {t("contextManagement.states.chunkLengthTokens", { count: result.chunk_length_tokens })}
           </p>
+          {item.displayPages.length > 0 ? (
+            <p className="status-text">
+              {t("contextManagement.fields.pages")}: {item.displayPages.join(", ")}
+            </p>
+          ) : null}
           {item.displayComponentScoreRows.length > 0 ? (
             <div className="card-stack">
               {item.displayComponentScoreRows.map((row) => (

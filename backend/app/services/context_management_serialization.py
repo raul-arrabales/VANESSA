@@ -199,6 +199,9 @@ def _normalize_schema_managed_metadata(
     normalized: dict[str, Any] = {}
     for key, value in metadata.items():
         property_name = str(key or "").strip()
+        if property_name.startswith("_"):
+            normalized[property_name] = value
+            continue
         property_type = schema_properties.get(property_name)
         if not property_name or property_type is None:
             raise PlatformControlPlaneError(

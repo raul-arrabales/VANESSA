@@ -323,14 +323,20 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
             upserted_documents.append(document),
         ),
     )
+    monkeypatch.setattr(context_management_documents.context_repo, "list_knowledge_sources", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(context_management_documents.context_repo, "update_sync_run_progress", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents.context_repo,
+        "finish_sync_run",
+        lambda _database_url, **kwargs: {"id": kwargs["run_id"], "status": kwargs["status"]},
+    )
     monkeypatch.setattr(context_management_documents.context_repo, "get_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
     monkeypatch.setattr(context_management_documents, "_serialize_knowledge_base", lambda row: row)
 
-    refreshed = context_management_documents.resync_knowledge_base(
+    refreshed = context_management_documents.perform_knowledge_base_resync_run(
         "postgresql://ignored",
         config=object(),
-        knowledge_base_id="kb-primary",
-        updated_by_user_id=9,
+        run={"id": "sync-run-1", "knowledge_base_id": "kb-primary", "created_by_user_id": 9},
     )
 
     assert chunk_texts == ["Alpha text", "Beta text"]
@@ -340,7 +346,8 @@ def test_resync_knowledge_base_uses_chunking_context(monkeypatch):
         {"category": "guide"},
         {"category": "faq"},
     ]
-    assert refreshed["id"] == "kb-primary"
+    assert refreshed["knowledge_base"]["id"] == "kb-primary"
+    assert refreshed["sync_run"]["id"] == "sync-run-1"
 
 
 def test_source_sync_uses_chunking_context(monkeypatch):
@@ -508,3 +515,182 @@ def test_source_sync_chunks_pdf_pages_with_page_metadata(monkeypatch):
         {"text": "page-two-chunk", "metadata": {"page_number": 2}},
     ]]
     assert summary["created_document_count"] == 1
+
+
+def test_full_resync_reparses_source_managed_pdf_pages_for_chunk_metadata(monkeypatch):
+    knowledge_base = _knowledge_base()
+    upserted_chunk_lists: list[list[dict[str, object]]] = []
+
+    monkeypatch.setattr(context_management_documents, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_documents, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents,
+        "_mark_knowledge_base_sync_ready",
+        lambda *_args, **kwargs: {"id": "kb-primary", "last_sync_summary": kwargs["summary"]},
+    )
+    monkeypatch.setattr(context_management_documents, "_refresh_document_count", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents,
+        "_resolve_knowledge_base_vector_adapter",
+        lambda *_args, **_kwargs: type(
+            "_Adapter",
+            (),
+            {
+                "delete_index": lambda self, **_kwargs: None,
+                "ensure_index": lambda self, **_kwargs: None,
+            },
+        )(),
+    )
+    monkeypatch.setattr(context_management_documents.context_repo, "list_knowledge_sources", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        context_management_documents.context_repo,
+        "list_documents",
+        lambda *_args, **_kwargs: [
+            {
+                "id": "doc-pdf",
+                "knowledge_base_id": "kb-primary",
+                "title": "Source PDF",
+                "text": "Page one\n\nPage two",
+                "source_type": "local_directory",
+                "source_name": "Docs folder",
+                "metadata_json": {"source_path": "docs/source.pdf"},
+                "chunk_count": 1,
+                "source_id": "source-1",
+                "source_path": "docs/source.pdf",
+                "source_document_key": "docs/source.pdf#0",
+                "managed_by_source": True,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_documents.context_repo,
+        "get_knowledge_source",
+        lambda *_args, **_kwargs: {
+            "id": "source-1",
+            "source_type": "local_directory",
+            "display_name": "Docs folder",
+            "relative_path": "product_docs",
+            "lifecycle_state": "active",
+        },
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_resolve_source_directory",
+        lambda *_args, **_kwargs: ("product_docs", Path("/tmp/product_docs")),
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_parse_source_documents",
+        lambda *_args, **_kwargs: [
+            {
+                "title": "Source PDF",
+                "source_type": "local_directory",
+                "source_name": "Docs folder",
+                "uri": None,
+                "text": "Page one\n\nPage two",
+                "metadata": {"source_path": "docs/source.pdf", "_page_chunking_version": 1},
+                "page_texts": [
+                    {"page_number": 1, "text": "Page one"},
+                    {"page_number": 2, "text": "Page two"},
+                ],
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_chunk_knowledge_base_page_texts",
+        lambda *_args, **_kwargs: [
+            {"text": "page-one-chunk", "metadata": {"page_number": 1}},
+            {"text": "page-two-chunk", "metadata": {"page_number": 2}},
+        ],
+    )
+    monkeypatch.setattr(
+        context_management_documents.context_repo,
+        "set_document_chunk_count",
+        lambda _database_url, **kwargs: {
+            "id": kwargs["document_id"],
+            "text": "Page one\n\nPage two",
+            "chunk_count": kwargs["chunk_count"],
+            "metadata_json": {"source_path": "docs/source.pdf"},
+            "source_id": "source-1",
+            "source_path": "docs/source.pdf",
+            "source_document_key": "docs/source.pdf#0",
+            "managed_by_source": True,
+        },
+    )
+    monkeypatch.setattr(
+        context_management_documents,
+        "_upsert_document_chunks",
+        lambda _database_url, _config, *, knowledge_base, document, chunks: upserted_chunk_lists.append(chunks),
+    )
+    monkeypatch.setattr(context_management_documents.context_repo, "update_sync_run_progress", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents.context_repo,
+        "finish_sync_run",
+        lambda _database_url, **kwargs: {"id": kwargs["run_id"], "status": kwargs["status"]},
+    )
+    monkeypatch.setattr(context_management_documents.context_repo, "get_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_documents, "_serialize_knowledge_base", lambda row: row)
+
+    result = context_management_documents.perform_knowledge_base_resync_run(
+        "postgresql://ignored",
+        config=object(),
+        run={"id": "sync-run-1", "knowledge_base_id": "kb-primary", "created_by_user_id": 9},
+    )
+
+    assert upserted_chunk_lists == [[
+        {"text": "page-one-chunk", "metadata": {"page_number": 1}},
+        {"text": "page-two-chunk", "metadata": {"page_number": 2}},
+    ]]
+    assert result["sync_run"]["status"] == "ready"
+
+
+def test_full_resync_persists_underlying_error_message(monkeypatch):
+    captured_finish: dict[str, object] = {}
+    captured_kb_error: dict[str, object] = {}
+    knowledge_base = _knowledge_base()
+
+    monkeypatch.setattr(context_management_documents, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_documents, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents, "_mark_knowledge_base_syncing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_documents.context_repo, "list_knowledge_sources", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(context_management_documents.context_repo, "list_documents", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(context_management_documents.context_repo, "update_sync_run_progress", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        context_management_documents,
+        "_resolve_knowledge_base_vector_adapter",
+        lambda *_args, **_kwargs: type(
+            "_Adapter",
+            (),
+            {
+                "delete_index": lambda self, **_kwargs: (_ for _ in ()).throw(ValueError("metadata keys must start with a letter")),
+                "ensure_index": lambda self, **_kwargs: None,
+            },
+        )(),
+    )
+
+    def _finish_sync_run(_database_url, **kwargs):
+        captured_finish.update(kwargs)
+        return {"id": kwargs["run_id"], "status": kwargs["status"], "error_summary": kwargs.get("error_summary")}
+
+    def _mark_error(_database_url, **kwargs):
+        captured_kb_error.update(kwargs)
+        return None
+
+    monkeypatch.setattr(context_management_documents.context_repo, "finish_sync_run", _finish_sync_run)
+    monkeypatch.setattr(context_management_documents, "_mark_knowledge_base_sync_error", _mark_error)
+
+    try:
+        context_management_documents.perform_knowledge_base_resync_run(
+            "postgresql://ignored",
+            config=object(),
+            run={"id": "sync-run-1", "knowledge_base_id": "kb-primary", "created_by_user_id": 9},
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Expected resync failure")
+
+    assert captured_finish["error_summary"] == "metadata keys must start with a letter"
+    assert captured_kb_error["summary"] == "metadata keys must start with a letter"

@@ -3,7 +3,7 @@ from __future__ import annotations
 from json import dumps
 from uuid import uuid4
 
-from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, jsonify, request, send_file, stream_with_context
 
 from ...application.playgrounds_service import (
     PlaygroundChatExecutionError,
@@ -25,6 +25,8 @@ from ...application.playgrounds_service import (
 from ...authz import require_role
 from ...config import get_auth_config
 from ...services.agent_engine_client import AgentEngineClientError
+from ...services.knowledge_source_files import resolve_knowledge_source_file
+from ...services.platform_types import PlatformControlPlaneError
 
 bp = Blueprint("playgrounds", __name__)
 
@@ -304,3 +306,24 @@ def get_playground_knowledge_base_options_route():
         config=_config(),
     )
     return jsonify(payload), 200
+
+
+@bp.get("/v1/playgrounds/knowledge-bases/<knowledge_base_id>/documents/<document_id>/source-file")
+@require_role("user")
+def get_playground_knowledge_source_file_route(knowledge_base_id: str, document_id: str):
+    try:
+        source_file = resolve_knowledge_source_file(
+            _database_url(),
+            config=_config(),
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+        )
+    except PlatformControlPlaneError as exc:
+        return jsonify({"error": exc.code, "message": exc.message, "details": exc.details}), exc.status_code
+    return send_file(
+        source_file.path,
+        mimetype=source_file.mimetype,
+        as_attachment=source_file.as_attachment,
+        download_name=source_file.download_name,
+        conditional=True,
+    )

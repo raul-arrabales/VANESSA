@@ -3,6 +3,7 @@ from __future__ import annotations
 """Projection helpers for retrieval payloads; canonical contract: docs/services/retrieval_contract.md."""
 
 from typing import Any
+from urllib.parse import quote
 
 from .retrieval_reference_identity import (
     first_metadata_string,
@@ -23,6 +24,22 @@ def trim_retrieval_snippet(text: str, limit: int = 220) -> str:
     return normalized[: limit - 1].rstrip() + "…"
 
 
+def source_file_url_from_metadata(metadata: dict[str, Any]) -> str | None:
+    knowledge_base_id = string_or_none(metadata.get("knowledge_base_id"))
+    document_id = string_or_none(metadata.get("document_id"))
+    source_path = string_or_none(metadata.get("source_path"))
+    source_type = str(metadata.get("source_type") or "").strip().lower()
+    is_source_managed = bool(metadata.get("managed_by_source")) or bool(string_or_none(metadata.get("source_id")))
+    if source_type == "local_directory":
+        is_source_managed = True
+    if not knowledge_base_id or not document_id or not source_path or not is_source_managed:
+        return None
+    return (
+        "/v1/playgrounds/knowledge-bases/"
+        f"{quote(knowledge_base_id, safe='')}/documents/{quote(document_id, safe='')}/source-file"
+    )
+
+
 def serialize_retrieval_source(result: dict[str, Any]) -> dict[str, Any]:
     metadata = result.get("metadata") if isinstance(result.get("metadata"), dict) else {}
     text = str(result.get("text", "")).strip()
@@ -39,6 +56,9 @@ def serialize_retrieval_source(result: dict[str, Any]) -> dict[str, Any]:
         "score": result.get("score"),
         "score_kind": result.get("score_kind"),
     }
+    file_url = source_file_url_from_metadata(metadata)
+    if file_url:
+        payload["file_url"] = file_url
     if isinstance(result.get("relevance_score"), (int, float)):
         payload["relevance_score"] = float(result["relevance_score"])
     if string_or_none(result.get("relevance_kind")):
@@ -71,9 +91,12 @@ def build_retrieval_references(
                 "description": reference_description(result, metadata),
                 "uri": first_metadata_string(metadata, URI_METADATA_KEYS),
                 "file_reference": reference_file_value(metadata, result),
+                "file_url": source_file_url_from_metadata(metadata),
                 "pages": set(),
                 "source_ids": [],
             }
+        if not grouped[group_key].get("file_url"):
+            grouped[group_key]["file_url"] = source_file_url_from_metadata(metadata)
         grouped[group_key]["source_ids"].append(str(result.get("id", "")).strip())
         grouped[group_key]["pages"].update(metadata_page_numbers(metadata))
 
@@ -91,6 +114,7 @@ def build_retrieval_references(
             "description": group["description"],
             "uri": group["uri"],
             "file_reference": group["file_reference"],
+            **({"file_url": group["file_url"]} if group.get("file_url") else {}),
             "pages": sorted(group["pages"]),
             "source_ids": source_ids,
         }

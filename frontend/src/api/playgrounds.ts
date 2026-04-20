@@ -17,6 +17,7 @@ export type PlaygroundKnowledgeSource = {
     keyword_score?: number;
   } | null;
   uri?: string | null;
+  file_url?: string | null;
   source_type?: string | null;
   reference_id?: string | null;
   citation_label?: string | null;
@@ -28,6 +29,7 @@ export type PlaygroundKnowledgeReference = {
   title: string;
   description?: string | null;
   uri?: string | null;
+  file_url?: string | null;
   file_reference?: string | null;
   pages?: number[];
   source_ids?: string[];
@@ -189,6 +191,7 @@ export function getPlaygroundMessageSources(
       relevance_kind: stringOrNull(rawSource.relevance_kind),
       relevance_components: relevanceComponents,
       uri: stringOrNull(rawSource.uri),
+      file_url: stringOrNull(rawSource.file_url),
       source_type: stringOrNull(rawSource.source_type),
       reference_id: stringOrNull(rawSource.reference_id),
       citation_label: stringOrNull(rawSource.citation_label),
@@ -240,6 +243,7 @@ export function getPlaygroundMessageReferences(
       title,
       description: stringOrNull(rawReference.description),
       uri: stringOrNull(rawReference.uri),
+      file_url: stringOrNull(rawReference.file_url),
       file_reference: stringOrNull(rawReference.file_reference),
       pages: numberArray(rawReference.pages),
       source_ids: stringArray(rawReference.source_ids),

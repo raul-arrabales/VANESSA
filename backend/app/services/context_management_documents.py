@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from ..config import AuthConfig
 from ..repositories import context_management as context_repo
-from .context_management_ingestion import _parse_upload_documents
+from .context_management_ingestion import _parse_source_documents, _parse_upload_documents, _source_document_key
 from .context_management_serialization import (
     _normalize_document_payload,
     _normalize_schema_managed_metadata,
@@ -296,6 +296,88 @@ def _chunk_document_payload(
     return _chunk_knowledge_base_text(database_url, knowledge_base=knowledge_base, text=text)
 
 
+def _chunk_document_for_resync(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    knowledge_base: KnowledgeBaseRecord,
+    document: dict[str, Any],
+    source_cache: dict[str, dict[str, Any] | None],
+) -> list[KnowledgeTextChunk]:
+    if not bool(document.get("managed_by_source")):
+        return _chunk_knowledge_base_text(
+            database_url,
+            knowledge_base=knowledge_base,
+            text=str(document.get("text") or ""),
+        )
+    source_id = str(document.get("source_id") or "").strip()
+    source_path = str(document.get("source_path") or "").strip()
+    source_document_key = str(document.get("source_document_key") or "").strip()
+    if not source_id or not source_path:
+        return _chunk_knowledge_base_text(
+            database_url,
+            knowledge_base=knowledge_base,
+            text=str(document.get("text") or ""),
+        )
+    if source_id not in source_cache:
+        source_cache[source_id] = context_repo.get_knowledge_source(
+            database_url,
+            knowledge_base_id=str(knowledge_base["id"]),
+            source_id=source_id,
+        )
+    source = source_cache.get(source_id)
+    if (
+        source is None
+        or str(source.get("source_type") or "").strip().lower() != "local_directory"
+        or str(source.get("lifecycle_state") or "").strip().lower() not in {"", "active"}
+    ):
+        return _chunk_knowledge_base_text(
+            database_url,
+            knowledge_base=knowledge_base,
+            text=str(document.get("text") or ""),
+        )
+    try:
+        _, source_directory = _resolve_source_directory(
+            config,
+            str(source.get("relative_path") or "").strip(),
+            require_exists=True,
+        )
+        parsed_documents = _parse_source_documents(
+            source_directory / source_path,
+            relative_path=source_path,
+            source=source,
+        )
+    except PlatformControlPlaneError:
+        raise
+    except Exception:
+        return _chunk_knowledge_base_text(
+            database_url,
+            knowledge_base=knowledge_base,
+            text=str(document.get("text") or ""),
+        )
+    for position, parsed_document in enumerate(parsed_documents):
+        if _source_document_key(source_path, position) == source_document_key:
+            return _chunk_document_payload(
+                database_url,
+                knowledge_base=knowledge_base,
+                text=str(parsed_document.get("text") or document.get("text") or ""),
+                page_texts=parsed_document.get("page_texts"),
+            )
+    if len(parsed_documents) == 1 and not source_document_key:
+        parsed_document = parsed_documents[0]
+        return _chunk_document_payload(
+            database_url,
+            knowledge_base=knowledge_base,
+            text=str(parsed_document.get("text") or document.get("text") or ""),
+            page_texts=parsed_document.get("page_texts"),
+        )
+    return _chunk_knowledge_base_text(
+        database_url,
+        knowledge_base=knowledge_base,
+        text=str(document.get("text") or ""),
+    )
+
+
 def resync_knowledge_base(
     database_url: str,
     *,
@@ -421,11 +503,14 @@ def perform_knowledge_base_resync_run(
         )
         total_chunks = 0
         processed_document_count = 0
+        source_cache: dict[str, dict[str, Any] | None] = {}
         for document in documents:
-            chunks = _chunk_knowledge_base_text(
+            chunks = _chunk_document_for_resync(
                 database_url,
+                config=config,
                 knowledge_base=knowledge_base,
-                text=str(document.get("text") or ""),
+                document=document,
+                source_cache=source_cache,
             )
             total_chunks += len(chunks)
             synced_document = document
@@ -483,6 +568,7 @@ def perform_knowledge_base_resync_run(
             "sync_run": _serialize_sync_run(finished_run or run),
         }
     except Exception as exc:
+        error_summary = str(exc).strip() or "Knowledge-base resync failed."
         context_repo.finish_sync_run(
             database_url,
             run_id=str(run["id"]),
@@ -493,12 +579,12 @@ def perform_knowledge_base_resync_run(
             created_document_count=0,
             updated_document_count=0,
             deleted_document_count=0,
-            error_summary=str(exc) or "Knowledge-base resync failed.",
+            error_summary=error_summary,
         )
         _mark_knowledge_base_sync_error(
             database_url,
             knowledge_base_id=knowledge_base_id,
             updated_by_user_id=updated_by_user_id,
-            summary="Knowledge-base resync failed.",
+            summary=error_summary,
         )
         raise

@@ -60,6 +60,7 @@ function buildSession(): PlaygroundSessionViewModel {
               title: "Architecture Overview",
               description: "Docs folder",
               file_reference: "docs/architecture.md",
+              file_url: "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
               pages: [2, 3],
               source_ids: ["doc-1", "doc-2"],
             },
@@ -116,6 +117,10 @@ describe("ThreadPanel", () => {
     expect(screen.getByText("Docs folder")).toBeVisible();
     expect(screen.getByText("docs/architecture.md")).toBeVisible();
     expect(screen.getByText("Pages 2, 3")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open source" })).toHaveAttribute(
+      "href",
+      "/api/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+    );
     expect(screen.queryByText(/A longer retrieval-backed chunk/)).not.toBeInTheDocument();
 
     await act(async () => {

@@ -131,10 +131,15 @@ Knowledge-base ingestion stores these built-in metadata fields on every indexed 
 - `source_type`
 - `source_name`
 - `uri`
+- `source_id`
+- `source_path`
+- `managed_by_source`
 
 PDF ingestion also stores `page_number` on each chunk when the original page is known. `page_number` is chunk-level metadata and is safe to use for source references and retrieval filters. It is not inferred from `page_count`; `page_count` remains document-level metadata when the parser can determine it.
 
 Vector-store schemas must reserve these built-in fields, including `page_number`, so custom schema properties should not duplicate them.
+
+Knowledge-chat reference projection aggregates pages from `page_number`, `pages`, or `page_start` / `page_end`. For source-managed local-directory documents, backend projection may include `file_url`, an authenticated `/v1/playgrounds/.../source-file` route. The frontend must use that backend URL instead of exposing local `file://` paths.
 
 ## Scoring Semantics
 

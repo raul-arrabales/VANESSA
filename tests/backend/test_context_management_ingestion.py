@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.services import context_management_parsers
+from app.services.context_management_ingestion import _source_document_changed
 from app.services import context_management_ingestion
 from app.services.context_management_types import MAX_INGESTION_FILE_SIZE_BYTES
 from app.services.platform_types import PlatformControlPlaneError
@@ -45,12 +46,53 @@ def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
         "metadata": {
             "page_count": 3,
             "source_filename": "architecture.pdf",
+            "_page_chunking_version": 1,
         },
         "page_texts": [
             {"page_number": 1, "text": "First page text"},
             {"page_number": 3, "text": "Third page text"},
         ],
     }
+
+
+def test_source_document_changed_when_existing_pdf_lacks_page_chunking_marker():
+    existing = {
+        "title": "architecture",
+        "source_type": "local_directory",
+        "source_name": "Docs",
+        "uri": None,
+        "text": "First page text\n\nThird page text",
+        "metadata_json": {
+            "page_count": 3,
+            "source_filename": "architecture.pdf",
+            "source_path": "architecture.pdf",
+        },
+        "chunk_count": 2,
+        "source_path": "architecture.pdf",
+        "source_document_key": "architecture.pdf#0",
+        "managed_by_source": True,
+    }
+    parsed_document = {
+        "title": "architecture",
+        "source_type": "local_directory",
+        "source_name": "Docs",
+        "uri": None,
+        "text": "First page text\n\nThird page text",
+        "metadata": {
+            "page_count": 3,
+            "source_filename": "architecture.pdf",
+            "source_path": "architecture.pdf",
+            "_page_chunking_version": 1,
+        },
+    }
+
+    assert _source_document_changed(
+        existing,
+        parsed_document=parsed_document,
+        chunk_count=2,
+        source_path="architecture.pdf",
+        source_document_key="architecture.pdf#0",
+    )
 
 
 def test_ingestion_accepts_twenty_megabyte_payload():

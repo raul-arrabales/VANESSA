@@ -18,6 +18,7 @@ describe("KnowledgeBaseRetrievalResultCard", () => {
       metadata: {
         document_id: "doc-2",
         chunk_index: 1,
+        page_number: 4,
         source_name: "FAQ folder",
         empty_field: "",
       },
@@ -40,6 +41,7 @@ describe("KnowledgeBaseRetrievalResultCard", () => {
 
     expect(screen.getByRole("heading", { name: "Chunk 1: FAQ" })).toBeVisible();
     expect(screen.getByText("Hybrid score: 0.875")).toBeVisible();
+    expect(screen.getAllByText("Pages: 4")[0]).toBeVisible();
     expect(screen.getByText(result.text, { selector: "p" })).toBeVisible();
     expect(screen.getByLabelText("Chunk text")).toHaveDisplayValue(result.text);
     expect(screen.getByText("Chunk length: 18 tokens")).toBeVisible();

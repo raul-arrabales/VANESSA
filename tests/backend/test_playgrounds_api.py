@@ -4,6 +4,8 @@ import pytest
 
 from app.api.http import playgrounds as playground_routes  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services.knowledge_source_files import KnowledgeSourceFile  # noqa: E402
+from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 from tests.backend.support.auth_harness import auth_header, login  # noqa: E402
 
 
@@ -328,3 +330,68 @@ def test_get_playground_knowledge_base_options_route_returns_payload(client, mon
 
     assert response.status_code == 200
     assert response.get_json()["knowledge_bases"][0]["id"] == "kb-primary"
+
+
+def test_get_playground_knowledge_source_file_route_serves_file(client, tmp_path, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="source-file@example.com",
+        username="source-file-user",
+        password_hash=hash_password("source-file-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "source-file-pass-123").get_json()["access_token"]
+    source_file = tmp_path / "faq.md"
+    source_file.write_text("# FAQ\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        playground_routes,
+        "resolve_knowledge_source_file",
+        lambda *_args, **_kwargs: KnowledgeSourceFile(
+            path=source_file,
+            mimetype="text/markdown",
+            as_attachment=False,
+            download_name="faq.md",
+        ),
+    )
+
+    response = test_client.get(
+        "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert response.data == b"# FAQ\n"
+    assert response.headers["Content-Type"].startswith("text/markdown")
+
+
+def test_get_playground_knowledge_source_file_route_returns_control_plane_error(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="manual-source-file@example.com",
+        username="manual-source-file-user",
+        password_hash=hash_password("manual-source-file-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "manual-source-file-pass-123").get_json()["access_token"]
+
+    def _raise(*_args, **_kwargs):
+        raise PlatformControlPlaneError(
+            "source_file_not_available",
+            "Only source-managed local-directory documents have source files.",
+            status_code=409,
+        )
+
+    monkeypatch.setattr(playground_routes, "resolve_knowledge_source_file", _raise)
+
+    response = test_client.get(
+        "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "source_file_not_available"

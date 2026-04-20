@@ -375,8 +375,22 @@ def test_send_playground_message_persists_structured_knowledge_metadata(monkeypa
         lambda **_kwargs: playgrounds_service.PlaygroundExecutionResult(
             output="knowledge answer",
             response={"id": "exec-1"},
-            sources=[{"id": "doc-1", "title": "Architecture Overview"}],
-            references=[{"id": "ref-1", "citation_label": "[1]", "title": "Architecture Overview"}],
+            sources=[
+                {
+                    "id": "doc-1",
+                    "title": "Architecture Overview",
+                    "file_url": "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+                }
+            ],
+            references=[
+                {
+                    "id": "ref-1",
+                    "citation_label": "[1]",
+                    "title": "Architecture Overview",
+                    "pages": [4],
+                    "file_url": "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+                }
+            ],
             retrieval={"index": "kb_product_docs", "result_count": 1},
             knowledge_base_id="kb-primary",
         ),
@@ -429,13 +443,35 @@ def test_send_playground_message_persists_structured_knowledge_metadata(monkeypa
     assert payload["output"] == "knowledge answer"
     assert captured["assistant_metadata"] == {
         "response": {"id": "exec-1"},
-        "sources": [{"id": "doc-1", "title": "Architecture Overview"}],
-        "references": [{"id": "ref-1", "citation_label": "[1]", "title": "Architecture Overview"}],
+        "sources": [
+            {
+                "id": "doc-1",
+                "title": "Architecture Overview",
+                "file_url": "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+            }
+        ],
+        "references": [
+            {
+                "id": "ref-1",
+                "citation_label": "[1]",
+                "title": "Architecture Overview",
+                "pages": [4],
+                "file_url": "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+            }
+        ],
         "retrieval": {"index": "kb_product_docs", "result_count": 1},
         "knowledge_base_id": "kb-primary",
     }
     assert payload["retrieval"] == {"index": "kb_product_docs", "result_count": 1}
-    assert payload["references"] == [{"id": "ref-1", "citation_label": "[1]", "title": "Architecture Overview"}]
+    assert payload["references"] == [
+        {
+            "id": "ref-1",
+            "citation_label": "[1]",
+            "title": "Architecture Overview",
+            "pages": [4],
+            "file_url": "/v1/playgrounds/knowledge-bases/kb-primary/documents/doc-1/source-file",
+        }
+    ]
 
 
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):

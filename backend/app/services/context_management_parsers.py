@@ -209,6 +209,7 @@ def extract_pdf_document(
         "metadata": {
             "page_count": page_count,
             "source_filename": Path(filename).name,
+            "_page_chunking_version": 1,
         },
         "page_texts": extracted_pages,
     }

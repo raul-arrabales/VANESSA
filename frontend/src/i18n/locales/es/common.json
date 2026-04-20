@@ -334,7 +334,11 @@
     "references": {
       "toggle": "Referencias ({{count}})",
       "file": "Archivo",
-      "pages": "Paginas {{pages}}"
+      "pages": "Paginas {{pages}}",
+      "openSource": "Abrir fuente",
+      "openSourceAuthRequired": "Inicia sesion de nuevo para abrir este archivo fuente.",
+      "openSourceFailed": "No se pudo abrir este archivo fuente.",
+      "openSourcePopupBlocked": "Permite ventanas emergentes para abrir este archivo fuente."
     },
     "chat": {
       "title": "Espacio de chat",
@@ -552,6 +556,7 @@
       "chunkLength": "Longitud del fragmento",
       "chunkMetadata": "Metadatos del fragmento",
       "chunkText": "Texto del fragmento",
+      "pages": "Paginas",
       "similarity": "Similitud",
       "semanticScore": "Puntuacion semantica",
       "keywordScore": "Puntuacion de palabras clave",

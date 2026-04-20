@@ -446,7 +446,7 @@ def test_weaviate_vector_store_adapter_query_supports_embedding_and_bm25(monkeyp
                             {
                                 "document_id": "doc-1",
                                 "text": "hello",
-                                "metadata_json": '{"category": "ops"}',
+                                "metadata_json": '{"category": "ops", "page_number": 7}',
                                 "_additional": {"id": "uuid-1", "distance": 0.12},
                             }
                         ]
@@ -492,7 +492,7 @@ def test_weaviate_vector_store_adapter_query_supports_embedding_and_bm25(monkeyp
             {
                 "id": "doc-1",
                 "text": "hello",
-                "metadata": {"category": "ops"},
+                "metadata": {"category": "ops", "page_number": 7},
                 "score": 0.12,
                 "score_kind": "distance",
             }
@@ -517,6 +517,74 @@ def test_weaviate_vector_store_adapter_query_supports_embedding_and_bm25(monkeyp
     assert embedding_query.count("{") == embedding_query.count("}")
     assert 'bm25: { query: "hello", properties: ["text"] }' in text_query
     assert text_query.count("{") == text_query.count("}")
+
+
+def test_vector_store_adapters_skip_internal_metadata_keys_before_property_coercion(monkeypatch: pytest.MonkeyPatch):
+    weaviate_calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _weaviate_request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        weaviate_calls.append((url, method, payload))
+        if url.endswith("/v1/schema/KnowledgeBase"):
+            return {"class": "KnowledgeBase"}, 200
+        if url.endswith("/v1/batch/objects"):
+            return {"objects": [{"result": {"errors": None}}]}, 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _weaviate_request)
+    weaviate_adapter = platform_adapters.WeaviateVectorStoreAdapter(_binding())
+
+    weaviate_adapter.upsert(
+        index_name="knowledge_base",
+        documents=[
+            {
+                "id": "doc-1",
+                "text": "hello",
+                "metadata": {"_page_chunking_version": 1, "page_number": 2},
+                "embedding": [0.1, 0.2],
+            }
+        ],
+    )
+
+    batch_payload = weaviate_calls[1][2]
+    assert batch_payload is not None
+    properties = batch_payload["objects"][0]["properties"]  # type: ignore[index]
+    assert "_page_chunking_version" not in properties
+    assert properties["page_number"] == 2
+
+    qdrant_calls: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _qdrant_request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del headers, timeout_seconds
+        qdrant_calls.append((url, method, payload))
+        if url.endswith("/collections/knowledge_base") and method == "GET":
+            return {"status": "ok", "result": {"status": "green"}}, 200
+        if url.endswith("/collections/knowledge_base/index"):
+            return {"status": "ok", "result": True}, 200
+        if url.endswith("/collections/knowledge_base/points") and method == "PUT":
+            return {"status": "ok", "result": {"status": "acknowledged"}}, 200
+        raise AssertionError(f"unexpected request: {method} {url}")
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _qdrant_request)
+    qdrant_adapter = platform_adapters.QdrantVectorStoreAdapter(_qdrant_binding())
+
+    qdrant_adapter.upsert(
+        index_name="knowledge_base",
+        documents=[
+            {
+                "id": "doc-1",
+                "text": "hello",
+                "metadata": {"_page_chunking_version": 1, "page_number": 2},
+                "embedding": [0.1, 0.2],
+            }
+        ],
+    )
+
+    points_payload = next(call[2] for call in qdrant_calls if call[0].endswith("/collections/knowledge_base/points"))
+    assert points_payload is not None
+    point_payload = points_payload["points"][0]["payload"]  # type: ignore[index]
+    assert "_page_chunking_version" not in point_payload
+    assert point_payload["page_number"] == 2
 
 
 def test_weaviate_vector_store_adapter_delete_returns_deleted_ids(monkeypatch: pytest.MonkeyPatch):
@@ -637,7 +705,7 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
                         "payload": {
                             "document_id": "doc-1",
                             "text": "hello",
-                            "metadata": {"tenant": "ops"},
+                            "metadata": {"tenant": "ops", "page_number": 9},
                         },
                     }
                 ],
@@ -652,7 +720,7 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
                             "payload": {
                                 "document_id": "doc-1",
                                 "text": "hello",
-                                "metadata": {"tenant": "ops"},
+                                "metadata": {"tenant": "ops", "page_number": 9},
                             },
                         }
                     ]
@@ -693,7 +761,7 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
             {
                 "id": "doc-1",
                 "text": "hello",
-                "metadata": {"tenant": "ops"},
+                "metadata": {"tenant": "ops", "page_number": 9},
                 "score": 0.87,
                 "score_kind": "similarity",
             }
@@ -705,7 +773,7 @@ def test_qdrant_vector_store_adapter_upsert_and_query_return_normalized_document
             {
                 "id": "doc-1",
                 "text": "hello",
-                "metadata": {"tenant": "ops"},
+                "metadata": {"tenant": "ops", "page_number": 9},
                 "score": 1.0,
                 "score_kind": "text_match",
             }

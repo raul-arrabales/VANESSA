@@ -424,6 +424,18 @@ describe("KnowledgePlaygroundPage", () => {
                   },
                 },
               ],
+              references: [
+                {
+                  id: "ref-1",
+                  citation_label: "[1]",
+                  title: "Architecture Overview",
+                  description: "Docs folder",
+                  file_reference: "docs/architecture.pdf",
+                  file_url: "/v1/playgrounds/knowledge-bases/kb_primary/documents/doc-1/source-file",
+                  pages: [3],
+                  source_ids: ["doc-1"],
+                },
+              ],
             },
             createdAt: "2026-03-18T11:00:01Z",
           },
@@ -446,6 +458,11 @@ describe("KnowledgePlaygroundPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "References (1)" }));
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Docs folder")).toBeVisible();
+    expect(screen.getByText("Pages 3")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open source" })).toHaveAttribute(
+      "href",
+      "/api/v1/playgrounds/knowledge-bases/kb_primary/documents/doc-1/source-file#page=3",
+    );
     expect(screen.queryByText(/Similarity/i)).not.toBeInTheDocument();
   });
 
