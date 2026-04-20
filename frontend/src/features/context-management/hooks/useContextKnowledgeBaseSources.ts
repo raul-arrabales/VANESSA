@@ -171,15 +171,22 @@ export function useContextKnowledgeBaseSources(): ContextKnowledgeBaseSourcesRes
   }
 
   async function handleSyncSource(sourceId: string): Promise<void> {
-    if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin || syncingSourceId) {
+    const activeSourceRun = workspace.syncRuns.find((run) => (
+      run.source_id === sourceId && (run.status === "queued" || run.status === "running")
+    ));
+    if (!workspace.token || !workspace.knowledgeBase || !workspace.isSuperadmin || syncingSourceId || activeSourceRun) {
       return;
     }
     setSyncingSourceId(sourceId);
     try {
       const response = await syncKnowledgeSource(workspace.knowledgeBase.id, sourceId, workspace.token);
       workspace.setKnowledgeBase(response.knowledge_base);
+      workspace.setSources((current) => current.map((source) => (
+        source.id === response.source.id ? response.source : source
+      )));
+      workspace.setSyncRuns((current) => [response.sync_run, ...current.filter((run) => run.id !== response.sync_run.id)]);
       await workspace.reload();
-      workspace.showSuccessFeedback(t("contextManagement.feedback.sourceSynced", { name: response.source.display_name }));
+      workspace.showSuccessFeedback(t("contextManagement.feedback.sourceSyncQueued", { name: response.source.display_name }));
     } catch (requestError) {
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.sourceSyncFailed"));
     } finally {

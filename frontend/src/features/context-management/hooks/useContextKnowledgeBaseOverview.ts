@@ -14,6 +14,7 @@ import {
 } from "../chunkingForm";
 import type { KnowledgeBaseOverviewFormState } from "../types";
 import { useContextKnowledgeBaseLoader } from "./useContextKnowledgeBaseLoader";
+import type { KnowledgeSyncRun } from "../../../api/context";
 
 export type ContextKnowledgeBaseOverviewResult = ReturnType<typeof useContextKnowledgeBaseLoader> & {
   form: KnowledgeBaseOverviewFormState;
@@ -21,6 +22,7 @@ export type ContextKnowledgeBaseOverviewResult = ReturnType<typeof useContextKno
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
   isResyncing: boolean;
+  activeResyncRun: KnowledgeSyncRun | null;
   handleSaveKnowledgeBase: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   openDeleteDialog: () => void;
   closeDeleteDialog: () => void;
@@ -31,7 +33,7 @@ export type ContextKnowledgeBaseOverviewResult = ReturnType<typeof useContextKno
 export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewResult {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
-  const workspace = useContextKnowledgeBaseLoader({ loadSources: true });
+  const workspace = useContextKnowledgeBaseLoader({ loadSources: true, loadSyncRuns: true });
   const [form, setForm] = useState<KnowledgeBaseOverviewFormState>({
     slug: "",
     displayName: "",
@@ -138,10 +140,11 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     }
     setIsResyncing(true);
     try {
-      const refreshed = await resyncKnowledgeBase(workspace.knowledgeBase.id, workspace.token);
-      workspace.setKnowledgeBase(refreshed);
+      const response = await resyncKnowledgeBase(workspace.knowledgeBase.id, workspace.token);
+      workspace.setKnowledgeBase(response.knowledge_base);
+      workspace.setSyncRuns((current) => [response.sync_run, ...current.filter((run) => run.id !== response.sync_run.id)]);
       await workspace.reload();
-      workspace.showSuccessFeedback(t("contextManagement.feedback.resynced", { name: refreshed.display_name }));
+      workspace.showSuccessFeedback(t("contextManagement.feedback.resyncQueued", { name: response.knowledge_base.display_name }));
     } catch (requestError) {
       workspace.showErrorFeedback(requestError, t("contextManagement.feedback.resyncFailed"));
     } finally {
@@ -149,13 +152,18 @@ export function useContextKnowledgeBaseOverview(): ContextKnowledgeBaseOverviewR
     }
   }
 
+  const activeResyncRun = workspace.syncRuns.find((run) => (
+    run.operation_type === "knowledge_resync" && (run.status === "queued" || run.status === "running")
+  )) ?? null;
+
   return {
     ...workspace,
     form,
     setForm,
     isDeleteDialogOpen,
     isDeleting,
-    isResyncing,
+    isResyncing: isResyncing || activeResyncRun !== null,
+    activeResyncRun,
     handleSaveKnowledgeBase,
     openDeleteDialog,
     closeDeleteDialog,

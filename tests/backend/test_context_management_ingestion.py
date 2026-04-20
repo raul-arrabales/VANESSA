@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from app.services import context_management_parsers
+from app.services import context_management_ingestion
+from app.services.context_management_types import MAX_INGESTION_FILE_SIZE_BYTES
+from app.services.platform_types import PlatformControlPlaneError
 
 
 def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
@@ -48,3 +51,36 @@ def test_extract_pdf_document_keeps_page_texts_with_page_numbers(monkeypatch):
             {"page_number": 3, "text": "Third page text"},
         ],
     }
+
+
+def test_ingestion_accepts_twenty_megabyte_payload():
+    raw = context_management_ingestion._read_ingestion_bytes(
+        lambda: b"x" * MAX_INGESTION_FILE_SIZE_BYTES,
+        filename="large.md",
+        too_large_code="too_large",
+        too_large_message="too large",
+        read_error_code="invalid",
+        read_error_message="invalid",
+        details_key="filename",
+    )
+
+    assert len(raw) == MAX_INGESTION_FILE_SIZE_BYTES
+
+
+def test_ingestion_rejects_payload_above_twenty_megabytes():
+    try:
+        context_management_ingestion._read_ingestion_bytes(
+            lambda: b"x" * (MAX_INGESTION_FILE_SIZE_BYTES + 1),
+            filename="too-large.md",
+            too_large_code="too_large",
+            too_large_message="Uploaded files must be 20 MB or smaller",
+            read_error_code="invalid",
+            read_error_message="invalid",
+            details_key="filename",
+        )
+    except PlatformControlPlaneError as exc:
+        assert exc.code == "too_large"
+        assert str(exc) == "Uploaded files must be 20 MB or smaller"
+        assert exc.details["max_file_size_bytes"] == MAX_INGESTION_FILE_SIZE_BYTES
+    else:
+        raise AssertionError("Expected PlatformControlPlaneError")

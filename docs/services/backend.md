@@ -117,13 +117,13 @@ Platform-control request parsing and response shaping are now owned by the appli
 - `GET /v1/context/knowledge-bases/{id}` (admin)
 - `PUT /v1/context/knowledge-bases/{id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}` (superadmin)
-- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin, returns `202` with a queued sync run)
 - `POST /v1/context/knowledge-bases/{id}/query` (admin)
 - `GET /v1/context/knowledge-bases/{id}/sources` (admin)
 - `POST /v1/context/knowledge-bases/{id}/sources` (superadmin)
 - `PUT /v1/context/knowledge-bases/{id}/sources/{source_id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}/sources/{source_id}` (superadmin)
-- `POST /v1/context/knowledge-bases/{id}/sources/{source_id}/sync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/sources/{source_id}/sync` (superadmin, returns `202` with a queued sync run)
 - `GET /v1/context/knowledge-bases/{id}/sync-runs` (admin)
 - `GET /v1/context/knowledge-bases/{id}/documents` (admin)
 - `POST /v1/context/knowledge-bases/{id}/documents` (superadmin)
@@ -145,11 +145,11 @@ Context-management semantics:
 - For Weaviate-backed KBs, the backend keeps collection creation on `vectorizer: none` and supplies vectors from VANESSA embeddings providers or external uploads rather than native Weaviate module vectorizers.
 - Managed `local_directory` knowledge sources live under allowlisted backend-visible roots configured by `CONTEXT_SOURCE_ROOTS`.
 - Source sync is deterministic: document identity is derived from `source_id + source_path + logical position`, so re-sync updates or deletes existing source-managed documents instead of duplicating them.
-- Source sync runs are persisted with file/document counters and error summaries for operator-facing history.
+- Source sync runs are persisted with operation type, queued/running/ready/error state, progress fields, file/document counters, and error summaries for operator-facing history.
 - Source include/exclude globs use simple Python `fnmatch`-style matching against source-relative paths and do not support brace expansion.
 - Current managed ingestion supports `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files. PDF handling uses `pypdf`, creates one logical document per PDF, and fails clearly for encrypted or scanned/image-only PDFs because OCR is not part of this slice.
 - Knowledge-base detail payloads now include sync diagnostics such as `last_sync_at`, `last_sync_error`, `last_sync_summary`, and `eligible_for_binding`.
-- Operators can run a synchronous resync to rebuild one managed knowledge base from stored documents.
+- Operators can run an asynchronous resync that reconciles active local-directory sources first, then rebuilds one managed knowledge base from the final stored documents.
 - Operators can also create/update/delete directory-backed sources and run `Sync now` against one source without rebuilding the whole knowledge base.
 - Operators can also run a retrieval test against one managed knowledge base through the active deployment embeddings/vector runtime without going through full Knowledge Chat.
 - Deployment editors expose only knowledge bases that are both `active` and `ready`.

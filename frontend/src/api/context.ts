@@ -213,7 +213,15 @@ export type KnowledgeSyncRun = {
   knowledge_base_id: string;
   source_id?: string | null;
   source_display_name?: string | null;
-  status: "syncing" | "ready" | "error" | string;
+  operation_type?: "source_sync" | "knowledge_resync" | string;
+  status: "queued" | "running" | "ready" | "error" | string;
+  total_file_count: number;
+  processed_file_count: number;
+  total_document_count: number;
+  processed_document_count: number;
+  current_step?: string | null;
+  current_path?: string | null;
+  progress_percent?: number | null;
   scanned_file_count: number;
   changed_file_count: number;
   deleted_file_count: number;
@@ -359,15 +367,17 @@ export async function deleteKnowledgeBase(knowledgeBaseId: string, token: string
   });
 }
 
-export async function resyncKnowledgeBase(knowledgeBaseId: string, token: string): Promise<KnowledgeBase> {
-  const result = await requestJson<{ knowledge_base: KnowledgeBase }>(
+export async function resyncKnowledgeBase(
+  knowledgeBaseId: string,
+  token: string,
+): Promise<{ knowledge_base: KnowledgeBase; sync_run: KnowledgeSyncRun }> {
+  return requestJson<{ knowledge_base: KnowledgeBase; sync_run: KnowledgeSyncRun }>(
     `/v1/context/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/resync`,
     {
       method: "POST",
       token,
     },
   );
-  return result.knowledge_base;
 }
 
 export async function queryKnowledgeBase(

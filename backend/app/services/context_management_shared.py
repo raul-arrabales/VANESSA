@@ -27,6 +27,8 @@ from .context_management_vectorization import (
 )
 from .platform_types import CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
+_VECTOR_UPSERT_CHUNK_BATCH_SIZE = 64
+
 
 @dataclass(frozen=True)
 class SourceSyncFailure:
@@ -275,29 +277,31 @@ def _upsert_document_chunks(
     adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
     adapter.ensure_index(index_name=str(knowledge_base["index_name"]), schema=dict(knowledge_base.get("schema_json") or {}))
     chunk_records = [_normalize_knowledge_text_chunk(chunk) for chunk in chunks]
-    chunk_texts = [chunk["text"] for chunk in chunk_records]
-    embeddings_payload = embed_knowledge_base_texts(
-        database_url,
-        config=config,
-        knowledge_base=knowledge_base,
-        texts=chunk_texts,
-    )
-    embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload.get("embeddings"), list) else []
-    documents = [
-        {
-            "id": _chunk_document_id(str(document["id"]), index),
-            "text": chunk["text"],
-            "embedding": embeddings[index] if index < len(embeddings) else None,
-            "metadata": _build_chunk_metadata(
-                knowledge_base=knowledge_base,
-                document=document,
-                chunk_index=index,
-                chunk_metadata=dict(chunk.get("metadata") or {}),
-            ),
-        }
-        for index, chunk in enumerate(chunk_records)
-    ]
-    adapter.upsert(index_name=str(knowledge_base["index_name"]), documents=documents)
+    for batch_start in range(0, len(chunk_records), _VECTOR_UPSERT_CHUNK_BATCH_SIZE):
+        batch = chunk_records[batch_start:batch_start + _VECTOR_UPSERT_CHUNK_BATCH_SIZE]
+        chunk_texts = [chunk["text"] for chunk in batch]
+        embeddings_payload = embed_knowledge_base_texts(
+            database_url,
+            config=config,
+            knowledge_base=knowledge_base,
+            texts=chunk_texts,
+        )
+        embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload.get("embeddings"), list) else []
+        documents = [
+            {
+                "id": _chunk_document_id(str(document["id"]), batch_start + index),
+                "text": chunk["text"],
+                "embedding": embeddings[index] if index < len(embeddings) else None,
+                "metadata": _build_chunk_metadata(
+                    knowledge_base=knowledge_base,
+                    document=document,
+                    chunk_index=batch_start + index,
+                    chunk_metadata=dict(chunk.get("metadata") or {}),
+                ),
+            }
+            for index, chunk in enumerate(batch)
+        ]
+        adapter.upsert(index_name=str(knowledge_base["index_name"]), documents=documents)
 
 
 def _normalize_knowledge_text_chunk(chunk: KnowledgeTextChunk) -> KnowledgeTextChunk:

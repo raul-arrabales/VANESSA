@@ -725,6 +725,7 @@ def create_sync_run(
     *,
     knowledge_base_id: str,
     source_id: str | None,
+    operation_type: str,
     created_by_user_id: int | None,
 ) -> dict[str, Any]:
     with get_connection(database_url) as connection:
@@ -734,22 +735,85 @@ def create_sync_run(
                 id,
                 knowledge_base_id,
                 source_id,
+                operation_type,
                 status,
                 created_by_user_id
             )
-            VALUES (%s, %s, %s, 'syncing', %s)
+            VALUES (%s, %s, %s, %s, 'queued', %s)
             RETURNING *
             """,
             (
                 str(uuid4()),
                 knowledge_base_id.strip(),
                 source_id.strip() if source_id else None,
+                operation_type.strip().lower(),
                 created_by_user_id,
             ),
         ).fetchone()
     if row is None:
         raise RuntimeError("failed_to_create_sync_run")
     return dict(row)
+
+
+def claim_next_queued_sync_run(database_url: str) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sync_runs AS runs
+            SET
+              status = 'running',
+              current_step = COALESCE(current_step, 'Starting sync.'),
+              started_at = NOW()
+            WHERE runs.id = (
+                SELECT id
+                FROM context_knowledge_sync_runs
+                WHERE status = 'queued'
+                ORDER BY started_at ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING *
+            """
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def update_sync_run_progress(
+    database_url: str,
+    *,
+    run_id: str,
+    total_file_count: int | None = None,
+    processed_file_count: int | None = None,
+    total_document_count: int | None = None,
+    processed_document_count: int | None = None,
+    current_step: str | None = None,
+    current_path: str | None = None,
+) -> dict[str, Any] | None:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            UPDATE context_knowledge_sync_runs
+            SET
+              total_file_count = COALESCE(%s, total_file_count),
+              processed_file_count = COALESCE(%s, processed_file_count),
+              total_document_count = COALESCE(%s, total_document_count),
+              processed_document_count = COALESCE(%s, processed_document_count),
+              current_step = COALESCE(%s, current_step),
+              current_path = %s
+            WHERE id = %s
+            RETURNING *
+            """,
+            (
+                total_file_count,
+                processed_file_count,
+                total_document_count,
+                processed_document_count,
+                current_step.strip() if isinstance(current_step, str) and current_step.strip() else None,
+                current_path.strip() if isinstance(current_path, str) and current_path.strip() else None,
+                run_id.strip(),
+            ),
+        ).fetchone()
+    return dict(row) if row is not None else None
 
 
 def finish_sync_run(
@@ -778,6 +842,8 @@ def finish_sync_run(
               updated_document_count = %s,
               deleted_document_count = %s,
               error_summary = %s,
+              current_step = %s,
+              current_path = NULL,
               finished_at = NOW()
             WHERE id = %s
             RETURNING *
@@ -791,10 +857,30 @@ def finish_sync_run(
                 updated_document_count,
                 deleted_document_count,
                 error_summary.strip() if isinstance(error_summary, str) and error_summary.strip() else None,
+                "Sync completed." if status.strip().lower() == "ready" else "Sync failed.",
                 run_id.strip(),
             ),
         ).fetchone()
     return dict(row) if row is not None else None
+
+
+def reconcile_stale_sync_runs(database_url: str, *, stale_after_seconds: int) -> int:
+    with get_connection(database_url) as connection:
+        rows = connection.execute(
+            """
+            UPDATE context_knowledge_sync_runs
+            SET
+              status = 'error',
+              error_summary = 'Worker restarted while sync job was running',
+              current_step = 'Sync failed.',
+              finished_at = NOW()
+            WHERE status = 'running'
+              AND started_at < (NOW() - (%s * INTERVAL '1 second'))
+            RETURNING id
+            """,
+            (stale_after_seconds,),
+        ).fetchall()
+    return len(rows)
 
 
 def list_sync_runs(database_url: str, *, knowledge_base_id: str) -> list[dict[str, Any]]:

@@ -224,7 +224,7 @@ def delete_knowledge_base_route(knowledge_base_id: str):
 @require_role("superadmin")
 def resync_knowledge_base_route(knowledge_base_id: str):
     try:
-        knowledge_base = resync_knowledge_base(
+        payload = resync_knowledge_base(
             _database_url(),
             config=_config(),
             knowledge_base_id=knowledge_base_id,
@@ -232,7 +232,7 @@ def resync_knowledge_base_route(knowledge_base_id: str):
         )
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
-    return jsonify({"knowledge_base": knowledge_base}), 200
+    return jsonify(payload), 202
 
 
 @bp.post("/v1/context/knowledge-bases/<knowledge_base_id>/query")
@@ -328,7 +328,7 @@ def sync_knowledge_source_route(knowledge_base_id: str, source_id: str):
         )
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
-    return jsonify(payload), 200
+    return jsonify(payload), 202
 
 
 @bp.get("/v1/context/knowledge-bases/<knowledge_base_id>/sync-runs")

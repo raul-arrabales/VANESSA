@@ -8,6 +8,7 @@ from ..repositories.users import count_users, create_user
 from ..security import hash_password
 from . import auth_lifecycle
 from .knowledge_chat_bootstrap import ensure_knowledge_chat_agent
+from .knowledge_sync_worker import ensure_knowledge_sync_worker_started
 from .model_download_worker import ensure_download_worker_started
 from .platform_bootstrap import ensure_platform_bootstrap_state
 from .runtime_profile_service import seed_runtime_profile_from_config
@@ -40,6 +41,7 @@ def ensure_auth_initialized() -> bool:
         run_auth_schema_migration_fn=run_auth_schema_migration,
         bootstrap_superadmin_fn=bootstrap_superadmin,
         ensure_download_worker_started_fn=ensure_download_worker_started,
+        ensure_knowledge_sync_worker_started_fn=ensure_knowledge_sync_worker_started,
     )
     if not ready:
         return False

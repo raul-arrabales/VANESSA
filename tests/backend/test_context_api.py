@@ -408,6 +408,33 @@ def test_resync_knowledge_base_route_requires_superadmin(client, monkeypatch: py
     assert response.status_code == 403
 
 
+def test_resync_knowledge_base_route_enqueues_for_superadmin(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    superadmin = users.create_user(
+        "ignored",
+        email="superadmin-resync@example.com",
+        username="superadmin-resync",
+        password_hash=hash_password("superadmin-pass-123"),
+        role="superadmin",
+        is_active=True,
+    )
+    token = _login(test_client, superadmin["username"], "superadmin-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        context_routes,
+        "resync_knowledge_base",
+        lambda *_args, **_kwargs: {
+            "knowledge_base": {"id": "kb-primary", "display_name": "Product Docs"},
+            "sync_run": {"id": "run-1", "operation_type": "knowledge_resync", "status": "queued"},
+        },
+    )
+
+    response = test_client.post("/v1/context/knowledge-bases/kb-primary/resync", headers=_auth(token))
+
+    assert response.status_code == 202
+    assert response.get_json()["sync_run"]["operation_type"] == "knowledge_resync"
+
+
 def test_query_knowledge_base_route_returns_payload_for_admin(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     admin = users.create_user(
@@ -739,7 +766,7 @@ def test_sync_knowledge_source_route_returns_payload_for_superadmin(client, monk
         headers=_auth(token),
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert response.get_json()["sync_run"]["id"] == "run-1"
 
 

@@ -678,6 +678,7 @@
       "sourceDirectoriesLoadFailed": "No se pudieron cargar los directorios de fuentes.",
       "sourceDeleteFailed": "No se pudo eliminar la fuente.",
       "sourceSynced": "La fuente '{{name}}' se sincronizo.",
+      "sourceSyncQueued": "Sincronizacion de fuente '{{name}}' iniciada.",
       "sourceSyncFailed": "No se pudo sincronizar la fuente.",
       "uploaded": "Se subieron {{count}} archivo(s).",
       "uploadFailed": "No se pudieron subir los archivos.",
@@ -688,8 +689,14 @@
       "metadataInvalidInteger": "Los valores enteros de metadatos deben ser numeros enteros.",
       "metadataInvalidBoolean": "Los valores booleanos de metadatos deben ser verdadero o falso.",
       "resynced": "La base de conocimiento '{{name}}' se resincronizo.",
+      "resyncQueued": "Resincronizacion de base de conocimiento '{{name}}' iniciada.",
       "resyncFailed": "No se pudo resincronizar la base de conocimiento.",
       "queryFailed": "No se pudo ejecutar la prueba de recuperacion."
+    },
+    "syncProgress": {
+      "aria": "Progreso de sincronizacion de conocimiento",
+      "queued": "Esperando para iniciar.",
+      "percent": "{{percent}}%"
     },
     "deleteDialog": {
       "eyebrow": "Gestion de base de conocimiento",

@@ -686,6 +686,7 @@
       "sourceDirectoriesLoadFailed": "Unable to load source directories.",
       "sourceDeleteFailed": "Unable to delete source.",
       "sourceSynced": "Source '{{name}}' synced.",
+      "sourceSyncQueued": "Source '{{name}}' sync started.",
       "sourceSyncFailed": "Unable to sync the source.",
       "uploaded": "Uploaded {{count}} file(s).",
       "uploadFailed": "Unable to upload files.",
@@ -696,8 +697,14 @@
       "metadataInvalidInteger": "Metadata integer values must be whole numbers.",
       "metadataInvalidBoolean": "Metadata boolean values must be true or false.",
       "resynced": "Knowledge base '{{name}}' resynced.",
+      "resyncQueued": "Knowledge base '{{name}}' resync started.",
       "resyncFailed": "Unable to resync the knowledge base.",
       "queryFailed": "Unable to run the retrieval test."
+    },
+    "syncProgress": {
+      "aria": "Knowledge sync progress",
+      "queued": "Waiting to start.",
+      "percent": "{{percent}}%"
     },
     "deleteDialog": {
       "eyebrow": "Knowledge base management",

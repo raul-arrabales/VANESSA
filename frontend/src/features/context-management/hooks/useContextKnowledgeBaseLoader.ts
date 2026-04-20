@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,9 +36,13 @@ export type ContextKnowledgeBaseLoaderResult = {
   setSources: Dispatch<SetStateAction<KnowledgeSource[]>>;
   syncRuns: KnowledgeSyncRun[];
   setSyncRuns: Dispatch<SetStateAction<KnowledgeSyncRun[]>>;
+  hasActiveSyncRuns: boolean;
   showErrorFeedback: ReturnType<typeof useActionFeedback>["showErrorFeedback"];
   showSuccessFeedback: ReturnType<typeof useActionFeedback>["showSuccessFeedback"];
 };
+
+const ACTIVE_SYNC_RUN_STATUSES = new Set(["queued", "running"]);
+const SYNC_RUN_POLL_INTERVAL_MS = 2000;
 
 type ContextKnowledgeBaseLoaderPayload = {
   knowledgeBase: KnowledgeBase;
@@ -65,11 +69,11 @@ async function loadKnowledgeBaseWorkspaceData(
 export function useContextKnowledgeBaseLoader(
   options: ContextKnowledgeBaseLoaderOptions = {},
 ): ContextKnowledgeBaseLoaderResult {
-  const normalizedOptions = {
+  const normalizedOptions = useMemo(() => ({
     loadDocuments: options.loadDocuments ?? false,
     loadSources: options.loadSources ?? false,
     loadSyncRuns: options.loadSyncRuns ?? false,
-  };
+  }), [options.loadDocuments, options.loadSources, options.loadSyncRuns]);
   const { t } = useTranslation("common");
   const { knowledgeBaseId = "" } = useParams();
   const location = useLocation();
@@ -84,7 +88,12 @@ export function useContextKnowledgeBaseLoader(
 
   useRouteActionFeedback(location.state);
 
-  const reload = async (): Promise<void> => {
+  const hasActiveSyncRuns = useMemo(
+    () => syncRuns.some((run) => ACTIVE_SYNC_RUN_STATUSES.has(run.status)),
+    [syncRuns],
+  );
+
+  const reload = useCallback(async (): Promise<void> => {
     if (!token || !knowledgeBaseId) {
       return;
     }
@@ -94,7 +103,7 @@ export function useContextKnowledgeBaseLoader(
     setDocuments(payload.documents);
     setSources(payload.sources);
     setSyncRuns(payload.syncRuns);
-  };
+  }, [knowledgeBaseId, normalizedOptions, token]);
 
   useEffect(() => {
     if (!token || !knowledgeBaseId) {
@@ -138,6 +147,38 @@ export function useContextKnowledgeBaseLoader(
     token,
   ]);
 
+  useEffect(() => {
+    if (!token || !knowledgeBaseId || !normalizedOptions.loadSyncRuns || !hasActiveSyncRuns) {
+      return;
+    }
+    let cancelled = false;
+    let timeoutId: number | undefined;
+
+    const poll = async (): Promise<void> => {
+      try {
+        await reload();
+      } catch {
+        // Keep polling active sync runs; transient refresh errors surface on the next explicit load.
+      } finally {
+        if (!cancelled) {
+          timeoutId = window.setTimeout(() => {
+            void poll();
+          }, SYNC_RUN_POLL_INTERVAL_MS);
+        }
+      }
+    };
+
+    timeoutId = window.setTimeout(() => {
+      void poll();
+    }, SYNC_RUN_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [hasActiveSyncRuns, knowledgeBaseId, normalizedOptions.loadSyncRuns, reload, token]);
+
   return {
     knowledgeBaseId,
     knowledgeBase,
@@ -152,6 +193,7 @@ export function useContextKnowledgeBaseLoader(
     setSources,
     syncRuns,
     setSyncRuns,
+    hasActiveSyncRuns,
     showErrorFeedback,
     showSuccessFeedback,
   };

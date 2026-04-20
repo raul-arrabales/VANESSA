@@ -57,6 +57,55 @@ def test_normalize_knowledge_source_sync_failure_wraps_unexpected_exception_with
     }
 
 
+def test_sync_knowledge_source_enqueues_run(monkeypatch: pytest.MonkeyPatch):
+    knowledge_base = {"id": "kb-primary", "index_name": "kb_product_docs", "schema_json": {}}
+    source = {
+        "id": "source-1",
+        "knowledge_base_id": "kb-primary",
+        "display_name": "Patient Guides",
+        "relative_path": "patient_guides",
+        "include_globs": [],
+        "exclude_globs": [],
+        "metadata_json": {},
+        "lifecycle_state": "active",
+        "last_sync_status": "idle",
+    }
+    run = {
+        "id": "run-1",
+        "knowledge_base_id": "kb-primary",
+        "source_id": "source-1",
+        "operation_type": "source_sync",
+        "status": "queued",
+    }
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+    monkeypatch.setattr(context_management_sources, "_require_knowledge_source", lambda *_args, **_kwargs: source)
+    monkeypatch.setattr(context_management_sources, "require_knowledge_base_text_ingestion_supported", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_syncing", lambda *_args, **kwargs: captured.setdefault("kb", kwargs) or knowledge_base)
+    monkeypatch.setattr(context_management_sources.context_repo, "mark_knowledge_source_syncing", lambda *_args, **_kwargs: {**source, "last_sync_status": "syncing"})
+    monkeypatch.setattr(context_management_sources.context_repo, "get_knowledge_source", lambda *_args, **_kwargs: {**source, "last_sync_status": "syncing"})
+    monkeypatch.setattr(context_management_sources.context_repo, "get_knowledge_base", lambda *_args, **_kwargs: knowledge_base)
+
+    def _create_sync_run(*_args, **kwargs):
+        captured["run"] = kwargs
+        return run
+
+    monkeypatch.setattr(context_management_sources.context_repo, "create_sync_run", _create_sync_run)
+
+    payload = context_management_sources.sync_knowledge_source(
+        "postgresql://ignored",
+        config=object(),
+        knowledge_base_id="kb-primary",
+        source_id="source-1",
+        updated_by_user_id=1,
+    )
+
+    assert captured["run"]["operation_type"] == "source_sync"
+    assert payload["sync_run"]["status"] == "queued"
+    assert payload["source"]["last_sync_status"] == "syncing"
+
+
 def test_sync_knowledge_source_persists_and_raises_the_same_chunking_failure(monkeypatch: pytest.MonkeyPatch):
     persisted: dict[str, object] = {}
 
@@ -113,12 +162,10 @@ def test_sync_knowledge_source_persists_and_raises_the_same_chunking_failure(mon
     monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_sync_error", lambda *_args, **kwargs: persisted.setdefault("kb_error", kwargs))
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
-        context_management_sources.sync_knowledge_source(
+        context_management_sources.perform_knowledge_source_sync_run(
             "postgresql://ignored",
             config=object(),
-            knowledge_base_id="kb-primary",
-            source_id="source-1",
-            updated_by_user_id=1,
+            run={"id": "run-1", "knowledge_base_id": "kb-primary", "source_id": "source-1", "created_by_user_id": 1},
         )
 
     assert exc_info.value.code == "knowledge_base_chunking_exceeds_embeddings_limit"
@@ -176,12 +223,10 @@ def test_sync_knowledge_source_wraps_unexpected_exception_with_persisted_message
     monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_sync_error", lambda *_args, **kwargs: persisted.setdefault("kb_error", kwargs))
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
-        context_management_sources.sync_knowledge_source(
+        context_management_sources.perform_knowledge_source_sync_run(
             "postgresql://ignored",
             config=object(),
-            knowledge_base_id="kb-primary",
-            source_id="source-1",
-            updated_by_user_id=1,
+            run={"id": "run-1", "knowledge_base_id": "kb-primary", "source_id": "source-1", "created_by_user_id": 1},
         )
 
     assert exc_info.value.code == "knowledge_source_sync_failed"
@@ -257,12 +302,10 @@ def test_sync_knowledge_source_persists_precise_embeddings_failure_message(monke
     monkeypatch.setattr(context_management_sources, "_mark_knowledge_base_sync_error", lambda *_args, **kwargs: persisted.setdefault("kb_error", kwargs))
 
     with pytest.raises(PlatformControlPlaneError) as exc_info:
-        context_management_sources.sync_knowledge_source(
+        context_management_sources.perform_knowledge_source_sync_run(
             "postgresql://ignored",
             config=object(),
-            knowledge_base_id="kb-primary",
-            source_id="source-1",
-            updated_by_user_id=1,
+            run={"id": "run-1", "knowledge_base_id": "kb-primary", "source_id": "source-1", "created_by_user_id": 1},
         )
 
     assert exc_info.value.code == "embeddings_input_too_large"

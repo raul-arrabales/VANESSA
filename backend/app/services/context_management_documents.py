@@ -11,6 +11,7 @@ from .context_management_serialization import (
     _normalize_schema_managed_metadata,
     _serialize_document,
     _serialize_knowledge_base,
+    _serialize_sync_run,
 )
 from .context_management_shared import (
     _chunk_knowledge_base_page_texts,
@@ -22,6 +23,7 @@ from .context_management_shared import (
     _refresh_document_count,
     _require_knowledge_base,
     _resolve_knowledge_base_vector_adapter,
+    _resolve_source_directory,
     _upsert_document_chunks,
 )
 from .context_management_types import (
@@ -303,6 +305,37 @@ def resync_knowledge_base(
 ) -> dict[str, Any]:
     knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
     require_knowledge_base_text_ingestion_supported(knowledge_base)
+    run = context_repo.create_sync_run(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=None,
+        operation_type="knowledge_resync",
+        created_by_user_id=updated_by_user_id,
+    )
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary="Queued knowledge-base resync.",
+    )
+    return {
+        "knowledge_base": _serialize_knowledge_base(
+            context_repo.get_knowledge_base(database_url, knowledge_base_id) or knowledge_base
+        ),
+        "sync_run": _serialize_sync_run(run),
+    }
+
+
+def perform_knowledge_base_resync_run(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    run: dict[str, Any],
+) -> dict[str, Any]:
+    knowledge_base_id = str(run.get("knowledge_base_id") or "").strip()
+    updated_by_user_id = int(run["created_by_user_id"]) if run.get("created_by_user_id") is not None else None
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
     documents = context_repo.list_documents(database_url, knowledge_base_id=knowledge_base_id)
     _mark_knowledge_base_syncing(
         database_url,
@@ -311,6 +344,75 @@ def resync_knowledge_base(
         summary="Rebuilding vector index from stored documents.",
     )
     try:
+        source_scanned_file_count = 0
+        source_changed_file_count = 0
+        source_deleted_file_count = 0
+        source_created_document_count = 0
+        source_updated_document_count = 0
+        source_deleted_document_count = 0
+        context_repo.update_sync_run_progress(
+            database_url,
+            run_id=str(run["id"]),
+            current_step="Reconciling active sources.",
+            current_path=None,
+        )
+        for source in context_repo.list_knowledge_sources(database_url, knowledge_base_id=knowledge_base_id):
+            if str(source.get("lifecycle_state") or "").strip().lower() != "active":
+                continue
+            from .context_management_sources import _sync_knowledge_source_documents
+
+            _, source_directory = _resolve_source_directory(
+                config,
+                str(source.get("relative_path") or "").strip(),
+                require_exists=True,
+            )
+            context_repo.mark_knowledge_source_syncing(
+                database_url,
+                knowledge_base_id=knowledge_base_id,
+                source_id=str(source["id"]),
+            )
+            try:
+                source_result = _sync_knowledge_source_documents(
+                    database_url,
+                    config,
+                    knowledge_base=knowledge_base,
+                    source=source,
+                    source_directory=source_directory,
+                    sync_run_id=str(run["id"]),
+                    updated_by_user_id=updated_by_user_id,
+                )
+            except Exception as exc:
+                context_repo.set_knowledge_source_sync_result(
+                    database_url,
+                    knowledge_base_id=knowledge_base_id,
+                    source_id=str(source["id"]),
+                    last_sync_status="error",
+                    last_sync_error=str(exc) or "Knowledge source sync failed.",
+                )
+                raise
+            source_scanned_file_count += source_result["scanned_file_count"]
+            source_changed_file_count += source_result["changed_file_count"]
+            source_deleted_file_count += source_result["deleted_file_count"]
+            source_created_document_count += source_result["created_document_count"]
+            source_updated_document_count += source_result["updated_document_count"]
+            source_deleted_document_count += source_result["deleted_document_count"]
+            context_repo.set_knowledge_source_sync_result(
+                database_url,
+                knowledge_base_id=knowledge_base_id,
+                source_id=str(source["id"]),
+                last_sync_status="ready",
+                last_sync_error=None,
+            )
+
+        documents = context_repo.list_documents(database_url, knowledge_base_id=knowledge_base_id)
+        context_repo.update_sync_run_progress(
+            database_url,
+            run_id=str(run["id"]),
+            total_document_count=len(documents),
+            processed_document_count=0,
+            current_step="Rebuilding vector index.",
+            current_path=None,
+        )
         adapter = _resolve_knowledge_base_vector_adapter(database_url, config, knowledge_base)
         adapter.delete_index(index_name=str(knowledge_base["index_name"]))
         adapter.ensure_index(
@@ -318,6 +420,7 @@ def resync_knowledge_base(
             schema=dict(knowledge_base.get("schema_json") or {}),
         )
         total_chunks = 0
+        processed_document_count = 0
         for document in documents:
             chunks = _chunk_knowledge_base_text(
                 database_url,
@@ -344,6 +447,14 @@ def resync_knowledge_base(
                     document=synced_document,
                     chunks=chunks,
                 )
+            processed_document_count += 1
+            context_repo.update_sync_run_progress(
+                database_url,
+                run_id=str(run["id"]),
+                processed_document_count=processed_document_count,
+                current_step="Rebuilding vector index.",
+                current_path=str(document.get("source_path") or document.get("title") or "").strip() or None,
+            )
         _refresh_document_count(database_url, knowledge_base_id=knowledge_base_id, updated_by_user_id=updated_by_user_id)
         refreshed = _mark_knowledge_base_sync_ready(
             database_url,
@@ -351,12 +462,39 @@ def resync_knowledge_base(
             updated_by_user_id=updated_by_user_id,
             summary=f"Resynced {len(documents)} document(s) and {total_chunks} chunk(s).",
         )
-        return _serialize_knowledge_base(
-            context_repo.get_knowledge_base(database_url, knowledge_base_id)
-            or refreshed
-            or _require_knowledge_base(database_url, knowledge_base_id)
+        finished_run = context_repo.finish_sync_run(
+            database_url,
+            run_id=str(run["id"]),
+            status="ready",
+            scanned_file_count=source_scanned_file_count,
+            changed_file_count=source_changed_file_count,
+            deleted_file_count=source_deleted_file_count,
+            created_document_count=source_created_document_count,
+            updated_document_count=source_updated_document_count,
+            deleted_document_count=source_deleted_document_count,
+            error_summary=None,
         )
-    except Exception:
+        return {
+            "knowledge_base": _serialize_knowledge_base(
+                context_repo.get_knowledge_base(database_url, knowledge_base_id)
+                or refreshed
+                or _require_knowledge_base(database_url, knowledge_base_id)
+            ),
+            "sync_run": _serialize_sync_run(finished_run or run),
+        }
+    except Exception as exc:
+        context_repo.finish_sync_run(
+            database_url,
+            run_id=str(run["id"]),
+            status="error",
+            scanned_file_count=0,
+            changed_file_count=0,
+            deleted_file_count=0,
+            created_document_count=0,
+            updated_document_count=0,
+            deleted_document_count=0,
+            error_summary=str(exc) or "Knowledge-base resync failed.",
+        )
         _mark_knowledge_base_sync_error(
             database_url,
             knowledge_base_id=knowledge_base_id,

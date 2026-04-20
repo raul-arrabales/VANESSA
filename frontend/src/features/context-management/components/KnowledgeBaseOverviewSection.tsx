@@ -1,8 +1,9 @@
 import { useRef, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeBase } from "../../../api/context";
+import type { KnowledgeBase, KnowledgeSyncRun } from "../../../api/context";
 import ModalDialog from "../../../components/ModalDialog";
 import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
+import { KnowledgeBaseSyncProgress } from "./KnowledgeBaseSyncProgress";
 import type { KnowledgeBaseOverviewFormState } from "../types";
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   isDeleting: boolean;
   isSuperadmin: boolean;
   isResyncing: boolean;
+  activeResyncRun: KnowledgeSyncRun | null;
   onFormChange: Dispatch<SetStateAction<KnowledgeBaseOverviewFormState>>;
   onCloseDeleteDialog: () => void;
   onConfirmDelete: () => Promise<void>;
@@ -47,6 +49,7 @@ export function KnowledgeBaseOverviewSection({
   isDeleting,
   isSuperadmin,
   isResyncing,
+  activeResyncRun,
   onFormChange,
   onCloseDeleteDialog,
   onConfirmDelete,
@@ -172,6 +175,7 @@ export function KnowledgeBaseOverviewSection({
           {t("contextManagement.fields.lastSyncError")}: {knowledgeBase.last_sync_error}
         </p>
       ) : null}
+      {activeResyncRun ? <KnowledgeBaseSyncProgress run={activeResyncRun} /> : null}
       {isSuperadmin ? (
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" disabled={isResyncing} onClick={() => void onResync()}>

@@ -59,6 +59,7 @@ def ensure_auth_initialized(
     run_auth_schema_migration_fn,
     bootstrap_superadmin_fn,
     ensure_download_worker_started_fn,
+    ensure_knowledge_sync_worker_started_fn=None,
 ) -> bool:
     global _auth_initialized, _auth_init_error
 
@@ -72,6 +73,8 @@ def ensure_auth_initialized(
         run_auth_schema_migration_fn(config.database_url)
         bootstrap_superadmin_fn(config)
         ensure_download_worker_started_fn()
+        if ensure_knowledge_sync_worker_started_fn is not None:
+            ensure_knowledge_sync_worker_started_fn()
         _auth_initialized = True
         return True
     except Exception as exc:  # pragma: no cover - guarded by endpoint behavior tests

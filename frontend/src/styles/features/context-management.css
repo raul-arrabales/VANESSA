@@ -41,6 +41,46 @@
   line-height: 1.5;
 }
 
+.context-sync-progress {
+  gap: var(--space-2);
+}
+
+.context-sync-progress-track {
+  position: relative;
+  height: 0.75rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border-muted) 78%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+}
+
+.context-sync-progress-bar {
+  height: 100%;
+  min-width: 0.25rem;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  transition: width var(--duration-normal) var(--easing-standard);
+}
+
+.context-sync-progress-track[data-mode="indeterminate"] .context-sync-progress-bar {
+  width: 42%;
+  animation: context-sync-progress-indeterminate 1.4s linear infinite;
+}
+
+.context-sync-progress-path {
+  overflow-wrap: anywhere;
+}
+
+@keyframes context-sync-progress-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
+}
+
 .context-retrieval-query-textarea {
   min-height: 0;
   overflow-y: auto;

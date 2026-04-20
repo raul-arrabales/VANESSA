@@ -29,6 +29,7 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
   const detail = useContextKnowledgeBaseSources();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeView = resolveSourcesPageView(searchParams.get("view"), detail.isSuperadmin);
+  const activeSyncRuns = detail.syncRuns.filter((run) => run.status === "queued" || run.status === "running");
   const availableViews = SOURCES_PAGE_VIEW_ORDER.filter((view) => detail.isSuperadmin || view !== "add");
   const submenuItems = availableViews.map((view) => ({
     id: view,
@@ -84,6 +85,7 @@ export default function ContextKnowledgeBaseSourcesPage(): JSX.Element {
               sources={detail.sources}
               isSuperadmin={detail.isSuperadmin}
               syncingSourceId={detail.syncingSourceId}
+              activeSyncRuns={activeSyncRuns}
               onEdit={handleEditSource}
               onDelete={detail.handleDeleteSource}
               onSync={detail.handleSyncSource}

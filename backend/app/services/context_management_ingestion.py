@@ -6,6 +6,7 @@ from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from .context_management_types import (
+    MAX_INGESTION_FILE_SIZE_LABEL,
     ParsedIngestionDocument,
     _MAX_FILE_SIZE_BYTES,
     _SUPPORTED_UPLOAD_EXTENSIONS,
@@ -34,11 +35,20 @@ def _iter_source_files(
 
 
 def _parse_source_documents(file_path: Path, *, relative_path: str, source: dict[str, Any]) -> list[ParsedIngestionDocument]:
+    _validate_ingestion_file_size(
+        lambda: file_path.stat().st_size,
+        filename=relative_path,
+        too_large_code="source_file_too_large",
+        too_large_message=f"Source files must be {MAX_INGESTION_FILE_SIZE_LABEL} or smaller",
+        read_error_code="invalid_source_file",
+        read_error_message="Source file could not be read",
+        details_key="relative_path",
+    )
     raw_bytes = _read_ingestion_bytes(
         file_path.read_bytes,
         filename=relative_path,
         too_large_code="source_file_too_large",
-        too_large_message=f"Source files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
+        too_large_message=f"Source files must be {MAX_INGESTION_FILE_SIZE_LABEL} or smaller",
         read_error_code="invalid_source_file",
         read_error_message="Source file could not be read",
         details_key="relative_path",
@@ -106,7 +116,7 @@ def _parse_upload_documents(file_storage: Any) -> list[ParsedIngestionDocument]:
         lambda: getattr(file_storage, "read")(),
         filename=filename,
         too_large_code="upload_limit_exceeded",
-        too_large_message=f"Uploaded files must be smaller than {_MAX_FILE_SIZE_BYTES} bytes",
+        too_large_message=f"Uploaded files must be {MAX_INGESTION_FILE_SIZE_LABEL} or smaller",
         read_error_code="invalid_upload",
         read_error_message="Uploaded file could not be read",
         details_key="filename",
@@ -120,6 +130,34 @@ def _parse_upload_documents(file_storage: Any) -> list[ParsedIngestionDocument]:
         invalid_pdf_code="invalid_upload_pdf",
         details_key="filename",
     )
+
+
+def _validate_ingestion_file_size(
+    get_size: Any,
+    *,
+    filename: str,
+    too_large_code: str,
+    too_large_message: str,
+    read_error_code: str,
+    read_error_message: str,
+    details_key: str,
+) -> None:
+    try:
+        size = int(get_size())
+    except Exception as exc:
+        raise PlatformControlPlaneError(
+            read_error_code,
+            read_error_message,
+            status_code=400,
+            details={details_key: filename},
+        ) from exc
+    if size > _MAX_FILE_SIZE_BYTES:
+        raise PlatformControlPlaneError(
+            too_large_code,
+            too_large_message,
+            status_code=400,
+            details={details_key: filename, "max_file_size_bytes": _MAX_FILE_SIZE_BYTES},
+        )
 
 
 def _read_ingestion_bytes(
@@ -153,6 +191,6 @@ def _read_ingestion_bytes(
             too_large_code,
             too_large_message,
             status_code=400,
-            details={details_key: filename},
+            details={details_key: filename, "max_file_size_bytes": _MAX_FILE_SIZE_BYTES},
         )
     return bytes(raw_bytes)

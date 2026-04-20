@@ -1,10 +1,12 @@
 import { useTranslation } from "react-i18next";
-import type { KnowledgeSource } from "../../../api/context";
+import type { KnowledgeSource, KnowledgeSyncRun } from "../../../api/context";
+import { KnowledgeBaseSyncProgress } from "./KnowledgeBaseSyncProgress";
 
 type Props = {
   sources: KnowledgeSource[];
   isSuperadmin: boolean;
   syncingSourceId: string | null;
+  activeSyncRuns: KnowledgeSyncRun[];
   onEdit: (source: KnowledgeSource) => void;
   onDelete: (sourceId: string) => Promise<void>;
   onSync: (sourceId: string) => Promise<void>;
@@ -14,6 +16,7 @@ export function KnowledgeBaseSourcesListSection({
   sources,
   isSuperadmin,
   syncingSourceId,
+  activeSyncRuns,
   onEdit,
   onDelete,
   onSync,
@@ -32,6 +35,11 @@ export function KnowledgeBaseSourcesListSection({
       {sources.length === 0 ? <p className="status-text">{t("contextManagement.states.noSources")}</p> : null}
       {sources.map((source) => (
         <article key={source.id} className="panel panel-nested card-stack">
+          {(() => {
+            const activeRun = activeSyncRuns.find((run) => run.source_id === source.id) ?? null;
+            const isSourceSyncing = syncingSourceId === source.id || activeRun !== null;
+            return (
+              <>
           <div className="platform-card-header">
             <div className="card-stack">
               <h4 className="section-title">{source.display_name}</h4>
@@ -55,15 +63,16 @@ export function KnowledgeBaseSourcesListSection({
           {source.last_sync_error ? (
             <p className="status-text error-text">{t("contextManagement.fields.lastSyncError")}: {source.last_sync_error}</p>
           ) : null}
+          {activeRun ? <KnowledgeBaseSyncProgress run={activeRun} /> : null}
           {isSuperadmin ? (
             <div className="form-actions">
               <button
                 type="button"
                 className="btn btn-secondary"
-                disabled={syncingSourceId === source.id}
+                disabled={isSourceSyncing}
                 onClick={() => void onSync(source.id)}
               >
-                {syncingSourceId === source.id ? t("contextManagement.actions.syncingSource") : t("contextManagement.actions.syncSource")}
+                {isSourceSyncing ? t("contextManagement.actions.syncingSource") : t("contextManagement.actions.syncSource")}
               </button>
               <button type="button" className="btn btn-secondary" onClick={() => onEdit(source)}>
                 {t("contextManagement.actions.edit")}
@@ -73,6 +82,9 @@ export function KnowledgeBaseSourcesListSection({
               </button>
             </div>
           ) : null}
+              </>
+            );
+          })()}
         </article>
       ))}
     </section>

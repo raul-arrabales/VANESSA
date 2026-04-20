@@ -18,6 +18,7 @@ export default function ContextKnowledgeBaseDetailPage(): JSX.Element {
             isDeleting={detail.isDeleting}
             isSuperadmin={detail.isSuperadmin}
             isResyncing={detail.isResyncing}
+            activeResyncRun={detail.activeResyncRun}
             onFormChange={detail.setForm}
             onCloseDeleteDialog={detail.closeDeleteDialog}
             onConfirmDelete={detail.confirmDeleteKnowledgeBase}

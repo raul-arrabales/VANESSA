@@ -74,13 +74,13 @@ Platform control plane endpoints:
 - `GET /v1/context/knowledge-bases/{id}` (admin)
 - `PUT /v1/context/knowledge-bases/{id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}` (superadmin)
-- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/resync` (superadmin, returns `202` with a queued sync run)
 - `POST /v1/context/knowledge-bases/{id}/query` (admin)
 - `GET /v1/context/knowledge-bases/{id}/sources` (admin)
 - `POST /v1/context/knowledge-bases/{id}/sources` (superadmin)
 - `PUT /v1/context/knowledge-bases/{id}/sources/{source_id}` (superadmin)
 - `DELETE /v1/context/knowledge-bases/{id}/sources/{source_id}` (superadmin)
-- `POST /v1/context/knowledge-bases/{id}/sources/{source_id}/sync` (superadmin)
+- `POST /v1/context/knowledge-bases/{id}/sources/{source_id}/sync` (superadmin, returns `202` with a queued sync run)
 - `GET /v1/context/knowledge-bases/{id}/sync-runs` (admin)
 - `GET /v1/context/knowledge-bases/{id}/documents` (admin)
 - `POST /v1/context/knowledge-bases/{id}/documents` (superadmin)
@@ -108,8 +108,9 @@ Platform control plane semantics:
 - Deployment binding save is now provider-local: required capabilities still need a selected provider, but resources/defaults may be left empty until the capability is fully configured.
 - Deployment binding and runtime retrieval now enforce both vector-store-provider compatibility and embeddings-target compatibility for `vanessa_embeddings` knowledge bases. Save-time cross-capability mismatches are reported as deployment readiness issues instead of blocking edits. `self_provided` KBs are excluded from the current text ingestion and text-query flows.
 - Managed knowledge bases now also support repeatable `local_directory` content sources under allowlisted backend-visible roots from `CONTEXT_SOURCE_ROOTS`.
-- Source sync is synchronous in the current slice, but each run is persisted in `context_knowledge_sync_runs` with file/document counters and error summaries for operator review.
-- Managed knowledge-base ingestion now accepts `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files. PDF import uses `pypdf`, creates one logical document per PDF, and intentionally fails for encrypted or scanned/image-only PDFs because OCR is not included yet.
+- Source sync and full knowledge-base resync are worker-backed asynchronous jobs. Each run is persisted in `context_knowledge_sync_runs` with operation type, queued/running/ready/error state, file/document counters, progress fields, and error summaries for operator review.
+- Managed knowledge-base ingestion now accepts `.txt`, `.md`, `.json`, `.jsonl`, and text-extractable `.pdf` files up to 20 MB each. PDF import uses `pypdf`, creates one logical document per PDF, and intentionally fails for encrypted or scanned/image-only PDFs because OCR is not included yet.
+- Full knowledge-base resync first reconciles active local-directory sources, then rebuilds the vector index from the final stored document corpus, including manual and source-managed documents.
 - Source-managed documents now carry provenance (`source_id`, `source_path`, `source_document_key`) and are treated as read-only from the manual document editor.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.

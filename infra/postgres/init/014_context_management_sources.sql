@@ -95,7 +95,14 @@ CREATE TABLE IF NOT EXISTS context_knowledge_sync_runs (
     id UUID PRIMARY KEY,
     knowledge_base_id UUID NOT NULL REFERENCES context_knowledge_bases(id) ON DELETE CASCADE,
     source_id UUID REFERENCES context_knowledge_sources(id) ON DELETE CASCADE,
-    status TEXT NOT NULL DEFAULT 'syncing',
+    operation_type TEXT NOT NULL DEFAULT 'source_sync',
+    status TEXT NOT NULL DEFAULT 'queued',
+    total_file_count INTEGER NOT NULL DEFAULT 0,
+    processed_file_count INTEGER NOT NULL DEFAULT 0,
+    total_document_count INTEGER NOT NULL DEFAULT 0,
+    processed_document_count INTEGER NOT NULL DEFAULT 0,
+    current_step TEXT,
+    current_path TEXT,
     scanned_file_count INTEGER NOT NULL DEFAULT 0,
     changed_file_count INTEGER NOT NULL DEFAULT 0,
     deleted_file_count INTEGER NOT NULL DEFAULT 0,
@@ -111,7 +118,21 @@ CREATE TABLE IF NOT EXISTS context_knowledge_sync_runs (
 ALTER TABLE context_knowledge_sync_runs
     ADD COLUMN IF NOT EXISTS source_id UUID REFERENCES context_knowledge_sources(id) ON DELETE CASCADE;
 ALTER TABLE context_knowledge_sync_runs
-    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'syncing';
+    ADD COLUMN IF NOT EXISTS operation_type TEXT NOT NULL DEFAULT 'source_sync';
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'queued';
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS total_file_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS processed_file_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS total_document_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS processed_document_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS current_step TEXT;
+ALTER TABLE context_knowledge_sync_runs
+    ADD COLUMN IF NOT EXISTS current_path TEXT;
 ALTER TABLE context_knowledge_sync_runs
     ADD COLUMN IF NOT EXISTS scanned_file_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE context_knowledge_sync_runs
@@ -133,18 +154,23 @@ ALTER TABLE context_knowledge_sync_runs
 ALTER TABLE context_knowledge_sync_runs
     ADD COLUMN IF NOT EXISTS created_by_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL;
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'context_knowledge_sync_runs_status_check'
-    ) THEN
-        ALTER TABLE context_knowledge_sync_runs
-        ADD CONSTRAINT context_knowledge_sync_runs_status_check
-        CHECK (status IN ('syncing', 'ready', 'error'));
-    END IF;
-END
-$$;
+UPDATE context_knowledge_sync_runs
+SET status = 'running'
+WHERE status = 'syncing';
+
+ALTER TABLE context_knowledge_sync_runs
+    DROP CONSTRAINT IF EXISTS context_knowledge_sync_runs_status_check;
+
+ALTER TABLE context_knowledge_sync_runs
+    ADD CONSTRAINT context_knowledge_sync_runs_status_check
+    CHECK (status IN ('queued', 'running', 'ready', 'error'));
+
+ALTER TABLE context_knowledge_sync_runs
+    DROP CONSTRAINT IF EXISTS context_knowledge_sync_runs_operation_type_check;
+
+ALTER TABLE context_knowledge_sync_runs
+    ADD CONSTRAINT context_knowledge_sync_runs_operation_type_check
+    CHECK (operation_type IN ('source_sync', 'knowledge_resync'));
 
 CREATE INDEX IF NOT EXISTS context_knowledge_sync_runs_kb_idx
     ON context_knowledge_sync_runs (knowledge_base_id, started_at DESC);

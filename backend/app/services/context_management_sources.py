@@ -290,13 +290,46 @@ def sync_knowledge_source(
             status_code=409,
             details={"source_id": source_id, "lifecycle_state": source.get("lifecycle_state")},
         )
-    _, source_directory = _resolve_source_directory(config, str(source.get("relative_path") or "").strip(), require_exists=True)
     run = context_repo.create_sync_run(
         database_url,
         knowledge_base_id=knowledge_base_id,
         source_id=source_id,
+        operation_type="source_sync",
         created_by_user_id=updated_by_user_id,
     )
+    _mark_knowledge_base_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        updated_by_user_id=updated_by_user_id,
+        summary=f"Syncing managed source '{source['display_name']}'.",
+    )
+    context_repo.mark_knowledge_source_syncing(
+        database_url,
+        knowledge_base_id=knowledge_base_id,
+        source_id=source_id,
+    )
+    refreshed_source = context_repo.get_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
+    refreshed_kb = context_repo.get_knowledge_base(database_url, knowledge_base_id)
+    return {
+        "knowledge_base": _serialize_knowledge_base(refreshed_kb or knowledge_base),
+        "source": _serialize_knowledge_source(refreshed_source or source),
+        "sync_run": _serialize_sync_run(run),
+    }
+
+
+def perform_knowledge_source_sync_run(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    run: dict[str, Any],
+) -> dict[str, Any]:
+    knowledge_base_id = str(run.get("knowledge_base_id") or "").strip()
+    source_id = str(run.get("source_id") or "").strip()
+    updated_by_user_id = int(run["created_by_user_id"]) if run.get("created_by_user_id") is not None else None
+    knowledge_base = _require_knowledge_base(database_url, knowledge_base_id)
+    require_knowledge_base_text_ingestion_supported(knowledge_base)
+    source = _require_knowledge_source(database_url, knowledge_base_id=knowledge_base_id, source_id=source_id)
+    _, source_directory = _resolve_source_directory(config, str(source.get("relative_path") or "").strip(), require_exists=True)
     _mark_knowledge_base_syncing(
         database_url,
         knowledge_base_id=knowledge_base_id,
@@ -315,6 +348,7 @@ def sync_knowledge_source(
             knowledge_base=knowledge_base,
             source=source,
             source_directory=source_directory,
+            sync_run_id=str(run["id"]),
             updated_by_user_id=updated_by_user_id,
         )
         finished_run = context_repo.finish_sync_run(
@@ -406,6 +440,7 @@ def _sync_knowledge_source_documents(
     knowledge_base: KnowledgeBaseRecord,
     source: dict[str, Any],
     source_directory: Path,
+    sync_run_id: str | None = None,
     updated_by_user_id: int | None,
 ) -> SourceSyncSummary:
     scanned_file_count = 0
@@ -419,13 +454,42 @@ def _sync_knowledge_source_documents(
     include_globs = list(source.get("include_globs") or [])
     exclude_globs = list(source.get("exclude_globs") or [])
 
-    for file_path, relative_path in _iter_source_files(
+    source_files = _iter_source_files(
         source_directory,
         include_globs=include_globs,
         exclude_globs=exclude_globs,
-    ):
+    )
+    if sync_run_id:
+        context_repo.update_sync_run_progress(
+            database_url,
+            run_id=sync_run_id,
+            total_file_count=len(source_files),
+            processed_file_count=0,
+            current_step="Scanning source files.",
+            current_path=None,
+        )
+
+    processed_document_count = 0
+    total_document_count = 0
+    for file_path, relative_path in source_files:
+        if sync_run_id:
+            context_repo.update_sync_run_progress(
+                database_url,
+                run_id=sync_run_id,
+                current_step="Parsing source file.",
+                current_path=relative_path,
+            )
         scanned_file_count += 1
         parsed_documents = _parse_source_documents(file_path, relative_path=relative_path, source=source)
+        total_document_count += len(parsed_documents)
+        if sync_run_id:
+            context_repo.update_sync_run_progress(
+                database_url,
+                run_id=sync_run_id,
+                total_document_count=total_document_count,
+                current_step="Indexing source documents.",
+                current_path=relative_path,
+            )
         for position, parsed_document in enumerate(parsed_documents):
             source_document_key = _source_document_key(relative_path, position)
             seen_keys.add(source_document_key)
@@ -461,7 +525,17 @@ def _sync_knowledge_source_documents(
                 )
                 _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=document, chunks=chunks)
                 created_document_count += 1
+                processed_document_count += 1
                 changed_paths.add(relative_path)
+                if sync_run_id:
+                    context_repo.update_sync_run_progress(
+                        database_url,
+                        run_id=sync_run_id,
+                        processed_file_count=scanned_file_count,
+                        processed_document_count=processed_document_count,
+                        current_step="Indexing source documents.",
+                        current_path=relative_path,
+                    )
                 continue
             if not _source_document_changed(
                 existing,
@@ -470,6 +544,16 @@ def _sync_knowledge_source_documents(
                 source_path=relative_path,
                 source_document_key=source_document_key,
             ):
+                processed_document_count += 1
+                if sync_run_id:
+                    context_repo.update_sync_run_progress(
+                        database_url,
+                        run_id=sync_run_id,
+                        processed_file_count=scanned_file_count,
+                        processed_document_count=processed_document_count,
+                        current_step="Indexing source documents.",
+                        current_path=relative_path,
+                    )
                 continue
             _delete_document_chunks(database_url, config, knowledge_base=knowledge_base, document=existing)
             updated = context_repo.update_document(
@@ -493,7 +577,26 @@ def _sync_knowledge_source_documents(
                 raise PlatformControlPlaneError("knowledge_document_not_found", "Knowledge document not found", status_code=404)
             _upsert_document_chunks(database_url, config, knowledge_base=knowledge_base, document=updated, chunks=chunks)
             updated_document_count += 1
+            processed_document_count += 1
             changed_paths.add(relative_path)
+            if sync_run_id:
+                context_repo.update_sync_run_progress(
+                    database_url,
+                    run_id=sync_run_id,
+                    processed_file_count=scanned_file_count,
+                    processed_document_count=processed_document_count,
+                    current_step="Indexing source documents.",
+                    current_path=relative_path,
+                )
+
+        if sync_run_id:
+            context_repo.update_sync_run_progress(
+                database_url,
+                run_id=sync_run_id,
+                processed_file_count=scanned_file_count,
+                current_step="Scanning source files.",
+                current_path=None,
+            )
 
     existing_documents = context_repo.list_source_documents(
         database_url,
@@ -514,6 +617,16 @@ def _sync_knowledge_source_documents(
         source_path = str(document.get("source_path") or "").strip()
         if source_path:
             deleted_paths.add(source_path)
+
+    if sync_run_id:
+        context_repo.update_sync_run_progress(
+            database_url,
+            run_id=sync_run_id,
+            processed_file_count=scanned_file_count,
+            processed_document_count=processed_document_count,
+            current_step="Refreshing knowledge base.",
+            current_path=None,
+        )
 
     _refresh_document_count(
         database_url,

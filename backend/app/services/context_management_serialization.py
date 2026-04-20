@@ -454,12 +454,31 @@ def _serialize_knowledge_source(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _serialize_sync_run(row: dict[str, Any]) -> dict[str, Any]:
+    total_file_count = int(row.get("total_file_count") or 0)
+    processed_file_count = int(row.get("processed_file_count") or 0)
+    total_document_count = int(row.get("total_document_count") or 0)
+    processed_document_count = int(row.get("processed_document_count") or 0)
+    progress_percent = _sync_progress_percent(
+        total_file_count=total_file_count,
+        processed_file_count=processed_file_count,
+        total_document_count=total_document_count,
+        processed_document_count=processed_document_count,
+        status=str(row.get("status") or "").strip(),
+    )
     return {
         "id": str(row.get("id") or "").strip(),
         "knowledge_base_id": str(row.get("knowledge_base_id") or "").strip(),
         "source_id": str(row.get("source_id") or "").strip() or None,
         "source_display_name": str(row.get("source_display_name") or "").strip() or None,
+        "operation_type": str(row.get("operation_type") or "source_sync").strip() or "source_sync",
         "status": str(row.get("status") or "").strip(),
+        "total_file_count": total_file_count,
+        "processed_file_count": processed_file_count,
+        "total_document_count": total_document_count,
+        "processed_document_count": processed_document_count,
+        "current_step": str(row.get("current_step") or "").strip() or None,
+        "current_path": str(row.get("current_path") or "").strip() or None,
+        "progress_percent": progress_percent,
         "scanned_file_count": int(row.get("scanned_file_count") or 0),
         "changed_file_count": int(row.get("changed_file_count") or 0),
         "deleted_file_count": int(row.get("deleted_file_count") or 0),
@@ -470,6 +489,23 @@ def _serialize_sync_run(row: dict[str, Any]) -> dict[str, Any]:
         "started_at": row.get("started_at").isoformat() if row.get("started_at") else None,
         "finished_at": row.get("finished_at").isoformat() if row.get("finished_at") else None,
     }
+
+
+def _sync_progress_percent(
+    *,
+    total_file_count: int,
+    processed_file_count: int,
+    total_document_count: int,
+    processed_document_count: int,
+    status: str,
+) -> int | None:
+    if status == "ready":
+        return 100
+    if total_document_count > 0:
+        return max(0, min(99, round((processed_document_count / total_document_count) * 100)))
+    if total_file_count > 0:
+        return max(0, min(99, round((processed_file_count / total_file_count) * 100)))
+    return None
 
 
 def _serialize_runtime_knowledge_base(resource: dict[str, Any], *, default_resource_id: str | None) -> dict[str, Any]:
