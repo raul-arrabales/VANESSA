@@ -1,336 +1,177 @@
 # VANESSA
 ### Versatile AI Navigator for Enhanced Semantic Search & Automation
 
-VANESSA is a modular, containerized AI assistant stack with:
+[![Docs Pages](https://img.shields.io/github/actions/workflow/status/raul-arrabales/VANESSA/docs-pages.yml?branch=main&label=docs)](https://github.com/raul-arrabales/VANESSA/actions/workflows/docs-pages.yml)
+[![License](https://img.shields.io/github/license/raul-arrabales/VANESSA)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-1f6feb)](https://raul-arrabales.github.io/VANESSA/)
 
-- Frontend service
-- Flask backend API
-- Agent orchestration service
-- Sandbox service for controlled code execution
-- Optional MCP gateway service for remote/general-purpose tool invocation
-- Private LLM gateway service (local-first routing)
-- Local vLLM inference runtime service
-- Local vLLM embeddings runtime service
-- Optional local llama.cpp runtime service
-- Wake-word (KWS) service
-- Weaviate vector store
-- Optional Qdrant vector store
-- PostgreSQL database
+VANESSA is a local-first, cloud-capable AI platform for building, operating, and governing AI assistants, tools, and model-serving infrastructure. It combines a backend-owned GenAI control plane, a distinct ModelOps layer, agent/tool orchestration, and a modular multi-service runtime that can run fully locally or mix local and cloud providers.
 
-The backend also owns a GenAI control plane that distinguishes:
+It is designed for teams that want more than a single chat app: a platform where model lifecycle, tool execution, deployment profiles, runtime policy, and product AI surfaces can evolve cleanly together.
 
-- `capabilities` such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`
-- `providers` such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, and OpenAI-compatible cloud families
-- `deployment profiles` that bind capabilities to active providers
-- provider origin, persisted on provider families as `local` or `cloud` and inherited by provider instances and runtime snapshots
+Best for: local AI experimentation, agent and tool orchestration, platform governance, and extensible OSS development.
 
-The product-facing AI surface is now split into explicit domains:
+## Quick Links
 
-- `frontend/src/features/playgrounds` for the user-facing `AI Playground` section and its shared chat and knowledge workspaces
-- `frontend/src/features/agent-builder` for builder-facing agent authoring
-- `frontend/src/features/catalog-admin` for superadmin catalog administration
-- `frontend/src/features/vanessa-core` for first-party Vanessa behavior surfaced from the `Vanessa AI` section
-- `backend/app/api/http`, `backend/app/application`, `backend/app/domain`, and `backend/app/infrastructure` for product-domain backend work
-- `agent_engine/app/execution_pipeline`, `agent_engine/app/retrieval`, `agent_engine/app/tool_runtime`, and `agent_engine/app/policies` for composable execution stages
+- [Quick Start](#quick-start)
+- [Why VANESSA](#why-vanessa)
+- [System At A Glance](#system-at-a-glance)
+- [Documentation](#documentation-map)
+- [Local Staging](#local-staging)
+- [Contributing](#contributing)
+- [Testing](#testing)
 
-Canonical product APIs now live under `/v1/playgrounds/*` and `/v1/agent-projects/*`.
-Backend-owned admin and governance surfaces, including ModelOps, now also follow the canonical `backend/app/api/http` plus `backend/app/application` ownership pattern instead of flat route orchestration.
-Remaining backend operational surfaces such as runtime profile, agent executions, policy rules, quote management, and public content now follow that same canonical ownership pattern as well.
+## Why VANESSA
 
-## Documentation Site
+- Local-first runtime with optional cloud providers behind a backend-owned control plane
+- Explicit `capabilities`, `providers`, and `deployment profiles` for runtime switching and governance
+- Separate ModelOps domain for managed model catalog, validation, lifecycle, and sharing
+- Agent orchestration with converged tool runtime support for MCP-backed tools and sandboxed Python execution
+- Product-facing AI surfaces for playgrounds, builder workflows, catalog administration, and first-party Vanessa behavior
+- Modular container topology that stays extensible without collapsing control, runtime, and product concerns into one service
 
-Project documentation is published to GitHub Pages:
+## Experience Snapshot
 
-- URL: `https://raul-arrabales.github.io/VANESSA/`
-- Deployment: automatic on `main` pushes for docs-related changes and manual via Actions `workflow_dispatch`
+| Vanessa AI | AI Playground |
+| --- | --- |
+| ![Vanessa AI workspace](vanessa-core-visual.png) | ![AI Playground workspace](playgrounds-chat-visual.png) |
 
-Local docs authoring:
+## Quick Start
+
+The fastest way to run VANESSA locally is through the local staging workflow:
 
 ```bash
-pip install -r requirements-docs.txt
-mkdocs serve
-mkdocs build --strict
+git clone https://github.com/raul-arrabales/VANESSA.git
+cd VANESSA
+./ops/local-staging/start.sh
+./ops/local-staging/health.sh
 ```
 
-## Local Staging-Like Manual Testing
+Then open:
 
-Use the launcher scripts in `ops/local-staging/` for a consistent Ubuntu workflow:
+- Frontend: `http://localhost:3000`
+- LLM gateway (when local staging is up): `http://localhost:8000`
+
+For a fuller setup guide, see [docs/setup.md](docs/setup.md) and [ops/local-staging/README.md](ops/local-staging/README.md).
+
+## System At A Glance
+
+![VANESSA architecture](docs/assets/architecture.svg)
+
+VANESSA is organized around a few clear domains:
+
+- Product UI: React/Vite frontend for playgrounds, agent builder, catalog administration, platform control, and Vanessa AI
+- Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
+- Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
+- Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
+- Tool runtimes: optional MCP gateway for remote/general-purpose tools and sandbox for isolated Python execution
+- Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
+
+For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).
+
+## Core Concepts
+
+The runtime architecture is intentionally explicit:
+
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
+- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `sandbox_local`, or OpenAI-compatible cloud families
+- `deployment profile`: the named set of active capability bindings used to resolve a runtime snapshot
+- `provider_origin`: backend-owned `local` or `cloud` classification inherited by provider instances and runtime payloads
+- `platform_runtime`: the resolved runtime snapshot passed from backend to `agent_engine`
+
+Model lifecycle and access governance live in ModelOps, while active runtime selection lives in the platform control plane.
+
+## Runtime Profiles
+
+VANESSA currently uses global runtime profile semantics for safety gates and provider access:
+
+- `online` allows cloud-capable runtime behavior where configured
+- `offline` blocks cloud provider validation, deployment activation, runtime resolution, and invocation before any provider client is created
+- MCP-backed web search is governed by the same runtime contract, while sandbox-backed Python execution can remain available offline when the optional capability is bound
+
+## Product Areas
+
+The product-facing AI surface is split into clear domains:
+
+- `AI Playground`: user-facing chat and knowledge workspaces
+- `Agent Builder`: builder-facing agent authoring and publish flows
+- `Catalog Control`: superadmin management for typed agent and tool definitions
+- `Vanessa AI`: first-party Vanessa behavior on top of shared execution seams
+- `Platform Control`: provider, deployment, runtime, and capability governance
+
+Canonical product APIs live under `/v1/playgrounds/*` and `/v1/agent-projects/*`, while admin and platform surfaces live under the backend-owned `backend/app/api/http` domain modules.
+
+## Local Staging
+
+The `ops/local-staging/` workflow is the recommended way to validate the full stack on Ubuntu-like environments:
 
 - `./ops/local-staging/start.sh`
 - `./ops/local-staging/health.sh`
 - `./ops/local-staging/logs.sh --follow`
 - `./ops/local-staging/stop.sh`
 
-Full guide: `ops/local-staging/README.md`
+Highlights:
 
-The split local vLLM runtimes adapt to host hardware in local staging:
+- GPU hosts automatically use the GPU local runtime path
+- CPU-only hosts build a compatible local vLLM image for the detected ISA
+- Optional `llama_cpp`, `qdrant`, and `mcp_gateway` profiles can be enabled through environment variables
 
-- NVIDIA GPU hosts use the GPU runtime override image
-- CPU-only hosts add the CPU override compose file and build a local CPU vLLM image matched to the detected ISA (`avx512` or `avx2`)
-- Unsupported CPU hosts fail early with a clear launcher diagnostic instead of crashing with `SIGILL`
+Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
-`llama_cpp` is optional in local staging:
+## Documentation Map
 
-- Set `LLAMA_CPP_URL` to enable the optional `llama_cpp` compose profile
-- Set `LLAMA_CPP_MODEL_PATH` to a GGUF file mounted from `models/llm/`
-- `LLAMA_CPP_CONTEXT_SIZE` controls the server context window
-- When enabled, backend seeds an inactive `local-llama-cpp` deployment profile for platform switching
+Start here for deeper project documentation:
 
-`qdrant` is optional in local staging:
+- [Documentation Home](docs/index.md)
+- [Architecture](docs/architecture.md)
+- [Setup](docs/setup.md)
+- [Local Staging](docs/local-staging.md)
+- [Testing](docs/testing.md)
+- [Contributing](docs/contributing.md)
+- [Backend Service](docs/services/backend.md)
+- [ModelOps](docs/services/modelops.md)
+- [Sandbox](docs/services/sandbox.md)
+- [Agent Engine](docs/services/agent-engine.md)
 
-- Set `QDRANT_URL` to enable the optional `qdrant` compose profile
-- When enabled, backend seeds an inactive `local-qdrant` deployment profile for platform switching
+Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 
-`mcp_gateway` is optional in local staging:
+## Repository Structure
 
-- Set `MCP_GATEWAY_URL` to enable the optional `mcp_gateway` compose profile
-- When enabled, backend seeds an active `mcp_runtime -> mcp_gateway_local` binding into each local deployment profile
-- The gateway currently exposes the built-in `web_search` tool for agent-driven tool calls
+- `frontend/`: React UI for product AI, control surfaces, and admin workflows
+- `backend/`: Flask API, control plane, ModelOps, orchestration, and HTTP domains
+- `agent_engine/`: execution pipeline, retrieval, and tool runtime orchestration
+- `sandbox/`: isolated Python execution runtime
+- `mcp_gateway/`: optional MCP-backed tool runtime provider
+- `infra/`: Dockerfiles, compose wiring, and architecture metadata
+- `docs/`: architecture, setup, service docs, and contributor guidance
+- `ops/local-staging/`: staging-like launcher and health workflows
 
-## LLM API Endpoints (Local)
+## Testing
 
-When running local staging (`./ops/local-staging/start.sh`), the LLM service is exposed at `http://localhost:8000`.
-
-- `GET /health`
-  - Quick liveness/readiness probe.
-  - Backend `/system/health` also reports active capability/provider health for the platform control plane when initialized.
-  - Example:
-    ```bash
-    curl -sS -i http://localhost:8000/health
-    ```
-  - Expected: `200 OK` with a basic health payload.
-  - Failure codes you may see: `404`, `5xx`.
-
-- `GET /v1/models`
-  - Lists available models (OpenAI-compatible endpoint).
-  - Example:
-    ```bash
-    curl -sS -i http://localhost:8000/v1/models
-    ```
-  - Expected: `200 OK` and JSON with a `data` array.
-  - Failure codes you may see: `401` (if auth enabled), `404`, `5xx`.
-
-- `POST /v1/responses`
-  - Generates model output through the VANESSA normalized envelope.
-  - Example (dummy model):
-    ```bash
-    curl -sS -i http://localhost:8000/v1/responses \
-      -H 'Content-Type: application/json' \
-      -d '{
-        "model": "dummy",
-        "input": [
-          {
-            "role": "user",
-            "content": [{"type": "text", "text": "Reply with the single word: pong"}]
-          }
-        ]
-      }'
-    ```
-  - Expected: `200 OK` with generated response content.
-  - Failure codes you may see: `400`, `401`, `404`, `422`, `429`, `5xx`.
-
-## Local LLM Runtime Selection
-
-Local staging resolves the split local runtimes automatically:
-
-- `LLM_RUNTIME_ACCELERATOR=auto|cpu|gpu`
-- `LLM_RUNTIME_CPU_VARIANT=auto|avx2|avx512`
-
-Default behavior:
-
-- Prefer GPU when `nvidia-smi -L` succeeds
-- Otherwise use CPU mode
-- In CPU mode prefer `avx512`, then `avx2`, otherwise fail early as unsupported
-
-Optional fallback control:
-
-- `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true` allows launcher scripts to omit the split local runtimes only when routing does not require local runtime
-
-The CPU runtime build is pinned by `LLM_RUNTIME_CPU_VLLM_VERSION`.
-The CPU builder installs PyTorch from `LLM_RUNTIME_CPU_TORCH_INDEX_URL` (default: `https://download.pytorch.org/whl/cpu`).
-The CPU builder also pins `transformers` with `LLM_RUNTIME_CPU_TRANSFORMERS_VERSION` for compatibility with the selected vLLM release.
-On this single-NUMA-node desktop staging host, the default CPU binding is `VLLM_CPU_OMP_THREADS_BIND=0-7`. You can override it with `auto`, `nobind`, or a custom CPU set if needed.
-
-## Run Containers For Testing
-
-These steps verify that Docker services are correctly defined and can start.
-
-### 1. Prerequisites
-
-- Docker and Docker Compose installed
-- Run commands from repository root: `VANESSA/`
-
-### 2. Validate Compose Configuration
+Common validation entrypoints:
 
 ```bash
-docker compose -f infra/docker-compose.yml config
+pytest
+cd frontend && npm test
+mkdocs build --strict
 ```
 
-Expected:
+See [docs/testing.md](docs/testing.md) for the fuller testing map.
 
-- Command succeeds
+## Contributing
 
-### 3. Build And Start All Services
+Contributions are welcome, especially around architecture clarity, local-first runtime ergonomics, agent/tool execution, ModelOps, and product AI workflows.
 
-```bash
-docker compose -f infra/docker-compose.yml up -d --build
-```
+- Contribution guide: [docs/contributing.md](docs/contributing.md)
+- Engineering conventions and ownership notes: [AGENTS.md](AGENTS.md)
+- Service-level docs: [docs/services](docs/services/)
 
-### 4. Check Runtime Status
+If a change affects topology, interfaces, or runtime behavior, update the relevant docs in the same change.
 
-```bash
-docker compose -f infra/docker-compose.yml ps -a
-```
+## Project Status
 
-Expected containers:
-
-- `vanessa-backend`
-- `vanessa-agent-engine`
-- `vanessa-llm`
-- `vanessa-llm-runtime-inference`
-- `vanessa-llm-runtime-embeddings`
-- `vanessa-llama-cpp` (only when `LLAMA_CPP_URL` enables the optional profile)
-- `vanessa-qdrant` (only when `QDRANT_URL` enables the optional profile)
-- `vanessa-mcp-gateway` (only when `MCP_GATEWAY_URL` enables the optional profile)
-- `vanessa-sandbox`
-- `vanessa-kws`
-- `vanessa-weaviate`
-- `vanessa-postgres`
-- `vanessa-frontend`
-
-### 5. Review Logs (If Any Service Fails)
-
-```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200
-```
-
-Service-specific logs:
-
-```bash
-docker compose -f infra/docker-compose.yml logs --no-color --tail=200 backend agent_engine sandbox mcp_gateway llm llm_runtime_inference llm_runtime_embeddings kws weaviate postgres frontend
-```
-
-### 6. Stop And Clean Up Test Run
-
-```bash
-docker compose -f infra/docker-compose.yml down
-```
-
-To also remove named volumes (will delete local Weaviate/Postgres data):
-
-```bash
-docker compose -f infra/docker-compose.yml down -v
-```
-
-
-## Runtime Profile Semantics
-
-VANESSA currently uses **global runtime profile semantics** for safety gates and tool access.
-
-- `GET /v1/runtime/profile` is available to authenticated users for visibility.
-- `PUT /v1/runtime/profile` is restricted to `superadmin` users.
-- Frontend settings show the runtime profile toggle to all authenticated users, but only superadmins can modify it.
-- Cloud platform providers are never valid execution targets in `offline`. Backend blocks cloud provider validation, deployment activation, active runtime resolution, and runtime invocation before any provider client or network call can be created.
-- Agent tool access also uses this same global runtime profile. For example, MCP-backed web search is blocked outside `online`, while sandbox-backed Python execution can remain available in `offline` when the sandbox runtime capability is active. Legacy `air_gapped` values are normalized to `offline`.
-
-When adding new safety/tool gates, use this same global runtime profile contract instead of creating per-user overrides unless the platform semantics are explicitly revised.
-
-## Architecture
-
-- Container #1: Responsive Web Frontend
-- Container #2: Backend (Flask API)
-- Container #3: LLM API (private model-serving HTTP gateway)
-- Container #4: LLM Runtime (local vLLM inference engine used by LLM API)
-- Container #5: Custom Agent Orchestration Engine
-- Container #6: Python Sandbox
-- Container #7: Wake-word service (KWS)
-- Container #8: Weaviate (persistent semantic index for RAG)
-- Container #9: Qdrant (optional alternate vector store for RAG)
-- Container #10: PostgreSQL
-
-Communication semantics (from generated architecture metadata) are directional service interactions, not container startup order:
-
-- Frontend -> Backend API (UI API requests)
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, Weaviate, optional Qdrant, PostgreSQL
-- Agent Engine -> LLM API, Sandbox, Weaviate, optional Qdrant, PostgreSQL
-- LLM API -> LLM Runtime (internal runtime execution path)
-- KWS -> Backend API (wake event webhook)
-
-## GenAI Control Plane
-
-Backend exposes platform control-plane endpoints for capability/provider management:
-
-- `GET /v1/platform/capabilities`
-- `GET /v1/platform/provider-families`
-- `GET /v1/platform/providers`
-- `POST /v1/platform/providers`
-- `PUT /v1/platform/providers/{id}`
-- `DELETE /v1/platform/providers/{id}`
-- `GET /v1/platform/deployments`
-- `GET /v1/platform/activation-audit`
-- `POST /v1/platform/deployments`
-- `PUT /v1/platform/deployments/{id}`
-- `POST /v1/platform/deployments/{id}/clone`
-- `DELETE /v1/platform/deployments/{id}`
-- `POST /v1/platform/deployments/{id}/activate`
-- `POST /v1/platform/providers/{id}/validate`
-- `POST /v1/platform/embeddings`
-
-Backend also exposes a typed superadmin catalog for agent/tool lifecycle management:
-
-- `GET /v1/catalog/agents`
-- `POST /v1/catalog/agents`
-- `GET /v1/catalog/agents/{id}`
-- `PUT /v1/catalog/agents/{id}`
-- `POST /v1/catalog/agents/{id}/validate`
-- `GET /v1/catalog/tools`
-- `POST /v1/catalog/tools`
-- `GET /v1/catalog/tools/{id}`
-- `PUT /v1/catalog/tools/{id}`
-- `POST /v1/catalog/tools/{id}/validate`
-
-This catalog surface is now canonical for superadmin CRUD and validation of typed agent/tool
-definitions, while the generic `/v1/registry/*` endpoints remain the lower-level runtime artifact surface.
-The frontend exposes the same workflows at `/control/catalog` for superadmin catalog administration and `/agent-builder` for builder-facing agent projects.
-- `POST /v1/platform/vector/indexes/ensure`
-- `POST /v1/platform/vector/documents/upsert`
-- `POST /v1/platform/vector/query`
-- `POST /v1/platform/vector/documents/delete`
-
-Current first-wave capabilities:
-
-- `llm_inference`
-- `embeddings`
-- `vector_store`
-
-Current bootstrapped local providers:
-
-- `vllm_local`
-- `llama_cpp_local`
-- `vllm_embeddings_local`
-- `weaviate_local`
-- `qdrant_local`
-
-Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints. Provider families persist `provider_origin`, provider instances inherit that origin, and deployment/runtime APIs serialize it so clients do not infer locality from naming. OpenAI-compatible cloud provider instances own endpoint/auth configuration, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings now select capability `resources` from the managed model inventory and provider-native inventory.
-
-The vector-store data plane is now active through the control plane as well: superadmin-only proof endpoints resolve embeddings, ensure, upsert, query, and delete through the active `embeddings` and `vector_store` bindings using provider-agnostic payloads.
-
-Bootstrapped deployment profiles:
-
-- `local-default` is always seeded and remains the default active profile
-- `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured
-- `local-qdrant` is seeded only when `QDRANT_URL` is configured
-
-The default deployment profile is bootstrapped from the existing `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL` values.
-
-The control plane now supports an operator-managed lifecycle on top of bootstrap seeding:
-
-- provider instances can be created, updated, validated, and deleted through the API/UI
-- deployment profiles can be created, updated, cloned, activated, and deleted through the API/UI
-- deployment bindings can now choose explicit capability resources plus a default resource where needed; `embeddings` requires a managed-model resource and no longer assumes it should reuse the chat model
-- activation history is readable through `/v1/platform/activation-audit`
-- deployment activation now performs provider preflight validation before switching
+VANESSA is actively evolving as a modular, high-ambition OSS AI platform. The architecture is already intentionally structured around long-term extensibility, but the project should still be read as an active platform build rather than a frozen product.
 
 ## License
 
-MIT
+This project is licensed under the terms in [LICENSE](LICENSE).
