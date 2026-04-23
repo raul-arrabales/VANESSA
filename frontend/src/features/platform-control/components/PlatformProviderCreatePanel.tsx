@@ -11,6 +11,7 @@ import {
   buildProviderMutationInput,
   DEFAULT_PROVIDER_FORM,
   supportsSavedCredentials,
+  stringifyJson,
   updateSecretRefsCredential,
 } from "../providerForm";
 import PlatformProviderForm from "./PlatformProviderForm";
@@ -22,6 +23,7 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
   const { showErrorFeedback } = useActionFeedback();
   const { errorMessage: loadErrorMessage, providerFamilies } = usePlatformProvidersData(token);
   const [form, setForm] = useState(DEFAULT_PROVIDER_FORM);
+  const [providerOrigin, setProviderOrigin] = useState<"local" | "cloud" | "">("");
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
@@ -71,6 +73,33 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
     }));
   }, [form.credentialId, providerSupportsSavedCredentials]);
 
+  useEffect(() => {
+    if (!form.providerKey) {
+      return;
+    }
+    const selectedFamily = providerFamilies.find((family) => family.provider_key === form.providerKey);
+    if (selectedFamily && selectedFamily.provider_origin !== providerOrigin) {
+      setProviderOrigin(selectedFamily.provider_origin);
+    }
+  }, [form.providerKey, providerFamilies, providerOrigin]);
+
+  function handleProviderOriginChange(nextOrigin: "local" | "cloud" | ""): void {
+    setProviderOrigin(nextOrigin);
+    const selectedFamily = providerFamilies.find((family) => family.provider_key === form.providerKey);
+    if (!selectedFamily || !nextOrigin || selectedFamily.provider_origin === nextOrigin) {
+      return;
+    }
+    setForm((current) => ({
+      ...current,
+      providerKey: "",
+      endpointUrl: "",
+      healthcheckUrl: "",
+      credentialId: "",
+      configText: stringifyJson({}),
+      secretRefsText: updateSecretRefsCredential(current.secretRefsText, ""),
+    }));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!token) {
@@ -106,6 +135,9 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
         <PlatformProviderForm
           value={form}
           providerFamilies={providerFamilies}
+          showOriginSelector
+          selectedOrigin={providerOrigin}
+          onOriginChange={handleProviderOriginChange}
           helperText={t("platformControl.providers.createHelp")}
           isSubmitting={saving}
           submitLabel={t("platformControl.actions.createProvider")}

@@ -8,6 +8,9 @@ type PlatformProviderFormProps = {
   value: ProviderFormState;
   providerFamilies: PlatformProviderFamily[];
   familyDisabled?: boolean;
+  showOriginSelector?: boolean;
+  selectedOrigin?: PlatformProviderFamily["provider_origin"] | "";
+  onOriginChange?: (origin: PlatformProviderFamily["provider_origin"] | "") => void;
   helperText: string;
   isSubmitting: boolean;
   submitLabel: string;
@@ -27,6 +30,9 @@ export default function PlatformProviderForm({
   value,
   providerFamilies,
   familyDisabled = false,
+  showOriginSelector = false,
+  selectedOrigin = "",
+  onOriginChange,
   helperText,
   isSubmitting,
   submitLabel,
@@ -39,6 +45,10 @@ export default function PlatformProviderForm({
   onSubmit,
 }: PlatformProviderFormProps): JSX.Element {
   const { t } = useTranslation("common");
+  const visibleProviderFamilies = showOriginSelector && selectedOrigin
+    ? providerFamilies.filter((family) => family.provider_origin === selectedOrigin)
+    : providerFamilies;
+  const isFamilySelectionDisabled = familyDisabled || (showOriginSelector && !selectedOrigin);
 
   function handleCredentialChange(credentialId: string): void {
     onChange({
@@ -51,16 +61,32 @@ export default function PlatformProviderForm({
   return (
     <form className="card-stack" onSubmit={onSubmit}>
       <div className="form-grid">
+        {showOriginSelector ? (
+          <label className="card-stack">
+            <span className="field-label">{t("platformControl.forms.provider.origin")}</span>
+            <select
+              className="field-input"
+              value={selectedOrigin}
+              onChange={(event) =>
+                onOriginChange?.((event.target.value as PlatformProviderFamily["provider_origin"] | "") || "")
+              }
+            >
+              <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+              <option value="local">{t("platformControl.badges.local")}</option>
+              <option value="cloud">{t("platformControl.badges.cloud")}</option>
+            </select>
+          </label>
+        ) : null}
         <label className="card-stack">
           <span className="field-label">{t("platformControl.forms.provider.family")}</span>
           <select
             className="field-input"
             value={value.providerKey}
-            disabled={familyDisabled}
+            disabled={isFamilySelectionDisabled}
             onChange={(event) => onChange(applyProviderFamilyDefaults(value, event.target.value))}
           >
             <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-            {providerFamilies.map((family) => (
+            {visibleProviderFamilies.map((family) => (
               <option key={family.provider_key} value={family.provider_key}>
                 {family.display_name}
               </option>

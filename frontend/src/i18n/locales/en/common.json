@@ -1397,6 +1397,7 @@
     "forms": {
       "selectPlaceholder": "Select an option",
       "provider": {
+        "origin": "Provider origin",
         "family": "Provider family",
         "slug": "Provider slug",
         "displayName": "Display name",

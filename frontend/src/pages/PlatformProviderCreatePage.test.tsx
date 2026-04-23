@@ -66,8 +66,10 @@ describe("PlatformProviderCreatePage", () => {
     vi.mocked(platformApi.createPlatformProvider).mockResolvedValue(providersFixture[0]);
 
     await renderWithAppProviders(<PlatformProviderCreatePage />);
+    const providerOriginLabel = await t("platformControl.forms.provider.origin");
     const providerFamilyLabel = await t("platformControl.forms.provider.family");
 
+    await userEvent.selectOptions(await screen.findByLabelText(providerOriginLabel), "local");
     await userEvent.selectOptions(await screen.findByLabelText(providerFamilyLabel), "vllm_local");
     await userEvent.type(screen.getByLabelText(await t("platformControl.forms.provider.slug")), "custom-vllm");
     await userEvent.type(screen.getByLabelText(await t("platformControl.forms.provider.displayName")), "Custom vLLM");
@@ -121,6 +123,10 @@ describe("PlatformProviderCreatePage", () => {
     await renderWithAppProviders(<PlatformProviderCreatePage />);
 
     await userEvent.selectOptions(
+      await screen.findByLabelText(await t("platformControl.forms.provider.origin")),
+      "cloud",
+    );
+    await userEvent.selectOptions(
       await screen.findByLabelText(await t("platformControl.forms.provider.family")),
       "openai_compatible_cloud_llm",
     );
@@ -154,5 +160,40 @@ describe("PlatformProviderCreatePage", () => {
         "token",
       );
     });
+  });
+
+  it("filters provider families by the selected provider origin", async () => {
+    vi.mocked(platformApi.listPlatformProviderFamilies).mockResolvedValue([
+      {
+        provider_key: "vllm_local",
+        provider_origin: "local",
+        capability: "llm_inference",
+        adapter_kind: "openai_compatible_llm",
+        display_name: "vLLM local gateway",
+        description: "Local LLM family.",
+      },
+      {
+        provider_key: "openai_compatible_cloud_llm",
+        provider_origin: "cloud",
+        capability: "llm_inference",
+        adapter_kind: "openai_compatible_llm",
+        display_name: "OpenAI-compatible cloud LLM",
+        description: "Cloud LLM family.",
+      },
+    ]);
+
+    await renderWithAppProviders(<PlatformProviderCreatePage />);
+
+    const familySelect = await screen.findByLabelText(await t("platformControl.forms.provider.family"));
+    expect(familySelect).toBeDisabled();
+
+    await userEvent.selectOptions(
+      await screen.findByLabelText(await t("platformControl.forms.provider.origin")),
+      "cloud",
+    );
+
+    expect(familySelect).toBeEnabled();
+    expect(screen.getByRole("option", { name: "OpenAI-compatible cloud LLM" })).toBeVisible();
+    expect(screen.queryByRole("option", { name: "vLLM local gateway" })).not.toBeInTheDocument();
   });
 });
