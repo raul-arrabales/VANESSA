@@ -2,15 +2,22 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ModelCredential } from "../../../api/modelops/types";
 import type { PlatformProviderFamily } from "../../../api/platform";
-import { applyProviderFamilyDefaults, updateSecretRefsCredential, type ProviderFormState } from "../providerForm";
+import {
+  applyProviderFamilyDefaults,
+  filterProviderFamiliesByOrigin,
+  PROVIDER_ORIGIN_OPTIONS,
+  updateSecretRefsCredential,
+  type ProviderFormState,
+  type ProviderOriginSelection,
+} from "../providerForm";
 
 type PlatformProviderFormProps = {
   value: ProviderFormState;
   providerFamilies: PlatformProviderFamily[];
   familyDisabled?: boolean;
   showOriginSelector?: boolean;
-  selectedOrigin?: PlatformProviderFamily["provider_origin"] | "";
-  onOriginChange?: (origin: PlatformProviderFamily["provider_origin"] | "") => void;
+  selectedOrigin?: ProviderOriginSelection;
+  onOriginChange?: (origin: ProviderOriginSelection) => void;
   helperText: string;
   isSubmitting: boolean;
   submitLabel: string;
@@ -45,9 +52,7 @@ export default function PlatformProviderForm({
   onSubmit,
 }: PlatformProviderFormProps): JSX.Element {
   const { t } = useTranslation("common");
-  const visibleProviderFamilies = showOriginSelector && selectedOrigin
-    ? providerFamilies.filter((family) => family.provider_origin === selectedOrigin)
-    : providerFamilies;
+  const visibleProviderFamilies = filterProviderFamiliesByOrigin(providerFamilies, showOriginSelector ? selectedOrigin : "");
   const isFamilySelectionDisabled = familyDisabled || (showOriginSelector && !selectedOrigin);
 
   function handleCredentialChange(credentialId: string): void {
@@ -67,13 +72,14 @@ export default function PlatformProviderForm({
             <select
               className="field-input"
               value={selectedOrigin}
-              onChange={(event) =>
-                onOriginChange?.((event.target.value as PlatformProviderFamily["provider_origin"] | "") || "")
-              }
+              onChange={(event) => onOriginChange?.((event.target.value as ProviderOriginSelection) || "")}
             >
               <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-              <option value="local">{t("platformControl.badges.local")}</option>
-              <option value="cloud">{t("platformControl.badges.cloud")}</option>
+              {PROVIDER_ORIGIN_OPTIONS.map((origin) => (
+                <option key={origin.value} value={origin.value}>
+                  {t(origin.labelKey)}
+                </option>
+              ))}
             </select>
           </label>
         ) : null}

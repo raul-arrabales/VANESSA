@@ -8,11 +8,13 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { usePlatformProvidersData } from "../hooks/usePlatformProvidersData";
 import {
+  applyProviderOriginChange,
   buildProviderMutationInput,
   DEFAULT_PROVIDER_FORM,
+  resolveProviderOriginSelection,
   supportsSavedCredentials,
-  stringifyJson,
   updateSecretRefsCredential,
+  type ProviderOriginSelection,
 } from "../providerForm";
 import PlatformProviderForm from "./PlatformProviderForm";
 
@@ -23,7 +25,7 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
   const { showErrorFeedback } = useActionFeedback();
   const { errorMessage: loadErrorMessage, providerFamilies } = usePlatformProvidersData(token);
   const [form, setForm] = useState(DEFAULT_PROVIDER_FORM);
-  const [providerOrigin, setProviderOrigin] = useState<"local" | "cloud" | "">("");
+  const [providerOrigin, setProviderOrigin] = useState<ProviderOriginSelection>("");
   const [saving, setSaving] = useState(false);
   const [credentials, setCredentials] = useState<ModelCredential[]>([]);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
@@ -77,27 +79,15 @@ export default function PlatformProviderCreatePanel(): JSX.Element {
     if (!form.providerKey) {
       return;
     }
-    const selectedFamily = providerFamilies.find((family) => family.provider_key === form.providerKey);
-    if (selectedFamily && selectedFamily.provider_origin !== providerOrigin) {
-      setProviderOrigin(selectedFamily.provider_origin);
+    const selectedOrigin = resolveProviderOriginSelection(providerFamilies, form.providerKey);
+    if (selectedOrigin && selectedOrigin !== providerOrigin) {
+      setProviderOrigin(selectedOrigin);
     }
   }, [form.providerKey, providerFamilies, providerOrigin]);
 
-  function handleProviderOriginChange(nextOrigin: "local" | "cloud" | ""): void {
+  function handleProviderOriginChange(nextOrigin: ProviderOriginSelection): void {
     setProviderOrigin(nextOrigin);
-    const selectedFamily = providerFamilies.find((family) => family.provider_key === form.providerKey);
-    if (!selectedFamily || !nextOrigin || selectedFamily.provider_origin === nextOrigin) {
-      return;
-    }
-    setForm((current) => ({
-      ...current,
-      providerKey: "",
-      endpointUrl: "",
-      healthcheckUrl: "",
-      credentialId: "",
-      configText: stringifyJson({}),
-      secretRefsText: updateSecretRefsCredential(current.secretRefsText, ""),
-    }));
+    setForm((current) => applyProviderOriginChange(current, providerFamilies, nextOrigin));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {

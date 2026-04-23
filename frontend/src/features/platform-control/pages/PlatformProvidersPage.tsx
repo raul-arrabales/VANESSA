@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearchParams } from "react-router-dom";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
@@ -7,7 +6,9 @@ import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider
 import PlatformPageLayout from "../components/PlatformPageLayout";
 import PlatformProviderCreatePanel from "../components/PlatformProviderCreatePanel";
 import PlatformProvidersDirectory from "../components/PlatformProvidersDirectory";
+import { usePlatformProvidersDirectoryFilters } from "../hooks/usePlatformProvidersDirectoryFilters";
 import { usePlatformProvidersData } from "../hooks/usePlatformProvidersData";
+import { PROVIDER_ORIGIN_OPTIONS } from "../providerForm";
 
 type PlatformProvidersView = "providers" | "create";
 
@@ -30,11 +31,24 @@ export default function PlatformProvidersPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const { errorMessage, providers, providerFamilies, deployments } = usePlatformProvidersData(token);
   useRouteActionFeedback(location.state);
-  const [search, setSearch] = useState("");
-  const [capabilityFilter, setCapabilityFilter] = useState("");
-  const [providerKeyFilter, setProviderKeyFilter] = useState("");
-  const [providerOriginFilter, setProviderOriginFilter] = useState("");
-  const [enabledFilter, setEnabledFilter] = useState("all");
+  const {
+    search,
+    setSearch,
+    capabilityFilter,
+    setCapabilityFilter,
+    providerKeyFilter,
+    setProviderKeyFilter,
+    providerOriginFilter,
+    setProviderOriginFilter,
+    enabledFilter,
+    setEnabledFilter,
+    filteredProviders,
+    capabilities,
+    providerKeys,
+  } = usePlatformProvidersDirectoryFilters({
+    providers,
+    providerFamilies,
+  });
   const activeView = resolvePlatformProvidersView(searchParams.get("view"));
   const submenuItems = PLATFORM_PROVIDERS_VIEW_ORDER.map((view) => ({
     id: view,
@@ -42,26 +56,6 @@ export default function PlatformProvidersPage(): JSX.Element {
     isActive: activeView === view,
     onSelect: () => handleChangeView(view),
   }));
-
-  const filteredProviders = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    return providers.filter((provider) => {
-      const matchesSearch = normalizedSearch.length === 0
-        || provider.display_name.toLowerCase().includes(normalizedSearch)
-        || provider.slug.toLowerCase().includes(normalizedSearch)
-        || provider.provider_key.toLowerCase().includes(normalizedSearch)
-        || provider.endpoint_url.toLowerCase().includes(normalizedSearch);
-      const matchesCapability = !capabilityFilter || provider.capability === capabilityFilter;
-      const matchesProviderKey = !providerKeyFilter || provider.provider_key === providerKeyFilter;
-      const matchesProviderOrigin = !providerOriginFilter || provider.provider_origin === providerOriginFilter;
-      const matchesEnabled = enabledFilter === "all"
-        || (enabledFilter === "enabled" ? provider.enabled : !provider.enabled);
-      return matchesSearch && matchesCapability && matchesProviderKey && matchesProviderOrigin && matchesEnabled;
-    });
-  }, [capabilityFilter, enabledFilter, providerKeyFilter, providerOriginFilter, providers, search]);
-
-  const capabilities = Array.from(new Set(providers.map((provider) => provider.capability)));
-  const providerKeys = Array.from(new Set(providerFamilies.map((family) => family.provider_key)));
 
   function handleChangeView(view: PlatformProvidersView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -114,8 +108,11 @@ export default function PlatformProvidersPage(): JSX.Element {
                   onChange={(event) => setProviderOriginFilter(event.target.value)}
                 >
                   <option value="">{t("platformControl.filters.all")}</option>
-                  <option value="local">{t("platformControl.badges.local")}</option>
-                  <option value="cloud">{t("platformControl.badges.cloud")}</option>
+                  {PROVIDER_ORIGIN_OPTIONS.map((origin) => (
+                    <option key={origin.value} value={origin.value}>
+                      {t(origin.labelKey)}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="card-stack">

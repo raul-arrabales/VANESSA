@@ -1,6 +1,15 @@
-import type { PlatformProvider, PlatformProviderMutationInput } from "../../api/platform";
+import type { PlatformProvider, PlatformProviderFamily, PlatformProviderMutationInput } from "../../api/platform";
 
 export const MODEL_CREDENTIAL_SECRET_REF_PREFIX = "modelops://credential/";
+export type ProviderOrigin = PlatformProviderFamily["provider_origin"];
+export type ProviderOriginSelection = ProviderOrigin | "";
+export const PROVIDER_ORIGIN_OPTIONS: ReadonlyArray<{
+  value: ProviderOrigin;
+  labelKey: `platformControl.badges.${ProviderOrigin}`;
+}> = [
+  { value: "local", labelKey: "platformControl.badges.local" },
+  { value: "cloud", labelKey: "platformControl.badges.cloud" },
+] as const;
 
 export type ProviderFormState = {
   providerKey: string;
@@ -73,6 +82,54 @@ export function applyProviderFamilyDefaults(form: ProviderFormState, providerKey
     ...form,
     providerKey,
     ...OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  };
+}
+
+export function getProviderFamily(
+  providerFamilies: PlatformProviderFamily[],
+  providerKey: string,
+): PlatformProviderFamily | null {
+  if (!providerKey) {
+    return null;
+  }
+  return providerFamilies.find((family) => family.provider_key === providerKey) ?? null;
+}
+
+export function filterProviderFamiliesByOrigin(
+  providerFamilies: PlatformProviderFamily[],
+  selectedOrigin: ProviderOriginSelection,
+): PlatformProviderFamily[] {
+  if (!selectedOrigin) {
+    return providerFamilies;
+  }
+  return providerFamilies.filter((family) => family.provider_origin === selectedOrigin);
+}
+
+export function resolveProviderOriginSelection(
+  providerFamilies: PlatformProviderFamily[],
+  providerKey: string,
+): ProviderOriginSelection {
+  return getProviderFamily(providerFamilies, providerKey)?.provider_origin ?? "";
+}
+
+export function applyProviderOriginChange(
+  form: ProviderFormState,
+  providerFamilies: PlatformProviderFamily[],
+  nextOrigin: ProviderOriginSelection,
+): ProviderFormState {
+  const selectedFamily = getProviderFamily(providerFamilies, form.providerKey);
+  if (!selectedFamily || !nextOrigin || selectedFamily.provider_origin === nextOrigin) {
+    return form;
+  }
+
+  return {
+    ...form,
+    providerKey: "",
+    endpointUrl: "",
+    healthcheckUrl: "",
+    credentialId: "",
+    configText: stringifyJson({}),
+    secretRefsText: updateSecretRefsCredential(form.secretRefsText, ""),
   };
 }
 
