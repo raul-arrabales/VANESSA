@@ -1438,6 +1438,7 @@
       "search": "Buscar",
       "capability": "Capacidad",
       "providerFamily": "Familia de proveedor",
+      "providerOrigin": "Origen del proveedor",
       "state": "Estado",
       "all": "Todos"
     },

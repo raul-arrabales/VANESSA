@@ -78,8 +78,11 @@ describe("PlatformProvidersPage", () => {
 
     await renderWithAppProviders(<PlatformProvidersPage />);
 
-    expect(await screen.findByRole("heading", { name: "OpenAI-compatible cloud LLM" })).toBeVisible();
-    expect(screen.getByText(await t("platformControl.badges.cloud"))).toBeVisible();
+    const cloudProviderHeading = await screen.findByRole("heading", { name: "OpenAI-compatible cloud LLM" });
+    expect(cloudProviderHeading).toBeVisible();
+    const cloudProviderCard = cloudProviderHeading.closest("article");
+    expect(cloudProviderCard).not.toBeNull();
+    expect(within(cloudProviderCard as HTMLElement).getByText(await t("platformControl.badges.cloud"))).toBeVisible();
   });
 
   it("filters the provider directory by search text", async () => {
@@ -89,6 +92,32 @@ describe("PlatformProvidersPage", () => {
 
     expect(screen.getByRole("heading", { name: "Weaviate local" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "vLLM local gateway" })).not.toBeInTheDocument();
+  });
+
+  it("filters the provider directory by provider origin", async () => {
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([
+      ...providersFixture,
+      {
+        ...providersFixture[0],
+        id: "provider-cloud",
+        slug: "openai-cloud-llm",
+        provider_key: "openai_compatible_cloud_llm",
+        provider_origin: "cloud",
+        display_name: "OpenAI-compatible cloud LLM",
+        endpoint_url: "https://api.example.com/v1",
+      },
+    ]);
+
+    await renderWithAppProviders(<PlatformProvidersPage />);
+
+    await userEvent.selectOptions(
+      await screen.findByLabelText(await t("platformControl.filters.providerOrigin")),
+      "cloud",
+    );
+
+    expect(screen.getByRole("heading", { name: "OpenAI-compatible cloud LLM" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "vLLM local gateway" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Weaviate local" })).not.toBeInTheDocument();
   });
 
   it("switches between provider page views", async () => {

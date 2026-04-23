@@ -33,6 +33,7 @@ export default function PlatformProvidersPage(): JSX.Element {
   const [search, setSearch] = useState("");
   const [capabilityFilter, setCapabilityFilter] = useState("");
   const [providerKeyFilter, setProviderKeyFilter] = useState("");
+  const [providerOriginFilter, setProviderOriginFilter] = useState("");
   const [enabledFilter, setEnabledFilter] = useState("all");
   const activeView = resolvePlatformProvidersView(searchParams.get("view"));
   const submenuItems = PLATFORM_PROVIDERS_VIEW_ORDER.map((view) => ({
@@ -52,11 +53,12 @@ export default function PlatformProvidersPage(): JSX.Element {
         || provider.endpoint_url.toLowerCase().includes(normalizedSearch);
       const matchesCapability = !capabilityFilter || provider.capability === capabilityFilter;
       const matchesProviderKey = !providerKeyFilter || provider.provider_key === providerKeyFilter;
+      const matchesProviderOrigin = !providerOriginFilter || provider.provider_origin === providerOriginFilter;
       const matchesEnabled = enabledFilter === "all"
         || (enabledFilter === "enabled" ? provider.enabled : !provider.enabled);
-      return matchesSearch && matchesCapability && matchesProviderKey && matchesEnabled;
+      return matchesSearch && matchesCapability && matchesProviderKey && matchesProviderOrigin && matchesEnabled;
     });
-  }, [capabilityFilter, enabledFilter, providerKeyFilter, providers, search]);
+  }, [capabilityFilter, enabledFilter, providerKeyFilter, providerOriginFilter, providers, search]);
 
   const capabilities = Array.from(new Set(providers.map((provider) => provider.capability)));
   const providerKeys = Array.from(new Set(providerFamilies.map((family) => family.provider_key)));
@@ -102,6 +104,18 @@ export default function PlatformProvidersPage(): JSX.Element {
                       {providerKey}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("platformControl.filters.providerOrigin")}</span>
+                <select
+                  className="field-input"
+                  value={providerOriginFilter}
+                  onChange={(event) => setProviderOriginFilter(event.target.value)}
+                >
+                  <option value="">{t("platformControl.filters.all")}</option>
+                  <option value="local">{t("platformControl.badges.local")}</option>
+                  <option value="cloud">{t("platformControl.badges.cloud")}</option>
                 </select>
               </label>
               <label className="card-stack">

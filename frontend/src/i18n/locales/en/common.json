@@ -1450,6 +1450,7 @@
       "search": "Search",
       "capability": "Capability",
       "providerFamily": "Provider family",
+      "providerOrigin": "Provider origin",
       "state": "State",
       "all": "All"
     },
