@@ -6,6 +6,7 @@ type CatalogToolsDirectoryProps = {
   validationResults: Record<string, CatalogToolValidation>;
   validatingToolId: string;
   onEdit: (tool: CatalogTool) => void;
+  onTest: (tool: CatalogTool) => void;
   onValidate: (toolId: string) => void;
 };
 
@@ -14,6 +15,7 @@ export default function CatalogToolsDirectory({
   validationResults,
   validatingToolId,
   onEdit,
+  onTest,
   onValidate,
 }: CatalogToolsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -48,6 +50,9 @@ export default function CatalogToolsDirectory({
               <div className="status-row">
                 <button type="button" className="btn btn-secondary" onClick={() => onEdit(tool)}>
                   {t("catalogControl.actions.edit")}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => onTest(tool)}>
+                  {t("catalogControl.actions.testTool")}
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => onValidate(tool.id)} disabled={validatingToolId === tool.id}>
                   {validatingToolId === tool.id ? t("catalogControl.actions.validating") : t("catalogControl.actions.validate")}

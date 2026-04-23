@@ -48,7 +48,7 @@ result_path = Path(os.environ["VANESSA_SANDBOX_RESULT_PATH"])
 code = os.environ["VANESSA_SANDBOX_CODE"]
 input_payload = json.loads(os.environ.get("VANESSA_SANDBOX_INPUT", "null"))
 globals_dict = {"__builtins__": SAFE_BUILTINS}
-locals_dict = {"input_payload": input_payload, "result": None}
+locals_dict = {"input_payload": input_payload, "input": input_payload, "result": None}
 
 stdout_buffer = io.StringIO()
 stderr_buffer = io.StringIO()

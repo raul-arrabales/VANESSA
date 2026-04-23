@@ -37,3 +37,16 @@ def test_validate_catalog_tool_passes_config_through(monkeypatch: pytest.MonkeyP
         "tool_id": "tool.web_search",
     }
     assert payload["validation"]["valid"] is True
+
+
+def test_execute_catalog_tool_requires_json_object() -> None:
+    with pytest.raises(catalog_management_service.CatalogError) as exc_info:
+        catalog_management_service.execute_catalog_tool(
+            "postgresql://ignored",
+            config="config",
+            tool_id="tool.web_search",
+            payload=[],
+            actor_user_id=10,
+        )
+
+    assert exc_info.value.code == "invalid_payload"

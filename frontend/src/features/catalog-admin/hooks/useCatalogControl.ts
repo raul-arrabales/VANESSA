@@ -5,11 +5,13 @@ import {
   createCatalogTool,
   listCatalogAgents,
   listCatalogTools,
+  testCatalogTool,
   type CatalogAgent,
   type CatalogAgentMutationInput,
   type CatalogAgentValidation,
   type CatalogTool,
   type CatalogToolMutationInput,
+  type CatalogToolTestResult,
   type CatalogToolValidation,
   updateCatalogAgent,
   updateCatalogTool,
@@ -33,6 +35,11 @@ export type ToolFormState = CatalogToolMutationInput & {
   inputSchemaText: string;
   outputSchemaText: string;
   safetyPolicyText: string;
+};
+
+export type ToolTestFormState = {
+  toolId: string;
+  inputText: string;
 };
 
 export const DEFAULT_AGENT_FORM: AgentFormState = {
@@ -72,6 +79,11 @@ export const DEFAULT_TOOL_FORM: ToolFormState = {
   safetyPolicyText: "{}",
 };
 
+export const DEFAULT_TOOL_TEST_FORM: ToolTestFormState = {
+  toolId: "",
+  inputText: "{}",
+};
+
 function stringifyJson(value: Record<string, unknown>): string {
   return JSON.stringify(value, null, 2);
 }
@@ -94,6 +106,98 @@ function parseJsonObject(text: string, errorMessage: string): Record<string, unk
   }
 
   return parsed as Record<string, unknown>;
+}
+
+function buildSampleValueFromSchema(schema: unknown, propertyName = ""): unknown {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    if (propertyName === "query") {
+      return "OpenAI platform runtime";
+    }
+    if (propertyName === "code") {
+      return "print('Hello from VANESSA')";
+    }
+    if (propertyName === "timeout_seconds" || propertyName === "top_k") {
+      return 3;
+    }
+    return "";
+  }
+
+  const schemaObject = schema as Record<string, unknown>;
+  const schemaType = String(schemaObject.type ?? "").trim().toLowerCase();
+  const enumValues = Array.isArray(schemaObject.enum) ? schemaObject.enum : [];
+  if (enumValues.length > 0) {
+    return enumValues[0];
+  }
+
+  if (schemaType === "object" || schemaObject.properties) {
+    const properties = schemaObject.properties && typeof schemaObject.properties === "object"
+      ? schemaObject.properties as Record<string, unknown>
+      : {};
+    const required = Array.isArray(schemaObject.required)
+      ? schemaObject.required.filter((item): item is string => typeof item === "string")
+      : [];
+    const propertyKeys = required.length > 0 ? required : Object.keys(properties).slice(0, 3);
+    const result: Record<string, unknown> = {};
+    for (const key of propertyKeys) {
+      if (!(key in properties)) {
+        continue;
+      }
+      result[key] = buildSampleValueFromSchema(properties[key], key);
+    }
+    return result;
+  }
+
+  if (schemaType === "array") {
+    return [buildSampleValueFromSchema(schemaObject.items, propertyName)];
+  }
+
+  if (schemaType === "integer" || schemaType === "number") {
+    const minimum = schemaObject.minimum;
+    return typeof minimum === "number" ? minimum : 1;
+  }
+
+  if (schemaType === "boolean") {
+    return false;
+  }
+
+  if (propertyName === "query") {
+    return "OpenAI platform runtime";
+  }
+  if (propertyName === "code") {
+    return "print('Hello from VANESSA')";
+  }
+  if (propertyName === "tool_name") {
+    return "example_tool";
+  }
+  return "example";
+}
+
+function buildSampleToolInput(tool: CatalogTool): Record<string, unknown> {
+  if (tool.id === "tool.web_search" || tool.spec.tool_name === "web_search") {
+    return {
+      query: "OpenAI platform runtime",
+      top_k: 3,
+    };
+  }
+
+  if (tool.id === "tool.python_exec" || tool.spec.tool_name === "python_exec") {
+    return {
+      code: "numbers = input_payload.get('numbers', [1, 2, 3])\nresult = sum(numbers)\nprint(f'Sum: {result}')",
+      input: {
+        numbers: [1, 2, 3],
+      },
+      timeout_seconds: 5,
+    };
+  }
+
+  return buildSampleValueFromSchema(tool.spec.input_schema) as Record<string, unknown>;
+}
+
+export function buildToolTestForm(tool: CatalogTool): ToolTestFormState {
+  return {
+    toolId: tool.id,
+    inputText: stringifyJson(buildSampleToolInput(tool)),
+  };
 }
 
 export function buildAgentForm(agent: CatalogAgent): AgentFormState {
@@ -146,10 +250,14 @@ export function useCatalogControl(token: string) {
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
   const [agentForm, setAgentForm] = useState<AgentFormState>(DEFAULT_AGENT_FORM);
   const [toolForm, setToolForm] = useState<ToolFormState>(DEFAULT_TOOL_FORM);
+  const [toolTestForm, setToolTestForm] = useState<ToolTestFormState>(DEFAULT_TOOL_TEST_FORM);
   const [agentValidationResults, setAgentValidationResults] = useState<Record<string, CatalogAgentValidation>>({});
   const [toolValidationResults, setToolValidationResults] = useState<Record<string, CatalogToolValidation>>({});
+  const [toolTestResult, setToolTestResult] = useState<CatalogToolTestResult | null>(null);
+  const [toolTestError, setToolTestError] = useState("");
   const [validatingAgentId, setValidatingAgentId] = useState("");
   const [validatingToolId, setValidatingToolId] = useState("");
+  const [testingToolId, setTestingToolId] = useState("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingTool, setSavingTool] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -306,6 +414,31 @@ export function useCatalogControl(token: string) {
     }
   }
 
+  async function handleToolTest(): Promise<CatalogToolTestResult | null> {
+    if (!token || !toolTestForm.toolId) {
+      return null;
+    }
+    setTestingToolId(toolTestForm.toolId);
+    setToolTestError("");
+    try {
+      const input = parseJsonObject(
+        toolTestForm.inputText,
+        t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.toolTest.input") }),
+      );
+      const result = await testCatalogTool(toolTestForm.toolId, input, token);
+      setToolTestResult(result);
+      return result;
+    } catch (error) {
+      setToolTestResult(null);
+      const message = error instanceof Error ? error.message : t("catalogControl.feedback.toolTestFailed");
+      setToolTestError(message);
+      showErrorFeedback(error, t("catalogControl.feedback.toolTestFailed"));
+      return null;
+    } finally {
+      setTestingToolId("");
+    }
+  }
+
   return {
     state,
     errorMessage,
@@ -316,10 +449,15 @@ export function useCatalogControl(token: string) {
     setAgentForm,
     toolForm,
     setToolForm,
+    toolTestForm,
+    setToolTestForm,
     agentValidationResults,
     toolValidationResults,
+    toolTestResult,
+    toolTestError,
     validatingAgentId,
     validatingToolId,
+    testingToolId,
     savingAgent,
     savingTool,
     loadCatalogState,
@@ -327,10 +465,21 @@ export function useCatalogControl(token: string) {
     handleToolValidate,
     handleAgentSubmit,
     handleToolSubmit,
+    handleToolTest,
     openAgentEditor: (agent: CatalogAgent) => setAgentForm(buildAgentForm(agent)),
     openToolEditor: (tool: CatalogTool) => setToolForm(buildToolForm(tool)),
+    openToolTester: (tool: CatalogTool) => {
+      setToolTestForm(buildToolTestForm(tool));
+      setToolTestResult(null);
+      setToolTestError("");
+    },
     resetAgentForm: () => setAgentForm(DEFAULT_AGENT_FORM),
     resetToolForm: () => setToolForm(DEFAULT_TOOL_FORM),
+    resetToolTester: () => {
+      setToolTestForm(DEFAULT_TOOL_TEST_FORM);
+      setToolTestResult(null);
+      setToolTestError("");
+    },
     publishedAgents: agents.filter((agent) => agent.published).length,
     publishedTools: tools.filter((tool) => tool.published).length,
   };

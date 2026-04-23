@@ -262,6 +262,72 @@ def validate_catalog_tool(
     }
 
 
+def execute_catalog_tool(
+    database_url: str,
+    *,
+    config: Any,
+    tool_id: str,
+    payload: dict[str, Any],
+    actor_user_id: int | None = None,
+) -> dict[str, Any]:
+    tool = get_catalog_tool(database_url, tool_id=tool_id)
+    spec = dict(tool["spec"])
+    tool_input = payload.get("input")
+    if not isinstance(tool_input, dict):
+        raise CatalogError("invalid_tool_input", "input must be a JSON object")
+
+    transport = str(spec.get("transport", "")).strip().lower()
+    request_metadata = payload.get("request_metadata") if isinstance(payload.get("request_metadata"), dict) else {}
+    if actor_user_id is not None and "actor_user_id" not in request_metadata:
+        request_metadata = {**request_metadata, "actor_user_id": actor_user_id}
+
+    if transport == "mcp":
+        try:
+            adapter = resolve_mcp_runtime_adapter(database_url, config)
+            result_payload, status_code = adapter.invoke(
+                tool_name=str(spec.get("tool_name", "")).strip(),
+                arguments=tool_input,
+                request_metadata=request_metadata,
+            )
+        except PlatformControlPlaneError as exc:
+            raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
+        return _serialize_catalog_tool_execution(
+            tool=tool,
+            input_payload=tool_input,
+            request_metadata=request_metadata,
+            result_payload=result_payload,
+            status_code=status_code,
+        )
+
+    if transport == "sandbox_http":
+        code = str(tool_input.get("code", "")).strip()
+        if not code:
+            raise CatalogError("invalid_tool_input", "Sandbox tools require input.code")
+        safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
+        timeout_seconds = int(tool_input.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
+        language = str(tool_input.get("language", "python")).strip() or "python"
+        try:
+            adapter = resolve_sandbox_execution_adapter(database_url, config)
+            result_payload, status_code = adapter.execute(
+                code=code,
+                language=language,
+                input_payload=tool_input.get("input", {}),
+                timeout_seconds=timeout_seconds,
+                policy=safety_policy,
+            )
+        except PlatformControlPlaneError as exc:
+            raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
+        return _serialize_catalog_tool_execution(
+            tool=tool,
+            input_payload=tool_input,
+            request_metadata=request_metadata,
+            result_payload=result_payload,
+            status_code=status_code,
+        )
+
+    raise CatalogError("invalid_transport", f"Unsupported transport '{transport}'.")
+
+
 def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any]:
     agent = get_catalog_agent(database_url, agent_id=agent_id)
     spec = dict(agent["spec"])
@@ -335,6 +401,27 @@ def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent",
         "published": published,
         "published_at": row.get("published_at"),
         "spec": current_spec,
+    }
+
+
+def _serialize_catalog_tool_execution(
+    *,
+    tool: dict[str, Any],
+    input_payload: dict[str, Any],
+    request_metadata: dict[str, Any],
+    result_payload: dict[str, Any] | None,
+    status_code: int,
+) -> dict[str, Any]:
+    payload = dict(result_payload) if isinstance(result_payload, dict) else None
+    return {
+        "tool": tool,
+        "execution": {
+            "input": input_payload,
+            "request_metadata": request_metadata,
+            "status_code": status_code,
+            "ok": payload is not None and 200 <= status_code < 300 and not payload.get("error"),
+            "result": payload,
+        },
     }
 
 

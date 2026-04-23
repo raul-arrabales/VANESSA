@@ -94,6 +94,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/catalog/tools",
         "/v1/catalog/tools/<tool_id>",
         "/v1/catalog/tools/<tool_id>/validate",
+        "/v1/catalog/tools/<tool_id>/test",
         "/voice/wake-events",
         "/voice/health",
         "/v1/registry/<entity_type>",

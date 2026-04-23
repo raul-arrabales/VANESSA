@@ -1,5 +1,5 @@
 export type CatalogControlSection = "overview" | "tools" | "agents";
-export type CatalogToolsView = "tools" | "create";
+export type CatalogToolsView = "tools" | "create" | "test";
 export type CatalogAgentsView = "agents" | "create";
 
 export const CATALOG_CONTROL_NAV_ITEMS: ReadonlyArray<{
@@ -19,10 +19,14 @@ export function resolveCatalogControlSection(value: string | null): CatalogContr
 }
 
 export function resolveCatalogToolsView(value: string | null): CatalogToolsView {
-  if (value === "create" || value === "tools") {
+  if (value === "create" || value === "tools" || value === "test") {
     return value;
   }
   return "tools";
+}
+
+export function resolveCatalogToolId(value: string | null): string {
+  return String(value ?? "").trim();
 }
 
 export function resolveCatalogAgentsView(value: string | null): CatalogAgentsView {
@@ -35,6 +39,7 @@ export function resolveCatalogAgentsView(value: string | null): CatalogAgentsVie
 export function buildCatalogControlUrl(
   section: CatalogControlSection,
   view?: CatalogToolsView | CatalogAgentsView,
+  options: { toolId?: string } = {},
 ): string {
   if (section === "overview") {
     return "/control/catalog";
@@ -44,6 +49,9 @@ export function buildCatalogControlUrl(
   params.set("section", section);
   if (view) {
     params.set("view", view);
+  }
+  if (section === "tools" && view === "test" && options.toolId) {
+    params.set("toolId", options.toolId);
   }
   return `/control/catalog?${params.toString()}`;
 }

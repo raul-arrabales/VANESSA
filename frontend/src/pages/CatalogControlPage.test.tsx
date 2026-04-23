@@ -25,6 +25,7 @@ vi.mock("../api/catalog", () => ({
   createCatalogTool: vi.fn(),
   updateCatalogTool: vi.fn(),
   validateCatalogTool: vi.fn(),
+  testCatalogTool: vi.fn(),
 }));
 
 vi.mock("../api/modelops", () => ({
@@ -63,7 +64,15 @@ const toolFixture = {
     transport: "mcp" as const,
     connection_profile_ref: "default" as const,
     tool_name: "web_search",
-    input_schema: {},
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        top_k: { type: "integer", minimum: 1, maximum: 10 },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
     output_schema: {},
     safety_policy: {},
     offline_compatible: false,
@@ -108,6 +117,16 @@ describe("CatalogControlPage", () => {
         errors: ["MCP gateway does not expose tool 'web_search'."],
         warnings: [],
         runtime_checks: { tool_discovered: false },
+      },
+    });
+    vi.mocked(catalogApi.testCatalogTool).mockResolvedValue({
+      tool: toolFixture,
+      execution: {
+        input: { query: "OpenAI platform runtime", top_k: 3 },
+        request_metadata: {},
+        status_code: 200,
+        ok: true,
+        result: { results: [{ title: "Example result" }] },
       },
     });
   });
@@ -179,5 +198,31 @@ describe("CatalogControlPage", () => {
     expect(screen.getByLabelText("Tool ID")).toHaveValue("tool.web_search");
     const subNav = screen.getByRole("navigation", { name: "Tool catalog sections" });
     expect(within(subNav).getByRole("link", { name: "Create tool" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("opens the test flow from the tools directory and runs the tool with sample input", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
+
+    await user.click(await screen.findByRole("button", { name: "Test" }));
+
+    expect(await screen.findByRole("heading", { name: "Test tool" })).toBeVisible();
+    const subNav = screen.getByRole("navigation", { name: "Tool catalog sections" });
+    expect(within(subNav).getByRole("link", { name: "Web search" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Test input")).toHaveValue('{\n  "query": "OpenAI platform runtime",\n  "top_k": 3\n}');
+
+    await user.click(screen.getByRole("button", { name: "Test" }));
+
+    await waitFor(() => {
+      expect(catalogApi.testCatalogTool).toHaveBeenCalledWith(
+        "tool.web_search",
+        { query: "OpenAI platform runtime", top_k: 3 },
+        "token",
+      );
+    });
+    const resultPanel = await screen.findByTestId("catalog-tool-test-result");
+    expect(resultPanel).toBeVisible();
+    expect(resultPanel).toHaveTextContent("Example result");
   });
 });

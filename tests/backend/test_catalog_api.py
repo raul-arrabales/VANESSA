@@ -57,6 +57,7 @@ def test_catalog_routes_require_superadmin(client):
         test_client.get("/v1/catalog/tools/tool.alpha", headers=_auth(token)),
         test_client.put("/v1/catalog/tools/tool.alpha", headers=_auth(token), json={}),
         test_client.post("/v1/catalog/tools/tool.alpha/validate", headers=_auth(token)),
+        test_client.post("/v1/catalog/tools/tool.alpha/test", headers=_auth(token), json={}),
     ]
 
     for response in responses:
@@ -140,6 +141,20 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
             },
         },
     )
+    monkeypatch.setattr(
+        catalog_routes,
+        "execute_catalog_tool",
+        lambda _db, *, config, tool_id, payload, actor_user_id: {
+            "tool": dict(tool_row, id=tool_id),
+            "execution": {
+                "input": payload["input"],
+                "request_metadata": {"actor_user_id": actor_user_id},
+                "status_code": 200,
+                "ok": True,
+                "result": {"results": [{"title": "Example"}]},
+            },
+        },
+    )
 
     agents = test_client.get("/v1/catalog/agents", headers=_auth(token))
     create_agent = test_client.post(
@@ -206,6 +221,11 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         },
     )
     validate_tool = test_client.post("/v1/catalog/tools/tool.web_search/validate", headers=_auth(token))
+    execute_tool = test_client.post(
+        "/v1/catalog/tools/tool.web_search/test",
+        headers=_auth(token),
+        json={"input": {"query": "OpenAI"}},
+    )
 
     assert agents.status_code == 200
     assert agents.get_json()["agents"][0]["id"] == "agent.alpha"
@@ -222,3 +242,6 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     assert update_tool.get_json()["tool"]["published"] is False
     assert validate_tool.status_code == 200
     assert validate_tool.get_json()["validation"]["runtime_checks"]["tool_discovered"] is True
+    assert execute_tool.status_code == 200
+    assert execute_tool.get_json()["execution"]["ok"] is True
+    assert execute_tool.get_json()["execution"]["result"]["results"][0]["title"] == "Example"

@@ -1704,6 +1704,8 @@
       "validate": "Validar",
       "validating": "Validando...",
       "edit": "Editar",
+      "testTool": "Probar",
+      "testingTool": "Probando...",
       "createAgent": "Crear agente",
       "updateAgent": "Actualizar agente",
       "newAgent": "Nuevo agente",
@@ -1744,10 +1746,20 @@
       "createTitle": "Crear herramienta",
       "createDescription": "Crea una nueva herramienta de plataforma o continua editando una existente desde este formulario.",
       "editing": "Editando una herramienta de plataforma existente.",
+      "testTitle": "Probar herramienta",
+      "testDescription": "Ejecuta una prueba en vivo contra {{name}} usando su transporte de runtime y esquema de entrada actuales.",
+      "testHelper": "Envía un objeto JSON que coincida con el esquema de entrada de la herramienta para inspeccionar la respuesta real del runtime.",
+      "testMissing": "Selecciona una herramienta de plataforma antes de abrir su vista de prueba.",
+      "testResultTitle": "Resultado de la prueba",
+      "testStatus": "Estado del runtime: {{statusCode}}",
+      "inputSchemaTitle": "Esquema de entrada",
+      "requestTitle": "Entrada enviada",
+      "responseTitle": "Resultado del runtime",
       "views": {
         "aria": "Secciones del catalogo de herramientas",
         "tools": "Herramientas de plataforma",
-        "create": "Crear herramienta"
+        "create": "Crear herramienta",
+        "test": "Probar herramienta"
       }
     },
     "forms": {
@@ -1774,6 +1786,9 @@
         "outputSchema": "Esquema de salida",
         "safetyPolicy": "Politica de seguridad",
         "connectionProfile": "Perfil de conexion: default"
+      },
+      "toolTest": {
+        "input": "Entrada de prueba"
       }
     },
     "validation": {
@@ -1791,7 +1806,8 @@
       "toolCreated": "Herramienta {{name}} creada.",
       "toolUpdated": "Herramienta {{name}} actualizada.",
       "agentValidated": "Agente {{name}} validado.",
-      "toolValidated": "Herramienta {{name}} validada."
+      "toolValidated": "Herramienta {{name}} validada.",
+      "toolTestFailed": "No se pudo probar esta herramienta."
     }
   },
   "agentBuilder": {

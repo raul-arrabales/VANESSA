@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
@@ -8,12 +8,14 @@ import CatalogAgentsDirectory from "../components/CatalogAgentsDirectory";
 import CatalogOverviewSection from "../components/CatalogOverviewSection";
 import CatalogPageLayout from "../components/CatalogPageLayout";
 import CatalogToolFormPanel from "../components/CatalogToolFormPanel";
+import CatalogToolTestPanel from "../components/CatalogToolTestPanel";
 import CatalogToolsDirectory from "../components/CatalogToolsDirectory";
 import { useCatalogControl } from "../hooks/useCatalogControl";
 import {
   buildCatalogControlUrl,
   resolveCatalogAgentsView,
   resolveCatalogControlSection,
+  resolveCatalogToolId,
   resolveCatalogToolsView,
 } from "../routes";
 
@@ -25,6 +27,7 @@ export default function CatalogControlPage(): JSX.Element {
   const activeSection = resolveCatalogControlSection(searchParams.get("section"));
   const activeToolsView = resolveCatalogToolsView(searchParams.get("view"));
   const activeAgentsView = resolveCatalogAgentsView(searchParams.get("view"));
+  const activeToolId = resolveCatalogToolId(searchParams.get("toolId"));
   const {
     state,
     errorMessage,
@@ -35,10 +38,15 @@ export default function CatalogControlPage(): JSX.Element {
     setAgentForm,
     toolForm,
     setToolForm,
+    toolTestForm,
+    setToolTestForm,
     agentValidationResults,
     toolValidationResults,
+    toolTestResult,
+    toolTestError,
     validatingAgentId,
     validatingToolId,
+    testingToolId,
     savingAgent,
     savingTool,
     loadCatalogState,
@@ -46,30 +54,53 @@ export default function CatalogControlPage(): JSX.Element {
     handleToolValidate,
     handleAgentSubmit,
     handleToolSubmit,
+    handleToolTest,
     openAgentEditor,
     openToolEditor,
+    openToolTester,
     resetAgentForm,
     resetToolForm,
     publishedAgents,
     publishedTools,
   } = useCatalogControl(token);
+  const selectedTestTool = tools.find((tool) => tool.id === activeToolId) ?? null;
+
+  useEffect(() => {
+    if (activeSection !== "tools" || activeToolsView !== "test" || !selectedTestTool) {
+      return;
+    }
+    if (toolTestForm.toolId !== selectedTestTool.id) {
+      openToolTester(selectedTestTool);
+    }
+  }, [activeSection, activeToolsView, openToolTester, selectedTestTool, toolTestForm.toolId]);
 
   const toolsSubmenuItems = useMemo(
-    () => [
-      {
-        id: "platform-tools",
-        label: t("catalogControl.tools.views.tools"),
-        isActive: activeToolsView === "tools",
-        to: buildCatalogControlUrl("tools", "tools"),
-      },
-      {
-        id: "create-tool",
-        label: t("catalogControl.tools.views.create"),
-        isActive: activeToolsView === "create",
-        to: buildCatalogControlUrl("tools", "create"),
-      },
-    ],
-    [activeToolsView, t],
+    () => {
+      const items = [
+        {
+          id: "platform-tools",
+          label: t("catalogControl.tools.views.tools"),
+          isActive: activeToolsView === "tools",
+          to: buildCatalogControlUrl("tools", "tools"),
+        },
+        {
+          id: "create-tool",
+          label: t("catalogControl.tools.views.create"),
+          isActive: activeToolsView === "create",
+          to: buildCatalogControlUrl("tools", "create"),
+        },
+      ];
+      if (selectedTestTool) {
+        items.push({
+          id: "test-tool",
+          label: selectedTestTool.spec.name,
+          isActive: activeToolsView === "test",
+          to: buildCatalogControlUrl("tools", "test", { toolId: selectedTestTool.id }),
+        });
+      }
+      return items;
+    },
+    [activeToolsView, selectedTestTool, t],
   );
   const agentsSubmenuItems = useMemo(
     () => [
@@ -139,6 +170,10 @@ export default function CatalogControlPage(): JSX.Element {
             openToolEditor(tool);
             navigate(buildCatalogControlUrl("tools", "create"));
           }}
+          onTest={(tool) => {
+            openToolTester(tool);
+            navigate(buildCatalogControlUrl("tools", "test", { toolId: tool.id }));
+          }}
         />
       ) : null}
 
@@ -152,6 +187,18 @@ export default function CatalogControlPage(): JSX.Element {
             void handleToolSubmit();
           }}
           onReset={resetToolForm}
+        />
+      ) : null}
+
+      {activeSection === "tools" && activeToolsView === "test" ? (
+        <CatalogToolTestPanel
+          tool={selectedTestTool}
+          form={toolTestForm}
+          testing={testingToolId === toolTestForm.toolId}
+          errorMessage={toolTestError}
+          result={toolTestResult}
+          onChange={setToolTestForm}
+          onSubmit={() => void handleToolTest()}
         />
       ) : null}
 

@@ -211,3 +211,109 @@ def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(m
 
     assert result_missing["validation"]["valid"] is False
     assert "Active platform runtime is missing capability 'mcp_runtime'" in result_missing["validation"]["errors"]
+
+
+def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatch):
+    tool_row = {
+        "entity_id": "tool.web_search",
+        "entity_type": "tool",
+        "owner_user_id": 1,
+        "visibility": "private",
+        "status": "published",
+        "current_version": "v1",
+        "published_at": "2026-01-01T00:00:00+00:00",
+        "current_spec": {
+            "name": "Web search",
+            "description": "desc",
+            "transport": "mcp",
+            "connection_profile_ref": "default",
+            "tool_name": "web_search",
+            "input_schema": {},
+            "output_schema": {},
+            "safety_policy": {},
+            "offline_compatible": False,
+        },
+    }
+    monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
+
+    captured: dict[str, object] = {}
+
+    class HealthyMcpAdapter:
+        def invoke(self, *, tool_name: str, arguments: dict[str, object], request_metadata: dict[str, object]):
+            captured["tool_name"] = tool_name
+            captured["arguments"] = arguments
+            captured["request_metadata"] = request_metadata
+            return {"results": [{"title": "Example"}]}, 200
+
+    monkeypatch.setattr(catalog_service, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
+
+    result = catalog_service.execute_catalog_tool(
+        "ignored",
+        config=SimpleNamespace(),
+        tool_id="tool.web_search",
+        payload={"input": {"query": "OpenAI", "top_k": 3}},
+        actor_user_id=7,
+    )
+
+    assert captured == {
+        "tool_name": "web_search",
+        "arguments": {"query": "OpenAI", "top_k": 3},
+        "request_metadata": {"actor_user_id": 7},
+    }
+    assert result["execution"]["ok"] is True
+    assert result["execution"]["result"]["results"][0]["title"] == "Example"
+
+
+def test_execute_catalog_tool_invokes_sandbox_runtime(monkeypatch: pytest.MonkeyPatch):
+    tool_row = {
+        "entity_id": "tool.python_exec",
+        "entity_type": "tool",
+        "owner_user_id": 1,
+        "visibility": "private",
+        "status": "published",
+        "current_version": "v1",
+        "published_at": "2026-01-01T00:00:00+00:00",
+        "current_spec": {
+            "name": "Python exec",
+            "description": "desc",
+            "transport": "sandbox_http",
+            "connection_profile_ref": "default",
+            "tool_name": "python_exec",
+            "input_schema": {},
+            "output_schema": {},
+            "safety_policy": {"timeout_seconds": 5, "network_access": False},
+            "offline_compatible": True,
+        },
+    }
+    monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
+
+    captured: dict[str, object] = {}
+
+    class HealthySandboxAdapter:
+        def execute(self, *, code: str, language: str, input_payload, timeout_seconds: int, policy: dict[str, object]):
+            captured["code"] = code
+            captured["language"] = language
+            captured["input_payload"] = input_payload
+            captured["timeout_seconds"] = timeout_seconds
+            captured["policy"] = policy
+            return {"stdout": "3\n", "stderr": "", "result": 3}, 200
+
+    monkeypatch.setattr(catalog_service, "resolve_sandbox_execution_adapter", lambda _db, config: HealthySandboxAdapter())
+
+    result = catalog_service.execute_catalog_tool(
+        "ignored",
+        config=SimpleNamespace(),
+        tool_id="tool.python_exec",
+        payload={"input": {"code": "print(1 + 2)", "input": {"value": 2}}},
+        actor_user_id=7,
+    )
+
+    assert captured == {
+        "code": "print(1 + 2)",
+        "language": "python",
+        "input_payload": {"value": 2},
+        "timeout_seconds": 5,
+        "policy": {"timeout_seconds": 5, "network_access": False},
+    }
+    assert result["execution"]["ok"] is True
+    assert result["execution"]["result"]["result"] == 3

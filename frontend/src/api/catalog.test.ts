@@ -4,6 +4,7 @@ import {
   createCatalogTool,
   listCatalogAgents,
   listCatalogTools,
+  testCatalogTool,
   updateCatalogAgent,
   updateCatalogTool,
   validateCatalogAgent,
@@ -41,7 +42,7 @@ describe("catalog api", () => {
     );
   });
 
-  it("supports create, update, and validate mutations", async () => {
+  it("supports create, update, validate, and test mutations", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({
       ok: true,
       text: async () => {
@@ -56,6 +57,12 @@ describe("catalog api", () => {
           return JSON.stringify({
             tool: { id: "tool.web_search", entity: { id: "tool.web_search", type: "tool", owner_user_id: 1, visibility: "private" }, current_version: "v1", status: "draft", published: false, published_at: null, spec: {} },
             validation: { valid: true, errors: [], warnings: [], runtime_checks: {} },
+          });
+        }
+        if (url.includes("/test")) {
+          return JSON.stringify({
+            tool: { id: "tool.web_search", entity: { id: "tool.web_search", type: "tool", owner_user_id: 1, visibility: "private" }, current_version: "v1", status: "draft", published: false, published_at: null, spec: {} },
+            execution: { input: { query: "OpenAI" }, request_metadata: {}, status_code: 200, ok: true, result: { results: [] } },
           });
         }
         if (url.includes("/agents")) {
@@ -130,6 +137,7 @@ describe("catalog api", () => {
       "token",
     );
     await validateCatalogTool("tool.web_search", "token");
+    await testCatalogTool("tool.web_search", { query: "OpenAI" }, "token");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/catalog/agents/agent.alpha/validate",
@@ -138,6 +146,13 @@ describe("catalog api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/catalog/tools/tool.web_search/validate",
       expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/catalog/tools/tool.web_search/test",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ input: { query: "OpenAI" } }),
+      }),
     );
   });
 });

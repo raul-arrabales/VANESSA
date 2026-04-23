@@ -92,6 +92,17 @@ export type CatalogToolValidation = {
   };
 };
 
+export type CatalogToolTestResult = {
+  tool: CatalogTool;
+  execution: {
+    input: Record<string, unknown>;
+    request_metadata: Record<string, unknown>;
+    status_code: number;
+    ok: boolean;
+    result: Record<string, unknown> | null;
+  };
+};
+
 export async function listCatalogAgents(token: string): Promise<CatalogAgent[]> {
   const result = await requestJson<{ agents: CatalogAgent[] }>("/v1/catalog/agents", { token });
   return result.agents;
@@ -149,5 +160,17 @@ export async function validateCatalogTool(toolId: string, token: string): Promis
   return requestJson<CatalogToolValidation>(`/v1/catalog/tools/${encodeURIComponent(toolId)}/validate`, {
     method: "POST",
     token,
+  });
+}
+
+export async function testCatalogTool(
+  toolId: string,
+  input: Record<string, unknown>,
+  token: string,
+): Promise<CatalogToolTestResult> {
+  return requestJson<CatalogToolTestResult>(`/v1/catalog/tools/${encodeURIComponent(toolId)}/test`, {
+    method: "POST",
+    token,
+    body: { input },
   });
 }

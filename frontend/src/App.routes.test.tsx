@@ -170,6 +170,7 @@ vi.mock("./api/catalog", () => ({
   createCatalogTool: vi.fn(),
   updateCatalogTool: vi.fn(),
   validateCatalogTool: vi.fn(),
+  testCatalogTool: vi.fn(),
 }));
 vi.mock("./api/agentProjects", () => ({
   listAgentProjects: vi.fn(async () => [{

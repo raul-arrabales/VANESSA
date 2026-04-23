@@ -1722,6 +1722,8 @@
       "validate": "Validate",
       "validating": "Validating...",
       "edit": "Edit",
+      "testTool": "Test",
+      "testingTool": "Testing...",
       "createAgent": "Create agent",
       "updateAgent": "Update agent",
       "newAgent": "New agent",
@@ -1762,10 +1764,20 @@
       "createTitle": "Create tool",
       "createDescription": "Create a new platform tool or continue editing an existing one from this form.",
       "editing": "Editing an existing platform tool.",
+      "testTitle": "Test tool",
+      "testDescription": "Run a live test against {{name}} using its current runtime transport and input schema.",
+      "testHelper": "Submit a JSON object matching the tool input schema to inspect the live runtime response.",
+      "testMissing": "Select a platform tool before opening its test view.",
+      "testResultTitle": "Test result",
+      "testStatus": "Runtime status: {{statusCode}}",
+      "inputSchemaTitle": "Input schema",
+      "requestTitle": "Submitted input",
+      "responseTitle": "Runtime result",
       "views": {
         "aria": "Tool catalog sections",
         "tools": "Platform tools",
-        "create": "Create tool"
+        "create": "Create tool",
+        "test": "Test tool"
       }
     },
     "forms": {
@@ -1792,6 +1804,9 @@
         "outputSchema": "Output schema",
         "safetyPolicy": "Safety policy",
         "connectionProfile": "Connection profile: default"
+      },
+      "toolTest": {
+        "input": "Test input"
       }
     },
     "validation": {
@@ -1809,7 +1824,8 @@
       "toolCreated": "Created tool {{name}}.",
       "toolUpdated": "Updated tool {{name}}.",
       "agentValidated": "Validated agent {{name}}.",
-      "toolValidated": "Validated tool {{name}}."
+      "toolValidated": "Validated tool {{name}}.",
+      "toolTestFailed": "Unable to test this tool."
     }
   },
   "agentBuilder": {

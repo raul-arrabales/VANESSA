@@ -6,6 +6,7 @@ from ..services.catalog_service import (
     CatalogError,
     create_catalog_agent as _create_catalog_agent,
     create_catalog_tool as _create_catalog_tool,
+    execute_catalog_tool as _execute_catalog_tool,
     get_catalog_agent as _get_catalog_agent,
     get_catalog_tool as _get_catalog_tool,
     list_catalog_agents as _list_catalog_agents,
@@ -102,3 +103,20 @@ def validate_catalog_tool(
     tool_id: str,
 ) -> dict[str, Any]:
     return _validate_catalog_tool(database_url, config=config, tool_id=tool_id)
+
+
+def execute_catalog_tool(
+    database_url: str,
+    *,
+    config: Any,
+    tool_id: str,
+    payload: Any,
+    actor_user_id: int | None = None,
+) -> dict[str, Any]:
+    return _execute_catalog_tool(
+        database_url,
+        config=config,
+        tool_id=tool_id,
+        payload=_require_json_object(payload),
+        actor_user_id=actor_user_id,
+    )

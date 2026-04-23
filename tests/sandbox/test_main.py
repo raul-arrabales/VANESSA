@@ -21,3 +21,15 @@ def test_execute_python_returns_stdout_and_result():
     assert status_code == 200
     assert payload["stdout"] == "hi\n"
     assert payload["result"] == {"value": 4}
+
+
+def test_execute_python_exposes_input_alias_for_payload():
+    payload, status_code = execute_python(
+        code="result = {'name': input['name'], 'name_from_payload': input_payload['name']}",
+        input_payload={"name": "Ada"},
+        timeout_seconds=5,
+        policy={"network_access": False},
+    )
+
+    assert status_code == 200
+    assert payload["result"] == {"name": "Ada", "name_from_payload": "Ada"}

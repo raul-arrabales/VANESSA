@@ -6,6 +6,7 @@ from ...application.catalog_management_service import (
     CatalogError,
     create_catalog_agent,
     create_catalog_tool,
+    execute_catalog_tool,
     get_catalog_agent,
     get_catalog_tool,
     list_catalog_agents,
@@ -131,6 +132,22 @@ def update_catalog_tool_route(tool_id: str):
 def validate_catalog_tool_route(tool_id: str):
     try:
         payload = validate_catalog_tool(_database_url(), config=_config(), tool_id=tool_id)
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
+
+
+@bp.post("/v1/catalog/tools/<tool_id>/test")
+@require_role("superadmin")
+def execute_catalog_tool_route(tool_id: str):
+    try:
+        payload = execute_catalog_tool(
+            _database_url(),
+            config=_config(),
+            tool_id=tool_id,
+            payload=request.get_json(silent=True),
+            actor_user_id=int(g.current_user["id"]),
+        )
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(payload), 200
