@@ -1,9 +1,14 @@
-import type { FormEvent } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
 import type { ManagedModel } from "../../../api/modelops";
 import type { PlatformCapability, PlatformDeploymentBinding, PlatformProvider } from "../../../api/platform";
-import type { DeploymentFormState } from "../deploymentEditor";
+import {
+  addCapabilityToDeploymentForm,
+  getAvailableDeploymentCapabilities,
+  getVisibleDeploymentCapabilities,
+  type DeploymentFormState,
+} from "../deploymentEditor";
 import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
 import { capabilityRequiresModelResource } from "../capabilities";
 import { filterModelsForProviderOrigin } from "../deploymentModelCompatibility";
@@ -58,6 +63,21 @@ export default function PlatformDeploymentForm({
   onSubmit,
 }: PlatformDeploymentFormProps): JSX.Element {
   const { t } = useTranslation("common");
+  const visibleCapabilities = getVisibleDeploymentCapabilities(capabilities, value);
+  const availableCapabilities = getAvailableDeploymentCapabilities(capabilities, value);
+  const [capabilityToAdd, setCapabilityToAdd] = useState("");
+
+  useEffect(() => {
+    if (availableCapabilities.length === 0) {
+      if (capabilityToAdd) {
+        setCapabilityToAdd("");
+      }
+      return;
+    }
+    if (!capabilityToAdd || !availableCapabilities.some((capability) => capability.capability === capabilityToAdd)) {
+      setCapabilityToAdd(availableCapabilities[0]?.capability ?? "");
+    }
+  }, [availableCapabilities, capabilityToAdd]);
 
   const updateCapabilityProvider = (capability: string, providerId: string): void => {
     const nextProvider = (providersByCapability[capability] ?? []).find((provider) => provider.id === providerId) ?? null;
@@ -179,7 +199,46 @@ export default function PlatformDeploymentForm({
           </label>
         </div>
 
-        {capabilities.map((capability) => {
+        {availableCapabilities.length > 0 ? (
+          <div className="deployment-binding-row panel panel-nested" data-testid="deployment-add-capability-row">
+            <div className="deployment-binding-heading">
+              <span className="field-label">{t("platformControl.forms.deployment.binding")}</span>
+              <h4 className="deployment-binding-title">{t("platformControl.forms.deployment.addCapabilityTitle")}</h4>
+              <p className="status-text">{t("platformControl.deployments.addCapabilityDescription")}</p>
+            </div>
+            <label className="card-stack deployment-binding-field">
+              <span className="field-label">{t("platformControl.forms.deployment.capability")}</span>
+              <select
+                className="field-input"
+                value={capabilityToAdd}
+                onChange={(event) => setCapabilityToAdd(event.target.value)}
+              >
+                {availableCapabilities.map((capability) => (
+                  <option key={capability.capability} value={capability.capability}>
+                    {capability.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="inline-meta-list">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={!capabilityToAdd}
+                onClick={() => {
+                  if (!capabilityToAdd) {
+                    return;
+                  }
+                  onChange(addCapabilityToDeploymentForm(value, capabilityToAdd));
+                }}
+              >
+                {t("platformControl.actions.addCapability")}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {visibleCapabilities.map((capability) => {
           const section = buildDeploymentCapabilitySectionState({
             capability,
             value,

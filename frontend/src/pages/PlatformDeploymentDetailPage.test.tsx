@@ -47,6 +47,17 @@ vi.mock("../api/context", () => ({
   listKnowledgeBases: vi.fn(),
 }));
 
+function buildDeploymentProviders() {
+  return providersFixture.map((provider) =>
+    provider.capability === "llm_inference" || provider.capability === "embeddings"
+      ? {
+          ...provider,
+          provider_origin: "cloud" as const,
+        }
+      : provider,
+  );
+}
+
 describe("PlatformDeploymentDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,6 +69,7 @@ describe("PlatformDeploymentDetailPage", () => {
       is_active: true,
     };
     primePlatformControlMocks();
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(buildDeploymentProviders());
   });
 
   it("shows deployment topology and activates an inactive deployment", async () => {
@@ -238,6 +250,86 @@ describe("PlatformDeploymentDetailPage", () => {
     });
   });
 
+  it("lets superadmins add and save an additional optional capability binding", async () => {
+    vi.mocked(platformApi.listPlatformCapabilities).mockResolvedValue([
+      {
+        capability: "llm_inference",
+        display_name: "LLM inference",
+        description: "Normalized chat and generation capability.",
+        required: true,
+        active_provider: null,
+      },
+      {
+        capability: "embeddings",
+        display_name: "Embeddings",
+        description: "Normalized text embeddings capability.",
+        required: true,
+        active_provider: null,
+      },
+      {
+        capability: "vector_store",
+        display_name: "Vector store",
+        description: "Semantic retrieval capability.",
+        required: true,
+        active_provider: null,
+      },
+      {
+        capability: "sandbox_execution",
+        display_name: "Sandbox execution",
+        description: "Sandbox capability.",
+        required: false,
+        active_provider: null,
+      },
+    ]);
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([
+      ...buildDeploymentProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-sandbox",
+        slug: "sandbox-local",
+        provider_key: "sandbox_local",
+        provider_origin: "local",
+        capability: "sandbox_execution",
+        adapter_kind: "sandbox_http",
+        display_name: "Sandbox local",
+        description: "Primary sandbox endpoint.",
+        endpoint_url: "http://sandbox:8080",
+        healthcheck_url: "http://sandbox:8080/health",
+      },
+    ]);
+    vi.mocked(platformApi.upsertDeploymentBinding).mockResolvedValue(deploymentsFixture[0]);
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-1" },
+    );
+
+    const addCapabilityRow = await screen.findByTestId("deployment-add-capability-row");
+    await userEvent.click(within(addCapabilityRow).getByRole("button", { name: await t("platformControl.actions.addCapability") }));
+
+    const sandboxRow = await screen.findByTestId("deployment-binding-row-sandbox_execution");
+    await userEvent.selectOptions(
+      within(sandboxRow).getByLabelText(
+        await t("platformControl.forms.deployment.providerForCapability", { capability: "Sandbox execution" }),
+      ),
+      "provider-sandbox",
+    );
+    await userEvent.click(within(sandboxRow).getByRole("button", { name: await t("platformControl.actions.saveBinding") }));
+
+    await waitFor(() => {
+      expect(platformApi.upsertDeploymentBinding).toHaveBeenCalledWith(
+        "deployment-1",
+        "sandbox_execution",
+        expect.objectContaining({
+          provider_id: "provider-sandbox",
+        }),
+        "token",
+      );
+    });
+  });
+
   it("saves deployment identity independently from capability bindings", async () => {
     vi.mocked(platformApi.patchDeploymentProfileIdentity).mockResolvedValue({
       ...deploymentsFixture[0],
@@ -270,7 +362,7 @@ describe("PlatformDeploymentDetailPage", () => {
 
   it("explains when a selected provider has a loaded model that is not yet eligible for binding", async () => {
     vi.mocked(platformApi.listPlatformProviders).mockResolvedValue(
-      providersFixture.map((provider) =>
+      buildDeploymentProviders().map((provider) =>
         provider.id === "provider-embeddings"
           ? {
               ...provider,
@@ -298,7 +390,11 @@ describe("PlatformDeploymentDetailPage", () => {
     );
 
     expect(await screen.findByText(/vLLM embeddings local currently has all-MiniLM-L6-v2 loaded/i)).toBeVisible();
-    expect(screen.getAllByText("GPT-5").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("table", {
+        name: await t("platformControl.deployments.tableAria", { name: "Local Default" }),
+      }),
+    ).toBeVisible();
 
     const embeddingsDefaultSelect = screen.getByLabelText(
       await t("platformControl.forms.deployment.defaultResourceForCapability", { capability: "Embeddings" }),

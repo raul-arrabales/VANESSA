@@ -71,6 +71,7 @@ export function usePlatformDeploymentDetailState({
     [capabilities],
   );
   const {
+    capabilities: editorCapabilities,
     requiredCapabilities,
     providersByCapability,
     modelResourcesByCapability,
@@ -119,7 +120,6 @@ export function usePlatformDeploymentDetailState({
   return {
     state,
     loadErrorMessage,
-    capabilities,
     providers,
     deployments,
     activationAudit,
@@ -130,6 +130,7 @@ export function usePlatformDeploymentDetailState({
     deploymentAudit,
     capabilityLabelByKey,
     requiredCapabilities,
+    capabilities: editorCapabilities,
     providersByCapability,
     modelResourcesByCapability,
     form,

@@ -12,7 +12,8 @@ import {
   buildCloneForm,
   buildDeploymentForm,
   buildDeploymentMutationInput,
-  DEFAULT_DEPLOYMENT_FORM,
+  createDefaultDeploymentForm,
+  getConfiguredOptionalDeploymentCapabilities,
   getCapabilityProviders,
   getManagedModelsByCapability,
   validateDeploymentForm,
@@ -31,6 +32,7 @@ type UsePlatformDeploymentEditorParams = {
 };
 
 type UsePlatformDeploymentEditorResult = {
+  capabilities: PlatformCapability[];
   requiredCapabilities: PlatformCapability[];
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
@@ -56,19 +58,19 @@ export function usePlatformDeploymentEditor({
     [capabilities],
   );
   const providersByCapability = useMemo(
-    () => getCapabilityProviders(providers, requiredCapabilities),
-    [providers, requiredCapabilities],
+    () => getCapabilityProviders(providers, capabilities),
+    [capabilities, providers],
   );
   const modelResourcesByCapability = useMemo(
-    () => getManagedModelsByCapability(eligibleModelsByCapability, requiredCapabilities),
-    [eligibleModelsByCapability, requiredCapabilities],
+    () => getManagedModelsByCapability(eligibleModelsByCapability, capabilities),
+    [capabilities, eligibleModelsByCapability],
   );
 
   const buildInitialForm = useCallback(
     (): DeploymentFormState => (
-      mode === "edit" && deployment ? buildDeploymentForm(deployment) : DEFAULT_DEPLOYMENT_FORM
+      mode === "edit" && deployment ? buildDeploymentForm(deployment, requiredCapabilities) : createDefaultDeploymentForm(requiredCapabilities)
     ),
-    [deployment, mode],
+    [deployment, mode, requiredCapabilities],
   );
 
   const buildInitialCloneForm = useCallback(
@@ -80,7 +82,9 @@ export function usePlatformDeploymentEditor({
 
   const validateAndBuildMutation = useCallback(
     (form: DeploymentFormState) => {
-      const validationError = validateDeploymentForm(requiredCapabilities, form, {
+      const configuredOptionalCapabilities = getConfiguredOptionalDeploymentCapabilities(capabilities, requiredCapabilities, form);
+      const capabilitiesToPersist = [...requiredCapabilities, ...configuredOptionalCapabilities];
+      const validationError = validateDeploymentForm(capabilitiesToPersist, form, {
         bindingRequiredMessage: t("platformControl.feedback.bindingRequired"),
         resourceRequiredMessage: (capability) =>
           t("platformControl.feedback.resourceRequired", { capability: capability.display_name }),
@@ -99,13 +103,14 @@ export function usePlatformDeploymentEditor({
 
       return {
         validationError,
-        mutationInput: validationError ? null : buildDeploymentMutationInput(requiredCapabilities, form, knowledgeBases),
+        mutationInput: validationError ? null : buildDeploymentMutationInput(capabilitiesToPersist, form, knowledgeBases),
       };
     },
-    [knowledgeBases, modelResourcesByCapability, providersByCapability, requiredCapabilities, t],
+    [capabilities, knowledgeBases, modelResourcesByCapability, providersByCapability, requiredCapabilities, t],
   );
 
   return {
+    capabilities,
     requiredCapabilities,
     providersByCapability,
     modelResourcesByCapability,

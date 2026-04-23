@@ -32,7 +32,7 @@ export function usePlatformDeploymentDetail({
     form: detailState.form,
     cloneForm: detailState.cloneForm,
     knowledgeBases: detailState.knowledgeBases,
-    requiredCapabilities: detailState.requiredCapabilities,
+    capabilities: detailState.capabilities,
     providersByCapability: detailState.providersByCapability,
     modelResourcesByCapability: detailState.modelResourcesByCapability,
     setLocalDeployment: detailState.setLocalDeployment,

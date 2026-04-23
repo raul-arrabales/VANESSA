@@ -29,7 +29,7 @@ type UsePlatformDeploymentDetailMutationsParams = {
   form: DeploymentFormState | null;
   cloneForm: DeploymentCloneFormState | null;
   knowledgeBases: KnowledgeBase[];
-  requiredCapabilities: PlatformCapability[];
+  capabilities: PlatformCapability[];
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
   setLocalDeployment: React.Dispatch<React.SetStateAction<PlatformDeploymentProfile | null>>;
@@ -63,7 +63,7 @@ export function usePlatformDeploymentDetailMutations({
   form,
   cloneForm,
   knowledgeBases,
-  requiredCapabilities,
+  capabilities,
   providersByCapability,
   modelResourcesByCapability,
   setLocalDeployment,
@@ -107,7 +107,7 @@ export function usePlatformDeploymentDetailMutations({
     if (!token || !deployment || !form) {
       return;
     }
-    const capability = requiredCapabilities.find((item) => item.capability === capabilityKey);
+    const capability = capabilities.find((item) => item.capability === capabilityKey);
     if (!capability) {
       return;
     }

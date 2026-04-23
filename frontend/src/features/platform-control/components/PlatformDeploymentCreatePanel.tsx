@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { createDeploymentProfile } from "../../../api/platform";
@@ -23,7 +23,7 @@ export default function PlatformDeploymentCreatePanel(): JSX.Element {
     knowledgeBases,
   } = usePlatformDeploymentEditorData(token);
   const {
-    requiredCapabilities,
+    capabilities: editorCapabilities,
     providersByCapability,
     modelResourcesByCapability,
     buildInitialForm,
@@ -38,6 +38,19 @@ export default function PlatformDeploymentCreatePanel(): JSX.Element {
   });
   const [form, setForm] = useState<DeploymentFormState>(() => buildInitialForm());
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const nextInitialForm = buildInitialForm();
+    const shouldHydrateRequiredCapabilities = form.capabilityKeys.length === 0
+      && nextInitialForm.capabilityKeys.length > 0
+      && !form.slug
+      && !form.displayName
+      && !form.description
+      && Object.keys(form.providerIdsByCapability).length === 0;
+    if (shouldHydrateRequiredCapabilities) {
+      setForm(nextInitialForm);
+    }
+  }, [buildInitialForm, form]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -79,7 +92,7 @@ export default function PlatformDeploymentCreatePanel(): JSX.Element {
       <article className="panel card-stack">
         <PlatformDeploymentForm
           value={form}
-          capabilities={requiredCapabilities}
+          capabilities={editorCapabilities}
           providersByCapability={providersByCapability}
           modelResourcesByCapability={modelResourcesByCapability}
           knowledgeBases={knowledgeBases}

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ManagedModel } from "../../../api/modelops";
-import type { PlatformDeploymentProfile, PlatformProvider } from "../../../api/platform";
+import type { PlatformCapability, PlatformDeploymentProfile, PlatformProvider } from "../../../api/platform";
 import {
   capabilitiesFixture,
   deploymentsFixture,
@@ -43,6 +43,7 @@ type HookHarnessProps = {
   mode: "create" | "edit";
   deployment?: PlatformDeploymentProfile | null;
   formToValidate?: DeploymentFormState;
+  capabilities?: PlatformCapability[];
   providers?: PlatformProvider[];
   eligibleModelsByCapability?: Record<string, ManagedModel[]>;
 };
@@ -51,6 +52,7 @@ function HookHarness({
   mode,
   deployment = null,
   formToValidate,
+  capabilities = capabilitiesFixture,
   providers = cloudModelProviders(),
   eligibleModelsByCapability = {
     llm_inference: llmModelsFixture,
@@ -59,7 +61,7 @@ function HookHarness({
 }: HookHarnessProps): JSX.Element {
   const editor = usePlatformDeploymentEditor({
     mode,
-    capabilities: capabilitiesFixture,
+    capabilities,
     providers,
     eligibleModelsByCapability,
     knowledgeBases: knowledgeBasesFixture,
@@ -71,6 +73,7 @@ function HookHarness({
   return (
     <div>
       <span data-testid="required-count">{String(editor.requiredCapabilities.length)}</span>
+      <span data-testid="capability-count">{String(editor.capabilities.length)}</span>
       <span data-testid="llm-providers">{String(editor.providersByCapability.llm_inference?.length ?? 0)}</span>
       <span data-testid="embeddings-models">{String(editor.modelResourcesByCapability.embeddings?.length ?? 0)}</span>
       <span data-testid="initial-form">{JSON.stringify(editor.buildInitialForm())}</span>
@@ -87,6 +90,7 @@ describe("usePlatformDeploymentEditor", () => {
       slug: "cloud-profile",
       displayName: "Cloud Profile",
       description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store"],
       providerIdsByCapability: {
         llm_inference: "provider-1",
         embeddings: "provider-embeddings",
@@ -111,8 +115,10 @@ describe("usePlatformDeploymentEditor", () => {
     render(<HookHarness mode="create" formToValidate={formToValidate} />);
 
     expect(screen.getByTestId("required-count")).toHaveTextContent("3");
+    expect(screen.getByTestId("capability-count")).toHaveTextContent("3");
     expect(screen.getByTestId("llm-providers")).toHaveTextContent("1");
     expect(screen.getByTestId("embeddings-models")).toHaveTextContent("1");
+    expect(screen.getByTestId("initial-form")).toHaveTextContent('"capabilityKeys":["llm_inference","embeddings","vector_store"]');
     expect(screen.getByTestId("initial-form")).toHaveTextContent('"slug":""');
     expect(screen.getByTestId("initial-clone")).toHaveTextContent("null");
     expect(screen.getByTestId("validation-error")).toHaveTextContent("");
@@ -153,6 +159,7 @@ describe("usePlatformDeploymentEditor", () => {
       slug: "local-default",
       displayName: "Local Default",
       description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store"],
       providerIdsByCapability: {
         llm_inference: "provider-1",
         embeddings: "provider-embeddings",
@@ -195,6 +202,7 @@ describe("usePlatformDeploymentEditor", () => {
       slug: "cloud-profile",
       displayName: "Cloud Profile",
       description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store"],
       providerIdsByCapability: {
         llm_inference: "provider-1",
         embeddings: "provider-embeddings",
@@ -230,5 +238,83 @@ describe("usePlatformDeploymentEditor", () => {
 
     expect(screen.getByTestId("validation-error")).toHaveTextContent("vLLM local gateway cannot serve Qwen local.");
     expect(screen.getByTestId("mutation-input")).toHaveTextContent("null");
+  });
+
+  it("includes configured optional capabilities in the mutation payload without requiring blank optional rows", () => {
+    const capabilitiesWithOptional = [
+      ...capabilitiesFixture,
+      {
+        capability: "sandbox_execution",
+        display_name: "Sandbox execution",
+        description: "Sandbox capability",
+        required: false,
+        active_provider: null,
+      },
+    ];
+    const providersWithOptional = [
+      ...cloudModelProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-sandbox",
+        slug: "sandbox-local",
+        provider_key: "sandbox_local",
+        capability: "sandbox_execution",
+        adapter_kind: "sandbox_http",
+        provider_origin: "local" as const,
+        display_name: "Sandbox local",
+      },
+    ];
+    const formToValidate: DeploymentFormState = {
+      slug: "cloud-profile",
+      displayName: "Cloud Profile",
+      description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store", "sandbox_execution"],
+      providerIdsByCapability: {
+        llm_inference: "provider-1",
+        embeddings: "provider-embeddings",
+        vector_store: "provider-2",
+        sandbox_execution: "provider-sandbox",
+      },
+      resourceIdsByCapability: {
+        llm_inference: ["gpt-5"],
+        embeddings: ["text-embedding-3-small"],
+        vector_store: ["kb_primary"],
+      },
+      defaultResourceIdsByCapability: {
+        llm_inference: "gpt-5",
+        embeddings: "text-embedding-3-small",
+      },
+      resourcePolicyByCapability: {
+        vector_store: {
+          selection_mode: "explicit",
+        },
+      },
+    };
+
+    render(
+      <HookHarness
+        mode="create"
+        capabilities={capabilitiesWithOptional}
+        formToValidate={formToValidate}
+        providers={providersWithOptional}
+        eligibleModelsByCapability={{
+          llm_inference: llmModelsFixture,
+          embeddings: embeddingsModelsFixture,
+        }}
+      />,
+    );
+
+    const mutationInput = JSON.parse(screen.getByTestId("mutation-input").textContent ?? "null") as {
+      bindings: Array<{ capability: string; provider_id: string }>;
+    };
+    expect(mutationInput.bindings.map((binding) => binding.capability)).toEqual([
+      "llm_inference",
+      "embeddings",
+      "vector_store",
+      "sandbox_execution",
+    ]);
+    expect(mutationInput.bindings.find((binding) => binding.capability === "sandbox_execution")).toEqual(
+      expect.objectContaining({ provider_id: "provider-sandbox" }),
+    );
   });
 });

@@ -78,6 +78,7 @@ function buildFormState(overrides: Partial<DeploymentFormState> = {}): Deploymen
     slug: "local-default",
     displayName: "Local Default",
     description: "",
+    capabilityKeys: [],
     providerIdsByCapability: {},
     resourceIdsByCapability: {},
     defaultResourceIdsByCapability: {},

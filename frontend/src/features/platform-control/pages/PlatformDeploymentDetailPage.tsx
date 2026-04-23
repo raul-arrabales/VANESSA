@@ -19,6 +19,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     activating,
     capabilityLabelByKey,
     cloneForm,
+    capabilities,
     cloning,
     confirmActivate,
     confirmDelete,
@@ -36,7 +37,6 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     loadErrorMessage,
     modelResourcesByCapability,
     providersByCapability,
-    requiredCapabilities,
     resetForm,
     savingCapabilityKeys,
     savingIdentity,
@@ -121,10 +121,10 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 <h3 className="section-title">{t("platformControl.sections.settings")}</h3>
                 <p className="status-text">{t("platformControl.deployments.settingsDescription")}</p>
               </div>
-              <PlatformDeploymentForm
-                value={form}
-                capabilities={requiredCapabilities}
-                providersByCapability={providersByCapability}
+                <PlatformDeploymentForm
+                  value={form}
+                  capabilities={capabilities}
+                  providersByCapability={providersByCapability}
                 modelResourcesByCapability={modelResourcesByCapability}
                 knowledgeBases={knowledgeBases}
                 bindingStatusByCapability={Object.fromEntries(

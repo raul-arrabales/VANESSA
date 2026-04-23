@@ -15,6 +15,7 @@ export type DeploymentFormState = {
   slug: string;
   displayName: string;
   description: string;
+  capabilityKeys: string[];
   providerIdsByCapability: Record<string, string>;
   resourceIdsByCapability: Record<string, string[]>;
   defaultResourceIdsByCapability: Record<string, string>;
@@ -31,6 +32,7 @@ export const DEFAULT_DEPLOYMENT_FORM: DeploymentFormState = {
   slug: "",
   displayName: "",
   description: "",
+  capabilityKeys: [],
   providerIdsByCapability: {},
   resourceIdsByCapability: {},
   defaultResourceIdsByCapability: {},
@@ -50,11 +52,29 @@ type DeploymentFormValidationOptions = {
   modelResourcesByCapability?: Record<string, ManagedModel[]>;
 };
 
-export function buildDeploymentForm(deployment: PlatformDeploymentProfile): DeploymentFormState {
+function uniqueCapabilityKeys(capabilityKeys: string[]): string[] {
+  return Array.from(new Set(capabilityKeys));
+}
+
+export function createDefaultDeploymentForm(requiredCapabilities: PlatformCapability[]): DeploymentFormState {
+  return {
+    ...DEFAULT_DEPLOYMENT_FORM,
+    capabilityKeys: requiredCapabilities.map((capability) => capability.capability),
+  };
+}
+
+export function buildDeploymentForm(
+  deployment: PlatformDeploymentProfile,
+  requiredCapabilities: PlatformCapability[] = [],
+): DeploymentFormState {
   return {
     slug: deployment.slug,
     displayName: deployment.display_name,
     description: deployment.description,
+    capabilityKeys: uniqueCapabilityKeys([
+      ...requiredCapabilities.map((capability) => capability.capability),
+      ...deployment.bindings.map((binding) => binding.capability),
+    ]),
     providerIdsByCapability: Object.fromEntries(
       deployment.bindings.map((binding) => [binding.capability, binding.provider.id]),
     ),
@@ -101,16 +121,16 @@ export function getManagedModelsByCapability(
 }
 
 export function validateDeploymentForm(
-  requiredCapabilities: PlatformCapability[],
+  capabilitiesToValidate: PlatformCapability[],
   form: DeploymentFormState,
   options: DeploymentFormValidationOptions,
 ): string | null {
-  const missingBinding = requiredCapabilities.find((capability) => !form.providerIdsByCapability[capability.capability]);
+  const missingBinding = capabilitiesToValidate.find((capability) => !form.providerIdsByCapability[capability.capability]);
   if (missingBinding) {
     return options.bindingRequiredMessage;
   }
 
-  const incompleteModelBinding = requiredCapabilities.find((capability) => {
+  const incompleteModelBinding = capabilitiesToValidate.find((capability) => {
     if (!capabilityRequiresModelResource(capability.capability)) {
       return false;
     }
@@ -121,7 +141,7 @@ export function validateDeploymentForm(
       ?? `${incompleteModelBinding.display_name} requires at least one bound resource.`;
   }
 
-  const missingDefaultModelBinding = requiredCapabilities.find((capability) => {
+  const missingDefaultModelBinding = capabilitiesToValidate.find((capability) => {
     if (!capabilityRequiresModelResource(capability.capability)) {
       return false;
     }
@@ -135,7 +155,7 @@ export function validateDeploymentForm(
   }
 
   if (options.providersByCapability && options.modelResourcesByCapability) {
-    for (const capability of requiredCapabilities) {
+    for (const capability of capabilitiesToValidate) {
       if (!capabilityRequiresModelResource(capability.capability)) {
         continue;
       }
@@ -158,7 +178,7 @@ export function validateDeploymentForm(
     }
   }
 
-  const invalidVectorBinding = requiredCapabilities.find((capability) => {
+  const invalidVectorBinding = capabilitiesToValidate.find((capability) => {
     if (capability.capability !== "vector_store") {
       return false;
     }
@@ -249,15 +269,58 @@ export function buildDeploymentBindingMutationInput(
 }
 
 export function buildDeploymentMutationInput(
-  requiredCapabilities: PlatformCapability[],
+  capabilitiesToInclude: PlatformCapability[],
   form: DeploymentFormState,
   knowledgeBases: KnowledgeBase[],
 ): PlatformDeploymentMutationInput {
   return {
     ...buildDeploymentIdentityMutationInput(form),
-    bindings: requiredCapabilities.map((capability) => ({
+    bindings: capabilitiesToInclude.map((capability) => ({
       capability: capability.capability,
       ...buildDeploymentBindingMutationInput(capability, form, knowledgeBases),
     })),
   };
+}
+
+export function addCapabilityToDeploymentForm(
+  form: DeploymentFormState,
+  capabilityKey: string,
+): DeploymentFormState {
+  if (!capabilityKey || form.capabilityKeys.includes(capabilityKey)) {
+    return form;
+  }
+  return {
+    ...form,
+    capabilityKeys: [...form.capabilityKeys, capabilityKey],
+  };
+}
+
+export function getVisibleDeploymentCapabilities(
+  allCapabilities: PlatformCapability[],
+  form: DeploymentFormState,
+): PlatformCapability[] {
+  const includedKeys = new Set(form.capabilityKeys);
+  return allCapabilities.filter((capability) => includedKeys.has(capability.capability));
+}
+
+export function getAvailableDeploymentCapabilities(
+  allCapabilities: PlatformCapability[],
+  form: DeploymentFormState,
+): PlatformCapability[] {
+  const includedKeys = new Set(form.capabilityKeys);
+  return allCapabilities.filter((capability) => !includedKeys.has(capability.capability));
+}
+
+export function getConfiguredOptionalDeploymentCapabilities(
+  allCapabilities: PlatformCapability[],
+  requiredCapabilities: PlatformCapability[],
+  form: DeploymentFormState,
+): PlatformCapability[] {
+  const requiredCapabilityKeys = new Set(requiredCapabilities.map((capability) => capability.capability));
+  const includedKeys = new Set(form.capabilityKeys);
+  return allCapabilities.filter((capability) =>
+    includedKeys.has(capability.capability)
+    && !requiredCapabilityKeys.has(capability.capability)
+    && Boolean(form.providerIdsByCapability[capability.capability]),
+  );
 }

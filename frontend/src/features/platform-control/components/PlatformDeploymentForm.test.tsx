@@ -46,13 +46,59 @@ function buildKnowledgeBases(): KnowledgeBase[] {
 }
 
 function DeploymentFormHarness(): JSX.Element {
-  const [value, setValue] = useState<DeploymentFormState>(buildDeploymentForm(deploymentsFixture[0]));
+  const [value, setValue] = useState<DeploymentFormState>(buildDeploymentForm(deploymentsFixture[0], capabilitiesFixture));
 
   return (
     <PlatformDeploymentForm
       value={value}
       capabilities={capabilitiesFixture}
       providersByCapability={buildProvidersByCapability(capabilitiesFixture, providersFixture)}
+      modelResourcesByCapability={buildModelResourcesByCapability()}
+      knowledgeBases={buildKnowledgeBases()}
+      helperText="Editing deployment local-default."
+      isSubmitting={false}
+      submitLabel="Save deployment"
+      submitBusyLabel="Saving..."
+      onChange={setValue}
+      onSubmit={(event) => event.preventDefault()}
+    />
+  );
+}
+
+function DeploymentFormWithOptionalCapabilityHarness(): JSX.Element {
+  const capabilitiesWithOptional: PlatformCapability[] = [
+    ...capabilitiesFixture,
+    {
+      capability: "sandbox_execution",
+      display_name: "Sandbox execution",
+      description: "Sandbox capability",
+      required: false,
+      active_provider: null,
+    },
+  ];
+  const providersWithOptional: PlatformProvider[] = [
+    ...providersFixture,
+    {
+      ...providersFixture[0],
+      id: "provider-sandbox",
+      slug: "sandbox-local",
+      provider_key: "sandbox_local",
+      provider_origin: "local",
+      capability: "sandbox_execution",
+      adapter_kind: "sandbox_http",
+      display_name: "Sandbox local",
+      description: "Primary sandbox provider.",
+      endpoint_url: "http://sandbox:8080",
+      healthcheck_url: "http://sandbox:8080/health",
+    },
+  ];
+  const [value, setValue] = useState<DeploymentFormState>(buildDeploymentForm(deploymentsFixture[0], capabilitiesFixture));
+
+  return (
+    <PlatformDeploymentForm
+      value={value}
+      capabilities={capabilitiesWithOptional}
+      providersByCapability={buildProvidersByCapability(capabilitiesWithOptional, providersWithOptional)}
       modelResourcesByCapability={buildModelResourcesByCapability()}
       knowledgeBases={buildKnowledgeBases()}
       helperText="Editing deployment local-default."
@@ -98,5 +144,19 @@ describe("PlatformDeploymentForm", () => {
     expect(within(llmRow).getByRole("button", {
       name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "LLM inference" }),
     })).toHaveTextContent("GPT-4.1");
+  });
+
+  it("lets superadmins add another capability row until all platform capabilities are included", async () => {
+    await renderWithAppProviders(<DeploymentFormWithOptionalCapabilityHarness />);
+
+    const addCapabilityRow = screen.getByTestId("deployment-add-capability-row");
+    expect(within(addCapabilityRow).getByLabelText(await t("platformControl.forms.deployment.capability"))).toHaveValue(
+      "sandbox_execution",
+    );
+
+    await userEvent.click(within(addCapabilityRow).getByRole("button", { name: await t("platformControl.actions.addCapability") }));
+
+    expect(await screen.findByTestId("deployment-binding-row-sandbox_execution")).toBeVisible();
+    expect(screen.queryByTestId("deployment-add-capability-row")).not.toBeInTheDocument();
   });
 });
