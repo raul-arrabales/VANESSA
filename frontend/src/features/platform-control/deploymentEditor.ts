@@ -212,6 +212,13 @@ export function buildDeploymentBindingMutationInput(
   form: DeploymentFormState,
   knowledgeBases: KnowledgeBase[],
 ): PlatformDeploymentBindingMutationInput {
+  if (!capabilitySupportsResources(capability.capability)) {
+    return {
+      provider_id: form.providerIdsByCapability[capability.capability],
+      config: {},
+    };
+  }
+
   const knowledgeBasesById = new Map(knowledgeBases.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase]));
   return {
     provider_id: form.providerIdsByCapability[capability.capability],

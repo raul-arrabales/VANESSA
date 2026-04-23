@@ -305,7 +305,7 @@ describe("usePlatformDeploymentEditor", () => {
     );
 
     const mutationInput = JSON.parse(screen.getByTestId("mutation-input").textContent ?? "null") as {
-      bindings: Array<{ capability: string; provider_id: string }>;
+      bindings: Array<Record<string, unknown>>;
     };
     expect(mutationInput.bindings.map((binding) => binding.capability)).toEqual([
       "llm_inference",
@@ -313,8 +313,12 @@ describe("usePlatformDeploymentEditor", () => {
       "vector_store",
       "sandbox_execution",
     ]);
-    expect(mutationInput.bindings.find((binding) => binding.capability === "sandbox_execution")).toEqual(
-      expect.objectContaining({ provider_id: "provider-sandbox" }),
+    const sandboxBinding = mutationInput.bindings.find((binding) => binding.capability === "sandbox_execution");
+    expect(sandboxBinding).toEqual(
+      expect.objectContaining({ provider_id: "provider-sandbox", config: {} }),
     );
+    expect(sandboxBinding).not.toHaveProperty("resources");
+    expect(sandboxBinding).not.toHaveProperty("default_resource_id");
+    expect(sandboxBinding).not.toHaveProperty("resource_policy");
   });
 });
