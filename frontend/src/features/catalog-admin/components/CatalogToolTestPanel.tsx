@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { CatalogTool, CatalogToolTestResult } from "../../../api/catalog";
-import type { ToolTestFormState } from "../hooks/useCatalogControl";
+import type { ToolTestFormState } from "../hooks/useCatalogToolTesting";
 
 type CatalogToolTestPanelProps = {
   tool: CatalogTool | null;

@@ -188,68 +188,14 @@ def validate_catalog_tool(
 ) -> dict[str, Any]:
     tool = get_catalog_tool(database_url, tool_id=tool_id)
     spec = dict(tool["spec"])
-    errors: list[str] = []
-    warnings: list[str] = []
     transport = str(spec.get("transport", "")).strip().lower()
-
-    runtime_checks: dict[str, Any] = {
-        "runtime_capability": "mcp_runtime" if transport == "mcp" else "sandbox_execution",
-        "provider_reachable": False,
-        "provider_status_code": None,
-    }
-
-    if transport == "mcp":
-        try:
-            adapter = resolve_mcp_runtime_adapter(database_url, config)
-            health = adapter.health()
-            runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
-            runtime_checks["provider_status_code"] = health.get("status_code")
-            tools_payload, status_code = adapter.list_tools()
-            runtime_checks["tools_status_code"] = status_code
-            tools = tools_payload.get("tools") if isinstance(tools_payload, dict) else []
-            available_names = {
-                str(item.get("tool_name", "")).strip()
-                for item in tools
-                if isinstance(item, dict) and str(item.get("tool_name", "")).strip()
-            }
-            expected_name = str(spec.get("tool_name", "")).strip()
-            runtime_checks["tool_discovered"] = expected_name in available_names
-            runtime_checks["available_tool_names"] = sorted(available_names)
-            if not runtime_checks["provider_reachable"]:
-                errors.append("MCP runtime provider is not reachable.")
-            if not runtime_checks["tool_discovered"]:
-                errors.append(f"MCP gateway does not expose tool '{expected_name}'.")
-        except PlatformControlPlaneError as exc:
-            errors.append(exc.message)
-            runtime_checks["provider_status_code"] = exc.status_code
-            runtime_checks["tool_discovered"] = False
-    elif transport == "sandbox_http":
-        try:
-            adapter = resolve_sandbox_execution_adapter(database_url, config)
-            health = adapter.health()
-            runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
-            runtime_checks["provider_status_code"] = health.get("status_code")
-            safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
-            dry_run_payload, dry_run_status = adapter.execute(
-                code=str(safety_policy.get("dry_run_code", "result = {'status': 'ok'}")),
-                language="python",
-                input_payload={},
-                timeout_seconds=int(safety_policy.get("timeout_seconds", 5) or 5),
-                policy=safety_policy,
-            )
-            dry_run_ok = dry_run_payload is not None and 200 <= dry_run_status < 300 and not dry_run_payload.get("error")
-            runtime_checks["sandbox_dry_run_ok"] = dry_run_ok
-            runtime_checks["sandbox_dry_run_status_code"] = dry_run_status
-            if not runtime_checks["provider_reachable"]:
-                errors.append("Sandbox runtime provider is not reachable.")
-            if not dry_run_ok:
-                errors.append("Sandbox dry-run execution failed.")
-        except PlatformControlPlaneError as exc:
-            errors.append(exc.message)
-            runtime_checks["provider_status_code"] = exc.status_code
-            runtime_checks["sandbox_dry_run_ok"] = False
-    else:
-        errors.append(f"Unsupported transport '{transport}'.")
+    runtime_checks, errors = _validate_catalog_tool_transport(
+        database_url=database_url,
+        config=config,
+        transport=transport,
+        spec=spec,
+    )
+    warnings: list[str] = []
 
     return {
         "tool": tool,
@@ -281,51 +227,21 @@ def execute_catalog_tool(
     if actor_user_id is not None and "actor_user_id" not in request_metadata:
         request_metadata = {**request_metadata, "actor_user_id": actor_user_id}
 
-    if transport == "mcp":
-        try:
-            adapter = resolve_mcp_runtime_adapter(database_url, config)
-            result_payload, status_code = adapter.invoke(
-                tool_name=str(spec.get("tool_name", "")).strip(),
-                arguments=tool_input,
-                request_metadata=request_metadata,
-            )
-        except PlatformControlPlaneError as exc:
-            raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-        return _serialize_catalog_tool_execution(
-            tool=tool,
-            input_payload=tool_input,
-            request_metadata=request_metadata,
-            result_payload=result_payload,
-            status_code=status_code,
-        )
-
-    if transport == "sandbox_http":
-        code = str(tool_input.get("code", "")).strip()
-        if not code:
-            raise CatalogError("invalid_tool_input", "Sandbox tools require input.code")
-        safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
-        timeout_seconds = int(tool_input.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
-        language = str(tool_input.get("language", "python")).strip() or "python"
-        try:
-            adapter = resolve_sandbox_execution_adapter(database_url, config)
-            result_payload, status_code = adapter.execute(
-                code=code,
-                language=language,
-                input_payload=tool_input.get("input", {}),
-                timeout_seconds=timeout_seconds,
-                policy=safety_policy,
-            )
-        except PlatformControlPlaneError as exc:
-            raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-        return _serialize_catalog_tool_execution(
-            tool=tool,
-            input_payload=tool_input,
-            request_metadata=request_metadata,
-            result_payload=result_payload,
-            status_code=status_code,
-        )
-
-    raise CatalogError("invalid_transport", f"Unsupported transport '{transport}'.")
+    result_payload, status_code = _execute_catalog_tool_transport(
+        database_url=database_url,
+        config=config,
+        transport=transport,
+        spec=spec,
+        tool_input=tool_input,
+        request_metadata=request_metadata,
+    )
+    return _serialize_catalog_tool_execution(
+        tool=tool,
+        input_payload=tool_input,
+        request_metadata=request_metadata,
+        result_payload=result_payload,
+        status_code=status_code,
+    )
 
 
 def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any]:
@@ -402,6 +318,194 @@ def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent",
         "published_at": row.get("published_at"),
         "spec": current_spec,
     }
+
+
+def _runtime_capability_for_transport(transport: str) -> str:
+    if transport == "mcp":
+        return "mcp_runtime"
+    if transport == "sandbox_http":
+        return "sandbox_execution"
+    return "unknown"
+
+
+def _validate_catalog_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    transport: str,
+    spec: dict[str, Any],
+) -> tuple[dict[str, Any], list[str]]:
+    runtime_checks: dict[str, Any] = {
+        "runtime_capability": _runtime_capability_for_transport(transport),
+        "provider_reachable": False,
+        "provider_status_code": None,
+    }
+    errors: list[str] = []
+
+    if transport == "mcp":
+        _validate_mcp_tool_transport(
+            database_url=database_url,
+            config=config,
+            spec=spec,
+            runtime_checks=runtime_checks,
+            errors=errors,
+        )
+        return runtime_checks, errors
+
+    if transport == "sandbox_http":
+        _validate_sandbox_tool_transport(
+            database_url=database_url,
+            config=config,
+            spec=spec,
+            runtime_checks=runtime_checks,
+            errors=errors,
+        )
+        return runtime_checks, errors
+
+    errors.append(f"Unsupported transport '{transport}'.")
+    return runtime_checks, errors
+
+
+def _validate_mcp_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    runtime_checks: dict[str, Any],
+    errors: list[str],
+) -> None:
+    try:
+        adapter = resolve_mcp_runtime_adapter(database_url, config)
+        health = adapter.health()
+        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
+        runtime_checks["provider_status_code"] = health.get("status_code")
+        tools_payload, status_code = adapter.list_tools()
+        runtime_checks["tools_status_code"] = status_code
+        tools = tools_payload.get("tools") if isinstance(tools_payload, dict) else []
+        available_names = {
+            str(item.get("tool_name", "")).strip()
+            for item in tools
+            if isinstance(item, dict) and str(item.get("tool_name", "")).strip()
+        }
+        expected_name = str(spec.get("tool_name", "")).strip()
+        runtime_checks["tool_discovered"] = expected_name in available_names
+        runtime_checks["available_tool_names"] = sorted(available_names)
+        if not runtime_checks["provider_reachable"]:
+            errors.append("MCP runtime provider is not reachable.")
+        if not runtime_checks["tool_discovered"]:
+            errors.append(f"MCP gateway does not expose tool '{expected_name}'.")
+    except PlatformControlPlaneError as exc:
+        errors.append(exc.message)
+        runtime_checks["provider_status_code"] = exc.status_code
+        runtime_checks["tool_discovered"] = False
+
+
+def _validate_sandbox_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    runtime_checks: dict[str, Any],
+    errors: list[str],
+) -> None:
+    try:
+        adapter = resolve_sandbox_execution_adapter(database_url, config)
+        health = adapter.health()
+        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
+        runtime_checks["provider_status_code"] = health.get("status_code")
+        safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
+        dry_run_payload, dry_run_status = adapter.execute(
+            code=str(safety_policy.get("dry_run_code", "result = {'status': 'ok'}")),
+            language="python",
+            input_payload={},
+            timeout_seconds=int(safety_policy.get("timeout_seconds", 5) or 5),
+            policy=safety_policy,
+        )
+        dry_run_ok = dry_run_payload is not None and 200 <= dry_run_status < 300 and not dry_run_payload.get("error")
+        runtime_checks["sandbox_dry_run_ok"] = dry_run_ok
+        runtime_checks["sandbox_dry_run_status_code"] = dry_run_status
+        if not runtime_checks["provider_reachable"]:
+            errors.append("Sandbox runtime provider is not reachable.")
+        if not dry_run_ok:
+            errors.append("Sandbox dry-run execution failed.")
+    except PlatformControlPlaneError as exc:
+        errors.append(exc.message)
+        runtime_checks["provider_status_code"] = exc.status_code
+        runtime_checks["sandbox_dry_run_ok"] = False
+
+
+def _execute_catalog_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    transport: str,
+    spec: dict[str, Any],
+    tool_input: dict[str, Any],
+    request_metadata: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int]:
+    if transport == "mcp":
+        return _execute_mcp_tool_transport(
+            database_url=database_url,
+            config=config,
+            spec=spec,
+            tool_input=tool_input,
+            request_metadata=request_metadata,
+        )
+
+    if transport == "sandbox_http":
+        return _execute_sandbox_tool_transport(
+            database_url=database_url,
+            config=config,
+            spec=spec,
+            tool_input=tool_input,
+        )
+
+    raise CatalogError("invalid_transport", f"Unsupported transport '{transport}'.")
+
+
+def _execute_mcp_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    tool_input: dict[str, Any],
+    request_metadata: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int]:
+    try:
+        adapter = resolve_mcp_runtime_adapter(database_url, config)
+        return adapter.invoke(
+            tool_name=str(spec.get("tool_name", "")).strip(),
+            arguments=tool_input,
+            request_metadata=request_metadata,
+        )
+    except PlatformControlPlaneError as exc:
+        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
+
+
+def _execute_sandbox_tool_transport(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    tool_input: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int]:
+    code = str(tool_input.get("code", "")).strip()
+    if not code:
+        raise CatalogError("invalid_tool_input", "Sandbox tools require input.code")
+    safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
+    timeout_seconds = int(tool_input.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
+    language = str(tool_input.get("language", "python")).strip() or "python"
+    try:
+        adapter = resolve_sandbox_execution_adapter(database_url, config)
+        return adapter.execute(
+            code=code,
+            language=language,
+            input_payload=tool_input.get("input", {}),
+            timeout_seconds=timeout_seconds,
+            policy=safety_policy,
+        )
+    except PlatformControlPlaneError as exc:
+        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
 
 
 def _serialize_catalog_tool_execution(
