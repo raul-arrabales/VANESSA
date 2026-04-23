@@ -1675,8 +1675,25 @@
     }
   },
   "catalogControl": {
+    "eyebrow": "Catalog control",
     "title": "Agent and tool catalog",
     "description": "Manage typed agent and tool definitions through the canonical catalog surface.",
+    "navigation": {
+      "aria": "Catalog control sections",
+      "overview": "Overview",
+      "tools": "Tools",
+      "agents": "Agents"
+    },
+    "home": {
+      "description": "Review the catalog dashboard, then move into tools or agents for focused catalog administration.",
+      "exploreTitle": "Catalog areas",
+      "exploreDescription": "Use the overview to monitor catalog health, then open the tool or agent catalog for editing and validation work.",
+      "exploreAria": "Catalog management areas",
+      "toolsTitle": "Tools",
+      "toolsDescription": "Browse platform tools, validate runtime compatibility, and move into create or edit flows.",
+      "agentsTitle": "Agents",
+      "agentsDescription": "Browse platform agents, review validation results, and continue create or edit work."
+    },
     "state": {
       "idle": "Idle",
       "loading": "Loading",
@@ -1719,11 +1736,33 @@
       "sandbox": "Sandbox"
     },
     "agents": {
-      "description": "Define agent instructions, model defaults, and tool bindings before publishing."
+      "title": "Platform agents",
+      "pageDescription": "Browse platform agents or move into the create flow to add or update catalog-backed agent definitions.",
+      "description": "Define agent instructions, model defaults, and tool bindings before publishing.",
+      "listTitle": "Platform agents",
+      "createTitle": "Create agent",
+      "createDescription": "Create a new platform agent or continue editing an existing one from this form.",
+      "editing": "Editing an existing platform agent.",
+      "views": {
+        "aria": "Agent catalog sections",
+        "agents": "Platform agents",
+        "create": "Create agent"
+      }
     },
     "tools": {
+      "title": "Platform tools",
+      "pageDescription": "Browse platform tools or move into the create flow to add or update catalog-backed tool definitions.",
       "description": "Define tool transport, schemas, and safety policy, then validate active runtime compatibility.",
-      "transportLabel": "Transport: {{transport}}"
+      "transportLabel": "Transport: {{transport}}",
+      "listTitle": "Platform tools",
+      "createTitle": "Create tool",
+      "createDescription": "Create a new platform tool or continue editing an existing one from this form.",
+      "editing": "Editing an existing platform tool.",
+      "views": {
+        "aria": "Tool catalog sections",
+        "tools": "Platform tools",
+        "create": "Create tool"
+      }
     },
     "forms": {
       "status": "Save status",

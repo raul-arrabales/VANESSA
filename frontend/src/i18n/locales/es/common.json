@@ -1657,8 +1657,25 @@
     }
   },
   "catalogControl": {
+    "eyebrow": "Control del catalogo",
     "title": "Catalogo de agentes y herramientas",
     "description": "Administra definiciones tipadas de agentes y herramientas desde la superficie canonica del catalogo.",
+    "navigation": {
+      "aria": "Secciones del control del catalogo",
+      "overview": "Resumen",
+      "tools": "Herramientas",
+      "agents": "Agentes"
+    },
+    "home": {
+      "description": "Revisa el panel general del catalogo y luego entra en herramientas o agentes para una administracion enfocada.",
+      "exploreTitle": "Areas del catalogo",
+      "exploreDescription": "Usa el resumen para supervisar el catalogo y luego abre herramientas o agentes para editar y validar.",
+      "exploreAria": "Areas de administracion del catalogo",
+      "toolsTitle": "Herramientas",
+      "toolsDescription": "Explora las herramientas de plataforma, valida la compatibilidad del runtime y entra en los flujos de creacion o edicion.",
+      "agentsTitle": "Agentes",
+      "agentsDescription": "Explora los agentes de plataforma, revisa validaciones y continua el trabajo de creacion o edicion."
+    },
     "state": {
       "idle": "Inactivo",
       "loading": "Cargando",
@@ -1701,11 +1718,33 @@
       "sandbox": "Sandbox"
     },
     "agents": {
-      "description": "Define instrucciones, modelos por defecto y enlaces de herramientas antes de publicar."
+      "title": "Agentes de plataforma",
+      "pageDescription": "Explora los agentes de plataforma o entra en el flujo de creacion para agregar o actualizar definiciones del catalogo.",
+      "description": "Define instrucciones, modelos por defecto y enlaces de herramientas antes de publicar.",
+      "listTitle": "Agentes de plataforma",
+      "createTitle": "Crear agente",
+      "createDescription": "Crea un nuevo agente de plataforma o continua editando uno existente desde este formulario.",
+      "editing": "Editando un agente de plataforma existente.",
+      "views": {
+        "aria": "Secciones del catalogo de agentes",
+        "agents": "Agentes de plataforma",
+        "create": "Crear agente"
+      }
     },
     "tools": {
+      "title": "Herramientas de plataforma",
+      "pageDescription": "Explora las herramientas de plataforma o entra en el flujo de creacion para agregar o actualizar definiciones del catalogo.",
       "description": "Define transporte, esquemas y politica de seguridad, y valida la compatibilidad con el runtime activo.",
-      "transportLabel": "Transporte: {{transport}}"
+      "transportLabel": "Transporte: {{transport}}",
+      "listTitle": "Herramientas de plataforma",
+      "createTitle": "Crear herramienta",
+      "createDescription": "Crea una nueva herramienta de plataforma o continua editando una existente desde este formulario.",
+      "editing": "Editando una herramienta de plataforma existente.",
+      "views": {
+        "aria": "Secciones del catalogo de herramientas",
+        "tools": "Herramientas de plataforma",
+        "create": "Crear herramienta"
+      }
     },
     "forms": {
       "status": "Estado de guardado",

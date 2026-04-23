@@ -112,30 +112,32 @@ describe("CatalogControlPage", () => {
     });
   });
 
-  it("loads and renders agents and tools", async () => {
+  it("loads the overview dashboard with first-level navigation", async () => {
     await renderPage();
 
     expect(await screen.findByRole("heading", { name: "Agent and tool catalog" })).toBeVisible();
-    expect(await screen.findByText("Agent Alpha")).toBeVisible();
-    expect((await screen.findAllByText("Web search")).length).toBeGreaterThan(0);
+    const topNav = screen.getByRole("navigation", { name: "Catalog control sections" });
+    expect(within(topNav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(within(topNav).getByRole("link", { name: "Tools" })).toBeVisible();
+    expect(within(topNav).getByRole("link", { name: "Agents" })).toBeVisible();
+    expect(screen.getByText("Catalog areas")).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "Tool catalog sections" })).not.toBeInTheDocument();
   });
 
-  it("creates an agent from the typed form", async () => {
+  it("creates an agent from the create-agent view", async () => {
     const user = userEvent.setup();
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([]);
 
-    await renderPage();
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=create" });
 
-    const agentsHeading = await screen.findByRole("heading", { name: "Agents" });
-    const agentsPanel = agentsHeading.closest("article");
-    expect(agentsPanel).not.toBeNull();
-    const agentScope = within(agentsPanel as HTMLElement);
+    const subNav = await screen.findByRole("navigation", { name: "Agent catalog sections" });
+    expect(within(subNav).getByRole("link", { name: "Create agent" })).toHaveAttribute("aria-current", "page");
 
-    await user.type(agentScope.getByLabelText("Agent ID"), "agent.beta");
-    await user.type(agentScope.getByLabelText("Name"), "Agent Beta");
-    await user.type(agentScope.getByLabelText("Description"), "Catalog agent");
-    await user.type(agentScope.getByLabelText("Instructions"), "Use tools carefully.");
-    await user.click(agentScope.getByRole("button", { name: "Create agent" }));
+    await user.type(screen.getByLabelText("Agent ID"), "agent.beta");
+    await user.type(screen.getByLabelText("Name"), "Agent Beta");
+    await user.type(screen.getByLabelText("Description"), "Catalog agent");
+    await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
+    await user.click(screen.getByRole("button", { name: "Create agent" }));
 
     await waitFor(() => {
       expect(catalogApi.createCatalogAgent).toHaveBeenCalledWith(
@@ -152,15 +154,30 @@ describe("CatalogControlPage", () => {
   it("validates a tool and renders validation errors", async () => {
     const user = userEvent.setup();
 
-    await renderPage();
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
 
-    const validateButtons = await screen.findAllByRole("button", { name: "Validate" });
-    await user.click(validateButtons[1]);
+    const subNav = await screen.findByRole("navigation", { name: "Tool catalog sections" });
+    expect(within(subNav).getByRole("link", { name: "Platform tools" })).toHaveAttribute("aria-current", "page");
+
+    await user.click(await screen.findByRole("button", { name: "Validate" }));
 
     await waitFor(() => {
       expect(catalogApi.validateCatalogTool).toHaveBeenCalledWith("tool.web_search", "token");
     });
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByText("MCP gateway does not expose tool 'web_search'.")).toBeVisible();
+  });
+
+  it("opens the edit flow from the tools directory", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByRole("heading", { name: "Create tool" })).toBeVisible();
+    expect(screen.getByLabelText("Tool ID")).toHaveValue("tool.web_search");
+    const subNav = screen.getByRole("navigation", { name: "Tool catalog sections" });
+    expect(within(subNav).getByRole("link", { name: "Create tool" })).toHaveAttribute("aria-current", "page");
   });
 });
