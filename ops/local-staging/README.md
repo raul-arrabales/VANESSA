@@ -39,7 +39,7 @@ python scripts/generate_architecture.py --write
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
-  - Checks optional `mcp_gateway` when `MCP_GATEWAY_URL` is configured.
+  - Checks `mcp_gateway` by default.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
 - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
 - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
@@ -101,7 +101,6 @@ Supported launcher variables:
 - `LLAMA_CPP_MODEL_PATH` (required when `LLAMA_CPP_URL` is set; must point to a GGUF file under `models/llm/` or an absolute host path)
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
-- `MCP_GATEWAY_URL` (blank by default; when set, enables the optional `mcp_gateway` compose profile and backend bootstrap profile)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
 - `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
@@ -150,10 +149,10 @@ Split local runtime selection:
 - Local-staging scripts automatically add the `qdrant` compose profile when enabled.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /healthz` inside the container.
 
-`mcp_gateway` selection:
+`mcp_gateway` behavior:
 
-- The optional `mcp_gateway` service is enabled only when `MCP_GATEWAY_URL` is non-empty.
-- Local-staging scripts automatically add the `mcp_gateway` compose profile when enabled.
+- `mcp_gateway` is part of the default local-staging stack, like `sandbox`.
+- The gateway listens on container port `8080`; local staging publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
 
 ## Sample Auth Seeding
@@ -217,8 +216,8 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `Qdrant local`, activate `Local Qdrant`, and confirm retrieval still succeeds
 19. Optional MCP/tool-runtime proof:
-   - set `MCP_GATEWAY_URL=http://mcp_gateway:8080`
    - run `./ops/local-staging/start.sh`
+   - confirm `http://localhost:6100/health` responds on the host
    - validate `MCP gateway local` from Platform control
    - execute an agent that references `tool.web_search` while the runtime profile is `online`
 20. Stop while keeping state: `./ops/local-staging/stop.sh`
@@ -320,7 +319,7 @@ Use the targeted restart script when only one service changed:
 
 - Port already in use:
   - Run `./ops/local-staging/status.sh`
-  - Free ports `3000, 5000, 6000, 7000, 8000, 8080, 8081, 10400, 5432` or adjust compose mapping.
+- Free ports `3000, 5000, 6000, 6100, 7000, 8000, 8080, 8081, 10400, 5432` or adjust compose mapping.
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`

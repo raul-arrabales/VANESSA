@@ -141,15 +141,15 @@ services:
       context: ..
       dockerfile: infra/docker/mcp_gateway/Dockerfile
     container_name: vanessa-mcp-gateway
-    profiles:
-      - mcp_gateway
     ports:
-      - "6100:6100"
+      - "6100:8080"
     env_file:
       - path: .env.example
         required: true
       - path: .env.local
         required: false
+    environment:
+      MCP_GATEWAY_PORT: 8080
 
   agent_engine:
     build:

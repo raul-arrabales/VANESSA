@@ -92,8 +92,8 @@ def test_system_health_includes_qdrant_service_when_configured(client, monkeypat
     assert "http://qdrant:6333/healthz" in seen_urls
 
 
-def test_system_health_includes_mcp_gateway_service_when_configured(client, monkeypatch: pytest.MonkeyPatch):
-    config = build_test_auth_config(backend_app_module.AuthConfig, mcp_gateway_url="http://mcp_gateway:6100")
+def test_system_health_includes_mcp_gateway_service_by_default(client, monkeypatch: pytest.MonkeyPatch):
+    config = build_test_auth_config(backend_app_module.AuthConfig)
     seen_urls: list[str] = []
 
     def _http_ok(url: str) -> bool:
@@ -110,4 +110,4 @@ def test_system_health_includes_mcp_gateway_service_when_configured(client, monk
     assert response.status_code == 200
     payload = response.get_json()
     assert any(service["container"] == "mcp_gateway" for service in payload["services"])
-    assert "http://mcp_gateway:6100/health" in seen_urls
+    assert "http://mcp_gateway:8080/health" in seen_urls

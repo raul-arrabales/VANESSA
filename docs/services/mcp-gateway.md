@@ -18,7 +18,9 @@ Current built-in v1 tool:
 
 - `web_search`
 
-This service is optional in local and staging deployments. When `MCP_GATEWAY_URL` is configured, backend seeds the `mcp_gateway_local` provider and binds it to the optional `mcp_runtime` capability for active deployment profiles. Agent engine then uses that binding for LLM-driven tool calls such as `tool.web_search`.
+This service is part of the default local-staging stack. Backend seeds the `mcp_gateway_local` provider from `MCP_GATEWAY_URL` and binds it to `mcp_runtime` in the default local deployment profiles. Agent engine then uses that binding for LLM-driven tool calls such as `tool.web_search`.
+
+In local staging, `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080`. The container listens on port `8080`, while Docker publishes it on host port `6100` to avoid conflicting with Weaviate on `8080`.
 
 Canonical service notes: [`mcp_gateway/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/mcp_gateway/README.md).
 

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-03-25T16:05:22+00:00",
+  "generated_at": "2026-04-24T15:40:09+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -79,7 +79,7 @@
       "container": "mcp_gateway",
       "label": "MCP Gateway",
       "group": "runtime",
-      "description": "Optional HTTP gateway for MCP-backed tool runtimes.",
+      "description": "HTTP gateway for MCP-backed tool runtimes.",
       "public_exposed": true,
       "criticality": "medium"
     },
@@ -373,5 +373,5 @@
       }
     }
   },
-  "source_hash": "0d3fcd3d1cb7a55a4d8de6d074b97bbc092c2a6799a73b27a20308886967463e"
+  "source_hash": "0506da0091217cd9ea59ab71608f2afd34264ca4f119292ecad48ce1c3d4e435"
 }

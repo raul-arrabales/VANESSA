@@ -287,13 +287,9 @@ qdrant_internal_http_ok() {
   compose exec -T qdrant python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6333${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
-mcp_gateway_enabled_requested() {
-  [[ -n "${MCP_GATEWAY_URL:-}" ]]
-}
-
 mcp_gateway_internal_http_ok() {
   local path="$1"
-  compose exec -T mcp_gateway python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6100${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+  compose exec -T mcp_gateway python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8080${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
 resolve_llm_local_model_host_path() {
@@ -412,9 +408,6 @@ compose() {
   if qdrant_enabled_requested; then
     cmd+=(--profile qdrant)
   fi
-  if mcp_gateway_enabled_requested; then
-    cmd+=(--profile mcp_gateway)
-  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -434,9 +427,6 @@ stack_services_for_start() {
       continue
     fi
     if [[ "${service}" == "qdrant" ]] && ! qdrant_enabled_requested; then
-      continue
-    fi
-    if [[ "${service}" == "mcp_gateway" ]] && ! mcp_gateway_enabled_requested; then
       continue
     fi
     services_to_start+=("${service}")

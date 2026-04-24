@@ -276,15 +276,11 @@ run_checks() {
     printf 'qdrant: SKIP (QDRANT_URL not set)\n'
   fi
 
-  if mcp_gateway_enabled_requested; then
-    if mcp_gateway_ready_ok; then
-      printf 'mcp_gateway: OK (/health)\n'
-    else
-      printf 'mcp_gateway: FAIL\n'
-      failures=$((failures + 1))
-    fi
+  if mcp_gateway_ready_ok; then
+    printf 'mcp_gateway: OK (/health)\n'
   else
-    printf 'mcp_gateway: SKIP (MCP_GATEWAY_URL not set)\n'
+    printf 'mcp_gateway: FAIL\n'
+    failures=$((failures + 1))
   fi
 
   if [[ "${llm_routing_mode}" == "local_only" ]]; then

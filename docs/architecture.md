@@ -34,7 +34,7 @@ Legend:
 6. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
 7. Agent Engine: multi-step agent logic and tool workflows.
 8. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
-9. MCP Gateway: optional normalized HTTP provider for MCP-backed tools such as web search.
+9. MCP Gateway: normalized HTTP provider for MCP-backed tools such as web search.
 10. KWS: offline wake-word detection and wake-event emission.
 11. Weaviate: persistent semantic index for RAG context retrieval.
 12. Qdrant: optional vector database for alternate retrieval provider binding.
@@ -43,8 +43,8 @@ Legend:
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
-- Agent Engine -> LLM API, Sandbox, optional MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
+- Agent Engine -> LLM API, Sandbox, MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
 - LLM API -> LLM Runtime Inference, LLM Runtime Embeddings
 - KWS -> Backend API
 
@@ -87,13 +87,12 @@ Current provider proof state:
 - `local-default` keeps `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
-- When `SANDBOX_URL` is configured, deployment profiles also bind `sandbox_execution -> sandbox_local`.
-- When `MCP_GATEWAY_URL` is configured, deployment profiles also bind `mcp_runtime -> mcp_gateway_local`.
+- `local-default` also binds `sandbox_execution -> sandbox_local` and `mcp_runtime -> mcp_gateway_local`.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; OpenAI-compatible cloud provider instances hold endpoint/auth config, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings choose explicit managed-model resources.
 - Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
 - `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.
-- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain optional and are enforced per execution when an agent references tools that need them.
+- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain modeled as optional platform capabilities, but local staging now seeds and binds both sandbox and MCP runtime by default and still enforces them per execution only when an agent references tools that need them.
 
 ## Tool Runtime Convergence
 
@@ -104,7 +103,7 @@ Agent tools now use a hybrid split:
 
 Current v1 transports:
 
-- `mcp`: remote/general-purpose tools executed through the optional MCP gateway provider.
+- `mcp`: remote/general-purpose tools executed through the MCP gateway provider.
 - `sandbox_http`: native Python execution tools executed through the sandbox provider.
 
 Current canonical tools:

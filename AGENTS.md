@@ -32,7 +32,7 @@ Current architectural pillars:
   - `llm` is the normalized private LLM gateway.
   - `llm_runtime_inference`, `llm_runtime_embeddings`, and optional `llama_cpp` are local runtime/provider options behind the control plane.
   - Weaviate and optional Qdrant are alternate `vector_store` providers.
-  - Sandbox and optional MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
+  - Sandbox and MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
 
 Design goals:
 
@@ -152,8 +152,8 @@ Respect these runtime boundaries when generating code or configuration.
    - Native runtime provider for Python execution tools.
    - Must only be accessed through approved backend/agent_engine abstractions and policy checks.
 
-9. **Optional MCP Gateway (`mcp_gateway`)**
-   - Optional normalized HTTP provider for MCP-backed tools.
+9. **MCP Gateway (`mcp_gateway`)**
+   - Normalized HTTP provider for MCP-backed tools.
    - Used for provider validation and agent tool dispatch.
 
 10. **Wake-word service (`kws`)**
@@ -264,9 +264,9 @@ This should start the current local stack, including at least:
 - Weaviate
 - PostgreSQL
 - Sandbox
+- MCP gateway
 - Optional llama.cpp
 - Optional Qdrant
-- Optional MCP gateway
 
 ---
 
@@ -371,7 +371,7 @@ When making changes:
 - `llm` is the normalized gateway.
 - `llm_runtime_inference`, `llm_runtime_embeddings`, and `llama_cpp` are provider/runtime options behind control-plane selection.
 - Weaviate and Qdrant are alternate `vector_store` providers.
-- Sandbox and MCP gateway are optional runtime capabilities, not generic utilities to call directly from anywhere.
+- Sandbox and MCP gateway are runtime capabilities, not generic utilities to call directly from anywhere.
 
 6. Be safe with the sandbox.
 - Any code-execution feature must integrate through approved backend/agent_engine abstractions and governance checks.

@@ -154,9 +154,6 @@ fi
 if [[ "${target_service}" == "qdrant" ]]; then
   qdrant_enabled_requested || die "qdrant is disabled. Set QDRANT_URL to enable the optional Qdrant runtime."
 fi
-if [[ "${target_service}" == "mcp_gateway" ]]; then
-  mcp_gateway_enabled_requested || die "mcp_gateway is disabled. Set MCP_GATEWAY_URL to enable the optional MCP runtime."
-fi
 validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"

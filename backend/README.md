@@ -13,7 +13,7 @@ System diagnostics endpoints:
   - Includes active capability/provider health from the platform control plane when available.
   - Includes optional `llama_cpp` reachability when `LLAMA_CPP_URL` is configured.
   - Includes optional `qdrant` reachability when `QDRANT_URL` is configured.
-  - Includes optional `mcp_gateway` reachability when `MCP_GATEWAY_URL` is configured.
+  - Includes `mcp_gateway` reachability by default in local staging and whenever `MCP_GATEWAY_URL` is non-empty.
 - `GET /system/architecture` returns generated architecture graph JSON.
 - `GET /system/architecture.svg` returns generated architecture diagram SVG.
 
@@ -99,7 +99,7 @@ Platform control plane semantics:
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
 - `SANDBOX_URL` seeds the optional `sandbox_local` provider instance and binds it as `sandbox_execution`.
-- `MCP_GATEWAY_URL` enables the optional local MCP gateway provider instance and binds it as `mcp_runtime`.
+- `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080` in local staging, seeds `mcp_gateway_local`, and binds it as `mcp_runtime`.
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Managed knowledge bases are now a backend-owned context-management domain. They live in Postgres, each target one configured `vector_store` provider instance, and are bound into deployments as explicit `vector_store` resources.
 - Schema creation can now start from reusable provider-specific schema profiles. Built-in Weaviate profiles seed plain document RAG, agent semantic memory, and agent episodic memory templates, and superadmins may save custom profiles for reuse.

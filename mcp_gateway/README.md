@@ -13,4 +13,6 @@ Current API:
 - `GET /v1/tools`
 - `POST /v1/tools/invoke`
 
-When `MCP_GATEWAY_URL` is configured, backend seeds this service as the optional `mcp_gateway_local` provider for the `mcp_runtime` capability. Agent engine then uses it for LLM-driven MCP tool execution, starting with the built-in `tool.web_search` flow.
+Backend seeds this service as the default local `mcp_gateway_local` provider for the `mcp_runtime` capability. Agent engine then uses it for LLM-driven MCP tool execution, starting with the built-in `tool.web_search` flow.
+
+In local staging, `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080`. The service listens on container port `8080`, and Docker publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.

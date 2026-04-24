@@ -78,7 +78,7 @@ services:
   mcp_gateway:
     label: MCP Gateway
     group: runtime
-    description: Optional HTTP gateway for MCP-backed tool runtimes.
+    description: HTTP gateway for MCP-backed tool runtimes.
     public_exposed: true
     criticality: medium
   weaviate:

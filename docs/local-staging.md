@@ -45,7 +45,7 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 - Optional provider proofs:
   - Set `LLAMA_CPP_URL` to enable the alternate local LLM provider.
   - Set `QDRANT_URL` to enable the alternate local vector-store provider.
-  - Set `MCP_GATEWAY_URL` to enable the optional MCP runtime provider for agent web-search tools.
+- MCP gateway is enabled by default in local staging for agent web-search tools. It is exposed on `http://localhost:6100` on the host so it does not collide with Weaviate on `8080`.
 
 For complete script flags, environment variables, and troubleshooting details, see the canonical guide in [`ops/local-staging/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/ops/local-staging/README.md).
 

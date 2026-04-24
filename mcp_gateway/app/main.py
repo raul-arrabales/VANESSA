@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import quote_plus
+
+
+DEFAULT_MCP_GATEWAY_PORT = 8080
 
 
 def _web_search(arguments: dict[str, Any]) -> tuple[dict[str, Any], int]:
@@ -132,5 +136,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = HTTPServer(("0.0.0.0", 6100), Handler)
+    port = int(os.getenv("MCP_GATEWAY_PORT", str(DEFAULT_MCP_GATEWAY_PORT)) or DEFAULT_MCP_GATEWAY_PORT)
+    server = HTTPServer(("0.0.0.0", port), Handler)
     server.serve_forever()

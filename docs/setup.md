@@ -28,7 +28,7 @@ npm run dev
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Expected services include frontend, backend, agent engine, sandbox, llm, llm runtime, kws, weaviate, and postgres, plus optional `llama_cpp`, `qdrant`, and `mcp_gateway` profiles when their corresponding runtime URLs are configured.
+Expected services include frontend, backend, agent engine, sandbox, mcp_gateway, llm, llm runtime, kws, weaviate, and postgres, plus optional `llama_cpp` and `qdrant` profiles when their corresponding runtime URLs are configured.
 
 ## Documentation Site (MkDocs)
 
