@@ -50,6 +50,28 @@ export const OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS = {
   }),
 };
 
+export const MCP_GATEWAY_LOCAL_PROVIDER_DEFAULTS = {
+  slug: "mcp-gateway-local",
+  displayName: "MCP gateway local",
+  description: "Optional local MCP gateway for hosted tool runtimes.",
+  endpointUrl: "http://mcp_gateway:8080",
+  healthcheckUrl: "http://mcp_gateway:8080/health",
+  configText: stringifyJson({
+    invoke_path: "/v1/tools/invoke",
+    list_tools_path: "/v1/tools",
+    healthcheck_tool_name: "web_search",
+  }),
+  credentialId: "",
+  secretRefsText: stringifyJson({}),
+  enabled: true,
+};
+
+const PROVIDER_FAMILY_DEFAULTS: Record<string, Partial<ProviderFormState>> = {
+  openai_compatible_cloud_llm: OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  openai_compatible_cloud_embeddings: OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  mcp_gateway_local: MCP_GATEWAY_LOCAL_PROVIDER_DEFAULTS,
+};
+
 export function stringifyJson(value: Record<string, unknown> | Record<string, string>): string {
   return JSON.stringify(value, null, 2);
 }
@@ -71,17 +93,13 @@ export function supportsLocalModelSlot(provider: Pick<PlatformProvider, "capabil
 }
 
 export function applyProviderFamilyDefaults(form: ProviderFormState, providerKey: string): ProviderFormState {
-  if (!isOpenAICompatibleCloudProvider(providerKey)) {
-    return {
-      ...form,
-      providerKey,
-    };
-  }
+  const normalizedProviderKey = providerKey.trim().toLowerCase();
+  const defaults = PROVIDER_FAMILY_DEFAULTS[normalizedProviderKey];
 
   return {
     ...form,
     providerKey,
-    ...OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+    ...(defaults ?? {}),
   };
 }
 

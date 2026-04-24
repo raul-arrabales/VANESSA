@@ -162,6 +162,92 @@ describe("PlatformProviderCreatePage", () => {
     });
   });
 
+  it("pre-populates the local MCP gateway defaults when its family is selected", async () => {
+    vi.mocked(platformApi.listPlatformProviderFamilies).mockResolvedValue([
+      {
+        provider_key: "mcp_gateway_local",
+        provider_origin: "local",
+        capability: "mcp_runtime",
+        adapter_kind: "mcp_http",
+        display_name: "MCP gateway local",
+        description: "Local MCP gateway family.",
+      },
+    ]);
+    vi.mocked(platformApi.createPlatformProvider).mockResolvedValue({
+      ...providersFixture[0],
+      id: "provider-mcp",
+      slug: "mcp-gateway-local",
+      provider_key: "mcp_gateway_local",
+      provider_origin: "local",
+      capability: "mcp_runtime",
+      adapter_kind: "mcp_http",
+      display_name: "MCP gateway local",
+      description: "Optional local MCP gateway for hosted tool runtimes.",
+      endpoint_url: "http://mcp_gateway:8080",
+      healthcheck_url: "http://mcp_gateway:8080/health",
+      config: {
+        invoke_path: "/v1/tools/invoke",
+        list_tools_path: "/v1/tools",
+        healthcheck_tool_name: "web_search",
+      },
+      secret_refs: {},
+    });
+
+    await renderWithAppProviders(<PlatformProviderCreatePage />);
+
+    await userEvent.selectOptions(
+      await screen.findByLabelText(await t("platformControl.forms.provider.origin")),
+      "local",
+    );
+    await userEvent.selectOptions(
+      await screen.findByLabelText(await t("platformControl.forms.provider.family")),
+      "mcp_gateway_local",
+    );
+
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.slug"))).toHaveValue("mcp-gateway-local");
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.displayName"))).toHaveValue("MCP gateway local");
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.endpoint"))).toHaveValue("http://mcp_gateway:8080");
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.healthcheck"))).toHaveValue(
+      "http://mcp_gateway:8080/health",
+    );
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.description"))).toHaveValue(
+      "Optional local MCP gateway for hosted tool runtimes.",
+    );
+    expect(screen.getByLabelText(await t("platformControl.forms.provider.config"))).toHaveValue(
+      JSON.stringify(
+        {
+          invoke_path: "/v1/tools/invoke",
+          list_tools_path: "/v1/tools",
+          healthcheck_tool_name: "web_search",
+        },
+        null,
+        2,
+      ),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.createProvider") }));
+
+    await waitFor(() => {
+      expect(platformApi.createPlatformProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider_key: "mcp_gateway_local",
+          slug: "mcp-gateway-local",
+          display_name: "MCP gateway local",
+          description: "Optional local MCP gateway for hosted tool runtimes.",
+          endpoint_url: "http://mcp_gateway:8080",
+          healthcheck_url: "http://mcp_gateway:8080/health",
+          config: {
+            invoke_path: "/v1/tools/invoke",
+            list_tools_path: "/v1/tools",
+            healthcheck_tool_name: "web_search",
+          },
+          secret_refs: {},
+        }),
+        "token",
+      );
+    });
+  });
+
   it("filters provider families by the selected provider origin", async () => {
     vi.mocked(platformApi.listPlatformProviderFamilies).mockResolvedValue([
       {
