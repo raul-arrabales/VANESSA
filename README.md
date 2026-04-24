@@ -49,8 +49,7 @@ cd VANESSA
 
 Then open:
 
-- Frontend: `http://localhost:3000`
-- LLM gateway (when local staging is up): `http://localhost:8000`
+- Frontend: `http://localhost:3000` (when local staging is up)
 
 For a fuller setup guide, see [docs/setup.md](docs/setup.md) and [ops/local-staging/README.md](ops/local-staging/README.md).
 
