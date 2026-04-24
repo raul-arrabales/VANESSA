@@ -32,9 +32,9 @@ Best for: local AI experimentation, agent and tool orchestration, platform gover
 
 ## Experience Snapshot
 
-| Vanessa AI | AI Playground |
+| Deployment Profiles | Knowledge Chat |
 | --- | --- |
-| ![Vanessa AI workspace](vanessa-core-visual.png) | ![AI Playground workspace](playgrounds-chat-visual.png) |
+| ![Deployment Profiles](docs/assets/screenshots/Vanessa_Deployment_Profiles.png) | ![Knowledge Chat](docs/assets/screenshots/Vanessa_Knowledge_Chat.png) |
 
 ## Quick Start
 
