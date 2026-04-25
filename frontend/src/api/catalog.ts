@@ -34,6 +34,8 @@ type CatalogEntityMeta = {
 export type CatalogAgent = {
   id: string;
   entity: CatalogEntityMeta;
+  agent_kind?: "platform" | "user";
+  is_platform_agent?: boolean;
   current_version: string;
   status: string;
   published: boolean;
@@ -124,6 +126,13 @@ export async function updateCatalogAgent(agentId: string, input: CatalogAgentMut
     body: input,
   });
   return result.agent;
+}
+
+export async function deleteCatalogAgent(agentId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/catalog/agents/${encodeURIComponent(agentId)}`, {
+    method: "DELETE",
+    token,
+  });
 }
 
 export async function validateCatalogAgent(agentId: string, token: string): Promise<CatalogAgentValidation> {

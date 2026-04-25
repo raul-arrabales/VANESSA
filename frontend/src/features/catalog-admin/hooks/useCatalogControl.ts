@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   createCatalogAgent,
   createCatalogTool,
+  deleteCatalogAgent,
   listCatalogAgents,
   listCatalogTools,
   type CatalogAgent,
@@ -151,6 +152,7 @@ export function useCatalogControl(token: string) {
   const [toolValidationResults, setToolValidationResults] = useState<Record<string, CatalogToolValidation>>({});
   const [validatingAgentId, setValidatingAgentId] = useState("");
   const [validatingToolId, setValidatingToolId] = useState("");
+  const [deletingAgentId, setDeletingAgentId] = useState("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingTool, setSavingTool] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -255,6 +257,24 @@ export function useCatalogControl(token: string) {
     }
   }
 
+  async function handleAgentDelete(agent: CatalogAgent): Promise<boolean> {
+    if (!token) {
+      return false;
+    }
+    setDeletingAgentId(agent.id);
+    try {
+      await deleteCatalogAgent(agent.id, token);
+      await loadCatalogState();
+      showSuccessFeedback(t("catalogControl.feedback.agentDeleted", { name: agent.spec.name }));
+      return true;
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.feedback.deleteFailed"));
+      return false;
+    } finally {
+      setDeletingAgentId("");
+    }
+  }
+
   async function handleToolSubmit(): Promise<CatalogTool | null> {
     if (!token) {
       return null;
@@ -326,11 +346,13 @@ export function useCatalogControl(token: string) {
     toolTestError: toolTesting.toolTestError,
     validatingAgentId,
     validatingToolId,
+    deletingAgentId,
     testingToolId: toolTesting.testingToolId,
     savingAgent,
     savingTool,
     loadCatalogState,
     handleAgentValidate,
+    handleAgentDelete,
     handleToolValidate,
     handleAgentSubmit,
     handleToolSubmit,

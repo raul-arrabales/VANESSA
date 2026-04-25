@@ -6,6 +6,7 @@ from ..services.catalog_service import (
     CatalogError,
     create_catalog_agent as _create_catalog_agent,
     create_catalog_tool as _create_catalog_tool,
+    delete_catalog_agent as _delete_catalog_agent,
     execute_catalog_tool as _execute_catalog_tool,
     get_catalog_agent as _get_catalog_agent,
     get_catalog_tool as _get_catalog_tool,
@@ -55,6 +56,21 @@ def update_catalog_agent(
         database_url,
         agent_id=agent_id,
         payload=_require_json_object(payload),
+    )
+
+
+def delete_catalog_agent(
+    database_url: str,
+    *,
+    agent_id: str,
+    actor_user_id: int,
+    actor_role: str,
+) -> None:
+    _delete_catalog_agent(
+        database_url,
+        agent_id=agent_id,
+        actor_user_id=actor_user_id,
+        actor_role=actor_role,
     )
 
 

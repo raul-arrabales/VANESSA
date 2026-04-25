@@ -8,10 +8,12 @@ from ..repositories.model_access import find_model_definition
 from ..repositories.registry import (
     create_registry_entity,
     create_registry_version,
+    delete_registry_entity,
     find_registry_entity,
     list_registry_entities,
     update_registry_entity,
 )
+from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
 from .platform_service import resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
 
@@ -20,6 +22,7 @@ _ENTITY_TYPE_TOOL = "tool"
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
 _VALID_TOOL_TRANSPORTS = {"mcp", "sandbox_http"}
 _VERSION_PATTERN = re.compile(r"^v(?P<number>\d+)$", re.IGNORECASE)
+_PLATFORM_AGENT_IDS = {KNOWLEDGE_CHAT_AGENT_ID}
 
 
 @dataclass(slots=True)
@@ -114,6 +117,30 @@ def update_catalog_agent(
         status=_entity_status(publish),
     )
     return get_catalog_agent(database_url, agent_id=agent_id)
+
+
+def delete_catalog_agent(
+    database_url: str,
+    *,
+    agent_id: str,
+    actor_user_id: int,
+    actor_role: str,
+) -> None:
+    existing = find_registry_entity(database_url, entity_type=_ENTITY_TYPE_AGENT, entity_id=agent_id)
+    if existing is None:
+        raise CatalogError("agent_not_found", "Agent not found", status_code=404)
+    if _is_platform_agent(agent_id):
+        raise CatalogError(
+            "platform_agent_delete_blocked",
+            "Platform agents can be edited or deactivated, but not deleted.",
+            status_code=409,
+        )
+    owner_user_id = existing.get("owner_user_id")
+    if str(actor_role).strip().lower() != "superadmin" and int(owner_user_id or 0) != int(actor_user_id):
+        raise CatalogError("agent_delete_forbidden", "Only the agent owner can delete this agent.", status_code=403)
+    deleted = delete_registry_entity(database_url, entity_type=_ENTITY_TYPE_AGENT, entity_id=agent_id)
+    if not deleted:
+        raise CatalogError("agent_not_found", "Agent not found", status_code=404)
 
 
 def create_catalog_tool(
@@ -304,7 +331,7 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
 def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent", "tool"]) -> dict[str, Any]:
     current_spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
     published = row.get("published_at") is not None
-    return {
+    serialized = {
         "id": str(row.get("entity_id", "")),
         "entity": {
             "id": str(row.get("entity_id", "")),
@@ -318,6 +345,14 @@ def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent",
         "published_at": row.get("published_at"),
         "spec": current_spec,
     }
+    if entity_type == _ENTITY_TYPE_AGENT:
+        serialized["agent_kind"] = "platform" if _is_platform_agent(str(row.get("entity_id", ""))) else "user"
+        serialized["is_platform_agent"] = serialized["agent_kind"] == "platform"
+    return serialized
+
+
+def _is_platform_agent(agent_id: str) -> bool:
+    return str(agent_id).strip() in _PLATFORM_AGENT_IDS
 
 
 def _runtime_capability_for_transport(transport: str) -> str:

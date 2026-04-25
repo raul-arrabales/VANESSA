@@ -1706,6 +1706,8 @@
       "edit": "Editar",
       "testTool": "Probar",
       "testingTool": "Probando...",
+      "delete": "Eliminar",
+      "deleting": "Eliminando...",
       "createAgent": "Crear agente",
       "updateAgent": "Actualizar agente",
       "newAgent": "Nuevo agente",
@@ -1728,13 +1730,26 @@
       "pageDescription": "Explora los agentes de plataforma o entra en el flujo de creacion para agregar o actualizar definiciones del catalogo.",
       "description": "Define instrucciones, modelos por defecto y enlaces de herramientas antes de publicar.",
       "listTitle": "Agentes de plataforma",
+      "platformListTitle": "Agentes de plataforma",
+      "platformDescription": "Revisa los agentes integrados de la plataforma Vanessa. Se pueden editar o desactivar, pero no eliminar.",
+      "userListTitle": "Agentes de usuario",
+      "userDescription": "Revisa agentes del catalogo creados por usuarios. Sus propietarios pueden eliminarlos cuando ya no sean necesarios.",
+      "emptyPlatform": "No hay agentes de plataforma disponibles.",
+      "emptyUser": "No hay agentes de usuario disponibles.",
       "createTitle": "Crear agente",
       "createDescription": "Crea un nuevo agente de plataforma o continua editando uno existente desde este formulario.",
       "editing": "Editando un agente de plataforma existente.",
       "views": {
         "aria": "Secciones del catalogo de agentes",
         "agents": "Agentes de plataforma",
+        "userAgents": "Agentes de usuario",
         "create": "Crear agente"
+      },
+      "deleteDialog": {
+        "title": "Eliminar agente de usuario",
+        "message": "¿Eliminar {{name}}? Esto elimina el agente del catalogo y sus versiones.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar agente"
       }
     },
     "tools": {
@@ -1799,10 +1814,12 @@
       "authRequired": "Se requiere autenticacion para administrar el catalogo.",
       "loadFailed": "No se pudieron cargar los datos del catalogo.",
       "saveFailed": "No se pudieron guardar los cambios del catalogo.",
+      "deleteFailed": "No se pudo eliminar este agente del catalogo.",
       "validationFailed": "No se pudo validar esta entrada del catalogo.",
       "invalidJson": "{{field}} debe ser JSON valido.",
       "agentCreated": "Agente {{name}} creado.",
       "agentUpdated": "Agente {{name}} actualizado.",
+      "agentDeleted": "Agente {{name}} eliminado.",
       "toolCreated": "Herramienta {{name}} creada.",
       "toolUpdated": "Herramienta {{name}} actualizada.",
       "agentValidated": "Agente {{name}} validado.",

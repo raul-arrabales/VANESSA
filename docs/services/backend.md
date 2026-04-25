@@ -36,6 +36,7 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `POST /v1/catalog/agents` (superadmin)
 - `GET /v1/catalog/agents/{id}` (superadmin)
 - `PUT /v1/catalog/agents/{id}` (superadmin)
+- `DELETE /v1/catalog/agents/{id}` (owner or superadmin; platform agents are blocked)
 - `POST /v1/catalog/agents/{id}/validate` (superadmin)
 - `GET /v1/catalog/tools` (superadmin)
 - `POST /v1/catalog/tools` (superadmin)
@@ -208,6 +209,7 @@ Bootstrap defaults:
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.
   Each catalog create/update writes a new registry version under the hood, so runtime consumers
   still resolve from the registry while operators work with typed DTOs instead of opaque spec blobs.
+- Catalog agents are classified as `platform` or `user`. Platform agents, such as `agent.knowledge_chat`, can be edited or deactivated by publishing a draft version, but they cannot be deleted. User agents can be deleted by their owner or a superadmin.
 
 ## ModelOps Endpoints
 - `GET /v1/modelops/models`

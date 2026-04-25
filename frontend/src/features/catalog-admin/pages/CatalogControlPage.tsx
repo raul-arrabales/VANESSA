@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import ModalDialog from "../../../components/ModalDialog";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
+import type { CatalogAgent } from "../../../api/catalog";
 import CatalogAgentFormPanel from "../components/CatalogAgentFormPanel";
 import CatalogAgentsDirectory from "../components/CatalogAgentsDirectory";
 import CatalogOverviewSection from "../components/CatalogOverviewSection";
@@ -21,8 +23,10 @@ import {
 
 export default function CatalogControlPage(): JSX.Element {
   const { t } = useTranslation("common");
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const navigate = useNavigate();
+  const deleteConfirmButtonRef = useRef<HTMLButtonElement>(null);
+  const [agentPendingDelete, setAgentPendingDelete] = useState<CatalogAgent | null>(null);
   const [searchParams] = useSearchParams();
   const activeSection = resolveCatalogControlSection(searchParams.get("section"));
   const activeToolsView = resolveCatalogToolsView(searchParams.get("view"));
@@ -46,11 +50,13 @@ export default function CatalogControlPage(): JSX.Element {
     toolTestError,
     validatingAgentId,
     validatingToolId,
+    deletingAgentId,
     testingToolId,
     savingAgent,
     savingTool,
     loadCatalogState,
     handleAgentValidate,
+    handleAgentDelete,
     handleToolValidate,
     handleAgentSubmit,
     handleToolSubmit,
@@ -64,6 +70,20 @@ export default function CatalogControlPage(): JSX.Element {
     publishedTools,
   } = useCatalogControl(token);
   const selectedTestTool = tools.find((tool) => tool.id === activeToolId) ?? null;
+  const platformAgents = useMemo(
+    () => agents.filter((agent) => agent.is_platform_agent || agent.agent_kind === "platform"),
+    [agents],
+  );
+  const userAgents = useMemo(
+    () => agents.filter((agent) => !(agent.is_platform_agent || agent.agent_kind === "platform")),
+    [agents],
+  );
+  const canDeleteAgent = (agent: CatalogAgent): boolean => {
+    if (agent.is_platform_agent || agent.agent_kind === "platform") {
+      return false;
+    }
+    return user?.role === "superadmin" || Number(agent.entity.owner_user_id) === Number(user?.id);
+  };
 
   useEffect(() => {
     if (activeSection !== "tools" || activeToolsView !== "test" || !selectedTestTool) {
@@ -109,6 +129,12 @@ export default function CatalogControlPage(): JSX.Element {
         label: t("catalogControl.agents.views.agents"),
         isActive: activeAgentsView === "agents",
         to: buildCatalogControlUrl("agents", "agents"),
+      },
+      {
+        id: "user-agents",
+        label: t("catalogControl.agents.views.userAgents"),
+        isActive: activeAgentsView === "user-agents",
+        to: buildCatalogControlUrl("agents", "user-agents"),
       },
       {
         id: "create-agent",
@@ -204,13 +230,39 @@ export default function CatalogControlPage(): JSX.Element {
 
       {activeSection === "agents" && activeAgentsView === "agents" ? (
         <CatalogAgentsDirectory
-          agents={agents}
+          agents={platformAgents}
+          title={t("catalogControl.agents.platformListTitle")}
+          description={t("catalogControl.agents.platformDescription")}
+          emptyMessage={t("catalogControl.agents.emptyPlatform")}
           validationResults={agentValidationResults}
           validatingAgentId={validatingAgentId}
+          deletingAgentId={deletingAgentId}
           onValidate={(agentId) => void handleAgentValidate(agentId)}
           onEdit={(agent) => {
             openAgentEditor(agent);
             navigate(buildCatalogControlUrl("agents", "create"));
+          }}
+        />
+      ) : null}
+
+      {activeSection === "agents" && activeAgentsView === "user-agents" ? (
+        <CatalogAgentsDirectory
+          agents={userAgents}
+          title={t("catalogControl.agents.userListTitle")}
+          description={t("catalogControl.agents.userDescription")}
+          emptyMessage={t("catalogControl.agents.emptyUser")}
+          validationResults={agentValidationResults}
+          validatingAgentId={validatingAgentId}
+          deletingAgentId={deletingAgentId}
+          onValidate={(agentId) => void handleAgentValidate(agentId)}
+          onEdit={(agent) => {
+            openAgentEditor(agent);
+            navigate(buildCatalogControlUrl("agents", "create"));
+          }}
+          onDelete={(agent) => {
+            if (canDeleteAgent(agent)) {
+              setAgentPendingDelete(agent);
+            }
           }}
         />
       ) : null}
@@ -227,6 +279,46 @@ export default function CatalogControlPage(): JSX.Element {
             void handleAgentSubmit();
           }}
           onReset={resetAgentForm}
+        />
+      ) : null}
+      {agentPendingDelete ? (
+        <ModalDialog
+          title={t("catalogControl.agents.deleteDialog.title")}
+          description={t("catalogControl.agents.deleteDialog.message", { name: agentPendingDelete.spec.name })}
+          closeDisabled={Boolean(deletingAgentId)}
+          onClose={() => {
+            if (!deletingAgentId) {
+              setAgentPendingDelete(null);
+            }
+          }}
+          initialFocusRef={deleteConfirmButtonRef}
+          actions={(
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setAgentPendingDelete(null)}
+                disabled={Boolean(deletingAgentId)}
+              >
+                {t("catalogControl.agents.deleteDialog.cancel")}
+              </button>
+              <button
+                ref={deleteConfirmButtonRef}
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  void handleAgentDelete(agentPendingDelete).then((deleted) => {
+                    if (deleted) {
+                      setAgentPendingDelete(null);
+                    }
+                  });
+                }}
+                disabled={Boolean(deletingAgentId)}
+              >
+                {deletingAgentId ? t("catalogControl.actions.deleting") : t("catalogControl.agents.deleteDialog.confirm")}
+              </button>
+            </>
+          )}
         />
       ) : null}
     </CatalogPageLayout>

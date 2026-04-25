@@ -187,6 +187,26 @@ def update_registry_entity(
     return dict(row)
 
 
+def delete_registry_entity(database_url: str, *, entity_type: str, entity_id: str) -> bool:
+    normalized_type = entity_type.strip().lower()
+    if normalized_type not in _ENTITY_TYPES:
+        raise ValueError("invalid_entity_type")
+    entity_id_value = entity_id.strip()
+    if not entity_id_value:
+        raise ValueError("entity_id_required")
+
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            DELETE FROM registry_entities
+            WHERE entity_type = %s AND entity_id = %s
+            RETURNING entity_id
+            """,
+            (normalized_type, entity_id_value),
+        ).fetchone()
+    return row is not None
+
+
 def list_registry_versions(database_url: str, *, entity_id: str) -> list[dict[str, Any]]:
     with get_connection(database_url) as connection:
         rows = connection.execute(

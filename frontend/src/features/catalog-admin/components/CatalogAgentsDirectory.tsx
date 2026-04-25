@@ -3,29 +3,40 @@ import type { CatalogAgent, CatalogAgentValidation } from "../../../api/catalog"
 
 type CatalogAgentsDirectoryProps = {
   agents: CatalogAgent[];
+  title: string;
+  description: string;
+  emptyMessage: string;
   validationResults: Record<string, CatalogAgentValidation>;
   validatingAgentId: string;
+  deletingAgentId: string;
   onEdit: (agent: CatalogAgent) => void;
   onValidate: (agentId: string) => void;
+  onDelete?: (agent: CatalogAgent) => void;
 };
 
 export default function CatalogAgentsDirectory({
   agents,
+  title,
+  description,
+  emptyMessage,
   validationResults,
   validatingAgentId,
+  deletingAgentId,
   onEdit,
   onValidate,
+  onDelete,
 }: CatalogAgentsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
 
   return (
     <article className="panel card-stack">
       <div className="status-row">
-        <h3 className="section-title">{t("catalogControl.agents.listTitle")}</h3>
-        <p className="status-text">{t("catalogControl.agents.description")}</p>
+        <h3 className="section-title">{title}</h3>
+        <p className="status-text">{description}</p>
       </div>
 
       <div className="catalog-grid">
+        {agents.length === 0 ? <p className="status-text">{emptyMessage}</p> : null}
         {agents.map((agent) => {
           const validation = validationResults[agent.id]?.validation;
           return (
@@ -48,6 +59,16 @@ export default function CatalogAgentsDirectory({
                 <button type="button" className="btn btn-secondary" onClick={() => onValidate(agent.id)} disabled={validatingAgentId === agent.id}>
                   {validatingAgentId === agent.id ? t("catalogControl.actions.validating") : t("catalogControl.actions.validate")}
                 </button>
+                {onDelete ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => onDelete(agent)}
+                    disabled={deletingAgentId === agent.id}
+                  >
+                    {deletingAgentId === agent.id ? t("catalogControl.actions.deleting") : t("catalogControl.actions.delete")}
+                  </button>
+                ) : null}
               </div>
               {validation ? (
                 <div className="card-stack">

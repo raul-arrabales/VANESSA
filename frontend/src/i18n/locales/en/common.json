@@ -1724,6 +1724,8 @@
       "edit": "Edit",
       "testTool": "Test",
       "testingTool": "Testing...",
+      "delete": "Delete",
+      "deleting": "Deleting...",
       "createAgent": "Create agent",
       "updateAgent": "Update agent",
       "newAgent": "New agent",
@@ -1746,13 +1748,26 @@
       "pageDescription": "Browse platform agents or move into the create flow to add or update catalog-backed agent definitions.",
       "description": "Define agent instructions, model defaults, and tool bindings before publishing.",
       "listTitle": "Platform agents",
+      "platformListTitle": "Platform agents",
+      "platformDescription": "Review built-in Vanessa platform agents. They can be edited or deactivated, but not deleted.",
+      "userListTitle": "User agents",
+      "userDescription": "Review user-created catalog agents. Owners can delete these agents when they are no longer needed.",
+      "emptyPlatform": "No platform agents are available.",
+      "emptyUser": "No user agents are available.",
       "createTitle": "Create agent",
       "createDescription": "Create a new platform agent or continue editing an existing one from this form.",
       "editing": "Editing an existing platform agent.",
       "views": {
         "aria": "Agent catalog sections",
         "agents": "Platform agents",
+        "userAgents": "User agents",
         "create": "Create agent"
+      },
+      "deleteDialog": {
+        "title": "Delete user agent",
+        "message": "Delete {{name}}? This removes the catalog agent and its versions.",
+        "cancel": "Cancel",
+        "confirm": "Delete agent"
       }
     },
     "tools": {
@@ -1817,10 +1832,12 @@
       "authRequired": "Authentication is required to manage the catalog.",
       "loadFailed": "Unable to load catalog data.",
       "saveFailed": "Unable to save catalog changes.",
+      "deleteFailed": "Unable to delete this catalog agent.",
       "validationFailed": "Unable to validate this catalog entry.",
       "invalidJson": "{{field}} must be valid JSON.",
       "agentCreated": "Created agent {{name}}.",
       "agentUpdated": "Updated agent {{name}}.",
+      "agentDeleted": "Deleted agent {{name}}.",
       "toolCreated": "Created tool {{name}}.",
       "toolUpdated": "Updated tool {{name}}.",
       "agentValidated": "Validated agent {{name}}.",

@@ -6,6 +6,7 @@ from ...application.catalog_management_service import (
     CatalogError,
     create_catalog_agent,
     create_catalog_tool,
+    delete_catalog_agent,
     execute_catalog_tool,
     get_catalog_agent,
     get_catalog_tool,
@@ -16,7 +17,7 @@ from ...application.catalog_management_service import (
     validate_catalog_agent,
     validate_catalog_tool,
 )
-from ...authz import require_role
+from ...authz import require_auth, require_role
 from ...config import get_auth_config
 
 bp = Blueprint("catalog", __name__)
@@ -75,6 +76,21 @@ def update_catalog_agent_route(agent_id: str):
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"agent": agent}), 200
+
+
+@bp.delete("/v1/catalog/agents/<agent_id>")
+@require_auth
+def delete_catalog_agent_route(agent_id: str):
+    try:
+        delete_catalog_agent(
+            _database_url(),
+            agent_id=agent_id,
+            actor_user_id=int(g.current_user["id"]),
+            actor_role=str(g.current_user.get("role", "user")),
+        )
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"deleted": True}), 200
 
 
 @bp.post("/v1/catalog/agents/<agent_id>/validate")

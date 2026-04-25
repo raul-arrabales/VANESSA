@@ -84,6 +84,72 @@ def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pyte
     assert updated["status"] == "published"
 
 
+def test_delete_catalog_agent_blocks_platform_agent_and_allows_owner(monkeypatch: pytest.MonkeyPatch):
+    rows = {
+        "agent:agent.knowledge_chat": {
+            "entity_id": "agent.knowledge_chat",
+            "entity_type": "agent",
+            "owner_user_id": 1,
+            "visibility": "private",
+            "status": "published",
+            "current_version": "v1",
+            "current_spec": {},
+            "published_at": "2026-01-01T00:00:00+00:00",
+        },
+        "agent:agent.user": {
+            "entity_id": "agent.user",
+            "entity_type": "agent",
+            "owner_user_id": 7,
+            "visibility": "private",
+            "status": "draft",
+            "current_version": "v1",
+            "current_spec": {},
+            "published_at": None,
+        },
+    }
+    deleted: list[str] = []
+
+    def _find_registry_entity(_db: str, *, entity_type: str, entity_id: str):
+        return rows.get(f"{entity_type}:{entity_id}")
+
+    def _delete_registry_entity(_db: str, *, entity_type: str, entity_id: str):
+        deleted.append(f"{entity_type}:{entity_id}")
+        rows.pop(f"{entity_type}:{entity_id}", None)
+        return True
+
+    monkeypatch.setattr(catalog_service, "find_registry_entity", _find_registry_entity)
+    monkeypatch.setattr(catalog_service, "delete_registry_entity", _delete_registry_entity)
+
+    with pytest.raises(catalog_service.CatalogError) as exc_info:
+        catalog_service.delete_catalog_agent(
+            "ignored",
+            agent_id="agent.knowledge_chat",
+            actor_user_id=1,
+            actor_role="superadmin",
+        )
+
+    assert exc_info.value.code == "platform_agent_delete_blocked"
+
+    with pytest.raises(catalog_service.CatalogError) as forbidden_info:
+        catalog_service.delete_catalog_agent(
+            "ignored",
+            agent_id="agent.user",
+            actor_user_id=9,
+            actor_role="user",
+        )
+
+    assert forbidden_info.value.code == "agent_delete_forbidden"
+
+    catalog_service.delete_catalog_agent(
+        "ignored",
+        agent_id="agent.user",
+        actor_user_id=7,
+        actor_role="user",
+    )
+
+    assert deleted == ["agent:agent.user"]
+
+
 def test_validate_catalog_agent_checks_model_and_tool_runtime_constraints(monkeypatch: pytest.MonkeyPatch):
     tool_rows = {
         "tool.web_search": {

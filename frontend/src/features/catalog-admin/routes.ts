@@ -1,6 +1,6 @@
 export type CatalogControlSection = "overview" | "tools" | "agents";
 export type CatalogToolsView = "tools" | "create" | "test";
-export type CatalogAgentsView = "agents" | "create";
+export type CatalogAgentsView = "agents" | "user-agents" | "create";
 
 export const CATALOG_CONTROL_NAV_ITEMS: ReadonlyArray<{
   id: CatalogControlSection;
@@ -30,7 +30,7 @@ export function resolveCatalogToolId(value: string | null): string {
 }
 
 export function resolveCatalogAgentsView(value: string | null): CatalogAgentsView {
-  if (value === "create" || value === "agents") {
+  if (value === "create" || value === "agents" || value === "user-agents") {
     return value;
   }
   return "agents";

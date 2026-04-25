@@ -20,6 +20,7 @@ vi.mock("../api/catalog", () => ({
   listCatalogAgents: vi.fn(),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
+  deleteCatalogAgent: vi.fn(),
   validateCatalogAgent: vi.fn(),
   listCatalogTools: vi.fn(),
   createCatalogTool: vi.fn(),
@@ -37,6 +38,8 @@ const modelApi = await import("../api/modelops");
 const agentFixture = {
   id: "agent.alpha",
   entity: { id: "agent.alpha", type: "agent" as const, owner_user_id: 1, visibility: "private" as const },
+  agent_kind: "user" as const,
+  is_platform_agent: false,
   current_version: "v1",
   status: "draft",
   published: false,
@@ -48,6 +51,24 @@ const agentFixture = {
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
     runtime_constraints: { internet_required: true, sandbox_required: false },
+  },
+};
+
+const platformAgentFixture = {
+  ...agentFixture,
+  id: "agent.knowledge_chat",
+  entity: { id: "agent.knowledge_chat", type: "agent" as const, owner_user_id: 1, visibility: "private" as const },
+  agent_kind: "platform" as const,
+  is_platform_agent: true,
+  status: "published",
+  published: true,
+  published_at: "2026-01-01T00:00:00+00:00",
+  spec: {
+    ...agentFixture.spec,
+    name: "Knowledge Chat",
+    description: "Product-facing knowledge-backed chat agent.",
+    tool_refs: [],
+    runtime_constraints: { internet_required: false, sandbox_required: false },
   },
 };
 
@@ -93,11 +114,12 @@ describe("CatalogControlPage", () => {
       role: "superadmin",
       is_active: true,
     };
-    vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([agentFixture]);
+    vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(modelApi.listEnabledModels).mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
     vi.mocked(catalogApi.createCatalogAgent).mockResolvedValue(agentFixture);
     vi.mocked(catalogApi.updateCatalogAgent).mockResolvedValue({ ...agentFixture, published: true });
+    vi.mocked(catalogApi.deleteCatalogAgent).mockResolvedValue(undefined);
     vi.mocked(catalogApi.validateCatalogAgent).mockResolvedValue({
       agent: agentFixture,
       validation: {
@@ -167,6 +189,42 @@ describe("CatalogControlPage", () => {
         }),
         "token",
       );
+    });
+  });
+
+  it("splits platform agents from user agents", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=agents" });
+
+    const subNav = await screen.findByRole("navigation", { name: "Agent catalog sections" });
+    const userAgentsLink = within(subNav).getByRole("link", { name: "User agents" });
+    expect(within(subNav).getByRole("link", { name: "Platform agents" })).toHaveAttribute("aria-current", "page");
+    expect(userAgentsLink).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Knowledge Chat" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Agent Alpha" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+
+    await user.click(userAgentsLink);
+
+    expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+  });
+
+  it("deletes a user agent after confirmation", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=user-agents" });
+
+    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete user agent" });
+    expect(within(dialog).getByText("Delete Agent Alpha? This removes the catalog agent and its versions.")).toBeVisible();
+
+    await user.click(within(dialog).getByRole("button", { name: "Delete agent" }));
+
+    await waitFor(() => {
+      expect(catalogApi.deleteCatalogAgent).toHaveBeenCalledWith("agent.alpha", "token");
     });
   });
 

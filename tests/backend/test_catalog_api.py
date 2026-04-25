@@ -109,6 +109,14 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(catalog_routes, "get_catalog_agent", lambda _db, *, agent_id: dict(agent_row, id=agent_id))
     monkeypatch.setattr(catalog_routes, "create_catalog_agent", lambda _db, *, payload, owner_user_id: dict(agent_row, id=payload["id"]))
     monkeypatch.setattr(catalog_routes, "update_catalog_agent", lambda _db, *, agent_id, payload: dict(agent_row, id=agent_id, published=payload["publish"]))
+    deleted_agents: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        catalog_routes,
+        "delete_catalog_agent",
+        lambda _db, *, agent_id, actor_user_id, actor_role: deleted_agents.append(
+            {"agent_id": agent_id, "actor_user_id": actor_user_id, "actor_role": actor_role}
+        ),
+    )
     monkeypatch.setattr(
         catalog_routes,
         "validate_catalog_agent",
@@ -185,6 +193,7 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         },
     )
     validate_agent = test_client.post("/v1/catalog/agents/agent.alpha/validate", headers=_auth(token))
+    delete_agent = test_client.delete("/v1/catalog/agents/agent.alpha", headers=_auth(token))
 
     tools = test_client.get("/v1/catalog/tools", headers=_auth(token))
     create_tool = test_client.post(
@@ -234,6 +243,9 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     assert update_agent.get_json()["agent"]["published"] is True
     assert validate_agent.status_code == 200
     assert validate_agent.get_json()["validation"]["valid"] is True
+    assert delete_agent.status_code == 200
+    assert delete_agent.get_json()["deleted"] is True
+    assert deleted_agents == [{"agent_id": "agent.alpha", "actor_user_id": root["id"], "actor_role": "superadmin"}]
 
     assert tools.status_code == 200
     assert tools.get_json()["tools"][0]["id"] == "tool.web_search"
