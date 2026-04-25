@@ -1784,6 +1784,8 @@
         "name": "Nombre",
         "description": "Descripcion",
         "instructions": "Instrucciones",
+        "retrievalInstructions": "Instrucciones de recuperacion",
+        "promptReview": "Revision del prompt",
         "defaultModel": "Modelo por defecto",
         "noDefaultModel": "Sin modelo por defecto",
         "toolRefs": "Referencias de herramientas",

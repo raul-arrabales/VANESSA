@@ -2,15 +2,14 @@ from __future__ import annotations
 
 from ..repositories.registry import create_registry_entity, create_registry_version, create_share_grant, find_registry_entity
 from ..repositories.users import list_users
+from .agent_prompt_defaults import default_agent_runtime_prompts
 
 KNOWLEDGE_CHAT_AGENT_ID = "agent.knowledge_chat"
 _KNOWLEDGE_CHAT_AGENT_SPEC = {
     "name": "Knowledge Chat",
     "description": "Product-facing knowledge-backed chat agent.",
-    "instructions": (
-        "Answer using retrieved knowledge when it is relevant and available. "
-        "When retrieved sources support an answer, cite them inline with bracketed numeric citations such as [1] or [1, 2]."
-    ),
+    "instructions": "Answer using retrieved knowledge when it is relevant and available.",
+    "runtime_prompts": default_agent_runtime_prompts(),
     "default_model_ref": None,
     "tool_refs": [],
     "runtime_constraints": {

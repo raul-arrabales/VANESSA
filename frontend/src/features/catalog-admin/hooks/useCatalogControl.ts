@@ -24,6 +24,18 @@ import { useCatalogToolTesting } from "./useCatalogToolTesting";
 export type CatalogLoadState = "idle" | "loading" | "success" | "error";
 type FormMode = "create" | "edit";
 
+export const DEFAULT_RETRIEVAL_CONTEXT_PROMPT = [
+  "Use the following retrieved context if it is relevant to the user's request.",
+  "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
+  "Do not cite a reference unless it supports the sentence that uses the citation.",
+].join("\n");
+
+const RETRIEVAL_CONTEXT_PREVIEW = [
+  "Reference [1] title={retrieved title} file={retrieved file}",
+  "Chunk id={retrieved chunk id} metadata={retrieved metadata}",
+  "{retrieved text}",
+].join("\n");
+
 export type AgentFormState = CatalogAgentMutationInput & {
   mode: FormMode;
   agentId: string;
@@ -46,6 +58,9 @@ export const DEFAULT_AGENT_FORM: AgentFormState = {
   name: "",
   description: "",
   instructions: "",
+  runtime_prompts: {
+    retrieval_context: DEFAULT_RETRIEVAL_CONTEXT_PROMPT,
+  },
   default_model_ref: null,
   tool_refs: [],
   runtime_constraints: {
@@ -108,6 +123,9 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
     name: agent.spec.name,
     description: agent.spec.description,
     instructions: agent.spec.instructions,
+    runtime_prompts: {
+      retrieval_context: agent.spec.runtime_prompts?.retrieval_context?.trim() || DEFAULT_RETRIEVAL_CONTEXT_PROMPT,
+    },
     default_model_ref: agent.spec.default_model_ref,
     tool_refs: agent.spec.tool_refs,
     runtime_constraints: {
@@ -115,6 +133,21 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
       sandbox_required: agent.spec.runtime_constraints.sandbox_required,
     },
   };
+}
+
+export function buildAgentSystemPromptPreview(form: AgentFormState): string {
+  const sections: string[] = [];
+  const instructions = form.instructions.trim();
+  if (instructions) {
+    sections.push(["System message: agent instructions", instructions].join("\n"));
+  }
+
+  const retrievalContext = form.runtime_prompts.retrieval_context.trim();
+  if (retrievalContext) {
+    sections.push(["System message: retrieval context", retrievalContext, RETRIEVAL_CONTEXT_PREVIEW].join("\n\n"));
+  }
+
+  return sections.join("\n\n---\n\n");
 }
 
 export function buildToolForm(tool: CatalogTool): ToolFormState {
@@ -233,6 +266,9 @@ export function useCatalogControl(token: string) {
         name: agentForm.name,
         description: agentForm.description,
         instructions: agentForm.instructions,
+        runtime_prompts: {
+          retrieval_context: agentForm.runtime_prompts.retrieval_context,
+        },
         default_model_ref: agentForm.default_model_ref?.trim() ? agentForm.default_model_ref.trim() : null,
         tool_refs: agentForm.tool_refs,
         runtime_constraints: agentForm.runtime_constraints,

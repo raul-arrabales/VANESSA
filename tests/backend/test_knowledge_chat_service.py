@@ -392,5 +392,6 @@ def test_ensure_knowledge_chat_agent_seeds_entity_and_share(monkeypatch: pytest.
     assert knowledge_chat_bootstrap.ensure_knowledge_chat_agent("ignored") is True
     assert created_entities[0]["entity_id"] == "agent.knowledge_chat"
     assert created_versions[0]["entity_id"] == "agent.knowledge_chat"
+    assert "retrieval_context" in created_versions[0]["spec_json"]["runtime_prompts"]
     assert created_shares[0]["permission"] == "execute"
     assert created_shares[0]["grantee_type"] == "public"

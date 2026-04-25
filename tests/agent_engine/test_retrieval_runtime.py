@@ -47,6 +47,32 @@ def test_prepend_retrieval_context_uses_deduplicated_reference_citations():
     assert effective_messages[1:] == messages
 
 
+def test_prepend_retrieval_context_can_keep_agent_system_prompt_first():
+    messages = [
+        {"role": "system", "content": [{"type": "text", "text": "Agent instructions"}]},
+        {"role": "user", "content": [{"type": "text", "text": "What is retrieval?"}]},
+    ]
+
+    effective_messages = retrieval_runtime.prepend_retrieval_context(
+        messages,
+        retrieval_results=[
+            {
+                "id": "doc-1#0",
+                "text": "First chunk",
+                "metadata": {"title": "Guide", "source_path": "docs/guide.md"},
+            },
+        ],
+        retrieval_instructions="Custom retrieval instructions.",
+        after_leading_system_messages=True,
+    )
+
+    assert effective_messages[0] == messages[0]
+    assert effective_messages[1]["role"] == "system"
+    assert "Custom retrieval instructions." in effective_messages[1]["content"][0]["text"]
+    assert "Reference [1]" in effective_messages[1]["content"][0]["text"]
+    assert effective_messages[2] == messages[1]
+
+
 def _runtime_snapshot() -> dict[str, object]:
     return {
         "deployment_profile": {"slug": "local-default"},

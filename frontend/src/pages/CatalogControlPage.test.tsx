@@ -48,6 +48,9 @@ const agentFixture = {
     name: "Agent Alpha",
     description: "Agent description",
     instructions: "Be concise.",
+    runtime_prompts: {
+      retrieval_context: "Use retrieved context and cite references.",
+    },
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
     runtime_constraints: { internet_required: true, sandbox_required: false },
@@ -178,6 +181,8 @@ describe("CatalogControlPage", () => {
     await user.type(screen.getByLabelText("Name"), "Agent Beta");
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
     await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
+    expect((screen.getByLabelText("Retrieval instructions") as HTMLTextAreaElement).value).toContain("Use the following retrieved context");
+    expect((screen.getByLabelText("Prompt review") as HTMLTextAreaElement).value).toContain("System message: agent instructions");
     await user.click(screen.getByRole("button", { name: "Create agent" }));
 
     await waitFor(() => {
@@ -186,6 +191,9 @@ describe("CatalogControlPage", () => {
           id: "agent.beta",
           name: "Agent Beta",
           publish: false,
+          runtime_prompts: expect.objectContaining({
+            retrieval_context: expect.stringContaining("Use the following retrieved context"),
+          }),
         }),
         "token",
       );

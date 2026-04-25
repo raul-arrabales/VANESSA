@@ -320,7 +320,15 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
     monkeypatch.setattr(
         execution_service,
         "resolve_agent_spec",
-        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v1", "current_spec": {"tool_refs": []}},
+        lambda *, agent_id: {
+            "entity_id": agent_id,
+            "current_version": "v1",
+            "current_spec": {
+                "instructions": "Answer as the catalog agent.",
+                "runtime_prompts": {"retrieval_context": "Use retrieved chunks and cite them."},
+                "tool_refs": [],
+            },
+        },
     )
     monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
     monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
@@ -458,9 +466,11 @@ def test_execution_with_retrieval_from_prompt_queries_vector_then_calls_llm(monk
         ],
     }
     assert seen_llm_messages[0][0]["role"] == "system"
-    assert "retrieved text" in seen_llm_messages[0][0]["content"][0]["text"]
-    assert "Reference [1]" in seen_llm_messages[0][0]["content"][0]["text"]
-    assert "bracketed numeric citations such as [1] or [1, 2]" in seen_llm_messages[0][0]["content"][0]["text"]
+    assert seen_llm_messages[0][0]["content"][0]["text"] == "Answer as the catalog agent."
+    assert seen_llm_messages[0][1]["role"] == "system"
+    assert "Use retrieved chunks and cite them." in seen_llm_messages[0][1]["content"][0]["text"]
+    assert "retrieved text" in seen_llm_messages[0][1]["content"][0]["text"]
+    assert "Reference [1]" in seen_llm_messages[0][1]["content"][0]["text"]
 
 
 def test_execution_with_qdrant_runtime_records_qdrant_retrieval_call(monkeypatch: pytest.MonkeyPatch):

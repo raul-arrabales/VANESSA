@@ -1802,6 +1802,8 @@
         "name": "Name",
         "description": "Description",
         "instructions": "Instructions",
+        "retrievalInstructions": "Retrieval instructions",
+        "promptReview": "Prompt review",
         "defaultModel": "Default model",
         "noDefaultModel": "No default model",
         "toolRefs": "Tool refs",

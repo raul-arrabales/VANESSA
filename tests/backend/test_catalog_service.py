@@ -57,6 +57,7 @@ def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pyte
             "name": "Agent Alpha",
             "description": "desc",
             "instructions": "be concise",
+            "runtime_prompts": {"retrieval_context": "Use retrieved context."},
             "default_model_ref": None,
             "tool_refs": [],
             "runtime_constraints": {"internet_required": False, "sandbox_required": False},
@@ -71,6 +72,7 @@ def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pyte
             "name": "Agent Alpha",
             "description": "desc",
             "instructions": "be concise",
+            "runtime_prompts": {"retrieval_context": "Use retrieved context and cite it."},
             "default_model_ref": "safe-small",
             "tool_refs": [],
             "runtime_constraints": {"internet_required": False, "sandbox_required": False},
@@ -78,8 +80,10 @@ def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pyte
     )
 
     assert created["current_version"] == "v1"
+    assert created["spec"]["runtime_prompts"]["retrieval_context"] == "Use retrieved context."
     assert created["published"] is False
     assert updated["current_version"] == "v2"
+    assert updated["spec"]["runtime_prompts"]["retrieval_context"] == "Use retrieved context and cite it."
     assert updated["published"] is True
     assert updated["status"] == "published"
 

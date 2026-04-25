@@ -20,3 +20,9 @@
 .catalog-multiselect {
   min-height: 10rem;
 }
+
+.catalog-prompt-review {
+  min-height: 16rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace);
+  white-space: pre-wrap;
+}

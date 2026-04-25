@@ -198,6 +198,7 @@ def resolve_agent_spec(*, agent_id: str) -> dict[str, Any]:
                 "name": agent_id,
                 "description": "in-memory agent",
                 "instructions": "",
+                "runtime_prompts": {},
                 "default_model_ref": None,
                 "tool_refs": [],
                 "runtime_constraints": {},

@@ -28,6 +28,14 @@ from .types import (
     RetrievalRequest,
 )
 
+DEFAULT_RETRIEVAL_CONTEXT_PROMPT = "\n".join(
+    [
+        "Use the following retrieved context if it is relevant to the user's request.",
+        "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
+        "Do not cite a reference unless it supports the sentence that uses the citation.",
+    ]
+)
+
 
 def _retrieval_dependency_error(exc: EmbeddingsRuntimeClientError) -> ExecutionBlockedError:
     upstream = exc.details.get("upstream") if isinstance(exc.details.get("upstream"), dict) else {}
@@ -380,18 +388,13 @@ def prepend_retrieval_context(
     messages: list[dict[str, Any]],
     *,
     retrieval_results: list[dict[str, Any]],
+    retrieval_instructions: str | None = None,
+    after_leading_system_messages: bool = False,
 ) -> list[dict[str, Any]]:
     if not retrieval_results:
         return messages
 
-    context_lines = [
-        "Use the following retrieved context if it is relevant to the user's request.",
-        (
-            "When you use retrieved context, cite the supporting reference inline with "
-            "bracketed numeric citations such as [1] or [1, 2]."
-        ),
-        "Do not cite a reference unless it supports the sentence that uses the citation.",
-    ]
+    context_lines = [(retrieval_instructions or "").strip() or DEFAULT_RETRIEVAL_CONTEXT_PROMPT]
     grouped_results = group_retrieval_results_for_citations(retrieval_results)
     for index, group in enumerate(grouped_results, start=1):
         context_lines.append(
@@ -403,7 +406,11 @@ def prepend_retrieval_context(
             context_lines.append(
                 f"Chunk id={result.get('id', '')} metadata={metadata_json}\n{str(result.get('text', '')).strip()}"
             )
-    return [
-        {"role": "system", "content": [{"type": "text", "text": "\n\n".join(context_lines)}]},
-        *messages,
-    ]
+    retrieval_message = {"role": "system", "content": [{"type": "text", "text": "\n\n".join(context_lines)}]}
+    if not after_leading_system_messages:
+        return [retrieval_message, *messages]
+
+    insert_index = 0
+    while insert_index < len(messages) and str(messages[insert_index].get("role", "")).strip().lower() == "system":
+        insert_index += 1
+    return [*messages[:insert_index], retrieval_message, *messages[insert_index:]]

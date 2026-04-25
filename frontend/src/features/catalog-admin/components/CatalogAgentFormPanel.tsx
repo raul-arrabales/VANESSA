@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogTool } from "../../../api/catalog";
 import type { ModelCatalogItem } from "../../../api/modelops";
-import type { AgentFormState } from "../hooks/useCatalogControl";
+import { buildAgentSystemPromptPreview, type AgentFormState } from "../hooks/useCatalogControl";
 
 type CatalogAgentFormPanelProps = {
   form: AgentFormState;
@@ -24,6 +24,7 @@ export default function CatalogAgentFormPanel({
   onReset,
 }: CatalogAgentFormPanelProps): JSX.Element {
   const { t } = useTranslation("common");
+  const promptPreview = buildAgentSystemPromptPreview(form);
 
   return (
     <article className="panel card-stack">
@@ -83,6 +84,26 @@ export default function CatalogAgentFormPanel({
         <label className="card-stack">
           <span className="field-label">{t("catalogControl.forms.agent.instructions")}</span>
           <textarea className="field-input form-textarea" value={form.instructions} onChange={(event) => onChange({ ...form, instructions: event.target.value })} />
+        </label>
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.agent.retrievalInstructions")}</span>
+          <textarea
+            className="field-input form-textarea"
+            value={form.runtime_prompts.retrieval_context}
+            onChange={(event) =>
+              onChange({
+                ...form,
+                runtime_prompts: {
+                  ...form.runtime_prompts,
+                  retrieval_context: event.target.value,
+                },
+              })
+            }
+          />
+        </label>
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.agent.promptReview")}</span>
+          <textarea className="field-input form-textarea catalog-prompt-review" value={promptPreview} readOnly />
         </label>
         <label className="card-stack">
           <span className="field-label">{t("catalogControl.forms.agent.toolRefs")}</span>

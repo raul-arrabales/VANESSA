@@ -67,9 +67,32 @@ def _deterministic_execution_result(*, agent_id: str, runtime_profile: str) -> E
     )
 
 
+def _system_text_message(text: str) -> dict[str, Any]:
+    return {"role": "system", "content": [{"type": "text", "text": text}]}
+
+
+def _agent_current_spec(agent_entity: dict[str, Any]) -> dict[str, Any]:
+    current_spec = agent_entity.get("current_spec")
+    return current_spec if isinstance(current_spec, dict) else {}
+
+
+def _prepend_agent_instructions(messages: list[dict[str, Any]], *, agent_spec: dict[str, Any]) -> list[dict[str, Any]]:
+    instructions = str(agent_spec.get("instructions") or "").strip()
+    if not instructions:
+        return messages
+    return [_system_text_message(instructions), *messages]
+
+
+def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
+    runtime_prompts = agent_spec.get("runtime_prompts") if isinstance(agent_spec.get("runtime_prompts"), dict) else {}
+    retrieval_context = str(runtime_prompts.get("retrieval_context") or "").strip()
+    return retrieval_context or None
+
+
 def _execute_model_call(
     *,
     context: ExecutionContext,
+    agent_entity: dict[str, Any],
     model_ref: str | None,
     agent_tools: list[dict[str, Any]],
 ) -> tuple[ExecutionResult, str | None]:
@@ -82,7 +105,14 @@ def _execute_model_call(
         retrieval_request=context.conversation.retrieval_request,
         platform_runtime=context.platform_runtime,
     )
-    effective_messages = prepend_retrieval_context(messages, retrieval_results=retrieval_results)
+    agent_spec = _agent_current_spec(agent_entity)
+    effective_messages = _prepend_agent_instructions(messages, agent_spec=agent_spec)
+    effective_messages = prepend_retrieval_context(
+        effective_messages,
+        retrieval_results=retrieval_results,
+        retrieval_instructions=_agent_retrieval_instructions(agent_spec),
+        after_leading_system_messages=True,
+    )
 
     runtime_snapshot = context.platform_runtime if isinstance(context.platform_runtime, dict) else {}
     requested_model_override = str(context.execution_input.get("model", "")).strip() or None
@@ -302,6 +332,7 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         )
         result, effective_model_ref = _execute_model_call(
             context=context,
+            agent_entity=agent_entity,
             model_ref=model_ref,
             agent_tools=agent_tools,
         )

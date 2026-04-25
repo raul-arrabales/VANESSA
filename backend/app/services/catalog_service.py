@@ -13,6 +13,7 @@ from ..repositories.registry import (
     list_registry_entities,
     update_registry_entity,
 )
+from .agent_prompt_defaults import default_agent_runtime_prompts, normalize_agent_runtime_prompts
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
 from .platform_service import resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
@@ -330,6 +331,8 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
 
 def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent", "tool"]) -> dict[str, Any]:
     current_spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
+    if entity_type == _ENTITY_TYPE_AGENT:
+        current_spec = _normalize_agent_spec_for_response(current_spec)
     published = row.get("published_at") is not None
     serialized = {
         "id": str(row.get("entity_id", "")),
@@ -353,6 +356,12 @@ def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent",
 
 def _is_platform_agent(agent_id: str) -> bool:
     return str(agent_id).strip() in _PLATFORM_AGENT_IDS
+
+
+def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(spec)
+    normalized["runtime_prompts"] = normalize_agent_runtime_prompts(normalized.get("runtime_prompts"))
+    return normalized
 
 
 def _runtime_capability_for_transport(transport: str) -> str:
@@ -585,12 +594,23 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise CatalogError("invalid_runtime_constraints", "runtime_constraints.internet_required must be a boolean")
     if not isinstance(runtime_constraints.get("sandbox_required"), bool):
         raise CatalogError("invalid_runtime_constraints", "runtime_constraints.sandbox_required must be a boolean")
+    runtime_prompts = payload.get("runtime_prompts")
+    if runtime_prompts is None:
+        coerced_runtime_prompts = default_agent_runtime_prompts()
+    elif not isinstance(runtime_prompts, dict):
+        raise CatalogError("invalid_runtime_prompts", "runtime_prompts must be an object")
+    else:
+        retrieval_context = str(runtime_prompts.get("retrieval_context", "")).strip()
+        if not retrieval_context:
+            raise CatalogError("invalid_runtime_prompts", "runtime_prompts.retrieval_context is required")
+        coerced_runtime_prompts = {"retrieval_context": retrieval_context}
     default_model_ref_raw = payload.get("default_model_ref")
     default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
     return {
         "name": name,
         "description": description,
         "instructions": instructions,
+        "runtime_prompts": coerced_runtime_prompts,
         "default_model_ref": default_model_ref or None,
         "tool_refs": tool_refs,
         "runtime_constraints": {
