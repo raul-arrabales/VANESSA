@@ -35,16 +35,18 @@ Legend:
 7. Agent Engine: multi-step agent logic and tool workflows.
 8. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
 9. MCP Gateway: normalized HTTP provider for MCP-backed tools such as web search.
-10. KWS: offline wake-word detection and wake-event emission.
-11. Weaviate: persistent semantic index for RAG context retrieval.
-12. Qdrant: optional vector database for alternate retrieval provider binding.
-13. PostgreSQL: persistent relational data for auth and metadata.
+10. SearXNG: local token-free metasearch backend used only by MCP Gateway for web search.
+11. KWS: offline wake-word detection and wake-event emission.
+12. Weaviate: persistent semantic index for RAG context retrieval.
+13. Qdrant: optional vector database for alternate retrieval provider binding.
+14. PostgreSQL: persistent relational data for auth and metadata.
 
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
 - Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
 - Agent Engine -> LLM API, Sandbox, MCP Gateway, Weaviate, optional Qdrant, PostgreSQL
+- MCP Gateway -> SearXNG
 - LLM API -> LLM Runtime Inference, LLM Runtime Embeddings
 - KWS -> Backend API
 
@@ -108,7 +110,7 @@ Current v1 transports:
 
 Current canonical tools:
 
-- `tool.web_search` -> `transport: mcp`, `tool_name: web_search`
+- `tool.web_search` -> `transport: mcp`, `tool_name: web_search`, served by MCP Gateway through local SearXNG; token-free but internet-required
 - `tool.python_exec` -> `transport: sandbox_http`, `tool_name: python_exec`
 
 Tool execution is LLM-driven. Agent engine passes tool definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the appropriate runtime provider, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.

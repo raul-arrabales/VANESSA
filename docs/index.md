@@ -20,7 +20,7 @@ VANESSA (Versatile AI Navigator for Enhanced Semantic Search & Automation) is a 
 - Flask backend API
 - Agent orchestration service
 - Sandbox for controlled code execution
-- Optional MCP gateway for remote/general-purpose tool execution
+- MCP gateway for remote/general-purpose tool execution, including SearXNG-backed web search
 - LLM gateway and split local runtimes
 - Wake-word service
 - Weaviate vector store

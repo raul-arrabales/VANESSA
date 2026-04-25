@@ -99,7 +99,7 @@ Platform control plane semantics:
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
 - `SANDBOX_URL` seeds the optional `sandbox_local` provider instance and binds it as `sandbox_execution`.
-- `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080` in local staging, seeds `mcp_gateway_local`, and binds it as `mcp_runtime`.
+- `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080` in local staging, seeds `mcp_gateway_local`, and binds it as `mcp_runtime`. The built-in web search tool remains online-only and is served by MCP Gateway through local SearXNG.
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Managed knowledge bases are now a backend-owned context-management domain. They live in Postgres, each target one configured `vector_store` provider instance, and are bound into deployments as explicit `vector_store` resources.
 - Schema creation can now start from reusable provider-specific schema profiles. Built-in Weaviate profiles seed plain document RAG, agent semantic memory, and agent episodic memory templates, and superadmins may save custom profiles for reuse.
@@ -121,7 +121,7 @@ Platform control plane semantics:
 - Deployment list/detail payloads now include `configuration_status` for both the deployment and each binding so the UI can show partially configured or mismatched capability state directly from backend-owned readiness rules.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`. Partially configured deployments may now be activated; missing resources/defaults are surfaced as readiness warnings and still enforced at runtime when a capability is used.
 - Registry bootstrap also seeds canonical built-in tools:
-  - `tool.web_search` -> MCP-backed `web_search`
+  - `tool.web_search` -> MCP-backed `web_search`, backed by local SearXNG
   - `tool.python_exec` -> sandbox-backed Python execution
 - The typed catalog surface is now canonical for superadmin agent/tool lifecycle management.
   Generic `/v1/registry/*` routes remain available for compatibility, but catalog create/update

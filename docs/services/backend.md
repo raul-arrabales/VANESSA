@@ -204,7 +204,7 @@ Bootstrap defaults:
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible, but incomplete resource/default configuration is reported through readiness metadata instead of blocking activation.
 - Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
-- Tool definitions remain registry entities. Backend bootstraps `tool.web_search` and `tool.python_exec`, and registry validation constrains tool specs to `transport in {"mcp", "sandbox_http"}` with `connection_profile_ref == "default"` in this first convergence phase.
+- Tool definitions remain registry entities. Backend bootstraps `tool.web_search` and `tool.python_exec`, and registry validation constrains tool specs to `transport in {"mcp", "sandbox_http"}` with `connection_profile_ref == "default"` in this first convergence phase. `tool.web_search` stays online-only and reaches SearXNG only through the MCP gateway runtime provider.
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.
   Each catalog create/update writes a new registry version under the hood, so runtime consumers
   still resolve from the registry while operators work with typed DTOs instead of opaque spec blobs.

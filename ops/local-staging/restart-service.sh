@@ -50,6 +50,7 @@ check_service_ready() {
     llm_runtime_embeddings) llm_runtime_internal_http_ok "llm_runtime_embeddings" "/health" ;;
     llama_cpp) llama_cpp_internal_http_ok "/v1/models" ;;
     qdrant) qdrant_internal_http_ok "/healthz" ;;
+    searxng) searxng_internal_http_ok "/" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
     *) return 1 ;;

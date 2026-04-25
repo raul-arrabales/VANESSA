@@ -25,7 +25,7 @@ LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MO
 LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant mcp_gateway agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -285,6 +285,11 @@ qdrant_enabled_requested() {
 qdrant_internal_http_ok() {
   local path="$1"
   compose exec -T qdrant python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6333${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
+searxng_internal_http_ok() {
+  local path="$1"
+  compose exec -T searxng python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8080${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
 mcp_gateway_internal_http_ok() {

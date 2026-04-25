@@ -49,7 +49,7 @@ These seams are intended to support future Vanessa-specific planner, memory/retr
 
 Current canonical built-in tools:
 
-- `tool.web_search` via `transport: mcp`
+- `tool.web_search` via `transport: mcp`; the gateway resolves it through local SearXNG, so it requires online runtime
 - `tool.python_exec` via `transport: sandbox_http`
 
 Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and canonical `retrieval_calls`.

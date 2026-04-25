@@ -136,6 +136,22 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: vanessa-searxng
+    expose:
+      - "8080"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-local-searxng-secret}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_data:/var/cache/searxng
+
   mcp_gateway:
     build:
       context: ..
@@ -150,6 +166,8 @@ services:
         required: false
     environment:
       MCP_GATEWAY_PORT: 8080
+    depends_on:
+      - searxng
 
   agent_engine:
     build:
@@ -226,4 +244,5 @@ services:
 volumes:
   weaviate_data:
   qdrant_data:
+  searxng_data:
   postgres_data:

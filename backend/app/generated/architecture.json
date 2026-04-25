@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-04-24T15:40:09+00:00",
+  "generated_at": "2026-04-25T16:00:53+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -72,6 +72,15 @@
       "group": "runtime",
       "description": "Optional OpenAI-compatible llama.cpp runtime for alternate local inference.",
       "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
+      "id": "searxng",
+      "container": "searxng",
+      "label": "SearXNG",
+      "group": "runtime",
+      "description": "Local token-free metasearch backend used by the MCP gateway web search tool.",
+      "public_exposed": false,
       "criticality": "medium"
     },
     {
@@ -282,6 +291,15 @@
       "purpose": "Runtime text generation path",
       "kind": "internal",
       "direction": "outbound"
+    },
+    {
+      "id": "mcp_gateway-searxng",
+      "from": "mcp_gateway",
+      "to": "searxng",
+      "protocol": "HTTP",
+      "purpose": "Web search queries through the local SearXNG JSON API",
+      "kind": "http",
+      "direction": "outbound"
     }
   ],
   "rendering": {
@@ -341,15 +359,21 @@
         "width": 220,
         "height": 84
       },
-      "mcp_gateway": {
+      "searxng": {
         "x": 846,
         "y": 570,
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "mcp_gateway": {
         "x": 846,
         "y": 694,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 818,
         "width": 220,
         "height": 84
       },
@@ -373,5 +397,5 @@
       }
     }
   },
-  "source_hash": "0506da0091217cd9ea59ab71608f2afd34264ca4f119292ecad48ce1c3d4e435"
+  "source_hash": "4eef2c1098253cc8f6851738b35cd02aa14d51b7309c87b18f9517a7ff88d964"
 }

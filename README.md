@@ -63,7 +63,7 @@ VANESSA is organized around a few clear domains:
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
-- Tool runtimes: MCP gateway for remote/general-purpose tools and sandbox for isolated Python execution
+- Tool runtimes: MCP gateway for remote/general-purpose tools, SearXNG-backed web search, and sandbox for isolated Python execution
 - Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
 
 For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).
@@ -113,7 +113,7 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- Optional `llama_cpp`, `qdrant`, and `mcp_gateway` profiles can be enabled through environment variables
+- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp` and `qdrant` profiles can be enabled through environment variables
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -141,6 +141,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `agent_engine/`: execution pipeline, retrieval, and tool runtime orchestration
 - `sandbox/`: isolated Python execution runtime
 - `mcp_gateway/`: MCP-backed tool runtime provider
+- `infra/searxng/`: local SearXNG configuration used by MCP web search
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance
 - `ops/local-staging/`: staging-like launcher and health workflows

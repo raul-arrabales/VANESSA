@@ -39,7 +39,7 @@ python scripts/generate_architecture.py --write
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
-  - Checks `mcp_gateway` by default.
+  - Checks `searxng` and `mcp_gateway` by default.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
 - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
 - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
@@ -154,6 +154,14 @@ Split local runtime selection:
 - `mcp_gateway` is part of the default local-staging stack, like `sandbox`.
 - The gateway listens on container port `8080`; local staging publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
+- The built-in `web_search` tool calls SearXNG at `SEARXNG_URL`, defaulting to `http://searxng:8080`.
+- This is token-free but still online-only because SearXNG queries upstream internet search engines.
+
+`searxng` behavior:
+
+- `searxng` is part of the default local-staging stack and stays internal to Docker.
+- Local config lives in `infra/searxng/settings.yml`; JSON output must remain enabled for MCP web search.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /` inside the container.
 
 ## Sample Auth Seeding
 
@@ -219,6 +227,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - run `./ops/local-staging/start.sh`
    - confirm `http://localhost:6100/health` responds on the host
    - validate `MCP gateway local` from Platform control
+   - test `tool.web_search` from Catalog Control and confirm real URLs are returned
    - execute an agent that references `tool.web_search` while the runtime profile is `online`
 20. Stop while keeping state: `./ops/local-staging/stop.sh`
 
@@ -319,7 +328,7 @@ Use the targeted restart script when only one service changed:
 
 - Port already in use:
   - Run `./ops/local-staging/status.sh`
-- Free ports `3000, 5000, 6000, 6100, 7000, 8000, 8080, 8081, 10400, 5432` or adjust compose mapping.
+- Free ports `3000, 5000, 6000, 6100, 7000, 8000, 8080, 8081, 10400, 5432` or adjust compose mapping. SearXNG is internal-only and does not reserve a host port by default.
 - Service unhealthy after startup:
   - Run `./ops/local-staging/logs.sh --follow`
   - Re-run `./ops/local-staging/health.sh --wait --timeout 240`

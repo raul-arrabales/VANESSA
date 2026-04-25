@@ -39,6 +39,10 @@ qdrant_ready_ok() {
   qdrant_internal_http_ok "/healthz"
 }
 
+searxng_ready_ok() {
+  searxng_internal_http_ok "/"
+}
+
 mcp_gateway_ready_ok() {
   mcp_gateway_internal_http_ok "/health"
 }
@@ -274,6 +278,13 @@ run_checks() {
     fi
   else
     printf 'qdrant: SKIP (QDRANT_URL not set)\n'
+  fi
+
+  if searxng_ready_ok; then
+    printf 'searxng: OK (/)\n'
+  else
+    printf 'searxng: FAIL\n'
+    failures=$((failures + 1))
   fi
 
   if mcp_gateway_ready_ok; then

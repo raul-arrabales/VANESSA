@@ -15,6 +15,7 @@ rendering:
     - llm_runtime_inference
     - llm_runtime_embeddings
     - llama_cpp
+    - searxng
     - mcp_gateway
     - sandbox
     - weaviate
@@ -80,6 +81,12 @@ services:
     group: runtime
     description: HTTP gateway for MCP-backed tool runtimes.
     public_exposed: true
+    criticality: medium
+  searxng:
+    label: SearXNG
+    group: runtime
+    description: Local token-free metasearch backend used by the MCP gateway web search tool.
+    public_exposed: false
     criticality: medium
   weaviate:
     label: Weaviate
@@ -170,6 +177,12 @@ edges:
     to: mcp_gateway
     protocol: HTTP
     purpose: Agent MCP tool invocation
+    kind: http
+    direction: outbound
+  - from: mcp_gateway
+    to: searxng
+    protocol: HTTP
+    purpose: Web search queries through the local SearXNG JSON API
     kind: http
     direction: outbound
   - from: agent_engine

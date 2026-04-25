@@ -33,6 +33,7 @@ Current architectural pillars:
   - `llm_runtime_inference`, `llm_runtime_embeddings`, and optional `llama_cpp` are local runtime/provider options behind the control plane.
   - Weaviate and optional Qdrant are alternate `vector_store` providers.
   - Sandbox and MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
+  - SearXNG is the local token-free metasearch backend consumed only by MCP gateway web search tools.
 
 Design goals:
 
@@ -155,20 +156,26 @@ Respect these runtime boundaries when generating code or configuration.
 9. **MCP Gateway (`mcp_gateway`)**
    - Normalized HTTP provider for MCP-backed tools.
    - Used for provider validation and agent tool dispatch.
+   - Calls SearXNG for the built-in `web_search` tool; backend, frontend, and agent_engine must not call SearXNG directly.
 
-10. **Wake-word service (`kws`)**
+10. **SearXNG (`searxng`)**
+    - Local token-free metasearch service for real web search.
+    - Requires internet access even though it runs as a local container.
+    - Must stay behind MCP gateway and not become a platform capability by itself.
+
+11. **Wake-word service (`kws`)**
    - Offline wake-word detection and wake-event emission.
    - Integrates with backend via webhook/event flow.
 
-11. **Weaviate**
+12. **Weaviate**
     - Persistent vector index.
     - One possible `vector_store` provider.
 
-12. **Optional Qdrant (`qdrant`)**
+13. **Optional Qdrant (`qdrant`)**
     - Alternate vector database.
     - Alternate `vector_store` provider selected by deployment profile.
 
-13. **PostgreSQL**
+14. **PostgreSQL**
     - Persistent relational storage for auth, metadata, control-plane state, ModelOps state, and execution metadata.
 
 ---
@@ -194,6 +201,7 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `mcp_gateway/`
   - MCP-backed tool runtime gateway.
+  - Owns the SearXNG-backed `web_search` adapter surface exposed through MCP runtime.
 
 - `kws/`
   - Wake-word service.
@@ -206,6 +214,7 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `infra/`
   - Compose files, Dockerfiles, architecture metadata, infrastructure wiring.
+  - Includes SearXNG config for local MCP web search under `infra/searxng/`.
 
 - `ops/local-staging/`
   - Human-facing staging-like local runtime workflow and scripts.
@@ -265,6 +274,7 @@ This should start the current local stack, including at least:
 - PostgreSQL
 - Sandbox
 - MCP gateway
+- SearXNG
 - Optional llama.cpp
 - Optional Qdrant
 
