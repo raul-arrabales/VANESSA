@@ -4,6 +4,7 @@ import {
   createCatalogTool,
   listCatalogAgents,
   listCatalogTools,
+  previewCatalogAgentPrompt,
   testCatalogTool,
   updateCatalogAgent,
   updateCatalogTool,
@@ -65,6 +66,11 @@ describe("catalog api", () => {
             execution: { input: { query: "OpenAI" }, request_metadata: {}, status_code: 200, ok: true, result: { results: [] } },
           });
         }
+        if (url.includes("/prompt-preview")) {
+          return JSON.stringify({
+            prompt_preview: { messages: [], text: "preview" },
+          });
+        }
         if (url.includes("/agents")) {
           return JSON.stringify({
             agent: { id: "agent.alpha", entity: { id: "agent.alpha", type: "agent", owner_user_id: 1, visibility: "private" }, current_version: "v1", status: "draft", published: false, published_at: null, spec: {} },
@@ -106,6 +112,19 @@ describe("catalog api", () => {
       "token",
     );
     await validateCatalogAgent("agent.alpha", "token");
+    await previewCatalogAgentPrompt(
+      {
+        publish: false,
+        name: "Agent Alpha",
+        description: "desc",
+        instructions: "be concise",
+        runtime_prompts: { retrieval_context: "Use retrieved context." },
+        default_model_ref: null,
+        tool_refs: [],
+        runtime_constraints: { internet_required: false, sandbox_required: false },
+      },
+      "token",
+    );
     await createCatalogTool(
       {
         id: "tool.web_search",
@@ -143,6 +162,10 @@ describe("catalog api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/catalog/agents/agent.alpha/validate",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/catalog/agents/prompt-preview",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenCalledWith(

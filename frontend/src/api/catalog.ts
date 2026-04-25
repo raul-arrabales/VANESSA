@@ -87,6 +87,18 @@ export type CatalogAgentValidation = {
   };
 };
 
+export type CatalogAgentPromptPreview = {
+  agent?: CatalogAgent;
+  prompt_preview: {
+    messages: Array<{
+      role: "system";
+      label: string;
+      content: string;
+    }>;
+    text: string;
+  };
+};
+
 export type CatalogToolValidation = {
   tool: CatalogTool;
   validation: {
@@ -141,6 +153,20 @@ export async function deleteCatalogAgent(agentId: string, token: string): Promis
 export async function validateCatalogAgent(agentId: string, token: string): Promise<CatalogAgentValidation> {
   return requestJson<CatalogAgentValidation>(`/v1/catalog/agents/${encodeURIComponent(agentId)}/validate`, {
     method: "POST",
+    token,
+  });
+}
+
+export async function previewCatalogAgentPrompt(input: CatalogAgentMutationInput, token: string): Promise<CatalogAgentPromptPreview> {
+  return requestJson<CatalogAgentPromptPreview>("/v1/catalog/agents/prompt-preview", {
+    method: "POST",
+    token,
+    body: input,
+  });
+}
+
+export async function getCatalogAgentPromptPreview(agentId: string, token: string): Promise<CatalogAgentPromptPreview> {
+  return requestJson<CatalogAgentPromptPreview>(`/v1/catalog/agents/${encodeURIComponent(agentId)}/prompt-preview`, {
     token,
   });
 }

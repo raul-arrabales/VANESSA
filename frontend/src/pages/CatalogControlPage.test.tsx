@@ -21,6 +21,7 @@ vi.mock("../api/catalog", () => ({
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
   deleteCatalogAgent: vi.fn(),
+  previewCatalogAgentPrompt: vi.fn(),
   validateCatalogAgent: vi.fn(),
   listCatalogTools: vi.fn(),
   createCatalogTool: vi.fn(),
@@ -123,6 +124,15 @@ describe("CatalogControlPage", () => {
     vi.mocked(catalogApi.createCatalogAgent).mockResolvedValue(agentFixture);
     vi.mocked(catalogApi.updateCatalogAgent).mockResolvedValue({ ...agentFixture, published: true });
     vi.mocked(catalogApi.deleteCatalogAgent).mockResolvedValue(undefined);
+    vi.mocked(catalogApi.previewCatalogAgentPrompt).mockResolvedValue({
+      prompt_preview: {
+        messages: [
+          { role: "system", label: "agent_instructions", content: "Backend agent instructions" },
+          { role: "system", label: "retrieval_context", content: "Backend retrieval preview" },
+        ],
+        text: "Backend prompt preview",
+      },
+    });
     vi.mocked(catalogApi.validateCatalogAgent).mockResolvedValue({
       agent: agentFixture,
       validation: {
@@ -182,7 +192,15 @@ describe("CatalogControlPage", () => {
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
     await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
     expect((screen.getByLabelText("Retrieval instructions") as HTMLTextAreaElement).value).toContain("Use the following retrieved context");
-    expect((screen.getByLabelText("Prompt review") as HTMLTextAreaElement).value).toContain("System message: agent instructions");
+    await waitFor(() => {
+      expect(catalogApi.previewCatalogAgentPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instructions: expect.stringContaining("Use tools carefully."),
+        }),
+        "token",
+      );
+    });
+    expect((screen.getByLabelText("Prompt review") as HTMLTextAreaElement).value).toBe("Backend prompt preview");
     await user.click(screen.getByRole("button", { name: "Create agent" }));
 
     await waitFor(() => {

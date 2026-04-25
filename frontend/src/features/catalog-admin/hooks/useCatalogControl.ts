@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createCatalogAgent,
@@ -6,6 +6,7 @@ import {
   deleteCatalogAgent,
   listCatalogAgents,
   listCatalogTools,
+  previewCatalogAgentPrompt,
   type CatalogAgent,
   type CatalogAgentMutationInput,
   type CatalogAgentValidation,
@@ -28,12 +29,6 @@ export const DEFAULT_RETRIEVAL_CONTEXT_PROMPT = [
   "Use the following retrieved context if it is relevant to the user's request.",
   "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
   "Do not cite a reference unless it supports the sentence that uses the citation.",
-].join("\n");
-
-const RETRIEVAL_CONTEXT_PREVIEW = [
-  "Reference [1] title={retrieved title} file={retrieved file}",
-  "Chunk id={retrieved chunk id} metadata={retrieved metadata}",
-  "{retrieved text}",
 ].join("\n");
 
 export type AgentFormState = CatalogAgentMutationInput & {
@@ -135,21 +130,6 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
   };
 }
 
-export function buildAgentSystemPromptPreview(form: AgentFormState): string {
-  const sections: string[] = [];
-  const instructions = form.instructions.trim();
-  if (instructions) {
-    sections.push(["System message: agent instructions", instructions].join("\n"));
-  }
-
-  const retrievalContext = form.runtime_prompts.retrieval_context.trim();
-  if (retrievalContext) {
-    sections.push(["System message: retrieval context", retrievalContext, RETRIEVAL_CONTEXT_PREVIEW].join("\n\n"));
-  }
-
-  return sections.join("\n\n---\n\n");
-}
-
 export function buildToolForm(tool: CatalogTool): ToolFormState {
   return {
     mode: "edit",
@@ -188,7 +168,10 @@ export function useCatalogControl(token: string) {
   const [deletingAgentId, setDeletingAgentId] = useState("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingTool, setSavingTool] = useState(false);
+  const [agentPromptPreview, setAgentPromptPreview] = useState("");
+  const [agentPromptPreviewLoading, setAgentPromptPreviewLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const promptPreviewRequestId = useRef(0);
   const toolTesting = useCatalogToolTesting(token);
 
   const loadCatalogState = useCallback(async (): Promise<void> => {
@@ -220,6 +203,53 @@ export function useCatalogControl(token: string) {
   useEffect(() => {
     void loadCatalogState();
   }, [loadCatalogState]);
+
+  useEffect(() => {
+    if (!token) {
+      setAgentPromptPreview("");
+      return;
+    }
+
+    const requestId = promptPreviewRequestId.current + 1;
+    promptPreviewRequestId.current = requestId;
+    setAgentPromptPreviewLoading(true);
+    const timeout = window.setTimeout(() => {
+      const payload: CatalogAgentMutationInput = {
+        id: agentForm.id || undefined,
+        visibility: agentForm.visibility,
+        publish: agentForm.publish,
+        name: agentForm.name,
+        description: agentForm.description,
+        instructions: agentForm.instructions,
+        runtime_prompts: {
+          retrieval_context: agentForm.runtime_prompts.retrieval_context,
+        },
+        default_model_ref: agentForm.default_model_ref,
+        tool_refs: agentForm.tool_refs,
+        runtime_constraints: agentForm.runtime_constraints,
+      };
+      void previewCatalogAgentPrompt(payload, token)
+        .then((preview) => {
+          if (promptPreviewRequestId.current === requestId) {
+            setAgentPromptPreview(preview.prompt_preview.text);
+          }
+        })
+        .catch(() => {
+          if (promptPreviewRequestId.current === requestId) {
+            setAgentPromptPreview("");
+          }
+        })
+        .finally(() => {
+          if (promptPreviewRequestId.current === requestId) {
+            setAgentPromptPreviewLoading(false);
+          }
+        });
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [agentForm, token]);
 
   async function handleAgentValidate(agentId: string): Promise<void> {
     if (!token) {
@@ -383,6 +413,8 @@ export function useCatalogControl(token: string) {
     validatingAgentId,
     validatingToolId,
     deletingAgentId,
+    agentPromptPreview,
+    agentPromptPreviewLoading,
     testingToolId: toolTesting.testingToolId,
     savingAgent,
     savingTool,

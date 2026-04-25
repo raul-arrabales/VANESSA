@@ -13,7 +13,11 @@ from ..repositories.registry import (
     list_registry_entities,
     update_registry_entity,
 )
-from .agent_prompt_defaults import default_agent_runtime_prompts, normalize_agent_runtime_prompts
+from .agent_prompt_defaults import (
+    build_agent_system_prompt_preview,
+    default_agent_runtime_prompts,
+    normalize_agent_runtime_prompts,
+)
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
 from .platform_service import resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
@@ -327,6 +331,22 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
             "derived_runtime_requirements": derived_runtime_requirements,
         },
     }
+
+
+def preview_catalog_agent_prompt(database_url: str, *, agent_id: str) -> dict[str, Any]:
+    agent = get_catalog_agent(database_url, agent_id=agent_id)
+    return {
+        "agent": agent,
+        "prompt_preview": build_agent_system_prompt_preview(dict(agent["spec"])),
+    }
+
+
+def preview_catalog_agent_prompt_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    spec = {
+        "instructions": str(payload.get("instructions") or ""),
+        "runtime_prompts": normalize_agent_runtime_prompts(payload.get("runtime_prompts")),
+    }
+    return {"prompt_preview": build_agent_system_prompt_preview(spec)}
 
 
 def _serialize_catalog_row(row: dict[str, Any], *, entity_type: Literal["agent", "tool"]) -> dict[str, Any]:

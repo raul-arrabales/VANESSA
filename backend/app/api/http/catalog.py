@@ -12,6 +12,8 @@ from ...application.catalog_management_service import (
     get_catalog_tool,
     list_catalog_agents,
     list_catalog_tools,
+    preview_catalog_agent_prompt,
+    preview_catalog_agent_prompt_payload,
     update_catalog_agent,
     update_catalog_tool,
     validate_catalog_agent,
@@ -58,6 +60,16 @@ def create_catalog_agent_route():
     return jsonify({"agent": agent}), 201
 
 
+@bp.post("/v1/catalog/agents/prompt-preview")
+@require_role("superadmin")
+def preview_catalog_agent_prompt_payload_route():
+    try:
+        payload = preview_catalog_agent_prompt_payload(request.get_json(silent=True))
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
+
+
 @bp.get("/v1/catalog/agents/<agent_id>")
 @require_role("superadmin")
 def get_catalog_agent_route(agent_id: str):
@@ -66,6 +78,16 @@ def get_catalog_agent_route(agent_id: str):
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"agent": agent}), 200
+
+
+@bp.get("/v1/catalog/agents/<agent_id>/prompt-preview")
+@require_role("superadmin")
+def preview_catalog_agent_prompt_route(agent_id: str):
+    try:
+        payload = preview_catalog_agent_prompt(_database_url(), agent_id=agent_id)
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
 
 
 @bp.put("/v1/catalog/agents/<agent_id>")

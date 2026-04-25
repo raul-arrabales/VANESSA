@@ -2,13 +2,15 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogTool } from "../../../api/catalog";
 import type { ModelCatalogItem } from "../../../api/modelops";
-import { buildAgentSystemPromptPreview, type AgentFormState } from "../hooks/useCatalogControl";
+import type { AgentFormState } from "../hooks/useCatalogControl";
 
 type CatalogAgentFormPanelProps = {
   form: AgentFormState;
   tools: CatalogTool[];
   models: ModelCatalogItem[];
   saving: boolean;
+  promptPreview: string;
+  promptPreviewLoading: boolean;
   onChange: (value: AgentFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
@@ -19,12 +21,13 @@ export default function CatalogAgentFormPanel({
   tools,
   models,
   saving,
+  promptPreview,
+  promptPreviewLoading,
   onChange,
   onSubmit,
   onReset,
 }: CatalogAgentFormPanelProps): JSX.Element {
   const { t } = useTranslation("common");
-  const promptPreview = buildAgentSystemPromptPreview(form);
 
   return (
     <article className="panel card-stack">
@@ -103,7 +106,7 @@ export default function CatalogAgentFormPanel({
         </label>
         <label className="card-stack">
           <span className="field-label">{t("catalogControl.forms.agent.promptReview")}</span>
-          <textarea className="field-input form-textarea catalog-prompt-review" value={promptPreview} readOnly />
+          <textarea className="field-input form-textarea catalog-prompt-review" value={promptPreviewLoading ? t("catalogControl.forms.agent.promptReviewLoading") : promptPreview} readOnly />
         </label>
         <label className="card-stack">
           <span className="field-label">{t("catalogControl.forms.agent.toolRefs")}</span>

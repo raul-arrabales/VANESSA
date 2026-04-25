@@ -1786,6 +1786,7 @@
         "instructions": "Instrucciones",
         "retrievalInstructions": "Instrucciones de recuperacion",
         "promptReview": "Revision del prompt",
+        "promptReviewLoading": "Cargando revision del prompt...",
         "defaultModel": "Modelo por defecto",
         "noDefaultModel": "Sin modelo por defecto",
         "toolRefs": "Referencias de herramientas",

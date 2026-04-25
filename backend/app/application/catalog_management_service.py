@@ -12,6 +12,8 @@ from ..services.catalog_service import (
     get_catalog_tool as _get_catalog_tool,
     list_catalog_agents as _list_catalog_agents,
     list_catalog_tools as _list_catalog_tools,
+    preview_catalog_agent_prompt as _preview_catalog_agent_prompt,
+    preview_catalog_agent_prompt_payload as _preview_catalog_agent_prompt_payload,
     update_catalog_agent as _update_catalog_agent,
     update_catalog_tool as _update_catalog_tool,
     validate_catalog_agent as _validate_catalog_agent,
@@ -76,6 +78,14 @@ def delete_catalog_agent(
 
 def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any]:
     return _validate_catalog_agent(database_url, agent_id=agent_id)
+
+
+def preview_catalog_agent_prompt(database_url: str, *, agent_id: str) -> dict[str, Any]:
+    return _preview_catalog_agent_prompt(database_url, agent_id=agent_id)
+
+
+def preview_catalog_agent_prompt_payload(payload: Any) -> dict[str, Any]:
+    return _preview_catalog_agent_prompt_payload(_require_json_object(payload))
 
 
 def list_catalog_tools(database_url: str) -> list[dict[str, Any]]:

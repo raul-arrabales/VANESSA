@@ -51,6 +51,8 @@ export default function CatalogControlPage(): JSX.Element {
     validatingAgentId,
     validatingToolId,
     deletingAgentId,
+    agentPromptPreview,
+    agentPromptPreviewLoading,
     testingToolId,
     savingAgent,
     savingTool,
@@ -273,6 +275,8 @@ export default function CatalogControlPage(): JSX.Element {
           tools={tools}
           models={models}
           saving={savingAgent}
+          promptPreview={agentPromptPreview}
+          promptPreviewLoading={agentPromptPreviewLoading}
           onChange={setAgentForm}
           onSubmit={(event) => {
             event.preventDefault();

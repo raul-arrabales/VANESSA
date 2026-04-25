@@ -165,6 +165,7 @@ vi.mock("./api/catalog", () => ({
   listCatalogAgents: vi.fn(async () => []),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
+  previewCatalogAgentPrompt: vi.fn(async () => ({ prompt_preview: { messages: [], text: "" } })),
   validateCatalogAgent: vi.fn(),
   listCatalogTools: vi.fn(async () => []),
   createCatalogTool: vi.fn(),

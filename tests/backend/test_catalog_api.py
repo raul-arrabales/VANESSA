@@ -49,7 +49,9 @@ def test_catalog_routes_require_superadmin(client):
     responses = [
         test_client.get("/v1/catalog/agents", headers=_auth(token)),
         test_client.post("/v1/catalog/agents", headers=_auth(token), json={}),
+        test_client.post("/v1/catalog/agents/prompt-preview", headers=_auth(token), json={}),
         test_client.get("/v1/catalog/agents/agent.alpha", headers=_auth(token)),
+        test_client.get("/v1/catalog/agents/agent.alpha/prompt-preview", headers=_auth(token)),
         test_client.put("/v1/catalog/agents/agent.alpha", headers=_auth(token), json={}),
         test_client.post("/v1/catalog/agents/agent.alpha/validate", headers=_auth(token)),
         test_client.get("/v1/catalog/tools", headers=_auth(token)),
@@ -109,6 +111,16 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(catalog_routes, "get_catalog_agent", lambda _db, *, agent_id: dict(agent_row, id=agent_id))
     monkeypatch.setattr(catalog_routes, "create_catalog_agent", lambda _db, *, payload, owner_user_id: dict(agent_row, id=payload["id"]))
     monkeypatch.setattr(catalog_routes, "update_catalog_agent", lambda _db, *, agent_id, payload: dict(agent_row, id=agent_id, published=payload["publish"]))
+    monkeypatch.setattr(
+        catalog_routes,
+        "preview_catalog_agent_prompt_payload",
+        lambda payload: {"prompt_preview": {"messages": [], "text": f"draft:{payload['instructions']}"}},
+    )
+    monkeypatch.setattr(
+        catalog_routes,
+        "preview_catalog_agent_prompt",
+        lambda _db, *, agent_id: {"agent": dict(agent_row, id=agent_id), "prompt_preview": {"messages": [], "text": f"stored:{agent_id}"}},
+    )
     deleted_agents: list[dict[str, object]] = []
     monkeypatch.setattr(
         catalog_routes,
@@ -193,6 +205,15 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         },
     )
     validate_agent = test_client.post("/v1/catalog/agents/agent.alpha/validate", headers=_auth(token))
+    draft_prompt_preview = test_client.post(
+        "/v1/catalog/agents/prompt-preview",
+        headers=_auth(token),
+        json={
+            "instructions": "draft instructions",
+            "runtime_prompts": {"retrieval_context": "draft retrieval"},
+        },
+    )
+    stored_prompt_preview = test_client.get("/v1/catalog/agents/agent.alpha/prompt-preview", headers=_auth(token))
     delete_agent = test_client.delete("/v1/catalog/agents/agent.alpha", headers=_auth(token))
 
     tools = test_client.get("/v1/catalog/tools", headers=_auth(token))
@@ -243,6 +264,10 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     assert update_agent.get_json()["agent"]["published"] is True
     assert validate_agent.status_code == 200
     assert validate_agent.get_json()["validation"]["valid"] is True
+    assert draft_prompt_preview.status_code == 200
+    assert draft_prompt_preview.get_json()["prompt_preview"]["text"] == "draft:draft instructions"
+    assert stored_prompt_preview.status_code == 200
+    assert stored_prompt_preview.get_json()["prompt_preview"]["text"] == "stored:agent.alpha"
     assert delete_agent.status_code == 200
     assert delete_agent.get_json()["deleted"] is True
     assert deleted_agents == [{"agent_id": "agent.alpha", "actor_user_id": root["id"], "actor_role": "superadmin"}]

@@ -10,6 +10,14 @@ DEFAULT_RETRIEVAL_CONTEXT_PROMPT = "\n".join(
     ]
 )
 
+RETRIEVAL_CONTEXT_PREVIEW = "\n".join(
+    [
+        "Reference [1] title={retrieved title} file={retrieved file}",
+        "Chunk id={retrieved chunk id} metadata={retrieved metadata}",
+        "{retrieved text}",
+    ]
+)
+
 
 def default_agent_runtime_prompts() -> dict[str, str]:
     return {"retrieval_context": DEFAULT_RETRIEVAL_CONTEXT_PROMPT}
@@ -19,3 +27,37 @@ def normalize_agent_runtime_prompts(value: Any) -> dict[str, str]:
     runtime_prompts = value if isinstance(value, dict) else {}
     retrieval_context = str(runtime_prompts.get("retrieval_context") or "").strip()
     return {"retrieval_context": retrieval_context or DEFAULT_RETRIEVAL_CONTEXT_PROMPT}
+
+
+def build_agent_system_prompt_preview(spec: dict[str, Any]) -> dict[str, Any]:
+    runtime_prompts = normalize_agent_runtime_prompts(spec.get("runtime_prompts"))
+    messages: list[dict[str, str]] = []
+    text_sections: list[str] = []
+
+    instructions = str(spec.get("instructions") or "").strip()
+    if instructions:
+        messages.append(
+            {
+                "role": "system",
+                "label": "agent_instructions",
+                "content": instructions,
+            }
+        )
+        text_sections.append("\n".join(["System message: agent instructions", instructions]))
+
+    retrieval_context = runtime_prompts["retrieval_context"]
+    if retrieval_context:
+        retrieval_content = "\n\n".join([retrieval_context, RETRIEVAL_CONTEXT_PREVIEW])
+        messages.append(
+            {
+                "role": "system",
+                "label": "retrieval_context",
+                "content": retrieval_content,
+            }
+        )
+        text_sections.append("\n".join(["System message: retrieval context", retrieval_content]))
+
+    return {
+        "messages": messages,
+        "text": "\n\n---\n\n".join(text_sections),
+    }

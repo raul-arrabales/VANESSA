@@ -1804,6 +1804,7 @@
         "instructions": "Instructions",
         "retrievalInstructions": "Retrieval instructions",
         "promptReview": "Prompt review",
+        "promptReviewLoading": "Loading prompt preview...",
         "defaultModel": "Default model",
         "noDefaultModel": "No default model",
         "toolRefs": "Tool refs",

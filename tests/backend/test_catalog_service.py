@@ -233,6 +233,43 @@ def test_validate_catalog_agent_checks_model_and_tool_runtime_constraints(monkey
     assert result["validation"]["derived_runtime_requirements"]["sandbox_required"] is True
 
 
+def test_preview_catalog_agent_prompt_uses_normalized_runtime_prompts(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        catalog_service,
+        "find_registry_entity",
+        lambda _db, *, entity_type, entity_id: {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "owner_user_id": 1,
+            "visibility": "private",
+            "status": "draft",
+            "current_version": "v1",
+            "published_at": None,
+            "current_spec": {
+                "name": "Agent Alpha",
+                "description": "desc",
+                "instructions": "Answer from catalog instructions.",
+                "default_model_ref": None,
+                "tool_refs": [],
+                "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+            },
+        },
+    )
+
+    stored_preview = catalog_service.preview_catalog_agent_prompt("ignored", agent_id="agent.alpha")
+    draft_preview = catalog_service.preview_catalog_agent_prompt_payload(
+        {
+            "instructions": "Draft instructions.",
+            "runtime_prompts": {"retrieval_context": "Draft retrieval instructions."},
+        }
+    )
+
+    assert "Answer from catalog instructions." in stored_preview["prompt_preview"]["text"]
+    assert "Use the following retrieved context" in stored_preview["prompt_preview"]["text"]
+    assert draft_preview["prompt_preview"]["messages"][0]["content"] == "Draft instructions."
+    assert "Draft retrieval instructions." in draft_preview["prompt_preview"]["messages"][1]["content"]
+
+
 def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(monkeypatch: pytest.MonkeyPatch):
     tool_row = {
         "entity_id": "tool.web_search",
