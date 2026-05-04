@@ -29,6 +29,20 @@ def normalize_agent_runtime_prompts(value: Any) -> dict[str, str]:
     return {"retrieval_context": retrieval_context or DEFAULT_RETRIEVAL_CONTEXT_PROMPT}
 
 
+def coerce_agent_runtime_prompts(value: Any, *, default_when_missing: bool) -> dict[str, str]:
+    if value is None:
+        if default_when_missing:
+            return default_agent_runtime_prompts()
+        raise ValueError("runtime_prompts is required")
+    if not isinstance(value, dict):
+        raise ValueError("runtime_prompts must be an object")
+
+    retrieval_context = str(value.get("retrieval_context", "")).strip()
+    if not retrieval_context:
+        raise ValueError("runtime_prompts.retrieval_context is required")
+    return {"retrieval_context": retrieval_context}
+
+
 def build_agent_system_prompt_preview(spec: dict[str, Any]) -> dict[str, Any]:
     runtime_prompts = normalize_agent_runtime_prompts(spec.get("runtime_prompts"))
     messages: list[dict[str, str]] = []

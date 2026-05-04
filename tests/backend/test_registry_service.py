@@ -5,6 +5,53 @@ import pytest
 from app.services import registry_service  # noqa: E402
 
 
+def test_agent_spec_requires_runtime_prompts():
+    with pytest.raises(ValueError) as exc_info:
+        registry_service.create_entity_with_version(
+            "ignored",
+            entity_type="agent",
+            entity_id="agent.alpha",
+            owner_user_id=1,
+            visibility="private",
+            spec={
+                "name": "Agent Alpha",
+                "description": "test agent",
+                "instructions": "be concise",
+                "default_model_ref": "model.default",
+                "tool_refs": [],
+                "runtime_constraints": {"internet_required": False, "sandbox_required": True},
+            },
+            version="v1",
+            publish=False,
+        )
+
+    assert str(exc_info.value) == "missing_agent_field:runtime_prompts"
+
+
+def test_agent_spec_rejects_empty_runtime_prompt():
+    with pytest.raises(ValueError) as exc_info:
+        registry_service.create_entity_with_version(
+            "ignored",
+            entity_type="agent",
+            entity_id="agent.alpha",
+            owner_user_id=1,
+            visibility="private",
+            spec={
+                "name": "Agent Alpha",
+                "description": "test agent",
+                "instructions": "be concise",
+                "runtime_prompts": {"retrieval_context": ""},
+                "default_model_ref": "model.default",
+                "tool_refs": [],
+                "runtime_constraints": {"internet_required": False, "sandbox_required": True},
+            },
+            version="v1",
+            publish=False,
+        )
+
+    assert str(exc_info.value) == "invalid_agent_field:runtime_prompts.retrieval_context is required"
+
+
 def test_tool_spec_accepts_mcp_transport(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         registry_service,

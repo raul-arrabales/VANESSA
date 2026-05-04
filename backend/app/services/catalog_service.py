@@ -15,6 +15,7 @@ from ..repositories.registry import (
 )
 from .agent_prompt_defaults import (
     build_agent_system_prompt_preview,
+    coerce_agent_runtime_prompts,
     default_agent_runtime_prompts,
     normalize_agent_runtime_prompts,
 )
@@ -622,16 +623,13 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise CatalogError("invalid_runtime_constraints", "runtime_constraints.internet_required must be a boolean")
     if not isinstance(runtime_constraints.get("sandbox_required"), bool):
         raise CatalogError("invalid_runtime_constraints", "runtime_constraints.sandbox_required must be a boolean")
-    runtime_prompts = payload.get("runtime_prompts")
-    if runtime_prompts is None:
-        coerced_runtime_prompts = default_agent_runtime_prompts()
-    elif not isinstance(runtime_prompts, dict):
-        raise CatalogError("invalid_runtime_prompts", "runtime_prompts must be an object")
-    else:
-        retrieval_context = str(runtime_prompts.get("retrieval_context", "")).strip()
-        if not retrieval_context:
-            raise CatalogError("invalid_runtime_prompts", "runtime_prompts.retrieval_context is required")
-        coerced_runtime_prompts = {"retrieval_context": retrieval_context}
+    try:
+        coerced_runtime_prompts = coerce_agent_runtime_prompts(
+            payload.get("runtime_prompts"),
+            default_when_missing=True,
+        )
+    except ValueError as exc:
+        raise CatalogError("invalid_runtime_prompts", str(exc)) from exc
     default_model_ref_raw = payload.get("default_model_ref")
     default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
     return {

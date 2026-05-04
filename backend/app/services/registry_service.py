@@ -9,6 +9,7 @@ from ..repositories.registry import (
     list_registry_entities,
     list_registry_versions,
 )
+from .agent_prompt_defaults import coerce_agent_runtime_prompts
 
 _ENTITY_TYPES = {"model", "agent", "tool"}
 
@@ -30,10 +31,22 @@ def _initial_status_for_type(entity_type: str) -> str:
 
 def _validate_spec(entity_type: str, spec: dict[str, Any]) -> None:
     if entity_type == "agent":
-        required = ["name", "description", "instructions", "default_model_ref", "tool_refs", "runtime_constraints"]
+        required = [
+            "name",
+            "description",
+            "instructions",
+            "runtime_prompts",
+            "default_model_ref",
+            "tool_refs",
+            "runtime_constraints",
+        ]
         for key in required:
             if key not in spec:
                 raise ValueError(f"missing_agent_field:{key}")
+        try:
+            coerce_agent_runtime_prompts(spec.get("runtime_prompts"), default_when_missing=False)
+        except ValueError as exc:
+            raise ValueError(f"invalid_agent_field:{exc}") from exc
     elif entity_type == "tool":
         required = [
             "name",

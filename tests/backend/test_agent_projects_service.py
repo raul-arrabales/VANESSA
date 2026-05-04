@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.application import agent_projects_service
+from app.services.agent_prompt_defaults import default_agent_runtime_prompts
 
 
 def _project_row() -> dict[str, object]:
@@ -83,8 +84,8 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
         },
     )
 
-    assert created_specs[0]["runtime_prompts"] == agent_projects_service.default_agent_runtime_prompts()
-    assert project["spec"]["runtime_prompts"] == agent_projects_service.default_agent_runtime_prompts()
+    assert created_specs[0]["runtime_prompts"] == default_agent_runtime_prompts()
+    assert project["spec"]["runtime_prompts"] == default_agent_runtime_prompts()
 
 
 def test_publish_agent_project_compiles_catalog_payload_and_persists_published_agent_id(monkeypatch):

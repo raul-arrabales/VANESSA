@@ -176,6 +176,7 @@ def test_registry_and_runtime_endpoints(client):
                 "name": "Agent Alpha",
                 "description": "test agent",
                 "instructions": "be concise",
+                "runtime_prompts": {"retrieval_context": "Use retrieved context when available."},
                 "default_model_ref": "model.default",
                 "tool_refs": [],
                 "runtime_constraints": {"internet_required": False, "sandbox_required": True},

@@ -12,7 +12,7 @@ from ..repositories.agent_projects import (
 )
 from ..repositories.model_access import find_model_definition
 from ..repositories.registry import find_registry_entity
-from ..services.agent_prompt_defaults import default_agent_runtime_prompts, normalize_agent_runtime_prompts
+from ..services.agent_prompt_defaults import coerce_agent_runtime_prompts, normalize_agent_runtime_prompts
 from .catalog_management_service import create_catalog_agent, update_catalog_agent
 
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
@@ -266,16 +266,13 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_description", "description is required")
     if not instructions:
         raise AgentProjectError("invalid_instructions", "instructions is required")
-    runtime_prompts = payload.get("runtime_prompts")
-    if runtime_prompts is None:
-        coerced_runtime_prompts = default_agent_runtime_prompts()
-    elif not isinstance(runtime_prompts, dict):
-        raise AgentProjectError("invalid_runtime_prompts", "runtime_prompts must be an object")
-    else:
-        retrieval_context = str(runtime_prompts.get("retrieval_context", "")).strip()
-        if not retrieval_context:
-            raise AgentProjectError("invalid_runtime_prompts", "runtime_prompts.retrieval_context is required")
-        coerced_runtime_prompts = {"retrieval_context": retrieval_context}
+    try:
+        coerced_runtime_prompts = coerce_agent_runtime_prompts(
+            payload.get("runtime_prompts"),
+            default_when_missing=True,
+        )
+    except ValueError as exc:
+        raise AgentProjectError("invalid_runtime_prompts", str(exc)) from exc
     tool_refs_raw = payload.get("tool_refs", [])
     if not isinstance(tool_refs_raw, list):
         raise AgentProjectError("invalid_tool_refs", "tool_refs must be an array")
