@@ -42,7 +42,7 @@ def _database_url() -> str:
 
 
 @bp.get("/v1/catalog/defaults")
-@require_role("superadmin")
+@require_auth
 def get_catalog_defaults_route():
     try:
         defaults = get_catalog_defaults()

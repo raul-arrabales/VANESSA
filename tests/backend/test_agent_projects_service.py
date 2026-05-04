@@ -15,6 +15,7 @@ def _project_row() -> dict[str, object]:
         "name": "Support Agent",
         "description": "Handles support workflows.",
         "instructions": "Be helpful.",
+        "runtime_prompts": {"retrieval_context": "Use retrieved context for support answers."},
         "default_model_ref": "safe-small",
         "tool_refs": ["tool.web_search"],
         "workflow_definition": {"entrypoint": "assistant"},
@@ -54,6 +55,38 @@ def test_validate_agent_project_reports_runtime_constraint_mismatches(monkeypatc
     ]
 
 
+def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch):
+    created_specs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        agent_projects_service,
+        "create_project_row",
+        lambda _database_url, *, project_id, owner_user_id, spec, visibility: created_specs.append(spec)
+        or {**_project_row(), **spec, "id": project_id, "owner_user_id": owner_user_id, "visibility": visibility},
+    )
+
+    project = agent_projects_service.create_agent_project(
+        "postgresql://ignored",
+        owner_user_id=10,
+        payload={
+            "id": "proj-new",
+            "visibility": "private",
+            "name": "Support Agent",
+            "description": "Handles support workflows.",
+            "instructions": "Be helpful.",
+            "default_model_ref": None,
+            "tool_refs": [],
+            "workflow_definition": {"entrypoint": "assistant"},
+            "tool_policy": {"allow_user_tools": False},
+            "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+        },
+    )
+
+    assert created_specs[0]["runtime_prompts"] == agent_projects_service.default_agent_runtime_prompts()
+    assert project["spec"]["runtime_prompts"] == agent_projects_service.default_agent_runtime_prompts()
+
+
 def test_publish_agent_project_compiles_catalog_payload_and_persists_published_agent_id(monkeypatch):
     create_calls: list[dict[str, object]] = []
 
@@ -78,6 +111,7 @@ def test_publish_agent_project_compiles_catalog_payload_and_persists_published_a
     )
 
     assert create_calls[0]["owner_user_id"] == 10
+    assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": "Use retrieved context for support answers."}
     assert create_calls[0]["payload"]["tool_refs"] == ["tool.web_search"]
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
 

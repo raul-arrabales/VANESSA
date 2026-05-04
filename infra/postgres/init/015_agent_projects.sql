@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS agent_projects (
     name TEXT NOT NULL,
     description TEXT NOT NULL,
     instructions TEXT NOT NULL,
+    runtime_prompts JSONB NOT NULL DEFAULT '{}'::jsonb,
     default_model_ref TEXT,
     tool_refs JSONB NOT NULL DEFAULT '[]'::jsonb,
     workflow_definition JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -28,6 +29,9 @@ BEGIN
     END IF;
 END
 $$;
+
+ALTER TABLE agent_projects
+    ADD COLUMN IF NOT EXISTS runtime_prompts JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS agent_project_versions (
     project_id TEXT NOT NULL REFERENCES agent_projects(id) ON DELETE CASCADE,

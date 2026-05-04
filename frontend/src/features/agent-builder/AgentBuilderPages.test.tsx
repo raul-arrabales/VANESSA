@@ -7,6 +7,7 @@ import { renderWithAppProviders } from "../../test/renderWithAppProviders";
 import AgentBuilderProjectsPage from "./pages/AgentBuilderProjectsPage";
 import AgentProjectDetailPage from "./pages/AgentProjectDetailPage";
 import * as agentProjectsApi from "../../api/agentProjects";
+import * as catalogApi from "../../api/catalog";
 
 let mockUser: AuthUser | null = null;
 
@@ -27,6 +28,12 @@ vi.mock("../../api/agentProjects", () => ({
   publishAgentProject: vi.fn(),
 }));
 
+vi.mock("../../api/catalog", () => ({
+  getCatalogDefaults: vi.fn(),
+}));
+
+const apiRetrievalDefault = "Use API retrieval defaults for project agents.";
+
 const projectFixture = {
   id: "proj-1",
   owner_user_id: 10,
@@ -39,6 +46,7 @@ const projectFixture = {
     name: "Support Agent",
     description: "Handles support workflows.",
     instructions: "Be helpful.",
+    runtime_prompts: { retrieval_context: "Use project retrieval context." },
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
     workflow_definition: { entrypoint: "assistant" },
@@ -57,6 +65,9 @@ describe("Agent builder pages", () => {
       role: "user",
       is_active: true,
     };
+    vi.mocked(catalogApi.getCatalogDefaults).mockResolvedValue({
+      agent: { runtime_prompts: { retrieval_context: apiRetrievalDefault } },
+    });
     vi.mocked(agentProjectsApi.listAgentProjects).mockResolvedValue([projectFixture]);
     vi.mocked(agentProjectsApi.createAgentProject).mockResolvedValue(projectFixture);
     vi.mocked(agentProjectsApi.getAgentProject).mockResolvedValue(projectFixture);
@@ -91,6 +102,7 @@ describe("Agent builder pages", () => {
     await user.type(screen.getByLabelText("Name"), "Support Agent");
     await user.type(screen.getByLabelText("Description"), "Handles support workflows.");
     await user.type(screen.getByLabelText("Instructions"), "Be helpful.");
+    expect(screen.getByLabelText("Retrieval instructions")).toHaveValue(apiRetrievalDefault);
     await user.click(screen.getByRole("button", { name: "Create project" }));
 
     await waitFor(() => {
@@ -98,6 +110,7 @@ describe("Agent builder pages", () => {
         expect.objectContaining({
           id: "proj-1",
           name: "Support Agent",
+          runtime_prompts: { retrieval_context: apiRetrievalDefault },
         }),
         "token",
       );

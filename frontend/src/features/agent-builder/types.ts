@@ -1,4 +1,5 @@
 import type { AgentProject, AgentProjectMutationInput, AgentProjectVisibility } from "../../api/agentProjects";
+import type { CatalogDefaults } from "../../api/catalog";
 import type { PreviewableAssistantExperience } from "../ai-shared/assistantExperience";
 
 export type AgentProjectFormState = {
@@ -7,6 +8,7 @@ export type AgentProjectFormState = {
   name: string;
   description: string;
   instructions: string;
+  retrievalContext: string;
   defaultModelRef: string;
   toolRefsText: string;
   workflowDefinitionText: string;
@@ -17,19 +19,24 @@ export type AgentProjectFormState = {
 
 export type AgentProjectPreview = PreviewableAssistantExperience;
 
-export const DEFAULT_AGENT_PROJECT_FORM: AgentProjectFormState = {
-  id: "",
-  visibility: "private",
-  name: "",
-  description: "",
-  instructions: "",
-  defaultModelRef: "",
-  toolRefsText: "",
-  workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",
-  toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
-  internetRequired: false,
-  sandboxRequired: false,
-};
+export function buildDefaultAgentProjectForm(defaults: CatalogDefaults | null): AgentProjectFormState {
+  return {
+    id: "",
+    visibility: "private",
+    name: "",
+    description: "",
+    instructions: "",
+    retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+    defaultModelRef: "",
+    toolRefsText: "",
+    workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",
+    toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
+    internetRequired: false,
+    sandboxRequired: false,
+  };
+}
+
+export const DEFAULT_AGENT_PROJECT_FORM: AgentProjectFormState = buildDefaultAgentProjectForm(null);
 
 export function parseJsonObject(text: string, errorMessage: string): Record<string, unknown> {
   const normalized = text.trim();
@@ -58,6 +65,7 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     name: project.spec.name,
     description: project.spec.description,
     instructions: project.spec.instructions,
+    retrievalContext: project.spec.runtime_prompts.retrieval_context,
     defaultModelRef: project.spec.default_model_ref ?? "",
     toolRefsText: project.spec.tool_refs.join(", "),
     workflowDefinitionText: JSON.stringify(project.spec.workflow_definition, null, 2),
@@ -83,6 +91,9 @@ export function toAgentProjectMutationInput(
     name: form.name.trim(),
     description: form.description.trim(),
     instructions: form.instructions.trim(),
+    runtime_prompts: {
+      retrieval_context: form.retrievalContext.trim(),
+    },
     default_model_ref: form.defaultModelRef.trim() || null,
     tool_refs: form.toolRefsText
       .split(/\r?\n|,/)

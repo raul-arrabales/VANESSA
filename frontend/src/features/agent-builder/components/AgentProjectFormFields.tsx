@@ -62,6 +62,13 @@ export function AgentProjectFormFields({ form, setForm, disableId = false }: Pro
         }} />
       </label>
       <label className="card-stack">
+        <span className="field-label">{t("agentBuilder.fields.retrievalInstructions")}</span>
+        <textarea className="field-input form-textarea" value={form.retrievalContext} onChange={(event) => {
+          const value = event.currentTarget.value;
+          setForm((current) => ({ ...current, retrievalContext: value }));
+        }} />
+      </label>
+      <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.defaultModelRef")}</span>
         <input className="field-input" value={form.defaultModelRef} onChange={(event) => {
           const value = event.currentTarget.value;

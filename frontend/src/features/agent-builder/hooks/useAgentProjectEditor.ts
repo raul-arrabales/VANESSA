@@ -159,6 +159,7 @@ const DEFAULT_EMPTY_FORM: AgentProjectFormState = {
   name: "",
   description: "",
   instructions: "",
+  retrievalContext: "",
   defaultModelRef: "",
   toolRefsText: "",
   workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",

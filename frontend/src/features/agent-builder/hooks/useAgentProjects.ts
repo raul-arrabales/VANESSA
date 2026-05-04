@@ -2,9 +2,10 @@ import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { createAgentProject, listAgentProjects, type AgentProject } from "../../../api/agentProjects";
+import { getCatalogDefaults } from "../../../api/catalog";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
-import { DEFAULT_AGENT_PROJECT_FORM, toAgentProjectMutationInput, type AgentProjectFormState } from "../types";
+import { buildDefaultAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../types";
 
 type UseAgentProjectsResult = {
   projects: AgentProject[];
@@ -26,7 +27,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [form, setForm] = useState<AgentProjectFormState>(DEFAULT_AGENT_PROJECT_FORM);
+  const [form, setForm] = useState<AgentProjectFormState>(() => buildDefaultAgentProjectForm(null));
 
   useRouteActionFeedback(location.state);
 
@@ -39,7 +40,20 @@ export function useAgentProjects(): UseAgentProjectsResult {
       setLoading(true);
       setErrorMessage("");
       try {
-        setProjects(await listAgentProjects(token));
+        const [defaultsPayload, projectsPayload] = await Promise.all([
+          getCatalogDefaults(token),
+          listAgentProjects(token),
+        ]);
+        setProjects(projectsPayload);
+        setForm((current) => {
+          if (current.retrievalContext.trim()) {
+            return current;
+          }
+          return {
+            ...current,
+            retrievalContext: defaultsPayload.agent.runtime_prompts.retrieval_context,
+          };
+        });
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : t("agentBuilder.feedback.loadFailed"));
       } finally {

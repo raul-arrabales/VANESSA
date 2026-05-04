@@ -1865,6 +1865,7 @@
       "name": "Name",
       "description": "Description",
       "instructions": "Instructions",
+      "retrievalInstructions": "Retrieval instructions",
       "defaultModelRef": "Default model ref",
       "toolRefs": "Tool refs",
       "workflowDefinition": "Workflow definition",

@@ -12,6 +12,7 @@ from ..repositories.agent_projects import (
 )
 from ..repositories.model_access import find_model_definition
 from ..repositories.registry import find_registry_entity
+from ..services.agent_prompt_defaults import default_agent_runtime_prompts, normalize_agent_runtime_prompts
 from .catalog_management_service import create_catalog_agent, update_catalog_agent
 
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
@@ -245,6 +246,7 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
             "name": str(row.get("name", "")),
             "description": str(row.get("description", "")),
             "instructions": str(row.get("instructions", "")),
+            "runtime_prompts": normalize_agent_runtime_prompts(row.get("runtime_prompts")),
             "default_model_ref": _string_or_none(row.get("default_model_ref")),
             "tool_refs": list(row.get("tool_refs") or []),
             "workflow_definition": dict(row.get("workflow_definition") or {}),
@@ -264,6 +266,16 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_description", "description is required")
     if not instructions:
         raise AgentProjectError("invalid_instructions", "instructions is required")
+    runtime_prompts = payload.get("runtime_prompts")
+    if runtime_prompts is None:
+        coerced_runtime_prompts = default_agent_runtime_prompts()
+    elif not isinstance(runtime_prompts, dict):
+        raise AgentProjectError("invalid_runtime_prompts", "runtime_prompts must be an object")
+    else:
+        retrieval_context = str(runtime_prompts.get("retrieval_context", "")).strip()
+        if not retrieval_context:
+            raise AgentProjectError("invalid_runtime_prompts", "runtime_prompts.retrieval_context is required")
+        coerced_runtime_prompts = {"retrieval_context": retrieval_context}
     tool_refs_raw = payload.get("tool_refs", [])
     if not isinstance(tool_refs_raw, list):
         raise AgentProjectError("invalid_tool_refs", "tool_refs must be an array")
@@ -286,6 +298,7 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "name": name,
         "description": description,
         "instructions": instructions,
+        "runtime_prompts": coerced_runtime_prompts,
         "default_model_ref": default_model_ref or None,
         "tool_refs": [str(item).strip() for item in tool_refs_raw if str(item).strip()],
         "workflow_definition": workflow_definition,
@@ -310,6 +323,7 @@ def _compile_catalog_payload(project: dict[str, Any]) -> dict[str, Any]:
         "name": spec["name"],
         "description": spec["description"],
         "instructions": spec["instructions"],
+        "runtime_prompts": normalize_agent_runtime_prompts(spec.get("runtime_prompts")),
         "default_model_ref": spec.get("default_model_ref"),
         "tool_refs": list(spec.get("tool_refs", [])),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),

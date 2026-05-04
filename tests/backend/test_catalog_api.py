@@ -47,7 +47,6 @@ def test_catalog_routes_require_superadmin(client):
     token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
 
     responses = [
-        test_client.get("/v1/catalog/defaults", headers=_auth(token)),
         test_client.get("/v1/catalog/agents", headers=_auth(token)),
         test_client.post("/v1/catalog/agents", headers=_auth(token), json={}),
         test_client.post("/v1/catalog/agents/prompt-preview", headers=_auth(token), json={}),
@@ -65,6 +64,29 @@ def test_catalog_routes_require_superadmin(client):
 
     for response in responses:
         assert response.status_code == 403
+
+
+def test_catalog_defaults_are_available_to_authenticated_users(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    user = user_store.create_user(
+        "ignored",
+        email="builder@example.com",
+        username="builder",
+        password_hash=hash_password("builder-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "builder-pass-123").get_json()["access_token"]
+    monkeypatch.setattr(
+        catalog_routes,
+        "get_catalog_defaults",
+        lambda: {"agent": {"runtime_prompts": {"retrieval_context": "Default retrieval instructions."}}},
+    )
+
+    response = test_client.get("/v1/catalog/defaults", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json()["defaults"]["agent"]["runtime_prompts"]["retrieval_context"] == "Default retrieval instructions."
 
 
 def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch):

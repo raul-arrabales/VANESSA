@@ -16,6 +16,7 @@ def list_agent_projects(database_url: str, *, owner_user_id: int | None = None) 
             p.name,
             p.description,
             p.instructions,
+            p.runtime_prompts,
             p.default_model_ref,
             p.tool_refs,
             p.workflow_definition,
@@ -48,6 +49,7 @@ def get_agent_project(database_url: str, *, project_id: str) -> dict[str, Any] |
                 p.name,
                 p.description,
                 p.instructions,
+                p.runtime_prompts,
                 p.default_model_ref,
                 p.tool_refs,
                 p.workflow_definition,
@@ -85,6 +87,7 @@ def create_agent_project(
                     name,
                     description,
                     instructions,
+                    runtime_prompts,
                     default_model_ref,
                     tool_refs,
                     workflow_definition,
@@ -96,7 +99,7 @@ def create_agent_project(
                     created_at,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s, NULL, 1, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s, NULL, 1, %s, %s)
                 """,
                 (
                     project_id,
@@ -104,6 +107,7 @@ def create_agent_project(
                     spec["name"],
                     spec["description"],
                     spec["instructions"],
+                    psycopg.types.json.Jsonb(spec["runtime_prompts"]),
                     spec["default_model_ref"],
                     psycopg.types.json.Jsonb(spec["tool_refs"]),
                     psycopg.types.json.Jsonb(spec["workflow_definition"]),
@@ -160,6 +164,7 @@ def update_agent_project(
                     name = %s,
                     description = %s,
                     instructions = %s,
+                    runtime_prompts = %s::jsonb,
                     default_model_ref = %s,
                     tool_refs = %s::jsonb,
                     workflow_definition = %s::jsonb,
@@ -174,6 +179,7 @@ def update_agent_project(
                     spec["name"],
                     spec["description"],
                     spec["instructions"],
+                    psycopg.types.json.Jsonb(spec["runtime_prompts"]),
                     spec["default_model_ref"],
                     psycopg.types.json.Jsonb(spec["tool_refs"]),
                     psycopg.types.json.Jsonb(spec["workflow_definition"]),
