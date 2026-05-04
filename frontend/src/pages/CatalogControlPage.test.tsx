@@ -17,6 +17,7 @@ vi.mock("../auth/AuthProvider", () => ({
 }));
 
 vi.mock("../api/catalog", () => ({
+  getCatalogDefaults: vi.fn(),
   listCatalogAgents: vi.fn(),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("../api/modelops", () => ({
 }));
 
 const modelApi = await import("../api/modelops");
+const apiRetrievalDefault = "Use API-provided retrieval instructions.";
 
 const agentFixture = {
   id: "agent.alpha",
@@ -118,6 +120,13 @@ describe("CatalogControlPage", () => {
       role: "superadmin",
       is_active: true,
     };
+    vi.mocked(catalogApi.getCatalogDefaults).mockResolvedValue({
+      agent: {
+        runtime_prompts: {
+          retrieval_context: apiRetrievalDefault,
+        },
+      },
+    });
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(modelApi.listEnabledModels).mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
@@ -191,7 +200,7 @@ describe("CatalogControlPage", () => {
     await user.type(screen.getByLabelText("Name"), "Agent Beta");
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
     await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
-    expect((screen.getByLabelText("Retrieval instructions") as HTMLTextAreaElement).value).toContain("Use the following retrieved context");
+    expect((screen.getByLabelText("Retrieval instructions") as HTMLTextAreaElement).value).toBe(apiRetrievalDefault);
     await waitFor(() => {
       expect(catalogApi.previewCatalogAgentPrompt).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -210,7 +219,7 @@ describe("CatalogControlPage", () => {
           name: "Agent Beta",
           publish: false,
           runtime_prompts: expect.objectContaining({
-            retrieval_context: expect.stringContaining("Use the following retrieved context"),
+            retrieval_context: apiRetrievalDefault,
           }),
         }),
         "token",

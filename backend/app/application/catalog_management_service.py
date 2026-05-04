@@ -9,6 +9,7 @@ from ..services.catalog_service import (
     delete_catalog_agent as _delete_catalog_agent,
     execute_catalog_tool as _execute_catalog_tool,
     get_catalog_agent as _get_catalog_agent,
+    get_catalog_defaults as _get_catalog_defaults,
     get_catalog_tool as _get_catalog_tool,
     list_catalog_agents as _list_catalog_agents,
     list_catalog_tools as _list_catalog_tools,
@@ -90,6 +91,10 @@ def preview_catalog_agent_prompt_payload(payload: Any) -> dict[str, Any]:
 
 def list_catalog_tools(database_url: str) -> list[dict[str, Any]]:
     return _list_catalog_tools(database_url)
+
+
+def get_catalog_defaults() -> dict[str, Any]:
+    return _get_catalog_defaults()
 
 
 def get_catalog_tool(database_url: str, *, tool_id: str) -> dict[str, Any]:

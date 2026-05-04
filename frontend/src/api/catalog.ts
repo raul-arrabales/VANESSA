@@ -15,6 +15,14 @@ export type CatalogAgentSpec = {
   };
 };
 
+export type CatalogDefaults = {
+  agent: {
+    runtime_prompts: {
+      retrieval_context: string;
+    };
+  };
+};
+
 export type CatalogToolSpec = {
   name: string;
   description: string;
@@ -123,6 +131,11 @@ export type CatalogToolTestResult = {
 export async function listCatalogAgents(token: string): Promise<CatalogAgent[]> {
   const result = await requestJson<{ agents: CatalogAgent[] }>("/v1/catalog/agents", { token });
   return result.agents;
+}
+
+export async function getCatalogDefaults(token: string): Promise<CatalogDefaults> {
+  const result = await requestJson<{ defaults: CatalogDefaults }>("/v1/catalog/defaults", { token });
+  return result.defaults;
 }
 
 export async function createCatalogAgent(input: CatalogAgentMutationInput, token: string): Promise<CatalogAgent> {

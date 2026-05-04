@@ -9,6 +9,7 @@ from ...application.catalog_management_service import (
     delete_catalog_agent,
     execute_catalog_tool,
     get_catalog_agent,
+    get_catalog_defaults,
     get_catalog_tool,
     list_catalog_agents,
     list_catalog_tools,
@@ -38,6 +39,16 @@ def _config():
 
 def _database_url() -> str:
     return _config().database_url
+
+
+@bp.get("/v1/catalog/defaults")
+@require_role("superadmin")
+def get_catalog_defaults_route():
+    try:
+        defaults = get_catalog_defaults()
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"defaults": defaults}), 200
 
 
 @bp.get("/v1/catalog/agents")

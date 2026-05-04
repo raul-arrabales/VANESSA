@@ -4,12 +4,14 @@ import {
   createCatalogAgent,
   createCatalogTool,
   deleteCatalogAgent,
+  getCatalogDefaults,
   listCatalogAgents,
   listCatalogTools,
   previewCatalogAgentPrompt,
   type CatalogAgent,
   type CatalogAgentMutationInput,
   type CatalogAgentValidation,
+  type CatalogDefaults,
   type CatalogTool,
   type CatalogToolMutationInput,
   type CatalogToolValidation,
@@ -25,12 +27,6 @@ import { useCatalogToolTesting } from "./useCatalogToolTesting";
 export type CatalogLoadState = "idle" | "loading" | "success" | "error";
 type FormMode = "create" | "edit";
 
-export const DEFAULT_RETRIEVAL_CONTEXT_PROMPT = [
-  "Use the following retrieved context if it is relevant to the user's request.",
-  "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
-  "Do not cite a reference unless it supports the sentence that uses the citation.",
-].join("\n");
-
 export type AgentFormState = CatalogAgentMutationInput & {
   mode: FormMode;
   agentId: string;
@@ -44,25 +40,33 @@ export type ToolFormState = CatalogToolMutationInput & {
   safetyPolicyText: string;
 };
 
-export const DEFAULT_AGENT_FORM: AgentFormState = {
-  mode: "create",
-  agentId: "",
-  id: "",
-  visibility: "private",
-  publish: false,
-  name: "",
-  description: "",
-  instructions: "",
-  runtime_prompts: {
-    retrieval_context: DEFAULT_RETRIEVAL_CONTEXT_PROMPT,
-  },
-  default_model_ref: null,
-  tool_refs: [],
-  runtime_constraints: {
-    internet_required: false,
-    sandbox_required: false,
-  },
-};
+function agentRuntimePromptsFromDefaults(defaults: CatalogDefaults | null): CatalogAgentMutationInput["runtime_prompts"] {
+  return {
+    retrieval_context: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+  };
+}
+
+export function buildDefaultAgentForm(defaults: CatalogDefaults | null): AgentFormState {
+  return {
+    mode: "create",
+    agentId: "",
+    id: "",
+    visibility: "private",
+    publish: false,
+    name: "",
+    description: "",
+    instructions: "",
+    runtime_prompts: agentRuntimePromptsFromDefaults(defaults),
+    default_model_ref: null,
+    tool_refs: [],
+    runtime_constraints: {
+      internet_required: false,
+      sandbox_required: false,
+    },
+  };
+}
+
+export const DEFAULT_AGENT_FORM: AgentFormState = buildDefaultAgentForm(null);
 
 export const DEFAULT_TOOL_FORM: ToolFormState = {
   mode: "create",
@@ -119,7 +123,7 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
     description: agent.spec.description,
     instructions: agent.spec.instructions,
     runtime_prompts: {
-      retrieval_context: agent.spec.runtime_prompts?.retrieval_context?.trim() || DEFAULT_RETRIEVAL_CONTEXT_PROMPT,
+      retrieval_context: agent.spec.runtime_prompts?.retrieval_context ?? "",
     },
     default_model_ref: agent.spec.default_model_ref,
     tool_refs: agent.spec.tool_refs,
@@ -159,7 +163,7 @@ export function useCatalogControl(token: string) {
   const [agents, setAgents] = useState<CatalogAgent[]>([]);
   const [tools, setTools] = useState<CatalogTool[]>([]);
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
-  const [agentForm, setAgentForm] = useState<AgentFormState>(DEFAULT_AGENT_FORM);
+  const [agentForm, setAgentForm] = useState<AgentFormState>(() => buildDefaultAgentForm(null));
   const [toolForm, setToolForm] = useState<ToolFormState>(DEFAULT_TOOL_FORM);
   const [agentValidationResults, setAgentValidationResults] = useState<Record<string, CatalogAgentValidation>>({});
   const [toolValidationResults, setToolValidationResults] = useState<Record<string, CatalogToolValidation>>({});
@@ -171,6 +175,7 @@ export function useCatalogControl(token: string) {
   const [agentPromptPreview, setAgentPromptPreview] = useState("");
   const [agentPromptPreviewLoading, setAgentPromptPreviewLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const catalogDefaultsRef = useRef<CatalogDefaults | null>(null);
   const promptPreviewRequestId = useRef(0);
   const toolTesting = useCatalogToolTesting(token);
 
@@ -185,14 +190,31 @@ export function useCatalogControl(token: string) {
     setErrorMessage("");
 
     try {
-      const [agentsPayload, toolsPayload, modelsPayload] = await Promise.all([
+      const [defaultsPayload, agentsPayload, toolsPayload, modelsPayload] = await Promise.all([
+        getCatalogDefaults(token),
         listCatalogAgents(token),
         listCatalogTools(token),
         listEnabledModels(token),
       ]);
+      const previousDefaults = catalogDefaultsRef.current;
+      catalogDefaultsRef.current = defaultsPayload;
       setAgents(agentsPayload);
       setTools(toolsPayload);
       setModels(modelsPayload);
+      setAgentForm((current) => {
+        if (current.mode !== "create") {
+          return current;
+        }
+        const currentRetrievalContext = current.runtime_prompts.retrieval_context.trim();
+        const previousRetrievalDefault = previousDefaults?.agent.runtime_prompts.retrieval_context.trim() ?? "";
+        if (currentRetrievalContext && currentRetrievalContext !== previousRetrievalDefault) {
+          return current;
+        }
+        return {
+          ...current,
+          runtime_prompts: agentRuntimePromptsFromDefaults(defaultsPayload),
+        };
+      });
       setState("success");
     } catch (error) {
       setState("error");
@@ -428,7 +450,7 @@ export function useCatalogControl(token: string) {
     openAgentEditor: (agent: CatalogAgent) => setAgentForm(buildAgentForm(agent)),
     openToolEditor: (tool: CatalogTool) => setToolForm(buildToolForm(tool)),
     openToolTester: toolTesting.openToolTester,
-    resetAgentForm: () => setAgentForm(DEFAULT_AGENT_FORM),
+    resetAgentForm: () => setAgentForm(buildDefaultAgentForm(catalogDefaultsRef.current)),
     resetToolForm: () => setToolForm(DEFAULT_TOOL_FORM),
     resetToolTester: toolTesting.resetToolTester,
     publishedAgents: agents.filter((agent) => agent.published).length,

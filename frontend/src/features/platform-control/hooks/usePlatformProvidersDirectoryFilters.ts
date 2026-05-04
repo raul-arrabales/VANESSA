@@ -7,7 +7,7 @@ type UsePlatformProvidersDirectoryFiltersOptions = {
   providerFamilies: PlatformProviderFamily[];
 };
 
-type ProviderEnabledFilter = "all" | "enabled" | "disabled";
+export type ProviderEnabledFilter = "all" | "enabled" | "disabled";
 
 export function usePlatformProvidersDirectoryFilters({
   providers,

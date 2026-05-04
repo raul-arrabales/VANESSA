@@ -47,6 +47,7 @@ def test_catalog_routes_require_superadmin(client):
     token = _login(test_client, user["username"], "user-pass-123").get_json()["access_token"]
 
     responses = [
+        test_client.get("/v1/catalog/defaults", headers=_auth(token)),
         test_client.get("/v1/catalog/agents", headers=_auth(token)),
         test_client.post("/v1/catalog/agents", headers=_auth(token), json={}),
         test_client.post("/v1/catalog/agents/prompt-preview", headers=_auth(token), json={}),
@@ -108,6 +109,11 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     }
 
     monkeypatch.setattr(catalog_routes, "list_catalog_agents", lambda _db: [agent_row])
+    monkeypatch.setattr(
+        catalog_routes,
+        "get_catalog_defaults",
+        lambda: {"agent": {"runtime_prompts": {"retrieval_context": "Default retrieval instructions."}}},
+    )
     monkeypatch.setattr(catalog_routes, "get_catalog_agent", lambda _db, *, agent_id: dict(agent_row, id=agent_id))
     monkeypatch.setattr(catalog_routes, "create_catalog_agent", lambda _db, *, payload, owner_user_id: dict(agent_row, id=payload["id"]))
     monkeypatch.setattr(catalog_routes, "update_catalog_agent", lambda _db, *, agent_id, payload: dict(agent_row, id=agent_id, published=payload["publish"]))
@@ -176,6 +182,7 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         },
     )
 
+    defaults = test_client.get("/v1/catalog/defaults", headers=_auth(token))
     agents = test_client.get("/v1/catalog/agents", headers=_auth(token))
     create_agent = test_client.post(
         "/v1/catalog/agents",
@@ -257,6 +264,8 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         json={"input": {"query": "OpenAI"}},
     )
 
+    assert defaults.status_code == 200
+    assert defaults.get_json()["defaults"]["agent"]["runtime_prompts"]["retrieval_context"] == "Default retrieval instructions."
     assert agents.status_code == 200
     assert agents.get_json()["agents"][0]["id"] == "agent.alpha"
     assert create_agent.status_code == 201

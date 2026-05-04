@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCatalogAgent,
   createCatalogTool,
+  getCatalogDefaults,
   listCatalogAgents,
   listCatalogTools,
   previewCatalogAgentPrompt,
@@ -20,22 +21,36 @@ describe("catalog api", () => {
   it("lists agents and tools with auth headers", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({
       ok: true,
-      text: async () => String(input).endsWith("/agents") ? JSON.stringify({ agents: [] }) : JSON.stringify({ tools: [] }),
+      text: async () => {
+        const url = String(input);
+        if (url.endsWith("/defaults")) {
+          return JSON.stringify({ defaults: { agent: { runtime_prompts: { retrieval_context: "API retrieval default" } } } });
+        }
+        return url.endsWith("/agents") ? JSON.stringify({ agents: [] }) : JSON.stringify({ tools: [] });
+      },
     }));
     vi.stubGlobal("fetch", fetchMock);
 
+    await getCatalogDefaults("token");
     await listCatalogAgents("token");
     await listCatalogTools("token");
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/v1/catalog/agents",
+      "/api/v1/catalog/defaults",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      "/api/v1/catalog/agents",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       "/api/v1/catalog/tools",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),

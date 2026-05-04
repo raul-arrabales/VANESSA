@@ -162,6 +162,7 @@ vi.mock("./api/playgrounds", () => ({
   streamPlaygroundMessage: vi.fn(),
 }));
 vi.mock("./api/catalog", () => ({
+  getCatalogDefaults: vi.fn(async () => ({ agent: { runtime_prompts: { retrieval_context: "API retrieval default" } } })),
   listCatalogAgents: vi.fn(async () => []),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
@@ -523,7 +524,7 @@ describe("App superadmin models route", () => {
     await renderWithAppProviders(<App />, { route: "/ai/vanessa" });
 
     expect(await screen.findByRole("heading", { name: "Vanessa Core" })).toBeVisible();
-    expect(screen.getByText("Work with Vanessa as a first-party assistant inside the Vanessa AI workspace.")).toBeVisible();
+    expect(screen.getByText("Chat with Vanessa in the Vanessa AI workspace.")).toBeVisible();
   });
 
   it("shows only the Vanessa destination on the AI landing page", async () => {

@@ -37,7 +37,7 @@ def test_prepend_retrieval_context_uses_deduplicated_reference_citations():
     )
 
     context_text = effective_messages[0]["content"][0]["text"]
-    assert "bracketed numeric citations such as [1] or [1, 2]" in context_text
+    assert not context_text.startswith("Use the following retrieved context")
     assert context_text.count("Reference [1]") == 1
     assert context_text.count("Reference [2]") == 1
     assert "Chunk id=doc-1#0" in context_text

@@ -8,6 +8,12 @@ from app.services import catalog_service  # noqa: E402
 from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 
 
+def test_catalog_defaults_expose_backend_owned_agent_runtime_prompts():
+    defaults = catalog_service.get_catalog_defaults()
+
+    assert defaults["agent"]["runtime_prompts"] == catalog_service.default_agent_runtime_prompts()
+
+
 def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pytest.MonkeyPatch):
     entities: dict[str, dict] = {}
 

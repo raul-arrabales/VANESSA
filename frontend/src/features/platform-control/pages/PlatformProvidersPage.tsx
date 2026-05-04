@@ -6,9 +6,9 @@ import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider
 import PlatformPageLayout from "../components/PlatformPageLayout";
 import PlatformProviderCreatePanel from "../components/PlatformProviderCreatePanel";
 import PlatformProvidersDirectory from "../components/PlatformProvidersDirectory";
-import { usePlatformProvidersDirectoryFilters } from "../hooks/usePlatformProvidersDirectoryFilters";
+import { type ProviderEnabledFilter, usePlatformProvidersDirectoryFilters } from "../hooks/usePlatformProvidersDirectoryFilters";
 import { usePlatformProvidersData } from "../hooks/usePlatformProvidersData";
-import { PROVIDER_ORIGIN_OPTIONS } from "../providerForm";
+import { PROVIDER_ORIGIN_OPTIONS, type ProviderOriginSelection } from "../providerForm";
 
 type PlatformProvidersView = "providers" | "create";
 
@@ -22,6 +22,14 @@ function resolvePlatformProvidersView(value: string | null): PlatformProvidersVi
     return value;
   }
   return "providers";
+}
+
+function resolveProviderOriginFilter(value: string): ProviderOriginSelection {
+  return value === "local" || value === "cloud" ? value : "";
+}
+
+function resolveEnabledFilter(value: string): ProviderEnabledFilter {
+  return value === "enabled" || value === "disabled" ? value : "all";
 }
 
 export default function PlatformProvidersPage(): JSX.Element {
@@ -105,7 +113,7 @@ export default function PlatformProvidersPage(): JSX.Element {
                 <select
                   className="field-input"
                   value={providerOriginFilter}
-                  onChange={(event) => setProviderOriginFilter(event.target.value)}
+                  onChange={(event) => setProviderOriginFilter(resolveProviderOriginFilter(event.target.value))}
                 >
                   <option value="">{t("platformControl.filters.all")}</option>
                   {PROVIDER_ORIGIN_OPTIONS.map((origin) => (
@@ -117,7 +125,7 @@ export default function PlatformProvidersPage(): JSX.Element {
               </label>
               <label className="card-stack">
                 <span className="field-label">{t("platformControl.filters.state")}</span>
-                <select className="field-input" value={enabledFilter} onChange={(event) => setEnabledFilter(event.target.value)}>
+                <select className="field-input" value={enabledFilter} onChange={(event) => setEnabledFilter(resolveEnabledFilter(event.target.value))}>
                   <option value="all">{t("platformControl.filters.all")}</option>
                   <option value="enabled">{t("platformControl.badges.enabled")}</option>
                   <option value="disabled">{t("platformControl.badges.disabled")}</option>

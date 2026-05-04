@@ -46,6 +46,14 @@ def list_catalog_tools(database_url: str) -> list[dict[str, Any]]:
     return [_serialize_catalog_row(row, entity_type=_ENTITY_TYPE_TOOL) for row in list_registry_entities(database_url, entity_type=_ENTITY_TYPE_TOOL)]
 
 
+def get_catalog_defaults() -> dict[str, Any]:
+    return {
+        "agent": {
+            "runtime_prompts": default_agent_runtime_prompts(),
+        },
+    }
+
+
 def get_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any]:
     row = find_registry_entity(database_url, entity_type=_ENTITY_TYPE_AGENT, entity_id=agent_id)
     if row is None:

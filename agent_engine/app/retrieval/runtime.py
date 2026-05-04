@@ -28,15 +28,6 @@ from .types import (
     RetrievalRequest,
 )
 
-DEFAULT_RETRIEVAL_CONTEXT_PROMPT = "\n".join(
-    [
-        "Use the following retrieved context if it is relevant to the user's request.",
-        "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
-        "Do not cite a reference unless it supports the sentence that uses the citation.",
-    ]
-)
-
-
 def _retrieval_dependency_error(exc: EmbeddingsRuntimeClientError) -> ExecutionBlockedError:
     upstream = exc.details.get("upstream") if isinstance(exc.details.get("upstream"), dict) else {}
     error_payload = upstream.get("error") if isinstance(upstream.get("error"), dict) else {}
@@ -394,7 +385,8 @@ def prepend_retrieval_context(
     if not retrieval_results:
         return messages
 
-    context_lines = [(retrieval_instructions or "").strip() or DEFAULT_RETRIEVAL_CONTEXT_PROMPT]
+    retrieval_instruction_text = (retrieval_instructions or "").strip()
+    context_lines = [retrieval_instruction_text] if retrieval_instruction_text else []
     grouped_results = group_retrieval_results_for_citations(retrieval_results)
     for index, group in enumerate(grouped_results, start=1):
         context_lines.append(
