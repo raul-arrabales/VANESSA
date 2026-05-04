@@ -415,10 +415,16 @@
       "confirm": "Eliminar conversación"
     }
   },
+  "playgroundSessionSettings": {
+    "title": "Configuración del chat",
+    "description": "Elige el modelo utilizado para esta conversación.",
+    "close": "Cerrar"
+  },
   "playgroundSessionSidebar": {
     "aria": "Historial de conversaciones",
     "expand": "Expandir historial de conversaciones",
     "collapse": "Contraer historial de conversaciones",
+    "settings": "Configuración del chat",
     "actionsFor": "Acciones de la conversación para {{title}}"
   },
   "contextManagement": {

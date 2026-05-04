@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PlaygroundSessionDetail,
@@ -8,7 +9,7 @@ import type {
 } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
 import ChatPlaygroundPage from "../features/playgrounds/pages/ChatPlaygroundPage";
-import TestRouter from "../test/TestRouter";
+import { renderWithAppProviders } from "../test/renderWithAppProviders";
 
 const playgroundApiMocks = vi.hoisted(() => ({
   getPlaygroundModelOptions: vi.fn(),
@@ -68,6 +69,7 @@ vi.mock("../auth/AuthProvider", () => ({
 }));
 
 vi.mock("../feedback/ActionFeedbackProvider", () => ({
+  ActionFeedbackProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useActionFeedback: () => ({
     showErrorFeedback: feedbackMocks.showErrorFeedback,
     showSuccessFeedback: feedbackMocks.showSuccessFeedback,
@@ -127,12 +129,8 @@ function sendResult(
   };
 }
 
-function renderChatPlayground() {
-  return render(
-    <TestRouter>
-      <ChatPlaygroundPage />
-    </TestRouter>,
-  );
+async function renderChatPlayground() {
+  return await renderWithAppProviders(<ChatPlaygroundPage />);
 }
 
 function getChatShell(container: HTMLElement): HTMLElement {
@@ -187,6 +185,10 @@ async function openSavedChat(title = "Thread one"): Promise<void> {
 async function waitForDraftReady(): Promise<void> {
   await screen.findByRole("heading", { name: "New conversation" });
   await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
+}
+
+async function openChatSettings(): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
 }
 
 describe("ChatPlaygroundPage", () => {
@@ -255,7 +257,7 @@ describe("ChatPlaygroundPage", () => {
       }),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
     expect(screen.getByText("Loading saved conversations...")).toBeVisible();
@@ -267,7 +269,7 @@ describe("ChatPlaygroundPage", () => {
   });
 
   it("collapses the history into a slim rail and restores the persisted collapsed state", async () => {
-    const firstRender = renderChatPlayground();
+    const firstRender = await renderChatPlayground();
 
     await waitForDraftReady();
     expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
@@ -283,7 +285,7 @@ describe("ChatPlaygroundPage", () => {
 
     firstRender.unmount();
 
-    const secondRender = renderChatPlayground();
+    const secondRender = await renderChatPlayground();
 
     await waitForDraftReady();
     expect(getChatShell(secondRender.container)).toHaveAttribute("data-history-collapsed", "true");
@@ -298,9 +300,10 @@ describe("ChatPlaygroundPage", () => {
       }),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     expect(await screen.findByText("Loading available models...")).toBeVisible();
+    await openChatSettings();
     expect(screen.getByLabelText("Model")).toHaveDisplayValue("Loading models...");
     expect(screen.queryByText("No enabled models")).toBeNull();
 
@@ -319,9 +322,10 @@ describe("ChatPlaygroundPage", () => {
       models: [],
     });
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     expect(await screen.findByText("No enabled models are available right now.")).toBeVisible();
+    await openChatSettings();
     expect(screen.getByLabelText("Model")).toHaveDisplayValue("No enabled models");
     expect(screen.getByLabelText("Message")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
@@ -339,7 +343,7 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     const messageInput = await screen.findByLabelText("Message");
@@ -368,11 +372,13 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
+    await openChatSettings();
     await userEvent.selectOptions(screen.getByLabelText("Model"), "safe-large");
     expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
 
     await userEvent.type(screen.getByLabelText("Message"), "Test prompt");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -410,7 +416,7 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "**literal user**");
@@ -436,19 +442,19 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Please answer");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Assistant reply");
-    expect(screen.getAllByRole("button", { name: "playgrounds.messageActions.copy" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Copy response" })).toHaveLength(1);
 
-    await userEvent.click(screen.getByRole("button", { name: "playgrounds.messageActions.copy" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy response" }));
 
     expect(clipboardMocks.writeText).toHaveBeenCalledWith("Assistant reply");
-    expect(screen.getByRole("button", { name: "playgrounds.messageActions.copied" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Copied" })).toBeVisible();
   });
 
   it("reports clipboard failures through shared action feedback", async () => {
@@ -464,18 +470,18 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Need a copy");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByTestId("markdown-message");
 
-    await userEvent.click(screen.getByRole("button", { name: "playgrounds.messageActions.copy" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy response" }));
 
     await waitFor(() => expect(feedbackMocks.showErrorFeedback).toHaveBeenCalledWith(
       expect.any(Error),
-      "playgrounds.messageActions.copyFailed",
+      "Unable to copy message content.",
     ));
   });
 
@@ -491,7 +497,7 @@ describe("ChatPlaygroundPage", () => {
       sessionSummary("conv-1", "Renamed thread", { updated_at: "2026-03-18T11:00:03Z" }),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await openSavedChat();
     expect(await screen.findByRole("button", { name: /^Thread two/i })).toBeVisible();
@@ -500,24 +506,24 @@ describe("ChatPlaygroundPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread two" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
-    const renameDialog = await screen.findByRole("dialog", { name: "playgroundSessionDialogs.rename.title" });
+    const renameDialog = await screen.findByRole("dialog", { name: "Rename conversation" });
     expect(renameDialog).toBeVisible();
-    const renameInput = screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel");
+    const renameInput = screen.getByLabelText("Conversation title");
     expect(renameInput).toHaveFocus();
     await userEvent.clear(renameInput);
-    expect(screen.getByRole("button", { name: "playgroundSessionDialogs.rename.confirm" })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "playgroundSessionDialogs.cancel" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "playgroundSessionDialogs.rename.title" })).toBeNull());
+    expect(screen.getByRole("button", { name: "Save title" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Rename conversation" })).toBeNull());
     expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));
     expect(screen.getByRole("menuitem", { name: "Rename" })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeVisible();
     await userEvent.click(screen.getByRole("menuitem", { name: "Rename" }));
-    expect(await screen.findByRole("dialog", { name: "playgroundSessionDialogs.rename.title" })).toBeVisible();
-    await userEvent.clear(screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel"));
-    await userEvent.type(screen.getByLabelText("playgroundSessionDialogs.rename.fieldLabel"), "Renamed thread");
-    await userEvent.click(screen.getByRole("button", { name: "playgroundSessionDialogs.rename.confirm" }));
+    expect(await screen.findByRole("dialog", { name: "Rename conversation" })).toBeVisible();
+    await userEvent.clear(screen.getByLabelText("Conversation title"));
+    await userEvent.type(screen.getByLabelText("Conversation title"), "Renamed thread");
+    await userEvent.click(screen.getByRole("button", { name: "Save title" }));
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
       "conv-1",
       { title: "Renamed thread" },
@@ -527,14 +533,14 @@ describe("ChatPlaygroundPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
-    expect(await screen.findByRole("dialog", { name: "playgroundSessionDialogs.delete.title" })).toBeVisible();
+    expect(await screen.findByRole("dialog", { name: "Delete conversation" })).toBeVisible();
     await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "playgroundSessionDialogs.delete.title" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Delete conversation" })).toBeNull());
     expect(playgroundApiMocks.deletePlaygroundSession).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
-    await userEvent.click(await screen.findByRole("button", { name: "playgroundSessionDialogs.delete.confirm" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete conversation" }));
 
     expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("conv-1", "token");
     await waitFor(() => expect(screen.queryByRole("button", { name: /^Renamed thread/i })).toBeNull());
@@ -542,7 +548,7 @@ describe("ChatPlaygroundPage", () => {
   });
 
   it("switches back to a fresh local draft when New chat is clicked from a saved session", async () => {
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await openSavedChat();
     expect(await screen.findByRole("heading", { name: "Thread one" })).toBeVisible();
@@ -556,7 +562,7 @@ describe("ChatPlaygroundPage", () => {
   it("renders a sidebar history error without blocking the local draft", async () => {
     playgroundApiMocks.listPlaygroundSessions.mockRejectedValueOnce(new Error("History failed"));
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
     expect(await screen.findByText("History failed")).toBeVisible();
@@ -587,7 +593,7 @@ describe("ChatPlaygroundPage", () => {
       ),
     );
 
-    const { container } = renderChatPlayground();
+    const { container } = await renderChatPlayground();
     await waitForDraftReady();
 
     const thread = getChatThread(container);
@@ -611,7 +617,7 @@ describe("ChatPlaygroundPage", () => {
   it("restores the draft and cleans up the empty saved session when the first stream fails", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockRejectedValueOnce(new Error("Stream failed"));
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Broken prompt");
@@ -630,7 +636,7 @@ describe("ChatPlaygroundPage", () => {
       }),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Lock controls");
@@ -639,9 +645,10 @@ describe("ChatPlaygroundPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "New chat" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Conversation actions for Thread one" })).toBeDisabled();
-      expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
       expect(screen.getByRole("button", { name: /^Thread one/i })).toBeDisabled();
     });
+    await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
 
     resolveStream(
       sendResult(
@@ -666,7 +673,7 @@ describe("ChatPlaygroundPage", () => {
       }),
     );
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await waitForDraftReady();
     await userEvent.type(screen.getByLabelText("Message"), "Stop mid-stream");
@@ -688,7 +695,7 @@ describe("ChatPlaygroundPage", () => {
       sessionSummary("conv-1", longTitle, { updated_at: "2026-03-18T11:00:02Z" }),
     ]);
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     const title = await screen.findByText(longTitle);
     expect(title).toHaveClass("chatbot-conversation-item-title");
@@ -701,7 +708,7 @@ describe("ChatPlaygroundPage", () => {
       sessionSummary("conv-2", "Thread two", { updated_at: "2026-03-18T11:00:01Z" }),
     ]);
 
-    renderChatPlayground();
+    await renderChatPlayground();
 
     await screen.findByRole("button", { name: /^Thread one/i });
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Thread one" }));

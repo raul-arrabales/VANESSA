@@ -420,10 +420,16 @@
       "confirm": "Delete conversation"
     }
   },
+  "playgroundSessionSettings": {
+    "title": "Chat settings",
+    "description": "Choose the model used for this conversation.",
+    "close": "Close"
+  },
   "playgroundSessionSidebar": {
     "aria": "Conversation history",
     "expand": "Expand conversation history",
     "collapse": "Collapse conversation history",
+    "settings": "Chat settings",
     "actionsFor": "Conversation actions for {{title}}"
   },
   "contextManagement": {

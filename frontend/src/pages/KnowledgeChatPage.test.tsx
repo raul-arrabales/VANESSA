@@ -200,6 +200,7 @@ describe("KnowledgePlaygroundPage", () => {
     await renderKnowledgeChat();
 
     expect(await screen.findByText("Loading knowledge bases...")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
     expect(screen.getByLabelText("Model")).toHaveDisplayValue("Safe Small");
     expect(screen.getByRole("button", { name: "Ask knowledge chat" })).toBeDisabled();
 

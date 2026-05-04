@@ -50,11 +50,13 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<{ kind: "rename" | "delete"; sessionId: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [composerHeight, setComposerHeight] = useState(96);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
+  const settingsModelSelectRef = useRef<HTMLSelectElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -136,6 +138,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         historyLoadingText={config.sessionBootstrap.historyLoadingText}
         newSessionLabel={config.newSessionLabel}
         temporarySessionLabel={config.temporarySessionLabel}
+        settingsLabel={t("playgroundSessionSidebar.settings")}
+        showSettings={config.selectors.model}
         sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
         canCreateSession={sessionState.canCreateSession}
@@ -149,6 +153,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           pinToBottomOnNextUpdate("auto");
           actions.createTemporaryChat();
         }}
+        onOpenSettings={() => setIsSettingsDialogOpen(true)}
         onSelectSession={(sessionId) => {
           pinToBottomOnNextUpdate("auto");
           sessionState.setActiveSessionId(sessionId);
@@ -181,20 +186,6 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         <div className="chatbot-sidebar-header">
           <h3 className="section-title">{viewState.activeSession?.title ?? config.emptySessionTitle}</h3>
         </div>
-
-        {config.selectors.model ? (
-          <ModelSelector
-            models={optionsState.models}
-            value={viewState.activeSession?.selectorState.modelId ?? ""}
-            isLoading={!optionsState.hasLoadedModels}
-            disabled={viewState.isModelSelectorDisabled}
-            onChange={(value) => {
-              if (viewState.activeSession) {
-                void actions.updateModel(viewState.activeSession.id, value);
-              }
-            }}
-          />
-        ) : null}
 
         {config.selectors.assistant || config.selectors.knowledgeBase ? (
           <div className="chatbot-toolbar">
@@ -259,6 +250,39 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           )}
         />
       </div>
+      {isSettingsDialogOpen && config.selectors.model ? (
+        <ModalDialog
+          className="playground-session-dialog"
+          title={t("playgroundSessionSettings.title")}
+          description={t("playgroundSessionSettings.description")}
+          onClose={() => setIsSettingsDialogOpen(false)}
+          initialFocusRef={settingsModelSelectRef}
+          actions={(
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsSettingsDialogOpen(false)}
+            >
+              {t("playgroundSessionSettings.close")}
+            </button>
+          )}
+        >
+          <div className="control-group playground-session-settings-fields">
+            <ModelSelector
+              selectRef={settingsModelSelectRef}
+              models={optionsState.models}
+              value={viewState.activeSession?.selectorState.modelId ?? ""}
+              isLoading={!optionsState.hasLoadedModels}
+              disabled={viewState.isModelSelectorDisabled}
+              onChange={(value) => {
+                if (viewState.activeSession) {
+                  void actions.updateModel(viewState.activeSession.id, value);
+                }
+              }}
+            />
+          </div>
+        </ModalDialog>
+      ) : null}
       {pendingDialog?.kind === "rename" ? (
         <ModalDialog
           className="playground-session-dialog"

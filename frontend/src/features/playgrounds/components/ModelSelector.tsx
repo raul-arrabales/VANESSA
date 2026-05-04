@@ -1,10 +1,12 @@
 import { useTranslation } from "react-i18next";
+import type { Ref } from "react";
 
 type ModelSelectorProps = {
   models: Array<{ id: string; displayName: string }>;
   value: string;
   isLoading: boolean;
   disabled: boolean;
+  selectRef?: Ref<HTMLSelectElement>;
   onChange: (value: string) => void;
 };
 
@@ -13,6 +15,7 @@ export default function ModelSelector({
   value,
   isLoading,
   disabled,
+  selectRef,
   onChange,
 }: ModelSelectorProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -21,6 +24,7 @@ export default function ModelSelector({
     <>
       <label className="field-label" htmlFor="model-picker">{t("playgrounds.shared.modelSelector.label")}</label>
       <select
+        ref={selectRef}
         id="model-picker"
         aria-label={t("playgrounds.shared.modelSelector.aria")}
         className="field-input"

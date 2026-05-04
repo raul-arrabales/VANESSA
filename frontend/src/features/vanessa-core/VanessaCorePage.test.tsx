@@ -130,6 +130,7 @@ describe("VanessaCorePage", () => {
     await renderWithAppProviders(<VanessaCorePage />);
 
     expect(await screen.findByText("Chat with Vanessa in the Vanessa AI workspace.")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
     expect(screen.getByLabelText("Model")).toBeVisible();
     expect(screen.queryByLabelText("Assistant")).toBeNull();
     expect(screen.queryByLabelText("Knowledge base")).toBeNull();

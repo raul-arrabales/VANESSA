@@ -12,6 +12,8 @@ describe("SessionSidebar", () => {
         historyLoadingText="Cargando"
         newSessionLabel="Nuevo chat"
         temporarySessionLabel="Chat temporal"
+        settingsLabel="Configuración del chat"
+        showSettings
         sessions={[
           {
             id: "session-1",
@@ -39,6 +41,7 @@ describe("SessionSidebar", () => {
         onToggleCollapsed={vi.fn()}
         onCreateSession={vi.fn()}
         onCreateTemporarySession={vi.fn()}
+        onOpenSettings={vi.fn()}
         onSelectSession={vi.fn()}
         onRenameSession={vi.fn()}
         onDeleteSession={vi.fn()}
@@ -50,6 +53,7 @@ describe("SessionSidebar", () => {
 
     expect(screen.getByRole("complementary", { name: "Historial de conversaciones" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Contraer historial de conversaciones" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Configuración del chat" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Acciones de la conversación para Hilo uno" })).toBeVisible();
   });
 });
