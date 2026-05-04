@@ -395,3 +395,90 @@ def test_ensure_knowledge_chat_agent_seeds_entity_and_share(monkeypatch: pytest.
     assert "retrieval_context" in created_versions[0]["spec_json"]["runtime_prompts"]
     assert created_shares[0]["permission"] == "execute"
     assert created_shares[0]["grantee_type"] == "public"
+
+
+def test_ensure_knowledge_chat_agent_reconciles_missing_platform_fields_without_overwriting_user_edits(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    created_versions: list[dict[str, object]] = []
+    created_shares: list[dict[str, object]] = []
+    existing = {
+        "entity_id": "agent.knowledge_chat",
+        "entity_type": "agent",
+        "owner_user_id": 3,
+        "current_version": "v3",
+        "current_spec": {
+            "name": "Custom Knowledge Chat",
+            "description": "Product-facing knowledge-backed chat agent.",
+            "instructions": "Use the team style guide.",
+            "runtime_prompts": {},
+            "runtime_constraints": {"internet_required": True},
+        },
+    }
+
+    monkeypatch.setattr(knowledge_chat_bootstrap, "find_registry_entity", lambda _db, *, entity_type, entity_id: existing)
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "list_registry_versions",
+        lambda _db, *, entity_id: [{"version": "v1"}, {"version": "v2"}, {"version": "v3"}],
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_registry_entity",
+        lambda _db, **kwargs: pytest.fail("existing platform agent should not be recreated"),
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_registry_version",
+        lambda _db, **kwargs: created_versions.append(kwargs) or {"entity_id": kwargs["entity_id"], "version": kwargs["version"]},
+    )
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_share_grant",
+        lambda _db, **kwargs: created_shares.append(kwargs) or kwargs,
+    )
+
+    assert knowledge_chat_bootstrap.ensure_knowledge_chat_agent("ignored") is True
+
+    assert created_versions[0]["version"] == "v4"
+    reconciled_spec = created_versions[0]["spec_json"]
+    assert reconciled_spec["name"] == "Custom Knowledge Chat"
+    assert reconciled_spec["instructions"] == "Use the team style guide."
+    assert "retrieval_context" in reconciled_spec["runtime_prompts"]
+    assert reconciled_spec["default_model_ref"] is None
+    assert reconciled_spec["tool_refs"] == []
+    assert reconciled_spec["runtime_constraints"] == {
+        "internet_required": True,
+        "sandbox_required": False,
+    }
+    assert created_shares[0]["permission"] == "execute"
+
+
+def test_ensure_knowledge_chat_agent_leaves_current_platform_spec_unchanged(monkeypatch: pytest.MonkeyPatch):
+    created_versions: list[dict[str, object]] = []
+    existing = {
+        "entity_id": "agent.knowledge_chat",
+        "entity_type": "agent",
+        "owner_user_id": 3,
+        "current_version": "v2",
+        "current_spec": {
+            "name": "Custom Knowledge Chat",
+            "description": "Custom description.",
+            "instructions": "Custom instructions.",
+            "runtime_prompts": {"retrieval_context": "Custom retrieval instructions."},
+            "default_model_ref": "model.alpha",
+            "tool_refs": ["tool.custom"],
+            "runtime_constraints": {"internet_required": True, "sandbox_required": True},
+        },
+    }
+
+    monkeypatch.setattr(knowledge_chat_bootstrap, "find_registry_entity", lambda _db, *, entity_type, entity_id: existing)
+    monkeypatch.setattr(
+        knowledge_chat_bootstrap,
+        "create_registry_version",
+        lambda _db, **kwargs: created_versions.append(kwargs) or {"entity_id": kwargs["entity_id"], "version": kwargs["version"]},
+    )
+    monkeypatch.setattr(knowledge_chat_bootstrap, "create_share_grant", lambda _db, **kwargs: kwargs)
+
+    assert knowledge_chat_bootstrap.ensure_knowledge_chat_agent("ignored") is True
+    assert created_versions == []
