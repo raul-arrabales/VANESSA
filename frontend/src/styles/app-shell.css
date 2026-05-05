@@ -163,6 +163,13 @@
   align-content: start;
 }
 
+.app-main-content[data-layout="full-bleed"] {
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
+  align-content: stretch;
+}
+
 .app-topbar.panel {
   margin: 0;
   border-top: 0;
@@ -462,6 +469,10 @@
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  .app-main-content[data-layout="full-bleed"] {
+    overflow: auto;
   }
 
   .app-sidebar.panel {

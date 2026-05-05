@@ -134,4 +134,16 @@ describe("AppChrome", () => {
     await userEvent.click(screen.getByRole("button", { name: await t("nav.sidebar.close") }));
     expect(sidebar).toHaveAttribute("data-drawer-open", "false");
   });
+
+  it("uses a full-bleed content layout for final chat workspaces", async () => {
+    await renderShell("/playgrounds/chat");
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-layout", "full-bleed");
+  });
+
+  it("keeps the default content layout for multi-component pages", async () => {
+    await renderShell("/playgrounds");
+
+    expect(screen.getByRole("main")).toHaveAttribute("data-layout", "default");
+  });
 });

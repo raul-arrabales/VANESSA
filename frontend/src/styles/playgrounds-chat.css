@@ -3,16 +3,17 @@
   --chatbot-history-width-collapsed: 4.5rem;
   --chatbot-message-user-max-width: 66.666%;
   --chatbot-message-user-max-width-mobile: 85%;
-  --chatbot-shell-min-height: max(34rem, calc(100dvh - 10rem));
   --chatbot-thread-min-height-mobile: 28rem;
   --chatbot-history-width: var(--chatbot-history-width-expanded);
   display: grid;
   grid-template-columns: var(--chatbot-history-width) minmax(0, 1fr);
   gap: var(--space-4);
-  min-height: var(--chatbot-shell-min-height);
+  height: 100%;
+  min-height: 0;
   align-items: stretch;
   min-width: 0;
   overflow: hidden;
+  padding: var(--space-4) var(--space-5) var(--space-5);
 }
 
 .chatbot-shell[data-history-collapsed="true"] {
@@ -768,7 +769,8 @@
 @media (max-width: 900px) {
   .chatbot-shell {
     grid-template-columns: 1fr;
-    min-height: auto;
+    height: auto;
+    min-height: 100%;
   }
 
   .chatbot-thread-shell {

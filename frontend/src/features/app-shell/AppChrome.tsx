@@ -6,6 +6,7 @@ import AppSidebar from "../../components/AppSidebar";
 import AppTopBar from "../../components/AppTopBar";
 import { useActionFeedback } from "../../feedback/ActionFeedbackProvider";
 import { useRuntimeMode } from "../../runtime/RuntimeModeProvider";
+import { getMainContentLayout } from "../../routes/appRoutes";
 import { buildSidebarItems, buildTopBarPathItems, buildUserMenuItems } from "./navigation";
 import { useAppShellState } from "./useAppShellState";
 
@@ -136,6 +137,7 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
     role: user?.role ?? null,
   }, t);
   const pathItems = buildTopBarPathItems(location.pathname, t);
+  const mainContentLayout = getMainContentLayout(location.pathname);
 
   useEffect(() => {
     if (!runtimeError || !isAuthenticated) {
@@ -271,7 +273,7 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
           }}
           logoutLabel={t("auth.logout")}
         />
-        <main className="app-main-content">
+        <main className="app-main-content" data-layout={mainContentLayout}>
           {children}
         </main>
       </div>

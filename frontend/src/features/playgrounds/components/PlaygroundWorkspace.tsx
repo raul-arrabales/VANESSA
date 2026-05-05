@@ -128,7 +128,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
 
   return (
     <section
-      className="panel chatbot-shell"
+      className="chatbot-shell"
       aria-label={config.panelAriaLabel}
       data-history-collapsed={preferences.isSidebarCollapsed ? "true" : "false"}
     >

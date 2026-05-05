@@ -273,6 +273,7 @@ describe("ChatPlaygroundPage", () => {
 
     await waitForDraftReady();
     expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
+    expect(getChatShell(firstRender.container)).not.toHaveClass("panel");
     expect(getChatShell(firstRender.container)).toHaveAttribute("data-history-collapsed", "false");
 
     await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));

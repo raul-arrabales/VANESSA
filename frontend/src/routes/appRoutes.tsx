@@ -46,6 +46,7 @@ const VanessaCorePage = lazy(() => import("../features/vanessa-core/pages/Vaness
 export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds" | "agentBuilder";
 export type AppRouteNavGroup = "primary" | "userMenu";
 export type AppRouteAudience = "guest" | "authenticated" | "all";
+export type AppRouteMainContentLayout = "default" | "full-bleed";
 
 export type AppRouteDefinition = {
   id: string;
@@ -60,6 +61,7 @@ export type AppRouteDefinition = {
   guestOnly?: boolean;
   navGroup?: AppRouteNavGroup;
   navAudience?: AppRouteAudience;
+  mainContentLayout?: AppRouteMainContentLayout;
   sidebar?: {
     icon: AppNavIconName;
     order: number;
@@ -490,6 +492,7 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
+    mainContentLayout: "full-bleed",
     element: <VanessaCorePage />,
   },
   {
@@ -515,6 +518,7 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
+    mainContentLayout: "full-bleed",
     element: <ChatbotPage />,
   },
   {
@@ -525,6 +529,7 @@ export const appRoutes: AppRouteDefinition[] = [
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
+    mainContentLayout: "full-bleed",
     element: <KnowledgeChatPage />,
   },
 ];
@@ -545,6 +550,14 @@ export function getBreadcrumbRoutes(pathname: string): AppRouteDefinition[] {
   return appRoutes
     .filter((route) => route.showInBreadcrumbs && isRoutePrefix(pathname, route.path))
     .sort((left, right) => left.path.length - right.path.length);
+}
+
+export function getMainContentLayout(pathname: string): AppRouteMainContentLayout {
+  const activeRoute = appRoutes
+    .filter((route) => matchPath({ path: route.path, end: true }, pathname) !== null)
+    .sort((left, right) => right.path.length - left.path.length)[0];
+
+  return activeRoute?.mainContentLayout ?? "default";
 }
 
 export function getNavRoutes(
