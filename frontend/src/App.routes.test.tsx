@@ -497,7 +497,7 @@ describe("App superadmin models route", () => {
 
     await renderWithAppProviders(<App />, { route: "/playgrounds/knowledge" });
 
-    expect(await screen.findByLabelText("Knowledge base")).toBeVisible();
+    expect(await screen.findByRole("button", { name: "Chat settings" })).toBeVisible();
   });
 
   it("renders the chat playground page for authenticated users", async () => {

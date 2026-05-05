@@ -53,6 +53,8 @@ describe("SessionSidebar", () => {
 
     expect(screen.getByRole("complementary", { name: "Historial de conversaciones" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Contraer historial de conversaciones" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Nuevo chat" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Chat temporal" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Configuración del chat" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Acciones de la conversación para Hilo uno" })).toBeVisible();
   });

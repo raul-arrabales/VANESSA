@@ -10,6 +10,7 @@ describe("KnowledgeBaseSelector", () => {
         knowledgeBases={[]}
         value=""
         disabled={false}
+        isLoading={false}
         onChange={vi.fn()}
       />,
       { language: "es" },

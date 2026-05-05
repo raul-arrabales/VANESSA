@@ -365,6 +365,7 @@
       "knowledgeBaseSelector": {
         "label": "Knowledge base",
         "aria": "Knowledge base",
+        "loading": "Loading knowledge bases...",
         "placeholder": "Select knowledge base"
       }
     }

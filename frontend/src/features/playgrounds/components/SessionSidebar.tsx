@@ -77,8 +77,8 @@ export default function SessionSidebar({
       ref={sidebarRef}
     >
       <div className="chatbot-sidebar-header">
-        {!isCollapsed ? <h2 className="section-title">{title}</h2> : null}
-        <div className="chatbot-sidebar-actions">
+        <div className="chatbot-sidebar-title-row">
+          {!isCollapsed ? <h2 className="section-title">{title}</h2> : null}
           <button
             type="button"
             className="chatbot-sidebar-toggle"
@@ -92,6 +92,8 @@ export default function SessionSidebar({
               </svg>
             </span>
           </button>
+        </div>
+        <div className="chatbot-sidebar-actions">
           <button
             type="button"
             className="chatbot-sidebar-icon-button"
@@ -130,7 +132,6 @@ export default function SessionSidebar({
             >
               <span className="chatbot-sidebar-icon chatbot-sidebar-icon-stroke" aria-hidden="true">
                 <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M12 8.25a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5Z" />
                   <path d="M19.4 15a7.9 7.9 0 0 0 .06-1 7.9 7.9 0 0 0-.06-1l2.1-1.65-2-3.46-2.48 1a7.7 7.7 0 0 0-1.73-1L14.9 5.25h-4l-.39 2.64a7.7 7.7 0 0 0-1.73 1l-2.48-1-2 3.46L6.4 13a7.9 7.9 0 0 0-.06 1 7.9 7.9 0 0 0 .06 1l-2.1 1.65 2 3.46 2.48-1a7.7 7.7 0 0 0 1.73 1l.39 2.64h4l.39-2.64a7.7 7.7 0 0 0 1.73-1l2.48 1 2-3.46L19.4 15Z" />
                 </svg>
               </span>

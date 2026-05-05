@@ -360,6 +360,7 @@
       "knowledgeBaseSelector": {
         "label": "Base de conocimiento",
         "aria": "Base de conocimiento",
+        "loading": "Cargando bases de conocimiento...",
         "placeholder": "Selecciona una base de conocimiento"
       }
     }

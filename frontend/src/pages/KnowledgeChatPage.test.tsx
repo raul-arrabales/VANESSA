@@ -91,6 +91,14 @@ async function openSavedSession(title = "Knowledge session"): Promise<void> {
   await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^${title}`, "i") }));
 }
 
+async function openKnowledgeChatSettings(): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
+}
+
+async function closeKnowledgeChatSettings(): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name: "Close" }));
+}
+
 describe("KnowledgePlaygroundPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -166,7 +174,10 @@ describe("KnowledgePlaygroundPage", () => {
     await renderKnowledgeChat();
 
     expect(playgroundApiMocks.getPlaygroundSession).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Knowledge base")).toBeNull();
+    await openKnowledgeChatSettings();
     expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    await closeKnowledgeChatSettings();
 
     await userEvent.type(screen.getByLabelText("Message"), "First question");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
@@ -200,8 +211,9 @@ describe("KnowledgePlaygroundPage", () => {
     await renderKnowledgeChat();
 
     expect(await screen.findByText("Loading knowledge bases...")).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: "Chat settings" }));
+    await openKnowledgeChatSettings();
     expect(screen.getByLabelText("Model")).toHaveDisplayValue("Safe Small");
+    expect(screen.getByLabelText("Knowledge base")).toHaveDisplayValue("Loading knowledge bases...");
     expect(screen.getByRole("button", { name: "Ask knowledge chat" })).toBeDisabled();
 
     resolveKnowledgeBases({
@@ -219,7 +231,10 @@ describe("KnowledgePlaygroundPage", () => {
   it("collapses the knowledge history into a slim rail while keeping the new-session control available", async () => {
     await renderKnowledgeChat();
 
+    expect(screen.getByRole("button", { name: "Chat settings" })).toBeVisible();
+    await openKnowledgeChatSettings();
     expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    await closeKnowledgeChatSettings();
     expect(getKnowledgeShell()).toHaveAttribute("data-history-collapsed", "false");
 
     await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));
@@ -276,7 +291,9 @@ describe("KnowledgePlaygroundPage", () => {
     await renderKnowledgeChat();
 
     expect(await screen.findByText("Knowledge bases are not configured.")).toBeVisible();
+    await openKnowledgeChatSettings();
     expect(screen.getByLabelText("Knowledge base")).toBeDisabled();
+    await closeKnowledgeChatSettings();
     expect(screen.getByLabelText("Message")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Ask knowledge chat" })).toBeDisabled();
   });
@@ -321,7 +338,9 @@ describe("KnowledgePlaygroundPage", () => {
       { knowledge_binding: { knowledge_base_id: "kb_primary" } },
       "token",
     ));
+    await openKnowledgeChatSettings();
     expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    await closeKnowledgeChatSettings();
 
     await userEvent.type(screen.getByLabelText("Message"), "Legacy question");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
@@ -354,11 +373,14 @@ describe("KnowledgePlaygroundPage", () => {
     });
 
     await renderKnowledgeChat();
+    await openKnowledgeChatSettings();
     expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
     await userEvent.selectOptions(screen.getByLabelText("Knowledge base"), "kb_secondary");
     expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
+    await closeKnowledgeChatSettings();
 
     await openSavedSession();
+    await openKnowledgeChatSettings();
     await userEvent.selectOptions(await screen.findByLabelText("Knowledge base"), "kb_secondary");
 
     await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
@@ -385,9 +407,11 @@ describe("KnowledgePlaygroundPage", () => {
 
     await renderKnowledgeChat();
 
+    await openKnowledgeChatSettings();
     const selector = await screen.findByLabelText("Knowledge base");
     expect(selector).toHaveValue("");
     expect(screen.getByRole("option", { name: "Select knowledge base" })).toBeVisible();
+    await closeKnowledgeChatSettings();
 
     await userEvent.type(screen.getByLabelText("Message"), "Need an answer");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
@@ -449,7 +473,9 @@ describe("KnowledgePlaygroundPage", () => {
 
     await renderKnowledgeChat();
 
+    await openKnowledgeChatSettings();
     expect(await screen.findByLabelText("Knowledge base")).toHaveValue("kb_primary");
+    await closeKnowledgeChatSettings();
     await userEvent.type(screen.getByLabelText("Message"), "How does retrieval work?");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
