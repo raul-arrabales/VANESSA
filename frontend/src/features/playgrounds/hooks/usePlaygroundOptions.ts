@@ -4,6 +4,7 @@ import {
   getPlaygroundModelOptions,
 } from "../../../api/playgrounds";
 import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions } from "../types";
+import { hasSelector } from "../selectorConfig";
 
 type UsePlaygroundOptionsParams = {
   token: string;
@@ -23,13 +24,14 @@ function buildEmptyOptions(config: PlaygroundWorkspaceConfig): PlaygroundWorkspa
 }
 
 export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlaygroundOptionsParams) {
+  const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
   const [options, setOptions] = useState<PlaygroundWorkspaceOptions>(() => buildEmptyOptions(config));
   const [modelError, setModelError] = useState("");
   const [knowledgeBaseError, setKnowledgeBaseError] = useState("");
   const [isModelsLoading, setIsModelsLoading] = useState(false);
   const [hasLoadedModels, setHasLoadedModels] = useState(false);
   const [isKnowledgeBasesLoading, setIsKnowledgeBasesLoading] = useState(false);
-  const [hasLoadedKnowledgeBases, setHasLoadedKnowledgeBases] = useState(!config.selectors.knowledgeBase);
+  const [hasLoadedKnowledgeBases, setHasLoadedKnowledgeBases] = useState(!hasKnowledgeBaseSelector);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -39,7 +41,7 @@ export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlay
       setIsModelsLoading(false);
       setHasLoadedModels(false);
       setIsKnowledgeBasesLoading(false);
-      setHasLoadedKnowledgeBases(!config.selectors.knowledgeBase);
+      setHasLoadedKnowledgeBases(!hasKnowledgeBaseSelector);
       return;
     }
 
@@ -82,13 +84,13 @@ export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlay
     config.defaultAssistantRef,
     config.feedback.optionsError,
     config.playgroundKind,
-    config.selectors.knowledgeBase,
+    hasKnowledgeBaseSelector,
     isAuthenticated,
     token,
   ]);
 
   useEffect(() => {
-    if (!config.selectors.knowledgeBase) {
+    if (!hasKnowledgeBaseSelector) {
       setOptions((current) => ({
         ...current,
         knowledgeBases: [],
@@ -149,7 +151,7 @@ export function usePlaygroundOptions({ token, isAuthenticated, config }: UsePlay
     return () => {
       cancelled = true;
     };
-  }, [config.feedback.optionsError, config.selectors.knowledgeBase, isAuthenticated, token]);
+  }, [config.feedback.optionsError, hasKnowledgeBaseSelector, isAuthenticated, token]);
 
   return useMemo(() => {
     const hasLoaded = hasLoadedModels && hasLoadedKnowledgeBases;

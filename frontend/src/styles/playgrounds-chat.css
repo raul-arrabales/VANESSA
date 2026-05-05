@@ -1,6 +1,6 @@
 .chatbot-shell {
   --chatbot-history-width-expanded: minmax(14rem, 18rem);
-  --chatbot-history-width-collapsed: 4.5rem;
+  --chatbot-history-width-collapsed: 3.25rem;
   --chatbot-message-user-max-width: 66.666%;
   --chatbot-message-user-max-width-mobile: 85%;
   --chatbot-thread-min-height-mobile: 28rem;
@@ -67,8 +67,10 @@
 }
 
 .chatbot-sidebar[data-collapsed="true"] .chatbot-sidebar-actions {
+  align-items: center;
   flex-direction: column;
   flex-wrap: nowrap;
+  gap: var(--space-1);
 }
 
 .chatbot-sidebar-intro {
@@ -81,8 +83,8 @@
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   display: inline-flex;
@@ -331,6 +333,16 @@
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--bg-surface) 90%, transparent);
   overscroll-behavior: contain;
+}
+
+.chatbot-thread-shell-starter {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.chatbot-starter-composer {
+  width: min(100%, 54rem);
 }
 
 .chatbot-thread {

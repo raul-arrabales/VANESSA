@@ -149,7 +149,7 @@ describe("KnowledgePlaygroundPage", () => {
     playgroundApiMocks.createPlaygroundSession.mockResolvedValue(
       detail({
         id: "sess-draft",
-        title: "Knowledge playground",
+        title: "Knowledge Chat",
       }),
     );
   });
@@ -193,6 +193,16 @@ describe("KnowledgePlaygroundPage", () => {
     ));
     await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
     expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-draft", { prompt: "First question" }, "token");
+  });
+
+  it("starts a fresh knowledge chat with the composer centered and no empty-thread copy", async () => {
+    const view = await renderKnowledgeChat();
+
+    await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
+
+    expect(view.container.querySelector(".chatbot-thread-shell-starter")).not.toBeNull();
+    expect(screen.getByLabelText("Message")).toBeVisible();
+    expect(screen.queryByText("No messages yet. Ask Knowledge Chat to search the active corpus.")).toBeNull();
   });
 
   it("waits for knowledge-base options after models load and shows a KB-specific loading message", async () => {
@@ -534,7 +544,7 @@ describe("KnowledgePlaygroundPage", () => {
     await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("knowledge answer"));
   });
 
-  it("renders assistant markdown in knowledge playground replies after persisting the draft", async () => {
+  it("renders assistant markdown in Knowledge Chat replies after persisting the draft", async () => {
     playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
       session: detail({
         id: "sess-draft",

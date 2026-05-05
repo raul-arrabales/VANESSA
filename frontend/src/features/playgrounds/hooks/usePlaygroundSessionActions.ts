@@ -10,6 +10,7 @@ import {
   updatePlaygroundSession,
 } from "../../../api/playgrounds";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import { hasSelector } from "../selectorConfig";
 import type {
   PlaygroundMessageViewModel,
   PlaygroundSessionViewModel,
@@ -84,6 +85,7 @@ export function usePlaygroundSessionActions({
 }: UsePlaygroundSessionActionsParams) {
   const { showErrorFeedback } = useActionFeedback();
   const streamAbortRef = useRef<AbortController | null>(null);
+  const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
 
   const createOrResetDraftSession = (): PlaygroundSessionViewModel => {
     const nextDraft = createDraftSession(config, options, activeSession);
@@ -124,7 +126,7 @@ export function usePlaygroundSessionActions({
             model_id: activeSession?.selectorState.modelId ?? options.models[0]?.id ?? null,
           },
           knowledge_binding: {
-            knowledge_base_id: config.selectors.knowledgeBase
+            knowledge_base_id: hasKnowledgeBaseSelector
               ? (activeSession?.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId ?? options.knowledgeBases[0]?.id ?? null)
               : null,
           },
@@ -255,7 +257,7 @@ export function usePlaygroundSessionActions({
               assistant_ref: options.defaultAssistantRef ?? undefined,
               model_selection: { model_id: options.models[0]?.id ?? null },
               knowledge_binding: {
-                knowledge_base_id: config.selectors.knowledgeBase
+                knowledge_base_id: hasKnowledgeBaseSelector
                   ? options.defaultKnowledgeBaseId
                   : null,
               },
@@ -292,7 +294,7 @@ export function usePlaygroundSessionActions({
           assistant_ref: currentDraft.selectorState.assistantRef ?? options.defaultAssistantRef ?? undefined,
           model_selection: { model_id: currentDraft.selectorState.modelId },
           knowledge_binding: {
-            knowledge_base_id: config.selectors.knowledgeBase
+            knowledge_base_id: hasKnowledgeBaseSelector
               ? currentDraft.selectorState.knowledgeBaseId
               : null,
           },
@@ -336,7 +338,7 @@ export function usePlaygroundSessionActions({
       setError(config.feedback.missingModel);
       return;
     }
-    if (config.selectors.knowledgeBase && !activeSession.selectorState.knowledgeBaseId) {
+    if (hasKnowledgeBaseSelector && !activeSession.selectorState.knowledgeBaseId) {
       setError(config.feedback.missingKnowledgeBase);
       return;
     }

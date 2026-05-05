@@ -10,6 +10,7 @@ import type { PlaygroundSessionViewModel } from "../types";
 type ThreadPanelProps = {
   activeSession: PlaygroundSessionViewModel | null;
   isBootstrapping: boolean;
+  isSending: boolean;
   loadingText: string;
   emptyStateText: string;
   threadRef: RefObject<HTMLDivElement>;
@@ -24,6 +25,7 @@ type ThreadPanelProps = {
 export default function ThreadPanel({
   activeSession,
   isBootstrapping,
+  isSending,
   loadingText,
   emptyStateText,
   threadRef,
@@ -44,6 +46,10 @@ export default function ThreadPanel({
   const copyLabel = t("playgrounds.messageActions.copy");
   const copiedLabel = t("playgrounds.messageActions.copied");
   const copyFailedLabel = t("playgrounds.messageActions.copyFailed");
+  const shouldShowStarterComposer = Boolean(activeSession)
+    && activeSession?.messages.length === 0
+    && !isBootstrapping
+    && !isSending;
 
   useEffect(() => () => {
     if (copiedResetTimeoutRef.current !== null) {
@@ -71,6 +77,21 @@ export default function ThreadPanel({
       showErrorFeedback(error, copyFailedLabel);
     }
   };
+
+  if (shouldShowStarterComposer) {
+    return (
+      <div
+        ref={threadRef}
+        className="chatbot-thread-shell chatbot-thread-shell-starter"
+        onScroll={handleScroll}
+        style={shellStyle}
+      >
+        <div className="chatbot-starter-composer">
+          {composer}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

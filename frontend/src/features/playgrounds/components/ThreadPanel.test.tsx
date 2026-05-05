@@ -90,6 +90,7 @@ describe("ThreadPanel", () => {
       <ThreadPanel
         activeSession={buildSession()}
         isBootstrapping={false}
+        isSending={false}
         loadingText="Loading..."
         emptyStateText="Empty"
         threadRef={{ current: null }}
@@ -137,5 +138,55 @@ describe("ThreadPanel", () => {
     });
 
     expect(screen.getByRole("button", { name: "Copy response" })).toBeVisible();
+  });
+
+  it("centers only the composer for a ready empty session", async () => {
+    const emptySession = { ...buildSession(), messageCount: 0, messages: [] };
+
+    const { container } = await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={emptySession}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="No messages yet"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<button type="button">Send starter</button>}
+        composerHeight={96}
+      />,
+    );
+
+    expect(container.querySelector(".chatbot-thread-shell-starter")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Send starter" })).toBeVisible();
+    expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
+  });
+
+  it("uses the threaded layout after an empty session has submitted", async () => {
+    const emptySession = { ...buildSession(), messageCount: 0, messages: [] };
+
+    const { container } = await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={emptySession}
+        isBootstrapping={false}
+        isSending
+        loadingText="Loading..."
+        emptyStateText="No messages yet"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<button type="button">Sending starter</button>}
+        composerHeight={96}
+      />,
+    );
+
+    expect(container.querySelector(".chatbot-thread-shell-starter")).toBeNull();
+    expect(screen.getByText("No messages yet")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sending starter" })).toBeVisible();
   });
 });

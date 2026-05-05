@@ -5,6 +5,7 @@ import type {
   PlaygroundWorkspaceConfig,
   PlaygroundWorkspaceOptions,
 } from "../types";
+import { hasSelector } from "../selectorConfig";
 
 type PlaygroundWorkspaceOptionsState = PlaygroundWorkspaceOptions & {
   modelError: string;
@@ -57,11 +58,12 @@ export function buildPlaygroundWorkspaceViewState({
   localizedMessages,
 }: UsePlaygroundWorkspaceViewStateParams): PlaygroundWorkspaceViewState {
   const activeSession = sessionState.activeSession;
+  const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
   const modelAvailabilityMessage = optionsState.modelError
     || (optionsState.hasLoadedModels && optionsState.models.length === 0
       ? (localizedMessages?.noEnabledModels ?? "")
       : "");
-  const knowledgeBaseAvailabilityMessage = config.selectors.knowledgeBase
+  const knowledgeBaseAvailabilityMessage = hasKnowledgeBaseSelector
     ? (
       optionsState.knowledgeBaseError
       || (
@@ -72,7 +74,7 @@ export function buildPlaygroundWorkspaceViewState({
     )
     : "";
   const hasUsableModels = optionsState.hasLoadedModels && !optionsState.modelError && optionsState.models.length > 0;
-  const hasUsableKnowledgeBases = !config.selectors.knowledgeBase
+  const hasUsableKnowledgeBases = !hasKnowledgeBaseSelector
     || (
       optionsState.hasLoadedKnowledgeBases
       && !optionsState.knowledgeBaseError
@@ -85,7 +87,7 @@ export function buildPlaygroundWorkspaceViewState({
       ? config.modelLoadingText
       : modelAvailabilityMessage
         ? modelAvailabilityMessage
-        : config.selectors.knowledgeBase && !optionsState.hasLoadedKnowledgeBases
+        : hasKnowledgeBaseSelector && !optionsState.hasLoadedKnowledgeBases
           ? config.knowledgeBaseLoadingText
           : knowledgeBaseAvailabilityMessage || config.loadingText;
   const isInteractionLocked = isSending || isSessionBusy;

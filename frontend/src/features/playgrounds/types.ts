@@ -34,6 +34,8 @@ export type PlaygroundSessionViewModel = {
   persistence: PlaygroundSessionPersistence;
 };
 
+export type PlaygroundSelectorKind = "assistant" | "knowledgeBase" | "model";
+
 export type PlaygroundWorkspaceConfig = {
   playgroundKind: PlaygroundVariant;
   title: string;
@@ -48,11 +50,8 @@ export type PlaygroundWorkspaceConfig = {
   temporarySessionLabel: string;
   temporarySessionTitle: string;
   draftPlaceholder: string;
-  selectors: {
-    model: boolean;
-    knowledgeBase: boolean;
-    assistant: boolean;
-  };
+  inlineSelectors: PlaygroundSelectorKind[];
+  settingsSelectors: PlaygroundSelectorKind[];
   messaging: {
     mode: "stream" | "request";
     submitLabel: string;

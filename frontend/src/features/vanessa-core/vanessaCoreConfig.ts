@@ -15,11 +15,8 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
   temporarySessionLabel: "Temporary chat",
   temporarySessionTitle: "Temporary chat",
   draftPlaceholder: "Ask Vanessa anything",
-  selectors: {
-    model: true,
-    knowledgeBase: false,
-    assistant: false,
-  },
+  inlineSelectors: [],
+  settingsSelectors: ["model"],
   messaging: {
     mode: "stream",
     submitLabel: "Send to Vanessa",

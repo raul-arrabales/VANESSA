@@ -183,7 +183,6 @@ async function openSavedChat(title = "Thread one"): Promise<void> {
 }
 
 async function waitForDraftReady(): Promise<void> {
-  await screen.findByRole("heading", { name: "New conversation" });
   await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
 }
 
@@ -259,13 +258,23 @@ describe("ChatPlaygroundPage", () => {
 
     await renderChatPlayground();
 
-    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    await waitForDraftReady();
     expect(screen.getByText("Loading saved conversations...")).toBeVisible();
     expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
     expect(playgroundApiMocks.getPlaygroundSession).not.toHaveBeenCalled();
 
     resolveHistory([sessionSummary("conv-1", "Thread one")]);
     expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
+  });
+
+  it("starts a fresh chat with the composer centered and no empty-thread copy", async () => {
+    const view = await renderChatPlayground();
+
+    await waitForDraftReady();
+
+    expect(view.container.querySelector(".chatbot-thread-shell-starter")).not.toBeNull();
+    expect(screen.getByLabelText("Message")).toBeVisible();
+    expect(screen.queryByText("No messages yet. Start chatting to build context memory.")).toBeNull();
   });
 
   it("collapses the history into a slim rail and restores the persisted collapsed state", async () => {
@@ -530,7 +539,7 @@ describe("ChatPlaygroundPage", () => {
       { title: "Renamed thread" },
       "token",
     ));
-    expect(await screen.findByRole("heading", { name: "Renamed thread" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /^Renamed thread/i })).toBeVisible();
 
     await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Renamed thread" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
@@ -552,11 +561,11 @@ describe("ChatPlaygroundPage", () => {
     await renderChatPlayground();
 
     await openSavedChat();
-    expect(await screen.findByRole("heading", { name: "Thread one" })).toBeVisible();
+    await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());
 
     await userEvent.click(screen.getByRole("button", { name: "New chat" }));
 
-    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    await waitForDraftReady();
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
   });
 
@@ -565,7 +574,7 @@ describe("ChatPlaygroundPage", () => {
 
     await renderChatPlayground();
 
-    expect(await screen.findByRole("heading", { name: "New conversation" })).toBeVisible();
+    await waitForDraftReady();
     expect(await screen.findByText("History failed")).toBeVisible();
     expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled();
     await waitFor(() => expect(screen.getByLabelText("Message")).toBeEnabled());

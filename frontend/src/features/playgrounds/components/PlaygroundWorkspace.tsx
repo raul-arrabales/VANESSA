@@ -5,8 +5,7 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { useStickyChatScroll } from "../../../hooks/useStickyChatScroll";
 import AssistantSelector from "./AssistantSelector";
 import Composer from "./Composer";
-import KnowledgeBaseSelector from "./KnowledgeBaseSelector";
-import ModelSelector from "./ModelSelector";
+import PlaygroundSettingsDialog from "./PlaygroundSettingsDialog";
 import SessionSidebar from "./SessionSidebar";
 import ThreadPanel from "./ThreadPanel";
 import { usePlaygroundOptions } from "../hooks/usePlaygroundOptions";
@@ -14,6 +13,7 @@ import { usePlaygroundPreferences } from "../hooks/usePlaygroundPreferences";
 import { usePlaygroundSessionActions } from "../hooks/usePlaygroundSessionActions";
 import { usePlaygroundSessions } from "../hooks/usePlaygroundSessions";
 import { usePlaygroundWorkspaceViewState } from "../hooks/usePlaygroundWorkspaceViewState";
+import { hasInlineSelector, hasSelector } from "../selectorConfig";
 import type { PlaygroundWorkspaceConfig } from "../types";
 
 type PlaygroundWorkspaceProps = {
@@ -24,15 +24,18 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   const { t } = useTranslation("common");
   const { token, isAuthenticated } = useAuth();
   const preferences = usePlaygroundPreferences(config.playgroundKind);
+  const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
+  const hasAssistantInlineSelector = hasInlineSelector(config, "assistant");
+  const hasSettingsSelectors = config.settingsSelectors.length > 0;
   const optionsState = usePlaygroundOptions({
     token,
     isAuthenticated,
     config,
   });
   const hasLoadedRequiredOptions = optionsState.hasLoadedModels
-    && (!config.selectors.knowledgeBase || optionsState.hasLoadedKnowledgeBases);
+    && (!hasKnowledgeBaseSelector || optionsState.hasLoadedKnowledgeBases);
   const isRequiredOptionsLoading = optionsState.isModelsLoading
-    || (config.selectors.knowledgeBase && optionsState.isKnowledgeBasesLoading);
+    || (hasKnowledgeBaseSelector && optionsState.isKnowledgeBasesLoading);
   const sessionState = usePlaygroundSessions({
     token,
     isAuthenticated,
@@ -56,8 +59,6 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [composerHeight, setComposerHeight] = useState(96);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
-  const settingsModelSelectRef = useRef<HTMLSelectElement>(null);
-  const settingsKnowledgeBaseSelectRef = useRef<HTMLSelectElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -126,8 +127,6 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     isSending,
     isSessionBusy,
   });
-  const hasSettingsSelectors = config.selectors.model || config.selectors.knowledgeBase;
-  const settingsInitialFocusRef = config.selectors.model ? settingsModelSelectRef : settingsKnowledgeBaseSelectRef;
 
   return (
     <section
@@ -186,30 +185,25 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
       />
 
       <div className="chatbot-main">
-        <div className="chatbot-sidebar-header">
-          <h3 className="section-title">{viewState.activeSession?.title ?? config.emptySessionTitle}</h3>
-        </div>
-
-        {config.selectors.assistant ? (
+        {hasAssistantInlineSelector ? (
           <div className="chatbot-toolbar">
-            {config.selectors.assistant ? (
-              <AssistantSelector
-                assistants={optionsState.assistants}
-                value={viewState.activeSession?.selectorState.assistantRef ?? optionsState.defaultAssistantRef ?? ""}
-                disabled={viewState.isAssistantSelectorDisabled}
-                onChange={(value) => {
-                  if (viewState.activeSession) {
-                    void actions.updateAssistant(viewState.activeSession.id, value);
-                  }
-                }}
-              />
-            ) : null}
+            <AssistantSelector
+              assistants={optionsState.assistants}
+              value={viewState.activeSession?.selectorState.assistantRef ?? optionsState.defaultAssistantRef ?? ""}
+              disabled={viewState.isAssistantSelectorDisabled}
+              onChange={(value) => {
+                if (viewState.activeSession) {
+                  void actions.updateAssistant(viewState.activeSession.id, value);
+                }
+              }}
+            />
           </div>
         ) : null}
 
         <ThreadPanel
           activeSession={viewState.activeSession}
           isBootstrapping={viewState.isThreadBootstrapping}
+          isSending={isSending}
           loadingText={viewState.threadStatusText}
           emptyStateText={config.emptyStateText}
           threadRef={threadRef}
@@ -242,53 +236,28 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         />
       </div>
       {isSettingsDialogOpen && hasSettingsSelectors ? (
-        <ModalDialog
-          className="playground-session-dialog"
-          title={t("playgroundSessionSettings.title")}
-          description={t("playgroundSessionSettings.description")}
+        <PlaygroundSettingsDialog
+          selectors={config.settingsSelectors}
+          models={optionsState.models}
+          knowledgeBases={optionsState.knowledgeBases}
+          modelValue={viewState.activeSession?.selectorState.modelId ?? ""}
+          knowledgeBaseValue={viewState.activeSession?.selectorState.knowledgeBaseId ?? ""}
+          isModelLoading={!optionsState.hasLoadedModels}
+          isKnowledgeBaseLoading={!optionsState.hasLoadedKnowledgeBases}
+          isModelDisabled={viewState.isModelSelectorDisabled}
+          isKnowledgeBaseDisabled={viewState.isKnowledgeBaseSelectorDisabled}
           onClose={() => setIsSettingsDialogOpen(false)}
-          initialFocusRef={settingsInitialFocusRef}
-          actions={(
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsSettingsDialogOpen(false)}
-            >
-              {t("playgroundSessionSettings.close")}
-            </button>
-          )}
-        >
-          <div className="control-group playground-session-settings-fields">
-            {config.selectors.model ? (
-              <ModelSelector
-                selectRef={settingsModelSelectRef}
-                models={optionsState.models}
-                value={viewState.activeSession?.selectorState.modelId ?? ""}
-                isLoading={!optionsState.hasLoadedModels}
-                disabled={viewState.isModelSelectorDisabled}
-                onChange={(value) => {
-                  if (viewState.activeSession) {
-                    void actions.updateModel(viewState.activeSession.id, value);
-                  }
-                }}
-              />
-            ) : null}
-            {config.selectors.knowledgeBase ? (
-              <KnowledgeBaseSelector
-                selectRef={settingsKnowledgeBaseSelectRef}
-                knowledgeBases={optionsState.knowledgeBases}
-                value={viewState.activeSession?.selectorState.knowledgeBaseId ?? ""}
-                isLoading={!optionsState.hasLoadedKnowledgeBases}
-                disabled={viewState.isKnowledgeBaseSelectorDisabled}
-                onChange={(value) => {
-                  if (viewState.activeSession) {
-                    void actions.updateKnowledgeBase(viewState.activeSession.id, value);
-                  }
-                }}
-              />
-            ) : null}
-          </div>
-        </ModalDialog>
+          onModelChange={(value) => {
+            if (viewState.activeSession) {
+              void actions.updateModel(viewState.activeSession.id, value);
+            }
+          }}
+          onKnowledgeBaseChange={(value) => {
+            if (viewState.activeSession) {
+              void actions.updateKnowledgeBase(viewState.activeSession.id, value);
+            }
+          }}
+        />
       ) : null}
       {pendingDialog?.kind === "rename" ? (
         <ModalDialog

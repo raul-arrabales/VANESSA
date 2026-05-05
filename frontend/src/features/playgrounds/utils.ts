@@ -5,6 +5,7 @@ import type {
   PlaygroundWorkspaceOptions,
   PlaygroundMessageViewModel,
 } from "./types";
+import { hasSelector } from "./selectorConfig";
 
 export function sortSessions(sessions: PlaygroundSessionViewModel[]): PlaygroundSessionViewModel[] {
   return [...sessions].sort((left, right) => {
@@ -89,7 +90,7 @@ export function createDraftSession(
   const selectorState: PlaygroundSelectorState = {
     assistantRef: source?.selectorState.assistantRef ?? options.defaultAssistantRef ?? config.defaultAssistantRef ?? null,
     modelId: source?.selectorState.modelId ?? options.models[0]?.id ?? null,
-    knowledgeBaseId: config.selectors.knowledgeBase
+    knowledgeBaseId: hasSelector(config, "knowledgeBase")
       ? (source?.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId ?? null)
       : null,
   };

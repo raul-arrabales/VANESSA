@@ -6,6 +6,7 @@ import {
   updatePlaygroundSession,
 } from "../../../api/playgrounds";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import { hasSelector } from "../selectorConfig";
 import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions, PlaygroundSessionViewModel } from "../types";
 import { mapPlaygroundSessionDetail, mapPlaygroundSessionSummary } from "../types";
 import { createDraftSession, sortSessions, upsertSession } from "../utils";
@@ -28,6 +29,7 @@ export function usePlaygroundSessions({
   options,
 }: UsePlaygroundSessionsParams) {
   const { showErrorFeedback } = useActionFeedback();
+  const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
   const [savedSessions, setSavedSessions] = useState<PlaygroundSessionViewModel[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<PlaygroundSessionViewModel | null>(null);
@@ -151,7 +153,7 @@ export function usePlaygroundSessions({
             assistant_ref: options.defaultAssistantRef ?? undefined,
             model_selection: { model_id: options.models[0]?.id ?? null },
             knowledge_binding: {
-              knowledge_base_id: config.selectors.knowledgeBase
+              knowledge_base_id: hasKnowledgeBaseSelector
                 ? options.defaultKnowledgeBaseId
                 : null,
             },
@@ -185,7 +187,7 @@ export function usePlaygroundSessions({
     activeSessionId,
     config.feedback.createError,
     config.playgroundKind,
-    config.selectors.knowledgeBase,
+    hasKnowledgeBaseSelector,
     config.sessionBootstrap.mode,
     hasLoadedOptions,
     isAuthenticated,
@@ -230,7 +232,7 @@ export function usePlaygroundSessions({
         const loadedSession = mapPlaygroundSessionDetail(session);
         const needsKnowledgeBaseRepair = (
           config.playgroundKind === "knowledge"
-          && config.selectors.knowledgeBase
+          && hasKnowledgeBaseSelector
           && !session.knowledge_binding.knowledge_base_id
           && Boolean(options.defaultKnowledgeBaseId)
         );
@@ -290,7 +292,7 @@ export function usePlaygroundSessions({
     config.feedback.sessionError,
     config.feedback.updateKnowledgeBaseError,
     config.playgroundKind,
-    config.selectors.knowledgeBase,
+    hasKnowledgeBaseSelector,
     hasLoadedOptions,
     isOptionsLoading,
     options.defaultKnowledgeBaseId,
