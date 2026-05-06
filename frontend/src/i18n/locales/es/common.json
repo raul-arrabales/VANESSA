@@ -1925,14 +1925,13 @@
   },
   "runtimeMode": {
     "toggleLabel": "Modo de ejecución",
-    "toggleTooltip": "Modo de ejecución actual: {{mode}}",
+    "switchTooltip": "Modo de ejecución actual: {{mode}}. Haz clic para cambiar a {{nextMode}}.",
     "online": "En línea",
     "offline": "Sin conexión",
     "permissionDenied": "Solo los superadministradores pueden cambiar el modo de ejecución.",
     "lockedByEnvironment": "El modo de ejecución está bloqueado por la configuración del entorno en {{mode}}.",
     "updateFailed": "No se pudo actualizar el modo de ejecución.",
     "updated": "Modo de ejecución actualizado a {{mode}}.",
-    "offlineLabel": "Sin conexión",
     "confirmEnableOffline": "¿Cambiar al modo sin conexión para todos los usuarios? Las acciones que dependen de internet se bloquearán en todo el sistema.",
     "confirmEnableOnline": "¿Cambiar al modo en línea para todos los usuarios?",
     "dialog": {

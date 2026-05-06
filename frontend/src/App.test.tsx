@@ -10,6 +10,7 @@ let mockUser: AuthUser | null = null;
 const mockSetMode = vi.fn();
 let mockRuntimeLocked = false;
 let mockRuntimeError = "";
+let mockRuntimeMode: "offline" | "online" = "offline";
 
 vi.mock("./auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -26,7 +27,7 @@ vi.mock("./auth/AuthProvider", () => ({
 
 vi.mock("./runtime/RuntimeModeProvider", () => ({
   useRuntimeMode: () => ({
-    mode: "offline",
+    mode: mockRuntimeMode,
     isLocked: mockRuntimeLocked,
     source: mockRuntimeLocked ? "forced" : "database",
     isLoading: false,
@@ -41,6 +42,7 @@ describe("App header", () => {
     mockUser = null;
     mockRuntimeLocked = false;
     mockRuntimeError = "";
+    mockRuntimeMode = "offline";
     mockSetMode.mockReset();
     vi.restoreAllMocks();
   });
@@ -77,7 +79,7 @@ describe("App header", () => {
 
     await renderApp();
 
-    expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
+    expect(screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
   });
 
   it("shows Vanessa AI in the primary nav for authenticated users", async () => {
@@ -118,7 +120,7 @@ describe("App header", () => {
     expect(within(userMenuPanel as HTMLElement).getByRole("link", { name: "Docs" })).toHaveAttribute("target", "_blank");
   });
 
-  it("enables runtime toggle for superadmin users", async () => {
+  it("enables the icon-only runtime mode button for superadmin users", async () => {
     mockUser = {
       id: 1,
       email: "root@example.com",
@@ -129,7 +131,36 @@ describe("App header", () => {
 
     await renderApp();
 
-    expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeEnabled();
+    const runtimeButton = screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") });
+    expect(runtimeButton).toBeEnabled();
+    expect(runtimeButton).toHaveClass("runtime-mode-pill");
+    expect(runtimeButton).toHaveAttribute("data-mode", "offline");
+    expect(runtimeButton).toHaveAttribute(
+      "title",
+      await t("runtimeMode.switchTooltip", {
+        mode: await t("runtimeMode.offline"),
+        nextMode: await t("runtimeMode.online"),
+      }),
+    );
+    expect(runtimeButton).not.toHaveTextContent(await t("runtimeMode.offline"));
+  });
+
+  it("shows online transfer indicator placeholders beside the online cloud icon", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+    mockRuntimeMode = "online";
+
+    const container = await renderApp();
+    const runtimeButton = screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") });
+
+    expect(runtimeButton).toHaveAttribute("data-mode", "online");
+    expect(container.querySelector(".runtime-transfer-indicator[data-direction='upload']")).not.toBeNull();
+    expect(container.querySelector(".runtime-transfer-indicator[data-direction='download']")).not.toBeNull();
   });
 
   it("disables runtime toggle when the runtime profile is environment-locked", async () => {
@@ -144,7 +175,7 @@ describe("App header", () => {
 
     await renderApp();
 
-    expect(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
+    expect(screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") })).toBeDisabled();
     expect(screen.getByText(await t("runtimeMode.lockedByEnvironment", { mode: await t("runtimeMode.offline") }))).toBeVisible();
   });
 
@@ -161,7 +192,7 @@ describe("App header", () => {
 
     await renderApp();
 
-    await user.click(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") }));
+    await user.click(screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") }));
     expect(screen.getByRole("dialog")).toBeVisible();
     await user.click(screen.getByRole("button", { name: await t("runtimeMode.dialog.cancel") }));
 
@@ -181,7 +212,7 @@ describe("App header", () => {
 
     await renderApp();
 
-    await user.click(screen.getByRole("switch", { name: await t("runtimeMode.toggleLabel") }));
+    await user.click(screen.getByRole("button", { name: await t("runtimeMode.toggleLabel") }));
     await user.click(screen.getByRole("button", { name: await t("runtimeMode.dialog.confirmOnline") }));
 
     expect(mockSetMode).toHaveBeenCalledWith("online");

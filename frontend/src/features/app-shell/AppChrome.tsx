@@ -19,6 +19,26 @@ type RuntimeModeConfirmationDialogProps = {
   onConfirm: () => void;
 };
 
+type RuntimeModeIconProps = {
+  mode: "offline" | "online" | null;
+};
+
+function RuntimeModeIcon({ mode }: RuntimeModeIconProps): JSX.Element {
+  if (mode === "online") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M7.5 18.5a5 5 0 0 1-.66-9.95 6.25 6.25 0 0 1 11.75 2.12A4 4 0 0 1 18 18.5H7.5Zm0-2h10.44a2 2 0 0 0 .18-4h-1.35l-.16-1.34a4.25 4.25 0 0 0-8.18-1.11l-.39.97-1.04.03a3 3 0 0 0 .08 6h.42v1.45Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="m4.1 3 16.9 16.9-1.4 1.4-2.83-2.83H7.5a5 5 0 0 1-.66-9.95A6.22 6.22 0 0 1 7.88 6.2L2.7 4.4 4.1 3Zm3.4 13.5h7.27L9.35 11.08l-.92-1.03-.39.97-1.04.03a3 3 0 0 0 .08 6h.42v-.55Zm1.82-11.14a6.25 6.25 0 0 1 9.27 5.31A4 4 0 0 1 18 18.5h-.06l-1.99-2h1.99a2 2 0 0 0 .18-4h-1.35l-.16-1.34a4.24 4.24 0 0 0-5.8-3.35L9.32 5.36Z" />
+    </svg>
+  );
+}
+
 function RuntimeModeConfirmationDialog({
   nextMode,
   isPending,
@@ -131,6 +151,8 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
   const canUpdateRuntimeMode = user?.role === "superadmin";
   const isRuntimeToggleDisabled = !canUpdateRuntimeMode || isRuntimeLocked || isRuntimeLoading || isRuntimeSaving || !mode;
   const isOfflineMode = mode === "offline";
+  const nextRuntimeMode = isOfflineMode ? "online" : "offline";
+  const nextRuntimeModeLabel = t(`runtimeMode.${nextRuntimeMode}`);
   const userMenuRoutes = buildUserMenuItems(isAuthenticated, t);
   const sidebarItems = buildSidebarItems(location.pathname, {
     isAuthenticated,
@@ -197,35 +219,45 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
 
   const runtimeControl = (
     <div className="app-topbar-runtime">
-      <label
-        className="runtime-toggle"
+      <button
+        type="button"
+        className="runtime-mode-pill"
+        data-mode={mode ?? "unknown"}
+        aria-label={t("runtimeMode.toggleLabel")}
+        disabled={isRuntimeToggleDisabled}
         title={
           !canUpdateRuntimeMode
             ? t("runtimeMode.permissionDenied")
             : isRuntimeLocked
               ? t("runtimeMode.lockedByEnvironment", { mode: runtimeModeLabel })
-              : t("runtimeMode.toggleTooltip", { mode: runtimeModeLabel })
+              : t("runtimeMode.switchTooltip", { mode: runtimeModeLabel, nextMode: nextRuntimeModeLabel })
         }
-      >
-        <span className="runtime-toggle-text">{t("runtimeMode.offlineLabel")}</span>
-        <input
-          type="checkbox"
-          role="switch"
-          aria-label={t("runtimeMode.toggleLabel")}
-          disabled={isRuntimeToggleDisabled}
-          checked={isOfflineMode}
-          onChange={(event) => {
-            if (!mode || isRuntimeToggleDisabled) {
-              return;
-            }
+        onClick={() => {
+          if (!mode || isRuntimeToggleDisabled) {
+            return;
+          }
 
-            requestRuntimeMode(event.currentTarget.checked ? "offline" : "online");
-          }}
-        />
-        <span className="runtime-toggle-track" aria-hidden="true">
-          <span className="runtime-toggle-thumb" />
+          requestRuntimeMode(nextRuntimeMode);
+        }}
+      >
+        <span className="runtime-mode-icon">
+          <RuntimeModeIcon mode={mode} />
         </span>
-      </label>
+        {mode === "online" ? (
+          <span className="runtime-transfer-indicators" aria-hidden="true">
+            <span className="runtime-transfer-indicator" data-direction="upload" data-active="false">
+              <svg viewBox="0 0 12 12" focusable="false">
+                <path d="M6 2 2.8 5.2l.9.9L5.35 4.45V10h1.3V4.45L8.3 6.1l.9-.9L6 2Z" />
+              </svg>
+            </span>
+            <span className="runtime-transfer-indicator" data-direction="download" data-active="false">
+              <svg viewBox="0 0 12 12" focusable="false">
+                <path d="M5.35 2v5.55L3.7 5.9l-.9.9L6 10l3.2-3.2-.9-.9-1.65 1.65V2h-1.3Z" />
+              </svg>
+            </span>
+          </span>
+        ) : null}
+      </button>
       {isRuntimeLocked ? (
         <span className="status-text app-topbar-runtime-note">
           {t("runtimeMode.lockedByEnvironment", { mode: runtimeModeLabel })}
