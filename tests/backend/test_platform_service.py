@@ -160,6 +160,46 @@ def test_runtime_identifier_for_resource_ignores_string_none_provider_resource_i
     assert runtime_identifier == "/models/llm/sentence-transformers--all-MiniLM-L6-v2"
 
 
+def test_bound_resource_inventory_validation_uses_runtime_identifier():
+    binding = platform_service.ProviderBinding(
+        capability_key="llm_inference",
+        provider_instance_id="provider-llm",
+        provider_slug="vllm-local-gateway",
+        provider_key="vllm_local",
+        provider_display_name="vLLM local gateway",
+        provider_description="desc",
+        endpoint_url="http://llm:8000",
+        healthcheck_url="http://llm:8000/health",
+        enabled=True,
+        adapter_kind="openai_compatible_llm",
+        config={},
+        binding_config={},
+        deployment_profile_id="deployment-1",
+        deployment_profile_slug="local-default",
+        deployment_profile_display_name="Local Default",
+        resources=[
+            {
+                "id": "local-model",
+                "provider_resource_id": "local-model-runtime-id",
+                "metadata": {"local_path": "/models/local-model"},
+            }
+        ],
+    )
+
+    errors = platform_service._validate_bound_resources_against_provider_inventory(  # type: ignore[attr-defined]
+        binding,
+        [{"id": "other-runtime-id", "provider_resource_id": "other-runtime-id"}],
+    )
+
+    assert errors == [
+        {
+            "code": "resource_not_exposed",
+            "resource_id": "local-model",
+            "provider_resource_id": "local-model-runtime-id",
+        }
+    ]
+
+
 def test_default_resource_runtime_identifier_ignores_string_none_provider_resource_id():
     binding = platform_service.ProviderBinding(
         capability_key="embeddings",

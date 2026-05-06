@@ -18,6 +18,7 @@ from .platform_credential_refs import resolve_binding_modelops_credential
 from .platform_serialization import (
     _build_model_binding_resource,
     _is_cloud_provider_row,
+    _runtime_identifier_for_resource,
     _runtime_model_identifier,
     _serialize_binding_resource,
 )

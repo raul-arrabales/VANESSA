@@ -38,7 +38,7 @@ require_prerequisites
 
 query_slot() {
   local provider_key="$1"
-  compose exec -T postgres psql -U vanessa -d vanessa -At -F $'\t' -c "
+  compose exec -T postgres psql -U vanessa -d vanessa -At -F '|' -c "
     SELECT
       COALESCE(i.config_json->>'loaded_managed_model_id', ''),
       COALESCE(i.config_json->>'loaded_managed_model_name', ''),
@@ -79,8 +79,8 @@ upsert_env_var() {
   mv "${temp_file}" "${file_path}"
 }
 
-IFS=$'\t' read -r llm_managed_id llm_managed_name llm_runtime_id llm_local_path llm_load_state <<< "$(query_slot "vllm_local")"
-IFS=$'\t' read -r embeddings_managed_id embeddings_managed_name embeddings_runtime_id embeddings_local_path embeddings_load_state <<< "$(query_slot "vllm_embeddings_local")"
+IFS='|' read -r llm_managed_id llm_managed_name llm_runtime_id llm_local_path llm_load_state <<< "$(query_slot "vllm_local")"
+IFS='|' read -r embeddings_managed_id embeddings_managed_name embeddings_runtime_id embeddings_local_path embeddings_load_state <<< "$(query_slot "vllm_embeddings_local")"
 
 effective_inference_local_path="${llm_local_path:-}"
 effective_embeddings_local_path="${embeddings_local_path:-}"
