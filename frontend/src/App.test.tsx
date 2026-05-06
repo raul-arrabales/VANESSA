@@ -50,14 +50,15 @@ describe("App header", () => {
     return container;
   }
 
-  it("renders user icon and label in the menu trigger", async () => {
+  it("renders icon-only user menu trigger with the display name as a tooltip", async () => {
     const container = await renderApp();
 
     const trigger = container.querySelector(".user-menu-trigger");
     expect(trigger).not.toBeNull();
     expect(container.querySelector(".app-topbar-brand-mark")).not.toBeNull();
     expect(container.querySelector(".user-menu-icon")).not.toBeNull();
-    expect(container.querySelector(".user-menu-label")).not.toBeNull();
+    expect(container.querySelector(".user-menu-label")).toBeNull();
+    expect(trigger).toHaveAttribute("title", await t("nav.guest"));
     expect(container.querySelector(".app-brand")).not.toBeNull();
     expect(container.querySelector(".welcome-page-brand-display")).not.toBeNull();
     expect(screen.getByRole("button", { name: await t("nav.guest") })).toBeVisible();

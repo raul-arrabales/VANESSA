@@ -362,8 +362,8 @@
 .user-menu-trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0.38rem 0.72rem;
+  justify-content: center;
+  padding: 0.38rem;
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
@@ -389,15 +389,6 @@
   width: 0.82rem;
   height: 0.82rem;
   fill: currentColor;
-}
-
-.user-menu-label {
-  max-width: 12rem;
-  font-size: 0.92rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .user-menu-panel {

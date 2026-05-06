@@ -90,8 +90,10 @@ export default function AppTopBar({
           <button
             type="button"
             className="user-menu-trigger"
+            aria-label={displayName}
             aria-expanded={isMenuOpen}
             aria-controls={menuId}
+            title={displayName}
             onClick={onToggleUserMenu}
           >
             <span className="user-menu-icon" aria-hidden="true">
@@ -100,7 +102,6 @@ export default function AppTopBar({
                 <path d="M12 13.75c-4.28 0-7.75 2.69-7.75 6v.5h15.5v-.5c0-3.31-3.47-6-7.75-6Z" />
               </svg>
             </span>
-            <span className="user-menu-label">{displayName}</span>
           </button>
           {isMenuOpen ? (
             <div id={menuId} className="user-menu-panel">
