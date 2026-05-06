@@ -3,23 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from .platform_local_slots import _effective_local_slot
+from .platform_resources import (
+    _normalized_optional_identifier,
+    _runtime_identifier_for_resource,
+    _runtime_model_identifier,
+)
 from .platform_service_types import _LOCAL_SLOT_CONFIG_KEYS
 from .platform_types import ProviderBinding
-
-
-def _normalized_optional_identifier(value: Any) -> str | None:
-    normalized = str(value or "").strip()
-    if not normalized:
-        return None
-    if normalized.lower() in {"none", "null"}:
-        return None
-    return normalized
-
-
-def _runtime_model_identifier(model_row: dict[str, Any]) -> str:
-    provider_model_id = _normalized_optional_identifier(model_row.get("provider_model_id"))
-    local_path = _normalized_optional_identifier(model_row.get("local_path"))
-    return provider_model_id or local_path
 
 
 def _is_cloud_provider_row(provider_row: dict[str, Any]) -> bool:
@@ -46,17 +36,6 @@ def _build_model_binding_resource(model_row: dict[str, Any], *, provider_resourc
             "availability": model_row.get("availability"),
         },
     }
-
-
-def _runtime_identifier_for_resource(resource: dict[str, Any]) -> str:
-    provider_resource_id = _normalized_optional_identifier(resource.get("provider_resource_id"))
-    if provider_resource_id:
-        return provider_resource_id
-    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
-    provider_model_id = _normalized_optional_identifier(metadata.get("provider_model_id"))
-    local_path = _normalized_optional_identifier(metadata.get("local_path"))
-    source_id = _normalized_optional_identifier(metadata.get("source_id"))
-    return provider_model_id or local_path or source_id
 
 
 def _serialize_binding_resource(resource: dict[str, Any]) -> dict[str, Any]:

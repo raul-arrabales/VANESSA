@@ -47,6 +47,8 @@ cd VANESSA
 ./ops/local-staging/health.sh
 ```
 
+For ad hoc compose commands in local staging, use `./ops/local-staging/compose.sh ...` so the CPU/GPU runtime override files are included.
+
 Then open:
 
 - Frontend: `http://localhost:3000` (when local staging is up)

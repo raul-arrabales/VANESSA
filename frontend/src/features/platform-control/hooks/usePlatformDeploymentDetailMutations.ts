@@ -22,6 +22,7 @@ import {
   type DeploymentFormState,
 } from "../deploymentEditor";
 import type { ManagedModel } from "../../../api/modelops";
+import { formatActivationValidationError } from "../validationFeedback";
 
 type UsePlatformDeploymentDetailMutationsParams = {
   token: string;
@@ -208,7 +209,7 @@ export function usePlatformDeploymentDetailMutations({
       showSuccessFeedback(t("platformControl.feedback.activationSuccess", { name: deployment.display_name }));
       await reload();
     } catch (error) {
-      showErrorFeedback(error, t("platformControl.feedback.activationFailed"));
+      showErrorFeedback(formatActivationValidationError(error) ?? error, t("platformControl.feedback.activationFailed"));
     } finally {
       setActivating(false);
     }

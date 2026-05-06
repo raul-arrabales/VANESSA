@@ -20,8 +20,11 @@ python scripts/generate_architecture.py --write
 ./ops/local-staging/health.sh
 ./ops/local-staging/logs.sh --follow
 ./ops/local-staging/restart-service.sh --service frontend
+./ops/local-staging/compose.sh ps
 ./ops/local-staging/stop.sh
 ```
+
+Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose operations. The wrapper adds the resolved CPU/GPU override files; raw `docker compose -f infra/docker-compose.yml ...` uses the base GPU runtime definition and can recreate the split vLLM runtime containers with the wrong image on CPU-only hosts.
 
 ## Scripts
 
@@ -49,6 +52,9 @@ python scripts/generate_architecture.py --write
 - `logs.sh`
   - Shows or streams logs for all services or one service.
   - Flags: `--service <name>`, `--tail <n>`, `--follow`
+- `compose.sh`
+  - Delegates to Docker Compose with the same CPU/GPU override resolution used by the local-staging scripts.
+  - Use for ad hoc commands such as `./ops/local-staging/compose.sh ps` or `./ops/local-staging/compose.sh up -d backend`.
 - `restart-service.sh`
   - Rebuilds/restarts one service for fast iteration; defaults to `--build --no-deps --wait`.
   - Flags: `--service <name>`, `--no-build`, `--with-deps`, `--no-wait`, `--timeout <seconds>`, `--env-file <path>`

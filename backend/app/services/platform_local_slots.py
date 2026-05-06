@@ -542,7 +542,8 @@ def assign_provider_loaded_model(
             details={"provider_instance_id": provider_row.get("id"), "managed_model_id": normalized_model_id},
         )
 
-    from .platform_serialization import _runtime_model_identifier, _serialize_provider_row
+    from .platform_resources import _runtime_model_identifier
+    from .platform_serialization import _serialize_provider_row
 
     runtime_model_id = _runtime_model_identifier(model_row)
     if not runtime_model_id:

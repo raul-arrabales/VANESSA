@@ -84,8 +84,6 @@ from .platform_runtime import (
 from .platform_serialization import (
     _build_model_binding_resource,
     _is_cloud_provider_row,
-    _runtime_identifier_for_resource,
-    _runtime_model_identifier,
     _serialize_activation_audit_row,
     _serialize_binding_resource,
     _serialize_deployment_profile,
@@ -94,6 +92,7 @@ from .platform_serialization import (
     _serialize_runtime_binding,
     _serialize_runtime_deployment_profile,
 )
+from .platform_resources import _runtime_identifier_for_resource, _runtime_model_identifier
 from .platform_shared import _expected_task_key, _runtime_model_entries_for_capability
 from .platform_types import (
     ALL_CAPABILITIES,

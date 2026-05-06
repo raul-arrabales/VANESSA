@@ -8,8 +8,11 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 ./ops/local-staging/start.sh
 ./ops/local-staging/health.sh
 ./ops/local-staging/logs.sh --follow
+./ops/local-staging/compose.sh ps
 ./ops/local-staging/stop.sh
 ```
+
+Use `./ops/local-staging/compose.sh ...` for ad hoc compose commands so local staging keeps the same CPU/GPU runtime override resolution as the launcher scripts. Raw `docker compose -f infra/docker-compose.yml ...` can recreate split vLLM runtime containers with the wrong image on CPU-only hosts.
 
 ## Useful Operations
 

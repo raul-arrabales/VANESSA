@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 from .context_management_metadata import is_internal_metadata_key
 from .openai_compatible_generation import add_openai_compatible_chat_generation_options
+from .platform_resources import _default_resource_runtime_identifier as _resource_runtime_identifier
 from .platform_types import PlatformControlPlaneError, ProviderBinding
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
@@ -130,6 +131,10 @@ def _binding_secret_refs(binding: ProviderBinding) -> dict[str, str]:
     return dict(secret_refs) if isinstance(secret_refs, dict) else {}
 
 
+def _default_resource_runtime_identifier(binding: ProviderBinding) -> str:
+    return _resource_runtime_identifier(binding.default_resource or {})
+
+
 def _resolve_secret_ref(reference: str) -> str | None:
     normalized_reference = reference.strip()
     if not normalized_reference:
@@ -155,27 +160,6 @@ def _openai_compatible_headers(binding: ProviderBinding) -> dict[str, str]:
         )
     headers["Authorization"] = f"Bearer {api_key}"
     return headers
-
-
-def _normalized_optional_identifier(value: Any) -> str | None:
-    normalized = str(value or "").strip()
-    if not normalized:
-        return None
-    if normalized.lower() in {"none", "null"}:
-        return None
-    return normalized
-
-
-def _default_resource_runtime_identifier(binding: ProviderBinding) -> str:
-    resource = binding.default_resource or {}
-    provider_resource_id = _normalized_optional_identifier(resource.get("provider_resource_id"))
-    if provider_resource_id:
-        return provider_resource_id
-    metadata = resource.get("metadata") if isinstance(resource.get("metadata"), dict) else {}
-    provider_model_id = _normalized_optional_identifier(metadata.get("provider_model_id"))
-    local_path = _normalized_optional_identifier(metadata.get("local_path"))
-    source_id = _normalized_optional_identifier(metadata.get("source_id"))
-    return provider_model_id or local_path or source_id
 
 
 def _normalize_model_resource(item: dict[str, Any]) -> dict[str, Any]:

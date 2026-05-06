@@ -4,7 +4,8 @@ from collections.abc import Iterable
 from typing import Any
 
 from ..repositories import context_management as context_repo
-from .platform_serialization import _runtime_identifier_for_resource, _serialize_deployment_profile
+from .platform_resources import _runtime_identifier_for_resource
+from .platform_serialization import _serialize_deployment_profile
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_LLM_INFERENCE,

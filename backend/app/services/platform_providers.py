@@ -15,6 +15,7 @@ from .platform_bindings import (
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
 from .platform_credential_refs import resolve_binding_modelops_credential
+from .platform_preflight import _annotate_provider_validation
 from .platform_local_slots import assign_provider_loaded_model as _assign_provider_loaded_model
 from .platform_local_slots import clear_provider_loaded_model as _clear_provider_loaded_model
 from .platform_local_slots import _is_local_model_slot_provider
@@ -237,12 +238,12 @@ def validate_provider(
         adapter = _adapter_from_binding(binding)
         health = adapter.health()
         resources, resources_status = _list_adapter_resources(adapter)
-        validation = {
+        validation = _annotate_provider_validation(binding.capability_key, {
             "health": health,
             "resources_reachable": 200 <= resources_status < 300,
             "resources_status_code": resources_status,
             "resources": [_serialize_binding_resource(resource) for resource in resources],
-        }
+        })
         if credential_summary:
             validation["credential"] = credential_summary
         return {
@@ -255,7 +256,7 @@ def validate_provider(
         health = adapter.health()
         resources, resources_status = _list_adapter_resources(adapter)
         if not binding.default_resource_id:
-            validation = {
+            validation = _annotate_provider_validation(binding.capability_key, {
                 "health": health,
                 "embeddings_reachable": False,
                 "embeddings_status_code": 409,
@@ -263,7 +264,7 @@ def validate_provider(
                 "resources_reachable": 200 <= resources_status < 300,
                 "resources_status_code": resources_status,
                 "resources": [_serialize_binding_resource(resource) for resource in resources],
-            }
+            })
             if credential_summary:
                 validation["credential"] = credential_summary
             return {
@@ -273,7 +274,7 @@ def validate_provider(
         embeddings_payload, embeddings_status = adapter.embed_texts(texts=["healthcheck"])
         embeddings = embeddings_payload.get("embeddings") if isinstance(embeddings_payload, dict) else []
         embedding_dimension = len(embeddings[0]) if isinstance(embeddings, list) and embeddings else 0
-        validation = {
+        validation = _annotate_provider_validation(binding.capability_key, {
             "health": health,
             "embeddings_reachable": embeddings_payload is not None and 200 <= embeddings_status < 300,
             "embeddings_status_code": embeddings_status,
@@ -281,7 +282,7 @@ def validate_provider(
             "resources_reachable": 200 <= resources_status < 300,
             "resources_status_code": resources_status,
             "resources": [_serialize_binding_resource(resource) for resource in resources],
-        }
+        })
         if credential_summary:
             validation["credential"] = credential_summary
         return {
@@ -294,12 +295,12 @@ def validate_provider(
         resources, resources_status = _list_adapter_resources(adapter)
         return {
             "provider": _serialize_provider_row(provider_row),
-            "validation": {
+            "validation": _annotate_provider_validation(binding.capability_key, {
                 "health": adapter.health(),
                 "resources_reachable": 200 <= resources_status < 300,
                 "resources_status_code": resources_status,
                 "resources": [_serialize_binding_resource(resource) for resource in resources],
-            },
+            }),
         }
 
     if binding.capability_key == CAPABILITY_SANDBOX_EXECUTION:
@@ -307,11 +308,11 @@ def validate_provider(
         dry_run_payload, dry_run_status = adapter.execute_dry_run()
         return {
             "provider": _serialize_provider_row(provider_row),
-            "validation": {
+            "validation": _annotate_provider_validation(binding.capability_key, {
                 "health": adapter.health(),
                 "execute_reachable": dry_run_payload is not None and 200 <= dry_run_status < 300,
                 "execute_status_code": dry_run_status,
-            },
+            }),
         }
 
     if binding.capability_key == CAPABILITY_MCP_RUNTIME:
@@ -323,11 +324,11 @@ def validate_provider(
         )
         return {
             "provider": _serialize_provider_row(provider_row),
-            "validation": {
+            "validation": _annotate_provider_validation(binding.capability_key, {
                 "health": adapter.health(),
                 "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
                 "invoke_status_code": invoke_status,
-            },
+            }),
         }
 
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)

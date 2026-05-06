@@ -9,6 +9,7 @@ from app.services import (  # noqa: E402
     platform_bootstrap,
     platform_credential_refs,
     platform_deployment_status,
+    platform_preflight,
     platform_service,
     provider_origin_policy,
 )
@@ -196,6 +197,44 @@ def test_bound_resource_inventory_validation_uses_runtime_identifier():
             "code": "resource_not_exposed",
             "resource_id": "local-model",
             "provider_resource_id": "local-model-runtime-id",
+        }
+    ]
+
+
+def test_preflight_annotation_does_not_block_on_diagnostic_health_when_operation_succeeds():
+    validation = platform_preflight._annotate_provider_validation(  # type: ignore[attr-defined]
+        "embeddings",
+        {
+            "health": {"reachable": False, "status_code": 405},
+            "embeddings_reachable": True,
+            "embeddings_status_code": 200,
+            "resources_reachable": True,
+            "resources_status_code": 200,
+        },
+    )
+
+    assert validation["diagnostic_health_reachable"] is False
+    assert validation["operation_reachable"] is True
+    assert validation["blocking_failures"] == []
+
+
+def test_preflight_annotation_reports_blocking_operation_failure():
+    validation = platform_preflight._annotate_provider_validation(  # type: ignore[attr-defined]
+        "embeddings",
+        {
+            "health": {"reachable": True, "status_code": 200},
+            "embeddings_reachable": False,
+            "embeddings_status_code": 404,
+            "resources_reachable": True,
+            "resources_status_code": 200,
+        },
+    )
+
+    assert validation["operation_reachable"] is False
+    assert validation["blocking_failures"] == [
+        {
+            "code": "embeddings_unreachable",
+            "message": "Embeddings request failed with HTTP 404",
         }
     ]
 
@@ -1382,7 +1421,8 @@ def test_activate_deployment_profile_rejects_failed_preflight_validation(monkeyp
         if binding.provider_instance_id == "provider-1":
             return {
                 "health": {"reachable": False, "status_code": 503},
-                "models_reachable": False,
+                "resources_reachable": False,
+                "resources_status_code": 503,
             }
         if binding.provider_instance_id == "provider-embeddings":
             return {
@@ -2368,6 +2408,10 @@ def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.Mo
         "resources_reachable": True,
         "resources_status_code": 200,
         "resources": [],
+        "diagnostic_health_reachable": True,
+        "discovery_reachable": True,
+        "operation_reachable": True,
+        "blocking_failures": [],
     }
 
 

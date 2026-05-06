@@ -7,7 +7,7 @@ from .context_management_chunking_compatibility import (
     resolve_embedding_resource_chunking_constraints,
     serialize_embeddings_chunking_constraints,
 )
-from .platform_serialization import _runtime_identifier_for_resource
+from .platform_resources import _runtime_identifier_for_resource
 from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_VECTOR_STORE, PlatformControlPlaneError
 
 VECTOR_MODE_VANESSA_EMBEDDINGS = "vanessa_embeddings"

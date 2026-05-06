@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
+import { ApiError } from "../auth/authApi";
 import type { AuthUser } from "../auth/types";
 import PlatformDeploymentDetailPage from "./PlatformDeploymentDetailPage";
 import * as platformApi from "../api/platform";
@@ -139,6 +140,52 @@ describe("PlatformDeploymentDetailPage", () => {
       expect(platformApi.activateDeploymentProfile).toHaveBeenCalledWith("deployment-2", "token");
     });
     expect(await screen.findByText(await t("platformControl.feedback.activationSuccess", { name: "Staging Profile" }))).toBeVisible();
+  });
+
+  it("surfaces provider-level activation validation details", async () => {
+    vi.mocked(platformApi.activateDeploymentProfile).mockRejectedValue(
+      new ApiError(
+        "Deployment profile preflight validation failed",
+        409,
+        "deployment_profile_validation_failed",
+        {
+          providers: [
+            {
+              provider: {
+                display_name: "OpenAI Cloud Embeddings",
+              },
+              validation: {
+                blocking_failures: [
+                  {
+                    code: "embeddings_unreachable",
+                    message: "Embeddings request failed with HTTP 405",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ),
+    );
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-2" },
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: await t("platformControl.actions.activate") }));
+    const activationDialog = await screen.findByRole("dialog", {
+      name: await t("platformControl.deployments.activationDialogTitle"),
+    });
+    await userEvent.click(within(activationDialog).getByRole("button", { name: await t("platformControl.actions.confirmActivate") }));
+
+    expect(
+      await screen.findByText(
+        "Deployment profile preflight validation failed: OpenAI Cloud Embeddings: Embeddings request failed with HTTP 405",
+      ),
+    ).toBeVisible();
   });
 
   it("clones a deployment profile from the detail page", async () => {

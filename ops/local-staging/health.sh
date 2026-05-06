@@ -31,6 +31,27 @@ llm_runtime_ready_ok() {
   llm_runtime_internal_http_ok "${service_name}" "/health"
 }
 
+llm_runtime_image_mismatch_reason() {
+  local service_name="$1"
+  local expected_image=""
+  local container_id=""
+  local actual_image=""
+
+  if [[ "${runtime_accelerator}" == "cpu" ]]; then
+    expected_image="${LLM_RUNTIME_CPU_IMAGE:-vanessa-llm-runtime-cpu:local}"
+  else
+    expected_image="${LLM_RUNTIME_GPU_IMAGE:-vanessa-llm-runtime-gpu:local}"
+  fi
+
+  container_id="$(compose ps -q "${service_name}" 2>/dev/null || true)"
+  [[ -n "${container_id}" ]] || return 0
+  actual_image="$(docker inspect --format '{{.Config.Image}}' "${container_id}" 2>/dev/null || true)"
+  [[ -n "${actual_image}" ]] || return 0
+  if [[ "${actual_image}" != "${expected_image}" ]]; then
+    printf 'expected_image=%s, actual_image=%s, hint=use ops/local-staging/compose.sh or local-staging scripts\n' "${expected_image}" "${actual_image}"
+  fi
+}
+
 llama_cpp_ready_ok() {
   llama_cpp_internal_http_ok "/v1/models"
 }
@@ -300,7 +321,12 @@ run_checks() {
       printf 'llm_runtime_embeddings: FAIL (accelerator=%s, variant=%s, reason=unsupported_cpu)\n' "${runtime_accelerator}" "${runtime_cpu_variant}"
       failures=$((failures + 2))
     else
-      if llm_runtime_ready_ok "llm_runtime_inference"; then
+      inference_image_mismatch="$(llm_runtime_image_mismatch_reason "llm_runtime_inference")"
+      embeddings_image_mismatch="$(llm_runtime_image_mismatch_reason "llm_runtime_embeddings")"
+      if [[ -n "${inference_image_mismatch}" ]]; then
+        printf 'llm_runtime_inference: FAIL (accelerator=%s, reason=image_mismatch, %s)\n' "${runtime_accelerator}" "${inference_image_mismatch}"
+        failures=$((failures + 1))
+      elif llm_runtime_ready_ok "llm_runtime_inference"; then
         if [[ "${runtime_accelerator}" == "cpu" ]]; then
           printf 'llm_runtime_inference: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
         else
@@ -315,7 +341,10 @@ run_checks() {
         failures=$((failures + 1))
       fi
 
-      if llm_runtime_ready_ok "llm_runtime_embeddings"; then
+      if [[ -n "${embeddings_image_mismatch}" ]]; then
+        printf 'llm_runtime_embeddings: FAIL (accelerator=%s, reason=image_mismatch, %s)\n' "${runtime_accelerator}" "${embeddings_image_mismatch}"
+        failures=$((failures + 1))
+      elif llm_runtime_ready_ok "llm_runtime_embeddings"; then
         if [[ "${runtime_accelerator}" == "cpu" ]]; then
           printf 'llm_runtime_embeddings: OK (accelerator=%s, variant=%s, bind=%s)\n' "${runtime_accelerator}" "${runtime_cpu_variant}" "${runtime_cpu_bind}"
         else

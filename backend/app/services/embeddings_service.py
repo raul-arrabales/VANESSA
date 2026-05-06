@@ -8,7 +8,7 @@ from . import platform_adapters
 from .platform_local_slots import recover_provider_local_slot_runtime
 from ..config import AuthConfig
 from .platform_service import resolve_embeddings_adapter
-from .platform_serialization import _runtime_identifier_for_resource
+from .platform_resources import _runtime_identifier_for_resource
 from .platform_types import PlatformControlPlaneError
 
 
