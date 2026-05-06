@@ -35,9 +35,22 @@ export type PlaygroundKnowledgeReference = {
   source_ids?: string[];
 };
 
+export type PlaygroundRunStatus = {
+  id: string;
+  kind: "thinking" | "connecting" | "retrieving" | "searching_web" | "running_tool" | "generating" | string;
+  label: string;
+  state: "running" | "completed" | "failed" | string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_ms?: number | null;
+  summary?: string | null;
+  details?: Record<string, unknown>;
+};
+
 export type PlaygroundMessageMetadata = Record<string, unknown> & {
   sources?: PlaygroundKnowledgeSource[];
   references?: PlaygroundKnowledgeReference[];
+  statuses?: PlaygroundRunStatus[];
 };
 
 export type PlaygroundMessage = {
@@ -126,6 +139,7 @@ export type SendPlaygroundMessageResult = {
     index: string;
     result_count: number;
   };
+  statuses?: PlaygroundRunStatus[];
 };
 
 function stringOrNull(value: unknown): string | null | undefined {
@@ -253,6 +267,7 @@ export function getPlaygroundMessageReferences(
 
 export type StreamPlaygroundMessageOptions = {
   onDelta?: (text: string) => void;
+  onStatus?: (status: PlaygroundRunStatus) => void;
   signal?: AbortSignal;
 };
 
@@ -416,6 +431,8 @@ async function readPlaygroundMessageStream(
           if (text) {
             options.onDelta?.(text);
           }
+        } else if (parsedEvent.event === "status") {
+          options.onStatus?.(normalizeRunStatus(parsedEvent.data));
         } else if (parsedEvent.event === "complete") {
           completed = parsedEvent.data as SendPlaygroundMessageResult;
         } else if (parsedEvent.event === "error") {
@@ -517,4 +534,21 @@ function parseSseEvent(rawEvent: string): { event: string; data: Record<string, 
 
   const payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
   return { event: eventName, data: payload };
+}
+
+function normalizeRunStatus(payload: Record<string, unknown>): PlaygroundRunStatus {
+  const details = payload.details && typeof payload.details === "object" && !Array.isArray(payload.details)
+    ? payload.details as Record<string, unknown>
+    : {};
+  return {
+    id: String(payload.id || `${payload.kind || "status"}-${Date.now()}`),
+    kind: String(payload.kind || "thinking"),
+    label: String(payload.label || "Thinking"),
+    state: String(payload.state || "running"),
+    started_at: stringOrNull(payload.started_at) ?? null,
+    completed_at: stringOrNull(payload.completed_at) ?? null,
+    duration_ms: numberOrNull(payload.duration_ms) ?? null,
+    summary: stringOrNull(payload.summary) ?? null,
+    details,
+  };
 }

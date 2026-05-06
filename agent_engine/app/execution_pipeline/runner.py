@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from json import loads
+from queue import Queue
+from threading import Thread
+from typing import Any, Iterator
 from uuid import uuid4
 
 from ..policies.runtime_policy import (
@@ -31,6 +34,7 @@ from ..tool_runtime.dispatch import (
     runtime_capability_for_transport,
     tool_message_content,
 )
+from .progress import ProgressRecorder, compact_payload, summarize_results, trim_text
 from .types import ConversationState, ExecutionContext, ExecutionResult
 
 _MAX_TOOL_CALL_ROUNDS = 3
@@ -71,6 +75,35 @@ def _system_text_message(text: str) -> dict[str, Any]:
     return {"role": "system", "content": [{"type": "text", "text": text}]}
 
 
+def _tool_arguments(tool_call: dict[str, Any]) -> dict[str, Any]:
+    raw_arguments = str(((tool_call.get("function") or {}).get("arguments", "")))
+    if not raw_arguments.strip():
+        return {}
+    try:
+        parsed = loads(raw_arguments)
+    except ValueError:
+        return {"raw_arguments": trim_text(raw_arguments)}
+    return parsed if isinstance(parsed, dict) else {"value": compact_payload(parsed)}
+
+
+def _tool_status_label(tool_name: str, arguments: dict[str, Any]) -> str:
+    if tool_name == "web_search":
+        query = trim_text(arguments.get("query"), limit=140)
+        return f"Searching the web for: {query}" if query else "Searching the web"
+    return f"Running tool: {tool_name}" if tool_name else "Running tool"
+
+
+def _model_status_details(runtime_snapshot: dict[str, Any], requested_model: str | None) -> dict[str, Any]:
+    llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
+    deployment_profile = runtime_snapshot.get("deployment_profile", {})
+    return {
+        "requested_model": requested_model,
+        "provider_slug": llm_binding.get("slug"),
+        "provider_key": llm_binding.get("provider_key"),
+        "deployment_profile_slug": deployment_profile.get("slug"),
+    }
+
+
 def _agent_current_spec(agent_entity: dict[str, Any]) -> dict[str, Any]:
     current_spec = agent_entity.get("current_spec")
     return current_spec if isinstance(current_spec, dict) else {}
@@ -95,16 +128,60 @@ def _execute_model_call(
     agent_entity: dict[str, Any],
     model_ref: str | None,
     agent_tools: list[dict[str, Any]],
+    progress: ProgressRecorder | None = None,
 ) -> tuple[ExecutionResult, str | None]:
+    progress = progress or ProgressRecorder()
     _raise_simulated_error_if_requested(context.execution_input)
     messages = list(context.conversation.messages)
     if not messages and context.conversation.retrieval_request is None:
         return _deterministic_execution_result(agent_id=context.agent_id, runtime_profile=context.runtime_profile), model_ref
 
-    embedding_call, retrieval_call, retrieval_results = execute_retrieval_call(
-        retrieval_request=context.conversation.retrieval_request,
-        platform_runtime=context.platform_runtime,
-    )
+    retrieval_request = context.conversation.retrieval_request
+    retrieval_status_id: str | None = None
+    if retrieval_request is not None:
+        retrieval_status_id = progress.start(
+            kind="retrieving",
+            label=f"Retrieving information from: {retrieval_request.index}",
+            summary=retrieval_request.query,
+            details={
+                "index": retrieval_request.index,
+                "query": retrieval_request.query,
+                "top_k": retrieval_request.top_k,
+                "search_method": retrieval_request.search_method,
+            },
+        )
+    try:
+        embedding_call, retrieval_call, retrieval_results = execute_retrieval_call(
+            retrieval_request=retrieval_request,
+            platform_runtime=context.platform_runtime,
+        )
+    except Exception:
+        if retrieval_status_id is not None:
+            progress.fail(
+                retrieval_status_id,
+                kind="retrieving",
+                label="Retrieval failed",
+                details={
+                    "index": retrieval_request.index if retrieval_request is not None else None,
+                    "query": retrieval_request.query if retrieval_request is not None else None,
+                },
+            )
+        raise
+    if retrieval_status_id is not None and retrieval_call is not None:
+        progress.complete(
+            retrieval_status_id,
+            kind="retrieving",
+            label=f"Retrieved information from: {retrieval_call.get('index') or retrieval_request.index}",
+            summary=f"{int(retrieval_call.get('result_count', 0) or 0)} results",
+            details={
+                "index": retrieval_call.get("index"),
+                "query": retrieval_call.get("query"),
+                "top_k": retrieval_call.get("top_k"),
+                "search_method": retrieval_call.get("search_method"),
+                "result_count": retrieval_call.get("result_count"),
+                "results": summarize_results(retrieval_call.get("results")),
+            },
+        )
     agent_spec = _agent_current_spec(agent_entity)
     effective_messages = _prepend_agent_instructions(messages, agent_spec=agent_spec)
     effective_messages = prepend_retrieval_context(
@@ -131,19 +208,41 @@ def _execute_model_call(
 
     model_calls: list[dict[str, Any]] = []
     tool_calls: list[dict[str, Any]] = []
+    connect_status_id = progress.start(
+        kind="connecting",
+        label="Connecting to model runtime",
+        details=_model_status_details(runtime_snapshot, effective_requested_model),
+    )
     try:
         client = build_llm_runtime_client(runtime_snapshot)
     except LlmRuntimeClientError as exc:
+        progress.fail(
+            connect_status_id,
+            kind="connecting",
+            label="Model runtime connection failed",
+            details={**_model_status_details(runtime_snapshot, effective_requested_model), "error": compact_payload(exc.details)},
+        )
         if exc.code == "runtime_timeout":
             raise ExecutionBlockedError(code="EXEC_TIMEOUT", message="Execution timed out", status_code=504, details=exc.details) from exc
         if exc.code in {"runtime_unreachable", "runtime_upstream_unavailable"}:
             raise ExecutionBlockedError(code="EXEC_UPSTREAM_UNAVAILABLE", message="Upstream LLM/tool dependency unavailable", status_code=503, details=exc.details) from exc
         raise ExecutionBlockedError(code="EXEC_INTERNAL_ERROR", message="Execution failed internally", status_code=500, details=exc.details) from exc
+    progress.complete(
+        connect_status_id,
+        kind="connecting",
+        label="Connected to model runtime",
+        details=_model_status_details(runtime_snapshot, effective_requested_model),
+    )
 
     llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
     deployment_profile = runtime_snapshot.get("deployment_profile", {})
     effective_model = effective_requested_model
     completion: dict[str, Any] | None = None
+    generation_status_id = progress.start(
+        kind="generating",
+        label="Generating response",
+        details=_model_status_details(runtime_snapshot, effective_requested_model),
+    )
     for _round_index in range(_MAX_TOOL_CALL_ROUNDS):
         try:
             completion = client.chat_completion(
@@ -152,6 +251,12 @@ def _execute_model_call(
                 tools=tool_definitions or None,
             )
         except LlmRuntimeClientError as exc:
+            progress.fail(
+                generation_status_id,
+                kind="generating",
+                label="Response generation failed",
+                details={**_model_status_details(runtime_snapshot, effective_requested_model), "error": compact_payload(exc.details)},
+            )
             if exc.code == "runtime_timeout":
                 raise ExecutionBlockedError(code="EXEC_TIMEOUT", message="Execution timed out", status_code=504, details=exc.details) from exc
             if exc.code in {"runtime_unreachable", "runtime_upstream_unavailable"}:
@@ -176,15 +281,47 @@ def _execute_model_call(
             tool_name = str(((tool_call.get("function") or {}).get("name", ""))).strip()
             tool_entity = tool_lookup.get(tool_name)
             if tool_entity is None:
+                progress.fail(
+                    generation_status_id,
+                    kind="generating",
+                    label="Response generation failed",
+                    details={"reason": "tool_not_allowed", "tool_name": tool_name},
+                )
                 raise ExecutionBlockedError(
                     code="EXEC_TOOL_NOT_ALLOWED",
                     message=f"Tool '{tool_name}' referenced by the model is not allowed",
                     status_code=403,
                 )
-            call_record, tool_payload = invoke_tool_call(
-                tool_entity=tool_entity,
-                tool_call=tool_call,
-                platform_runtime=runtime_snapshot,
+            arguments = _tool_arguments(tool_call)
+            tool_status_id = progress.start(
+                kind="searching_web" if tool_name == "web_search" else "running_tool",
+                label=_tool_status_label(tool_name, arguments),
+                details={"tool_name": tool_name, "arguments": compact_payload(arguments)},
+            )
+            try:
+                call_record, tool_payload = invoke_tool_call(
+                    tool_entity=tool_entity,
+                    tool_call=tool_call,
+                    platform_runtime=runtime_snapshot,
+                )
+            except Exception:
+                progress.fail(
+                    tool_status_id,
+                    kind="searching_web" if tool_name == "web_search" else "running_tool",
+                    label=f"{_tool_status_label(tool_name, arguments)} failed",
+                    details={"tool_name": tool_name, "arguments": compact_payload(arguments)},
+                )
+                raise
+            progress.complete(
+                tool_status_id,
+                kind="searching_web" if tool_name == "web_search" else "running_tool",
+                label=_tool_status_label(tool_name, arguments),
+                summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
+                details={
+                    "tool_name": tool_name,
+                    "arguments": compact_payload(arguments),
+                    "result": compact_payload(call_record.get("result") or call_record.get("error") or tool_payload),
+                },
             )
             tool_calls.append(call_record)
             effective_messages.append(
@@ -195,6 +332,12 @@ def _execute_model_call(
                 }
             )
     else:
+        progress.fail(
+            generation_status_id,
+            kind="generating",
+            label="Response generation failed",
+            details={"reason": "tool_round_limit_exceeded"},
+        )
         raise ExecutionBlockedError(
             code="EXEC_INTERNAL_ERROR",
             message="Execution failed internally",
@@ -203,7 +346,16 @@ def _execute_model_call(
         )
 
     if completion is None:
+        progress.fail(generation_status_id, kind="generating", label="Response generation failed")
         raise ExecutionBlockedError(code="EXEC_INTERNAL_ERROR", message="Execution failed internally", status_code=500)
+
+    progress.complete(
+        generation_status_id,
+        kind="generating",
+        label="Generated response",
+        summary=f"{len(str(completion.get('output_text', '')))} characters",
+        details=_model_status_details(runtime_snapshot, effective_model),
+    )
 
     return (
         ExecutionResult(
@@ -246,7 +398,7 @@ def _build_execution(
     )
 
 
-def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
+def create_execution(payload: dict[str, Any], progress_emit=None) -> tuple[dict[str, Any], int]:
     agent_id = str(payload.get("agent_id", "")).strip()
     if not agent_id:
         raise ValueError("invalid_agent_id")
@@ -297,6 +449,12 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         input_payload=normalized_input,
     )
 
+    progress = ProgressRecorder(progress_emit)
+    thinking_status_id = progress.start(
+        kind="thinking",
+        label="Thinking",
+        details={"agent_id": agent_id, "runtime_profile": runtime_profile},
+    )
     try:
         agent_entity = resolve_agent_spec(agent_id=agent_id)
         require_agent_execute_permission(
@@ -309,6 +467,16 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             runtime_profile=runtime_profile,
         )
         agent_tools = resolve_agent_tools(agent_entity=agent_entity, runtime_profile=runtime_profile)
+        progress.complete(
+            thinking_status_id,
+            kind="thinking",
+            label="Planned execution",
+            details={
+                "agent_id": agent_id,
+                "agent_version": agent_version,
+                "tool_count": len(agent_tools),
+            },
+        )
         requested_model_override = str(normalized_input.get("model", "")).strip() or None
         running_model_ref = requested_model_override or model_ref
         running_started_at = _iso_now()
@@ -335,6 +503,7 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             agent_entity=agent_entity,
             model_ref=model_ref,
             agent_tools=agent_tools,
+            progress=progress,
         )
         finished = _build_execution(
             execution_id=execution_id,
@@ -356,6 +525,12 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         )
         return {"execution": finished.to_payload()}, 201
     except ExecutionBlockedError as exc:
+        progress.fail(
+            thinking_status_id,
+            kind="thinking",
+            label="Execution blocked",
+            details={"error": exc.code, "message": exc.message},
+        )
         blocked_status = "blocked" if exc.status_code in {403} else "failed"
         failed_execution = _build_execution(
             execution_id=execution_id,
@@ -377,6 +552,12 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         )
         raise
     except Exception as exc:
+        progress.fail(
+            thinking_status_id,
+            kind="thinking",
+            label="Execution failed",
+            details={"error": "EXEC_INTERNAL_ERROR", "message": str(exc)},
+        )
         failed_execution = _build_execution(
             execution_id=execution_id,
             status="failed",
@@ -400,6 +581,50 @@ def create_execution(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
             message="Execution failed internally",
             status_code=500,
         ) from exc
+
+
+def create_execution_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    events: Queue[dict[str, Any] | None] = Queue()
+
+    def _emit_status(status: dict[str, Any]) -> None:
+        events.put({"event": "status", "data": status})
+
+    def _run() -> None:
+        try:
+            response_payload, status_code = create_execution(payload, progress_emit=_emit_status)
+            events.put({"event": "complete", "data": {**response_payload, "status_code": status_code}})
+        except ExecutionBlockedError as exc:
+            events.put(
+                {
+                    "event": "error",
+                    "data": {
+                        "error": exc.code,
+                        "message": exc.message,
+                        "status_code": exc.status_code,
+                        "details": exc.details,
+                    },
+                }
+            )
+        except ValueError as exc:
+            events.put(
+                {
+                    "event": "error",
+                    "data": {
+                        "error": str(exc) or "invalid_payload",
+                        "message": "Expected valid payload",
+                        "status_code": 400,
+                    },
+                }
+            )
+        finally:
+            events.put(None)
+
+    Thread(target=_run, daemon=True).start()
+    while True:
+        event = events.get()
+        if event is None:
+            return
+        yield event
 
 
 def get_execution(execution_id: str) -> tuple[dict[str, Any], int]:

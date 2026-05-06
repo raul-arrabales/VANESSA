@@ -32,6 +32,31 @@ def _request_json(method: str, host: str, port: int, path: str, body: dict | Non
     return response.status, parsed
 
 
+def _request_sse(method: str, host: str, port: int, path: str, body: dict | None = None, headers: dict | None = None):
+    conn = HTTPConnection(host, port, timeout=3)
+    payload = json.dumps(body).encode("utf-8") if body is not None else None
+    merged_headers = {"Content-Type": "application/json", "Accept": "text/event-stream"} if body is not None else {}
+    if headers:
+        merged_headers.update(headers)
+    conn.request(method, path, body=payload, headers=merged_headers)
+    response = conn.getresponse()
+    raw = response.read().decode("utf-8")
+    events = []
+    for raw_event in raw.strip().split("\n\n"):
+        if not raw_event:
+            continue
+        event_name = "message"
+        data = {}
+        for line in raw_event.splitlines():
+            if line.startswith("event:"):
+                event_name = line.removeprefix("event:").strip()
+            if line.startswith("data:"):
+                data = json.loads(line.removeprefix("data:").strip())
+        events.append({"event": event_name, "data": data})
+    conn.close()
+    return response.status, events
+
+
 def test_execution_create_and_get_roundtrip():
     try:
         server = HTTPServer(("127.0.0.1", 0), module.Handler)
@@ -94,6 +119,40 @@ def test_internal_endpoint_requires_service_token(monkeypatch: pytest.MonkeyPatc
         )
         assert ok_status == 201
         assert payload["execution"]["agent_ref"] == "agent.alpha"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_internal_stream_endpoint_returns_status_and_complete(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AGENT_ENGINE_SERVICE_TOKEN", "test-token")
+    monkeypatch.setattr(
+        module,
+        "create_execution_stream",
+        lambda _payload: iter([
+            {"event": "status", "data": {"id": "thinking-1", "kind": "thinking", "label": "Thinking", "state": "running"}},
+            {"event": "complete", "data": {"execution": {"id": "exec-1", "status": "succeeded"}}},
+        ]),
+    )
+    try:
+        server = HTTPServer(("127.0.0.1", 0), module.Handler)
+    except PermissionError:
+        pytest.skip("Socket binding is not permitted in this test environment")
+    host, port = server.server_address
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, events = _request_sse(
+            "POST",
+            host,
+            port,
+            "/v1/internal/agent-executions/stream",
+            {"agent_id": "agent.alpha", "runtime_profile": "offline", "input": {"prompt": "hello"}},
+            headers={"X-Service-Token": "test-token"},
+        )
+        assert status == 200
+        assert [event["event"] for event in events] == ["status", "complete"]
+        assert events[0]["data"]["label"] == "Thinking"
     finally:
         server.shutdown()
         server.server_close()

@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from time import monotonic
+from typing import Any, Iterator
 
 from ..config import AuthConfig
-from ..services.agent_engine_client import AgentEngineClientError, create_execution
+from ..services.agent_engine_client import AgentEngineClientError, create_execution, stream_execution
 from ..services.context_management import list_active_runtime_knowledge_bases, resolve_runtime_knowledge_base_selection
 from ..services.knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
 from ..services.modelops_common import ModelOpsError
@@ -53,6 +54,7 @@ class PlaygroundExecutionResult:
     references: list[dict[str, Any]] = field(default_factory=list)
     retrieval: dict[str, Any] | None = None
     knowledge_base_id: str | None = None
+    statuses: list[dict[str, Any]] = field(default_factory=list)
 
 
 def serialize_message(row: dict[str, Any]) -> dict[str, Any]:
@@ -79,6 +81,44 @@ def string_or_none(value: Any) -> str | None:
         return None
     normalized = str(value).strip()
     return normalized or None
+
+
+def _status_now() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def start_status(kind: str, label: str, *, summary: str | None = None, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "id": f"{kind}-{datetime.utcnow().timestamp()}",
+        "kind": kind,
+        "label": label,
+        "state": "running",
+        "started_at": _status_now(),
+        "completed_at": None,
+        "duration_ms": None,
+        "summary": summary,
+        "details": details or {},
+        "_started_monotonic": monotonic(),
+    }
+
+
+def complete_status(status: dict[str, Any], *, label: str | None = None, summary: str | None = None, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    started = status.pop("_started_monotonic", None)
+    completed = dict(status)
+    completed["state"] = "completed"
+    completed["completed_at"] = _status_now()
+    completed["duration_ms"] = int((monotonic() - started) * 1000) if isinstance(started, (int, float)) else None
+    if label is not None:
+        completed["label"] = label
+    if summary is not None:
+        completed["summary"] = summary
+    if details is not None:
+        completed["details"] = details
+    return completed
+
+
+def public_status(status: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in status.items() if not key.startswith("_")}
 
 
 def normalize_prompt(value: Any) -> str:
@@ -263,6 +303,114 @@ def execute_knowledge_request(
         references=references,
         retrieval=retrieval,
         knowledge_base_id=str(selected_knowledge_base["id"]),
+    )
+
+
+def stream_knowledge_request(
+    *,
+    database_url: str,
+    config: AuthConfig,
+    request_id: str,
+    request: PlaygroundExecutionRequest,
+    actor_user_id: int,
+    actor_user_role: str,
+    stream_execution_fn=None,
+    get_active_platform_runtime_fn=None,
+    resolve_runtime_profile_fn=None,
+    ensure_knowledge_chat_agent_fn=None,
+    resolve_model_for_inference_fn=None,
+) -> Iterator[dict[str, Any]]:
+    if not request.model_id:
+        raise PlaygroundExecutionValidationError("invalid_model", "model is required")
+
+    stream_execution_impl = stream_execution_fn or stream_execution
+    get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
+    resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
+    ensure_knowledge_chat_agent_impl = ensure_knowledge_chat_agent_fn or ensure_knowledge_chat_agent
+    resolve_model_for_inference_impl = resolve_model_for_inference_fn or resolve_model_for_inference
+
+    prompt = normalize_prompt(request.prompt)
+    resolved_model = resolve_model_for_inference_impl(
+        database_url,
+        config=config,
+        user_id=actor_user_id,
+        user_role=actor_user_role,
+        requested_model_id=request.model_id,
+    )
+    ensure_knowledge_chat_agent_impl(database_url)
+    platform_runtime = get_active_platform_runtime_for_dispatch(
+        database_url,
+        config,
+        get_active_platform_runtime_fn=get_active_platform_runtime_impl,
+    )
+    selected_knowledge_base = resolve_runtime_knowledge_base_selection(
+        platform_runtime,
+        database_url=database_url,
+        knowledge_base_id=request.knowledge_base_id,
+    )
+    statuses: list[dict[str, Any]] = []
+    for event in stream_execution_impl(
+        base_url=config.agent_engine_url.rstrip("/"),
+        service_token=config.agent_engine_service_token,
+        request_id=request_id,
+        agent_id=KNOWLEDGE_CHAT_AGENT_ID,
+        execution_input={
+            "prompt": prompt,
+            "model": str(resolved_model.get("id") or request.model_id),
+            "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
+            "retrieval": {
+                "index": str(selected_knowledge_base["index_name"]),
+                "query": prompt,
+                "top_k": config.product_rag_top_k,
+                "filters": {},
+                "search_method": "semantic",
+                "query_preprocessing": "none",
+            },
+        },
+        requested_by_user_id=actor_user_id,
+        requested_by_role=actor_user_role,
+        runtime_profile=resolve_runtime_profile_impl(database_url),
+        platform_runtime=platform_runtime,
+        timeout_seconds=max(float(config.llm_request_timeout_seconds), 1.0) + _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS,
+    ):
+        event_name = str(event.get("event") or "").strip()
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        if event_name == "status":
+            statuses.append(data)
+            yield {"event": "status", "data": data}
+            continue
+        if event_name == "error":
+            raise AgentEngineClientError(
+                code=str(data.get("error") or "knowledge_chat_failed"),
+                message=str(data.get("message") or "Knowledge chat request failed."),
+                status_code=int(data.get("status_code", 502) or 502),
+                details=data,
+            )
+        if event_name != "complete":
+            continue
+
+        execution_payload = data.get("execution") if isinstance(data.get("execution"), dict) else {}
+        result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
+        sources, retrieval, references = normalize_execution_retrieval(execution_payload)
+        output = add_missing_reference_citation(str(result_payload.get("output_text", "")).strip(), references)
+        yield {
+            "event": "complete",
+            "data": PlaygroundExecutionResult(
+                output=output,
+                response=execution_payload,
+                sources=sources,
+                references=references,
+                retrieval=retrieval,
+                knowledge_base_id=str(selected_knowledge_base["id"]),
+                statuses=statuses,
+            ),
+        }
+        return
+
+    raise AgentEngineClientError(
+        code="agent_engine_stream_incomplete",
+        message="Agent engine stream ended before completion",
+        status_code=502,
     )
 
 

@@ -8,11 +8,13 @@ from urllib.parse import urlparse
 try:  # pragma: no cover - import path varies by invocation style
     from .config import get_config
     from .execution_pipeline.runner import create_execution, get_execution
+    from .execution_pipeline.runner import create_execution_stream
     from .repositories.executions import ensure_schema
     from .services.policy_runtime_gate import ExecutionBlockedError
 except ImportError:  # pragma: no cover
     from agent_engine.app.config import get_config
     from agent_engine.app.execution_pipeline.runner import create_execution, get_execution
+    from agent_engine.app.execution_pipeline.runner import create_execution_stream
     from agent_engine.app.repositories.executions import ensure_schema
     from agent_engine.app.services.policy_runtime_gate import ExecutionBlockedError
 
@@ -31,6 +33,19 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_sse_stream(self, events) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+        for event in events:
+            event_name = str(event.get("event") or "message")
+            payload = event.get("data") if isinstance(event.get("data"), dict) else {}
+            body = f"event: {event_name}\ndata: {json.dumps(payload)}\n\n".encode("utf-8")
+            self.wfile.write(body)
+            self.wfile.flush()
 
     def _read_json(self) -> dict[str, Any] | None:
         try:
@@ -94,6 +109,14 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authorize_internal(path):
             return
         route_path = self._route_path()
+
+        if route_path == "/v1/agent-executions/stream":
+            payload = self._read_json()
+            if payload is None:
+                self._send_json(400, {"error": "invalid_payload", "message": "Expected JSON object"})
+                return
+            self._send_sse_stream(create_execution_stream(payload))
+            return
 
         if route_path != "/v1/agent-executions":
             self._send_json(404, {"error": "not_found", "message": "Route not found"})

@@ -488,6 +488,111 @@
   overflow-wrap: anywhere;
 }
 
+.assistant-status-timeline {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.assistant-status-item {
+  border: 0;
+}
+
+.assistant-status-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 1.5rem;
+  width: fit-content;
+  max-width: 100%;
+  color: color-mix(in oklab, var(--text-secondary) 84%, transparent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.assistant-status-summary::-webkit-details-marker {
+  display: none;
+}
+
+.assistant-status-summary:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 60%, white);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.assistant-status-dot {
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  opacity: 0.72;
+}
+
+.assistant-status-item[data-state="running"] .assistant-status-dot {
+  animation: assistant-status-pulse 1.15s ease-in-out infinite;
+}
+
+.assistant-status-item[data-state="completed"] .assistant-status-dot {
+  background: var(--success, #2e8f5b);
+}
+
+.assistant-status-item[data-state="failed"] .assistant-status-dot {
+  background: var(--danger, #b94a48);
+}
+
+.assistant-status-label,
+.assistant-status-extra {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-status-extra {
+  color: color-mix(in oklab, var(--text-secondary) 62%, transparent);
+}
+
+.assistant-status-details {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0 1.15rem;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--border-subtle, var(--bg-subtle)) 72%, transparent);
+  color: var(--text-secondary);
+  background: color-mix(in oklab, var(--bg-surface) 54%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.assistant-status-detail-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.28fr) 1fr;
+  gap: var(--space-3);
+}
+
+.assistant-status-detail-row dt {
+  margin: 0;
+  color: color-mix(in oklab, var(--text-secondary) 70%, transparent);
+  text-transform: capitalize;
+}
+
+.assistant-status-detail-row dd {
+  margin: 0;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes assistant-status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
 .chatbot-message-user {
   justify-items: end;
 }

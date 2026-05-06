@@ -5,7 +5,8 @@ import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { getPlaygroundMessageReferences, getPlaygroundMessageSources } from "../../../api/playgrounds";
 import KnowledgeReferencesList from "../../ai-shared/KnowledgeReferencesList";
 import { buildPlaygroundKnowledgeReferencesFromSources } from "../../ai-shared/retrieval";
-import type { PlaygroundSessionViewModel } from "../types";
+import AssistantStatusTimeline from "./AssistantStatusTimeline";
+import type { PlaygroundRunStatus, PlaygroundSessionViewModel } from "../types";
 
 type ThreadPanelProps = {
   activeSession: PlaygroundSessionViewModel | null;
@@ -21,6 +22,10 @@ type ThreadPanelProps = {
   composer: ReactNode;
   composerHeight: number;
 };
+
+function getMessageStatuses(metadata: Record<string, unknown>): PlaygroundRunStatus[] {
+  return Array.isArray(metadata.statuses) ? metadata.statuses as PlaygroundRunStatus[] : [];
+}
 
 export default function ThreadPanel({
   activeSession,
@@ -110,20 +115,26 @@ export default function ThreadPanel({
             const references = storedReferences.length > 0
               ? storedReferences
               : buildPlaygroundKnowledgeReferencesFromSources(getPlaygroundMessageSources(message.metadata));
+            const statuses = message.role === "assistant" ? getMessageStatuses(message.metadata) : [];
             return (
               <article
                 key={message.id}
                 className={`chatbot-message chatbot-message-${message.role}`}
               >
                 <div className="chatbot-message-surface">
-                  <ChatMessageBody
-                    content={message.content}
-                    renderMarkdown={message.role === "assistant"}
-                  />
+                  {statuses.length > 0 ? (
+                    <AssistantStatusTimeline statuses={statuses} messageId={message.id} />
+                  ) : null}
+                  {message.content.trim() ? (
+                    <ChatMessageBody
+                      content={message.content}
+                      renderMarkdown={message.role === "assistant"}
+                    />
+                  ) : null}
                   {message.role === "assistant" && references.length > 0 ? (
                     <KnowledgeReferencesList references={references} messageId={message.id} />
                   ) : null}
-                  {message.role === "assistant" ? (
+                  {message.role === "assistant" && message.content.trim() ? (
                     <div
                       className="chatbot-message-actions"
                       data-copied={copiedMessageId === message.id ? "true" : "false"}

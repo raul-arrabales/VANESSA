@@ -13,7 +13,7 @@ const playgroundApiMocks = vi.hoisted(() => ({
   createPlaygroundSession: vi.fn(),
   getPlaygroundSession: vi.fn(),
   updatePlaygroundSession: vi.fn(),
-  sendPlaygroundMessage: vi.fn(),
+  streamPlaygroundMessage: vi.fn(),
   deletePlaygroundSession: vi.fn(),
 }));
 const clipboardMocks = vi.hoisted(() => ({
@@ -33,8 +33,7 @@ vi.mock("../api/playgrounds", async (importOriginal) => {
     getPlaygroundSession: playgroundApiMocks.getPlaygroundSession,
     updatePlaygroundSession: playgroundApiMocks.updatePlaygroundSession,
     deletePlaygroundSession: playgroundApiMocks.deletePlaygroundSession,
-    sendPlaygroundMessage: playgroundApiMocks.sendPlaygroundMessage,
-    streamPlaygroundMessage: vi.fn(),
+    streamPlaygroundMessage: playgroundApiMocks.streamPlaygroundMessage,
   };
 });
 
@@ -155,7 +154,7 @@ describe("KnowledgePlaygroundPage", () => {
   });
 
   it("sends knowledge-playground requests through a draft-backed session without preloading saved history", async () => {
-    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValue({
       session: detail({
         id: "sess-draft",
         title: "First question",
@@ -191,8 +190,8 @@ describe("KnowledgePlaygroundPage", () => {
       },
       "token",
     ));
-    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledTimes(1));
-    expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenLastCalledWith("sess-draft", { prompt: "First question" }, "token");
+    await waitFor(() => expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledTimes(1));
+    expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenLastCalledWith("sess-draft", { prompt: "First question" }, "token", expect.any(Object));
   });
 
   it("starts a fresh knowledge chat with the composer centered and no empty-thread copy", async () => {
@@ -203,6 +202,71 @@ describe("KnowledgePlaygroundPage", () => {
     expect(view.container.querySelector(".chatbot-thread-shell-starter")).not.toBeNull();
     expect(screen.getByLabelText("Message")).toBeVisible();
     expect(screen.queryByText("No messages yet. Ask Knowledge Chat to search the active corpus.")).toBeNull();
+  });
+
+  it("renders streamed knowledge-chat status messages while waiting for the answer", async () => {
+    let resolveStream: (value: unknown) => void = () => undefined;
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, streamOptions) => {
+        streamOptions.onStatus?.({
+          id: "retrieval-1",
+          kind: "retrieving",
+          label: "Retrieving information from: kb_product_docs",
+          state: "running",
+          started_at: "2026-03-18T11:00:00Z",
+          completed_at: null,
+          duration_ms: null,
+          summary: "retrieval query",
+          details: { query: "retrieval query" },
+        });
+        return await new Promise((resolve) => {
+          resolveStream = resolve;
+        });
+      },
+    );
+
+    await renderKnowledgeChat();
+
+    await userEvent.type(await screen.findByLabelText("Message"), "Find docs");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+
+    expect(await screen.findByText("Retrieving information from: kb_product_docs")).toBeVisible();
+
+    resolveStream({
+          session: detail({
+            id: "sess-draft",
+            title: "Find docs",
+            message_count: 2,
+            messages: [
+              { id: "m1", role: "user", content: "Find docs", metadata: {}, createdAt: "2026-03-18T11:00:00Z" },
+              {
+                id: "m2",
+                role: "assistant",
+                content: "knowledge answer",
+                metadata: {
+                  statuses: [
+                    {
+                      id: "retrieval-1",
+                      kind: "retrieving",
+                      label: "Retrieved information from: kb_product_docs",
+                      state: "completed",
+                      duration_ms: 1200,
+                      summary: "1 result",
+                      details: { query: "retrieval query" },
+                    },
+                  ],
+                },
+                createdAt: "2026-03-18T11:00:01Z",
+              },
+            ],
+          }),
+          messages: [],
+          output: "knowledge answer",
+          statuses: [],
+        });
+
+    expect(await screen.findByText("Retrieved information from: kb_product_docs - 1.2s")).toBeVisible();
+    expect(await screen.findByText("knowledge answer")).toBeVisible();
   });
 
   it("waits for knowledge-base options after models load and shows a KB-specific loading message", async () => {
@@ -324,7 +388,7 @@ describe("KnowledgePlaygroundPage", () => {
         knowledge_binding: { knowledge_base_id: "kb_primary" },
       }),
     );
-    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValue({
       session: detail({
         knowledge_binding: { knowledge_base_id: "kb_primary" },
         message_count: 2,
@@ -355,10 +419,11 @@ describe("KnowledgePlaygroundPage", () => {
     await userEvent.type(screen.getByLabelText("Message"), "Legacy question");
     await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
 
-    await waitFor(() => expect(playgroundApiMocks.sendPlaygroundMessage).toHaveBeenCalledWith(
+    await waitFor(() => expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledWith(
       "sess-1",
       { prompt: "Legacy question" },
       "token",
+      expect.any(Object),
     ));
   });
 
@@ -428,11 +493,11 @@ describe("KnowledgePlaygroundPage", () => {
 
     expect(screen.getByText("Knowledge base is required.")).toBeVisible();
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
-    expect(playgroundApiMocks.sendPlaygroundMessage).not.toHaveBeenCalled();
+    expect(playgroundApiMocks.streamPlaygroundMessage).not.toHaveBeenCalled();
   });
 
   it("renders citations from persisted assistant metadata after the first draft send", async () => {
-    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValue({
       session: detail({
         id: "sess-draft",
         title: "How does retrieval work?",
@@ -504,7 +569,7 @@ describe("KnowledgePlaygroundPage", () => {
   });
 
   it("copies only the assistant answer text without including source cards", async () => {
-    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValue({
       session: detail({
         id: "sess-draft",
         title: "How does retrieval work?",
@@ -545,7 +610,7 @@ describe("KnowledgePlaygroundPage", () => {
   });
 
   it("renders assistant markdown in Knowledge Chat replies after persisting the draft", async () => {
-    playgroundApiMocks.sendPlaygroundMessage.mockResolvedValue({
+    playgroundApiMocks.streamPlaygroundMessage.mockResolvedValue({
       session: detail({
         id: "sess-draft",
         title: "Summarize the docs",

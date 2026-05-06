@@ -93,6 +93,37 @@ def test_create_execution_accepts_explicit_timeout(monkeypatch: pytest.MonkeyPat
     assert seen_timeouts == [45.0]
 
 
+def test_stream_execution_yields_status_and_validates_complete_payload(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _fake_request_sse(**kwargs):
+        seen_payloads.append(kwargs["payload"])
+        yield {"event": "status", "data": {"id": "thinking-1", "kind": "thinking", "label": "Thinking", "state": "running"}}
+        yield {"event": "complete", "data": _golden_success_payload()}
+
+    monkeypatch.setattr(agent_engine_client, "_request_sse", _fake_request_sse)
+
+    events = list(agent_engine_client.stream_execution(
+        base_url="http://agent_engine:7000",
+        service_token="token",
+        request_id="req-stream",
+        agent_id="agent.alpha",
+        execution_input={"prompt": "hello"},
+        requested_by_user_id=42,
+        requested_by_role="user",
+        runtime_profile="offline",
+        platform_runtime={
+            "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
+            "capabilities": {},
+        },
+    ))
+
+    assert [event["event"] for event in events] == ["status", "complete"]
+    assert events[0]["data"]["label"] == "Thinking"
+    assert events[1]["data"]["execution"]["id"] == "exec-1"
+    assert seen_payloads[0]["agent_id"] == "agent.alpha"
+
+
 def test_request_json_maps_transport_timeout_to_agent_engine_error(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         agent_engine_client,

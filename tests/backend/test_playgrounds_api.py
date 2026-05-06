@@ -170,6 +170,7 @@ def test_stream_playground_message_route_returns_sse_events(client, monkeypatch:
     token = _login(test_client, user["username"], "stream-pass-123").get_json()["access_token"]
 
     def _fake_stream(*_args, **_kwargs):
+        yield {"event": "status", "data": {"id": "thinking-1", "kind": "thinking", "label": "Thinking", "state": "running"}}
         yield {"event": "delta", "data": {"text": "Hello"}}
         yield {
             "event": "complete",
@@ -194,6 +195,8 @@ def test_stream_playground_message_route_returns_sse_events(client, monkeypatch:
     body = response.get_data(as_text=True)
     assert response.status_code == 200
     assert response.mimetype == "text/event-stream"
+    assert "event: status" in body
+    assert '"label": "Thinking"' in body
     assert "event: delta" in body
     assert '"text": "Hello"' in body
     assert "event: complete" in body

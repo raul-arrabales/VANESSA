@@ -4,6 +4,7 @@ import type {
   PlaygroundWorkspaceConfig,
   PlaygroundWorkspaceOptions,
   PlaygroundMessageViewModel,
+  PlaygroundRunStatus,
 } from "./types";
 import { hasSelector } from "./selectorConfig";
 
@@ -80,6 +81,33 @@ export function updateTransientAssistantMessage(
       ? { ...message, content: `${message.content}${text}` }
       : message
   ));
+}
+
+export function updateTransientAssistantStatus(
+  messages: PlaygroundMessageViewModel[],
+  assistantMessageId: string,
+  status: PlaygroundRunStatus,
+): PlaygroundMessageViewModel[] {
+  return messages.map((message) => {
+    if (message.id !== assistantMessageId) {
+      return message;
+    }
+    const currentStatuses = Array.isArray(message.metadata.statuses) ? message.metadata.statuses : [];
+    const nextStatuses = [
+      ...currentStatuses.filter((item) => (
+        item.id !== status.id
+        && !(status.kind === "thinking" && item.kind === "thinking" && item.id.endsWith("-thinking") && item.state === "running")
+      )),
+      status,
+    ];
+    return {
+      ...message,
+      metadata: {
+        ...message.metadata,
+        statuses: nextStatuses,
+      },
+    };
+  });
 }
 
 export function createDraftSession(

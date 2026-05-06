@@ -30,12 +30,16 @@ from .playground_execution import (
     PlaygroundExecutionValidationError,
     auto_title_from_prompt,
     build_context_messages,
+    complete_status,
     execute_knowledge_request,
     list_runtime_knowledge_base_options,
     normalize_prompt,
+    public_status,
     serialize_message,
     serialize_datetime,
+    start_status,
     string_or_none,
+    stream_knowledge_request,
 )
 
 DEFAULT_TITLE_SOURCE = "auto"
@@ -57,6 +61,18 @@ class PlaygroundChatExecutionError(RuntimeError):
         super().__init__(str(payload.get("message") or payload.get("error") or "playground_chat_failed"))
         self.payload = payload
         self.status_code = status_code
+
+
+def _record_status(statuses: dict[str, dict[str, Any]], status: dict[str, Any]) -> dict[str, Any]:
+    public = public_status(status)
+    status_id = str(public.get("id") or "")
+    if status_id:
+        statuses[status_id] = public
+    return public
+
+
+def _status_values(statuses: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    return list(statuses.values())
 
 
 def list_playground_sessions(
@@ -227,16 +243,15 @@ def stream_playground_message(
     )
     request = _build_execution_request(row=row, history_messages=history_messages, prompt=prompt)
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
-        payload = send_playground_message(
+        return _stream_knowledge_playground_message(
             database_url,
             config=config,
             request_id=request_id,
             owner_user_id=owner_user_id,
             owner_role=owner_role,
             session_id=session_id,
-            prompt=prompt,
+            request=request,
         )
-        return iter([{"event": "complete", "data": payload}])
     return _stream_chat_request(
         database_url,
         owner_user_id=owner_user_id,
@@ -276,19 +291,14 @@ def stream_temporary_playground_message(
 ) -> Iterator[dict[str, Any]]:
     request = _build_temporary_execution_request(payload=payload)
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
-        return iter([
-            {
-                "event": "complete",
-                "data": send_temporary_playground_message(
-                    database_url,
-                    config=config,
-                    request_id=request_id,
-                    owner_user_id=owner_user_id,
-                    owner_role=owner_role,
-                    payload=payload,
-                ),
-            }
-        ])
+        return _stream_temporary_knowledge_playground_message(
+            database_url,
+            config=config,
+            request_id=request_id,
+            owner_user_id=owner_user_id,
+            owner_role=owner_role,
+            request=request,
+        )
     return _stream_temporary_chat_request(request)
 
 
@@ -549,7 +559,7 @@ def _persist_execution_result(
     request: PlaygroundExecutionRequest,
     result: PlaygroundExecutionResult,
 ) -> dict[str, Any]:
-    assistant_metadata = None
+    assistant_metadata = {"statuses": result.statuses} if result.statuses else None
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         assistant_metadata = {
             "response": result.response,
@@ -558,6 +568,8 @@ def _persist_execution_result(
             "retrieval": result.retrieval,
             "knowledge_base_id": result.knowledge_base_id,
         }
+        if result.statuses:
+            assistant_metadata["statuses"] = result.statuses
     persisted = playgrounds_repository.append_message_pair(
         database_url,
         owner_user_id=owner_user_id,
@@ -583,21 +595,38 @@ def _stream_chat_request(
     if not request.model_id:
         raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
 
-    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
-        requested_model_id=request.model_id,
-        org_id=None,
-        group_id=None,
-        messages=build_context_messages(request.history, prompt=request.prompt),
-        max_tokens=None,
-        temperature=None,
-    )
-    if error_payload is not None or stream is None:
-        raise PlaygroundChatExecutionError(
-            error_payload if isinstance(error_payload, dict) else {"error": "llm_unreachable"},
-            status_code,
-        )
-
     def _stream() -> Iterator[dict[str, Any]]:
+        statuses: dict[str, dict[str, Any]] = {}
+        thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, thinking)}
+        completed_thinking = complete_status(thinking, label="Prepared request")
+        yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
+
+        connecting = start_status("connecting", "Connecting to model", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, connecting)}
+        stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+            requested_model_id=request.model_id,
+            org_id=None,
+            group_id=None,
+            messages=build_context_messages(request.history, prompt=request.prompt),
+            max_tokens=None,
+            temperature=None,
+        )
+        if error_payload is not None or stream is None:
+            yield {
+                "event": "error",
+                "data": public_stream_error_payload(
+                    {**error_payload, "status_code": status_code} if isinstance(error_payload, dict) else {"status_code": status_code},
+                    fallback_error="llm_unreachable",
+                    fallback_message="LLM service unavailable",
+                ),
+            }
+            return
+        completed_connecting = complete_status(connecting, label="Connected to model", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
+
+        generating = start_status("generating", "Generating response", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, generating)}
         assistant_output_parts: list[str] = []
         for event in stream:
             event_type = str(event.get("type", "")).strip().lower()
@@ -611,6 +640,9 @@ def _stream_chat_request(
 
             if event_type == "error":
                 payload = event.get("payload")
+                failed_generating = complete_status(generating, label="Response generation failed")
+                failed_generating["state"] = "failed"
+                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
                 yield {
                     "event": "error",
                     "data": public_stream_error_payload(
@@ -629,6 +661,9 @@ def _stream_chat_request(
                 llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
             output = extract_output_text(llm_response) or "".join(assistant_output_parts)
             if not output:
+                failed_generating = complete_status(generating, label="Response generation failed")
+                failed_generating["state"] = "failed"
+                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
                 yield {
                     "event": "error",
                     "data": {
@@ -638,11 +673,19 @@ def _stream_chat_request(
                 }
                 return
 
+            completed_generating = complete_status(
+                generating,
+                label="Generated response",
+                summary=f"{len(output)} characters",
+                details={"model_id": request.model_id},
+            )
+            yield {"event": "status", "data": _record_status(statuses, completed_generating)}
+            result = PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses))
             persisted = _persist_execution_result(
                 database_url,
                 owner_user_id=owner_user_id,
                 request=request,
-                result=PlaygroundExecutionResult(output=output, response=llm_response),
+                result=result,
             )
             session = get_playground_session_detail(
                 database_url,
@@ -655,7 +698,7 @@ def _stream_chat_request(
                 "data": _serialize_execution_response(
                     session=session,
                     persisted=persisted,
-                    result=PlaygroundExecutionResult(output=output, response=llm_response),
+                    result=result,
                 ),
             }
             return
@@ -675,21 +718,38 @@ def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Itera
     if not request.model_id:
         raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
 
-    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
-        requested_model_id=request.model_id,
-        org_id=None,
-        group_id=None,
-        messages=build_context_messages(request.history, prompt=request.prompt),
-        max_tokens=None,
-        temperature=None,
-    )
-    if error_payload is not None or stream is None:
-        raise PlaygroundChatExecutionError(
-            error_payload if isinstance(error_payload, dict) else {"error": "llm_unreachable"},
-            status_code,
-        )
-
     def _stream() -> Iterator[dict[str, Any]]:
+        statuses: dict[str, dict[str, Any]] = {}
+        thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, thinking)}
+        completed_thinking = complete_status(thinking, label="Prepared request")
+        yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
+
+        connecting = start_status("connecting", "Connecting to model", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, connecting)}
+        stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+            requested_model_id=request.model_id,
+            org_id=None,
+            group_id=None,
+            messages=build_context_messages(request.history, prompt=request.prompt),
+            max_tokens=None,
+            temperature=None,
+        )
+        if error_payload is not None or stream is None:
+            yield {
+                "event": "error",
+                "data": public_stream_error_payload(
+                    {**error_payload, "status_code": status_code} if isinstance(error_payload, dict) else {"status_code": status_code},
+                    fallback_error="llm_unreachable",
+                    fallback_message="LLM service unavailable",
+                ),
+            }
+            return
+        completed_connecting = complete_status(connecting, label="Connected to model", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
+
+        generating = start_status("generating", "Generating response", details={"model_id": request.model_id})
+        yield {"event": "status", "data": _record_status(statuses, generating)}
         assistant_output_parts: list[str] = []
         for event in stream:
             event_type = str(event.get("type", "")).strip().lower()
@@ -702,6 +762,9 @@ def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Itera
 
             if event_type == "error":
                 payload = event.get("payload")
+                failed_generating = complete_status(generating, label="Response generation failed")
+                failed_generating["state"] = "failed"
+                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
                 yield {
                     "event": "error",
                     "data": public_stream_error_payload(
@@ -720,6 +783,9 @@ def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Itera
                 llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
             output = extract_output_text(llm_response) or "".join(assistant_output_parts)
             if not output:
+                failed_generating = complete_status(generating, label="Response generation failed")
+                failed_generating["state"] = "failed"
+                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
                 yield {
                     "event": "error",
                     "data": {
@@ -729,11 +795,18 @@ def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Itera
                 }
                 return
 
+            completed_generating = complete_status(
+                generating,
+                label="Generated response",
+                summary=f"{len(output)} characters",
+                details={"model_id": request.model_id},
+            )
+            yield {"event": "status", "data": _record_status(statuses, completed_generating)}
             yield {
                 "event": "complete",
                 "data": _serialize_temporary_execution_response(
                     request=request,
-                    result=PlaygroundExecutionResult(output=output, response=llm_response),
+                    result=PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses)),
                 ),
             }
             return
@@ -763,6 +836,7 @@ def _serialize_execution_response(
         "sources": result.sources,
         "references": result.references,
         "retrieval": result.retrieval,
+        "statuses": result.statuses,
     }
 
 
@@ -780,6 +854,8 @@ def _serialize_temporary_execution_response(
             "retrieval": result.retrieval,
             "knowledge_base_id": result.knowledge_base_id,
         }
+    if result.statuses:
+        metadata["statuses"] = result.statuses
     messages = [
         *_temporary_history_to_messages(request.history),
         _temporary_message("temporary-user", "user", request.prompt),
@@ -806,6 +882,7 @@ def _serialize_temporary_execution_response(
         "sources": result.sources,
         "references": result.references,
         "retrieval": result.retrieval,
+        "statuses": result.statuses,
     }
 
 
@@ -830,6 +907,91 @@ def _temporary_message(
         "metadata": metadata or {},
         "createdAt": None,
     }
+
+
+def _stream_knowledge_playground_message(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    request_id: str,
+    owner_user_id: int,
+    owner_role: str,
+    session_id: str,
+    request: PlaygroundExecutionRequest,
+) -> Iterator[dict[str, Any]]:
+    statuses: dict[str, dict[str, Any]] = {}
+    for event in stream_knowledge_request(
+        database_url=database_url,
+        config=config,
+        request_id=request_id,
+        request=request,
+        actor_user_id=owner_user_id,
+        actor_user_role=owner_role,
+    ):
+        event_name = str(event.get("event") or "").strip()
+        data = event.get("data")
+        if event_name == "status" and isinstance(data, dict):
+            yield {"event": "status", "data": _record_status(statuses, data)}
+            continue
+        if event_name != "complete" or not isinstance(data, PlaygroundExecutionResult):
+            continue
+        result = data
+        result.statuses = _status_values(statuses)
+        persisted = _persist_execution_result(
+            database_url,
+            owner_user_id=owner_user_id,
+            request=request,
+            result=result,
+        )
+        session = get_playground_session_detail(
+            database_url,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            playground_kind=request.playground_kind,
+        )
+        yield {
+            "event": "complete",
+            "data": _serialize_execution_response(
+                session=session,
+                persisted=persisted,
+                result=result,
+            ),
+        }
+        return
+
+
+def _stream_temporary_knowledge_playground_message(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    request_id: str,
+    owner_user_id: int,
+    owner_role: str,
+    request: PlaygroundExecutionRequest,
+) -> Iterator[dict[str, Any]]:
+    statuses: dict[str, dict[str, Any]] = {}
+    for event in stream_knowledge_request(
+        database_url=database_url,
+        config=config,
+        request_id=request_id,
+        request=request,
+        actor_user_id=owner_user_id,
+        actor_user_role=owner_role,
+    ):
+        event_name = str(event.get("event") or "").strip()
+        data = event.get("data")
+        if event_name == "status" and isinstance(data, dict):
+            yield {"event": "status", "data": _record_status(statuses, data)}
+            continue
+        if event_name != "complete" or not isinstance(data, PlaygroundExecutionResult):
+            continue
+        result = data
+        result.statuses = _status_values(statuses)
+        yield {
+            "event": "complete",
+            "data": _serialize_temporary_execution_response(request=request, result=result),
+        }
+        return
 
 
 def _require_session(

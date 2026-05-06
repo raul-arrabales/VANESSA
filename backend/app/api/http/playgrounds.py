@@ -223,8 +223,17 @@ def post_playground_message_stream_route(session_id: str):
         return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
 
     def _response_stream():
-        for event in stream:
-            yield _format_sse_event(str(event["event"]), dict(event["data"]))
+        try:
+            for event in stream:
+                yield _format_sse_event(str(event["event"]), dict(event["data"]))
+        except AgentEngineClientError as exc:
+            yield _format_sse_event("error", {"error": exc.code, "message": exc.message, "status_code": exc.status_code})
+        except PlaygroundChatExecutionError as exc:
+            payload = exc.payload if isinstance(exc.payload, dict) else {}
+            yield _format_sse_event(
+                "error",
+                {"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc)), "status_code": exc.status_code},
+            )
 
     return Response(
         stream_with_context(_response_stream()),
@@ -260,8 +269,17 @@ def post_temporary_playground_message_stream_route():
         return jsonify({"error": exc.code, "message": exc.message}), exc.status_code
 
     def _response_stream():
-        for event in stream:
-            yield _format_sse_event(str(event["event"]), dict(event["data"]))
+        try:
+            for event in stream:
+                yield _format_sse_event(str(event["event"]), dict(event["data"]))
+        except AgentEngineClientError as exc:
+            yield _format_sse_event("error", {"error": exc.code, "message": exc.message, "status_code": exc.status_code})
+        except PlaygroundChatExecutionError as exc:
+            payload = exc.payload if isinstance(exc.payload, dict) else {}
+            yield _format_sse_event(
+                "error",
+                {"error": payload.get("error", "playground_chat_failed"), "message": payload.get("message", str(exc)), "status_code": exc.status_code},
+            )
 
     return Response(
         stream_with_context(_response_stream()),

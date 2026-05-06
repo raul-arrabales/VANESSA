@@ -189,4 +189,73 @@ describe("ThreadPanel", () => {
     expect(screen.getByText("No messages yet")).toBeVisible();
     expect(screen.getByRole("button", { name: "Sending starter" })).toBeVisible();
   });
+
+  it("renders expandable assistant progress statuses with elapsed time", async () => {
+    const session = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user",
+          role: "user" as const,
+          content: "User question",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant",
+          role: "assistant" as const,
+          content: "",
+          metadata: {
+            statuses: [
+              {
+                id: "retrieval-1",
+                kind: "retrieving",
+                label: "Retrieved information from: docs",
+                state: "completed",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: "2026-03-18T11:00:01Z",
+                duration_ms: 1234,
+                summary: "2 results",
+                details: {
+                  query: "deployment profiles",
+                  result_count: 2,
+                },
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+      ],
+    };
+
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={session}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const statusSummary = screen.getByText("Retrieved information from: docs - 1.2s").closest("summary");
+    expect(statusSummary).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("deployment profiles")).not.toBeVisible();
+    expect(screen.queryByRole("button", { name: "Copy response" })).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(statusSummary as HTMLElement);
+    });
+
+    expect(statusSummary).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("deployment profiles")).toBeVisible();
+    expect(screen.getByText("2 results")).toBeVisible();
+  });
 });

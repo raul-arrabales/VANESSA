@@ -3,8 +3,6 @@ import { useRef } from "react";
 import {
   createPlaygroundSession,
   deletePlaygroundSession,
-  sendPlaygroundMessage,
-  sendTemporaryPlaygroundMessage,
   streamPlaygroundMessage,
   streamTemporaryPlaygroundMessage,
   updatePlaygroundSession,
@@ -13,6 +11,7 @@ import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { hasSelector } from "../selectorConfig";
 import type {
   PlaygroundMessageViewModel,
+  PlaygroundRunStatus,
   PlaygroundSessionViewModel,
   PlaygroundWorkspaceConfig,
   PlaygroundWorkspaceOptions,
@@ -26,6 +25,7 @@ import {
   removeSession,
   sortSessions,
   updateTransientAssistantMessage,
+  updateTransientAssistantStatus,
   upsertSession,
 } from "../utils";
 
@@ -364,10 +364,26 @@ export function usePlaygroundSessionActions({
     setError("");
     setIsSending(true);
 
-    if (config.messaging.mode === "stream") {
+    const shouldUseStreamingTransport = config.messaging.mode === "stream" || config.messaging.mode === "request";
+    if (shouldUseStreamingTransport) {
       const userMessageId = createTransientMessageId("pending-user");
       const assistantMessageId = createTransientMessageId("pending-assistant");
-      const optimisticMessages = createOptimisticMessages(previousMessages, prompt, userMessageId, assistantMessageId);
+      const initialStatus = {
+        id: `${assistantMessageId}-thinking`,
+        kind: "thinking",
+        label: "Thinking",
+        state: "running",
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        duration_ms: null,
+        summary: null,
+        details: {},
+      };
+      const optimisticMessages = updateTransientAssistantStatus(
+        createOptimisticMessages(previousMessages, prompt, userMessageId, assistantMessageId),
+        assistantMessageId,
+        initialStatus,
+      );
       const controller = new AbortController();
       streamAbortRef.current = controller;
       setDraft("");
@@ -387,6 +403,16 @@ export function usePlaygroundSessionActions({
                 ? {
                   ...current,
                   messages: updateTransientAssistantMessage(current.messages, assistantMessageId, text),
+                }
+                : current
+            ));
+          },
+          onStatus: (status: PlaygroundRunStatus) => {
+            setActiveSession((current) => (
+              current && current.id === sessionId
+                ? {
+                  ...current,
+                  messages: updateTransientAssistantStatus(current.messages, assistantMessageId, status),
                 }
                 : current
             ));
@@ -431,34 +457,6 @@ export function usePlaygroundSessionActions({
         setIsSending(false);
       }
       return;
-    }
-
-    try {
-      const result = isTemporarySession
-        ? await sendTemporaryPlaygroundMessage(buildTemporaryMessagePayload(targetSession, prompt), token)
-        : await sendPlaygroundMessage(
-          sessionId,
-          { prompt },
-          token,
-        );
-      const nextSession = mapPlaygroundSessionDetail(result.session);
-      if (isTemporarySession) {
-        setActiveSession({ ...nextSession, persistence: "temporary" });
-      } else {
-        setSavedSessions((existing) => upsertSession(existing, nextSession));
-        setActiveSession(nextSession);
-      }
-      setDraft("");
-      pinToBottomOnNextUpdate("smooth");
-    } catch (requestError) {
-      if (draftSnapshot) {
-        await restoreDraftAfterFailedFirstSend(draftSnapshot, createdFromDraft, prompt);
-      } else {
-        setDraft(prompt);
-      }
-      showErrorFeedback(requestError, config.feedback.sendError);
-    } finally {
-      setIsSending(false);
     }
   };
 

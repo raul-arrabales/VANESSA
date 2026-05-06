@@ -474,6 +474,94 @@ def test_send_playground_message_persists_structured_knowledge_metadata(monkeypa
     ]
 
 
+def test_stream_knowledge_message_forwards_and_persists_statuses(monkeypatch):
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "get_session",
+        lambda _database_url, *, owner_user_id, conversation_id, conversation_kind: {
+            "id": conversation_id,
+            "conversation_kind": "knowledge",
+            "title": "Knowledge session",
+            "title_source": "auto",
+            "model_id": "safe-small",
+            "knowledge_base_id": "kb-primary",
+            "assistant_ref": "agent.knowledge_chat",
+        } if conversation_kind == "knowledge" else None,
+    )
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
+
+    def _fake_stream_knowledge_request(**_kwargs):
+        yield {
+            "event": "status",
+            "data": {
+                "id": "retrieval-1",
+                "kind": "retrieving",
+                "label": "Retrieved information from: kb_product_docs",
+                "state": "completed",
+                "duration_ms": 1200,
+                "details": {"query": "hello knowledge"},
+            },
+        }
+        yield {
+            "event": "complete",
+            "data": playgrounds_service.PlaygroundExecutionResult(
+                output="knowledge answer",
+                response={"id": "exec-1"},
+                retrieval={"index": "kb_product_docs", "result_count": 1},
+                knowledge_base_id="kb-primary",
+            ),
+        }
+
+    monkeypatch.setattr(playgrounds_service, "stream_knowledge_request", _fake_stream_knowledge_request)
+
+    def _append_message_pair(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation": {"id": kwargs["conversation_id"]},
+            "messages": [
+                {"id": "msg-user", "role": "user", "content": kwargs["user_content"], "metadata_json": {}, "created_at": "2026-03-18T11:00:00+00:00"},
+                {"id": "msg-assistant", "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
+            ],
+        }
+
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "append_message_pair", _append_message_pair)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_playground_session_detail",
+        lambda *_args, **_kwargs: {"id": "sess-knowledge", "playground_kind": "knowledge", "messages": []},
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    events = list(playgrounds_service.stream_playground_message(
+        "postgresql://ignored",
+        config=config,
+        request_id="req-knowledge-stream",
+        owner_user_id=10,
+        owner_role="user",
+        session_id="sess-knowledge",
+        prompt="hello knowledge",
+    ))
+
+    assert [event["event"] for event in events] == ["status", "complete"]
+    assert events[0]["data"]["label"] == "Retrieved information from: kb_product_docs"
+    assert captured["assistant_metadata"]["statuses"] == [events[0]["data"]]
+    assert events[1]["data"]["statuses"] == [events[0]["data"]]
+
+
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):
     monkeypatch.setattr(
         playgrounds_service,

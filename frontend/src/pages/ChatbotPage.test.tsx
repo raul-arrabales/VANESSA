@@ -440,6 +440,22 @@ describe("ChatPlaygroundPage", () => {
     expect(document.querySelector(".chatbot-message-assistant .chatbot-message-surface")).not.toBeNull();
   });
 
+  it("shows a thinking status instead of an empty assistant placeholder while waiting", async () => {
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async () => await new Promise<SendPlaygroundMessageResult>(() => undefined),
+    );
+
+    await renderChatPlayground();
+
+    await waitForDraftReady();
+    await userEvent.type(screen.getByLabelText("Message"), "Slow answer");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Slow answer")).toBeVisible();
+    expect(await screen.findByText("Thinking")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Copy response" })).toBeNull();
+  });
+
   it("renders the copy action only for assistant messages and copies the assistant response", async () => {
     playgroundApiMocks.streamPlaygroundMessage.mockResolvedValueOnce(
       sendResult(

@@ -3,6 +3,7 @@ import type {
   PlaygroundKnowledgeBaseOption,
   PlaygroundKind,
   PlaygroundMessage,
+  PlaygroundRunStatus,
   PlaygroundSessionDetail,
   PlaygroundSessionSummary,
 } from "../../api/playgrounds";
@@ -18,6 +19,8 @@ export type PlaygroundSelectorState = {
 export type PlaygroundMessageViewModel = PlaygroundMessage & {
   isTransient?: boolean;
 };
+
+export type { PlaygroundRunStatus };
 
 export type PlaygroundSessionPersistence = "draft" | "saved" | "temporary";
 

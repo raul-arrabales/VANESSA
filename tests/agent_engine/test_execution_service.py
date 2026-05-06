@@ -97,6 +97,65 @@ def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
     assert saved_statuses == ["queued", "running", "succeeded"]
 
 
+def test_execution_progress_recorder_emits_model_statuses(monkeypatch: pytest.MonkeyPatch):
+    progress_events: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v2", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v2", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        execution_service,
+        "build_llm_runtime_client",
+        lambda _runtime: type(
+            "FakeClient",
+            (),
+            {
+                "chat_completion": lambda self, **kwargs: {
+                    "output_text": "model output",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            },
+        )(),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "hello"},
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                },
+            },
+        },
+        progress_emit=progress_events.append,
+    )
+
+    assert status == 201
+    assert payload["execution"]["status"] == "succeeded"
+    assert [event["kind"] for event in progress_events] == [
+        "thinking",
+        "thinking",
+        "connecting",
+        "connecting",
+        "generating",
+        "generating",
+    ]
+    assert progress_events[-1]["state"] == "completed"
+    assert isinstance(progress_events[-1]["duration_ms"], int)
+
+
 def test_execution_runtime_block_is_persisted(monkeypatch: pytest.MonkeyPatch):
     captured: list[dict[str, Any]] = []
     monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
