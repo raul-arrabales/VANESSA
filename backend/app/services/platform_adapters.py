@@ -668,7 +668,7 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
     def _health_url(self) -> str:
         if self.binding.healthcheck_url:
             return self.binding.healthcheck_url
-        return self._embeddings_url()
+        return self._models_url()
 
     def _request_timeout_seconds(self) -> float:
         return _binding_timeout_seconds(self.binding.config)

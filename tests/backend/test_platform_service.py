@@ -2229,6 +2229,41 @@ def test_openai_embeddings_adapter_lists_normalized_embeddings_resources(monkeyp
     ]
 
 
+def test_openai_embeddings_adapter_health_defaults_to_models_endpoint(monkeypatch: pytest.MonkeyPatch):
+    seen_requests: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=2.0):
+        del payload, headers, timeout_seconds
+        seen_requests.append({"url": url, "method": method})
+        return {"data": []}, 200
+
+    monkeypatch.setattr(platform_adapters, "http_json_request", _request)
+    adapter = platform_adapters.OpenAICompatibleEmbeddingsAdapter(
+        platform_service.ProviderBinding(
+            capability_key="embeddings",
+            provider_instance_id="provider-openai-embeddings",
+            provider_slug="openai-cloud-embeddings",
+            provider_key="openai_compatible_cloud_embeddings",
+            provider_display_name="OpenAI Cloud Embeddings",
+            provider_description="desc",
+            endpoint_url="https://api.openai.com/v1",
+            healthcheck_url=None,
+            enabled=True,
+            adapter_kind="openai_compatible_embeddings",
+            config={"models_path": "/models", "embeddings_path": "/embeddings"},
+            binding_config={},
+            deployment_profile_id="deployment-cloud",
+            deployment_profile_slug="oai-cloud",
+            deployment_profile_display_name="OpenAI Cloud",
+        )
+    )
+
+    health = adapter.health()
+
+    assert health["reachable"] is True
+    assert seen_requests == [{"url": "https://api.openai.com/v1/models", "method": "GET"}]
+
+
 def test_validate_provider_supports_embeddings_capability(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
     monkeypatch.setattr(
