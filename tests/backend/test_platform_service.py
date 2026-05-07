@@ -321,6 +321,48 @@ def test_http_json_request_reports_non_json_success_without_raising(monkeypatch:
     }
 
 
+def test_stream_sse_request_emits_transport_metadata(monkeypatch: pytest.MonkeyPatch):
+    class _Response:
+        status = 200
+        headers = {"x-request-id": "req-123", "openai-processing-ms": "42", "authorization": "ignored"}
+
+        def __init__(self):
+            self._lines = [
+                b"event: delta\n",
+                b"data: {\"text\":\"hi\"}\n",
+                b"\n",
+                b"",
+            ]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def readline(self) -> bytes:
+            return self._lines.pop(0)
+
+    monkeypatch.setattr(platform_adapters, "urlopen", lambda *args, **kwargs: _Response())
+
+    events = list(
+        platform_adapters.stream_sse_request(
+            "https://api.openai.com/v1/chat/completions",
+            method="POST",
+            payload={"stream": True},
+            timeout_seconds=60,
+        )
+    )
+
+    assert events[0][0] == "transport"
+    assert events[0][1]["phase"] == "upstream_connected"
+    assert events[0][1]["status_code"] == 200
+    assert events[0][1]["endpoint_host"] == "api.openai.com"
+    assert isinstance(events[0][1]["duration_ms"], int)
+    assert events[0][1]["headers"] == {"x-request-id": "req-123", "openai-processing-ms": "42"}
+    assert events[1] == ("delta", {"text": "hi"})
+
+
 def test_openai_adapter_uses_models_url_when_healthcheck_is_null(monkeypatch: pytest.MonkeyPatch):
     seen_urls: list[str] = []
 

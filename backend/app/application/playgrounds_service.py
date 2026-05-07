@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from typing import Any
 
 from ..config import AuthConfig
@@ -591,6 +591,180 @@ def _persist_execution_result(
     return persisted
 
 
+def _stream_llm_chat_execution(
+    request: PlaygroundExecutionRequest,
+    statuses: dict[str, dict[str, Any]],
+) -> Generator[dict[str, Any], None, PlaygroundExecutionResult | None]:
+    thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
+    yield {"event": "status", "data": _record_status(statuses, thinking)}
+    completed_thinking = complete_status(thinking, label="Prepared request")
+    yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
+
+    connecting = start_status("connecting", "Preparing model request", details={"model_id": request.model_id})
+    yield {"event": "status", "data": _record_status(statuses, connecting)}
+    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+        requested_model_id=str(request.model_id or ""),
+        org_id=None,
+        group_id=None,
+        messages=build_context_messages(request.history, prompt=request.prompt),
+        max_tokens=None,
+        temperature=None,
+    )
+    if error_payload is not None or stream is None:
+        yield {
+            "event": "error",
+            "data": public_stream_error_payload(
+                {**error_payload, "status_code": status_code} if isinstance(error_payload, dict) else {"status_code": status_code},
+                fallback_error="llm_unreachable",
+                fallback_message="LLM service unavailable",
+            ),
+        }
+        return None
+    completed_connecting = complete_status(connecting, label="Model request prepared", details={"model_id": request.model_id})
+    yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
+
+    opening = start_status("opening_stream", "Opening upstream stream", details={"model_id": request.model_id})
+    yield {"event": "status", "data": _record_status(statuses, opening)}
+    waiting: dict[str, Any] | None = None
+    streaming_status: dict[str, Any] | None = None
+    assistant_output_parts: list[str] = []
+    delta_count = 0
+
+    def _fail_running_generation(label: str) -> dict[str, Any]:
+        failed = complete_status(streaming_status or waiting or opening, label=label)
+        failed["state"] = "failed"
+        return failed
+
+    def _transport_details(event: dict[str, Any] | None = None) -> dict[str, Any]:
+        details: dict[str, Any] = {"model_id": request.model_id}
+        if not event:
+            return details
+        for key in ("endpoint_host", "status_code", "duration_ms"):
+            if event.get(key) is not None:
+                details[key] = event.get(key)
+        headers = event.get("headers")
+        if isinstance(headers, dict) and headers:
+            details["headers"] = headers
+        return details
+
+    def _transport_summary(event: dict[str, Any] | None = None) -> str | None:
+        headers = event.get("headers") if isinstance(event, dict) else None
+        if not isinstance(headers, dict):
+            return None
+        for key in ("x-request-id", "x-openai-request-id", "openai-request-id", "request-id"):
+            value = str(headers.get(key) or "").strip()
+            if value:
+                return f"request id {value}"
+        return None
+
+    def _waiting_details(event: dict[str, Any] | None = None) -> dict[str, Any]:
+        details = _transport_details(event)
+        details["phase"] = "provider queueing, prompt prefill, and first-token sampling"
+        return details
+
+    for event in stream:
+        event_type = str(event.get("type", "")).strip().lower()
+        if event_type == "transport":
+            if waiting is None:
+                completed_opening = complete_status(
+                    opening,
+                    label="Upstream stream connected",
+                    summary=_transport_summary(event),
+                    details=_transport_details(event),
+                )
+                yield {"event": "status", "data": _record_status(statuses, completed_opening)}
+                waiting = start_status("waiting_first_token", "Waiting for first token", details=_waiting_details(event))
+                yield {"event": "status", "data": _record_status(statuses, waiting)}
+            continue
+
+        if event_type == "delta":
+            text = str(event.get("text", ""))
+            if not text:
+                continue
+            if waiting is None:
+                completed_opening = complete_status(
+                    opening,
+                    label="Upstream stream connected",
+                    details=_transport_details(),
+                )
+                yield {"event": "status", "data": _record_status(statuses, completed_opening)}
+                waiting = start_status("waiting_first_token", "Waiting for first token", details=_waiting_details())
+                yield {"event": "status", "data": _record_status(statuses, waiting)}
+            if streaming_status is None:
+                first_token = complete_status(
+                    waiting,
+                    label="Received first token",
+                    summary="Model started streaming",
+                    details={"model_id": request.model_id},
+                )
+                yield {"event": "status", "data": _record_status(statuses, first_token)}
+                streaming_status = start_status("streaming_tokens", "Streaming response", details={"model_id": request.model_id})
+                yield {"event": "status", "data": _record_status(statuses, streaming_status)}
+            delta_count += 1
+            assistant_output_parts.append(text)
+            yield {"event": "delta", "data": {"text": text}}
+            continue
+
+        if event_type == "error":
+            payload = event.get("payload")
+            yield {"event": "status", "data": _record_status(statuses, _fail_running_generation("Response generation failed"))}
+            yield {
+                "event": "error",
+                "data": public_stream_error_payload(
+                    payload if isinstance(payload, dict) else None,
+                    fallback_error="playground_chat_failed",
+                    fallback_message="LLM stream failed",
+                ),
+            }
+            return None
+
+        if event_type != "complete":
+            continue
+
+        llm_response = event.get("response")
+        if not isinstance(llm_response, dict):
+            llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
+        output = extract_output_text(llm_response) or "".join(assistant_output_parts)
+        if not output:
+            yield {"event": "status", "data": _record_status(statuses, _fail_running_generation("Response generation failed"))}
+            yield {
+                "event": "error",
+                "data": {
+                    "error": "empty_response",
+                    "message": "LLM stream completed without assistant output",
+                },
+            }
+            return None
+
+        if streaming_status is not None:
+            completed_streaming = complete_status(
+                streaming_status,
+                label="Streamed response",
+                summary=f"{len(output)} characters",
+                details={"model_id": request.model_id, "delta_count": delta_count},
+            )
+            yield {"event": "status", "data": _record_status(statuses, completed_streaming)}
+        else:
+            completed_waiting = complete_status(
+                waiting or opening,
+                label="Received response",
+                summary=f"{len(output)} characters",
+                details={"model_id": request.model_id, "delta_count": 0},
+            )
+            yield {"event": "status", "data": _record_status(statuses, completed_waiting)}
+
+        return PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses))
+
+    yield {
+        "event": "error",
+        "data": {
+            "error": "stream_incomplete",
+            "message": "LLM stream ended before completion",
+        },
+    }
+    return None
+
+
 def _stream_chat_request(
     database_url: str,
     *,
@@ -602,119 +776,31 @@ def _stream_chat_request(
 
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
-        thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, thinking)}
-        completed_thinking = complete_status(thinking, label="Prepared request")
-        yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
-
-        connecting = start_status("connecting", "Connecting to model", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, connecting)}
-        stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
-            requested_model_id=request.model_id,
-            org_id=None,
-            group_id=None,
-            messages=build_context_messages(request.history, prompt=request.prompt),
-            max_tokens=None,
-            temperature=None,
+        result = yield from _stream_llm_chat_execution(request, statuses)
+        if result is None:
+            return
+        result.statuses = _status_values(statuses)
+        persisted = _persist_execution_result(
+            database_url,
+            owner_user_id=owner_user_id,
+            request=request,
+            result=result,
         )
-        if error_payload is not None or stream is None:
-            yield {
-                "event": "error",
-                "data": public_stream_error_payload(
-                    {**error_payload, "status_code": status_code} if isinstance(error_payload, dict) else {"status_code": status_code},
-                    fallback_error="llm_unreachable",
-                    fallback_message="LLM service unavailable",
-                ),
-            }
-            return
-        completed_connecting = complete_status(connecting, label="Connected to model", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
-
-        generating = start_status("generating", "Generating response", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, generating)}
-        assistant_output_parts: list[str] = []
-        for event in stream:
-            event_type = str(event.get("type", "")).strip().lower()
-            if event_type == "delta":
-                text = str(event.get("text", ""))
-                if not text:
-                    continue
-                assistant_output_parts.append(text)
-                yield {"event": "delta", "data": {"text": text}}
-                continue
-
-            if event_type == "error":
-                payload = event.get("payload")
-                failed_generating = complete_status(generating, label="Response generation failed")
-                failed_generating["state"] = "failed"
-                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
-                yield {
-                    "event": "error",
-                    "data": public_stream_error_payload(
-                        payload if isinstance(payload, dict) else None,
-                        fallback_error="playground_chat_failed",
-                        fallback_message="LLM stream failed",
-                    ),
-                }
-                return
-
-            if event_type != "complete":
-                continue
-
-            llm_response = event.get("response")
-            if not isinstance(llm_response, dict):
-                llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
-            output = extract_output_text(llm_response) or "".join(assistant_output_parts)
-            if not output:
-                failed_generating = complete_status(generating, label="Response generation failed")
-                failed_generating["state"] = "failed"
-                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
-                yield {
-                    "event": "error",
-                    "data": {
-                        "error": "empty_response",
-                        "message": "LLM stream completed without assistant output",
-                    },
-                }
-                return
-
-            completed_generating = complete_status(
-                generating,
-                label="Generated response",
-                summary=f"{len(output)} characters",
-                details={"model_id": request.model_id},
-            )
-            yield {"event": "status", "data": _record_status(statuses, completed_generating)}
-            result = PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses))
-            persisted = _persist_execution_result(
-                database_url,
-                owner_user_id=owner_user_id,
-                request=request,
-                result=result,
-            )
-            session = get_playground_session_detail(
-                database_url,
-                owner_user_id=owner_user_id,
-                session_id=request.session_id,
-                playground_kind=request.playground_kind,
-            )
-            yield {
-                "event": "complete",
-                "data": _serialize_execution_response(
-                    session=session,
-                    persisted=persisted,
-                    result=result,
-                ),
-            }
-            return
-
+        session = get_playground_session_detail(
+            database_url,
+            owner_user_id=owner_user_id,
+            session_id=request.session_id,
+            playground_kind=request.playground_kind,
+        )
         yield {
-            "event": "error",
-            "data": {
-                "error": "stream_incomplete",
-                "message": "LLM stream ended before completion",
-            },
+            "event": "complete",
+            "data": _serialize_execution_response(
+                session=session,
+                persisted=persisted,
+                result=result,
+            ),
         }
+        return
 
     return _stream()
 
@@ -725,104 +811,18 @@ def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Itera
 
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
-        thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, thinking)}
-        completed_thinking = complete_status(thinking, label="Prepared request")
-        yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
-
-        connecting = start_status("connecting", "Connecting to model", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, connecting)}
-        stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
-            requested_model_id=request.model_id,
-            org_id=None,
-            group_id=None,
-            messages=build_context_messages(request.history, prompt=request.prompt),
-            max_tokens=None,
-            temperature=None,
-        )
-        if error_payload is not None or stream is None:
-            yield {
-                "event": "error",
-                "data": public_stream_error_payload(
-                    {**error_payload, "status_code": status_code} if isinstance(error_payload, dict) else {"status_code": status_code},
-                    fallback_error="llm_unreachable",
-                    fallback_message="LLM service unavailable",
-                ),
-            }
+        result = yield from _stream_llm_chat_execution(request, statuses)
+        if result is None:
             return
-        completed_connecting = complete_status(connecting, label="Connected to model", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
-
-        generating = start_status("generating", "Generating response", details={"model_id": request.model_id})
-        yield {"event": "status", "data": _record_status(statuses, generating)}
-        assistant_output_parts: list[str] = []
-        for event in stream:
-            event_type = str(event.get("type", "")).strip().lower()
-            if event_type == "delta":
-                text = str(event.get("text", ""))
-                if text:
-                    assistant_output_parts.append(text)
-                    yield {"event": "delta", "data": {"text": text}}
-                continue
-
-            if event_type == "error":
-                payload = event.get("payload")
-                failed_generating = complete_status(generating, label="Response generation failed")
-                failed_generating["state"] = "failed"
-                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
-                yield {
-                    "event": "error",
-                    "data": public_stream_error_payload(
-                        payload if isinstance(payload, dict) else None,
-                        fallback_error="playground_chat_failed",
-                        fallback_message="LLM stream failed",
-                    ),
-                }
-                return
-
-            if event_type != "complete":
-                continue
-
-            llm_response = event.get("response")
-            if not isinstance(llm_response, dict):
-                llm_response = {"output": [{"content": [{"type": "text", "text": "".join(assistant_output_parts)}]}]}
-            output = extract_output_text(llm_response) or "".join(assistant_output_parts)
-            if not output:
-                failed_generating = complete_status(generating, label="Response generation failed")
-                failed_generating["state"] = "failed"
-                yield {"event": "status", "data": _record_status(statuses, failed_generating)}
-                yield {
-                    "event": "error",
-                    "data": {
-                        "error": "empty_response",
-                        "message": "LLM stream completed without assistant output",
-                    },
-                }
-                return
-
-            completed_generating = complete_status(
-                generating,
-                label="Generated response",
-                summary=f"{len(output)} characters",
-                details={"model_id": request.model_id},
-            )
-            yield {"event": "status", "data": _record_status(statuses, completed_generating)}
-            yield {
-                "event": "complete",
-                "data": _serialize_temporary_execution_response(
-                    request=request,
-                    result=PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses)),
-                ),
-            }
-            return
-
+        result.statuses = _status_values(statuses)
         yield {
-            "event": "error",
-            "data": {
-                "error": "stream_incomplete",
-                "message": "LLM stream ended before completion",
-            },
+            "event": "complete",
+            "data": _serialize_temporary_execution_response(
+                request=request,
+                result=result,
+            ),
         }
+        return
 
     return _stream()
 

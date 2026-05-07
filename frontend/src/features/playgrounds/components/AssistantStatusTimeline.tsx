@@ -4,7 +4,7 @@ import type { PlaygroundRunStatus } from "../types";
 type AssistantStatusTimelineProps = {
   statuses: PlaygroundRunStatus[];
   messageId: string;
-  defaultExpanded?: boolean;
+  responseText?: string;
 };
 
 function formatDuration(durationMs?: number | null): string {
@@ -36,21 +36,79 @@ function statusLabel(status: PlaygroundRunStatus): string {
   return duration && status.state !== "running" ? `${status.label} - ${duration}` : status.label;
 }
 
+function timestampMillis(value?: string | null): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function totalDurationMs(statuses: PlaygroundRunStatus[]): number | null {
+  const startedAt = statuses
+    .map((status) => timestampMillis(status.started_at))
+    .filter((value): value is number => value !== null);
+  const completedAt = statuses
+    .map((status) => timestampMillis(status.completed_at))
+    .filter((value): value is number => value !== null);
+  if (startedAt.length > 0 && completedAt.length > 0) {
+    const duration = Math.max(...completedAt) - Math.min(...startedAt);
+    return duration >= 0 ? duration : null;
+  }
+
+  const durationTotal = statuses.reduce((total, status) => (
+    typeof status.duration_ms === "number" && Number.isFinite(status.duration_ms) && status.duration_ms > 0
+      ? total + status.duration_ms
+      : total
+  ), 0);
+  return durationTotal > 0 ? durationTotal : null;
+}
+
+function generationDurationMs(statuses: PlaygroundRunStatus[]): number | null {
+  const generationStatuses = statuses.filter((status) => status.kind === "generating");
+  return totalDurationMs(generationStatuses.length > 0 ? generationStatuses : statuses);
+}
+
+function estimateTokenCount(text?: string): number {
+  const normalized = (text ?? "").trim();
+  if (!normalized) {
+    return 0;
+  }
+  return Math.max(1, Math.round(normalized.length / 4));
+}
+
+function formatTokensPerSecond(responseText: string | undefined, durationMs: number | null): string {
+  const tokenCount = estimateTokenCount(responseText);
+  if (!durationMs || durationMs <= 0 || tokenCount === 0) {
+    return "";
+  }
+  const tokensPerSecond = tokenCount / (durationMs / 1000);
+  if (!Number.isFinite(tokensPerSecond) || tokensPerSecond <= 0) {
+    return "";
+  }
+  return `~${tokensPerSecond.toFixed(tokensPerSecond < 10 ? 1 : 0)} tok/s`;
+}
+
+function generationSummaryLabel(statuses: PlaygroundRunStatus[], responseText?: string): string {
+  const duration = formatDuration(totalDurationMs(statuses));
+  const throughput = formatTokensPerSecond(responseText, generationDurationMs(statuses));
+  const metrics = [duration, throughput].filter(Boolean).join(", ");
+  return metrics ? `Generation (${metrics})` : "Generation";
+}
+
 export default function AssistantStatusTimeline({
   statuses,
   messageId,
-  defaultExpanded = false,
+  responseText,
 }: AssistantStatusTimelineProps): JSX.Element | null {
   const hasRunningStatus = statuses.some((status) => status.state === "running");
-  const [isGroupOpen, setIsGroupOpen] = useState(defaultExpanded);
+  const [isGroupOpen, setIsGroupOpen] = useState(false);
 
   useEffect(() => {
-    if (hasRunningStatus || defaultExpanded) {
-      setIsGroupOpen(true);
-      return;
+    if (!hasRunningStatus) {
+      setIsGroupOpen(false);
     }
-    setIsGroupOpen(false);
-  }, [defaultExpanded, hasRunningStatus, messageId]);
+  }, [hasRunningStatus, messageId]);
 
   if (statuses.length === 0) {
     return null;
@@ -88,7 +146,7 @@ export default function AssistantStatusTimeline({
               <path d="M6 4.25 9.75 8 6 11.75" />
             </svg>
           </span>
-          <span>Generation details</span>
+          <span>{generationSummaryLabel(statuses, responseText)}</span>
         </summary>
         {timeline}
       </details>

@@ -5,8 +5,10 @@ from collections.abc import Iterator
 from json import dumps, loads
 import logging
 import os
+from time import monotonic
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
+from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -16,6 +18,15 @@ from .platform_resources import _default_resource_runtime_identifier as _resourc
 from .platform_types import PlatformControlPlaneError, ProviderBinding
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
+_TRACE_RESPONSE_HEADERS = (
+    "x-request-id",
+    "x-openai-request-id",
+    "openai-request-id",
+    "request-id",
+    "openai-processing-ms",
+    "server-timing",
+    "cf-ray",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -90,9 +101,18 @@ def stream_sse_request(
         request_headers.setdefault("Content-Type", "application/json")
         data = dumps(payload).encode("utf-8")
 
-    req = Request(url, data=data, headers=request_headers, method=method.upper())
+    normalized_url = str(url or "").strip()
+    req = Request(normalized_url, data=data, headers=request_headers, method=method.upper())
+    started = monotonic()
     try:
         with urlopen(req, timeout=timeout_seconds) as response:
+            yield "transport", {
+                "phase": "upstream_connected",
+                "duration_ms": int((monotonic() - started) * 1000),
+                "status_code": int(getattr(response, "status", 0) or 0),
+                "endpoint_host": urlparse(normalized_url).netloc,
+                "headers": _trace_response_headers(response),
+            }
             yield from _iter_sse_events(response)
     except TimeoutError as exc:
         raise StreamRequestError(
@@ -115,6 +135,24 @@ def stream_sse_request(
             "Upstream stream request failed",
             status_code=502,
         ) from exc
+
+
+def _trace_response_headers(response: Any) -> dict[str, str]:
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return {}
+    trace_headers: dict[str, str] = {}
+    for header_name in _TRACE_RESPONSE_HEADERS:
+        value = None
+        get_header = getattr(response, "getheader", None)
+        if callable(get_header):
+            value = get_header(header_name)
+        if value is None:
+            get_value = getattr(headers, "get", None)
+            value = get_value(header_name) if callable(get_value) else None
+        if value:
+            trace_headers[header_name] = str(value)[:256]
+    return trace_headers
 
 
 def _binding_timeout_seconds(config: dict[str, Any]) -> float:
@@ -1349,6 +1387,12 @@ def _iter_openai_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, An
 def _iter_vanessa_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, Any]]]) -> Iterator[dict[str, Any]]:
     for event_name, event_payload in raw_events:
         normalized_event_name = event_name.strip().lower()
+        if normalized_event_name == "transport":
+            yield {
+                "type": "transport",
+                **event_payload,
+            }
+            continue
         if normalized_event_name == "delta":
             text = str(event_payload.get("text", ""))
             if text:

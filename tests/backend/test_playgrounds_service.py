@@ -562,6 +562,102 @@ def test_stream_knowledge_message_forwards_and_persists_statuses(monkeypatch):
     assert events[1]["data"]["statuses"] == [events[0]["data"]]
 
 
+def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def _get_session(_database_url: str, *, owner_user_id: int, conversation_id: str, conversation_kind: str):
+        if conversation_kind == "plain":
+            return {
+                "id": conversation_id,
+                "conversation_kind": "plain",
+                "title": "New chat session",
+                "title_source": "auto",
+                "model_id": "safe-small",
+                "knowledge_base_id": None,
+                "assistant_ref": "assistant.playground.chat",
+            }
+        return None
+
+    def _fake_stream(**_kwargs):
+        yield {
+            "type": "transport",
+            "phase": "upstream_connected",
+            "duration_ms": 123,
+            "status_code": 200,
+            "endpoint_host": "api.openai.com",
+            "headers": {"x-request-id": "req-chat-1"},
+        }
+        yield {"type": "delta", "text": "Hello"}
+        yield {"type": "delta", "text": " world"}
+        yield {
+            "type": "complete",
+            "response": {
+                "output": [
+                    {
+                        "content": [{"type": "text", "text": "Hello world"}],
+                    }
+                ]
+            },
+        }
+
+    def _append_message_pair(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation": {"id": kwargs["conversation_id"]},
+            "messages": [
+                {"id": "msg-user", "role": "user", "content": kwargs["user_content"], "metadata_json": {}, "created_at": "2026-03-18T11:00:00+00:00"},
+                {"id": "msg-assistant", "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
+            ],
+        }
+
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "get_session", _get_session)
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(playgrounds_service, "chat_completion_stream_with_allowed_model", lambda **_kwargs: (_fake_stream(), None, 200))
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "append_message_pair", _append_message_pair)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_playground_session_detail",
+        lambda *_args, **_kwargs: {"id": "sess-chat", "playground_kind": "chat", "messages": []},
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    events = list(playgrounds_service.stream_playground_message(
+        "postgresql://ignored",
+        config=config,
+        request_id="req-chat-stream",
+        owner_user_id=10,
+        owner_role="user",
+        session_id="sess-chat",
+        prompt="hello",
+    ))
+
+    labels = [event["data"]["label"] for event in events if event["event"] == "status"]
+    assert "Opening upstream stream" in labels
+    assert "Upstream stream connected" in labels
+    assert "Waiting for first token" in labels
+    assert "Received first token" in labels
+    assert "Streaming response" in labels
+    assert "Streamed response" in labels
+    assert [event["data"]["text"] for event in events if event["event"] == "delta"] == ["Hello", " world"]
+    assert events[-1]["event"] == "complete"
+    assert captured["assistant_metadata"]["statuses"][-1]["label"] == "Streamed response"
+    connected_status = next(status for status in captured["assistant_metadata"]["statuses"] if status["label"] == "Upstream stream connected")
+    assert connected_status["summary"] == "request id req-chat-1"
+    assert connected_status["details"]["endpoint_host"] == "api.openai.com"
+
+
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):
     monkeypatch.setattr(
         playgrounds_service,

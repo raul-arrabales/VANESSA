@@ -27,6 +27,25 @@ function getMessageStatuses(metadata: Record<string, unknown>): PlaygroundRunSta
   return Array.isArray(metadata.statuses) ? metadata.statuses as PlaygroundRunStatus[] : [];
 }
 
+function TemporaryConversationIndicator(): JSX.Element {
+  const label = "Temporary conversation - not saved";
+  return (
+    <div className="chatbot-temporary-indicator-wrap">
+      <span
+        className="chatbot-temporary-indicator"
+        aria-label={label}
+        title={label}
+        role="img"
+      >
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v6.5a2.5 2.5 0 0 1-2.5 2.5h-5.2L8 20v-3H6.5A2.5 2.5 0 0 1 4 14.5V8a2.5 2.5 0 0 1 2.5-2.5Z" />
+          <path d="M8 10h8M8 13h5" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
 export default function ThreadPanel({
   activeSession,
   isBootstrapping,
@@ -55,6 +74,7 @@ export default function ThreadPanel({
     && activeSession?.messages.length === 0
     && !isBootstrapping
     && !isSending;
+  const isTemporarySession = activeSession?.persistence === "temporary";
 
   useEffect(() => () => {
     if (copiedResetTimeoutRef.current !== null) {
@@ -90,7 +110,9 @@ export default function ThreadPanel({
         className="chatbot-thread-shell chatbot-thread-shell-starter"
         onScroll={handleScroll}
         style={shellStyle}
+        data-temporary={isTemporarySession ? "true" : "false"}
       >
+        {isTemporarySession ? <TemporaryConversationIndicator /> : null}
         <div className="chatbot-starter-composer">
           {composer}
         </div>
@@ -98,17 +120,15 @@ export default function ThreadPanel({
     );
   }
 
-  const latestAssistantStatusMessageId = [...(activeSession?.messages ?? [])]
-    .reverse()
-    .find((message) => message.role === "assistant" && getMessageStatuses(message.metadata).length > 0)?.id;
-
   return (
     <div
       ref={threadRef}
       className="chatbot-thread-shell"
       onScroll={handleScroll}
       style={shellStyle}
+      data-temporary={isTemporarySession ? "true" : "false"}
     >
+      {isTemporarySession ? <TemporaryConversationIndicator /> : null}
       <div
         className="chatbot-thread"
         aria-live="polite"
@@ -130,7 +150,7 @@ export default function ThreadPanel({
                     <AssistantStatusTimeline
                       statuses={statuses}
                       messageId={message.id}
-                      defaultExpanded={message.id === latestAssistantStatusMessageId}
+                      responseText={message.content}
                     />
                   ) : null}
                   {message.content.trim() ? (

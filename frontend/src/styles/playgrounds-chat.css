@@ -341,6 +341,49 @@
   overflow: hidden;
 }
 
+.chatbot-temporary-indicator-wrap {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 4;
+  height: 0;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.chatbot-thread-shell-starter .chatbot-temporary-indicator-wrap {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  width: auto;
+}
+
+.chatbot-temporary-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px dashed color-mix(in oklab, var(--accent-primary) 54%, var(--border-muted));
+  border-radius: 999px;
+  color: var(--accent-primary);
+  background: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+}
+
+.chatbot-temporary-indicator svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 3 2.4;
+}
+
 .chatbot-starter-composer {
   width: min(100%, 54rem);
 }

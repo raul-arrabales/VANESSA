@@ -190,6 +190,27 @@ describe("ThreadPanel", () => {
     expect(screen.getByRole("button", { name: "Sending starter" })).toBeVisible();
   });
 
+  it("shows a floating temporary conversation indicator for temporary chats", async () => {
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={{ ...buildSession(), persistence: "temporary" }}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    expect(screen.getByLabelText("Temporary conversation - not saved")).toBeVisible();
+  });
+
   it("renders expandable assistant progress statuses with elapsed time", async () => {
     const session = {
       ...buildSession(),
@@ -245,7 +266,15 @@ describe("ThreadPanel", () => {
       />,
     );
 
-    expect(screen.getByText("Generation details").closest("summary")).toHaveAttribute("aria-expanded", "true");
+    const generationSummary = screen.getByText("Generation (1.0s)").closest("summary");
+    expect(generationSummary).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Retrieved information from: docs - 1.2s")).not.toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(generationSummary as HTMLElement);
+    });
+
+    expect(generationSummary).toHaveAttribute("aria-expanded", "true");
     const statusSummary = screen.getByText("Retrieved information from: docs - 1.2s").closest("summary");
     expect(statusSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("deployment profiles")).not.toBeVisible();
@@ -260,10 +289,10 @@ describe("ThreadPanel", () => {
     expect(screen.getByText("2 results")).toBeVisible();
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Generation details").closest("summary") as HTMLElement);
+      fireEvent.click(generationSummary as HTMLElement);
     });
 
-    expect(screen.getByText("Generation details").closest("summary")).toHaveAttribute("aria-expanded", "false");
+    expect(generationSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Retrieved information from: docs - 1.2s")).not.toBeVisible();
   });
 
@@ -345,11 +374,11 @@ describe("ThreadPanel", () => {
       />,
     );
 
-    const generationSummaries = screen.getAllByText("Generation details").map((node) => node.closest("summary"));
+    const generationSummaries = screen.getAllByText(/^Generation \(/).map((node) => node.closest("summary"));
     expect(generationSummaries[0]).toHaveAttribute("aria-expanded", "false");
-    expect(generationSummaries[1]).toHaveAttribute("aria-expanded", "true");
+    expect(generationSummaries[1]).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Thinking - 250ms")).not.toBeVisible();
-    expect(screen.getByText("Generating response - 2.0s")).toBeVisible();
+    expect(screen.getByText("Generating response - 2.0s")).not.toBeVisible();
 
     await act(async () => {
       fireEvent.click(generationSummaries[0] as HTMLElement);
@@ -357,5 +386,12 @@ describe("ThreadPanel", () => {
 
     expect(generationSummaries[0]).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Thinking - 250ms")).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(generationSummaries[1] as HTMLElement);
+    });
+
+    expect(generationSummaries[1]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Generating response - 2.0s")).toBeVisible();
   });
 });
