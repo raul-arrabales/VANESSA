@@ -101,11 +101,22 @@ def _select_bound_llm_model(adapter: Any, requested_model_id: str) -> dict[str, 
             continue
         if str(resource.get("id", "")).strip() == requested_model_id:
             return dict(resource)
+    available_model_ids = [
+        str(resource.get("id", "")).strip()
+        for resource in resources
+        if isinstance(resource, dict) and str(resource.get("id", "")).strip()
+    ]
+    default_resource_id = str(getattr(binding, "default_resource_id", "") or "").strip() or None
     raise PlatformControlPlaneError(
-        "model_not_bound",
-        "Requested model is not bound by the active LLM deployment binding",
+        "selected_model_unavailable",
+        "Selected model is not available in the active LLM deployment. Choose a model from the current deployment.",
         status_code=409,
-        details={"model_id": requested_model_id, "provider": getattr(binding, "provider_slug", None)},
+        details={
+            "model_id": requested_model_id,
+            "provider": getattr(binding, "provider_slug", None),
+            "available_model_ids": available_model_ids,
+            "default_model_id": default_resource_id,
+        },
     )
 
 

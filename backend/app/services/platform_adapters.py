@@ -1385,6 +1385,7 @@ def _iter_openai_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, An
 
 
 def _iter_vanessa_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, Any]]]) -> Iterator[dict[str, Any]]:
+    text_parts: list[str] = []
     for event_name, event_payload in raw_events:
         normalized_event_name = event_name.strip().lower()
         if normalized_event_name == "transport":
@@ -1396,18 +1397,17 @@ def _iter_vanessa_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, A
         if normalized_event_name == "delta":
             text = str(event_payload.get("text", ""))
             if text:
+                text_parts.append(text)
                 yield {"type": "delta", "text": text}
             continue
         if normalized_event_name == "complete":
             response_payload = event_payload.get("response")
-            normalized_response = (
-                _normalize_chat_response_payload(response_payload)
-                if isinstance(response_payload, dict)
-                else None
-            )
             yield {
                 "type": "complete",
-                "response": normalized_response,
+                "response": normalize_stream_complete_response(
+                    response_payload if isinstance(response_payload, dict) else None,
+                    text_parts,
+                ),
                 "status_code": 200,
             }
             return
@@ -1425,15 +1425,22 @@ def _first_openai_stream_choice(event_payload: dict[str, Any]) -> dict[str, Any]
 def _openai_chat_complete_event(text_parts: list[str]) -> dict[str, Any]:
     return {
         "type": "complete",
-        "response": {
-            "output": [
-                {
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": "".join(text_parts)}],
-                }
-            ]
-        },
+        "response": normalize_stream_complete_response(None, text_parts),
         "status_code": 200,
+    }
+
+
+def normalize_stream_complete_response(response_payload: dict[str, Any] | None, text_parts: list[str]) -> dict[str, Any] | None:
+    normalized_response = _normalize_chat_response_payload(response_payload) if isinstance(response_payload, dict) else None
+    if normalized_response is not None:
+        return normalized_response
+    return {
+        "output": [
+            {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "".join(text_parts)}],
+            }
+        ]
     }
 
 

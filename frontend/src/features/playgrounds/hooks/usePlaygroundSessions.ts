@@ -9,7 +9,7 @@ import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { hasSelector } from "../selectorConfig";
 import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions, PlaygroundSessionViewModel } from "../types";
 import { mapPlaygroundSessionDetail, mapPlaygroundSessionSummary } from "../types";
-import { createDraftSession, sortSessions, upsertSession } from "../utils";
+import { createDraftSession, resolveAvailableModelId, sortSessions, upsertSession } from "../utils";
 
 type UsePlaygroundSessionsParams = {
   token: string;
@@ -230,11 +230,10 @@ export function usePlaygroundSessions({
       try {
         const session = await getPlaygroundSession(activeSessionId, config.playgroundKind, token);
         const loadedSession = mapPlaygroundSessionDetail(session);
-        const availableModelIds = new Set(options.models.map((model) => model.id));
-        const defaultModelId = options.models[0]?.id ?? null;
+        const resolvedModelId = resolveAvailableModelId(loadedSession.selectorState.modelId, options.models);
         const needsModelRepair = Boolean(
-          defaultModelId
-          && (!loadedSession.selectorState.modelId || !availableModelIds.has(loadedSession.selectorState.modelId)),
+          resolvedModelId
+          && loadedSession.selectorState.modelId !== resolvedModelId,
         );
         const needsKnowledgeBaseRepair = (
           config.playgroundKind === "knowledge"
@@ -247,7 +246,7 @@ export function usePlaygroundSessions({
             const repaired = await updatePlaygroundSession(
               activeSessionId,
               {
-                ...(needsModelRepair ? { model_selection: { model_id: defaultModelId } } : {}),
+                ...(needsModelRepair ? { model_selection: { model_id: resolvedModelId } } : {}),
                 ...(needsKnowledgeBaseRepair
                   ? { knowledge_binding: { knowledge_base_id: options.defaultKnowledgeBaseId } }
                   : {}),

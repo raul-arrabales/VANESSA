@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Iterator
 
@@ -83,13 +83,17 @@ def string_or_none(value: Any) -> str | None:
     return normalized or None
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def _status_now() -> str:
-    return datetime.utcnow().isoformat() + "Z"
+    return _utc_now().isoformat().replace("+00:00", "Z")
 
 
 def start_status(kind: str, label: str, *, summary: str | None = None, details: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
-        "id": f"{kind}-{datetime.utcnow().timestamp()}",
+        "id": f"{kind}-{_utc_now().timestamp()}",
         "kind": kind,
         "label": label,
         "state": "running",
@@ -218,6 +222,40 @@ def resolve_model_for_inference(
     )
 
 
+def ensure_model_bound_to_active_runtime(platform_runtime: dict[str, Any], requested_model_id: str) -> None:
+    capabilities = platform_runtime.get("capabilities") if isinstance(platform_runtime.get("capabilities"), dict) else {}
+    llm_binding = capabilities.get("llm_inference") if isinstance(capabilities.get("llm_inference"), dict) else {}
+    resources = llm_binding.get("resources") if isinstance(llm_binding.get("resources"), list) else []
+    available_model_ids = [
+        str(resource.get("id") or "").strip()
+        for resource in resources
+        if isinstance(resource, dict) and str(resource.get("id") or "").strip()
+    ]
+    if not available_model_ids:
+        raise PlatformControlPlaneError(
+            "resource_required",
+            "Active LLM deployment is missing model resources",
+            status_code=503,
+            details={"provider": llm_binding.get("slug")},
+        )
+    if requested_model_id in available_model_ids:
+        return
+    raise PlatformControlPlaneError(
+        "selected_model_unavailable",
+        "Selected model is not available in the active LLM deployment. Choose a model from the current deployment.",
+        status_code=409,
+        details={
+            "model_id": requested_model_id,
+            "provider": llm_binding.get("slug"),
+            "available_model_ids": available_model_ids,
+            "default_model_id": llm_binding.get("default_resource_id"),
+            "deployment_profile": (platform_runtime.get("deployment_profile") or {}).get("slug")
+            if isinstance(platform_runtime.get("deployment_profile"), dict)
+            else None,
+        },
+    )
+
+
 def execute_knowledge_request(
     *,
     database_url: str,
@@ -255,6 +293,7 @@ def execute_knowledge_request(
         config,
         get_active_platform_runtime_fn=get_active_platform_runtime_impl,
     )
+    ensure_model_bound_to_active_runtime(platform_runtime, str(resolved_model.get("id") or request.model_id))
     selected_knowledge_base = resolve_runtime_knowledge_base_selection(
         platform_runtime,
         database_url=database_url,
@@ -343,6 +382,7 @@ def stream_knowledge_request(
         config,
         get_active_platform_runtime_fn=get_active_platform_runtime_impl,
     )
+    ensure_model_bound_to_active_runtime(platform_runtime, str(resolved_model.get("id") or request.model_id))
     selected_knowledge_base = resolve_runtime_knowledge_base_selection(
         platform_runtime,
         database_url=database_url,

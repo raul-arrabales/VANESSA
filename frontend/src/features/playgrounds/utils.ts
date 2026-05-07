@@ -110,18 +110,25 @@ export function updateTransientAssistantStatus(
   });
 }
 
+export function resolveAvailableModelId(
+  requestedModelId: string | null | undefined,
+  models: PlaygroundWorkspaceOptions["models"],
+): string | null {
+  const fallbackModelId = models[0]?.id ?? null;
+  if (!requestedModelId) {
+    return fallbackModelId;
+  }
+  return models.some((model) => model.id === requestedModelId) ? requestedModelId : fallbackModelId;
+}
+
 export function createDraftSession(
   config: PlaygroundWorkspaceConfig,
   options: PlaygroundWorkspaceOptions,
   source?: PlaygroundSessionViewModel | null,
 ): PlaygroundSessionViewModel {
-  const availableModelIds = new Set(options.models.map((model) => model.id));
-  const sourceModelId = source?.selectorState.modelId ?? null;
   const selectorState: PlaygroundSelectorState = {
     assistantRef: source?.selectorState.assistantRef ?? options.defaultAssistantRef ?? config.defaultAssistantRef ?? null,
-    modelId: sourceModelId && availableModelIds.has(sourceModelId)
-      ? sourceModelId
-      : options.models[0]?.id ?? null,
+    modelId: resolveAvailableModelId(source?.selectorState.modelId, options.models),
     knowledgeBaseId: hasSelector(config, "knowledgeBase")
       ? (source?.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId ?? null)
       : null,
