@@ -399,6 +399,7 @@ export function usePlaygroundSessionActions({
         const streamOptions = {
           signal: controller.signal,
           onDelta: (text: string) => {
+            pinToBottomOnNextUpdate("auto");
             setActiveSession((current) => (
               current && current.id === sessionId
                 ? {
@@ -409,6 +410,7 @@ export function usePlaygroundSessionActions({
             ));
           },
           onStatus: (status: PlaygroundRunStatus) => {
+            pinToBottomOnNextUpdate("auto");
             setActiveSession((current) => (
               current && current.id === sessionId
                 ? {

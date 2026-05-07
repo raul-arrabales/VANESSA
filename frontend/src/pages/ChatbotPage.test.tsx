@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PlaygroundSessionDetail,
   PlaygroundSessionSummary,
+  PlaygroundRunStatus,
   SendPlaygroundMessageResult,
 } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
@@ -637,6 +638,48 @@ describe("ChatPlaygroundPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Thread two/i }));
     await screen.findByText("Second thread");
+    await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
+  });
+
+  it("autoscrolls when streamed status messages arrive before response text", async () => {
+    const statusHandlers: Array<(status: PlaygroundRunStatus) => void> = [];
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, streamOptions) => {
+        if (streamOptions.onStatus) {
+          statusHandlers.push(streamOptions.onStatus);
+        }
+        return await new Promise<SendPlaygroundMessageResult>(() => undefined);
+      },
+    );
+
+    const { container } = await renderChatPlayground();
+    await waitForDraftReady();
+
+    const thread = getChatThread(container);
+    setThreadMetrics(thread, { scrollTop: 200 });
+    fireEvent.scroll(thread);
+    scrollToMock.mockClear();
+
+    await userEvent.type(screen.getByLabelText("Message"), "Slow status");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledTimes(1));
+    scrollToMock.mockClear();
+
+    await act(async () => {
+      statusHandlers[0]?.({
+        id: "waiting-first-token",
+        kind: "waiting_first_token",
+        label: "Waiting for first token",
+        state: "running",
+        started_at: "2026-03-18T11:00:00Z",
+        completed_at: null,
+        duration_ms: null,
+        summary: null,
+        details: { model_id: "safe-small" },
+      });
+    });
+
+    expect(await screen.findByText("Waiting for first token")).toBeVisible();
     await waitFor(() => expect(scrollToMock).toHaveBeenCalled());
   });
 

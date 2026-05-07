@@ -68,7 +68,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     }
 
     return `${sessionState.activeSession.id}:${sessionState.activeSession.messages.map((message) => (
-      `${message.id}:${message.content.length}`
+      `${message.id}:${message.content.length}:${JSON.stringify(message.metadata.statuses ?? [])}`
     )).join("|")}`;
   }, [sessionState.activeSession]);
   const {

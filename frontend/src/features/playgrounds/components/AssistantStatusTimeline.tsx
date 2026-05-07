@@ -5,6 +5,7 @@ type AssistantStatusTimelineProps = {
   statuses: PlaygroundRunStatus[];
   messageId: string;
   responseText?: string;
+  isLive?: boolean;
 };
 
 function formatDuration(durationMs?: number | null): string {
@@ -100,8 +101,9 @@ export default function AssistantStatusTimeline({
   statuses,
   messageId,
   responseText,
+  isLive = false,
 }: AssistantStatusTimelineProps): JSX.Element | null {
-  const hasRunningStatus = statuses.some((status) => status.state === "running");
+  const hasRunningStatus = isLive && statuses.some((status) => status.state === "running");
   const [isGroupOpen, setIsGroupOpen] = useState(false);
 
   useEffect(() => {

@@ -394,4 +394,61 @@ describe("ThreadPanel", () => {
     expect(generationSummaries[1]).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Generating response - 2.0s")).toBeVisible();
   });
+
+  it("collapses assistant statuses after sending finishes even if a status is still marked running", async () => {
+    const session = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user",
+          role: "user" as const,
+          content: "Question",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant",
+          role: "assistant" as const,
+          content: "Finished answer",
+          metadata: {
+            transient: true,
+            statuses: [
+              {
+                id: "streaming-1",
+                kind: "streaming_tokens",
+                label: "Streaming response",
+                state: "running",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: null,
+                duration_ms: null,
+                details: { model_id: "safe-small" },
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+      ],
+    };
+
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={session}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const generationSummary = screen.getByText("Generation").closest("summary");
+    expect(generationSummary).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Streaming response")).not.toBeVisible();
+  });
 });

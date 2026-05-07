@@ -151,6 +151,7 @@ export default function ThreadPanel({
                       statuses={statuses}
                       messageId={message.id}
                       responseText={message.content}
+                      isLive={isSending && Boolean(message.metadata.transient)}
                     />
                   ) : null}
                   {message.content.trim() ? (
