@@ -489,11 +489,69 @@
 }
 
 .assistant-status-timeline {
-  display: grid;
-  gap: var(--space-2);
   color: var(--text-secondary);
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.assistant-status-timeline-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.assistant-status-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.assistant-status-group-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  color: color-mix(in oklab, var(--text-secondary) 80%, transparent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.assistant-status-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.assistant-status-group-summary:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-primary) 60%, white);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.assistant-status-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  color: color-mix(in oklab, var(--text-secondary) 72%, transparent);
+  transition: transform 0.16s ease;
+}
+
+.assistant-status-group[open] .assistant-status-group-icon {
+  transform: rotate(90deg);
+}
+
+.assistant-status-group-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.assistant-status-group > .assistant-status-timeline-list {
+  margin-top: var(--space-2);
 }
 
 .assistant-status-item {

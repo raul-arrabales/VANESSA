@@ -281,6 +281,7 @@ export type TemporaryPlaygroundMessagePayload = {
   messages: Array<{
     role: "user" | "assistant";
     content: string;
+    metadata?: PlaygroundMessageMetadata;
   }>;
   prompt: string;
 };

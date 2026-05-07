@@ -245,6 +245,7 @@ describe("ThreadPanel", () => {
       />,
     );
 
+    expect(screen.getByText("Generation details").closest("summary")).toHaveAttribute("aria-expanded", "true");
     const statusSummary = screen.getByText("Retrieved information from: docs - 1.2s").closest("summary");
     expect(statusSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("deployment profiles")).not.toBeVisible();
@@ -257,5 +258,104 @@ describe("ThreadPanel", () => {
     expect(statusSummary).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("deployment profiles")).toBeVisible();
     expect(screen.getByText("2 results")).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Generation details").closest("summary") as HTMLElement);
+    });
+
+    expect(screen.getByText("Generation details").closest("summary")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Retrieved information from: docs - 1.2s")).not.toBeVisible();
+  });
+
+  it("collapses older assistant generation statuses behind generation details", async () => {
+    const session = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user-1",
+          role: "user" as const,
+          content: "First question",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant-1",
+          role: "assistant" as const,
+          content: "First answer",
+          metadata: {
+            statuses: [
+              {
+                id: "thinking-1",
+                kind: "thinking",
+                label: "Thinking",
+                state: "completed",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: "2026-03-18T11:00:00.250Z",
+                duration_ms: 250,
+                details: { model: "safe-small" },
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+        {
+          id: "m-user-2",
+          role: "user" as const,
+          content: "Second question",
+          metadata: {},
+          createdAt: "2026-03-18T11:01:00Z",
+        },
+        {
+          id: "m-assistant-2",
+          role: "assistant" as const,
+          content: "Second answer",
+          metadata: {
+            statuses: [
+              {
+                id: "generating-2",
+                kind: "generating",
+                label: "Generating response",
+                state: "completed",
+                started_at: "2026-03-18T11:01:00Z",
+                completed_at: "2026-03-18T11:01:02Z",
+                duration_ms: 2000,
+                details: { provider: "local" },
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:01:02Z",
+        },
+      ],
+    };
+
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={session}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const generationSummaries = screen.getAllByText("Generation details").map((node) => node.closest("summary"));
+    expect(generationSummaries[0]).toHaveAttribute("aria-expanded", "false");
+    expect(generationSummaries[1]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Thinking - 250ms")).not.toBeVisible();
+    expect(screen.getByText("Generating response - 2.0s")).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(generationSummaries[0] as HTMLElement);
+    });
+
+    expect(generationSummaries[0]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Thinking - 250ms")).toBeVisible();
   });
 });

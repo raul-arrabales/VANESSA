@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlaygroundRunStatus } from "../types";
 
 type AssistantStatusTimelineProps = {
   statuses: PlaygroundRunStatus[];
   messageId: string;
+  defaultExpanded?: boolean;
 };
 
 function formatDuration(durationMs?: number | null): string {
@@ -38,16 +39,59 @@ function statusLabel(status: PlaygroundRunStatus): string {
 export default function AssistantStatusTimeline({
   statuses,
   messageId,
+  defaultExpanded = false,
 }: AssistantStatusTimelineProps): JSX.Element | null {
+  const hasRunningStatus = statuses.some((status) => status.state === "running");
+  const [isGroupOpen, setIsGroupOpen] = useState(defaultExpanded);
+
+  useEffect(() => {
+    if (hasRunningStatus || defaultExpanded) {
+      setIsGroupOpen(true);
+      return;
+    }
+    setIsGroupOpen(false);
+  }, [defaultExpanded, hasRunningStatus, messageId]);
+
   if (statuses.length === 0) {
     return null;
   }
 
-  return (
-    <div className="assistant-status-timeline" aria-label="Response progress">
+  const timeline = (
+    <div className="assistant-status-timeline-list">
       {statuses.map((status) => (
         <AssistantStatusItem key={status.id} status={status} messageId={messageId} />
       ))}
+    </div>
+  );
+
+  if (hasRunningStatus) {
+    return (
+      <div className="assistant-status-timeline" aria-label="Response progress">
+        {timeline}
+      </div>
+    );
+  }
+
+  return (
+    <div className="assistant-status-timeline" aria-label="Response progress">
+      <details className="assistant-status-group" open={isGroupOpen}>
+        <summary
+          className="assistant-status-group-summary"
+          aria-expanded={isGroupOpen}
+          onClick={(event) => {
+            event.preventDefault();
+            setIsGroupOpen((current) => !current);
+          }}
+        >
+          <span className="assistant-status-group-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" focusable="false">
+              <path d="M6 4.25 9.75 8 6 11.75" />
+            </svg>
+          </span>
+          <span>Generation details</span>
+        </summary>
+        {timeline}
+      </details>
     </div>
   );
 }

@@ -475,7 +475,12 @@ def _normalize_temporary_history(raw_messages: Any) -> list[dict[str, Any]]:
         content = str(item.get("content") or "").strip()
         if role not in {"user", "assistant"} or not content:
             continue
-        messages.append({"role": role, "content": content})
+        metadata = item.get("metadata")
+        messages.append({
+            "role": role,
+            "content": content,
+            "metadata": metadata if isinstance(metadata, dict) else {},
+        })
     return messages
 
 
@@ -888,7 +893,12 @@ def _serialize_temporary_execution_response(
 
 def _temporary_history_to_messages(history: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
-        _temporary_message(f"temporary-history-{index}", str(item.get("role") or ""), str(item.get("content") or ""))
+        _temporary_message(
+            f"temporary-history-{index}",
+            str(item.get("role") or ""),
+            str(item.get("content") or ""),
+            metadata=item.get("metadata") if isinstance(item.get("metadata"), dict) else None,
+        )
         for index, item in enumerate(history)
     ]
 

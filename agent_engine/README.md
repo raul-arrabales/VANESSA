@@ -8,6 +8,7 @@ Current API:
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
 - `POST /v1/internal/agent-executions` (service-to-service; requires `X-Service-Token`)
+- `POST /v1/internal/agent-executions/stream` (service-to-service SSE; requires `X-Service-Token`)
 - `GET /v1/internal/agent-executions/{id}` (service-to-service; requires `X-Service-Token`)
 
 Notes:
@@ -15,6 +16,7 @@ Notes:
 - Backend should call only `/v1/internal/agent-executions*`.
 - Public `/v1/agent-executions*` remains as compatibility alias.
 - Configure service token with `AGENT_ENGINE_SERVICE_TOKEN`.
+- Streaming execution emits `status` events while the run progresses, followed by `complete` with the normal execution payload or `error` with the public error shape.
 - Backend now sends an execution-scoped `platform_runtime` snapshot that may include active bindings for `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
 - Explicit retrieval requests use the canonical retrieval contract documented in [`docs/services/retrieval_contract.md`](../docs/services/retrieval_contract.md).
 - Agent engine owns execution-time semantic / keyword / hybrid retrieval branching and emits canonical `relevance_*` fields while preserving provider `score` / `score_kind` fields on result items.

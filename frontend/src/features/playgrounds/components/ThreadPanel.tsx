@@ -98,6 +98,10 @@ export default function ThreadPanel({
     );
   }
 
+  const latestAssistantStatusMessageId = [...(activeSession?.messages ?? [])]
+    .reverse()
+    .find((message) => message.role === "assistant" && getMessageStatuses(message.metadata).length > 0)?.id;
+
   return (
     <div
       ref={threadRef}
@@ -123,7 +127,11 @@ export default function ThreadPanel({
               >
                 <div className="chatbot-message-surface">
                   {statuses.length > 0 ? (
-                    <AssistantStatusTimeline statuses={statuses} messageId={message.id} />
+                    <AssistantStatusTimeline
+                      statuses={statuses}
+                      messageId={message.id}
+                      defaultExpanded={message.id === latestAssistantStatusMessageId}
+                    />
                   ) : null}
                   {message.content.trim() ? (
                     <ChatMessageBody

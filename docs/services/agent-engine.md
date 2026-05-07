@@ -14,8 +14,11 @@ The agent engine hosts multi-step orchestration workflows and tool logic.
 - `GET /health`
 - `POST /v1/agent-executions`
 - `GET /v1/agent-executions/{id}`
+- `POST /v1/internal/agent-executions/stream`
 
 Execution records are persisted to PostgreSQL when `DATABASE_URL` is available; otherwise an in-memory fallback store is used.
+
+The internal streaming endpoint returns server-sent events for backend-owned playground and agent UI progress. It emits `status` events for retrieval, model connection/generation, tool execution, and web search progress, then emits `complete` with the same execution payload as the synchronous create endpoint. Failures are emitted as `error` events using the public error shape.
 
 Backend resolves the active platform bindings and passes them to agent engine as an execution-scoped `platform_runtime` snapshot. Prompt- and message-based executions perform a real LLM call through the active `llm_inference` provider. Explicit `input.retrieval` requests use the canonical retrieval contract, and agent engine executes semantic / keyword / hybrid retrieval against the active runtime bindings before the LLM call.
 

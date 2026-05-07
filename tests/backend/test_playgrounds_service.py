@@ -607,7 +607,7 @@ def test_send_temporary_playground_message_does_not_persist(monkeypatch):
             "playground_kind": "chat",
             "model_selection": {"model_id": "safe-small"},
             "knowledge_binding": {"knowledge_base_id": None},
-            "messages": [{"role": "user", "content": "earlier"}],
+            "messages": [{"role": "assistant", "content": "earlier", "metadata": {"statuses": [{"id": "old-status"}]}}],
             "prompt": "hello temporary",
         },
     )
@@ -616,6 +616,7 @@ def test_send_temporary_playground_message_does_not_persist(monkeypatch):
     assert payload["session"]["id"] == "temporary-chat-1"
     assert payload["session"]["message_count"] == 3
     assert payload["session"]["messages"][0]["content"] == "earlier"
+    assert payload["session"]["messages"][0]["metadata"]["statuses"] == [{"id": "old-status"}]
     assert payload["messages"][1]["content"] == "temporary answer"
 
 

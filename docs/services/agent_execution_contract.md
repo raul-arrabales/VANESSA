@@ -3,7 +3,14 @@
 ## Internal Endpoints
 
 - `POST /v1/internal/agent-executions`
+- `POST /v1/internal/agent-executions/stream`
 - `GET /v1/internal/agent-executions/{id}`
+
+The streaming endpoint returns server-sent events:
+
+- `event: status` with a progress status payload.
+- `event: complete` with the same execution payload returned by synchronous create execution.
+- `event: error` with the existing public error shape.
 
 ## Required Headers
 

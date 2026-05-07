@@ -62,6 +62,7 @@ function buildTemporaryMessagePayload(
       .map((message) => ({
         role: message.role,
         content: message.content,
+        metadata: message.metadata,
       })),
     prompt,
   };
