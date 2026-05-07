@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from json import dumps
 from typing import Any
 
 from .base import LlmRuntimeClient, LlmRuntimeClientError
 from .resolution import binding_timeout_seconds, resolve_effective_model
 from .secrets import openai_compatible_headers
-from .transport import JsonRequestFn, request_json_or_raise
+from .transport import JsonRequestFn, StreamRequestError, stream_sse_request, request_json_or_raise
 
 
 def llm_request_failed_code(status_code: int) -> str:
@@ -62,11 +63,49 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             "requested_model": selected_model_id,
         }
 
+    def chat_completion_stream(
+        self,
+        *,
+        requested_model: str | None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        selected_model_id, runtime_model_id = resolve_effective_model(
+            requested_model,
+            self.llm_binding,
+            request_json=self.request_json,
+        )
+        payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
+        payload["stream"] = True
+        request_format = self._request_format()
+        raw_events = stream_sse_request(
+            self._chat_url(),
+            method="POST",
+            payload=payload,
+            headers=openai_compatible_headers(self.llm_binding, error_cls=LlmRuntimeClientError),
+            timeout_seconds=binding_timeout_seconds(self.llm_binding),
+        )
+        try:
+            if request_format == "openai_chat":
+                yield from _iter_openai_chat_stream_events(raw_events, requested_model=selected_model_id)
+                return
+            yield from _iter_vanessa_chat_stream_events(raw_events, requested_model=selected_model_id)
+        except StreamRequestError as exc:
+            yield {
+                "type": "error",
+                "payload": exc.payload or {"error": "llm_stream_unreachable", "message": str(exc)},
+                "status_code": exc.status_code,
+            }
+
     def _chat_url(self) -> str:
         config = self.llm_binding.get("config") if isinstance(self.llm_binding.get("config"), dict) else {}
         chat_path = str(config.get("chat_completion_path", "/v1/chat/completions")).strip() or "/v1/chat/completions"
         endpoint_url = str(self.llm_binding.get("endpoint_url", "")).rstrip("/")
         return endpoint_url + chat_path
+
+    def _request_format(self) -> str:
+        config = self.llm_binding.get("config") if isinstance(self.llm_binding.get("config"), dict) else {}
+        return str(config.get("request_format", "responses_api")).strip().lower() or "responses_api"
 
 
 def build_request_payload(
@@ -263,6 +302,127 @@ def normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
             }
         )
     return normalized
+
+
+def _iter_vanessa_chat_stream_events(
+    raw_events: Iterator[tuple[str, dict[str, Any]]],
+    *,
+    requested_model: str,
+) -> Iterator[dict[str, Any]]:
+    text_parts: list[str] = []
+    for event_name, event_payload in raw_events:
+        normalized_event_name = event_name.strip().lower()
+        if normalized_event_name == "transport":
+            yield {
+                "type": "transport",
+                **event_payload,
+            }
+            continue
+        if normalized_event_name == "delta":
+            text = str(event_payload.get("text", ""))
+            if text:
+                text_parts.append(text)
+                yield {"type": "delta", "text": text}
+            continue
+        if normalized_event_name == "complete":
+            response_payload = event_payload.get("response")
+            normalized_response = (
+                normalize_stream_complete_response(response_payload, text_parts)
+                if isinstance(response_payload, dict)
+                else normalize_stream_complete_response(None, text_parts)
+            )
+            yield {
+                "type": "complete",
+                "response": normalized_response,
+                "status_code": 200,
+                "requested_model": requested_model,
+            }
+            return
+        if normalized_event_name == "error":
+            yield {
+                "type": "error",
+                "payload": event_payload,
+                "status_code": int(event_payload.get("status_code", 502) or 502),
+            }
+            return
+
+
+def _iter_openai_chat_stream_events(
+    raw_events: Iterator[tuple[str, dict[str, Any]]],
+    *,
+    requested_model: str,
+) -> Iterator[dict[str, Any]]:
+    text_parts: list[str] = []
+    for event_name, event_payload in raw_events:
+        normalized_event_name = event_name.strip().lower()
+        if normalized_event_name == "transport":
+            yield {"type": "transport", **event_payload}
+            continue
+        if normalized_event_name != "message":
+            for normalized_event in _iter_vanessa_chat_stream_events(iter([(event_name, event_payload)]), requested_model=requested_model):
+                yield normalized_event
+                if str(normalized_event.get("type") or "").strip().lower() in {"complete", "error"}:
+                    return
+            continue
+        if str(event_payload.get("raw") or "").strip() == "[DONE]":
+            yield _openai_chat_complete_event(text_parts, requested_model=requested_model)
+            return
+        error_payload = event_payload.get("error")
+        if isinstance(error_payload, dict):
+            yield {
+                "type": "error",
+                "payload": error_payload,
+                "status_code": int(event_payload.get("status_code", 502) or 502),
+            }
+            return
+        choice = _first_openai_stream_choice(event_payload)
+        if choice is None:
+            continue
+        delta = choice.get("delta")
+        if isinstance(delta, dict):
+            content = delta.get("content")
+            if isinstance(content, str) and content:
+                text_parts.append(content)
+                yield {"type": "delta", "text": content}
+                continue
+        if str(choice.get("finish_reason") or "").strip():
+            yield _openai_chat_complete_event(text_parts, requested_model=requested_model)
+            return
+
+
+def _first_openai_stream_choice(event_payload: dict[str, Any]) -> dict[str, Any] | None:
+    choices = event_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+    first = choices[0]
+    return first if isinstance(first, dict) else None
+
+
+def _openai_chat_complete_event(text_parts: list[str], *, requested_model: str) -> dict[str, Any]:
+    return {
+        "type": "complete",
+        "response": normalize_stream_complete_response(None, text_parts),
+        "status_code": 200,
+        "requested_model": requested_model,
+    }
+
+
+def normalize_stream_complete_response(response_payload: dict[str, Any] | None, text_parts: list[str]) -> dict[str, Any]:
+    if isinstance(response_payload, dict):
+        return response_payload
+    return {
+        "output": [
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "".join(text_parts),
+                    }
+                ],
+            }
+        ]
+    }
 
 
 def graphql_string(value: str) -> str:

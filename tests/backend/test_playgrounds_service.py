@@ -504,6 +504,8 @@ def test_stream_knowledge_message_forwards_and_persists_statuses(monkeypatch):
                 "details": {"query": "hello knowledge"},
             },
         }
+        yield {"event": "delta", "data": {"text": "knowledge "}}
+        yield {"event": "delta", "data": {"text": "answer"}}
         yield {
             "event": "complete",
             "data": playgrounds_service.PlaygroundExecutionResult(
@@ -556,10 +558,11 @@ def test_stream_knowledge_message_forwards_and_persists_statuses(monkeypatch):
         prompt="hello knowledge",
     ))
 
-    assert [event["event"] for event in events] == ["status", "complete"]
+    assert [event["event"] for event in events] == ["status", "delta", "delta", "complete"]
     assert events[0]["data"]["label"] == "Retrieved information from: kb_product_docs"
+    assert [event["data"]["text"] for event in events if event["event"] == "delta"] == ["knowledge ", "answer"]
     assert captured["assistant_metadata"]["statuses"] == [events[0]["data"]]
-    assert events[1]["data"]["statuses"] == [events[0]["data"]]
+    assert events[-1]["data"]["statuses"] == [events[0]["data"]]
 
 
 def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkeypatch):

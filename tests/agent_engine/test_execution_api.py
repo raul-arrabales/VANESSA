@@ -131,6 +131,7 @@ def test_internal_stream_endpoint_returns_status_and_complete(monkeypatch: pytes
         "create_execution_stream",
         lambda _payload: iter([
             {"event": "status", "data": {"id": "thinking-1", "kind": "thinking", "label": "Thinking", "state": "running"}},
+            {"event": "delta", "data": {"text": "Hel"}},
             {"event": "complete", "data": {"execution": {"id": "exec-1", "status": "succeeded"}}},
         ]),
     )
@@ -151,8 +152,9 @@ def test_internal_stream_endpoint_returns_status_and_complete(monkeypatch: pytes
             headers={"X-Service-Token": "test-token"},
         )
         assert status == 200
-        assert [event["event"] for event in events] == ["status", "complete"]
+        assert [event["event"] for event in events] == ["status", "delta", "complete"]
         assert events[0]["data"]["label"] == "Thinking"
+        assert events[1]["data"]["text"] == "Hel"
     finally:
         server.shutdown()
         server.server_close()

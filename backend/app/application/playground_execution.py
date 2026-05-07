@@ -349,6 +349,7 @@ def stream_knowledge_request(
         knowledge_base_id=request.knowledge_base_id,
     )
     statuses: list[dict[str, Any]] = []
+    output_parts: list[str] = []
     for event in stream_execution_impl(
         base_url=config.agent_engine_url.rstrip("/"),
         service_token=config.agent_engine_service_token,
@@ -379,6 +380,12 @@ def stream_knowledge_request(
             statuses.append(data)
             yield {"event": "status", "data": data}
             continue
+        if event_name == "delta":
+            text = str(data.get("text") or "")
+            if text:
+                output_parts.append(text)
+                yield {"event": "delta", "data": {"text": text}}
+            continue
         if event_name == "error":
             raise AgentEngineClientError(
                 code=str(data.get("error") or "knowledge_chat_failed"),
@@ -392,7 +399,8 @@ def stream_knowledge_request(
         execution_payload = data.get("execution") if isinstance(data.get("execution"), dict) else {}
         result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
         sources, retrieval, references = normalize_execution_retrieval(execution_payload)
-        output = add_missing_reference_citation(str(result_payload.get("output_text", "")).strip(), references)
+        output = str(result_payload.get("output_text", "")).strip() or "".join(output_parts).strip()
+        output = add_missing_reference_citation(output, references)
         yield {
             "event": "complete",
             "data": PlaygroundExecutionResult(

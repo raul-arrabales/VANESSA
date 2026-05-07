@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from json import loads
 import sys
 from pathlib import Path
 
@@ -10,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from agent_engine.app.services import runtime_client  # noqa: E402
+from agent_engine.app.services.runtime_clients import transport as runtime_transport  # noqa: E402
 
 
 def _platform_runtime(
@@ -339,6 +341,94 @@ def test_openai_compatible_runtime_client_passes_tools_and_normalizes_tool_calls
 
     assert payload["tool_calls"][0]["function"]["name"] == "web_search"
     assert seen_payloads[0]["tools"][0]["function"]["name"] == "web_search"
+
+
+def test_openai_compatible_runtime_client_streams_vanessa_gateway_events(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self):
+            self._lines = iter(
+                [
+                    b"event: delta\n",
+                    b"data: {\"text\":\"Hel\"}\n",
+                    b"\n",
+                    b"event: delta\n",
+                    b"data: {\"text\":\"lo\"}\n",
+                    b"\n",
+                    b"event: complete\n",
+                    b"data: {\"response\":{\"output\":[{\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}]}}\n",
+                    b"\n",
+                ]
+            )
+
+        def readline(self):
+            return next(self._lines, b"")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def _urlopen(req, *args, **kwargs):
+        del args, kwargs
+        seen_payloads.append(loads(req.data.decode("utf-8")))
+        return FakeResponse()
+
+    monkeypatch.setattr(runtime_transport, "urlopen", _urlopen)
+    client = runtime_client.build_llm_runtime_client(_platform_runtime())
+
+    events = list(client.chat_completion_stream(
+        requested_model="model.alpha",
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+    ))
+
+    assert seen_payloads[0]["stream"] is True
+    assert [event["type"] for event in events] == ["transport", "delta", "delta", "complete"]
+    assert [event.get("text") for event in events if event["type"] == "delta"] == ["Hel", "lo"]
+    assert events[-1]["requested_model"] == "model.alpha"
+
+
+def test_openai_compatible_runtime_client_streams_openai_chat_chunks(monkeypatch: pytest.MonkeyPatch):
+    class FakeResponse:
+        status = 200
+
+        def __init__(self):
+            self._lines = iter(
+                [
+                    b"data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n",
+                    b"\n",
+                    b"data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n",
+                    b"\n",
+                    b"data: [DONE]\n",
+                    b"\n",
+                ]
+            )
+
+        def readline(self):
+            return next(self._lines, b"")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(runtime_transport, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+    client = runtime_client.build_llm_runtime_client(
+        _platform_runtime(provider_key="llama_cpp_local", request_format="openai_chat")
+    )
+
+    events = list(client.chat_completion_stream(
+        requested_model=None,
+        messages=[{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+    ))
+
+    assert [event["type"] for event in events] == ["transport", "delta", "delta", "complete"]
+    assert events[-1]["response"]["output"][0]["content"][0]["text"] == "Hello"
 
 
 def test_openai_compatible_runtime_client_maps_transport_failures(monkeypatch: pytest.MonkeyPatch):

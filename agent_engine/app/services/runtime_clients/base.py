@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import Any
 
 
@@ -42,6 +43,16 @@ class LlmRuntimeClient(ABC):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def chat_completion_stream(
+        self,
+        *,
+        requested_model: str | None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> Iterator[dict[str, Any]]:
         raise NotImplementedError
 
 

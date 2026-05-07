@@ -943,6 +943,11 @@ def _stream_knowledge_playground_message(
         if event_name == "status" and isinstance(data, dict):
             yield {"event": "status", "data": _record_status(statuses, data)}
             continue
+        if event_name == "delta" and isinstance(data, dict):
+            text = str(data.get("text") or "")
+            if text:
+                yield {"event": "delta", "data": {"text": text}}
+            continue
         if event_name != "complete" or not isinstance(data, PlaygroundExecutionResult):
             continue
         result = data
@@ -992,6 +997,11 @@ def _stream_temporary_knowledge_playground_message(
         data = event.get("data")
         if event_name == "status" and isinstance(data, dict):
             yield {"event": "status", "data": _record_status(statuses, data)}
+            continue
+        if event_name == "delta" and isinstance(data, dict):
+            text = str(data.get("text") or "")
+            if text:
+                yield {"event": "delta", "data": {"text": text}}
             continue
         if event_name != "complete" or not isinstance(data, PlaygroundExecutionResult):
             continue

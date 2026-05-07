@@ -99,6 +99,7 @@ def test_stream_execution_yields_status_and_validates_complete_payload(monkeypat
     def _fake_request_sse(**kwargs):
         seen_payloads.append(kwargs["payload"])
         yield {"event": "status", "data": {"id": "thinking-1", "kind": "thinking", "label": "Thinking", "state": "running"}}
+        yield {"event": "delta", "data": {"text": "Hel"}}
         yield {"event": "complete", "data": _golden_success_payload()}
 
     monkeypatch.setattr(agent_engine_client, "_request_sse", _fake_request_sse)
@@ -118,9 +119,10 @@ def test_stream_execution_yields_status_and_validates_complete_payload(monkeypat
         },
     ))
 
-    assert [event["event"] for event in events] == ["status", "complete"]
+    assert [event["event"] for event in events] == ["status", "delta", "complete"]
     assert events[0]["data"]["label"] == "Thinking"
-    assert events[1]["data"]["execution"]["id"] == "exec-1"
+    assert events[1]["data"]["text"] == "Hel"
+    assert events[2]["data"]["execution"]["id"] == "exec-1"
     assert seen_payloads[0]["agent_id"] == "agent.alpha"
 
 

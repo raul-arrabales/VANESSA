@@ -10,6 +10,7 @@ import type {
 } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
 import ChatPlaygroundPage from "../features/playgrounds/pages/ChatPlaygroundPage";
+import KnowledgePlaygroundPage from "../features/playgrounds/pages/KnowledgePlaygroundPage";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 
 const playgroundApiMocks = vi.hoisted(() => ({
@@ -132,6 +133,10 @@ function sendResult(
 
 async function renderChatPlayground() {
   return await renderWithAppProviders(<ChatPlaygroundPage />);
+}
+
+async function renderKnowledgePlayground() {
+  return await renderWithAppProviders(<KnowledgePlaygroundPage />);
 }
 
 function getChatShell(container: HTMLElement): HTMLElement {
@@ -455,6 +460,59 @@ describe("ChatPlaygroundPage", () => {
     expect(await screen.findByText("Slow answer")).toBeVisible();
     expect(await screen.findByText("Thinking")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Copy response" })).toBeNull();
+  });
+
+  it("streams Knowledge Chat answer tokens into the assistant placeholder before completion", async () => {
+    const deltaHandlers: Array<(text: string) => void> = [];
+    playgroundApiMocks.getPlaygroundKnowledgeBaseOptions.mockResolvedValueOnce({
+      knowledge_bases: [
+        {
+          id: "kb-primary",
+          display_name: "Product Docs",
+          index_name: "kb_product_docs",
+          is_default: true,
+        },
+      ],
+      default_knowledge_base_id: "kb-primary",
+      selection_required: true,
+      configuration_message: null,
+    });
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("knowledge-1", "Knowledge thread", {
+        playground_kind: "knowledge",
+        assistant_ref: "agent.knowledge_chat",
+        knowledge_binding: { knowledge_base_id: "kb-primary" },
+      }),
+    ]);
+    playgroundApiMocks.createPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("knowledge-draft", "Knowledge Chat", {
+        playground_kind: "knowledge",
+        assistant_ref: "agent.knowledge_chat",
+        knowledge_binding: { knowledge_base_id: "kb-primary" },
+      }),
+    );
+    playgroundApiMocks.streamPlaygroundMessage.mockImplementationOnce(
+      async (_sessionId, _payload, _token, streamOptions) => {
+        if (streamOptions.onDelta) {
+          deltaHandlers.push(streamOptions.onDelta);
+        }
+        return await new Promise<SendPlaygroundMessageResult>(() => undefined);
+      },
+    );
+
+    await renderKnowledgePlayground();
+
+    await waitForDraftReady();
+    await userEvent.type(screen.getByLabelText("Message"), "What changed?");
+    await userEvent.click(screen.getByRole("button", { name: "Ask knowledge chat" }));
+    await waitFor(() => expect(playgroundApiMocks.streamPlaygroundMessage).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      deltaHandlers[0]?.("Partial ");
+      deltaHandlers[0]?.("knowledge answer");
+    });
+
+    expect(await screen.findByTestId("markdown-message")).toHaveTextContent("Partial knowledge answer");
   });
 
   it("renders the copy action only for assistant messages and copies the assistant response", async () => {

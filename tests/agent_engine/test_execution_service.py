@@ -156,6 +156,64 @@ def test_execution_progress_recorder_emits_model_statuses(monkeypatch: pytest.Mo
     assert isinstance(progress_events[-1]["duration_ms"], int)
 
 
+def test_streamed_execution_emits_model_deltas_and_stream_statuses(monkeypatch: pytest.MonkeyPatch):
+    progress_events: list[dict[str, Any]] = []
+    delta_events: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v2", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v2", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def chat_completion_stream(self, **kwargs):
+            yield {"type": "transport", "status_code": 200, "endpoint_host": "llm:8000", "duration_ms": 12}
+            yield {"type": "delta", "text": "Hel"}
+            yield {"type": "delta", "text": "lo"}
+            yield {
+                "type": "complete",
+                "response": {"output": [{"content": [{"type": "text", "text": "Hello"}]}]},
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "hello"},
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                },
+            },
+        },
+        progress_emit=progress_events.append,
+        delta_emit=delta_events.append,
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"]["output_text"] == "Hello"
+    assert delta_events == [{"text": "Hel"}, {"text": "lo"}]
+    labels = [event["label"] for event in progress_events]
+    assert "Opening upstream stream" in labels
+    assert "Upstream stream connected" in labels
+    assert "Waiting for first token" in labels
+    assert "Received first token" in labels
+    assert "Streaming response" in labels
+    assert "Streamed response" in labels
+
+
 def test_execution_runtime_block_is_persisted(monkeypatch: pytest.MonkeyPatch):
     captured: list[dict[str, Any]] = []
     monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")

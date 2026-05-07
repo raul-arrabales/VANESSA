@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from json import loads
 from queue import Queue
@@ -38,6 +39,7 @@ from .progress import ProgressRecorder, compact_payload, summarize_results, trim
 from .types import ConversationState, ExecutionContext, ExecutionResult
 
 _MAX_TOOL_CALL_ROUNDS = 3
+DeltaEmitter = Callable[[dict[str, Any]], None]
 
 
 def _iso_now() -> str:
@@ -104,6 +106,65 @@ def _model_status_details(runtime_snapshot: dict[str, Any], requested_model: str
     }
 
 
+def _stream_error_code(status_code: int) -> str:
+    if status_code == 504:
+        return "runtime_timeout"
+    if status_code >= 502:
+        return "runtime_upstream_unavailable"
+    return "runtime_request_failed"
+
+
+def _stream_error_message(status_code: int) -> str:
+    if status_code == 504:
+        return "LLM runtime stream timed out"
+    if status_code >= 502:
+        return "LLM runtime stream unavailable"
+    return "LLM runtime stream failed"
+
+
+def _extract_stream_output_text(response_payload: dict[str, Any]) -> str:
+    output = response_payload.get("output")
+    if isinstance(output, list):
+        text_parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if str(part.get("type", "")).strip().lower() != "text":
+                    continue
+                text = str(part.get("text", "")).strip()
+                if text:
+                    text_parts.append(text)
+        return "\n".join(text_parts)
+
+    choices = response_payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+    message = first.get("message")
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    return content.strip() if isinstance(content, str) else ""
+
+
+def _stream_transport_details(runtime_snapshot: dict[str, Any], requested_model: str | None, event: dict[str, Any] | None = None) -> dict[str, Any]:
+    details = _model_status_details(runtime_snapshot, requested_model)
+    if not event:
+        return details
+    for key in ("endpoint_host", "status_code", "duration_ms"):
+        if event.get(key) is not None:
+            details[key] = event.get(key)
+    return details
+
+
 def _agent_current_spec(agent_entity: dict[str, Any]) -> dict[str, Any]:
     current_spec = agent_entity.get("current_spec")
     return current_spec if isinstance(current_spec, dict) else {}
@@ -122,6 +183,143 @@ def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
     return retrieval_context or None
 
 
+def _stream_model_completion(
+    *,
+    client,
+    runtime_snapshot: dict[str, Any],
+    requested_model: str | None,
+    messages: list[dict[str, Any]],
+    progress: ProgressRecorder,
+    delta_emit: DeltaEmitter,
+) -> dict[str, Any]:
+    opening_status_id = progress.start(
+        kind="opening_stream",
+        label="Opening upstream stream",
+        details=_model_status_details(runtime_snapshot, requested_model),
+    )
+    waiting_status_id: str | None = None
+    streaming_status_id: str | None = None
+    output_parts: list[str] = []
+    delta_count = 0
+
+    def _fail_active(label: str, details: dict[str, Any] | None = None) -> None:
+        active_status_id = streaming_status_id or waiting_status_id or opening_status_id
+        active_kind = "streaming_tokens" if streaming_status_id else "waiting_first_token" if waiting_status_id else "opening_stream"
+        progress.fail(
+            active_status_id,
+            kind=active_kind,
+            label=label,
+            details=details or _model_status_details(runtime_snapshot, requested_model),
+        )
+
+    for event in client.chat_completion_stream(
+        requested_model=requested_model,
+        messages=messages,
+        tools=None,
+    ):
+        event_type = str(event.get("type", "")).strip().lower()
+        if event_type == "transport":
+            if waiting_status_id is None:
+                progress.complete(
+                    opening_status_id,
+                    kind="opening_stream",
+                    label="Upstream stream connected",
+                    details=_stream_transport_details(runtime_snapshot, requested_model, event),
+                )
+                waiting_status_id = progress.start(
+                    kind="waiting_first_token",
+                    label="Waiting for first token",
+                    details={
+                        **_stream_transport_details(runtime_snapshot, requested_model, event),
+                        "phase": "provider queueing, prompt prefill, and first-token sampling",
+                    },
+                )
+            continue
+
+        if event_type == "delta":
+            text = str(event.get("text", ""))
+            if not text:
+                continue
+            if waiting_status_id is None:
+                progress.complete(
+                    opening_status_id,
+                    kind="opening_stream",
+                    label="Upstream stream connected",
+                    details=_model_status_details(runtime_snapshot, requested_model),
+                )
+                waiting_status_id = progress.start(
+                    kind="waiting_first_token",
+                    label="Waiting for first token",
+                    details={
+                        **_model_status_details(runtime_snapshot, requested_model),
+                        "phase": "provider queueing, prompt prefill, and first-token sampling",
+                    },
+                )
+            if streaming_status_id is None:
+                progress.complete(
+                    waiting_status_id,
+                    kind="waiting_first_token",
+                    label="Received first token",
+                    summary="Model started streaming",
+                    details=_model_status_details(runtime_snapshot, requested_model),
+                )
+                streaming_status_id = progress.start(
+                    kind="streaming_tokens",
+                    label="Streaming response",
+                    details=_model_status_details(runtime_snapshot, requested_model),
+                )
+            output_parts.append(text)
+            delta_count += 1
+            delta_emit({"text": text})
+            continue
+
+        if event_type == "error":
+            payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+            status_code = int(event.get("status_code", 502) or 502)
+            _fail_active("Response generation failed", details={**_model_status_details(runtime_snapshot, requested_model), "error": compact_payload(payload)})
+            raise LlmRuntimeClientError(
+                code=_stream_error_code(status_code),
+                message=_stream_error_message(status_code),
+                status_code=status_code,
+                details=payload,
+            )
+
+        if event_type != "complete":
+            continue
+
+        response_payload = event.get("response") if isinstance(event.get("response"), dict) else {}
+        output_text = _extract_stream_output_text(response_payload) or "".join(output_parts)
+        if streaming_status_id is not None:
+            progress.complete(
+                streaming_status_id,
+                kind="streaming_tokens",
+                label="Streamed response",
+                summary=f"{len(output_text)} characters",
+                details={**_model_status_details(runtime_snapshot, requested_model), "delta_count": delta_count},
+            )
+        else:
+            progress.complete(
+                waiting_status_id or opening_status_id,
+                kind="waiting_first_token" if waiting_status_id else "opening_stream",
+                label="Received response",
+                summary=f"{len(output_text)} characters",
+                details={**_model_status_details(runtime_snapshot, requested_model), "delta_count": delta_count},
+            )
+        return {
+            "output_text": output_text,
+            "tool_calls": [],
+            "status_code": int(event.get("status_code", 200) or 200),
+            "requested_model": str(event.get("requested_model") or requested_model or "").strip() or requested_model,
+        }
+
+    _fail_active("Response generation failed")
+    raise LlmRuntimeClientError(
+        code="runtime_upstream_unavailable",
+        message="LLM runtime stream ended before completion",
+        status_code=502,
+    )
+
+
 def _execute_model_call(
     *,
     context: ExecutionContext,
@@ -129,6 +327,7 @@ def _execute_model_call(
     model_ref: str | None,
     agent_tools: list[dict[str, Any]],
     progress: ProgressRecorder | None = None,
+    delta_emit: DeltaEmitter | None = None,
 ) -> tuple[ExecutionResult, str | None]:
     progress = progress or ProgressRecorder()
     _raise_simulated_error_if_requested(context.execution_input)
@@ -245,11 +444,21 @@ def _execute_model_call(
     )
     for _round_index in range(_MAX_TOOL_CALL_ROUNDS):
         try:
-            completion = client.chat_completion(
-                requested_model=effective_requested_model,
-                messages=effective_messages,
-                tools=tool_definitions or None,
-            )
+            if delta_emit is not None and not tool_definitions:
+                completion = _stream_model_completion(
+                    client=client,
+                    runtime_snapshot=runtime_snapshot,
+                    requested_model=effective_requested_model,
+                    messages=effective_messages,
+                    progress=progress,
+                    delta_emit=delta_emit,
+                )
+            else:
+                completion = client.chat_completion(
+                    requested_model=effective_requested_model,
+                    messages=effective_messages,
+                    tools=tool_definitions or None,
+                )
         except LlmRuntimeClientError as exc:
             progress.fail(
                 generation_status_id,
@@ -398,7 +607,7 @@ def _build_execution(
     )
 
 
-def create_execution(payload: dict[str, Any], progress_emit=None) -> tuple[dict[str, Any], int]:
+def create_execution(payload: dict[str, Any], progress_emit=None, delta_emit: DeltaEmitter | None = None) -> tuple[dict[str, Any], int]:
     agent_id = str(payload.get("agent_id", "")).strip()
     if not agent_id:
         raise ValueError("invalid_agent_id")
@@ -504,6 +713,7 @@ def create_execution(payload: dict[str, Any], progress_emit=None) -> tuple[dict[
             model_ref=model_ref,
             agent_tools=agent_tools,
             progress=progress,
+            delta_emit=delta_emit,
         )
         finished = _build_execution(
             execution_id=execution_id,
@@ -589,9 +799,12 @@ def create_execution_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]
     def _emit_status(status: dict[str, Any]) -> None:
         events.put({"event": "status", "data": status})
 
+    def _emit_delta(delta: dict[str, Any]) -> None:
+        events.put({"event": "delta", "data": delta})
+
     def _run() -> None:
         try:
-            response_payload, status_code = create_execution(payload, progress_emit=_emit_status)
+            response_payload, status_code = create_execution(payload, progress_emit=_emit_status, delta_emit=_emit_delta)
             events.put({"event": "complete", "data": {**response_payload, "status_code": status_code}})
         except ExecutionBlockedError as exc:
             events.put(
