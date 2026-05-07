@@ -115,9 +115,13 @@ export function createDraftSession(
   options: PlaygroundWorkspaceOptions,
   source?: PlaygroundSessionViewModel | null,
 ): PlaygroundSessionViewModel {
+  const availableModelIds = new Set(options.models.map((model) => model.id));
+  const sourceModelId = source?.selectorState.modelId ?? null;
   const selectorState: PlaygroundSelectorState = {
     assistantRef: source?.selectorState.assistantRef ?? options.defaultAssistantRef ?? config.defaultAssistantRef ?? null,
-    modelId: source?.selectorState.modelId ?? options.models[0]?.id ?? null,
+    modelId: sourceModelId && availableModelIds.has(sourceModelId)
+      ? sourceModelId
+      : options.models[0]?.id ?? null,
     knowledgeBaseId: hasSelector(config, "knowledgeBase")
       ? (source?.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId ?? null)
       : null,

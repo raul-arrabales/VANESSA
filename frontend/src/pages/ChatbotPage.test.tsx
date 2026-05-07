@@ -644,6 +644,45 @@ describe("ChatPlaygroundPage", () => {
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
   });
 
+  it("repairs saved conversations whose model is no longer in the active deployment", async () => {
+    playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValueOnce({
+      assistants: [],
+      models: [
+        { id: "Qwen--Qwen2.5-0.5B-Instruct", display_name: "Qwen2.5-0.5B-Instruct" },
+      ],
+    });
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("conv-stale", "Cloud-era thread", {
+        model_selection: { model_id: "openai-gpt-5-nano" },
+        message_count: 2,
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("conv-stale", "Cloud-era thread", {
+        model_selection: { model_id: "openai-gpt-5-nano" },
+        message_count: 2,
+      }),
+    );
+    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
+      sessionSummary("conv-stale", "Cloud-era thread", {
+        model_selection: { model_id: "Qwen--Qwen2.5-0.5B-Instruct" },
+        message_count: 2,
+      }),
+    );
+
+    await renderChatPlayground();
+
+    await userEvent.click(await screen.findByRole("button", { name: /^Cloud-era thread/i }));
+
+    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
+      "conv-stale",
+      { model_selection: { model_id: "Qwen--Qwen2.5-0.5B-Instruct" } },
+      "token",
+    ));
+    await openChatSettings();
+    expect(screen.getByLabelText("Model")).toHaveDisplayValue("Qwen2.5-0.5B-Instruct");
+  });
+
   it("renders a sidebar history error without blocking the local draft", async () => {
     playgroundApiMocks.listPlaygroundSessions.mockRejectedValueOnce(new Error("History failed"));
 

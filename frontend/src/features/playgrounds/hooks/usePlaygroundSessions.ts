@@ -230,20 +230,27 @@ export function usePlaygroundSessions({
       try {
         const session = await getPlaygroundSession(activeSessionId, config.playgroundKind, token);
         const loadedSession = mapPlaygroundSessionDetail(session);
+        const availableModelIds = new Set(options.models.map((model) => model.id));
+        const defaultModelId = options.models[0]?.id ?? null;
+        const needsModelRepair = Boolean(
+          defaultModelId
+          && (!loadedSession.selectorState.modelId || !availableModelIds.has(loadedSession.selectorState.modelId)),
+        );
         const needsKnowledgeBaseRepair = (
           config.playgroundKind === "knowledge"
           && hasKnowledgeBaseSelector
           && !session.knowledge_binding.knowledge_base_id
           && Boolean(options.defaultKnowledgeBaseId)
         );
-        if (needsKnowledgeBaseRepair) {
+        if (needsModelRepair || needsKnowledgeBaseRepair) {
           try {
             const repaired = await updatePlaygroundSession(
               activeSessionId,
               {
-                knowledge_binding: {
-                  knowledge_base_id: options.defaultKnowledgeBaseId,
-                },
+                ...(needsModelRepair ? { model_selection: { model_id: defaultModelId } } : {}),
+                ...(needsKnowledgeBaseRepair
+                  ? { knowledge_binding: { knowledge_base_id: options.defaultKnowledgeBaseId } }
+                  : {}),
               },
               token,
             );
@@ -261,8 +268,11 @@ export function usePlaygroundSessions({
           } catch (requestError) {
             if (!cancelled) {
               setActiveSession(loadedSession);
-              setActiveError(requestError instanceof Error ? requestError.message : config.feedback.updateKnowledgeBaseError);
-              showErrorFeedback(requestError, config.feedback.updateKnowledgeBaseError);
+              const fallbackMessage = needsModelRepair
+                ? config.feedback.updateModelError
+                : config.feedback.updateKnowledgeBaseError;
+              setActiveError(requestError instanceof Error ? requestError.message : fallbackMessage);
+              showErrorFeedback(requestError, fallbackMessage);
             }
             return;
           }
@@ -290,12 +300,14 @@ export function usePlaygroundSessions({
     activeSession,
     activeSessionId,
     config.feedback.sessionError,
+    config.feedback.updateModelError,
     config.feedback.updateKnowledgeBaseError,
     config.playgroundKind,
     hasKnowledgeBaseSelector,
     hasLoadedOptions,
     isOptionsLoading,
     options.defaultKnowledgeBaseId,
+    options.models,
     savedSessions,
     showErrorFeedback,
     token,
