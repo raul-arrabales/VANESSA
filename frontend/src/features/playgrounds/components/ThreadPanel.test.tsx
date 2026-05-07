@@ -451,4 +451,118 @@ describe("ThreadPanel", () => {
     expect(generationSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Streaming response")).not.toBeVisible();
   });
+
+  it("shows live statuses above the response and completed generation below it", async () => {
+    const liveSession = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user-live",
+          role: "user" as const,
+          content: "Question",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant-live",
+          role: "assistant" as const,
+          content: "Partial answer",
+          metadata: {
+            transient: true,
+            statuses: [
+              {
+                id: "streaming-live",
+                kind: "streaming_tokens",
+                label: "Streaming response",
+                state: "running",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: null,
+                duration_ms: null,
+                details: {},
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+      ],
+    };
+
+    const liveView = await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={liveSession}
+        isBootstrapping={false}
+        isSending
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const liveStatus = screen.getByText("Streaming response");
+    const liveResponse = screen.getByText("Partial answer");
+    expect(liveStatus.compareDocumentPosition(liveResponse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    liveView.unmount();
+
+    const completedSession = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user-done",
+          role: "user" as const,
+          content: "Question",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant-done",
+          role: "assistant" as const,
+          content: "Finished answer",
+          metadata: {
+            statuses: [
+              {
+                id: "streaming-done",
+                kind: "streaming_tokens",
+                label: "Streamed response",
+                state: "completed",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: "2026-03-18T11:00:02Z",
+                duration_ms: 2000,
+                details: {},
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:02Z",
+        },
+      ],
+    };
+
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={completedSession}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const completedResponse = screen.getByText("Finished answer");
+    const generationSummary = screen.getByText(/^Generation \(2\.0s,/).closest("summary");
+    expect(generationSummary).toHaveAttribute("aria-expanded", "false");
+    expect(completedResponse.compareDocumentPosition(generationSummary as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

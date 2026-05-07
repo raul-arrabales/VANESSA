@@ -140,26 +140,29 @@ export default function ThreadPanel({
               ? storedReferences
               : buildPlaygroundKnowledgeReferencesFromSources(getPlaygroundMessageSources(message.metadata));
             const statuses = message.role === "assistant" ? getMessageStatuses(message.metadata) : [];
+            const isLiveAssistantStatus = statuses.length > 0 && isSending && Boolean(message.metadata.transient);
+            const statusTimeline = statuses.length > 0 ? (
+              <AssistantStatusTimeline
+                statuses={statuses}
+                messageId={message.id}
+                responseText={message.content}
+                isLive={isLiveAssistantStatus}
+              />
+            ) : null;
             return (
               <article
                 key={message.id}
                 className={`chatbot-message chatbot-message-${message.role}`}
               >
                 <div className="chatbot-message-surface">
-                  {statuses.length > 0 ? (
-                    <AssistantStatusTimeline
-                      statuses={statuses}
-                      messageId={message.id}
-                      responseText={message.content}
-                      isLive={isSending && Boolean(message.metadata.transient)}
-                    />
-                  ) : null}
+                  {isLiveAssistantStatus ? statusTimeline : null}
                   {message.content.trim() ? (
                     <ChatMessageBody
                       content={message.content}
                       renderMarkdown={message.role === "assistant"}
                     />
                   ) : null}
+                  {!isLiveAssistantStatus ? statusTimeline : null}
                   {message.role === "assistant" && references.length > 0 ? (
                     <KnowledgeReferencesList references={references} messageId={message.id} />
                   ) : null}
