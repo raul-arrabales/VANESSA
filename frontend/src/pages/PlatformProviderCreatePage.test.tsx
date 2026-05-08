@@ -133,7 +133,22 @@ describe("PlatformProviderCreatePage", () => {
     expect(screen.getByLabelText(await t("platformControl.forms.provider.endpoint"))).toHaveValue("https://api.openai.com/v1");
     expect(screen.getByLabelText(await t("platformControl.forms.provider.healthcheck"))).toHaveValue("None");
     expect(screen.getByLabelText(await t("platformControl.forms.provider.config"))).toHaveValue(
-      JSON.stringify({ models_path: "/models" }, null, 2),
+      JSON.stringify(
+        {
+          models_path: "/models",
+          request_options: {
+            service_tier: "",
+            prompt_cache_key: "",
+            prompt_cache_retention: "",
+            reasoning_effort: "",
+          },
+          stream_options: {
+            include_usage: true,
+          },
+        },
+        null,
+        2,
+      ),
     );
 
     await userEvent.selectOptions(
@@ -152,6 +167,15 @@ describe("PlatformProviderCreatePage", () => {
           healthcheck_url: null,
           config: {
             models_path: "/models",
+            request_options: {
+              service_tier: "",
+              prompt_cache_key: "",
+              prompt_cache_retention: "",
+              reasoning_effort: "",
+            },
+            stream_options: {
+              include_usage: true,
+            },
           },
           secret_refs: {
             api_key: "modelops://credential/00000000-0000-0000-0000-000000000001",

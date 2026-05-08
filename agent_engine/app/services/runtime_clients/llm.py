@@ -9,6 +9,12 @@ from .resolution import binding_timeout_seconds, resolve_effective_model
 from .secrets import openai_compatible_headers
 from .transport import JsonRequestFn, StreamRequestError, stream_sse_request, request_json_or_raise
 
+_REQUEST_OPTION_KEYS = {
+    "service_tier",
+    "prompt_cache_key",
+    "prompt_cache_retention",
+}
+
 
 def llm_request_failed_code(status_code: int) -> str:
     if status_code == 504:
@@ -42,6 +48,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             request_json=self.request_json,
         )
         payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
+        add_request_options(payload, self.llm_binding, stream=False)
         response_payload, status_code = request_json_or_raise(
             request_json=self.request_json,
             error_cls=LlmRuntimeClientError,
@@ -77,6 +84,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         )
         payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
         payload["stream"] = True
+        add_request_options(payload, self.llm_binding, stream=True)
         request_format = self._request_format()
         raw_events = stream_sse_request(
             self._chat_url(),
@@ -132,6 +140,29 @@ def build_request_payload(
     if tools:
         payload["tools"] = tools
     return payload
+
+
+def add_request_options(payload: dict[str, Any], llm_binding: dict[str, Any], *, stream: bool) -> None:
+    config = llm_binding.get("config") if isinstance(llm_binding.get("config"), dict) else {}
+    request_format = str(config.get("request_format", "responses_api")).strip().lower() or "responses_api"
+    options = config.get("request_options") if isinstance(config.get("request_options"), dict) else {}
+    merged_options = {**{key: config.get(key) for key in _REQUEST_OPTION_KEYS | {"reasoning_effort"}}, **options}
+    for key in _REQUEST_OPTION_KEYS:
+        value = merged_options.get(key)
+        if value is not None and value != "":
+            payload[key] = value
+
+    reasoning_effort = merged_options.get("reasoning_effort")
+    if reasoning_effort is not None and reasoning_effort != "":
+        if request_format == "openai_chat":
+            payload["reasoning_effort"] = reasoning_effort
+        else:
+            existing_reasoning = payload.get("reasoning") if isinstance(payload.get("reasoning"), dict) else {}
+            payload["reasoning"] = {**existing_reasoning, "effort": reasoning_effort}
+
+    stream_options = config.get("stream_options") if isinstance(config.get("stream_options"), dict) else None
+    if stream and stream_options:
+        payload["stream_options"] = dict(stream_options)
 
 
 def coerce_openai_chat_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -353,6 +384,7 @@ def _iter_openai_chat_stream_events(
     requested_model: str,
 ) -> Iterator[dict[str, Any]]:
     text_parts: list[str] = []
+    usage_payload: dict[str, Any] | None = None
     for event_name, event_payload in raw_events:
         normalized_event_name = event_name.strip().lower()
         if normalized_event_name == "transport":
@@ -365,8 +397,10 @@ def _iter_openai_chat_stream_events(
                     return
             continue
         if str(event_payload.get("raw") or "").strip() == "[DONE]":
-            yield _openai_chat_complete_event(text_parts, requested_model=requested_model)
+            yield _openai_chat_complete_event(text_parts, requested_model=requested_model, usage=usage_payload)
             return
+        if isinstance(event_payload.get("usage"), dict):
+            usage_payload = dict(event_payload["usage"])
         error_payload = event_payload.get("error")
         if isinstance(error_payload, dict):
             yield {
@@ -386,7 +420,7 @@ def _iter_openai_chat_stream_events(
                 yield {"type": "delta", "text": content}
                 continue
         if str(choice.get("finish_reason") or "").strip():
-            yield _openai_chat_complete_event(text_parts, requested_model=requested_model)
+            yield _openai_chat_complete_event(text_parts, requested_model=requested_model, usage=usage_payload)
             return
 
 
@@ -398,10 +432,18 @@ def _first_openai_stream_choice(event_payload: dict[str, Any]) -> dict[str, Any]
     return first if isinstance(first, dict) else None
 
 
-def _openai_chat_complete_event(text_parts: list[str], *, requested_model: str) -> dict[str, Any]:
+def _openai_chat_complete_event(
+    text_parts: list[str],
+    *,
+    requested_model: str,
+    usage: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    response = normalize_stream_complete_response(None, text_parts)
+    if usage:
+        response["usage"] = usage
     return {
         "type": "complete",
-        "response": normalize_stream_complete_response(None, text_parts),
+        "response": response,
         "status_code": 200,
         "requested_model": requested_model,
     }

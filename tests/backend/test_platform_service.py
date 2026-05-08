@@ -308,7 +308,7 @@ def test_http_json_request_reports_non_json_success_without_raising(monkeypatch:
         def read(self) -> bytes:
             return b"<html>not json</html>"
 
-    monkeypatch.setattr(platform_adapters, "urlopen", lambda *args, **kwargs: _Response())
+    monkeypatch.setattr(platform_adapters._HTTP_CLIENT, "request", lambda *args, **kwargs: _Response())
 
     payload, status_code = platform_adapters.http_json_request("https://example.test/models", method="GET")
 
@@ -340,10 +340,13 @@ def test_stream_sse_request_emits_transport_metadata(monkeypatch: pytest.MonkeyP
         def __exit__(self, exc_type, exc, tb):
             return False
 
+        def getheader(self, name: str, default=None):
+            return self.headers.get(name.lower()) or self.headers.get(name) or default
+
         def readline(self) -> bytes:
             return self._lines.pop(0)
 
-    monkeypatch.setattr(platform_adapters, "urlopen", lambda *args, **kwargs: _Response())
+    monkeypatch.setattr(platform_adapters._HTTP_CLIENT, "request", lambda *args, **kwargs: _Response())
 
     events = list(
         platform_adapters.stream_sse_request(
@@ -355,10 +358,11 @@ def test_stream_sse_request_emits_transport_metadata(monkeypatch: pytest.MonkeyP
     )
 
     assert events[0][0] == "transport"
-    assert events[0][1]["phase"] == "upstream_connected"
+    assert events[0][1]["phase"] == "upstream_response_headers"
     assert events[0][1]["status_code"] == 200
     assert events[0][1]["endpoint_host"] == "api.openai.com"
     assert isinstance(events[0][1]["duration_ms"], int)
+    assert events[0][1]["duration_meaning"] == "provider queueing, prompt prefill, and first-stream setup"
     assert events[0][1]["headers"] == {"x-request-id": "req-123", "openai-processing-ms": "42"}
     assert events[1] == ("delta", {"text": "hi"})
 
@@ -428,6 +432,13 @@ def test_openai_adapter_normalizes_openai_chat_stream(monkeypatch: pytest.Monkey
                 "chat_completion_path": "/chat/completions",
                 "request_format": "openai_chat",
                 "request_timeout_seconds": 60,
+                "request_options": {
+                    "service_tier": "priority",
+                    "prompt_cache_key": "vanessa-chat",
+                    "prompt_cache_retention": "24h",
+                    "reasoning_effort": "low",
+                },
+                "stream_options": {"include_usage": True},
                 "secret_refs": {"api_key": "sk-test"},
             },
         }
@@ -451,6 +462,11 @@ def test_openai_adapter_normalizes_openai_chat_stream(monkeypatch: pytest.Monkey
                 "model": "gpt-5-nano",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "stream": True,
+                "service_tier": "priority",
+                "prompt_cache_key": "vanessa-chat",
+                "prompt_cache_retention": "24h",
+                "reasoning_effort": "low",
+                "stream_options": {"include_usage": True},
             },
             "headers": {"Authorization": "Bearer sk-test"},
             "timeout_seconds": 60.0,
@@ -655,6 +671,8 @@ def test_saved_openai_credential_applies_cloud_runtime_defaults(monkeypatch: pyt
     assert resolved.config["chat_completion_path"] == "/chat/completions"
     assert resolved.config["request_format"] == "openai_chat"
     assert resolved.config["request_timeout_seconds"] == 60
+    assert resolved.config["request_options"] == {}
+    assert resolved.config["stream_options"] == {"include_usage": True}
     assert resolved.config["secret_refs"]["api_key"] == "sk-test"
 
 

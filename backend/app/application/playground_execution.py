@@ -23,6 +23,7 @@ DEFAULT_TITLE_SOURCE = "auto"
 MAX_CONTEXT_MESSAGES = 14
 CONTEXT_CHAR_BUDGET = 8000
 _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS = 10.0
+_PROMPT_CACHE_PREFIX_ROLES = {"system", "developer"}
 
 
 class PlaygroundExecutionValidationError(ValueError):
@@ -137,7 +138,19 @@ def auto_title_from_prompt(prompt: str) -> str:
 
 
 def build_context_messages(messages: list[dict[str, Any]], *, prompt: str) -> list[dict[str, Any]]:
-    reversed_messages = list(reversed(messages))
+    stable_messages: list[dict[str, Any]] = []
+    dynamic_messages: list[dict[str, Any]] = []
+    for message in messages:
+        content = str(message.get("content") or "")
+        if not content:
+            continue
+        role = str(message.get("role") or "").strip().lower()
+        if role in _PROMPT_CACHE_PREFIX_ROLES:
+            stable_messages.append(message)
+        else:
+            dynamic_messages.append(message)
+
+    reversed_messages = list(reversed(dynamic_messages))
     selected: list[dict[str, Any]] = []
     running_chars = 0
 
@@ -157,10 +170,29 @@ def build_context_messages(messages: list[dict[str, Any]], *, prompt: str) -> li
             "role": str(message.get("role") or ""),
             "content": [{"type": "text", "text": str(message.get("content") or "")}],
         }
-        for message in reversed(selected)
+        for message in stable_messages
     ]
+    normalized.extend([
+        {
+            "role": str(message.get("role") or ""),
+            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+        }
+        for message in reversed(selected)
+    ])
     normalized.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
     return normalized
+
+
+def order_messages_for_prompt_cache(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    stable_prefix: list[dict[str, Any]] = []
+    dynamic_tail: list[dict[str, Any]] = []
+    for message in messages:
+        role = str(message.get("role") or "").strip().lower()
+        if role in _PROMPT_CACHE_PREFIX_ROLES:
+            stable_prefix.append(message)
+        else:
+            dynamic_tail.append(message)
+    return [*stable_prefix, *dynamic_tail]
 
 
 def coerce_engine_messages(messages: Any) -> list[dict[str, Any]]:
@@ -173,7 +205,7 @@ def coerce_engine_messages(messages: Any) -> list[dict[str, Any]]:
             continue
         role = str(item.get("role", "")).strip().lower()
         content = str(item.get("content", "")).strip()
-        if role not in {"system", "user", "assistant", "tool"}:
+        if role not in {"system", "developer", "user", "assistant", "tool"}:
             continue
         if not content:
             continue
@@ -188,7 +220,7 @@ def coerce_engine_messages(messages: Any) -> list[dict[str, Any]]:
 
 def build_engine_messages(*, prompt: str, history_payload: Any) -> list[dict[str, Any]]:
     return [
-        *coerce_engine_messages(history_payload),
+        *order_messages_for_prompt_cache(coerce_engine_messages(history_payload)),
         {"role": "user", "content": [{"type": "text", "text": prompt}]},
     ]
 

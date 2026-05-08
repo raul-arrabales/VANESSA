@@ -16,6 +16,7 @@ DEFAULT_CONVERSATION_TITLE = "New conversation"
 DEFAULT_TITLE_SOURCE = "auto"
 MAX_CONTEXT_MESSAGES = 14
 CONTEXT_CHAR_BUDGET = 8000
+_PROMPT_CACHE_PREFIX_ROLES = {"system", "developer"}
 CHAT_CONVERSATION_UNSET = chat_repository.UNSET
 
 
@@ -413,7 +414,19 @@ def _auto_title_from_prompt(prompt: str) -> str:
 
 
 def _build_context_messages(messages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    reversed_messages = list(reversed(messages))
+    stable_messages: list[dict[str, Any]] = []
+    dynamic_messages: list[dict[str, Any]] = []
+    for message in messages:
+        content = str(message.get("content") or "")
+        if not content:
+            continue
+        role = str(message.get("role") or "").strip().lower()
+        if role in _PROMPT_CACHE_PREFIX_ROLES:
+            stable_messages.append(message)
+        else:
+            dynamic_messages.append(message)
+
+    reversed_messages = list(reversed(dynamic_messages))
     selected: list[dict[str, Any]] = []
     running_chars = 0
 
@@ -428,14 +441,21 @@ def _build_context_messages(messages: Sequence[dict[str, Any]]) -> list[dict[str
         selected.append(message)
         running_chars += len(content)
 
-    return [
+    normalized = [
+        {
+            "role": str(message.get("role") or ""),
+            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+        }
+        for message in stable_messages
+    ]
+    normalized.extend([
         {
             "role": str(message.get("role") or ""),
             "content": [{"type": "text", "text": str(message.get("content") or "")}],
         }
         for message in reversed(selected)
-    ]
-
+    ])
+    return normalized
 
 def _serialize_datetime(value: Any) -> str | None:
     if isinstance(value, datetime):

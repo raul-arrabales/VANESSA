@@ -127,6 +127,8 @@ def apply_openai_chat_runtime_defaults(provider_config: dict[str, Any]) -> dict[
     next_config.setdefault("models_path", "/models")
     next_config.setdefault("chat_completion_path", "/chat/completions")
     next_config.setdefault("request_format", "openai_chat")
+    next_config.setdefault("request_options", {})
+    next_config.setdefault("stream_options", {"include_usage": True})
     return next_config
 
 

@@ -50,6 +50,22 @@ export const OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS = {
   }),
 };
 
+export const OPENAI_COMPATIBLE_CLOUD_LLM_PROVIDER_DEFAULTS = {
+  ...OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  configText: stringifyJson({
+    models_path: "/models",
+    request_options: {
+      service_tier: "",
+      prompt_cache_key: "",
+      prompt_cache_retention: "",
+      reasoning_effort: "",
+    },
+    stream_options: {
+      include_usage: true,
+    },
+  }),
+};
+
 export const MCP_GATEWAY_LOCAL_PROVIDER_DEFAULTS = {
   slug: "mcp-gateway-local",
   displayName: "MCP gateway local",
@@ -67,7 +83,7 @@ export const MCP_GATEWAY_LOCAL_PROVIDER_DEFAULTS = {
 };
 
 const PROVIDER_FAMILY_DEFAULTS: Record<string, Partial<ProviderFormState>> = {
-  openai_compatible_cloud_llm: OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
+  openai_compatible_cloud_llm: OPENAI_COMPATIBLE_CLOUD_LLM_PROVIDER_DEFAULTS,
   openai_compatible_cloud_embeddings: OPENAI_COMPATIBLE_CLOUD_PROVIDER_DEFAULTS,
   mcp_gateway_local: MCP_GATEWAY_LOCAL_PROVIDER_DEFAULTS,
 };

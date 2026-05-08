@@ -60,7 +60,7 @@ def stream_model_completion(
                 progress.complete(
                     opening_status_id,
                     kind="opening_stream",
-                    label="Upstream stream connected",
+                    label="Provider queueing and stream setup complete",
                     details=_stream_transport_details(runtime_snapshot, requested_model, event),
                 )
                 waiting_status_id = progress.start(
@@ -68,7 +68,7 @@ def stream_model_completion(
                     label="Waiting for first token",
                     details={
                         **_stream_transport_details(runtime_snapshot, requested_model, event),
-                        "phase": "provider queueing, prompt prefill, and first-token sampling",
+                        "phase": "first token delivery",
                     },
                 )
             continue
@@ -81,7 +81,7 @@ def stream_model_completion(
                 progress.complete(
                     opening_status_id,
                     kind="opening_stream",
-                    label="Upstream stream connected",
+                    label="Provider queueing and stream setup complete",
                     details=model_status_details(runtime_snapshot, requested_model),
                 )
                 waiting_status_id = progress.start(
@@ -89,7 +89,7 @@ def stream_model_completion(
                     label="Waiting for first token",
                     details={
                         **model_status_details(runtime_snapshot, requested_model),
-                        "phase": "provider queueing, prompt prefill, and first-token sampling",
+                        "phase": "first token delivery",
                     },
                 )
             if streaming_status_id is None:
@@ -217,7 +217,7 @@ def _stream_transport_details(
     details = model_status_details(runtime_snapshot, requested_model)
     if not event:
         return details
-    for key in ("endpoint_host", "status_code", "duration_ms"):
+    for key in ("endpoint_host", "status_code", "duration_ms", "duration_meaning", "phase"):
         if event.get(key) is not None:
             details[key] = event.get(key)
     return details

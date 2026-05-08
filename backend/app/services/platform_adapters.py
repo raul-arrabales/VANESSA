@@ -2,18 +2,25 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from http.client import HTTPConnection, HTTPSConnection, HTTPResponse, RemoteDisconnected
 from json import dumps, loads
 import logging
 import os
+from queue import LifoQueue
+from socket import timeout as socket_timeout
+from ssl import SSLError
+from threading import Lock
 from time import monotonic
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 from urllib.parse import urlparse
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 from .context_management_metadata import is_internal_metadata_key
-from .openai_compatible_generation import add_openai_compatible_chat_generation_options
+from .openai_compatible_generation import (
+    add_openai_compatible_chat_generation_options,
+    add_openai_compatible_request_options,
+)
 from .platform_resources import _default_resource_runtime_identifier as _resource_runtime_identifier
 from .platform_types import PlatformControlPlaneError, ProviderBinding
 
@@ -28,6 +35,8 @@ _TRACE_RESPONSE_HEADERS = (
     "cf-ray",
 )
 logger = logging.getLogger(__name__)
+_RETRYABLE_TRANSPORT_ERRORS = (OSError, RemoteDisconnected, SSLError, socket_timeout)
+_RESPONSE_DRAIN_ERRORS = (*_RETRYABLE_TRANSPORT_ERRORS, AttributeError)
 
 
 class StreamRequestError(RuntimeError):
@@ -35,6 +44,119 @@ class StreamRequestError(RuntimeError):
         super().__init__(message)
         self.status_code = status_code
         self.payload = payload
+
+
+class _PooledHttpResponse:
+    def __init__(
+        self,
+        response: HTTPResponse,
+        *,
+        client: "_PooledHttpClient",
+        key: tuple[str, str, int],
+        connection: HTTPConnection,
+    ):
+        self._response = response
+        self._client = client
+        self._key = key
+        self._connection = connection
+        self.status = int(getattr(response, "status", 0) or 0)
+        self.headers = {key.lower(): value for key, value in response.getheaders()}
+
+    def read(self) -> bytes:
+        return self._response.read()
+
+    def readline(self) -> bytes:
+        return self._response.readline()
+
+    def getheader(self, name: str, default: str | None = None) -> str | None:
+        return self._response.getheader(name, default)
+
+    def __enter__(self) -> "_PooledHttpResponse":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if exc_type is None:
+            try:
+                self._response.read()
+            except _RESPONSE_DRAIN_ERRORS:
+                self._client.discard(self._connection)
+                return False
+            if self._response.isclosed():
+                self._client.release(self._key, self._connection)
+                return False
+        self._client.discard(self._connection)
+        return False
+
+
+class _PooledHttpClient:
+    def __init__(self, *, max_idle_per_origin: int = 8):
+        self._max_idle_per_origin = max_idle_per_origin
+        self._pools: dict[tuple[str, str, int], LifoQueue[HTTPConnection]] = {}
+        self._lock = Lock()
+
+    def request(
+        self,
+        url: str,
+        *,
+        method: str,
+        data: bytes | None,
+        headers: dict[str, str],
+        timeout_seconds: float,
+    ) -> _PooledHttpResponse:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise URLError("Provider URL is missing or invalid")
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        key = (parsed.scheme, parsed.hostname, port)
+        target = parsed.path or "/"
+        if parsed.query:
+            target = f"{target}?{parsed.query}"
+        last_error: BaseException | None = None
+        for attempt in range(2):
+            connection = self._acquire(key, timeout_seconds)
+            try:
+                connection.request(method.upper(), target, body=data, headers=headers)
+                return _PooledHttpResponse(connection.getresponse(), client=self, key=key, connection=connection)
+            except _RETRYABLE_TRANSPORT_ERRORS as exc:
+                last_error = exc
+                self.discard(connection)
+                if attempt == 0:
+                    continue
+                raise URLError(str(exc)) from exc
+        raise URLError(str(last_error or "request failed"))
+
+    def _acquire(self, key: tuple[str, str, int], timeout_seconds: float) -> HTTPConnection:
+        with self._lock:
+            pool = self._pools.setdefault(key, LifoQueue(maxsize=self._max_idle_per_origin))
+            while not pool.empty():
+                connection = pool.get_nowait()
+                connection.timeout = timeout_seconds
+                sock = getattr(connection, "sock", None)
+                if sock is not None:
+                    sock.settimeout(timeout_seconds)
+                    return connection
+        scheme, host, port = key
+        connection_cls = HTTPSConnection if scheme == "https" else HTTPConnection
+        return connection_cls(host, port=port, timeout=timeout_seconds)
+
+    def release(self, key: tuple[str, str, int], connection: HTTPConnection) -> None:
+        if getattr(connection, "sock", None) is None:
+            return
+        with self._lock:
+            pool = self._pools.setdefault(key, LifoQueue(maxsize=self._max_idle_per_origin))
+            if pool.full():
+                self.discard(connection)
+                return
+            pool.put_nowait(connection)
+
+    def discard(self, connection: HTTPConnection) -> None:
+        try:
+            connection.close()
+        except OSError:
+            pass
+
+
+_HTTP_CLIENT = _PooledHttpClient()
 
 
 def http_json_request(
@@ -57,10 +179,21 @@ def http_json_request(
     if not normalized_url or normalized_url.lower() in {"none", "null"} or "://" not in normalized_url:
         return {"error": "invalid_url", "message": "Provider URL is missing or invalid"}, 400
 
-    req = Request(normalized_url, data=data, headers=request_headers, method=method.upper())
     try:
-        with urlopen(req, timeout=timeout_seconds) as response:
+        with _HTTP_CLIENT.request(
+            normalized_url,
+            method=method,
+            data=data,
+            headers=request_headers,
+            timeout_seconds=timeout_seconds,
+        ) as response:
             raw = response.read().decode("utf-8")
+            if int(response.status) >= 400:
+                try:
+                    parsed = loads(raw) if raw else {"error": "upstream_error"}
+                except ValueError:
+                    parsed = {"error": "upstream_error", "body": raw}
+                return parsed, int(response.status)
             if not raw:
                 return {}, int(response.status)
             try:
@@ -72,15 +205,8 @@ def http_json_request(
                     "body": raw[:500],
                     "upstream_status_code": int(response.status),
                 }, 502
-    except TimeoutError:
+    except (TimeoutError, socket_timeout):
         return None, 504
-    except HTTPError as exc:
-        raw = exc.read().decode("utf-8")
-        try:
-            parsed = loads(raw) if raw else {"error": "upstream_error"}
-        except ValueError:
-            parsed = {"error": "upstream_error", "body": raw}
-        return parsed, int(exc.code)
     except URLError:
         return None, 502
 
@@ -102,33 +228,39 @@ def stream_sse_request(
         data = dumps(payload).encode("utf-8")
 
     normalized_url = str(url or "").strip()
-    req = Request(normalized_url, data=data, headers=request_headers, method=method.upper())
     started = monotonic()
     try:
-        with urlopen(req, timeout=timeout_seconds) as response:
+        with _HTTP_CLIENT.request(
+            normalized_url,
+            method=method,
+            data=data,
+            headers=request_headers,
+            timeout_seconds=timeout_seconds,
+        ) as response:
+            if int(response.status) >= 400:
+                raw = response.read().decode("utf-8")
+                try:
+                    parsed = loads(raw) if raw else {"error": "upstream_error"}
+                except ValueError:
+                    parsed = {"error": "upstream_error", "body": raw}
+                raise StreamRequestError(
+                    str(parsed.get("message") or parsed.get("error") or "Upstream stream request failed"),
+                    status_code=int(response.status),
+                    payload=parsed,
+                )
             yield "transport", {
-                "phase": "upstream_connected",
+                "phase": "upstream_response_headers",
                 "duration_ms": int((monotonic() - started) * 1000),
                 "status_code": int(getattr(response, "status", 0) or 0),
                 "endpoint_host": urlparse(normalized_url).netloc,
                 "headers": _trace_response_headers(response),
+                "duration_meaning": "provider queueing, prompt prefill, and first-stream setup",
             }
             yield from _iter_sse_events(response)
-    except TimeoutError as exc:
+    except (TimeoutError, socket_timeout) as exc:
         raise StreamRequestError(
             "Upstream stream request timed out",
             status_code=504,
-        ) from exc
-    except HTTPError as exc:
-        raw = exc.read().decode("utf-8")
-        try:
-            parsed = loads(raw) if raw else {"error": "upstream_error"}
-        except ValueError:
-            parsed = {"error": "upstream_error", "body": raw}
-        raise StreamRequestError(
-            str(parsed.get("message") or parsed.get("error") or "Upstream stream request failed"),
-            status_code=int(exc.code),
-            payload=parsed,
         ) from exc
     except URLError as exc:
         raise StreamRequestError(
@@ -497,6 +629,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 token_budget=max_tokens,
                 temperature=temperature,
             )
+            add_openai_compatible_request_options(
+                fallback_payload,
+                config=self.binding.config,
+                request_format=self._request_format(),
+            )
             fallback_response, fallback_status = http_json_request(
                 self._chat_url(),
                 method="POST",
@@ -525,6 +662,12 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             temperature=temperature,
         )
         payload["stream"] = True
+        add_openai_compatible_request_options(
+            payload,
+            config=self.binding.config,
+            request_format=request_format,
+            stream=True,
+        )
 
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
 
@@ -600,6 +743,12 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             temperature=temperature,
         )
         fallback_payload["stream"] = True
+        add_openai_compatible_request_options(
+            fallback_payload,
+            config=self.binding.config,
+            request_format=request_format,
+            stream=True,
+        )
         try:
             yield from _stream_attempt(fallback_payload)
         except StreamRequestError as exc:
@@ -637,6 +786,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             request_format=request_format,
             token_budget=max_tokens,
             temperature=temperature,
+        )
+        add_openai_compatible_request_options(
+            payload,
+            config=self.binding.config,
+            request_format=request_format,
         )
         return payload
 
@@ -1355,6 +1509,7 @@ def _stream_error_payload(event: dict[str, Any]) -> dict[str, Any] | None:
 
 def _iter_openai_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, Any]]]) -> Iterator[dict[str, Any]]:
     text_parts: list[str] = []
+    usage_payload: dict[str, Any] | None = None
     for event_name, event_payload in raw_events:
         if event_name.strip().lower() != "message":
             for normalized_event in _iter_vanessa_chat_stream_events(iter([(event_name, event_payload)])):
@@ -1363,8 +1518,10 @@ def _iter_openai_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, An
                     return
             continue
         if str(event_payload.get("raw") or "").strip() == "[DONE]":
-            yield _openai_chat_complete_event(text_parts)
+            yield _openai_chat_complete_event(text_parts, usage=usage_payload)
             return
+        if isinstance(event_payload.get("usage"), dict):
+            usage_payload = dict(event_payload["usage"])
         error_payload = event_payload.get("error")
         if isinstance(error_payload, dict):
             yield _stream_error_event(error_payload)
@@ -1380,7 +1537,7 @@ def _iter_openai_chat_stream_events(raw_events: Iterator[tuple[str, dict[str, An
                 yield {"type": "delta", "text": content}
                 continue
         if str(choice.get("finish_reason") or "").strip():
-            yield _openai_chat_complete_event(text_parts)
+            yield _openai_chat_complete_event(text_parts, usage=usage_payload)
             return
 
 
@@ -1422,10 +1579,13 @@ def _first_openai_stream_choice(event_payload: dict[str, Any]) -> dict[str, Any]
     return first_choice if isinstance(first_choice, dict) else None
 
 
-def _openai_chat_complete_event(text_parts: list[str]) -> dict[str, Any]:
+def _openai_chat_complete_event(text_parts: list[str], *, usage: dict[str, Any] | None = None) -> dict[str, Any]:
+    response = normalize_stream_complete_response(None, text_parts) or {}
+    if usage:
+        response["usage"] = usage
     return {
         "type": "complete",
-        "response": normalize_stream_complete_response(None, text_parts),
+        "response": response,
         "status_code": 200,
     }
 

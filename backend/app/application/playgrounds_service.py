@@ -639,7 +639,7 @@ def _stream_llm_chat_execution(
         details: dict[str, Any] = {"model_id": request.model_id}
         if not event:
             return details
-        for key in ("endpoint_host", "status_code", "duration_ms"):
+        for key in ("endpoint_host", "status_code", "duration_ms", "duration_meaning", "phase"):
             if event.get(key) is not None:
                 details[key] = event.get(key)
         headers = event.get("headers")
@@ -659,7 +659,7 @@ def _stream_llm_chat_execution(
 
     def _waiting_details(event: dict[str, Any] | None = None) -> dict[str, Any]:
         details = _transport_details(event)
-        details["phase"] = "provider queueing, prompt prefill, and first-token sampling"
+        details["phase"] = "first token delivery"
         return details
 
     for event in stream:
@@ -668,7 +668,7 @@ def _stream_llm_chat_execution(
             if waiting is None:
                 completed_opening = complete_status(
                     opening,
-                    label="Upstream stream connected",
+                    label="Provider queueing and stream setup complete",
                     summary=_transport_summary(event),
                     details=_transport_details(event),
                 )
@@ -684,7 +684,7 @@ def _stream_llm_chat_execution(
             if waiting is None:
                 completed_opening = complete_status(
                     opening,
-                    label="Upstream stream connected",
+                    label="Provider queueing and stream setup complete",
                     details=_transport_details(),
                 )
                 yield {"event": "status", "data": _record_status(statuses, completed_opening)}

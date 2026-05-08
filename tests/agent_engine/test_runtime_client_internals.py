@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import io
 import sys
 from pathlib import Path
-from urllib.error import HTTPError
 
 import pytest
 
@@ -31,7 +29,7 @@ class _FakeResponse:
 
 
 def test_http_json_request_returns_body_for_invalid_json_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(transport, "urlopen", lambda *_args, **_kwargs: _FakeResponse(status=200, body="not-json"))
+    monkeypatch.setattr(transport._HTTP_CLIENT, "request", lambda *_args, **_kwargs: _FakeResponse(status=200, body="not-json"))
 
     payload, status_code = transport.http_json_request("http://example.com/test", method="GET")
 
@@ -40,16 +38,11 @@ def test_http_json_request_returns_body_for_invalid_json_success(monkeypatch: py
 
 
 def test_http_json_request_preserves_non_json_http_error_body(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _raise_http_error(*_args, **_kwargs):
-        raise HTTPError(
-            url="http://example.com/test",
-            code=503,
-            msg="Service Unavailable",
-            hdrs=None,
-            fp=io.BytesIO(b"temporarily unavailable"),
-        )
-
-    monkeypatch.setattr(transport, "urlopen", _raise_http_error)
+    monkeypatch.setattr(
+        transport._HTTP_CLIENT,
+        "request",
+        lambda *_args, **_kwargs: _FakeResponse(status=503, body="temporarily unavailable"),
+    )
 
     payload, status_code = transport.http_json_request("http://example.com/test", method="GET")
 

@@ -1,7 +1,23 @@
 from __future__ import annotations
 
-from app.application import playgrounds_service
+from app.application import playground_execution, playgrounds_service
 from app.config import AuthConfig
+
+
+def test_build_context_messages_keeps_stable_prompt_prefix_ahead_of_recent_history():
+    history = [
+        {"role": "system", "content": "stable instructions"},
+        *[
+            {"role": "user" if index % 2 else "assistant", "content": f"turn {index}"}
+            for index in range(20)
+        ],
+    ]
+
+    messages = playground_execution.build_context_messages(history, prompt="latest question")
+
+    assert messages[0] == {"role": "system", "content": [{"type": "text", "text": "stable instructions"}]}
+    assert messages[-1] == {"role": "user", "content": [{"type": "text", "text": "latest question"}]}
+    assert len(messages) == playground_execution.MAX_CONTEXT_MESSAGES + 2
 
 
 def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases(monkeypatch):
@@ -584,10 +600,11 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
     def _fake_stream(**_kwargs):
         yield {
             "type": "transport",
-            "phase": "upstream_connected",
+            "phase": "upstream_response_headers",
             "duration_ms": 123,
             "status_code": 200,
             "endpoint_host": "api.openai.com",
+            "duration_meaning": "provider queueing, prompt prefill, and first-stream setup",
             "headers": {"x-request-id": "req-chat-1"},
         }
         yield {"type": "delta", "text": "Hello"}
@@ -648,7 +665,7 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
 
     labels = [event["data"]["label"] for event in events if event["event"] == "status"]
     assert "Opening upstream stream" in labels
-    assert "Upstream stream connected" in labels
+    assert "Provider queueing and stream setup complete" in labels
     assert "Waiting for first token" in labels
     assert "Received first token" in labels
     assert "Streaming response" in labels
@@ -656,7 +673,11 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
     assert [event["data"]["text"] for event in events if event["event"] == "delta"] == ["Hello", " world"]
     assert events[-1]["event"] == "complete"
     assert captured["assistant_metadata"]["statuses"][-1]["label"] == "Streamed response"
-    connected_status = next(status for status in captured["assistant_metadata"]["statuses"] if status["label"] == "Upstream stream connected")
+    connected_status = next(
+        status
+        for status in captured["assistant_metadata"]["statuses"]
+        if status["label"] == "Provider queueing and stream setup complete"
+    )
     assert connected_status["summary"] == "request id req-chat-1"
     assert connected_status["details"]["endpoint_host"] == "api.openai.com"
 

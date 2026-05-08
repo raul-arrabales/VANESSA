@@ -207,7 +207,7 @@ def test_streamed_execution_emits_model_deltas_and_stream_statuses(monkeypatch: 
     assert delta_events == [{"text": "Hel"}, {"text": "lo"}]
     labels = [event["label"] for event in progress_events]
     assert "Opening upstream stream" in labels
-    assert "Upstream stream connected" in labels
+    assert "Provider queueing and stream setup complete" in labels
     assert "Waiting for first token" in labels
     assert "Received first token" in labels
     assert "Streaming response" in labels

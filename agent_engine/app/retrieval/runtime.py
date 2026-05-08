@@ -86,7 +86,7 @@ def _coerce_messages(messages: list[Any]) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         role = str(item.get("role", "")).strip().lower()
-        if role not in {"system", "user", "assistant", "tool"}:
+        if role not in {"system", "developer", "user", "assistant", "tool"}:
             continue
         content = item.get("content")
         if isinstance(content, str):

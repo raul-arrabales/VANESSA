@@ -173,7 +173,19 @@ def test_openai_compatible_runtime_client_supports_vanessa_gateway_payloads(monk
         return {"output": [{"role": "assistant", "content": [{"type": "text", "text": "gateway reply"}]}]}, 200
 
     monkeypatch.setattr(runtime_client, "http_json_request", _request)
-    client = runtime_client.build_llm_runtime_client(_platform_runtime())
+    runtime = _platform_runtime()
+    runtime["capabilities"]["llm_inference"]["config"].update(
+        {
+            "request_options": {
+                "service_tier": "priority",
+                "prompt_cache_key": "agent-chat",
+                "prompt_cache_retention": "24h",
+                "reasoning_effort": "low",
+            },
+            "stream_options": {"include_usage": True},
+        }
+    )
+    client = runtime_client.build_llm_runtime_client(runtime)
 
     payload = client.chat_completion(
         requested_model="model.alpha",
@@ -190,6 +202,10 @@ def test_openai_compatible_runtime_client_supports_vanessa_gateway_payloads(monk
         {
             "model": "model.alpha",
             "input": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            "service_tier": "priority",
+            "prompt_cache_key": "agent-chat",
+            "prompt_cache_retention": "24h",
+            "reasoning": {"effort": "low"},
         }
     ]
     assert seen_timeouts == [60.0]
@@ -373,13 +389,24 @@ def test_openai_compatible_runtime_client_streams_vanessa_gateway_events(monkeyp
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    def _urlopen(req, *args, **kwargs):
-        del args, kwargs
-        seen_payloads.append(loads(req.data.decode("utf-8")))
+    def _request(*_args, data=None, **_kwargs):
+        seen_payloads.append(loads(data.decode("utf-8")))
         return FakeResponse()
 
-    monkeypatch.setattr(runtime_transport, "urlopen", _urlopen)
-    client = runtime_client.build_llm_runtime_client(_platform_runtime())
+    monkeypatch.setattr(runtime_transport._HTTP_CLIENT, "request", _request)
+    runtime = _platform_runtime()
+    runtime["capabilities"]["llm_inference"]["config"].update(
+        {
+            "request_options": {
+                "service_tier": "priority",
+                "prompt_cache_key": "agent-chat",
+                "prompt_cache_retention": "24h",
+                "reasoning_effort": "low",
+            },
+            "stream_options": {"include_usage": True},
+        }
+    )
+    client = runtime_client.build_llm_runtime_client(runtime)
 
     events = list(client.chat_completion_stream(
         requested_model="model.alpha",
@@ -387,6 +414,11 @@ def test_openai_compatible_runtime_client_streams_vanessa_gateway_events(monkeyp
     ))
 
     assert seen_payloads[0]["stream"] is True
+    assert seen_payloads[0]["service_tier"] == "priority"
+    assert seen_payloads[0]["prompt_cache_key"] == "agent-chat"
+    assert seen_payloads[0]["prompt_cache_retention"] == "24h"
+    assert seen_payloads[0]["reasoning"] == {"effort": "low"}
+    assert seen_payloads[0]["stream_options"] == {"include_usage": True}
     assert [event["type"] for event in events] == ["transport", "delta", "delta", "complete"]
     assert [event.get("text") for event in events if event["type"] == "delta"] == ["Hel", "lo"]
     assert events[-1]["requested_model"] == "model.alpha"
@@ -417,7 +449,7 @@ def test_openai_compatible_runtime_client_streams_openai_chat_chunks(monkeypatch
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    monkeypatch.setattr(runtime_transport, "urlopen", lambda *_args, **_kwargs: FakeResponse())
+    monkeypatch.setattr(runtime_transport._HTTP_CLIENT, "request", lambda *_args, **_kwargs: FakeResponse())
     client = runtime_client.build_llm_runtime_client(
         _platform_runtime(provider_key="llama_cpp_local", request_format="openai_chat")
     )
