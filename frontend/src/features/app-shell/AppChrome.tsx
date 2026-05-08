@@ -8,6 +8,7 @@ import { useActionFeedback } from "../../feedback/ActionFeedbackProvider";
 import { useRuntimeMode } from "../../runtime/RuntimeModeProvider";
 import { getMainContentLayout } from "../../routes/appRoutes";
 import { buildSidebarItems, buildTopBarPathItems, buildUserMenuItems } from "./navigation";
+import { useCloudTrafficIndicators } from "./useCloudTrafficIndicators";
 import { useAppShellState } from "./useAppShellState";
 
 const VANESSA_DOCS_URL = "https://raul-arrabales.github.io/VANESSA/";
@@ -118,7 +119,7 @@ function RuntimeModeConfirmationDialog({
 export default function AppChrome({ children }: { children: JSX.Element }): JSX.Element {
   const { t } = useTranslation("common");
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, token, isAuthenticated, logout } = useAuth();
   const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const {
     mode,
@@ -160,6 +161,7 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
   }, t);
   const pathItems = buildTopBarPathItems(location.pathname, t);
   const mainContentLayout = getMainContentLayout(location.pathname);
+  const cloudTraffic = useCloudTrafficIndicators({ isAuthenticated, mode, token });
 
   useEffect(() => {
     if (!runtimeError || !isAuthenticated) {
@@ -245,12 +247,20 @@ export default function AppChrome({ children }: { children: JSX.Element }): JSX.
         </span>
         {mode === "online" ? (
           <span className="runtime-transfer-indicators" aria-hidden="true">
-            <span className="runtime-transfer-indicator" data-direction="upload" data-active="false">
+            <span
+              className="runtime-transfer-indicator"
+              data-direction="upload"
+              data-active={cloudTraffic.uploadActive ? "true" : "false"}
+            >
               <svg viewBox="0 0 12 12" focusable="false">
                 <path d="M6 2 2.8 5.2l.9.9L5.35 4.45V10h1.3V4.45L8.3 6.1l.9-.9L6 2Z" />
               </svg>
             </span>
-            <span className="runtime-transfer-indicator" data-direction="download" data-active="false">
+            <span
+              className="runtime-transfer-indicator"
+              data-direction="download"
+              data-active={cloudTraffic.downloadActive ? "true" : "false"}
+            >
               <svg viewBox="0 0 12 12" focusable="false">
                 <path d="M5.35 2v5.55L3.7 5.9l-.9.9L6 10l3.2-3.2-.9-.9-1.65 1.65V2h-1.3Z" />
               </svg>

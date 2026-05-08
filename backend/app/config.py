@@ -26,6 +26,8 @@ DEFAULT_QDRANT_URL = ""
 DEFAULT_PRODUCT_RAG_INDEX = "knowledge_base"
 DEFAULT_PRODUCT_RAG_TOP_K = 5
 DEFAULT_CONTEXT_SOURCE_ROOTS = "/context_sources"
+DEFAULT_CLOUD_TRAFFIC_LOG_PATH = "/var/log/vanessa/cloud-traffic.jsonl"
+DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES = 10_485_760
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,9 @@ class BackendRuntimeConfig:
     runtime_profile_force: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
+    cloud_traffic_log_enabled: bool = True
+    cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
+    cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
 
 
 @dataclass(frozen=True)
@@ -97,6 +102,9 @@ class AuthConfig:
     runtime_profile_force: str | None = None
     kws_detection_threshold: float = 0.5
     kws_cooldown_ms: int = 2_000
+    cloud_traffic_log_enabled: bool = True
+    cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
+    cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
@@ -246,6 +254,15 @@ def get_auth_config() -> AuthConfig:
         runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
         kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
         kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
+        cloud_traffic_log_enabled=_get_bool_env("CLOUD_TRAFFIC_LOG_ENABLED", True),
+        cloud_traffic_log_path=(
+            os.getenv("CLOUD_TRAFFIC_LOG_PATH", DEFAULT_CLOUD_TRAFFIC_LOG_PATH).strip()
+            or DEFAULT_CLOUD_TRAFFIC_LOG_PATH
+        ),
+        cloud_traffic_log_max_bytes=_get_int_env(
+            "CLOUD_TRAFFIC_LOG_MAX_BYTES",
+            DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES,
+        ),
     )
 
 

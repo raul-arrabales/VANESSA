@@ -88,6 +88,7 @@ VANESSA currently uses global runtime profile semantics for safety gates and pro
 
 - `online` allows cloud-capable runtime behavior where configured
 - `offline` blocks cloud provider validation, deployment activation, runtime resolution, and invocation before any provider client is created
+- In online mode, cloud/external call metadata is published through backend cloud-traffic events so the topbar can indicate upload/download activity; optional local JSONL logging records only sanitized metadata.
 - MCP-backed web search is governed by the same runtime contract, while sandbox-backed Python execution can remain available offline when the optional capability is bound
 
 ## Product Areas

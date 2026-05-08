@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from time import monotonic
 from typing import Any
 
 from .base import EmbeddingsRuntimeClient, EmbeddingsRuntimeClientError
 from .resolution import binding_timeout_seconds, resolve_effective_embedding_model
 from .secrets import openai_compatible_headers
 from .transport import JsonRequestFn, request_json_or_raise
+from ..cloud_traffic import report_cloud_traffic_for_binding
 
 
 def embeddings_request_failed_code(status_code: int) -> str:
@@ -36,22 +38,55 @@ class OpenAICompatibleEmbeddingsRuntimeClient(EmbeddingsRuntimeClient):
             self.embeddings_binding,
             request_json=self.request_json,
         )
-        response_payload, status_code = request_json_or_raise(
-            request_json=self.request_json,
-            error_cls=EmbeddingsRuntimeClientError,
-            binding=self.embeddings_binding,
-            url=self._embeddings_url(),
-            method="POST",
-            payload={
-                "model": runtime_model_id,
-                "input": texts,
-            },
-            headers=openai_compatible_headers(self.embeddings_binding, error_cls=EmbeddingsRuntimeClientError),
-            timeout_seconds=binding_timeout_seconds(self.embeddings_binding),
-            unavailable_code="embeddings_runtime_unreachable",
-            unavailable_message="Embeddings runtime unavailable",
-            request_failed_code=embeddings_request_failed_code,
-            request_failed_message="Embeddings runtime request failed",
+        embeddings_url = self._embeddings_url()
+        started_at = monotonic()
+        report_cloud_traffic_for_binding(
+            self.embeddings_binding,
+            direction="egress",
+            phase="request_sent",
+            capability="embeddings",
+            operation="embeddings.create",
+            endpoint_url=embeddings_url,
+        )
+        try:
+            response_payload, status_code = request_json_or_raise(
+                request_json=self.request_json,
+                error_cls=EmbeddingsRuntimeClientError,
+                binding=self.embeddings_binding,
+                url=embeddings_url,
+                method="POST",
+                payload={
+                    "model": runtime_model_id,
+                    "input": texts,
+                },
+                headers=openai_compatible_headers(self.embeddings_binding, error_cls=EmbeddingsRuntimeClientError),
+                timeout_seconds=binding_timeout_seconds(self.embeddings_binding),
+                unavailable_code="embeddings_runtime_unreachable",
+                unavailable_message="Embeddings runtime unavailable",
+                request_failed_code=embeddings_request_failed_code,
+                request_failed_message="Embeddings runtime request failed",
+            )
+        except EmbeddingsRuntimeClientError as exc:
+            report_cloud_traffic_for_binding(
+                self.embeddings_binding,
+                direction="ingress",
+                phase="response_failed",
+                capability="embeddings",
+                operation="embeddings.create",
+                endpoint_url=embeddings_url,
+                status_code=exc.status_code,
+                duration_ms=int((monotonic() - started_at) * 1000),
+            )
+            raise
+        report_cloud_traffic_for_binding(
+            self.embeddings_binding,
+            direction="ingress",
+            phase="response_received",
+            capability="embeddings",
+            operation="embeddings.create",
+            endpoint_url=embeddings_url,
+            status_code=status_code,
+            duration_ms=int((monotonic() - started_at) * 1000),
         )
         embeddings = extract_embeddings(response_payload)
         if not embeddings:

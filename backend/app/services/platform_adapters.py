@@ -16,6 +16,7 @@ from uuid import NAMESPACE_URL, uuid5
 from urllib.parse import urlparse
 from urllib.error import URLError
 
+from .cloud_traffic import endpoint_host_from_url, publish_cloud_traffic_event, request_id_from_headers
 from .context_management_metadata import is_internal_metadata_key
 from .openai_compatible_generation import (
     add_openai_compatible_chat_generation_options,
@@ -377,6 +378,172 @@ def _filter_models_payload_by_capability(
     return {**payload, "data": filtered}
 
 
+def _binding_reports_cloud_traffic(binding: ProviderBinding) -> bool:
+    return str(binding.provider_origin or "").strip().lower() == "cloud"
+
+
+def _publish_binding_cloud_traffic(
+    binding: ProviderBinding,
+    *,
+    direction: str,
+    phase: str,
+    operation: str,
+    endpoint_url: str,
+    status_code: int | None = None,
+    duration_ms: int | None = None,
+    request_id: str | None = None,
+) -> None:
+    if not _binding_reports_cloud_traffic(binding):
+        return
+    publish_cloud_traffic_event(
+        {
+            "direction": direction,
+            "phase": phase,
+            "runtime_profile": "online",
+            "source_service": "backend",
+            "capability": binding.capability_key,
+            "operation": operation,
+            "provider_origin": binding.provider_origin,
+            "provider_key": binding.provider_key,
+            "provider_slug": binding.provider_slug,
+            "endpoint_host": endpoint_host_from_url(endpoint_url),
+            "status_code": status_code,
+            "duration_ms": duration_ms,
+            "request_id": request_id,
+        }
+    )
+
+
+def _cloud_traced_json_request(
+    binding: ProviderBinding,
+    url: str,
+    *,
+    method: str,
+    operation: str,
+    payload: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
+) -> tuple[Any, int]:
+    if not _binding_reports_cloud_traffic(binding):
+        return http_json_request(
+            url,
+            method=method,
+            payload=payload,
+            headers=headers,
+            timeout_seconds=timeout_seconds,
+        )
+    started = monotonic()
+    _publish_binding_cloud_traffic(
+        binding,
+        direction="egress",
+        phase="request_sent",
+        operation=operation,
+        endpoint_url=url,
+    )
+    try:
+        response_payload, status_code = http_json_request(
+            url,
+            method=method,
+            payload=payload,
+            headers=headers,
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception:
+        _publish_binding_cloud_traffic(
+            binding,
+            direction="ingress",
+            phase="response_failed",
+            operation=operation,
+            endpoint_url=url,
+            duration_ms=int((monotonic() - started) * 1000),
+        )
+        raise
+    _publish_binding_cloud_traffic(
+        binding,
+        direction="ingress",
+        phase="response_received",
+        operation=operation,
+        endpoint_url=url,
+        status_code=status_code,
+        duration_ms=int((monotonic() - started) * 1000),
+    )
+    return response_payload, status_code
+
+
+def _cloud_traced_sse_request(
+    binding: ProviderBinding,
+    url: str,
+    *,
+    method: str,
+    operation: str,
+    payload: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    timeout_seconds: float = _DEFAULT_HTTP_TIMEOUT_SECONDS,
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    if not _binding_reports_cloud_traffic(binding):
+        yield from stream_sse_request(
+            url,
+            method=method,
+            payload=payload,
+            headers=headers,
+            timeout_seconds=timeout_seconds,
+        )
+        return
+
+    started = monotonic()
+    _publish_binding_cloud_traffic(
+        binding,
+        direction="egress",
+        phase="request_sent",
+        operation=operation,
+        endpoint_url=url,
+    )
+    ingress_emitted = False
+    try:
+        for event_name, event_payload in stream_sse_request(
+            url,
+            method=method,
+            payload=payload,
+            headers=headers,
+            timeout_seconds=timeout_seconds,
+        ):
+            if not ingress_emitted and event_name == "transport":
+                ingress_emitted = True
+                metadata = event_payload if isinstance(event_payload, dict) else {}
+                _publish_binding_cloud_traffic(
+                    binding,
+                    direction="ingress",
+                    phase="first_stream_setup",
+                    operation=operation,
+                    endpoint_url=url,
+                    status_code=_safe_int(metadata.get("status_code")),
+                    duration_ms=_safe_int(metadata.get("duration_ms")) or int((monotonic() - started) * 1000),
+                    request_id=request_id_from_headers(metadata.get("headers") if isinstance(metadata.get("headers"), dict) else None),
+                )
+            yield event_name, event_payload
+    except StreamRequestError as exc:
+        if not ingress_emitted:
+            _publish_binding_cloud_traffic(
+                binding,
+                direction="ingress",
+                phase="first_stream_setup_failed",
+                operation=operation,
+                endpoint_url=url,
+                status_code=exc.status_code,
+                duration_ms=int((monotonic() - started) * 1000),
+            )
+        raise
+
+
+def _safe_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class LlmInferenceAdapter(ABC):
     def __init__(self, binding: ProviderBinding):
         self.binding = binding
@@ -561,9 +728,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         return _binding_timeout_seconds(self.binding.config)
 
     def health(self) -> dict[str, Any]:
-        payload, status_code = http_json_request(
+        payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._health_url(),
             method="GET",
+            operation="provider.health",
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
@@ -576,9 +745,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         }
 
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
-        payload, status_code = http_json_request(
+        payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._models_url(),
             method="GET",
+            operation="provider.list_models",
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
@@ -601,9 +772,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
             temperature=temperature,
         )
 
-        response_payload, status_code = http_json_request(
+        response_payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._chat_url(),
             method="POST",
+            operation="llm.chat_completion",
             payload=payload,
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
@@ -635,9 +808,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
                 config=self.binding.config,
                 request_format=self._request_format(),
             )
-            fallback_response, fallback_status = http_json_request(
+            fallback_response, fallback_status = _cloud_traced_json_request(
+                self.binding,
                 self._chat_url(),
                 method="POST",
+                operation="llm.chat_completion",
                 payload=fallback_payload,
                 headers=self._request_headers(),
                 timeout_seconds=self._request_timeout_seconds(),
@@ -673,9 +848,11 @@ class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
         fallback_model_id = str(self.binding.config.get("local_fallback_model_id", "")).strip()
 
         def _stream_attempt(stream_payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
-            raw_events = stream_sse_request(
+            raw_events = _cloud_traced_sse_request(
+                self.binding,
                 self._chat_url(),
                 method="POST",
+                operation="llm.chat_completion_stream",
                 payload=stream_payload,
                 headers=self._request_headers(),
                 timeout_seconds=self._request_timeout_seconds(),
@@ -826,6 +1003,7 @@ def build_credential_openai_compatible_llm_adapter(
             deployment_profile_id="modelops-credential",
             deployment_profile_slug="modelops-credential",
             deployment_profile_display_name="ModelOps credential",
+            provider_origin="cloud",
         )
     )
 
@@ -851,9 +1029,11 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
         return _binding_timeout_seconds(self.binding.config)
 
     def health(self) -> dict[str, Any]:
-        payload, status_code = http_json_request(
+        payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._health_url(),
             method="GET",
+            operation="provider.health",
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
@@ -866,9 +1046,11 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
         }
 
     def list_models(self) -> tuple[dict[str, Any] | None, int]:
-        payload, status_code = http_json_request(
+        payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._models_url(),
             method="GET",
+            operation="provider.list_models",
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),
         )
@@ -892,9 +1074,11 @@ class OpenAICompatibleEmbeddingsAdapter(EmbeddingsAdapter):
             "model": effective_model,
             "input": texts,
         }
-        response_payload, status_code = http_json_request(
+        response_payload, status_code = _cloud_traced_json_request(
+            self.binding,
             self._embeddings_url(),
             method="POST",
+            operation="embeddings.create",
             payload=payload,
             headers=self._request_headers(),
             timeout_seconds=self._request_timeout_seconds(),

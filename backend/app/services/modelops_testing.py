@@ -8,6 +8,7 @@ from ..config import AuthConfig
 from ..repositories import modelops as modelops_repo
 from ..repositories import platform_control_plane as platform_repo
 from ..repositories.model_credentials import get_active_credential_secret_by_id
+from .cloud_traffic import endpoint_host_from_url, publish_cloud_traffic_event
 from .modelops_common import ModelOpsError
 from .modelops_policy import can_manage_model, get_accessible_model
 from .modelops_serializers import serialize_model, serialize_model_test_run
@@ -198,14 +199,46 @@ def _execute_cloud_embeddings_test(
 
     request_payload = {"model": provider_model_id, "input": [text]}
     started_at = perf_counter()
+    embeddings_url = f"{api_base_url}/embeddings"
+    provider_slug = str(secret.get("provider_slug") or row.get("provider") or "openai_compatible").strip()
+    publish_cloud_traffic_event(
+        {
+            "direction": "egress",
+            "phase": "request_sent",
+            "runtime_profile": "online",
+            "source_service": "backend",
+            "capability": "modelops",
+            "operation": "modelops.test_cloud_embeddings",
+            "provider_origin": "cloud",
+            "provider_key": "openai_compatible_cloud_embeddings",
+            "provider_slug": provider_slug,
+            "endpoint_host": endpoint_host_from_url(embeddings_url),
+        }
+    )
     payload, status_code = http_json_request(
-        f"{api_base_url}/embeddings",
+        embeddings_url,
         method="POST",
         payload=request_payload,
         headers={"Authorization": f"Bearer {str(secret.get('api_key') or '').strip()}"},
         timeout_seconds=8.0,
     )
     latency_ms = (perf_counter() - started_at) * 1000
+    publish_cloud_traffic_event(
+        {
+            "direction": "ingress",
+            "phase": "response_received",
+            "runtime_profile": "online",
+            "source_service": "backend",
+            "capability": "modelops",
+            "operation": "modelops.test_cloud_embeddings",
+            "provider_origin": "cloud",
+            "provider_key": "openai_compatible_cloud_embeddings",
+            "provider_slug": provider_slug,
+            "endpoint_host": endpoint_host_from_url(embeddings_url),
+            "status_code": status_code,
+            "duration_ms": int(latency_ms),
+        }
+    )
     response_payload = payload if isinstance(payload, dict) else {}
     if payload is None or status_code >= 400:
         message = str(response_payload.get("message") or response_payload.get("error") or "Cloud embeddings test failed")

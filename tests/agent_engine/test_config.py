@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from agent_engine.app.config import (  # noqa: E402
     DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
+    DEFAULT_BACKEND_URL,
     get_config,
 )
 
@@ -20,22 +21,26 @@ def test_engine_config_defaults(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE", raising=False)
     monkeypatch.delenv("VANESSA_RUNTIME_PROFILE_FORCE", raising=False)
     monkeypatch.delenv("AGENT_ENGINE_SERVICE_TOKEN", raising=False)
+    monkeypatch.delenv("BACKEND_URL", raising=False)
 
     config = get_config()
     assert config.database_url == ""
     assert config.runtime_profile_force is None
     assert config.agent_engine_service_token == DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+    assert config.backend_url == DEFAULT_BACKEND_URL
 
 
 def test_engine_config_env_overrides(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://example")
     monkeypatch.setenv("VANESSA_RUNTIME_PROFILE_FORCE", "offline")
     monkeypatch.setenv("AGENT_ENGINE_SERVICE_TOKEN", "custom-token")
+    monkeypatch.setenv("BACKEND_URL", "http://backend.example")
 
     config = get_config()
     assert config.database_url == "postgresql://example"
     assert config.runtime_profile_force == "offline"
     assert config.agent_engine_service_token == "custom-token"
+    assert config.backend_url == "http://backend.example"
 
 
 

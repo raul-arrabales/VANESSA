@@ -6,6 +6,7 @@ from dataclasses import dataclass
 RUNTIME_PROFILES = {"online", "offline"}
 DEFAULT_RUNTIME_PROFILE = "offline"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
+DEFAULT_BACKEND_URL = "http://backend:5000"
 _LEGACY_RUNTIME_PROFILES = {"air_gapped": "offline"}
 
 
@@ -14,6 +15,7 @@ class EngineConfig:
     database_url: str
     runtime_profile_force: str | None
     agent_engine_service_token: str
+    backend_url: str
 
 
 def _get_runtime_profile_env(name: str) -> str | None:
@@ -41,4 +43,5 @@ def get_config() -> EngineConfig:
             os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
             or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
         ),
+        backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
     )

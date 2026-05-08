@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from json import dumps
+from time import monotonic
 from typing import Any
 
 from .base import LlmRuntimeClient, LlmRuntimeClientError
 from .resolution import binding_timeout_seconds, resolve_effective_model
 from .secrets import openai_compatible_headers
 from .transport import JsonRequestFn, StreamRequestError, stream_sse_request, request_json_or_raise
+from ..cloud_traffic import report_cloud_traffic_for_binding
 
 _REQUEST_OPTION_KEYS = {
     "service_tier",
@@ -49,19 +51,52 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         )
         payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
         add_openai_compatible_request_options(payload, self.llm_binding, stream=False)
-        response_payload, status_code = request_json_or_raise(
-            request_json=self.request_json,
-            error_cls=LlmRuntimeClientError,
-            binding=self.llm_binding,
-            url=self._chat_url(),
-            method="POST",
-            payload=payload,
-            headers=openai_compatible_headers(self.llm_binding, error_cls=LlmRuntimeClientError),
-            timeout_seconds=binding_timeout_seconds(self.llm_binding),
-            unavailable_code="runtime_unreachable",
-            unavailable_message="LLM runtime unavailable",
-            request_failed_code=llm_request_failed_code,
-            request_failed_message="LLM runtime request failed",
+        chat_url = self._chat_url()
+        started_at = monotonic()
+        report_cloud_traffic_for_binding(
+            self.llm_binding,
+            direction="egress",
+            phase="request_sent",
+            capability="llm_inference",
+            operation="llm.chat_completion",
+            endpoint_url=chat_url,
+        )
+        try:
+            response_payload, status_code = request_json_or_raise(
+                request_json=self.request_json,
+                error_cls=LlmRuntimeClientError,
+                binding=self.llm_binding,
+                url=chat_url,
+                method="POST",
+                payload=payload,
+                headers=openai_compatible_headers(self.llm_binding, error_cls=LlmRuntimeClientError),
+                timeout_seconds=binding_timeout_seconds(self.llm_binding),
+                unavailable_code="runtime_unreachable",
+                unavailable_message="LLM runtime unavailable",
+                request_failed_code=llm_request_failed_code,
+                request_failed_message="LLM runtime request failed",
+            )
+        except LlmRuntimeClientError as exc:
+            report_cloud_traffic_for_binding(
+                self.llm_binding,
+                direction="ingress",
+                phase="response_failed",
+                capability="llm_inference",
+                operation="llm.chat_completion",
+                endpoint_url=chat_url,
+                status_code=exc.status_code,
+                duration_ms=int((monotonic() - started_at) * 1000),
+            )
+            raise
+        report_cloud_traffic_for_binding(
+            self.llm_binding,
+            direction="ingress",
+            phase="response_received",
+            capability="llm_inference",
+            operation="llm.chat_completion",
+            endpoint_url=chat_url,
+            status_code=status_code,
+            duration_ms=int((monotonic() - started_at) * 1000),
         )
         return {
             "output_text": extract_output_text(response_payload),
@@ -86,8 +121,10 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         payload["stream"] = True
         add_openai_compatible_request_options(payload, self.llm_binding, stream=True)
         request_format = self._request_format()
-        raw_events = stream_sse_request(
-            self._chat_url(),
+        chat_url = self._chat_url()
+        raw_events = _cloud_traced_stream_request(
+            self.llm_binding,
+            chat_url,
             method="POST",
             payload=payload,
             headers=openai_compatible_headers(self.llm_binding, error_cls=LlmRuntimeClientError),
@@ -114,6 +151,70 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
     def _request_format(self) -> str:
         config = self.llm_binding.get("config") if isinstance(self.llm_binding.get("config"), dict) else {}
         return str(config.get("request_format", "responses_api")).strip().lower() or "responses_api"
+
+
+def _cloud_traced_stream_request(
+    binding: dict[str, Any],
+    url: str,
+    *,
+    method: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    timeout_seconds: float,
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    started_at = monotonic()
+    report_cloud_traffic_for_binding(
+        binding,
+        direction="egress",
+        phase="request_sent",
+        capability="llm_inference",
+        operation="llm.chat_completion_stream",
+        endpoint_url=url,
+    )
+    ingress_emitted = False
+    try:
+        for event_name, event_payload in stream_sse_request(
+            url,
+            method=method,
+            payload=payload,
+            headers=headers,
+            timeout_seconds=timeout_seconds,
+        ):
+            if not ingress_emitted and event_name == "transport":
+                ingress_emitted = True
+                report_cloud_traffic_for_binding(
+                    binding,
+                    direction="ingress",
+                    phase="first_stream_setup",
+                    capability="llm_inference",
+                    operation="llm.chat_completion_stream",
+                    endpoint_url=url,
+                    status_code=_safe_int(event_payload.get("status_code")),
+                    duration_ms=_safe_int(event_payload.get("duration_ms")) or int((monotonic() - started_at) * 1000),
+                )
+            yield event_name, event_payload
+    except StreamRequestError as exc:
+        if not ingress_emitted:
+            report_cloud_traffic_for_binding(
+                binding,
+                direction="ingress",
+                phase="first_stream_setup_failed",
+                capability="llm_inference",
+                operation="llm.chat_completion_stream",
+                endpoint_url=url,
+                status_code=exc.status_code,
+                duration_ms=int((monotonic() - started_at) * 1000),
+            )
+        raise
+
+
+def _safe_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def build_request_payload(

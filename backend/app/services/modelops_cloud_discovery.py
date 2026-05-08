@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import Any
 
 from ..config import AuthConfig
 from ..repositories import modelops as modelops_repo
 from ..repositories.model_credentials import get_active_credential_secret
+from .cloud_traffic import endpoint_host_from_url, publish_cloud_traffic_event
 from .modelops_common import ModelOpsError
 from .platform_adapters import http_json_request
 
@@ -64,11 +66,45 @@ def discover_cloud_provider_models(
     if not api_base_url:
         raise ModelOpsError("missing_config", "Cloud credential is missing api_base_url", status_code=400)
 
+    models_url = f"{api_base_url}/models"
+    started_at = perf_counter()
+    publish_cloud_traffic_event(
+        {
+            "direction": "egress",
+            "phase": "request_sent",
+            "runtime_profile": "online",
+            "source_service": "backend",
+            "capability": "modelops",
+            "operation": "modelops.discover_cloud_models",
+            "provider_origin": "cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "provider_slug": normalized_provider,
+            "endpoint_host": endpoint_host_from_url(models_url),
+        },
+        config=config,
+    )
     payload, status_code = http_json_request(
-        f"{api_base_url}/models",
+        models_url,
         method="GET",
         headers={"Authorization": f"Bearer {str(secret.get('api_key') or '').strip()}"},
         timeout_seconds=8.0,
+    )
+    publish_cloud_traffic_event(
+        {
+            "direction": "ingress",
+            "phase": "response_received",
+            "runtime_profile": "online",
+            "source_service": "backend",
+            "capability": "modelops",
+            "operation": "modelops.discover_cloud_models",
+            "provider_origin": "cloud",
+            "provider_key": "openai_compatible_cloud_llm",
+            "provider_slug": normalized_provider,
+            "endpoint_host": endpoint_host_from_url(models_url),
+            "status_code": status_code,
+            "duration_ms": int((perf_counter() - started_at) * 1000),
+        },
+        config=config,
     )
     if payload is None or status_code >= 400:
         raise ModelOpsError(

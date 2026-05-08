@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from time import monotonic
 from typing import Any
 
 from .base import McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
 from .resolution import binding_timeout_seconds
 from .transport import JsonRequestFn, request_json_or_raise
+from ..cloud_traffic import report_cloud_traffic_for_binding
 
 
 def tool_unavailable_code(status_code: int) -> str:
@@ -37,22 +39,59 @@ class HttpMcpToolRuntimeClient(McpToolRuntimeClient):
         arguments: dict[str, Any],
         request_metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        payload, status_code = request_json_or_raise(
-            request_json=self.request_json,
-            error_cls=ToolRuntimeClientError,
-            binding=self.mcp_binding,
-            url=self._invoke_url(),
-            method="POST",
-            payload={
-                "tool_name": tool_name,
-                "arguments": arguments,
-                "request_metadata": request_metadata,
-            },
-            timeout_seconds=binding_timeout_seconds(self.mcp_binding),
-            unavailable_code=tool_unavailable_code,
-            unavailable_message="Tool runtime unavailable",
-            request_failed_code=tool_request_failed_code,
-            request_failed_message="Tool runtime request failed",
+        invoke_url = self._invoke_url()
+        is_external_web_search = tool_name.strip().lower() == "web_search"
+        started_at = monotonic()
+        report_cloud_traffic_for_binding(
+            self.mcp_binding,
+            direction="egress",
+            phase="request_sent",
+            capability="mcp_runtime",
+            operation=f"tool.{tool_name.strip().lower() or 'unknown'}",
+            endpoint_url="external-web" if is_external_web_search else invoke_url,
+            force_external=is_external_web_search,
+        )
+        try:
+            payload, status_code = request_json_or_raise(
+                request_json=self.request_json,
+                error_cls=ToolRuntimeClientError,
+                binding=self.mcp_binding,
+                url=invoke_url,
+                method="POST",
+                payload={
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                    "request_metadata": request_metadata,
+                },
+                timeout_seconds=binding_timeout_seconds(self.mcp_binding),
+                unavailable_code=tool_unavailable_code,
+                unavailable_message="Tool runtime unavailable",
+                request_failed_code=tool_request_failed_code,
+                request_failed_message="Tool runtime request failed",
+            )
+        except ToolRuntimeClientError as exc:
+            report_cloud_traffic_for_binding(
+                self.mcp_binding,
+                direction="ingress",
+                phase="response_failed",
+                capability="mcp_runtime",
+                operation=f"tool.{tool_name.strip().lower() or 'unknown'}",
+                endpoint_url="external-web" if is_external_web_search else invoke_url,
+                status_code=exc.status_code,
+                duration_ms=int((monotonic() - started_at) * 1000),
+                force_external=is_external_web_search,
+            )
+            raise
+        report_cloud_traffic_for_binding(
+            self.mcp_binding,
+            direction="ingress",
+            phase="response_received",
+            capability="mcp_runtime",
+            operation=f"tool.{tool_name.strip().lower() or 'unknown'}",
+            endpoint_url="external-web" if is_external_web_search else invoke_url,
+            status_code=status_code,
+            duration_ms=int((monotonic() - started_at) * 1000),
+            force_external=is_external_web_search,
         )
         return {
             "status_code": status_code,

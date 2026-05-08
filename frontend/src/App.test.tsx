@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "./auth/types";
@@ -11,6 +11,9 @@ const mockSetMode = vi.fn();
 let mockRuntimeLocked = false;
 let mockRuntimeError = "";
 let mockRuntimeMode: "offline" | "online" = "offline";
+const cloudTrafficMocks = vi.hoisted(() => ({
+  streamCloudTrafficEvents: vi.fn(),
+}));
 
 vi.mock("./auth/AuthProvider", () => ({
   useAuth: () => ({
@@ -37,6 +40,10 @@ vi.mock("./runtime/RuntimeModeProvider", () => ({
   }),
 }));
 
+vi.mock("./api/cloudTraffic", () => ({
+  streamCloudTrafficEvents: cloudTrafficMocks.streamCloudTrafficEvents,
+}));
+
 describe("App header", () => {
   beforeEach(() => {
     mockUser = null;
@@ -45,6 +52,8 @@ describe("App header", () => {
     mockRuntimeMode = "offline";
     mockSetMode.mockReset();
     vi.restoreAllMocks();
+    cloudTrafficMocks.streamCloudTrafficEvents.mockReset();
+    cloudTrafficMocks.streamCloudTrafficEvents.mockImplementation(() => new Promise<void>(() => {}));
   });
 
   async function renderApp(): Promise<HTMLElement> {
@@ -161,6 +170,113 @@ describe("App header", () => {
     expect(runtimeButton).toHaveAttribute("data-mode", "online");
     expect(container.querySelector(".runtime-transfer-indicator[data-direction='upload']")).not.toBeNull();
     expect(container.querySelector(".runtime-transfer-indicator[data-direction='download']")).not.toBeNull();
+    expect(cloudTrafficMocks.streamCloudTrafficEvents).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ signal: expect.any(AbortSignal), onEvent: expect.any(Function) }),
+    );
+  });
+
+  it("does not subscribe or render transfer indicators in offline mode", async () => {
+    mockUser = {
+      id: 1,
+      email: "root@example.com",
+      username: "root",
+      role: "superadmin",
+      is_active: true,
+    };
+    mockRuntimeMode = "offline";
+
+    const container = await renderApp();
+
+    expect(container.querySelector(".runtime-transfer-indicator[data-direction='upload']")).toBeNull();
+    expect(container.querySelector(".runtime-transfer-indicator[data-direction='download']")).toBeNull();
+    expect(cloudTrafficMocks.streamCloudTrafficEvents).not.toHaveBeenCalled();
+  });
+
+  it("pulses upload and download transfer indicators from cloud traffic events", async () => {
+    vi.useFakeTimers();
+    try {
+      mockUser = {
+        id: 1,
+        email: "root@example.com",
+        username: "root",
+        role: "superadmin",
+        is_active: true,
+      };
+      mockRuntimeMode = "online";
+      cloudTrafficMocks.streamCloudTrafficEvents.mockImplementation((_token, options) => {
+        options.onEvent({
+          id: "event-1",
+          timestamp: "2026-05-08T00:00:00Z",
+          direction: "egress",
+          phase: "request_sent",
+          runtime_profile: "online",
+          source_service: "backend",
+        });
+        options.onEvent({
+          id: "event-2",
+          timestamp: "2026-05-08T00:00:00Z",
+          direction: "ingress",
+          phase: "response_received",
+          runtime_profile: "online",
+          source_service: "backend",
+        });
+        return new Promise<void>(() => {});
+      });
+
+      const container = await renderApp();
+      const upload = container.querySelector(".runtime-transfer-indicator[data-direction='upload']");
+      const download = container.querySelector(".runtime-transfer-indicator[data-direction='download']");
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(upload).toHaveAttribute("data-active", "true");
+      expect(download).toHaveAttribute("data-active", "true");
+
+      act(() => {
+        vi.advanceTimersByTime(900);
+      });
+
+      expect(upload).toHaveAttribute("data-active", "false");
+      expect(download).toHaveAttribute("data-active", "false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries the cloud traffic stream quietly after a transient failure", async () => {
+    vi.useFakeTimers();
+    try {
+      mockUser = {
+        id: 1,
+        email: "root@example.com",
+        username: "root",
+        role: "superadmin",
+        is_active: true,
+      };
+      mockRuntimeMode = "online";
+      cloudTrafficMocks.streamCloudTrafficEvents
+        .mockRejectedValueOnce(new Error("stream dropped"))
+        .mockImplementation(() => new Promise<void>(() => {}));
+
+      await renderApp();
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(cloudTrafficMocks.streamCloudTrafficEvents).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1500);
+        await Promise.resolve();
+      });
+
+      expect(cloudTrafficMocks.streamCloudTrafficEvents).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("disables runtime toggle when the runtime profile is environment-locked", async () => {

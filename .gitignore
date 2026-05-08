@@ -22,3 +22,5 @@ site/
 # KB Context Sources
 context_sources/
 
+# Local operational logs
+logs/

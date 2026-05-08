@@ -22,6 +22,9 @@ def test_backend_runtime_config_defaults(monkeypatch: pytest.MonkeyPatch):
         "BACKEND_URL",
         "LLM_URL",
         "LLM_RUNTIME_URL",
+        "CLOUD_TRAFFIC_LOG_ENABLED",
+        "CLOUD_TRAFFIC_LOG_PATH",
+        "CLOUD_TRAFFIC_LOG_MAX_BYTES",
         "AGENT_ENGINE_URL",
         "AGENT_ENGINE_SERVICE_TOKEN",
         "SANDBOX_URL",
@@ -90,3 +93,25 @@ def test_model_credentials_encryption_key_falls_back_to_jwt_secret(monkeypatch: 
 
     config = backend_config.get_auth_config()
     assert config.model_credentials_encryption_key == "jwt-signing-secret"
+
+
+def test_cloud_traffic_log_config_defaults_and_overrides(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://ignored")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "jwt-signing-secret")
+    monkeypatch.delenv("CLOUD_TRAFFIC_LOG_ENABLED", raising=False)
+    monkeypatch.delenv("CLOUD_TRAFFIC_LOG_PATH", raising=False)
+    monkeypatch.delenv("CLOUD_TRAFFIC_LOG_MAX_BYTES", raising=False)
+
+    defaults = backend_config.get_auth_config()
+    assert defaults.cloud_traffic_log_enabled is True
+    assert defaults.cloud_traffic_log_path == backend_config.DEFAULT_CLOUD_TRAFFIC_LOG_PATH
+    assert defaults.cloud_traffic_log_max_bytes == backend_config.DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
+
+    monkeypatch.setenv("CLOUD_TRAFFIC_LOG_ENABLED", "false")
+    monkeypatch.setenv("CLOUD_TRAFFIC_LOG_PATH", "/tmp/cloud.jsonl")
+    monkeypatch.setenv("CLOUD_TRAFFIC_LOG_MAX_BYTES", "1234")
+
+    overridden = backend_config.get_auth_config()
+    assert overridden.cloud_traffic_log_enabled is False
+    assert overridden.cloud_traffic_log_path == "/tmp/cloud.jsonl"
+    assert overridden.cloud_traffic_log_max_bytes == 1234

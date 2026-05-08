@@ -35,6 +35,7 @@ services:
     volumes:
       - ../models/llm:/models/llm
       - ../context_sources:/context_sources
+      - ../logs:/var/log/vanessa
 
   llm:
     build:

@@ -373,6 +373,25 @@
   color: var(--accent-primary);
   opacity: 1;
   filter: drop-shadow(0 0 0.22rem color-mix(in oklab, var(--accent-primary) 55%, transparent));
+  animation: runtime-transfer-pulse 900ms var(--easing-standard);
+}
+
+@keyframes runtime-transfer-pulse {
+  0% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-0.08rem);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runtime-transfer-indicator[data-active="true"] {
+    animation: none;
+  }
 }
 
 .user-menu {
