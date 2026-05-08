@@ -68,7 +68,7 @@ def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
             "platform_runtime": {
                 "deployment_profile": {"id": "dep-1", "slug": "local-default", "display_name": "Local Default"},
                 "capabilities": {
-                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local", "provider_origin": "local"},
                     "embeddings": {"slug": "vllm-embeddings-local", "provider_key": "vllm_embeddings_local"},
                     "vector_store": {"slug": "weaviate-local", "provider_key": "weaviate_local"},
                 },
@@ -135,7 +135,7 @@ def test_execution_progress_recorder_emits_model_statuses(monkeypatch: pytest.Mo
             "platform_runtime": {
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
-                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local", "provider_origin": "local"},
                 },
             },
         },
@@ -194,7 +194,7 @@ def test_streamed_execution_emits_model_deltas_and_stream_statuses(monkeypatch: 
             "platform_runtime": {
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
-                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local"},
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local", "provider_origin": "local"},
                 },
             },
         },
@@ -212,6 +212,8 @@ def test_streamed_execution_emits_model_deltas_and_stream_statuses(monkeypatch: 
     assert "Received first token" in labels
     assert "Streaming response" in labels
     assert "Streamed response" in labels
+    setup_event = next(event for event in progress_events if event["label"] == "Provider queueing and stream setup complete")
+    assert setup_event["details"]["provider_origin"] == "local"
 
 
 def test_execution_runtime_block_is_persisted(monkeypatch: pytest.MonkeyPatch):

@@ -196,7 +196,7 @@ def stream_plain_message(
         conversation_id=conversation_id,
         prompt=prompt,
     )
-    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+    stream, error_payload, status_code, _provider_telemetry = chat_completion_stream_with_allowed_model(
         requested_model_id=prepared["model_id"],
         org_id=None,
         group_id=None,

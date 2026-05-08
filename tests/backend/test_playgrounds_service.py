@@ -632,7 +632,21 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
 
     monkeypatch.setattr(playgrounds_service.playgrounds_repository, "get_session", _get_session)
     monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(playgrounds_service, "chat_completion_stream_with_allowed_model", lambda **_kwargs: (_fake_stream(), None, 200))
+    monkeypatch.setattr(
+        playgrounds_service,
+        "chat_completion_stream_with_allowed_model",
+        lambda **_kwargs: (
+            _fake_stream(),
+            None,
+            200,
+            {
+                "provider_slug": "openai-cloud",
+                "provider_key": "openai_compatible_cloud_llm",
+                "provider_origin": "cloud",
+                "deployment_profile_slug": "online-cloud",
+            },
+        ),
+    )
     monkeypatch.setattr(playgrounds_service.playgrounds_repository, "append_message_pair", _append_message_pair)
     monkeypatch.setattr(
         playgrounds_service,
@@ -680,6 +694,7 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
     )
     assert connected_status["summary"] == "request id req-chat-1"
     assert connected_status["details"]["endpoint_host"] == "api.openai.com"
+    assert connected_status["details"]["provider_origin"] == "cloud"
 
 
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):

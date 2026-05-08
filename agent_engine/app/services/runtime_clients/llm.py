@@ -48,7 +48,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
             request_json=self.request_json,
         )
         payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
-        add_request_options(payload, self.llm_binding, stream=False)
+        add_openai_compatible_request_options(payload, self.llm_binding, stream=False)
         response_payload, status_code = request_json_or_raise(
             request_json=self.request_json,
             error_cls=LlmRuntimeClientError,
@@ -84,7 +84,7 @@ class OpenAICompatibleLlmRuntimeClient(LlmRuntimeClient):
         )
         payload = build_request_payload(self.llm_binding, runtime_model_id, messages, tools=tools)
         payload["stream"] = True
-        add_request_options(payload, self.llm_binding, stream=True)
+        add_openai_compatible_request_options(payload, self.llm_binding, stream=True)
         request_format = self._request_format()
         raw_events = stream_sse_request(
             self._chat_url(),
@@ -142,7 +142,7 @@ def build_request_payload(
     return payload
 
 
-def add_request_options(payload: dict[str, Any], llm_binding: dict[str, Any], *, stream: bool) -> None:
+def add_openai_compatible_request_options(payload: dict[str, Any], llm_binding: dict[str, Any], *, stream: bool) -> None:
     config = llm_binding.get("config") if isinstance(llm_binding.get("config"), dict) else {}
     request_format = str(config.get("request_format", "responses_api")).strip().lower() or "responses_api"
     options = config.get("request_options") if isinstance(config.get("request_options"), dict) else {}

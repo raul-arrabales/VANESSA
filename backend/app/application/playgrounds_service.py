@@ -24,6 +24,16 @@ from ..services.modelops_queries import list_model_picker_options
 from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
 from ..services.stream_errors import public_stream_error_payload
+from ..services.stream_telemetry import (
+    STREAM_PHASE_FIRST_TOKEN_DELIVERY,
+    STREAM_STATUS_LABEL_OPENING,
+    STREAM_STATUS_LABEL_RECEIVED_FIRST_TOKEN,
+    STREAM_STATUS_LABEL_SETUP_COMPLETE,
+    STREAM_STATUS_LABEL_STREAMED,
+    STREAM_STATUS_LABEL_STREAMING,
+    STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN,
+    TRANSPORT_DETAIL_KEYS,
+)
 from .playground_execution import (
     PlaygroundExecutionRequest,
     PlaygroundExecutionResult,
@@ -595,14 +605,15 @@ def _stream_llm_chat_execution(
     request: PlaygroundExecutionRequest,
     statuses: dict[str, dict[str, Any]],
 ) -> Generator[dict[str, Any], None, PlaygroundExecutionResult | None]:
-    thinking = start_status("thinking", "Thinking", details={"model_id": request.model_id})
+    base_details = {"model_id": request.model_id}
+    thinking = start_status("thinking", "Thinking", details=base_details)
     yield {"event": "status", "data": _record_status(statuses, thinking)}
     completed_thinking = complete_status(thinking, label="Prepared request")
     yield {"event": "status", "data": _record_status(statuses, completed_thinking)}
 
-    connecting = start_status("connecting", "Preparing model request", details={"model_id": request.model_id})
+    connecting = start_status("connecting", "Preparing model request", details=base_details)
     yield {"event": "status", "data": _record_status(statuses, connecting)}
-    stream, error_payload, status_code = chat_completion_stream_with_allowed_model(
+    stream, error_payload, status_code, provider_telemetry = chat_completion_stream_with_allowed_model(
         requested_model_id=str(request.model_id or ""),
         org_id=None,
         group_id=None,
@@ -620,10 +631,13 @@ def _stream_llm_chat_execution(
             ),
         }
         return None
-    completed_connecting = complete_status(connecting, label="Model request prepared", details={"model_id": request.model_id})
+    completed_connecting = complete_status(connecting, label="Model request prepared", details={**base_details, **provider_telemetry})
     yield {"event": "status", "data": _record_status(statuses, completed_connecting)}
 
-    opening = start_status("opening_stream", "Opening upstream stream", details={"model_id": request.model_id})
+    def _model_details() -> dict[str, Any]:
+        return {"model_id": request.model_id, **provider_telemetry}
+
+    opening = start_status("opening_stream", STREAM_STATUS_LABEL_OPENING, details=_model_details())
     yield {"event": "status", "data": _record_status(statuses, opening)}
     waiting: dict[str, Any] | None = None
     streaming_status: dict[str, Any] | None = None
@@ -636,10 +650,10 @@ def _stream_llm_chat_execution(
         return failed
 
     def _transport_details(event: dict[str, Any] | None = None) -> dict[str, Any]:
-        details: dict[str, Any] = {"model_id": request.model_id}
+        details: dict[str, Any] = _model_details()
         if not event:
             return details
-        for key in ("endpoint_host", "status_code", "duration_ms", "duration_meaning", "phase"):
+        for key in TRANSPORT_DETAIL_KEYS:
             if event.get(key) is not None:
                 details[key] = event.get(key)
         headers = event.get("headers")
@@ -659,7 +673,7 @@ def _stream_llm_chat_execution(
 
     def _waiting_details(event: dict[str, Any] | None = None) -> dict[str, Any]:
         details = _transport_details(event)
-        details["phase"] = "first token delivery"
+        details["phase"] = STREAM_PHASE_FIRST_TOKEN_DELIVERY
         return details
 
     for event in stream:
@@ -668,12 +682,12 @@ def _stream_llm_chat_execution(
             if waiting is None:
                 completed_opening = complete_status(
                     opening,
-                    label="Provider queueing and stream setup complete",
+                    label=STREAM_STATUS_LABEL_SETUP_COMPLETE,
                     summary=_transport_summary(event),
                     details=_transport_details(event),
                 )
                 yield {"event": "status", "data": _record_status(statuses, completed_opening)}
-                waiting = start_status("waiting_first_token", "Waiting for first token", details=_waiting_details(event))
+                waiting = start_status("waiting_first_token", STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN, details=_waiting_details(event))
                 yield {"event": "status", "data": _record_status(statuses, waiting)}
             continue
 
@@ -684,21 +698,21 @@ def _stream_llm_chat_execution(
             if waiting is None:
                 completed_opening = complete_status(
                     opening,
-                    label="Provider queueing and stream setup complete",
+                    label=STREAM_STATUS_LABEL_SETUP_COMPLETE,
                     details=_transport_details(),
                 )
                 yield {"event": "status", "data": _record_status(statuses, completed_opening)}
-                waiting = start_status("waiting_first_token", "Waiting for first token", details=_waiting_details())
+                waiting = start_status("waiting_first_token", STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN, details=_waiting_details())
                 yield {"event": "status", "data": _record_status(statuses, waiting)}
             if streaming_status is None:
                 first_token = complete_status(
                     waiting,
-                    label="Received first token",
+                    label=STREAM_STATUS_LABEL_RECEIVED_FIRST_TOKEN,
                     summary="Model started streaming",
-                    details={"model_id": request.model_id},
+                    details=_model_details(),
                 )
                 yield {"event": "status", "data": _record_status(statuses, first_token)}
-                streaming_status = start_status("streaming_tokens", "Streaming response", details={"model_id": request.model_id})
+                streaming_status = start_status("streaming_tokens", STREAM_STATUS_LABEL_STREAMING, details=_model_details())
                 yield {"event": "status", "data": _record_status(statuses, streaming_status)}
             delta_count += 1
             assistant_output_parts.append(text)
@@ -739,9 +753,9 @@ def _stream_llm_chat_execution(
         if streaming_status is not None:
             completed_streaming = complete_status(
                 streaming_status,
-                label="Streamed response",
+                label=STREAM_STATUS_LABEL_STREAMED,
                 summary=f"{len(output)} characters",
-                details={"model_id": request.model_id, "delta_count": delta_count},
+                details={**_model_details(), "delta_count": delta_count},
             )
             yield {"event": "status", "data": _record_status(statuses, completed_streaming)}
         else:
@@ -749,7 +763,7 @@ def _stream_llm_chat_execution(
                 waiting or opening,
                 label="Received response",
                 summary=f"{len(output)} characters",
-                details={"model_id": request.model_id, "delta_count": 0},
+                details={**_model_details(), "delta_count": 0},
             )
             yield {"event": "status", "data": _record_status(statuses, completed_waiting)}
 

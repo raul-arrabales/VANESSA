@@ -11,6 +11,7 @@ from .modelops_common import ModelOpsError
 from .modelops_runtime import ensure_model_invokable, measure_and_record_inference
 from .platform_service import resolve_llm_inference_adapter
 from .platform_types import PlatformControlPlaneError
+from .stream_telemetry import llm_binding_telemetry
 
 
 def coerce_chat_messages(messages: Any) -> list[dict[str, Any]]:
@@ -256,14 +257,14 @@ def chat_completion_stream_with_allowed_model(
     messages: list[dict[str, Any]],
     max_tokens: int | None,
     temperature: float | None,
-) -> tuple[Iterator[dict[str, Any]] | None, dict[str, Any] | None, int]:
+) -> tuple[Iterator[dict[str, Any]] | None, dict[str, Any] | None, int, dict[str, Any]]:
     _ = org_id
     _ = group_id
     adapter, llm_model_id, allow_local_fallback, error_payload, status_code = _resolve_chat_completion_target(
         requested_model_id=requested_model_id,
     )
     if error_payload is not None:
-        return None, error_payload, status_code
+        return None, error_payload, status_code, {}
 
     return (
         adapter.chat_completion_stream(
@@ -275,4 +276,5 @@ def chat_completion_stream_with_allowed_model(
         ),
         None,
         200,
+        llm_binding_telemetry(getattr(adapter, "binding", None)),
     )

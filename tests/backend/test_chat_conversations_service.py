@@ -252,7 +252,7 @@ def test_stream_plain_message_persists_only_after_complete(monkeypatch: pytest.M
             assert messages["conv-1"] == []
             yield {"type": "complete", "response": _llm_response("Assistant reply")}
 
-        return _events(), None, 200
+        return _events(), None, 200, {}
 
     monkeypatch.setattr(service, "chat_completion_stream_with_allowed_model", _stream_response)
 
@@ -281,7 +281,7 @@ def test_stream_plain_message_does_not_persist_on_error(monkeypatch: pytest.Monk
             yield {"type": "delta", "text": "partial"}
             yield {"type": "error", "payload": {"error": "provider_failed", "message": "stream broke"}}
 
-        return _events(), None, 200
+        return _events(), None, 200, {}
 
     monkeypatch.setattr(service, "chat_completion_stream_with_allowed_model", _stream_response)
 

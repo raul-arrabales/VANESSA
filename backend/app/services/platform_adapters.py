@@ -23,6 +23,7 @@ from .openai_compatible_generation import (
 )
 from .platform_resources import _default_resource_runtime_identifier as _resource_runtime_identifier
 from .platform_types import PlatformControlPlaneError, ProviderBinding
+from .stream_telemetry import STREAM_DURATION_MEANING_RESPONSE_HEADERS, STREAM_PHASE_RESPONSE_HEADERS
 
 _DEFAULT_HTTP_TIMEOUT_SECONDS = 2.0
 _TRACE_RESPONSE_HEADERS = (
@@ -249,12 +250,12 @@ def stream_sse_request(
                     payload=parsed,
                 )
             yield "transport", {
-                "phase": "upstream_response_headers",
+                "phase": STREAM_PHASE_RESPONSE_HEADERS,
                 "duration_ms": int((monotonic() - started) * 1000),
                 "status_code": int(getattr(response, "status", 0) or 0),
                 "endpoint_host": urlparse(normalized_url).netloc,
                 "headers": _trace_response_headers(response),
-                "duration_meaning": "provider queueing, prompt prefill, and first-stream setup",
+                "duration_meaning": STREAM_DURATION_MEANING_RESPONSE_HEADERS,
             }
             yield from _iter_sse_events(response)
     except (TimeoutError, socket_timeout) as exc:

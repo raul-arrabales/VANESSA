@@ -4,19 +4,26 @@ from collections.abc import Callable
 from typing import Any
 
 from ..services.runtime_client import LlmRuntimeClientError
+from ..services.stream_telemetry import (
+    STREAM_PHASE_FIRST_TOKEN_DELIVERY,
+    STREAM_STATUS_LABEL_OPENING,
+    STREAM_STATUS_LABEL_RECEIVED_FIRST_TOKEN,
+    STREAM_STATUS_LABEL_SETUP_COMPLETE,
+    STREAM_STATUS_LABEL_STREAMED,
+    STREAM_STATUS_LABEL_STREAMING,
+    STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN,
+    TRANSPORT_DETAIL_KEYS,
+    runtime_llm_binding_telemetry,
+)
 from .progress import ProgressRecorder, compact_payload
 
 DeltaEmitter = Callable[[dict[str, Any]], None]
 
 
 def model_status_details(runtime_snapshot: dict[str, Any], requested_model: str | None) -> dict[str, Any]:
-    llm_binding = runtime_snapshot.get("capabilities", {}).get("llm_inference", {})
-    deployment_profile = runtime_snapshot.get("deployment_profile", {})
     return {
         "requested_model": requested_model,
-        "provider_slug": llm_binding.get("slug"),
-        "provider_key": llm_binding.get("provider_key"),
-        "deployment_profile_slug": deployment_profile.get("slug"),
+        **runtime_llm_binding_telemetry(runtime_snapshot),
     }
 
 
@@ -31,7 +38,7 @@ def stream_model_completion(
 ) -> dict[str, Any]:
     opening_status_id = progress.start(
         kind="opening_stream",
-        label="Opening upstream stream",
+        label=STREAM_STATUS_LABEL_OPENING,
         details=model_status_details(runtime_snapshot, requested_model),
     )
     waiting_status_id: str | None = None
@@ -60,15 +67,15 @@ def stream_model_completion(
                 progress.complete(
                     opening_status_id,
                     kind="opening_stream",
-                    label="Provider queueing and stream setup complete",
+                    label=STREAM_STATUS_LABEL_SETUP_COMPLETE,
                     details=_stream_transport_details(runtime_snapshot, requested_model, event),
                 )
                 waiting_status_id = progress.start(
                     kind="waiting_first_token",
-                    label="Waiting for first token",
+                    label=STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN,
                     details={
                         **_stream_transport_details(runtime_snapshot, requested_model, event),
-                        "phase": "first token delivery",
+                        "phase": STREAM_PHASE_FIRST_TOKEN_DELIVERY,
                     },
                 )
             continue
@@ -81,28 +88,28 @@ def stream_model_completion(
                 progress.complete(
                     opening_status_id,
                     kind="opening_stream",
-                    label="Provider queueing and stream setup complete",
+                    label=STREAM_STATUS_LABEL_SETUP_COMPLETE,
                     details=model_status_details(runtime_snapshot, requested_model),
                 )
                 waiting_status_id = progress.start(
                     kind="waiting_first_token",
-                    label="Waiting for first token",
+                    label=STREAM_STATUS_LABEL_WAITING_FIRST_TOKEN,
                     details={
                         **model_status_details(runtime_snapshot, requested_model),
-                        "phase": "first token delivery",
+                        "phase": STREAM_PHASE_FIRST_TOKEN_DELIVERY,
                     },
                 )
             if streaming_status_id is None:
                 progress.complete(
                     waiting_status_id,
                     kind="waiting_first_token",
-                    label="Received first token",
+                    label=STREAM_STATUS_LABEL_RECEIVED_FIRST_TOKEN,
                     summary="Model started streaming",
                     details=model_status_details(runtime_snapshot, requested_model),
                 )
                 streaming_status_id = progress.start(
                     kind="streaming_tokens",
-                    label="Streaming response",
+                    label=STREAM_STATUS_LABEL_STREAMING,
                     details=model_status_details(runtime_snapshot, requested_model),
                 )
             output_parts.append(text)
@@ -133,7 +140,7 @@ def stream_model_completion(
             progress.complete(
                 streaming_status_id,
                 kind="streaming_tokens",
-                label="Streamed response",
+                label=STREAM_STATUS_LABEL_STREAMED,
                 summary=f"{len(output_text)} characters",
                 details={**model_status_details(runtime_snapshot, requested_model), "delta_count": delta_count},
             )
@@ -217,7 +224,7 @@ def _stream_transport_details(
     details = model_status_details(runtime_snapshot, requested_model)
     if not event:
         return details
-    for key in ("endpoint_host", "status_code", "duration_ms", "duration_meaning", "phase"):
+    for key in TRANSPORT_DETAIL_KEYS:
         if event.get(key) is not None:
             details[key] = event.get(key)
     return details

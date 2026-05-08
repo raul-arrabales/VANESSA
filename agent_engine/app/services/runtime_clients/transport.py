@@ -13,6 +13,7 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 
 from .base import RuntimeClientError
+from ...services.stream_telemetry import STREAM_DURATION_MEANING_RESPONSE_HEADERS, STREAM_PHASE_RESPONSE_HEADERS
 
 DEFAULT_HTTP_TIMEOUT_SECONDS = 5.0
 _RETRYABLE_TRANSPORT_ERRORS = (OSError, RemoteDisconnected, SSLError, socket_timeout)
@@ -227,11 +228,11 @@ def stream_sse_request(
                     payload=parsed,
                 )
             yield "transport", {
-                "phase": "upstream_response_headers",
+                "phase": STREAM_PHASE_RESPONSE_HEADERS,
                 "duration_ms": int((monotonic() - started) * 1000),
                 "status_code": int(getattr(response, "status", 0) or 0),
                 "endpoint_host": urlparse(url).netloc,
-                "duration_meaning": "provider queueing, prompt prefill, and first-stream setup",
+                "duration_meaning": STREAM_DURATION_MEANING_RESPONSE_HEADERS,
             }
             yield from _iter_sse_events(response)
     except (TimeoutError, socket_timeout) as exc:
