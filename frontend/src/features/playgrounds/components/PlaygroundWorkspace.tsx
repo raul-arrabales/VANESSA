@@ -13,8 +13,9 @@ import { usePlaygroundPreferences } from "../hooks/usePlaygroundPreferences";
 import { usePlaygroundSessionActions } from "../hooks/usePlaygroundSessionActions";
 import { usePlaygroundSessions } from "../hooks/usePlaygroundSessions";
 import { usePlaygroundWorkspaceViewState } from "../hooks/usePlaygroundWorkspaceViewState";
+import { useSessionHistorySearch } from "../hooks/useSessionHistorySearch";
 import { hasInlineSelector, hasSelector } from "../selectorConfig";
-import type { PlaygroundSessionFilters, PlaygroundWorkspaceConfig } from "../types";
+import type { PlaygroundWorkspaceConfig } from "../types";
 
 type PlaygroundWorkspaceProps = {
   config: PlaygroundWorkspaceConfig;
@@ -36,9 +37,10 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     && (!hasKnowledgeBaseSelector || optionsState.hasLoadedKnowledgeBases);
   const isRequiredOptionsLoading = optionsState.isModelsLoading
     || (hasKnowledgeBaseSelector && optionsState.isKnowledgeBasesLoading);
-  const [isHistorySearchOpen, setIsHistorySearchOpen] = useState(false);
-  const [historySearchFilters, setHistorySearchFilters] = useState<PlaygroundSessionFilters>({});
-  const [debouncedHistorySearchFilters, setDebouncedHistorySearchFilters] = useState<PlaygroundSessionFilters>({});
+  const historySearch = useSessionHistorySearch({
+    isSidebarCollapsed: preferences.isSidebarCollapsed,
+    onExpandSidebar: preferences.toggleSidebar,
+  });
   const sessionState = usePlaygroundSessions({
     token,
     isAuthenticated,
@@ -53,7 +55,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
       defaultKnowledgeBaseId: optionsState.defaultKnowledgeBaseId,
       configurationMessage: optionsState.configurationMessage,
     },
-    sessionFilters: debouncedHistorySearchFilters,
+    sessionFilters: historySearch.debouncedSearchFilters,
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
@@ -114,23 +116,6 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   }, []);
 
   useEffect(() => {
-    if (
-      debouncedHistorySearchFilters.titleQuery === historySearchFilters.titleQuery
-      && debouncedHistorySearchFilters.updatedFrom === historySearchFilters.updatedFrom
-      && debouncedHistorySearchFilters.updatedTo === historySearchFilters.updatedTo
-    ) {
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedHistorySearchFilters(historySearchFilters);
-    }, 300);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [debouncedHistorySearchFilters, historySearchFilters]);
-
-  useEffect(() => {
     if (!pendingDialog) {
       return;
     }
@@ -163,13 +148,9 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         temporarySessionLabel={config.temporarySessionLabel}
         settingsLabel={t("playgroundSessionSidebar.settings")}
         showSettings={hasSettingsSelectors}
-        isSearchOpen={isHistorySearchOpen}
-        searchFilters={historySearchFilters}
-        isSearchActive={Boolean(
-          historySearchFilters.titleQuery
-          || historySearchFilters.updatedFrom
-          || historySearchFilters.updatedTo,
-        )}
+        isSearchOpen={historySearch.isSearchOpen}
+        searchFilters={historySearch.searchFilters}
+        isSearchActive={historySearch.isSearchActive}
         sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
         canCreateSession={sessionState.canCreateSession}
@@ -184,16 +165,9 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           actions.createTemporaryChat();
         }}
         onOpenSettings={() => setIsSettingsDialogOpen(true)}
-        onToggleSearch={() => {
-          if (preferences.isSidebarCollapsed) {
-            preferences.toggleSidebar();
-            setIsHistorySearchOpen(true);
-            return;
-          }
-          setIsHistorySearchOpen((current) => !current);
-        }}
-        onSearchFiltersChange={setHistorySearchFilters}
-        onClearSearch={() => setHistorySearchFilters({})}
+        onToggleSearch={historySearch.toggleSearch}
+        onSearchFiltersChange={historySearch.setSearchFilters}
+        onClearSearch={historySearch.clearSearch}
         onSelectSession={(sessionId) => {
           pinToBottomOnNextUpdate("auto");
           sessionState.setActiveSessionId(sessionId);
