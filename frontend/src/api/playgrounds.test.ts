@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { streamPlaygroundMessage } from "./playgrounds";
+import { listPlaygroundSessions, streamPlaygroundMessage } from "./playgrounds";
 
 describe("playgrounds API streaming", () => {
   afterEach(() => {
@@ -37,5 +37,29 @@ describe("playgrounds API streaming", () => {
       state: "running",
     }));
     expect(result.output).toBe("done");
+  });
+
+  it("encodes playground session search filters", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ sessions: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await listPlaygroundSessions("chat", "token", {
+      titleQuery: " launch notes ",
+      updatedFrom: "2026-03-01",
+      updatedTo: "2026-03-18",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/playgrounds/sessions?playground_kind=chat&title_query=launch+notes&updated_from=2026-03-01&updated_to=2026-03-18",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer token",
+        }),
+      }),
+    );
   });
 });

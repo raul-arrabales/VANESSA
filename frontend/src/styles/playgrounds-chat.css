@@ -1,5 +1,5 @@
 .chatbot-shell {
-  --chatbot-history-width-expanded: minmax(14rem, 18rem);
+  --chatbot-history-width-expanded: minmax(18rem, 24rem);
   --chatbot-history-width-collapsed: 3.25rem;
   --chatbot-message-user-max-width: 66.666%;
   --chatbot-message-user-max-width-mobile: 85%;
@@ -76,6 +76,33 @@
 .chatbot-sidebar-intro {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.chatbot-history-search {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-surface) 90%, transparent);
+}
+
+.chatbot-history-date-grid {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+}
+
+.chatbot-history-date-grid .field-input {
+  min-width: 0;
+}
+
+.chatbot-history-search-clear {
+  justify-self: start;
+}
+
+.chatbot-history-empty {
+  padding: var(--space-2) var(--space-3);
 }
 
 .chatbot-sidebar-toggle,
@@ -1016,6 +1043,12 @@
 
   .chatbot-message-user .chatbot-message-surface {
     max-width: var(--chatbot-message-user-max-width-mobile);
+  }
+}
+
+@media (max-width: 420px) {
+  .chatbot-history-date-grid {
+    grid-template-columns: 1fr;
   }
 }
 

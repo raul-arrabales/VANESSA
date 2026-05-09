@@ -56,6 +56,38 @@ def test_list_playground_sessions_requires_auth(client):
     assert response.status_code == 401
 
 
+def test_list_playground_sessions_forwards_search_filters(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="filter@example.com",
+        username="filter-user",
+        password_hash=hash_password("filter-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "filter-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
+
+    def _list_sessions(_database_url, **kwargs):
+        captured.update(kwargs)
+        return [_session_detail("sess-filter")]
+
+    monkeypatch.setattr(playground_routes, "list_playground_sessions", _list_sessions)
+
+    response = test_client.get(
+        "/v1/playgrounds/sessions?playground_kind=chat&title_query=launch&updated_from=2026-03-01&updated_to=2026-03-18",
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    assert captured["owner_user_id"] == user["id"]
+    assert captured["playground_kind"] == "chat"
+    assert captured["title_query"] == "launch"
+    assert captured["updated_from"] == "2026-03-01"
+    assert captured["updated_to"] == "2026-03-18"
+
+
 def test_create_playground_session_returns_service_payload(client, monkeypatch: pytest.MonkeyPatch):
     test_client, users = client
     user = users.create_user(

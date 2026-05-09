@@ -142,6 +142,12 @@ export type SendPlaygroundMessageResult = {
   statuses?: PlaygroundRunStatus[];
 };
 
+export type PlaygroundSessionFilters = {
+  titleQuery?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+};
+
 function stringOrNull(value: unknown): string | null | undefined {
   if (value === undefined) {
     return undefined;
@@ -289,9 +295,21 @@ export type TemporaryPlaygroundMessagePayload = {
 export async function listPlaygroundSessions(
   playgroundKind: PlaygroundKind,
   token: string,
+  filters: PlaygroundSessionFilters = {},
 ): Promise<PlaygroundSessionSummary[]> {
+  const params = new URLSearchParams({ playground_kind: playgroundKind });
+  const titleQuery = filters.titleQuery?.trim();
+  if (titleQuery) {
+    params.set("title_query", titleQuery);
+  }
+  if (filters.updatedFrom) {
+    params.set("updated_from", filters.updatedFrom);
+  }
+  if (filters.updatedTo) {
+    params.set("updated_to", filters.updatedTo);
+  }
   const result = await requestJson<{ sessions: PlaygroundSessionSummary[] }>(
-    `/v1/playgrounds/sessions?playground_kind=${encodeURIComponent(playgroundKind)}`,
+    `/v1/playgrounds/sessions?${params.toString()}`,
     { token },
   );
   return result.sessions;

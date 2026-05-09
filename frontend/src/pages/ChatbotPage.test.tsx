@@ -308,6 +308,47 @@ describe("ChatPlaygroundPage", () => {
     expect(screen.getByRole("button", { name: "Expand conversation history" })).toBeVisible();
   });
 
+  it("expands collapsed history when search is opened", async () => {
+    const view = await renderChatPlayground();
+
+    await waitForDraftReady();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse conversation history" }));
+    expect(getChatShell(view.container)).toHaveAttribute("data-history-collapsed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Search conversations" }));
+
+    expect(getChatShell(view.container)).toHaveAttribute("data-history-collapsed", "false");
+    expect(screen.getByRole("search", { name: "Search conversation history" })).toBeVisible();
+  });
+
+  it("reloads conversation history with debounced search filters", async () => {
+    playgroundApiMocks.listPlaygroundSessions
+      .mockResolvedValueOnce([sessionSummary("conv-1", "Thread one")])
+      .mockResolvedValueOnce([]);
+
+    await renderChatPlayground();
+
+    await waitForDraftReady();
+    expect(await screen.findByRole("button", { name: /^Thread one/i })).toBeVisible();
+
+    await userEvent.click(screen.getByRole("button", { name: "Search conversations" }));
+    await userEvent.type(screen.getByLabelText("Title"), "archive");
+    fireEvent.change(screen.getByLabelText("Updated from"), { target: { value: "2026-03-01" } });
+    fireEvent.change(screen.getByLabelText("Updated to"), { target: { value: "2026-03-18" } });
+
+    await waitFor(() => expect(playgroundApiMocks.listPlaygroundSessions).toHaveBeenLastCalledWith(
+      "chat",
+      "token",
+      {
+        titleQuery: "archive",
+        updatedFrom: "2026-03-01",
+        updatedTo: "2026-03-18",
+      },
+    ));
+    expect(await screen.findByText("No conversations match these filters.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /^Thread one/i })).toBeNull();
+  });
+
   it("shows model-loading UI instead of an empty-model state while chat models are still loading", async () => {
     let resolveModels: (value: { assistants: []; models: Array<{ id: string; display_name: string }> }) => void = () => undefined;
     playgroundApiMocks.getPlaygroundModelOptions.mockImplementationOnce(
@@ -644,7 +685,7 @@ describe("ChatPlaygroundPage", () => {
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
   });
 
-  it("repairs saved conversations whose model is no longer in the active deployment", async () => {
+  it("uses a local fallback for stale saved conversation models without touching updated_at", async () => {
     playgroundApiMocks.getPlaygroundModelOptions.mockResolvedValueOnce({
       assistants: [],
       models: [
@@ -663,24 +704,14 @@ describe("ChatPlaygroundPage", () => {
         message_count: 2,
       }),
     );
-    playgroundApiMocks.updatePlaygroundSession.mockResolvedValueOnce(
-      sessionSummary("conv-stale", "Cloud-era thread", {
-        model_selection: { model_id: "Qwen--Qwen2.5-0.5B-Instruct" },
-        message_count: 2,
-      }),
-    );
 
     await renderChatPlayground();
 
     await userEvent.click(await screen.findByRole("button", { name: /^Cloud-era thread/i }));
 
-    await waitFor(() => expect(playgroundApiMocks.updatePlaygroundSession).toHaveBeenCalledWith(
-      "conv-stale",
-      { model_selection: { model_id: "Qwen--Qwen2.5-0.5B-Instruct" } },
-      "token",
-    ));
     await openChatSettings();
     expect(screen.getByLabelText("Model")).toHaveDisplayValue("Qwen2.5-0.5B-Instruct");
+    expect(playgroundApiMocks.updatePlaygroundSession).not.toHaveBeenCalled();
   });
 
   it("renders a sidebar history error without blocking the local draft", async () => {

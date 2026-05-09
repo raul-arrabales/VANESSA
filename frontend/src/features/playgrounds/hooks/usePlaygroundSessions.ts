@@ -3,11 +3,14 @@ import {
   createPlaygroundSession,
   getPlaygroundSession,
   listPlaygroundSessions,
-  updatePlaygroundSession,
 } from "../../../api/playgrounds";
-import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { hasSelector } from "../selectorConfig";
-import type { PlaygroundWorkspaceConfig, PlaygroundWorkspaceOptions, PlaygroundSessionViewModel } from "../types";
+import type {
+  PlaygroundSessionFilters,
+  PlaygroundWorkspaceConfig,
+  PlaygroundWorkspaceOptions,
+  PlaygroundSessionViewModel,
+} from "../types";
 import { mapPlaygroundSessionDetail, mapPlaygroundSessionSummary } from "../types";
 import { createDraftSession, resolveAvailableModelId, sortSessions, upsertSession } from "../utils";
 
@@ -18,6 +21,7 @@ type UsePlaygroundSessionsParams = {
   hasLoadedOptions: boolean;
   config: PlaygroundWorkspaceConfig;
   options: PlaygroundWorkspaceOptions;
+  sessionFilters: PlaygroundSessionFilters;
 };
 
 export function usePlaygroundSessions({
@@ -27,8 +31,8 @@ export function usePlaygroundSessions({
   hasLoadedOptions,
   config,
   options,
+  sessionFilters,
 }: UsePlaygroundSessionsParams) {
-  const { showErrorFeedback } = useActionFeedback();
   const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
   const [savedSessions, setSavedSessions] = useState<PlaygroundSessionViewModel[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -60,12 +64,16 @@ export function usePlaygroundSessions({
     const loadHistory = async (): Promise<void> => {
       setIsHistoryLoading(true);
       try {
-        const listed = await listPlaygroundSessions(config.playgroundKind, token);
+        const listed = await listPlaygroundSessions(config.playgroundKind, token, sessionFilters);
         if (cancelled) {
           return;
         }
         const mapped = listed.map(mapPlaygroundSessionSummary);
         setSavedSessions((existing) => {
+          const hasFilters = Boolean(sessionFilters.titleQuery || sessionFilters.updatedFrom || sessionFilters.updatedTo);
+          if (hasFilters) {
+            return sortSessions(mapped);
+          }
           let merged = existing.filter((session) => session.persistence === "saved");
           mapped.forEach((session) => {
             merged = upsertSession(merged, session);
@@ -92,6 +100,7 @@ export function usePlaygroundSessions({
     config.feedback.sessionsError,
     config.playgroundKind,
     isAuthenticated,
+    sessionFilters,
     token,
   ]);
 
@@ -241,43 +250,17 @@ export function usePlaygroundSessions({
           && !session.knowledge_binding.knowledge_base_id
           && Boolean(options.defaultKnowledgeBaseId)
         );
-        if (needsModelRepair || needsKnowledgeBaseRepair) {
-          try {
-            const repaired = await updatePlaygroundSession(
-              activeSessionId,
-              {
-                ...(needsModelRepair ? { model_selection: { model_id: resolvedModelId } } : {}),
-                ...(needsKnowledgeBaseRepair
-                  ? { knowledge_binding: { knowledge_base_id: options.defaultKnowledgeBaseId } }
-                  : {}),
-              },
-              token,
-            );
-            if (!cancelled) {
-              const repairedSummary = mapPlaygroundSessionSummary(repaired);
-              setSavedSessions((existing) => upsertSession(existing, repairedSummary));
-              setActiveSession({
-                ...loadedSession,
-                ...repairedSummary,
-                messages: loadedSession.messages,
-              });
-              setActiveError("");
-            }
-            return;
-          } catch (requestError) {
-            if (!cancelled) {
-              setActiveSession(loadedSession);
-              const fallbackMessage = needsModelRepair
-                ? config.feedback.updateModelError
-                : config.feedback.updateKnowledgeBaseError;
-              setActiveError(requestError instanceof Error ? requestError.message : fallbackMessage);
-              showErrorFeedback(requestError, fallbackMessage);
-            }
-            return;
-          }
-        }
         if (!cancelled) {
-          setActiveSession(loadedSession);
+          setActiveSession({
+            ...loadedSession,
+            selectorState: {
+              ...loadedSession.selectorState,
+              modelId: needsModelRepair ? resolvedModelId : loadedSession.selectorState.modelId,
+              knowledgeBaseId: needsKnowledgeBaseRepair
+                ? options.defaultKnowledgeBaseId
+                : loadedSession.selectorState.knowledgeBaseId,
+            },
+          });
           setActiveError("");
         }
       } catch (requestError) {
@@ -299,8 +282,6 @@ export function usePlaygroundSessions({
     activeSession,
     activeSessionId,
     config.feedback.sessionError,
-    config.feedback.updateModelError,
-    config.feedback.updateKnowledgeBaseError,
     config.playgroundKind,
     hasKnowledgeBaseSelector,
     hasLoadedOptions,
@@ -308,7 +289,6 @@ export function usePlaygroundSessions({
     options.defaultKnowledgeBaseId,
     options.models,
     savedSessions,
-    showErrorFeedback,
     token,
   ]);
 

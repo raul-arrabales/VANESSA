@@ -236,6 +236,75 @@ def test_get_playground_knowledge_base_options_returns_fallback_configuration_me
     }
 
 
+def test_list_playground_sessions_passes_normalized_search_filters(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def _list_sessions(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return [
+            {
+                "id": "sess-1",
+                "conversation_kind": kwargs["conversation_kind"],
+                "title": "Launch notes",
+                "title_source": "auto",
+                "assistant_ref": "assistant.playground.chat",
+                "model_id": "safe-small",
+                "knowledge_base_id": None,
+                "message_count": 0,
+                "created_at": "2026-03-18T11:00:00+00:00",
+                "updated_at": "2026-03-18T11:00:00+00:00",
+            }
+        ]
+
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_sessions", _list_sessions)
+
+    payload = playgrounds_service.list_playground_sessions(
+        "postgresql://ignored",
+        owner_user_id=10,
+        playground_kind="chat",
+        title_query=" launch ",
+        updated_from="2026-03-01",
+        updated_to="2026-03-18",
+    )
+
+    assert payload[0]["title"] == "Launch notes"
+    assert captured["owner_user_id"] == 10
+    assert captured["conversation_kind"] == "plain"
+    assert captured["title_query"] == "launch"
+    assert str(captured["updated_from"]) == "2026-03-01"
+    assert str(captured["updated_to"]) == "2026-03-18"
+
+
+def test_list_playground_sessions_rejects_invalid_search_dates():
+    try:
+        playgrounds_service.list_playground_sessions(
+            "postgresql://ignored",
+            owner_user_id=10,
+            playground_kind="chat",
+            updated_from="03/01/2026",
+        )
+    except playgrounds_service.PlaygroundSessionValidationError as exc:
+        assert exc.code == "invalid_updated_from"
+        assert "YYYY-MM-DD" in exc.message
+    else:
+        raise AssertionError("Expected invalid updated_from to be rejected")
+
+
+def test_list_playground_sessions_rejects_reversed_date_range():
+    try:
+        playgrounds_service.list_playground_sessions(
+            "postgresql://ignored",
+            owner_user_id=10,
+            playground_kind="chat",
+            updated_from="2026-03-18",
+            updated_to="2026-03-01",
+        )
+    except playgrounds_service.PlaygroundSessionValidationError as exc:
+        assert exc.code == "invalid_updated_range"
+    else:
+        raise AssertionError("Expected reversed updated range to be rejected")
+
+
 def test_send_playground_message_requires_knowledge_binding_for_knowledge_sessions(monkeypatch):
     def _get_session(_database_url: str, *, owner_user_id: int, conversation_id: str, conversation_kind: str):
         if conversation_kind == "knowledge":

@@ -14,7 +14,7 @@ import { usePlaygroundSessionActions } from "../hooks/usePlaygroundSessionAction
 import { usePlaygroundSessions } from "../hooks/usePlaygroundSessions";
 import { usePlaygroundWorkspaceViewState } from "../hooks/usePlaygroundWorkspaceViewState";
 import { hasInlineSelector, hasSelector } from "../selectorConfig";
-import type { PlaygroundWorkspaceConfig } from "../types";
+import type { PlaygroundSessionFilters, PlaygroundWorkspaceConfig } from "../types";
 
 type PlaygroundWorkspaceProps = {
   config: PlaygroundWorkspaceConfig;
@@ -36,6 +36,9 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     && (!hasKnowledgeBaseSelector || optionsState.hasLoadedKnowledgeBases);
   const isRequiredOptionsLoading = optionsState.isModelsLoading
     || (hasKnowledgeBaseSelector && optionsState.isKnowledgeBasesLoading);
+  const [isHistorySearchOpen, setIsHistorySearchOpen] = useState(false);
+  const [historySearchFilters, setHistorySearchFilters] = useState<PlaygroundSessionFilters>({});
+  const [debouncedHistorySearchFilters, setDebouncedHistorySearchFilters] = useState<PlaygroundSessionFilters>({});
   const sessionState = usePlaygroundSessions({
     token,
     isAuthenticated,
@@ -50,6 +53,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
       defaultKnowledgeBaseId: optionsState.defaultKnowledgeBaseId,
       configurationMessage: optionsState.configurationMessage,
     },
+    sessionFilters: debouncedHistorySearchFilters,
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
@@ -110,6 +114,23 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   }, []);
 
   useEffect(() => {
+    if (
+      debouncedHistorySearchFilters.titleQuery === historySearchFilters.titleQuery
+      && debouncedHistorySearchFilters.updatedFrom === historySearchFilters.updatedFrom
+      && debouncedHistorySearchFilters.updatedTo === historySearchFilters.updatedTo
+    ) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedHistorySearchFilters(historySearchFilters);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [debouncedHistorySearchFilters, historySearchFilters]);
+
+  useEffect(() => {
     if (!pendingDialog) {
       return;
     }
@@ -142,6 +163,13 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         temporarySessionLabel={config.temporarySessionLabel}
         settingsLabel={t("playgroundSessionSidebar.settings")}
         showSettings={hasSettingsSelectors}
+        isSearchOpen={isHistorySearchOpen}
+        searchFilters={historySearchFilters}
+        isSearchActive={Boolean(
+          historySearchFilters.titleQuery
+          || historySearchFilters.updatedFrom
+          || historySearchFilters.updatedTo,
+        )}
         sessions={sessionState.savedSessions}
         activeSessionId={sessionState.activeSessionId}
         canCreateSession={sessionState.canCreateSession}
@@ -156,6 +184,16 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           actions.createTemporaryChat();
         }}
         onOpenSettings={() => setIsSettingsDialogOpen(true)}
+        onToggleSearch={() => {
+          if (preferences.isSidebarCollapsed) {
+            preferences.toggleSidebar();
+            setIsHistorySearchOpen(true);
+            return;
+          }
+          setIsHistorySearchOpen((current) => !current);
+        }}
+        onSearchFiltersChange={setHistorySearchFilters}
+        onClearSearch={() => setHistorySearchFilters({})}
         onSelectSession={(sessionId) => {
           pinToBottomOnNextUpdate("auto");
           sessionState.setActiveSessionId(sessionId);

@@ -426,6 +426,14 @@
     "expand": "Expandir historial de conversaciones",
     "collapse": "Contraer historial de conversaciones",
     "settings": "Configuración del chat",
+    "search": "Buscar conversaciones",
+    "searchAria": "Buscar en el historial de conversaciones",
+    "searchTitleLabel": "Titulo",
+    "searchTitlePlaceholder": "Buscar por titulo",
+    "updatedFromLabel": "Actualizado desde",
+    "updatedToLabel": "Actualizado hasta",
+    "clearSearch": "Limpiar busqueda",
+    "noSearchResults": "Ninguna conversacion coincide con estos filtros.",
     "actionsFor": "Acciones de la conversación para {{title}}"
   },
   "contextManagement": {

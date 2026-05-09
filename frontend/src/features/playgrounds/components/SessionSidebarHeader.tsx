@@ -13,6 +13,7 @@ type SessionSidebarHeaderProps = {
   onCreateSession: () => void;
   onCreateTemporarySession: () => void;
   onOpenSettings: () => void;
+  onToggleSearch: () => void;
 };
 
 export default function SessionSidebarHeader({
@@ -28,6 +29,7 @@ export default function SessionSidebarHeader({
   onCreateSession,
   onCreateTemporarySession,
   onOpenSettings,
+  onToggleSearch,
 }: SessionSidebarHeaderProps): JSX.Element {
   const { t } = useTranslation("common");
   const historyToggleLabel = isCollapsed
@@ -64,6 +66,21 @@ export default function SessionSidebarHeader({
           <span className="chatbot-sidebar-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5Z" />
+            </svg>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="chatbot-sidebar-icon-button"
+          onClick={onToggleSearch}
+          aria-label={t("playgroundSessionSidebar.search")}
+          title={t("playgroundSessionSidebar.search")}
+          disabled={isInteractionLocked}
+        >
+          <span className="chatbot-sidebar-icon chatbot-sidebar-icon-stroke" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <circle cx="10.5" cy="10.5" r="5.5" />
+              <path d="m15 15 4.5 4.5" />
             </svg>
           </span>
         </button>

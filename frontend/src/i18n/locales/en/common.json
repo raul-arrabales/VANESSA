@@ -431,6 +431,14 @@
     "expand": "Expand conversation history",
     "collapse": "Collapse conversation history",
     "settings": "Chat settings",
+    "search": "Search conversations",
+    "searchAria": "Search conversation history",
+    "searchTitleLabel": "Title",
+    "searchTitlePlaceholder": "Search by title",
+    "updatedFromLabel": "Updated from",
+    "updatedToLabel": "Updated to",
+    "clearSearch": "Clear search",
+    "noSearchResults": "No conversations match these filters.",
     "actionsFor": "Conversation actions for {{title}}"
   },
   "contextManagement": {

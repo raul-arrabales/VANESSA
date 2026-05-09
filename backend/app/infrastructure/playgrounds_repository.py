@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from ..repositories import chat_conversations as chat_repository
@@ -12,11 +13,17 @@ def list_sessions(
     *,
     owner_user_id: int,
     conversation_kind: str,
+    title_query: str | None = None,
+    updated_from: date | None = None,
+    updated_to: date | None = None,
 ) -> list[dict[str, Any]]:
     return chat_repository.list_conversation_summaries(
         database_url,
         owner_user_id=owner_user_id,
         conversation_kind=conversation_kind,
+        title_query=title_query,
+        updated_from=updated_from,
+        updated_to=updated_to,
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterator, Sequence
+from datetime import date
 from typing import Any
 
 from ..config import AuthConfig
@@ -90,13 +91,22 @@ def list_playground_sessions(
     *,
     owner_user_id: int,
     playground_kind: str | None = None,
+    title_query: str | None = None,
+    updated_from: str | None = None,
+    updated_to: str | None = None,
 ) -> list[dict[str, Any]]:
+    filters = _normalize_session_filters(
+        title_query=title_query,
+        updated_from=updated_from,
+        updated_to=updated_to,
+    )
     if playground_kind:
         conversation_kind = conversation_kind_for_playground_kind(playground_kind)
         rows = playgrounds_repository.list_sessions(
             database_url,
             owner_user_id=owner_user_id,
             conversation_kind=conversation_kind,
+            **filters,
         )
         return [_serialize_session_summary(row) for row in rows]
 
@@ -106,6 +116,7 @@ def list_playground_sessions(
             database_url,
             owner_user_id=owner_user_id,
             conversation_kind=conversation_kind,
+            **filters,
         )
         items.extend(_serialize_session_summary(row) for row in rows)
     items.sort(key=lambda row: row.get("updated_at") or "", reverse=True)
@@ -1066,6 +1077,44 @@ def _load_session_and_messages(
         row = _require_session(database_url, owner_user_id=owner_user_id, session_id=session_id)
     messages = playgrounds_repository.list_messages(database_url, conversation_id=session_id)
     return row, messages
+
+
+def _normalize_session_date(value: str | None, *, field_name: str) -> date | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if len(normalized) != 10 or normalized[4] != "-" or normalized[7] != "-":
+        raise PlaygroundSessionValidationError(
+            f"invalid_{field_name}",
+            f"{field_name} must use YYYY-MM-DD format",
+        )
+    try:
+        return date.fromisoformat(normalized)
+    except ValueError as exc:
+        raise PlaygroundSessionValidationError(
+            f"invalid_{field_name}",
+            f"{field_name} must use YYYY-MM-DD format",
+        ) from exc
+
+
+def _normalize_session_filters(
+    *,
+    title_query: str | None,
+    updated_from: str | None,
+    updated_to: str | None,
+) -> dict[str, Any]:
+    normalized_from = _normalize_session_date(updated_from, field_name="updated_from")
+    normalized_to = _normalize_session_date(updated_to, field_name="updated_to")
+    if normalized_from and normalized_to and normalized_from > normalized_to:
+        raise PlaygroundSessionValidationError(
+            "invalid_updated_range",
+            "updated_from must be on or before updated_to",
+        )
+    return {
+        "title_query": str(title_query or "").strip() or None,
+        "updated_from": normalized_from,
+        "updated_to": normalized_to,
+    }
 
 
 def _serialize_session_summary(row: dict[str, Any]) -> dict[str, Any]:

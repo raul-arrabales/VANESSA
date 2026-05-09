@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -41,13 +41,31 @@ def list_conversation_summaries(
     *,
     owner_user_id: int,
     conversation_kind: str = PLAIN_CONVERSATION_KIND,
+    title_query: str | None = None,
+    updated_from: date | None = None,
+    updated_to: date | None = None,
 ) -> list[dict[str, Any]]:
-    query = _conversation_select_sql() + """
-        WHERE c.owner_user_id = %s AND c.conversation_kind = %s
+    clauses = ["c.owner_user_id = %s", "c.conversation_kind = %s"]
+    params: list[object] = [owner_user_id, conversation_kind]
+
+    if title_query:
+        clauses.append("c.title ILIKE %s")
+        params.append(f"%{title_query}%")
+
+    if updated_from:
+        clauses.append("c.updated_at >= %s")
+        params.append(datetime.combine(updated_from, time.min, tzinfo=timezone.utc))
+
+    if updated_to:
+        clauses.append("c.updated_at < %s")
+        params.append(datetime.combine(updated_to + timedelta(days=1), time.min, tzinfo=timezone.utc))
+
+    query = _conversation_select_sql() + f"""
+        WHERE {' AND '.join(clauses)}
         ORDER BY c.updated_at DESC, c.created_at DESC, c.id DESC
     """
     with get_connection(database_url) as connection:
-        rows = connection.execute(query, (owner_user_id, conversation_kind)).fetchall()
+        rows = connection.execute(query, tuple(params)).fetchall()
     return [dict(row) for row in rows]
 
 

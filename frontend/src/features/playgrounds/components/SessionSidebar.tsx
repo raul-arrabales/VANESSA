@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useSessionSidebarMenu } from "../hooks/useSessionSidebarMenu";
-import type { PlaygroundSessionViewModel } from "../types";
+import type { PlaygroundSessionFilters, PlaygroundSessionViewModel } from "../types";
 import { formatTimestamp } from "../utils";
 import SessionSidebarHeader from "./SessionSidebarHeader";
 
@@ -12,6 +12,9 @@ type SessionSidebarProps = {
   temporarySessionLabel: string;
   settingsLabel: string;
   showSettings: boolean;
+  isSearchOpen: boolean;
+  searchFilters: PlaygroundSessionFilters;
+  isSearchActive: boolean;
   sessions: PlaygroundSessionViewModel[];
   activeSessionId: string | null;
   canCreateSession: boolean;
@@ -23,6 +26,9 @@ type SessionSidebarProps = {
   onCreateSession: () => void;
   onCreateTemporarySession: () => void;
   onOpenSettings: () => void;
+  onToggleSearch: () => void;
+  onSearchFiltersChange: (filters: PlaygroundSessionFilters) => void;
+  onClearSearch: () => void;
   onSelectSession: (sessionId: string) => void;
   onRenameSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
@@ -38,6 +44,9 @@ export default function SessionSidebar({
   temporarySessionLabel,
   settingsLabel,
   showSettings,
+  isSearchOpen,
+  searchFilters,
+  isSearchActive,
   sessions,
   activeSessionId,
   canCreateSession,
@@ -49,6 +58,9 @@ export default function SessionSidebar({
   onCreateSession,
   onCreateTemporarySession,
   onOpenSettings,
+  onToggleSearch,
+  onSearchFiltersChange,
+  onClearSearch,
   onSelectSession,
   onRenameSession,
   onDeleteSession,
@@ -87,7 +99,64 @@ export default function SessionSidebar({
         onCreateSession={onCreateSession}
         onCreateTemporarySession={onCreateTemporarySession}
         onOpenSettings={onOpenSettings}
+        onToggleSearch={onToggleSearch}
       />
+      {!isCollapsed && isSearchOpen ? (
+        <div className="chatbot-history-search" role="search" aria-label={t("playgroundSessionSidebar.searchAria")}>
+          <label className="control-group">
+            <span className="field-label">{t("playgroundSessionSidebar.searchTitleLabel")}</span>
+            <input
+              className="field-input"
+              type="search"
+              value={searchFilters.titleQuery ?? ""}
+              placeholder={t("playgroundSessionSidebar.searchTitlePlaceholder")}
+              onChange={(event) => onSearchFiltersChange({
+                ...searchFilters,
+                titleQuery: event.currentTarget.value,
+              })}
+              disabled={isInteractionLocked}
+            />
+          </label>
+          <div className="chatbot-history-date-grid">
+            <label className="control-group">
+              <span className="field-label">{t("playgroundSessionSidebar.updatedFromLabel")}</span>
+              <input
+                className="field-input"
+                type="date"
+                value={searchFilters.updatedFrom ?? ""}
+                onChange={(event) => onSearchFiltersChange({
+                  ...searchFilters,
+                  updatedFrom: event.currentTarget.value,
+                })}
+                disabled={isInteractionLocked}
+              />
+            </label>
+            <label className="control-group">
+              <span className="field-label">{t("playgroundSessionSidebar.updatedToLabel")}</span>
+              <input
+                className="field-input"
+                type="date"
+                value={searchFilters.updatedTo ?? ""}
+                onChange={(event) => onSearchFiltersChange({
+                  ...searchFilters,
+                  updatedTo: event.currentTarget.value,
+                })}
+                disabled={isInteractionLocked}
+              />
+            </label>
+          </div>
+          {isSearchActive ? (
+            <button
+              type="button"
+              className="btn btn-ghost chatbot-history-search-clear"
+              onClick={onClearSearch}
+              disabled={isInteractionLocked}
+            >
+              {t("playgroundSessionSidebar.clearSearch")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {!isCollapsed && introText ? <p className="status-text chatbot-sidebar-intro">{introText}</p> : null}
       {!isCollapsed ? (
         <div className="chatbot-conversation-list" role="list">
@@ -103,6 +172,9 @@ export default function SessionSidebar({
           ) : null}
           {!isHistoryLoading && historyError ? (
             <p className="status-text error-text">{historyError}</p>
+          ) : null}
+          {!isHistoryLoading && !historyError && isSearchActive && sessions.length === 0 ? (
+            <p className="status-text chatbot-history-empty">{t("playgroundSessionSidebar.noSearchResults")}</p>
           ) : null}
           {sessions.map((session) => {
             const actionsLabel = t("playgroundSessionSidebar.actionsFor", { title: session.title });

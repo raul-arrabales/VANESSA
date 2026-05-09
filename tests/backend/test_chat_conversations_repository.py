@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import date, datetime, timezone
+
+import pytest
 
 from app.repositories import chat_conversations
 
@@ -73,6 +76,120 @@ def test_get_conversation_scopes_by_owner(monkeypatch):
     assert row == expected_row
     assert "WHERE c.id = %s AND c.owner_user_id = %s AND c.conversation_kind = %s" in str(captured["query"])
     assert captured["params"] == ("conv-1", 42, "plain")
+
+
+def test_list_conversation_summaries_applies_title_and_updated_filters(monkeypatch):
+    expected_rows = [
+        {
+            "id": "conv-1",
+            "owner_user_id": 42,
+            "conversation_kind": "plain",
+            "title": "Launch Notes",
+            "title_source": "auto",
+            "model_id": "safe-small",
+            "created_at": None,
+            "updated_at": None,
+            "message_count": 0,
+        }
+    ]
+    captured: dict[str, object] = {}
+
+    class _FakeConnection:
+        def execute(self, query, params):
+            captured["query"] = str(query)
+            captured["params"] = params
+
+            class _Result:
+                def fetchall(self_inner):
+                    return expected_rows
+
+            return _Result()
+
+    @contextmanager
+    def _fake_get_connection(_database_url: str) -> Iterator[_FakeConnection]:
+        yield _FakeConnection()
+
+    monkeypatch.setattr(chat_conversations, "get_connection", _fake_get_connection)
+
+    rows = chat_conversations.list_conversation_summaries(
+        "postgresql://ignored",
+        owner_user_id=42,
+        conversation_kind="plain",
+        title_query="launch",
+        updated_from=date(2026, 3, 1),
+        updated_to=date(2026, 3, 18),
+    )
+
+    assert rows == expected_rows
+    assert "c.owner_user_id = %s" in str(captured["query"])
+    assert "c.conversation_kind = %s" in str(captured["query"])
+    assert "c.title ILIKE %s" in str(captured["query"])
+    assert "c.updated_at >= %s" in str(captured["query"])
+    assert "c.updated_at < %s" in str(captured["query"])
+    assert captured["params"] == (
+        42,
+        "plain",
+        "%launch%",
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        datetime(2026, 3, 19, tzinfo=timezone.utc),
+    )
+
+
+@pytest.mark.parametrize(
+    ("filters", "expected_sql", "expected_params"),
+    [
+        (
+            {"title_query": "notes"},
+            ["c.title ILIKE %s"],
+            (42, "plain", "%notes%"),
+        ),
+        (
+            {"updated_from": date(2026, 3, 1)},
+            ["c.updated_at >= %s"],
+            (42, "plain", datetime(2026, 3, 1, tzinfo=timezone.utc)),
+        ),
+        (
+            {"updated_to": date(2026, 3, 18)},
+            ["c.updated_at < %s"],
+            (42, "plain", datetime(2026, 3, 19, tzinfo=timezone.utc)),
+        ),
+    ],
+)
+def test_list_conversation_summaries_supports_individual_filters(
+    monkeypatch,
+    filters,
+    expected_sql,
+    expected_params,
+):
+    captured: dict[str, object] = {}
+
+    class _FakeConnection:
+        def execute(self, query, params):
+            captured["query"] = str(query)
+            captured["params"] = params
+
+            class _Result:
+                def fetchall(self_inner):
+                    return []
+
+            return _Result()
+
+    @contextmanager
+    def _fake_get_connection(_database_url: str) -> Iterator[_FakeConnection]:
+        yield _FakeConnection()
+
+    monkeypatch.setattr(chat_conversations, "get_connection", _fake_get_connection)
+
+    chat_conversations.list_conversation_summaries(
+        "postgresql://ignored",
+        owner_user_id=42,
+        conversation_kind="plain",
+        **filters,
+    )
+
+    for sql_fragment in expected_sql:
+        assert sql_fragment in str(captured["query"])
+    assert captured["params"] == expected_params
 
 
 def test_list_messages_orders_by_message_index(monkeypatch):

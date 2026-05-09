@@ -6,6 +6,7 @@ import type {
   PlaygroundRunStatus,
   PlaygroundSessionDetail,
   PlaygroundSessionSummary,
+  PlaygroundSessionFilters,
 } from "../../api/playgrounds";
 
 export type PlaygroundVariant = PlaygroundKind;
@@ -23,6 +24,8 @@ export type PlaygroundMessageViewModel = PlaygroundMessage & {
 export type { PlaygroundRunStatus };
 
 export type PlaygroundSessionPersistence = "draft" | "saved" | "temporary";
+
+export type { PlaygroundSessionFilters };
 
 export type PlaygroundSessionViewModel = {
   id: string;
