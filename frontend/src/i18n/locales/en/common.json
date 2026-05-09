@@ -1401,6 +1401,13 @@
       "loadState": "Page state",
       "none": "None"
     },
+    "quickSwitch": {
+      "title": "Switch deployment",
+      "description": "Activate another ready deployment profile without opening its detail page.",
+      "deploymentLabel": "Ready deployment",
+      "activateSelected": "Activate selected deployment",
+      "empty": "No other ready deployment profiles are available."
+    },
     "forms": {
       "selectPlaceholder": "Select an option",
       "provider": {

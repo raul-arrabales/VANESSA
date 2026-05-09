@@ -4,6 +4,7 @@ import type { OptionCardItem } from "../../../components/OptionCardGrid";
 import OptionCardGrid from "../../../components/OptionCardGrid";
 import { useAuth } from "../../../auth/AuthProvider";
 import PlatformCapabilitiesOverview from "../components/PlatformCapabilitiesOverview";
+import PlatformDeploymentQuickSwitch from "../components/PlatformDeploymentQuickSwitch";
 import PlatformPageLayout from "../components/PlatformPageLayout";
 import PlatformSummaryCards from "../components/PlatformSummaryCards";
 import { usePlatformOverview } from "../hooks/usePlatformOverview";
@@ -51,6 +52,14 @@ export default function PlatformControlPage(): JSX.Element {
           requiredCapabilities={requiredCapabilities.length}
         />
       </article>
+
+      <PlatformDeploymentQuickSwitch
+        activeDeployment={activeDeployment}
+        deployments={deployments}
+        isRefreshing={state === "loading"}
+        token={token}
+        onActivated={reload}
+      />
 
       <PlatformCapabilitiesOverview
         capabilities={capabilities}

@@ -1,11 +1,12 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import PlatformControlPage from "./PlatformControlPage";
 import * as platformApi from "../api/platform";
-import { primePlatformControlMocks } from "../test/platformControlFixtures";
+import { deploymentsFixture, primePlatformControlMocks } from "../test/platformControlFixtures";
 
 let mockUser: AuthUser | null = null;
 
@@ -75,6 +76,56 @@ describe("PlatformControlPage", () => {
     expect(providerLinks.some((link) => link.getAttribute("href") === "/control/platform/providers")).toBe(true);
     const deploymentLinks = await screen.findAllByRole("link", { name: await t("platformControl.home.deploymentsTitle") });
     expect(deploymentLinks.some((link) => link.getAttribute("href") === "/control/platform/deployments")).toBe(true);
+  });
+
+  it("activates another ready deployment from the overview quick switch", async () => {
+    vi.mocked(platformApi.activateDeploymentProfile).mockResolvedValue({
+      ...deploymentsFixture[1],
+      is_active: true,
+    });
+    vi.mocked(platformApi.listPlatformDeployments)
+      .mockResolvedValueOnce(deploymentsFixture)
+      .mockResolvedValueOnce([
+        { ...deploymentsFixture[0], is_active: false },
+        { ...deploymentsFixture[1], is_active: true },
+      ]);
+
+    await renderPage();
+
+    expect(await screen.findByText(await t("platformControl.quickSwitch.title"))).toBeVisible();
+    expect(screen.getByLabelText(await t("platformControl.quickSwitch.deploymentLabel"))).toHaveValue("deployment-2");
+    await userEvent.click(screen.getByRole("button", { name: await t("platformControl.quickSwitch.activateSelected") }));
+
+    const activationDialog = await screen.findByRole("dialog", {
+      name: await t("platformControl.deployments.activationDialogTitle"),
+    });
+    expect(within(activationDialog).getByText("Local Default")).toBeVisible();
+    expect(within(activationDialog).getByText("Staging Profile")).toBeVisible();
+
+    await userEvent.click(within(activationDialog).getByRole("button", { name: await t("platformControl.actions.confirmActivate") }));
+
+    await waitFor(() => {
+      expect(platformApi.activateDeploymentProfile).toHaveBeenCalledWith("deployment-2", "token");
+    });
+    expect(await screen.findByText(await t("platformControl.feedback.activationSuccess", { name: "Staging Profile" }))).toBeVisible();
+  });
+
+  it("explains when there are no other ready deployments to switch to", async () => {
+    vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue([
+      deploymentsFixture[0],
+      {
+        ...deploymentsFixture[1],
+        configuration_status: {
+          ...deploymentsFixture[1].configuration_status!,
+          is_ready: false,
+        },
+      },
+    ]);
+
+    await renderPage();
+
+    expect(await screen.findByText(await t("platformControl.quickSwitch.empty"))).toBeVisible();
+    expect(screen.queryByRole("button", { name: await t("platformControl.quickSwitch.activateSelected") })).not.toBeInTheDocument();
   });
 
   it("shows translated load errors", async () => {

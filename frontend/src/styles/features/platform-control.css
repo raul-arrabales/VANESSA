@@ -150,6 +150,13 @@
   margin-top: 0;
 }
 
+.platform-quick-switch {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(14rem, 1fr) auto;
+  align-items: end;
+}
+
 .provider-load-panel {
   position: fixed;
   right: var(--space-4);
@@ -371,6 +378,11 @@
 
   .platform-provider-actions {
     justify-content: flex-start;
+  }
+
+  .platform-quick-switch {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .deployment-identity-row,

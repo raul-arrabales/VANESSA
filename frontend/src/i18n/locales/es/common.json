@@ -1389,6 +1389,13 @@
       "loadState": "Estado de la pagina",
       "none": "Ninguno"
     },
+    "quickSwitch": {
+      "title": "Cambiar despliegue",
+      "description": "Activa otro perfil de despliegue listo sin abrir su pagina de detalle.",
+      "deploymentLabel": "Despliegue listo",
+      "activateSelected": "Activar despliegue seleccionado",
+      "empty": "No hay otros perfiles de despliegue listos disponibles."
+    },
     "forms": {
       "selectPlaceholder": "Selecciona una opcion",
       "provider": {
