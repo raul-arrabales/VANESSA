@@ -325,7 +325,9 @@
 
 .chatbot-thread-shell {
   position: relative;
+  align-self: center;
   flex: 1 1 auto;
+  width: min(100%, 900px);
   min-height: 0;
   overflow: auto;
   padding: var(--space-3);
