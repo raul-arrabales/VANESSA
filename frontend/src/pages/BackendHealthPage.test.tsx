@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BackendHealthPage from "./BackendHealthPage";
@@ -130,5 +130,41 @@ describe("BackendHealthPage", () => {
 
     await screen.findByText("Architecture diagram is unavailable in this backend environment.");
     await screen.findByText("Architecture artifacts could not be loaded.");
+  });
+
+  it("marks the frontend as up from the active browser session", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/system/health")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "degraded",
+            services: [
+              { service: "Frontend", container: "frontend", target: "http://frontend:3000", reachable: false },
+              { service: "Backend", container: "backend", target: "http://backend:5000", reachable: true },
+            ],
+          }),
+        };
+      }
+      if (url.endsWith("/system/architecture")) {
+        return { ok: false, status: 503 };
+      }
+      if (url.endsWith("/system/architecture.svg")) {
+        return { ok: false, status: 503 };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BackendHealthPage />);
+    await userEvent.click(screen.getByRole("button", { name: "Check all services" }));
+
+    await screen.findByText(window.location.origin);
+    const frontendRow = screen.getByText("Frontend").closest("tr");
+    expect(frontendRow).not.toBeNull();
+    expect(within(frontendRow as HTMLTableRowElement).getByText("Up")).toBeInTheDocument();
   });
 });

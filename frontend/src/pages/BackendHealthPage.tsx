@@ -57,11 +57,12 @@ const initialServices: ServiceRow[] = [
 ];
 
 function mapServicesFromHealth(payload: SystemHealthResponse): ServiceRow[] {
+  const frontendTarget = window.location.origin;
   return payload.services.map((service) => ({
     service: service.service,
     container: service.container,
-    target: service.target,
-    status: service.reachable ? "up" : "down",
+    target: service.container === "frontend" ? frontendTarget : service.target,
+    status: service.container === "frontend" ? "up" : service.reachable ? "up" : "down",
   }));
 }
 
@@ -160,6 +161,9 @@ export default function BackendHealthPage(): JSX.Element {
         }
 
         setServices((currentServices) => currentServices.map((service) => {
+          if (service.container === "frontend") {
+            return { ...service, target: window.location.origin, status: "up" };
+          }
           if (service.container === "backend") {
             return { ...service, status: backendUp ? "up" : "down" };
           }
