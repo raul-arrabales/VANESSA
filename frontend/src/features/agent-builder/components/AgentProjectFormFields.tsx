@@ -83,6 +83,20 @@ export function AgentProjectFormFields({ form, setForm, disableId = false }: Pro
         }} />
       </label>
       <label className="card-stack">
+        <span className="field-label">{t("agentBuilder.fields.mcpServerRefs")}</span>
+        <textarea className="field-input form-textarea" value={form.mcpServerRefsText} onChange={(event) => {
+          const value = event.currentTarget.value;
+          setForm((current) => ({ ...current, mcpServerRefsText: value }));
+        }} />
+      </label>
+      <label className="card-stack">
+        <span className="field-label">{t("agentBuilder.fields.agentDomain")}</span>
+        <input className="field-input" value={form.agentDomain} onChange={(event) => {
+          const value = event.currentTarget.value;
+          setForm((current) => ({ ...current, agentDomain: value }));
+        }} />
+      </label>
+      <label className="card-stack">
         <span className="field-label">{t("agentBuilder.fields.workflowDefinition")}</span>
         <textarea className="field-input form-textarea" value={form.workflowDefinitionText} onChange={(event) => {
           const value = event.currentTarget.value;

@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
 DEFAULT_MCP_GATEWAY_PORT = 8080
+DEFAULT_BACKEND_URL = "http://backend:5000"
+DEFAULT_MCP_GATEWAY_SERVICE_TOKEN = "dev-mcp-gateway-token"
 DEFAULT_SEARXNG_URL = "http://searxng:8080"
 DEFAULT_SEARXNG_TIMEOUT_SECONDS = 8.0
 _VALID_TIME_RANGES = {"day", "month", "year"}
@@ -28,6 +30,14 @@ def _env_float(name: str, default: float) -> float:
 
 def _optional_string(value: Any) -> str:
     return str(value).strip() if value is not None else ""
+
+
+def _backend_url() -> str:
+    return (os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL).rstrip("/")
+
+
+def _service_token() -> str:
+    return os.getenv("MCP_GATEWAY_SERVICE_TOKEN", DEFAULT_MCP_GATEWAY_SERVICE_TOKEN).strip() or DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
 
 
 def _coerce_top_k(value: Any) -> tuple[int | None, dict[str, str] | None]:
@@ -64,12 +74,8 @@ def _searxng_search_url(arguments: dict[str, Any], *, query: str) -> tuple[str |
     if error:
         return None, error
 
-    language = _optional_string(arguments.get("language")) or _optional_string(
-        os.getenv("SEARXNG_DEFAULT_LANGUAGE", "")
-    )
-    categories = _optional_string(arguments.get("categories")) or _optional_string(
-        os.getenv("SEARXNG_DEFAULT_CATEGORIES", "")
-    )
+    language = _optional_string(arguments.get("language")) or _optional_string(os.getenv("SEARXNG_DEFAULT_LANGUAGE", ""))
+    categories = _optional_string(arguments.get("categories")) or _optional_string(os.getenv("SEARXNG_DEFAULT_CATEGORIES", ""))
     engines = _optional_string(os.getenv("SEARXNG_DEFAULT_ENGINES", ""))
     base_url = (_optional_string(os.getenv("SEARXNG_URL")) or DEFAULT_SEARXNG_URL).rstrip("/")
     params: dict[str, str] = {
@@ -176,29 +182,47 @@ def _web_search(arguments: dict[str, Any]) -> tuple[dict[str, Any], int]:
     return {"query": query, "results": _normalize_results(payload, top_k=top_k)}, 200
 
 
-_TOOLS: dict[str, dict[str, Any]] = {
-    "web_search": {
-        "description": "Searches the web through the MCP gateway runtime.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "top_k": {"type": "integer", "minimum": 1, "maximum": 10},
-                "language": {"type": "string"},
-                "time_range": {"type": "string", "enum": ["day", "month", "year"]},
-                "safesearch": {"type": "integer", "enum": [0, 1, 2]},
-                "categories": {"type": "string"},
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-        "invoke": _web_search,
+def _request_backend_json(path: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> tuple[dict[str, Any] | None, int]:
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {
+        "Accept": "application/json",
+        "X-Service-Token": _service_token(),
     }
-}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    request = Request(_backend_url() + path, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=8.0) as response:
+            raw = response.read().decode("utf-8")
+            parsed = json.loads(raw) if raw else {}
+            return parsed if isinstance(parsed, dict) else {}, int(response.status)
+    except HTTPError as exc:
+        raw = exc.read().decode("utf-8")
+        try:
+            parsed = json.loads(raw) if raw else {"error": "backend_error"}
+        except ValueError:
+            parsed = {"error": "backend_error", "body": raw}
+        return parsed if isinstance(parsed, dict) else {"error": "backend_error"}, int(exc.code)
+    except (TimeoutError, URLError, OSError):
+        return None, 502
+
+
+def _query_from_metadata(metadata: dict[str, Any]) -> str:
+    params: dict[str, str] = {}
+    for source_key, param_key in [
+        ("agent_id", "agent_id"),
+        ("agent_domain", "agent_domain"),
+        ("delegated_user_id", "delegated_user_id"),
+        ("delegated_user_role", "delegated_user_role"),
+    ]:
+        value = _optional_string(metadata.get(source_key))
+        if value:
+            params[param_key] = value
+    return f"?{urlencode(params)}" if params else ""
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "VANESSAMcpGateway/0.1"
+    server_version = "VANESSAMcpGateway/0.2"
 
     def _send_json(self, status: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -222,41 +246,53 @@ class Handler(BaseHTTPRequestHandler):
             return None
         return parsed if isinstance(parsed, dict) else None
 
+    def _authorize_internal(self) -> bool:
+        token = self.headers.get("X-Service-Token", "").strip()
+        if not token or token != _service_token():
+            self._send_json(401, {"error": "invalid_service_token", "message": "Missing or invalid service token"})
+            return False
+        return True
+
     def do_GET(self) -> None:
-        if self.path == "/health":
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
             self._send_json(200, {"status": "ok", "service": "mcp_gateway"})
             return
-        if self.path == "/v1/tools":
-            self._send_json(
-                200,
-                {
-                    "tools": [
-                        {
-                            "tool_name": tool_name,
-                            "description": tool["description"],
-                            "input_schema": tool["input_schema"],
-                        }
-                        for tool_name, tool in sorted(_TOOLS.items())
-                    ]
-                },
-            )
+        if parsed.path == "/v1/tools":
+            payload, status_code = _request_backend_json(f"/v1/internal/mcp-servers/discover?{parsed.query}" if parsed.query else "/v1/internal/mcp-servers/discover")
+            if payload is None:
+                self._send_json(502, {"error": "backend_unavailable", "message": "Backend MCP registry is unavailable"})
+                return
+            self._send_json(status_code, payload)
             return
         self._send_json(404, {"error": "not_found", "message": "Route not found"})
 
     def do_POST(self) -> None:
-        if self.path != "/v1/tools/invoke":
+        parsed = urlparse(self.path)
+        if parsed.path == "/v1/internal/tools/web-search":
+            if not self._authorize_internal():
+                return
+            payload = self._read_json()
+            if payload is None:
+                self._send_json(400, {"error": "invalid_payload", "message": "Expected JSON object"})
+                return
+            arguments = payload.get("arguments", {})
+            if arguments is None:
+                arguments = {}
+            if not isinstance(arguments, dict):
+                self._send_json(400, {"error": "invalid_arguments", "message": "arguments must be an object"})
+                return
+            result, status_code = _web_search(arguments)
+            self._send_json(status_code, result)
+            return
+
+        if parsed.path != "/v1/tools/invoke":
             self._send_json(404, {"error": "not_found", "message": "Route not found"})
             return
 
         payload = self._read_json()
         if payload is None:
             self._send_json(400, {"error": "invalid_payload", "message": "Expected JSON object"})
-            return
-
-        tool_name = str(payload.get("tool_name", "")).strip()
-        tool = _TOOLS.get(tool_name)
-        if tool is None:
-            self._send_json(404, {"error": "tool_not_found", "message": "Tool not found"})
             return
         arguments = payload.get("arguments", {})
         if arguments is None:
@@ -271,20 +307,25 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "invalid_request_metadata", "message": "request_metadata must be an object"})
             return
 
-        result, status_code = tool["invoke"](arguments)
-        self._send_json(
-            status_code,
-            {
-                "tool_name": tool_name,
+        server_slug = _optional_string(request_metadata.get("mcp_server_slug")) or _optional_string(payload.get("server_slug")) or _optional_string(payload.get("tool_name"))
+        if not server_slug:
+            self._send_json(400, {"error": "invalid_mcp_server", "message": "MCP server slug is required"})
+            return
+        backend_payload, status_code = _request_backend_json(
+            f"/v1/internal/mcp-servers/{server_slug}/invoke",
+            method="POST",
+            payload={
                 "arguments": arguments,
                 "request_metadata": request_metadata,
-                "result": result if status_code < 400 else None,
-                "error": result if status_code >= 400 else None,
             },
         )
+        if backend_payload is None:
+            self._send_json(502, {"error": "backend_unavailable", "message": "Backend MCP invocation is unavailable"})
+            return
+        self._send_json(status_code, backend_payload)
 
 
 if __name__ == "__main__":
     port = int(os.getenv("MCP_GATEWAY_PORT", str(DEFAULT_MCP_GATEWAY_PORT)) or DEFAULT_MCP_GATEWAY_PORT)
-    server = HTTPServer(("0.0.0.0", port), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     server.serve_forever()

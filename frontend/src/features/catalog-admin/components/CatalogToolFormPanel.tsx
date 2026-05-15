@@ -44,14 +44,15 @@ export default function CatalogToolFormPanel({
             <input className="field-input" value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} />
           </label>
           <label className="card-stack">
-            <span className="field-label">{t("catalogControl.forms.tool.transport")}</span>
+            <span className="field-label">{t("catalogControl.forms.tool.executionBackend")}</span>
             <select
               className="field-input"
-              value={form.transport}
-              onChange={(event) => onChange({ ...form, transport: event.target.value as "mcp" | "sandbox_http" })}
+              value={form.execution_backend}
+              onChange={(event) => onChange({ ...form, execution_backend: event.target.value as ToolFormState["execution_backend"] })}
             >
-              <option value="mcp">{t("catalogControl.transport.mcp")}</option>
-              <option value="sandbox_http">{t("catalogControl.transport.sandbox")}</option>
+              <option value="sandbox_python">{t("catalogControl.executionBackend.sandboxPython")}</option>
+              <option value="mcp_gateway_web_search">{t("catalogControl.executionBackend.webSearch")}</option>
+              <option value="internal_http">{t("catalogControl.executionBackend.internalHttp")}</option>
             </select>
           </label>
           <label className="card-stack">
@@ -64,10 +65,6 @@ export default function CatalogToolFormPanel({
               <option value="draft">{t("catalogControl.badges.draft")}</option>
               <option value="published">{t("catalogControl.badges.published")}</option>
             </select>
-          </label>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.forms.tool.toolName")}</span>
-            <input className="field-input" value={form.tool_name} onChange={(event) => onChange({ ...form, tool_name: event.target.value })} />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.tool.offlineCompatible")}</span>
@@ -97,7 +94,14 @@ export default function CatalogToolFormPanel({
           <span className="field-label">{t("catalogControl.forms.tool.safetyPolicy")}</span>
           <textarea className="field-input form-textarea" value={form.safetyPolicyText} onChange={(event) => onChange({ ...form, safetyPolicyText: event.target.value })} />
         </label>
-        <p className="status-text">{t("catalogControl.forms.tool.connectionProfile")}</p>
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.tool.executionConfig")}</span>
+          <textarea className="field-input form-textarea" value={form.executionConfigText} onChange={(event) => onChange({ ...form, executionConfigText: event.target.value })} />
+        </label>
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.tool.permissions")}</span>
+          <textarea className="field-input form-textarea" value={form.permissionsText} onChange={(event) => onChange({ ...form, permissionsText: event.target.value })} />
+        </label>
         <div className="status-row">
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? t("catalogControl.actions.saving") : t(form.mode === "create" ? "catalogControl.actions.createTool" : "catalogControl.actions.updateTool")}

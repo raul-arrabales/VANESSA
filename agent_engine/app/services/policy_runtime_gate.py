@@ -201,6 +201,8 @@ def resolve_agent_spec(*, agent_id: str) -> dict[str, Any]:
                 "runtime_prompts": {},
                 "default_model_ref": None,
                 "tool_refs": [],
+                "mcp_server_refs": [],
+                "agent_domain": "default",
                 "runtime_constraints": {},
             },
         }
@@ -242,58 +244,82 @@ def validate_runtime_and_dependencies(*, agent_entity: dict[str, Any], runtime_p
 
 def resolve_agent_tools(*, agent_entity: dict[str, Any], runtime_profile: str) -> list[dict[str, Any]]:
     current_spec = agent_entity.get("current_spec") if isinstance(agent_entity.get("current_spec"), dict) else {}
-    tool_refs = current_spec.get("tool_refs") if isinstance(current_spec.get("tool_refs"), list) else []
+    tool_refs = current_spec.get("mcp_server_refs") if isinstance(current_spec.get("mcp_server_refs"), list) else []
     resolved_tools: list[dict[str, Any]] = []
-    for tool_ref in tool_refs:
-        tool_id = str(tool_ref).strip()
-        if not tool_id:
+    for server_ref in tool_refs:
+        server_slug = str(server_ref).strip()
+        if not server_slug:
             continue
-        tool = _get_entity(entity_type="tool", entity_id=tool_id) if _db_available() else None
-        if tool is None and _db_available():
+        server = _get_mcp_server_by_slug(server_slug) if _db_available() else None
+        if server is None and _db_available():
             raise ExecutionBlockedError(
                 code="EXEC_TOOL_NOT_ALLOWED",
-                message=f"Tool '{tool_id}' referenced by agent does not exist",
+                message=f"MCP server '{server_slug}' referenced by agent does not exist",
                 status_code=403,
             )
-        if tool is None:
+        if server is None:
             resolved_tools.append(
                 {
-                    "entity_id": tool_id,
+                    "entity_id": f"mcp.{server_slug}",
                     "current_version": "v1",
                     "current_spec": {
-                        "name": tool_id,
+                        "name": server_slug,
+                        "slug": server_slug,
                         "description": "",
-                        "transport": "mcp",
-                        "connection_profile_ref": "default",
-                        "tool_name": tool_id,
+                        "exposed_tool_name": server_slug,
+                        "backing_tool_id": "",
                         "input_schema": {},
                         "output_schema": {},
-                        "safety_policy": {},
-                        "offline_compatible": False,
+                        "authorization_policy": {},
+                        "enabled": True,
                     },
                 }
             )
             continue
-        tool_spec = tool.get("current_spec") if isinstance(tool.get("current_spec"), dict) else {}
-        transport = str(tool_spec.get("transport", "")).strip().lower()
-        if transport not in {"mcp", "sandbox_http"}:
+        server_spec = server.get("current_spec") if isinstance(server.get("current_spec"), dict) else {}
+        if not bool(server_spec.get("enabled", False)):
             raise ExecutionBlockedError(
                 code="EXEC_TOOL_NOT_ALLOWED",
-                message=f"Tool '{tool_id}' has an unsupported transport",
+                message=f"MCP server '{server_slug}' is disabled",
                 status_code=403,
             )
-        connection_profile_ref = str(tool_spec.get("connection_profile_ref", "")).strip().lower()
-        if connection_profile_ref != "default":
+        backing_tool_id = str(server_spec.get("backing_tool_id", "")).strip()
+        backing_tool = _get_entity(entity_type="tool", entity_id=backing_tool_id) if backing_tool_id else None
+        if backing_tool is None:
             raise ExecutionBlockedError(
                 code="EXEC_TOOL_NOT_ALLOWED",
-                message=f"Tool '{tool_id}' uses an unsupported connection profile",
+                message=f"MCP server '{server_slug}' references a missing backing tool",
                 status_code=403,
             )
+        tool_spec = backing_tool.get("current_spec") if isinstance(backing_tool.get("current_spec"), dict) else {}
         if runtime_profile != "online" and not bool(tool_spec.get("offline_compatible", False)):
             raise ExecutionBlockedError(
                 code="EXEC_TOOL_NOT_ALLOWED",
-                message=f"Tool '{tool_id}' is not allowed for profile '{runtime_profile}'",
+                message=f"MCP server '{server_slug}' is not allowed for profile '{runtime_profile}'",
                 status_code=403,
             )
-        resolved_tools.append(tool)
+        server["backing_tool"] = backing_tool
+        resolved_tools.append(server)
     return resolved_tools
+
+
+def _get_mcp_server_by_slug(slug: str) -> dict[str, Any] | None:
+    if not _db_available():
+        return None
+    with _connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT e.*, v.version AS current_version, v.spec_json AS current_spec, v.published_at
+            FROM registry_entities e
+            LEFT JOIN registry_versions v
+              ON v.entity_id = e.entity_id AND v.is_current = TRUE
+            WHERE e.entity_type = 'mcp_server'
+            """
+        ).fetchall()
+    normalized_slug = str(slug).strip().lower()
+    for row in rows:
+        item = dict(row)
+        spec = item.get("current_spec") if isinstance(item.get("current_spec"), dict) else {}
+        if str(spec.get("slug", "")).strip().lower() == normalized_slug:
+            return item
+    return None

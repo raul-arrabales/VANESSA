@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-04-25T16:00:53+00:00",
+  "generated_at": "2026-05-15T12:35:58+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -16,7 +16,7 @@
       "container": "backend",
       "label": "Backend API",
       "group": "api",
-      "description": "Flask API gateway, model governance surface, and capability/provider/served-model control plane.",
+      "description": "Flask API gateway, model governance surface, catalog registry, and capability/provider control plane.",
       "public_exposed": true,
       "criticality": "high"
     },
@@ -88,7 +88,7 @@
       "container": "mcp_gateway",
       "label": "MCP Gateway",
       "group": "runtime",
-      "description": "HTTP gateway for MCP-backed tool runtimes.",
+      "description": "HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.",
       "public_exposed": true,
       "criticality": "medium"
     },
@@ -144,7 +144,7 @@
       "from": "agent_engine",
       "to": "mcp_gateway",
       "protocol": "HTTP",
-      "purpose": "Agent MCP tool invocation",
+      "purpose": "Agent MCP discovery and invocation with identity metadata",
       "kind": "http",
       "direction": "outbound"
     },
@@ -216,7 +216,7 @@
       "from": "backend",
       "to": "mcp_gateway",
       "protocol": "HTTP",
-      "purpose": "Optional MCP runtime validation and control-plane provider checks",
+      "purpose": "MCP provider checks and private gateway-backed tool adapters",
       "kind": "http",
       "direction": "outbound"
     },
@@ -289,6 +289,15 @@
       "to": "llm_runtime_inference",
       "protocol": "Internal HTTP",
       "purpose": "Runtime text generation path",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "mcp_gateway-backend",
+      "from": "mcp_gateway",
+      "to": "backend",
+      "protocol": "compose",
+      "purpose": "Startup dependency",
       "kind": "internal",
       "direction": "outbound"
     },
@@ -397,5 +406,5 @@
       }
     }
   },
-  "source_hash": "4eef2c1098253cc8f6851738b35cd02aa14d51b7309c87b18f9517a7ff88d964"
+  "source_hash": "fc0e59eb9291fc29c04b744574fcc26a6811332ef66e4678c1bdfc1493733ff9"
 }

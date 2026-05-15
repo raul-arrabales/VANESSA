@@ -6,6 +6,7 @@ from dataclasses import dataclass
 RUNTIME_PROFILES = {"online", "offline"}
 DEFAULT_RUNTIME_PROFILE = "offline"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
+DEFAULT_MCP_GATEWAY_SERVICE_TOKEN = "dev-mcp-gateway-token"
 DEFAULT_BACKEND_URL = "http://backend:5000"
 _LEGACY_RUNTIME_PROFILES = {"air_gapped": "offline"}
 
@@ -15,6 +16,7 @@ class EngineConfig:
     database_url: str
     runtime_profile_force: str | None
     agent_engine_service_token: str
+    mcp_gateway_service_token: str
     backend_url: str
 
 
@@ -42,6 +44,10 @@ def get_config() -> EngineConfig:
         agent_engine_service_token=(
             os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
             or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+        ),
+        mcp_gateway_service_token=(
+            os.getenv("MCP_GATEWAY_SERVICE_TOKEN", DEFAULT_MCP_GATEWAY_SERVICE_TOKEN).strip()
+            or DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
         ),
         backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
     )

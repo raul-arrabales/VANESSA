@@ -31,7 +31,7 @@ services:
   backend:
     label: Backend API
     group: api
-    description: Flask API gateway, model governance surface, and capability/provider/served-model control plane.
+    description: Flask API gateway, model governance surface, catalog registry, and capability/provider control plane.
     public_exposed: true
     criticality: high
   kws:
@@ -79,7 +79,7 @@ services:
   mcp_gateway:
     label: MCP Gateway
     group: runtime
-    description: HTTP gateway for MCP-backed tool runtimes.
+    description: HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.
     public_exposed: true
     criticality: medium
   searxng:
@@ -140,7 +140,7 @@ edges:
   - from: backend
     to: mcp_gateway
     protocol: HTTP
-    purpose: Optional MCP runtime validation and control-plane provider checks
+    purpose: MCP provider checks and private gateway-backed tool adapters
     kind: http
     direction: outbound
   - from: backend
@@ -176,7 +176,7 @@ edges:
   - from: agent_engine
     to: mcp_gateway
     protocol: HTTP
-    purpose: Agent MCP tool invocation
+    purpose: Agent MCP discovery and invocation with identity metadata
     kind: http
     direction: outbound
   - from: mcp_gateway

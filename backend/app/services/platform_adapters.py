@@ -1633,7 +1633,7 @@ class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
         return self.binding.endpoint_url.rstrip("/") + path
 
     def _tools_url(self) -> str:
-        path = str(self.binding.config.get("tools_path", "/v1/tools")).strip() or "/v1/tools"
+        path = str(self.binding.config.get("tools_path") or self.binding.config.get("list_tools_path") or "/v1/tools").strip() or "/v1/tools"
         return self.binding.endpoint_url.rstrip("/") + path
 
     def health(self) -> dict[str, Any]:

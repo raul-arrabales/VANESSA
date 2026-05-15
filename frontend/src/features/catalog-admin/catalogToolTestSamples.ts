@@ -58,21 +58,18 @@ function buildSampleValueFromSchema(schema: unknown, propertyName = ""): unknown
   if (propertyName === "code") {
     return "print('Hello from VANESSA')";
   }
-  if (propertyName === "tool_name") {
-    return "example_tool";
-  }
   return "example";
 }
 
 export function buildSampleToolInput(tool: CatalogTool): Record<string, unknown> {
-  if (tool.id === "tool.web_search" || tool.spec.tool_name === "web_search") {
+  if (tool.id === "tool.web_search" || tool.spec.execution_backend === "mcp_gateway_web_search") {
     return {
       query: "OpenAI platform runtime",
       top_k: 3,
     };
   }
 
-  if (tool.id === "tool.python_exec" || tool.spec.tool_name === "python_exec") {
+  if (tool.id === "tool.python_exec" || tool.spec.execution_backend === "sandbox_python") {
     return {
       code: "numbers = input_payload.get('numbers', [1, 2, 3])\nresult = sum(numbers)\nprint(f'Sum: {result}')",
       input: {

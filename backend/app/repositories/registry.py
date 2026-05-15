@@ -7,7 +7,7 @@ from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 
-_ENTITY_TYPES = {"model", "agent", "tool"}
+_ENTITY_TYPES = {"model", "agent", "tool", "mcp_server"}
 _SHARE_PERMISSIONS = {"view", "fork", "execute", "admin"}
 _GRANTEE_TYPES = {"user", "group", "org", "public"}
 _RUNTIME_PROFILES = {"online", "offline"}

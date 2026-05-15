@@ -2,22 +2,31 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createCatalogAgent,
+  createCatalogMcpServer,
   createCatalogTool,
   deleteCatalogAgent,
+  deleteCatalogMcpServer,
   getCatalogDefaults,
   listCatalogAgents,
+  listCatalogMcpServers,
   listCatalogTools,
   previewCatalogAgentPrompt,
   type CatalogAgent,
   type CatalogAgentMutationInput,
   type CatalogAgentValidation,
   type CatalogDefaults,
+  type CatalogMcpServer,
+  type CatalogMcpServerMutationInput,
+  type CatalogMcpServerValidation,
   type CatalogTool,
   type CatalogToolMutationInput,
   type CatalogToolValidation,
+  setCatalogMcpServerEnabled,
   updateCatalogAgent,
+  updateCatalogMcpServer,
   updateCatalogTool,
   validateCatalogAgent,
+  validateCatalogMcpServer,
   validateCatalogTool,
 } from "../../../api/catalog";
 import { listEnabledModels, type ModelCatalogItem } from "../../../api/modelops";
@@ -38,6 +47,21 @@ export type ToolFormState = CatalogToolMutationInput & {
   inputSchemaText: string;
   outputSchemaText: string;
   safetyPolicyText: string;
+  executionConfigText: string;
+  permissionsText: string;
+};
+
+export type McpServerFormState = CatalogMcpServerMutationInput & {
+  mode: FormMode;
+  mcpServerId: string;
+  inputSchemaText: string;
+  outputSchemaText: string;
+  agentIdsText: string;
+  agentDomainsText: string;
+  agentRolesText: string;
+  userRolesText: string;
+  userIdsText: string;
+  userGroupIdsText: string;
 };
 
 function agentRuntimePromptsFromDefaults(defaults: CatalogDefaults | null): CatalogAgentMutationInput["runtime_prompts"] {
@@ -59,6 +83,8 @@ export function buildDefaultAgentForm(defaults: CatalogDefaults | null): AgentFo
     runtime_prompts: agentRuntimePromptsFromDefaults(defaults),
     default_model_ref: null,
     tool_refs: [],
+    mcp_server_refs: [],
+    agent_domain: "default",
     runtime_constraints: {
       internet_required: false,
       sandbox_required: false,
@@ -76,16 +102,50 @@ export const DEFAULT_TOOL_FORM: ToolFormState = {
   publish: false,
   name: "",
   description: "",
-  transport: "mcp",
-  connection_profile_ref: "default",
-  tool_name: "",
   input_schema: {},
   output_schema: {},
   safety_policy: {},
   offline_compatible: false,
+  execution_backend: "sandbox_python",
+  execution_config: {},
+  permissions: {},
   inputSchemaText: "{}",
   outputSchemaText: "{}",
   safetyPolicyText: "{}",
+  executionConfigText: "{}",
+  permissionsText: "{}",
+};
+
+export const DEFAULT_MCP_SERVER_FORM: McpServerFormState = {
+  mode: "create",
+  mcpServerId: "",
+  id: "",
+  visibility: "private",
+  publish: true,
+  name: "",
+  slug: "",
+  description: "",
+  backing_tool_id: "",
+  exposed_tool_name: "",
+  input_schema: {},
+  output_schema: {},
+  authorization_policy: {
+    agent_ids: ["*"],
+    agent_domains: ["*"],
+    agent_roles: ["*"],
+    user_roles: ["*"],
+    user_ids: ["*"],
+    user_group_ids: ["*"],
+  },
+  enabled: true,
+  inputSchemaText: "{}",
+  outputSchemaText: "{}",
+  agentIdsText: "*",
+  agentDomainsText: "*",
+  agentRolesText: "*",
+  userRolesText: "*",
+  userIdsText: "*",
+  userGroupIdsText: "*",
 };
 
 function stringifyJson(value: Record<string, unknown>): string {
@@ -127,6 +187,8 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
     },
     default_model_ref: agent.spec.default_model_ref,
     tool_refs: agent.spec.tool_refs,
+    mcp_server_refs: agent.spec.mcp_server_refs ?? [],
+    agent_domain: agent.spec.agent_domain ?? "default",
     runtime_constraints: {
       internet_required: agent.spec.runtime_constraints.internet_required,
       sandbox_required: agent.spec.runtime_constraints.sandbox_required,
@@ -143,16 +205,55 @@ export function buildToolForm(tool: CatalogTool): ToolFormState {
     publish: tool.published,
     name: tool.spec.name,
     description: tool.spec.description,
-    transport: tool.spec.transport,
-    connection_profile_ref: "default",
-    tool_name: tool.spec.tool_name,
     input_schema: tool.spec.input_schema,
     output_schema: tool.spec.output_schema,
     safety_policy: tool.spec.safety_policy,
     offline_compatible: tool.spec.offline_compatible,
+    execution_backend: tool.spec.execution_backend ?? "internal_http",
+    execution_config: tool.spec.execution_config ?? {},
+    permissions: tool.spec.permissions ?? {},
     inputSchemaText: stringifyJson(tool.spec.input_schema),
     outputSchemaText: stringifyJson(tool.spec.output_schema),
     safetyPolicyText: stringifyJson(tool.spec.safety_policy),
+    executionConfigText: stringifyJson(tool.spec.execution_config ?? {}),
+    permissionsText: stringifyJson(tool.spec.permissions ?? {}),
+  };
+}
+
+function textToList(text: string): string[] {
+  const items = text.split(",").map((item) => item.trim()).filter(Boolean);
+  return items.length > 0 ? items : ["*"];
+}
+
+function listToText(items: string[]): string {
+  return items.join(", ");
+}
+
+export function buildMcpServerForm(server: CatalogMcpServer): McpServerFormState {
+  const policy = server.spec.authorization_policy;
+  return {
+    mode: "edit",
+    mcpServerId: server.id,
+    id: server.id,
+    visibility: server.entity.visibility,
+    publish: server.published,
+    name: server.spec.name,
+    slug: server.spec.slug,
+    description: server.spec.description,
+    backing_tool_id: server.spec.backing_tool_id,
+    exposed_tool_name: server.spec.exposed_tool_name,
+    input_schema: server.spec.input_schema,
+    output_schema: server.spec.output_schema,
+    authorization_policy: policy,
+    enabled: server.spec.enabled,
+    inputSchemaText: stringifyJson(server.spec.input_schema),
+    outputSchemaText: stringifyJson(server.spec.output_schema),
+    agentIdsText: listToText(policy.agent_ids),
+    agentDomainsText: listToText(policy.agent_domains),
+    agentRolesText: listToText(policy.agent_roles),
+    userRolesText: listToText(policy.user_roles),
+    userIdsText: listToText(policy.user_ids),
+    userGroupIdsText: listToText(policy.user_group_ids),
   };
 }
 
@@ -162,16 +263,21 @@ export function useCatalogControl(token: string) {
   const [state, setState] = useState<CatalogLoadState>("idle");
   const [agents, setAgents] = useState<CatalogAgent[]>([]);
   const [tools, setTools] = useState<CatalogTool[]>([]);
+  const [mcpServers, setMcpServers] = useState<CatalogMcpServer[]>([]);
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
   const [agentForm, setAgentForm] = useState<AgentFormState>(() => buildDefaultAgentForm(null));
   const [toolForm, setToolForm] = useState<ToolFormState>(DEFAULT_TOOL_FORM);
+  const [mcpServerForm, setMcpServerForm] = useState<McpServerFormState>(DEFAULT_MCP_SERVER_FORM);
   const [agentValidationResults, setAgentValidationResults] = useState<Record<string, CatalogAgentValidation>>({});
   const [toolValidationResults, setToolValidationResults] = useState<Record<string, CatalogToolValidation>>({});
+  const [mcpValidationResults, setMcpValidationResults] = useState<Record<string, CatalogMcpServerValidation>>({});
   const [validatingAgentId, setValidatingAgentId] = useState("");
   const [validatingToolId, setValidatingToolId] = useState("");
+  const [validatingMcpServerId, setValidatingMcpServerId] = useState("");
   const [deletingAgentId, setDeletingAgentId] = useState("");
   const [savingAgent, setSavingAgent] = useState(false);
   const [savingTool, setSavingTool] = useState(false);
+  const [savingMcpServer, setSavingMcpServer] = useState(false);
   const [agentPromptPreview, setAgentPromptPreview] = useState("");
   const [agentPromptPreviewLoading, setAgentPromptPreviewLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -190,16 +296,18 @@ export function useCatalogControl(token: string) {
     setErrorMessage("");
 
     try {
-      const [defaultsPayload, agentsPayload, toolsPayload, modelsPayload] = await Promise.all([
+      const [defaultsPayload, agentsPayload, toolsPayload, mcpServersPayload, modelsPayload] = await Promise.all([
         getCatalogDefaults(token),
         listCatalogAgents(token),
         listCatalogTools(token),
+        listCatalogMcpServers(token),
         listEnabledModels(token),
       ]);
       const previousDefaults = catalogDefaultsRef.current;
       catalogDefaultsRef.current = defaultsPayload;
       setAgents(agentsPayload);
       setTools(toolsPayload);
+      setMcpServers(mcpServersPayload);
       setModels(modelsPayload);
       setAgentForm((current) => {
         if (current.mode !== "create") {
@@ -248,6 +356,8 @@ export function useCatalogControl(token: string) {
         },
         default_model_ref: agentForm.default_model_ref,
         tool_refs: agentForm.tool_refs,
+        mcp_server_refs: agentForm.mcp_server_refs,
+        agent_domain: agentForm.agent_domain,
         runtime_constraints: agentForm.runtime_constraints,
       };
       void previewCatalogAgentPrompt(payload, token)
@@ -305,6 +415,22 @@ export function useCatalogControl(token: string) {
     }
   }
 
+  async function handleMcpValidate(mcpServerId: string): Promise<void> {
+    if (!token) {
+      return;
+    }
+    setValidatingMcpServerId(mcpServerId);
+    try {
+      const result = await validateCatalogMcpServer(mcpServerId, token);
+      setMcpValidationResults((current) => ({ ...current, [mcpServerId]: result }));
+      showSuccessFeedback(t("catalogControl.feedback.mcpValidated", { name: result.mcp_server.spec.name }));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.feedback.validationFailed"));
+    } finally {
+      setValidatingMcpServerId("");
+    }
+  }
+
   async function handleAgentSubmit(): Promise<CatalogAgent | null> {
     if (!token) {
       return null;
@@ -323,6 +449,8 @@ export function useCatalogControl(token: string) {
         },
         default_model_ref: agentForm.default_model_ref?.trim() ? agentForm.default_model_ref.trim() : null,
         tool_refs: agentForm.tool_refs,
+        mcp_server_refs: agentForm.mcp_server_refs,
+        agent_domain: agentForm.agent_domain,
         runtime_constraints: agentForm.runtime_constraints,
       };
       const saved =
@@ -381,6 +509,14 @@ export function useCatalogControl(token: string) {
         toolForm.safetyPolicyText,
         t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.tool.safetyPolicy") }),
       );
+      const executionConfig = parseJsonObject(
+        toolForm.executionConfigText,
+        t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.tool.executionConfig") }),
+      );
+      const permissions = parseJsonObject(
+        toolForm.permissionsText,
+        t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.tool.permissions") }),
+      );
 
       const payload: CatalogToolMutationInput = {
         id: toolForm.id || undefined,
@@ -388,13 +524,13 @@ export function useCatalogControl(token: string) {
         publish: toolForm.publish,
         name: toolForm.name,
         description: toolForm.description,
-        transport: toolForm.transport,
-        connection_profile_ref: "default",
-        tool_name: toolForm.tool_name,
         input_schema: inputSchema,
         output_schema: outputSchema,
         safety_policy: safetyPolicy,
         offline_compatible: toolForm.offline_compatible,
+        execution_backend: toolForm.execution_backend,
+        execution_config: executionConfig,
+        permissions,
       };
       const saved =
         toolForm.mode === "create"
@@ -416,44 +552,137 @@ export function useCatalogControl(token: string) {
     }
   }
 
+  async function handleMcpSubmit(): Promise<CatalogMcpServer | null> {
+    if (!token) {
+      return null;
+    }
+    setSavingMcpServer(true);
+    try {
+      const inputSchema = parseJsonObject(
+        mcpServerForm.inputSchemaText,
+        t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.mcp.inputSchema") }),
+      );
+      const outputSchema = parseJsonObject(
+        mcpServerForm.outputSchemaText,
+        t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.mcp.outputSchema") }),
+      );
+      const payload: CatalogMcpServerMutationInput = {
+        id: mcpServerForm.id || undefined,
+        visibility: mcpServerForm.visibility,
+        publish: mcpServerForm.publish,
+        name: mcpServerForm.name,
+        slug: mcpServerForm.slug,
+        description: mcpServerForm.description,
+        backing_tool_id: mcpServerForm.backing_tool_id,
+        exposed_tool_name: mcpServerForm.exposed_tool_name,
+        input_schema: inputSchema,
+        output_schema: outputSchema,
+        authorization_policy: {
+          agent_ids: textToList(mcpServerForm.agentIdsText),
+          agent_domains: textToList(mcpServerForm.agentDomainsText),
+          agent_roles: textToList(mcpServerForm.agentRolesText),
+          user_roles: textToList(mcpServerForm.userRolesText),
+          user_ids: textToList(mcpServerForm.userIdsText),
+          user_group_ids: textToList(mcpServerForm.userGroupIdsText),
+        },
+        enabled: mcpServerForm.enabled,
+      };
+      const saved =
+        mcpServerForm.mode === "create"
+          ? await createCatalogMcpServer(payload, token)
+          : await updateCatalogMcpServer(mcpServerForm.mcpServerId, payload, token);
+      setMcpServerForm(buildMcpServerForm(saved));
+      await loadCatalogState();
+      showSuccessFeedback(
+        t(mcpServerForm.mode === "create" ? "catalogControl.feedback.mcpCreated" : "catalogControl.feedback.mcpUpdated", {
+          name: saved.spec.name,
+        }),
+      );
+      return saved;
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.feedback.saveFailed"));
+      return null;
+    } finally {
+      setSavingMcpServer(false);
+    }
+  }
+
+  async function handleMcpDelete(server: CatalogMcpServer): Promise<void> {
+    if (!token) {
+      return;
+    }
+    try {
+      await deleteCatalogMcpServer(server.id, token);
+      await loadCatalogState();
+      showSuccessFeedback(t("catalogControl.feedback.mcpDeleted", { name: server.spec.name }));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.feedback.deleteFailed"));
+    }
+  }
+
+  async function handleMcpToggle(server: CatalogMcpServer): Promise<void> {
+    if (!token) {
+      return;
+    }
+    try {
+      const saved = await setCatalogMcpServerEnabled(server.id, !server.spec.enabled, token);
+      setMcpServers((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.feedback.saveFailed"));
+    }
+  }
+
   return {
     state,
     errorMessage,
     agents,
     tools,
+    mcpServers,
     models,
     agentForm,
     setAgentForm,
     toolForm,
     setToolForm,
+    mcpServerForm,
+    setMcpServerForm,
     toolTestForm: toolTesting.toolTestForm,
     setToolTestForm: toolTesting.setToolTestForm,
     agentValidationResults,
     toolValidationResults,
+    mcpValidationResults,
     toolTestResult: toolTesting.toolTestResult,
     toolTestError: toolTesting.toolTestError,
     validatingAgentId,
     validatingToolId,
+    validatingMcpServerId,
     deletingAgentId,
     agentPromptPreview,
     agentPromptPreviewLoading,
     testingToolId: toolTesting.testingToolId,
     savingAgent,
     savingTool,
+    savingMcpServer,
     loadCatalogState,
     handleAgentValidate,
     handleAgentDelete,
     handleToolValidate,
+    handleMcpValidate,
     handleAgentSubmit,
     handleToolSubmit,
+    handleMcpSubmit,
+    handleMcpDelete,
+    handleMcpToggle,
     handleToolTest: toolTesting.handleToolTest,
     openAgentEditor: (agent: CatalogAgent) => setAgentForm(buildAgentForm(agent)),
     openToolEditor: (tool: CatalogTool) => setToolForm(buildToolForm(tool)),
+    openMcpEditor: (server: CatalogMcpServer) => setMcpServerForm(buildMcpServerForm(server)),
     openToolTester: toolTesting.openToolTester,
     resetAgentForm: () => setAgentForm(buildDefaultAgentForm(catalogDefaultsRef.current)),
     resetToolForm: () => setToolForm(DEFAULT_TOOL_FORM),
+    resetMcpServerForm: () => setMcpServerForm(DEFAULT_MCP_SERVER_FORM),
     resetToolTester: toolTesting.resetToolTester,
     publishedAgents: agents.filter((agent) => agent.published).length,
     publishedTools: tools.filter((tool) => tool.published).length,
+    enabledMcpServers: mcpServers.filter((server) => server.spec.enabled).length,
   };
 }

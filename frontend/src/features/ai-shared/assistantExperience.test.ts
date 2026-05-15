@@ -16,6 +16,8 @@ describe("assistant experience contract", () => {
       playground_kind: "chat",
       default_model_ref: "safe-small",
       tool_refs: ["tool.web_search", "tool.files"],
+      mcp_server_refs: [],
+      agent_domain: "default",
       runtime_constraints: {
         internet_required: false,
         sandbox_required: false,

@@ -19,6 +19,8 @@ def list_agent_projects(database_url: str, *, owner_user_id: int | None = None) 
             p.runtime_prompts,
             p.default_model_ref,
             p.tool_refs,
+            p.mcp_server_refs,
+            p.agent_domain,
             p.workflow_definition,
             p.tool_policy,
             p.runtime_constraints,
@@ -52,6 +54,8 @@ def get_agent_project(database_url: str, *, project_id: str) -> dict[str, Any] |
                 p.runtime_prompts,
                 p.default_model_ref,
                 p.tool_refs,
+                p.mcp_server_refs,
+                p.agent_domain,
                 p.workflow_definition,
                 p.tool_policy,
                 p.runtime_constraints,
@@ -90,6 +94,8 @@ def create_agent_project(
                     runtime_prompts,
                     default_model_ref,
                     tool_refs,
+                    mcp_server_refs,
+                    agent_domain,
                     workflow_definition,
                     tool_policy,
                     runtime_constraints,
@@ -99,7 +105,7 @@ def create_agent_project(
                     created_at,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s, NULL, 1, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, NULL, 1, %s, %s)
                 """,
                 (
                     project_id,
@@ -110,6 +116,8 @@ def create_agent_project(
                     psycopg.types.json.Jsonb(spec["runtime_prompts"]),
                     spec["default_model_ref"],
                     psycopg.types.json.Jsonb(spec["tool_refs"]),
+                    psycopg.types.json.Jsonb(spec["mcp_server_refs"]),
+                    spec["agent_domain"],
                     psycopg.types.json.Jsonb(spec["workflow_definition"]),
                     psycopg.types.json.Jsonb(spec["tool_policy"]),
                     psycopg.types.json.Jsonb(spec["runtime_constraints"]),
@@ -167,6 +175,8 @@ def update_agent_project(
                     runtime_prompts = %s::jsonb,
                     default_model_ref = %s,
                     tool_refs = %s::jsonb,
+                    mcp_server_refs = %s::jsonb,
+                    agent_domain = %s,
                     workflow_definition = %s::jsonb,
                     tool_policy = %s::jsonb,
                     runtime_constraints = %s::jsonb,
@@ -182,6 +192,8 @@ def update_agent_project(
                     psycopg.types.json.Jsonb(spec["runtime_prompts"]),
                     spec["default_model_ref"],
                     psycopg.types.json.Jsonb(spec["tool_refs"]),
+                    psycopg.types.json.Jsonb(spec["mcp_server_refs"]),
+                    spec["agent_domain"],
                     psycopg.types.json.Jsonb(spec["workflow_definition"]),
                     psycopg.types.json.Jsonb(spec["tool_policy"]),
                     psycopg.types.json.Jsonb(spec["runtime_constraints"]),

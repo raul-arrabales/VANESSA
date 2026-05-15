@@ -43,8 +43,13 @@ export default function CatalogToolsDirectory({
                 <code className="code-inline">{tool.id}</code>
               </p>
               <p className="status-text">
-                {t("catalogControl.tools.transportLabel", {
-                  transport: t(`catalogControl.transport.${tool.spec.transport === "mcp" ? "mcp" : "sandbox"}`),
+                {t("catalogControl.tools.backendLabel", {
+                  backend: t(`catalogControl.executionBackend.${tool.spec.execution_backend === "sandbox_python" ? "sandboxPython" : tool.spec.execution_backend === "mcp_gateway_web_search" ? "webSearch" : "internalHttp"}`),
+                })}
+              </p>
+              <p className="status-text">
+                {t("catalogControl.tools.validationLabel", {
+                  status: tool.validation_status?.last_validation_status ?? "unknown",
                 })}
               </p>
               <div className="status-row">

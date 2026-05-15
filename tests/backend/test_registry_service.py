@@ -52,7 +52,7 @@ def test_agent_spec_rejects_empty_runtime_prompt():
     assert str(exc_info.value) == "invalid_agent_field:runtime_prompts.retrieval_context is required"
 
 
-def test_tool_spec_accepts_mcp_transport(monkeypatch: pytest.MonkeyPatch):
+def test_tool_spec_accepts_web_search_execution_backend(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         registry_service,
         "create_registry_entity",
@@ -73,13 +73,13 @@ def test_tool_spec_accepts_mcp_transport(monkeypatch: pytest.MonkeyPatch):
         spec={
             "name": "Web Search",
             "description": "Search the web",
-            "transport": "mcp",
-            "connection_profile_ref": "default",
-            "tool_name": "web_search",
             "input_schema": {},
             "output_schema": {},
             "safety_policy": {},
             "offline_compatible": False,
+            "execution_backend": "mcp_gateway_web_search",
+            "execution_config": {},
+            "permissions": {},
         },
         version="v1",
         publish=True,
@@ -88,7 +88,7 @@ def test_tool_spec_accepts_mcp_transport(monkeypatch: pytest.MonkeyPatch):
     assert created["entity"]["entity_type"] == "tool"
 
 
-def test_tool_spec_accepts_sandbox_transport(monkeypatch: pytest.MonkeyPatch):
+def test_tool_spec_accepts_sandbox_execution_backend(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         registry_service,
         "create_registry_entity",
@@ -109,13 +109,13 @@ def test_tool_spec_accepts_sandbox_transport(monkeypatch: pytest.MonkeyPatch):
         spec={
             "name": "Python Execution",
             "description": "Run Python",
-            "transport": "sandbox_http",
-            "connection_profile_ref": "default",
-            "tool_name": "python_exec",
             "input_schema": {},
             "output_schema": {},
             "safety_policy": {},
             "offline_compatible": True,
+            "execution_backend": "sandbox_python",
+            "execution_config": {},
+            "permissions": {},
         },
         version="v1",
         publish=True,
@@ -124,7 +124,7 @@ def test_tool_spec_accepts_sandbox_transport(monkeypatch: pytest.MonkeyPatch):
     assert created["version"]["version"] == "v1"
 
 
-def test_tool_spec_rejects_non_default_connection_profile():
+def test_tool_spec_rejects_missing_execution_backend():
     with pytest.raises(ValueError) as exc_info:
         registry_service.create_entity_with_version(
             "ignored",
@@ -135,9 +135,6 @@ def test_tool_spec_rejects_non_default_connection_profile():
             spec={
                 "name": "Invalid Tool",
                 "description": "Invalid",
-                "transport": "mcp",
-                "connection_profile_ref": "custom",
-                "tool_name": "invalid_tool",
                 "input_schema": {},
                 "output_schema": {},
                 "safety_policy": {},
@@ -147,4 +144,4 @@ def test_tool_spec_rejects_non_default_connection_profile():
             publish=False,
         )
 
-    assert str(exc_info.value) == "invalid_connection_profile_ref"
+    assert str(exc_info.value) == "missing_tool_field:execution_backend"

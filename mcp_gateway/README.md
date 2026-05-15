@@ -1,19 +1,22 @@
 # MCP Gateway
 
-HTTP gateway for MCP-backed agent tools.
+HTTP gateway for gateway-hosted MCP server exposures.
 
-Current v1 tools:
-- `web_search` backed by local SearXNG
+Current v1 exposure:
+- `mcp.web_search` backed by the internal `tool.web_search` catalog tool and local SearXNG
 
-The gateway exposes a normalized tool-invocation surface for `agent_engine` and the platform control plane. It intentionally hides MCP session and transport details behind a provider boundary.
+The gateway exposes a normalized discovery and invocation surface for `agent_engine` and delegates registry lookup, authorization, schema validation, execution dispatch, and audit logging to backend. It intentionally keeps MCP exposure mechanics behind a provider boundary while internal tools remain backend-owned catalog capabilities.
 
 Current API:
 
 - `GET /health`
 - `GET /v1/tools`
 - `POST /v1/tools/invoke`
+- `POST /v1/internal/tools/web-search` (gateway-private runner used by backend)
 
-Backend seeds this service as the default local `mcp_gateway_local` provider for the `mcp_runtime` capability. Agent engine then uses it for LLM-driven MCP tool execution, starting with the built-in `tool.web_search` flow.
+Backend seeds this service as the default local `mcp_gateway_local` provider for the `mcp_runtime` capability. Agent engine then uses it for LLM-driven MCP tool execution against authorized MCP server refs.
+
+Gateway-to-backend internal calls require `MCP_GATEWAY_SERVICE_TOKEN`.
 
 In local staging, `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080`. The service listens on container port `8080`, and Docker publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.
 

@@ -1,8 +1,7 @@
 import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { createAgentProject, listAgentProjects, type AgentProject } from "../../../api/agentProjects";
-import { getCatalogDefaults } from "../../../api/catalog";
+import { createAgentProject, getAgentProjectDefaults, listAgentProjects, type AgentProject } from "../../../api/agentProjects";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
 import { buildDefaultAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../types";
@@ -41,7 +40,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
       setErrorMessage("");
       try {
         const [defaultsPayload, projectsPayload] = await Promise.all([
-          getCatalogDefaults(token),
+          getAgentProjectDefaults(token),
           listAgentProjects(token),
         ]);
         setProjects(projectsPayload);

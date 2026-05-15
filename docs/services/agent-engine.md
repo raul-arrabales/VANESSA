@@ -24,9 +24,9 @@ Backend resolves the active platform bindings and passes them to agent engine as
 
 Canonical retrieval semantics, normalized result fields, and backend/engine ownership boundaries are documented in [Retrieval Contract](retrieval_contract.md).
 
-Tool/runtime convergence now adds two optional runtime capabilities to that same snapshot:
+Tool execution now adds two optional runtime capabilities to that same snapshot:
 
-- `mcp_runtime` for MCP-backed remote/general-purpose tools
+- `mcp_runtime` for gateway-hosted MCP server exposures
 - `sandbox_execution` for native Python execution tools
 
 Execution flow summary:
@@ -43,17 +43,17 @@ The code is now split into explicit seams:
 
 - `agent_engine/app/execution_pipeline` for DTOs and stage orchestration
 - `agent_engine/app/retrieval` for retrieval normalization and execution
-- `agent_engine/app/tool_runtime` for transport-specific tool dispatch
+- `agent_engine/app/tool_runtime` for MCP exposure dispatch and identity propagation
 - `agent_engine/app/policies` for policy and agent-resolution stages
 
 The canonical HTTP entrypoint now resolves directly through `execution_pipeline.runner`; `services/execution_service.py` is kept only as a lightweight compatibility shim while older imports are phased out.
 
 These seams are intended to support future Vanessa-specific planner, memory/retrieval, response policy, and tool strategy modules without branching the generic execution flow.
 
-Current canonical built-in tools:
+Current canonical built-in tool surfaces:
 
-- `tool.web_search` via `transport: mcp`; the gateway resolves it through local SearXNG, so it requires online runtime
-- `tool.python_exec` via `transport: sandbox_http`
+- `mcp.web_search` backed by `tool.web_search`; the gateway resolves it through local SearXNG, so it requires online runtime
+- `tool.python_exec` remains an internal `sandbox_python` tool and can be exposed through an MCP server definition when needed
 
 Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and canonical `retrieval_calls`.
 

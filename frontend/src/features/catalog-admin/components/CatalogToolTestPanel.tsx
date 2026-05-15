@@ -49,8 +49,8 @@ export default function CatalogToolTestPanel({
       </div>
 
       <div className="card-stack">
-        <span className="field-label">{t("catalogControl.tools.transportLabel", {
-          transport: t(`catalogControl.transport.${tool.spec.transport === "mcp" ? "mcp" : "sandbox"}`),
+        <span className="field-label">{t("catalogControl.tools.backendLabel", {
+          backend: t(`catalogControl.executionBackend.${tool.spec.execution_backend === "sandbox_python" ? "sandboxPython" : tool.spec.execution_backend === "mcp_gateway_web_search" ? "webSearch" : "internalHttp"}`),
         })}</span>
         <code className="code-inline">{tool.id}</code>
       </div>

@@ -31,7 +31,7 @@ from ..tool_runtime.dispatch import (
     build_tool_definition,
     invoke_tool_call,
     resolve_tool_runtime_binding,
-    runtime_capability_for_transport,
+    runtime_capability_for_mcp_server,
     tool_message_content,
 )
 from .model_streaming import DeltaEmitter, model_status_details, stream_model_completion
@@ -174,6 +174,7 @@ def _execute_model_call(
             },
         )
     agent_spec = _agent_current_spec(agent_entity)
+    agent_domain = str(agent_spec.get("agent_domain") or "default").strip() or "default"
     effective_messages = _prepend_agent_instructions(messages, agent_spec=agent_spec)
     effective_messages = prepend_retrieval_context(
         effective_messages,
@@ -189,10 +190,10 @@ def _execute_model_call(
     tool_definitions: list[dict[str, Any]] = []
     for tool_entity in agent_tools:
         tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
-        tool_name = str(tool_spec.get("tool_name", "")).strip()
+        tool_name = str(tool_spec.get("exposed_tool_name") or tool_spec.get("tool_name") or "").strip()
         if not tool_name:
             continue
-        runtime_capability = runtime_capability_for_transport(str(tool_spec.get("transport", "")))
+        runtime_capability = "sandbox_execution" if str(tool_spec.get("transport", "")).strip().lower() == "sandbox_http" else runtime_capability_for_mcp_server()
         resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
         tool_lookup[tool_name] = tool_entity
         tool_definitions.append(build_tool_definition(tool_entity))
@@ -304,6 +305,10 @@ def _execute_model_call(
                     tool_entity=tool_entity,
                     tool_call=tool_call,
                     platform_runtime=runtime_snapshot,
+                    agent_id=context.agent_id,
+                    agent_domain=agent_domain,
+                    delegated_user_id=context.requested_by_user_id,
+                    delegated_user_role=context.requested_by_role,
                 )
             except Exception:
                 progress.fail(

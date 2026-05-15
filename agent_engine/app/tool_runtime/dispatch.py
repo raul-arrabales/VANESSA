@@ -11,25 +11,17 @@ from ..services.runtime_client import (
 )
 
 
-def runtime_capability_for_transport(transport: str) -> str:
-    normalized = transport.strip().lower()
-    if normalized == "mcp":
-        return "mcp_runtime"
-    if normalized == "sandbox_http":
-        return "sandbox_execution"
-    raise ExecutionBlockedError(
-        code="EXEC_TOOL_NOT_ALLOWED",
-        message=f"Unsupported tool transport '{transport}'",
-        status_code=403,
-    )
+def runtime_capability_for_mcp_server() -> str:
+    return "mcp_runtime"
 
 
-def build_tool_definition(tool_entity: dict[str, Any]) -> dict[str, Any]:
-    tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
+def build_tool_definition(mcp_server_entity: dict[str, Any]) -> dict[str, Any]:
+    tool_spec = mcp_server_entity.get("current_spec") if isinstance(mcp_server_entity.get("current_spec"), dict) else {}
+    tool_name = str(tool_spec.get("exposed_tool_name") or tool_spec.get("tool_name") or "").strip()
     return {
         "type": "function",
         "function": {
-            "name": str(tool_spec.get("tool_name", "")).strip(),
+            "name": tool_name,
             "description": str(tool_spec.get("description", "")).strip(),
             "parameters": dict(tool_spec.get("input_schema") or {}),
         },
@@ -80,12 +72,17 @@ def invoke_tool_call(
     tool_entity: dict[str, Any],
     tool_call: dict[str, Any],
     platform_runtime: dict[str, Any],
+    agent_id: str,
+    agent_domain: str,
+    delegated_user_id: int,
+    delegated_user_role: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
-    transport = str(tool_spec.get("transport", "")).strip().lower()
-    runtime_capability = runtime_capability_for_transport(transport)
+    runtime_capability = "sandbox_execution" if str(tool_spec.get("transport", "")).strip().lower() == "sandbox_http" else runtime_capability_for_mcp_server()
     binding = resolve_tool_runtime_binding(platform_runtime=platform_runtime, capability_key=runtime_capability)
     deployment_profile = platform_runtime.get("deployment_profile") if isinstance(platform_runtime.get("deployment_profile"), dict) else {}
+    tool_name = str(tool_spec.get("exposed_tool_name") or tool_spec.get("tool_name") or "").strip()
+    server_slug = str(tool_spec.get("slug") or tool_spec.get("tool_name") or tool_name).strip()
     arguments_text = str(((tool_call.get("function") or {}).get("arguments", "")))
     try:
         arguments = loads(arguments_text) if arguments_text.strip() else {}
@@ -98,8 +95,8 @@ def invoke_tool_call(
         return (
             {
                 "tool_ref": tool_entity.get("entity_id"),
-                "tool_name": tool_spec.get("tool_name"),
-                "transport": transport,
+                "tool_name": tool_name,
+                "mcp_server_slug": server_slug,
                 "runtime_capability": runtime_capability,
                 "provider_slug": binding.get("slug"),
                 "provider_key": binding.get("provider_key"),
@@ -118,8 +115,8 @@ def invoke_tool_call(
         return (
             {
                 "tool_ref": tool_entity.get("entity_id"),
-                "tool_name": tool_spec.get("tool_name"),
-                "transport": transport,
+                "tool_name": tool_name,
+                "mcp_server_slug": server_slug,
                 "runtime_capability": runtime_capability,
                 "provider_slug": binding.get("slug"),
                 "provider_key": binding.get("provider_key"),
@@ -132,14 +129,7 @@ def invoke_tool_call(
         )
 
     try:
-        if transport == "mcp":
-            runtime_client = build_mcp_tool_runtime_client(platform_runtime)
-            runtime_payload = runtime_client.invoke(
-                tool_name=str(tool_spec.get("tool_name", "")).strip(),
-                arguments=arguments,
-                request_metadata={"tool_ref": tool_entity.get("entity_id")},
-            )
-        elif transport == "sandbox_http":
+        if str(tool_spec.get("transport", "")).strip().lower() == "sandbox_http":
             runtime_client = build_sandbox_tool_runtime_client(platform_runtime)
             safety_policy = dict(tool_spec.get("safety_policy") or {})
             timeout_seconds = int(arguments.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
@@ -150,10 +140,19 @@ def invoke_tool_call(
                 policy=safety_policy,
             )
         else:
-            raise ToolRuntimeClientError(
-                code="unsupported_adapter_kind",
-                message="Unsupported tool runtime adapter",
-                status_code=500,
+            runtime_client = build_mcp_tool_runtime_client(platform_runtime)
+            runtime_payload = runtime_client.invoke(
+                tool_name=tool_name,
+                arguments=arguments,
+                request_metadata={
+                    "tool_ref": tool_entity.get("entity_id"),
+                    "mcp_server_slug": server_slug,
+                    "backing_tool_id": tool_spec.get("backing_tool_id"),
+                    "agent_id": agent_id,
+                    "agent_domain": agent_domain,
+                    "delegated_user_id": delegated_user_id,
+                    "delegated_user_role": delegated_user_role,
+                },
             )
     except ToolRuntimeClientError as exc:
         raise _map_tool_runtime_error(exc) from exc
@@ -163,8 +162,8 @@ def invoke_tool_call(
     error_payload = runtime_payload.get("error")
     call_record = {
         "tool_ref": tool_entity.get("entity_id"),
-        "tool_name": tool_spec.get("tool_name"),
-        "transport": transport,
+        "tool_name": tool_name,
+        "mcp_server_slug": server_slug,
         "runtime_capability": runtime_capability,
         "provider_slug": binding.get("slug"),
         "provider_key": binding.get("provider_key"),
@@ -172,6 +171,8 @@ def invoke_tool_call(
         "status_code": status_code,
         "arguments": arguments,
     }
+    if str(tool_spec.get("transport", "")).strip():
+        call_record["transport"] = str(tool_spec.get("transport", "")).strip()
     if error_payload is not None:
         call_record["error"] = error_payload
         return call_record, error_payload

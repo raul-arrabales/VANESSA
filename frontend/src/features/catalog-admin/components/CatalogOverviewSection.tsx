@@ -11,6 +11,8 @@ type CatalogOverviewSectionProps = {
   publishedAgents: number;
   toolCount: number;
   publishedTools: number;
+  mcpServerCount: number;
+  enabledMcpServers: number;
   modelCount: number;
 };
 
@@ -20,6 +22,8 @@ export default function CatalogOverviewSection({
   publishedAgents,
   toolCount,
   publishedTools,
+  mcpServerCount,
+  enabledMcpServers,
   modelCount,
 }: CatalogOverviewSectionProps): JSX.Element {
   const { t } = useTranslation("common");
@@ -29,6 +33,13 @@ export default function CatalogOverviewSection({
       title: t("catalogControl.home.toolsTitle"),
       description: t("catalogControl.home.toolsDescription"),
       to: buildCatalogControlUrl("tools", "tools"),
+      icon: "settings",
+    },
+    {
+      id: "mcp",
+      title: t("catalogControl.home.mcpTitle"),
+      description: t("catalogControl.home.mcpDescription"),
+      to: buildCatalogControlUrl("mcp", "registry"),
       icon: "settings",
     },
     {
@@ -58,6 +69,11 @@ export default function CatalogOverviewSection({
             <span className="field-label">{t("catalogControl.summary.models")}</span>
             <strong>{modelCount}</strong>
             <span className="status-text">{t(`catalogControl.state.${state}`)}</span>
+          </div>
+          <div className="summary-card">
+            <span className="field-label">{t("catalogControl.summary.mcpServers")}</span>
+            <strong>{mcpServerCount}</strong>
+            <span className="status-text">{t("catalogControl.summary.enabledCount", { count: enabledMcpServers })}</span>
           </div>
         </div>
       </article>

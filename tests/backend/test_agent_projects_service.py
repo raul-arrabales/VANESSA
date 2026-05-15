@@ -133,6 +133,8 @@ def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypat
         "playground_kind": "chat",
         "default_model_ref": "safe-small",
         "tool_refs": ["tool.web_search"],
+        "mcp_server_refs": [],
+        "agent_domain": "default",
         "runtime_constraints": {"internet_required": False, "sandbox_required": False},
         "workflow_definition": {"entrypoint": "assistant"},
     }

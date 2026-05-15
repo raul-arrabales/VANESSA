@@ -1,6 +1,7 @@
-export type CatalogControlSection = "overview" | "tools" | "agents";
+export type CatalogControlSection = "overview" | "tools" | "agents" | "mcp";
 export type CatalogToolsView = "tools" | "create" | "test";
 export type CatalogAgentsView = "agents" | "user-agents" | "create";
+export type CatalogMcpView = "registry" | "create" | "edit";
 
 export const CATALOG_CONTROL_NAV_ITEMS: ReadonlyArray<{
   id: CatalogControlSection;
@@ -9,13 +10,25 @@ export const CATALOG_CONTROL_NAV_ITEMS: ReadonlyArray<{
   { id: "overview", labelKey: "catalogControl.navigation.overview" },
   { id: "tools", labelKey: "catalogControl.navigation.tools" },
   { id: "agents", labelKey: "catalogControl.navigation.agents" },
+  { id: "mcp", labelKey: "catalogControl.navigation.mcp" },
 ];
 
 export function resolveCatalogControlSection(value: string | null): CatalogControlSection {
-  if (value === "tools" || value === "agents" || value === "overview") {
+  if (value === "tools" || value === "agents" || value === "overview" || value === "mcp") {
     return value;
   }
   return "overview";
+}
+
+export function resolveCatalogMcpView(value: string | null): CatalogMcpView {
+  if (value === "create" || value === "edit" || value === "registry") {
+    return value;
+  }
+  return "registry";
+}
+
+export function resolveCatalogMcpServerId(value: string | null): string {
+  return String(value ?? "").trim();
 }
 
 export function resolveCatalogToolsView(value: string | null): CatalogToolsView {
@@ -38,8 +51,8 @@ export function resolveCatalogAgentsView(value: string | null): CatalogAgentsVie
 
 export function buildCatalogControlUrl(
   section: CatalogControlSection,
-  view?: CatalogToolsView | CatalogAgentsView,
-  options: { toolId?: string } = {},
+  view?: CatalogToolsView | CatalogAgentsView | CatalogMcpView,
+  options: { toolId?: string; mcpServerId?: string } = {},
 ): string {
   if (section === "overview") {
     return "/control/catalog";
@@ -52,6 +65,9 @@ export function buildCatalogControlUrl(
   }
   if (section === "tools" && view === "test" && options.toolId) {
     params.set("toolId", options.toolId);
+  }
+  if (section === "mcp" && view === "edit" && options.mcpServerId) {
+    params.set("id", options.mcpServerId);
   }
   return `/control/catalog?${params.toString()}`;
 }

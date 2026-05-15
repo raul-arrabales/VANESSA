@@ -11,7 +11,7 @@ from ..repositories.registry import (
 )
 from .agent_prompt_defaults import coerce_agent_runtime_prompts
 
-_ENTITY_TYPES = {"model", "agent", "tool"}
+_ENTITY_TYPES = {"model", "agent", "tool", "mcp_server"}
 
 
 def _normalize_entity_type(entity_type: str) -> str:
@@ -51,22 +51,32 @@ def _validate_spec(entity_type: str, spec: dict[str, Any]) -> None:
         required = [
             "name",
             "description",
-            "transport",
-            "connection_profile_ref",
-            "tool_name",
             "input_schema",
             "output_schema",
             "safety_policy",
             "offline_compatible",
+            "execution_backend",
+            "execution_config",
+            "permissions",
         ]
         for key in required:
             if key not in spec:
                 raise ValueError(f"missing_tool_field:{key}")
-        transport = str(spec.get("transport", "")).strip().lower()
-        if transport not in {"mcp", "sandbox_http"}:
-            raise ValueError("invalid_transport")
-        if str(spec.get("connection_profile_ref", "")).strip().lower() != "default":
-            raise ValueError("invalid_connection_profile_ref")
+    elif entity_type == "mcp_server":
+        required = [
+            "name",
+            "slug",
+            "description",
+            "backing_tool_id",
+            "exposed_tool_name",
+            "input_schema",
+            "output_schema",
+            "authorization_policy",
+            "enabled",
+        ]
+        for key in required:
+            if key not in spec:
+                raise ValueError(f"missing_mcp_server_field:{key}")
 
 
 def create_entity_with_version(

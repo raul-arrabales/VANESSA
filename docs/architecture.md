@@ -34,7 +34,7 @@ Legend:
 6. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
 7. Agent Engine: multi-step agent logic and tool workflows.
 8. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
-9. MCP Gateway: normalized HTTP provider for MCP-backed tools such as web search.
+9. MCP Gateway: normalized HTTP provider that exposes authorized MCP server wrappers backed by catalog tools.
 10. SearXNG: local token-free metasearch backend used only by MCP Gateway for web search.
 11. KWS: offline wake-word detection and wake-event emission.
 12. Weaviate: persistent semantic index for RAG context retrieval.
@@ -95,26 +95,23 @@ Current provider proof state:
 - Online runtime cloud/external calls publish sanitized cloud-traffic events through backend. The app shell uses the authenticated SSE stream to light upload/download indicators, and backend can persist the same metadata to a local JSONL log without recording prompts, payloads, headers, credentials, response bodies, or full URLs.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
 - `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.
-- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain modeled as optional platform capabilities, but local staging now seeds and binds both sandbox and MCP runtime by default and still enforces them per execution only when an agent references tools that need them.
+- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain modeled as optional platform capabilities, but local staging now seeds and binds both sandbox and MCP runtime by default and still enforces them per execution only when an agent references internal tools or MCP server exposures that need them.
 
-## Tool Runtime Convergence
+## Tools And MCP Exposures
 
-Agent tools now use a hybrid split:
+Agent tools now use a catalog-backed split:
 
-- Tool definitions remain registry entities, referenced by agents via `tool_refs`.
-- Tool transport runtimes are control-plane capabilities resolved from the active deployment profile.
+- Internal tools are backend-owned registry entities with explicit input/output schemas, validation state, permissions, safety policy, offline compatibility, and an `execution_backend`.
+- MCP is no longer a tool transport field. An MCP server is a separate registry entity backed by one published, validation-current internal tool.
+- Agents discover and invoke authorized MCP server exposures via `mcp_server_refs`, while direct internal tool references remain available for platform-owned execution paths that need them.
+- MCP server definitions carry their own exposed tool name, schemas, enabled state, and authorization policy for agent IDs, agent domains, user roles, user IDs, and user group IDs.
 
-Current v1 transports:
+Current canonical tools and exposures:
 
-- `mcp`: remote/general-purpose tools executed through the MCP gateway provider.
-- `sandbox_http`: native Python execution tools executed through the sandbox provider.
+- `tool.web_search` -> `execution_backend: mcp_gateway_web_search`; the default `mcp.web_search` exposure is served by MCP Gateway through local SearXNG and is token-free but internet-required.
+- `tool.python_exec` -> `execution_backend: sandbox_python`; it can be exposed through one or more MCP server definitions when a superadmin chooses to publish that surface.
 
-Current canonical tools:
-
-- `tool.web_search` -> `transport: mcp`, `tool_name: web_search`, served by MCP Gateway through local SearXNG; token-free but internet-required
-- `tool.python_exec` -> `transport: sandbox_http`, `tool_name: python_exec`
-
-Tool execution is LLM-driven. Agent engine passes tool definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the appropriate runtime provider, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.
+Tool execution is LLM-driven. Agent engine passes authorized MCP exposure definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the active MCP gateway provider with agent/user/domain identity metadata, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.
 
 ## Design Principles
 

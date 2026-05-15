@@ -154,9 +154,9 @@ Respect these runtime boundaries when generating code or configuration.
    - Must only be accessed through approved backend/agent_engine abstractions and policy checks.
 
 9. **MCP Gateway (`mcp_gateway`)**
-   - Normalized HTTP provider for MCP-backed tools.
-   - Used for provider validation and agent tool dispatch.
-   - Calls SearXNG for the built-in `web_search` tool; backend, frontend, and agent_engine must not call SearXNG directly.
+   - Normalized HTTP provider for gateway-hosted MCP server exposures.
+   - Delegates registry lookup, authorization, schema validation, execution dispatch, and audit logging to backend.
+   - Calls SearXNG for the gateway-private web-search runner; backend, frontend, and agent_engine must not call SearXNG directly.
 
 10. **SearXNG (`searxng`)**
     - Local token-free metasearch service for real web search.
@@ -200,8 +200,8 @@ Respect these runtime boundaries when generating code or configuration.
   - Sandbox runtime and execution policy logic.
 
 - `mcp_gateway/`
-  - MCP-backed tool runtime gateway.
-  - Owns the SearXNG-backed `web_search` adapter surface exposed through MCP runtime.
+  - Gateway-hosted MCP server exposure provider.
+  - Owns the SearXNG-backed private web-search runner exposed through catalog-managed MCP server definitions.
 
 - `kws/`
   - Wake-word service.
@@ -370,7 +370,7 @@ When making changes:
 - Use backend service/adaptor layers instead of scattering HTTP calls.
 - Use vector-store adapters instead of provider-specific calls everywhere.
 - Use data access layers/repositories instead of inline SQL in feature code.
-- Keep tool definitions in the registry and tool transports in platform capabilities/providers.
+- Keep internal tool definitions in the registry and model MCP as separate gateway-hosted exposure definitions backed by validated tools.
 - Bind concrete managed models and other provider resources at the deployment-binding layer through `resources` and `default_resource_id`, not by attaching a single model directly to a provider instance.
 
 4. Keep backend and docs aligned with current architecture.
@@ -443,7 +443,7 @@ Keep these current repo truths in mind:
 - Active runtime selection happens through deployment profiles.
 - Model-bearing bindings are multi-model and require an explicit default.
 - `agent_engine` executes against backend-provided `platform_runtime`.
-- Tool execution currently converges around registry tool specs plus runtime transports selected through platform capabilities.
+- Internal tools are backend-owned catalog capabilities; MCP server definitions are separate gateway-hosted exposures backed by validated tools.
 - Product-facing AI interaction is standardized on `/v1/playgrounds/*`, while end-user agent authoring now lives under `/v1/agent-projects/*`.
 
 ---
@@ -454,7 +454,7 @@ These are still evolving and should influence design toward extensibility:
 
 - richer authentication/authorization surfaces
 - broader role-aware agent behaviors
-- expanded tool catalog and runtime transports
+- expanded tool catalog, MCP exposure policy, and runtime providers
 - observability, logging, metrics, and tracing improvements
 - continued evolution of platform/provider switching and ModelOps governance
 

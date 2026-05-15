@@ -1,15 +1,13 @@
 from __future__ import annotations
 
+from ..repositories.catalog_runtime import upsert_mcp_server_status, upsert_tool_runtime_status
 from ..repositories.registry import create_registry_entity, create_registry_version, find_registry_entity, list_registry_versions
 from ..repositories.users import list_users
 
 _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
     "tool.web_search": {
         "name": "Web Search",
-        "description": "Searches the web through the MCP runtime gateway.",
-        "transport": "mcp",
-        "connection_profile_ref": "default",
-        "tool_name": "web_search",
+        "description": "Searches the web through the MCP gateway's SearXNG-backed runner.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -51,13 +49,16 @@ _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
             "network_access": True,
         },
         "offline_compatible": False,
+        "execution_backend": "mcp_gateway_web_search",
+        "execution_config": {
+            "internal_tool_name": "web_search",
+            "gateway_internal_path": "/v1/internal/tools/web-search",
+        },
+        "permissions": {},
     },
     "tool.python_exec": {
         "name": "Python Execution",
         "description": "Runs constrained Python code in the sandbox runtime.",
-        "transport": "sandbox_http",
-        "connection_profile_ref": "default",
-        "tool_name": "python_exec",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -85,6 +86,30 @@ _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
             "allow_imports": False,
         },
         "offline_compatible": True,
+        "execution_backend": "sandbox_python",
+        "execution_config": {},
+        "permissions": {},
+    },
+}
+
+_BUILTIN_MCP_SERVERS: dict[str, dict[str, object]] = {
+    "mcp.web_search": {
+        "name": "Web Search MCP",
+        "slug": "web_search",
+        "description": "Expose the internal web search tool through the MCP gateway.",
+        "backing_tool_id": "tool.web_search",
+        "exposed_tool_name": "web_search",
+        "input_schema": _BUILTIN_TOOLS["tool.web_search"]["input_schema"],
+        "output_schema": _BUILTIN_TOOLS["tool.web_search"]["output_schema"],
+        "authorization_policy": {
+            "agent_ids": ["*"],
+            "agent_domains": ["*"],
+            "agent_roles": ["*"],
+            "user_roles": ["*"],
+            "user_ids": ["*"],
+            "user_group_ids": ["*"],
+        },
+        "enabled": True,
     },
 }
 
@@ -149,7 +174,7 @@ def ensure_builtin_tools(database_url: str) -> bool:
             )
             continue
         current_spec = existing.get("current_spec") if isinstance(existing.get("current_spec"), dict) else {}
-        if entity_id == "tool.web_search" and current_spec != spec:
+        if current_spec != spec:
             create_registry_version(
                 database_url,
                 entity_id=entity_id,
@@ -162,4 +187,39 @@ def ensure_builtin_tools(database_url: str) -> bool:
                 set_current=True,
                 published=True,
             )
+        latest = find_registry_entity(database_url, entity_type="tool", entity_id=entity_id)
+        upsert_tool_runtime_status(
+            database_url,
+            tool_id=entity_id,
+            validated_version=str((latest or {}).get("current_version") or "v1"),
+            last_validation_status="success",
+            validation_errors=[],
+        )
+    for entity_id, spec in _BUILTIN_MCP_SERVERS.items():
+        existing = find_registry_entity(database_url, entity_type="mcp_server", entity_id=entity_id)
+        if existing is None:
+            create_registry_entity(
+                database_url,
+                entity_id=entity_id,
+                entity_type="mcp_server",
+                owner_user_id=owner_user_id,
+                visibility="private",
+                status="published",
+            )
+            create_registry_version(
+                database_url,
+                entity_id=entity_id,
+                version="v1",
+                spec_json=dict(spec),
+                set_current=True,
+                published=True,
+            )
+        latest = find_registry_entity(database_url, entity_type="mcp_server", entity_id=entity_id)
+        upsert_mcp_server_status(
+            database_url,
+            mcp_server_id=entity_id,
+            validated_version=str((latest or {}).get("current_version") or "v1"),
+            runtime_status="success",
+            validation_errors=[],
+        )
     return True

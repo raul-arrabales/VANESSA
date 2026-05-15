@@ -9,6 +9,8 @@ export type CatalogAgentSpec = {
   };
   default_model_ref: string | null;
   tool_refs: string[];
+  mcp_server_refs?: string[];
+  agent_domain?: string;
   runtime_constraints: {
     internet_required: boolean;
     sandbox_required: boolean;
@@ -26,18 +28,45 @@ export type CatalogDefaults = {
 export type CatalogToolSpec = {
   name: string;
   description: string;
-  transport: "mcp" | "sandbox_http";
-  connection_profile_ref: "default";
-  tool_name: string;
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   safety_policy: Record<string, unknown>;
   offline_compatible: boolean;
+  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http";
+  execution_config?: Record<string, unknown>;
+  permissions?: Record<string, unknown>;
+};
+
+export type CatalogValidationStatus = {
+  last_validation_status: string;
+  is_validation_current: boolean;
+  validated_version: string | null;
+  last_validated_at: string | null;
+  validation_errors: string[];
+};
+
+export type CatalogMcpServerSpec = {
+  name: string;
+  slug: string;
+  description: string;
+  backing_tool_id: string;
+  exposed_tool_name: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  authorization_policy: {
+    agent_ids: string[];
+    agent_domains: string[];
+    agent_roles: string[];
+    user_roles: string[];
+    user_ids: string[];
+    user_group_ids: string[];
+  };
+  enabled: boolean;
 };
 
 type CatalogEntityMeta = {
   id: string;
-  type: "agent" | "tool";
+  type: "agent" | "tool" | "mcp_server";
   owner_user_id: number | null;
   visibility: "private" | "unlisted" | "public";
 };
@@ -51,6 +80,8 @@ export type CatalogAgent = {
   status: string;
   published: boolean;
   published_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   spec: CatalogAgentSpec;
 };
 
@@ -61,7 +92,29 @@ export type CatalogTool = {
   status: string;
   published: boolean;
   published_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   spec: CatalogToolSpec;
+  validation_status?: CatalogValidationStatus;
+};
+
+export type CatalogMcpServer = {
+  id: string;
+  entity: CatalogEntityMeta;
+  current_version: string;
+  status: string;
+  published: boolean;
+  published_at: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  spec: CatalogMcpServerSpec;
+  runtime_status: {
+    runtime_status: string;
+    is_validation_current: boolean;
+    validated_version: string | null;
+    last_validated_at: string | null;
+    validation_errors: string[];
+  };
 };
 
 export type CatalogAgentMutationInput = {
@@ -76,6 +129,12 @@ export type CatalogToolMutationInput = {
   publish: boolean;
 } & CatalogToolSpec;
 
+export type CatalogMcpServerMutationInput = {
+  id?: string;
+  visibility?: "private" | "unlisted" | "public";
+  publish: boolean;
+} & CatalogMcpServerSpec;
+
 export type CatalogAgentValidation = {
   agent: CatalogAgent;
   validation: {
@@ -85,8 +144,15 @@ export type CatalogAgentValidation = {
     resolved_tools: Array<{
       id: string;
       name: string;
-      transport: string;
+      execution_backend?: string;
       offline_compatible: boolean;
+    }>;
+    resolved_mcp_servers?: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      backing_tool_id: string;
+      enabled: boolean;
     }>;
     derived_runtime_requirements: {
       internet_required: boolean;
@@ -109,6 +175,16 @@ export type CatalogAgentPromptPreview = {
 
 export type CatalogToolValidation = {
   tool: CatalogTool;
+  validation: {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    runtime_checks: Record<string, unknown>;
+  };
+};
+
+export type CatalogMcpServerValidation = {
+  mcp_server: CatalogMcpServer;
   validation: {
     valid: boolean;
     errors: string[];
@@ -189,6 +265,11 @@ export async function listCatalogTools(token: string): Promise<CatalogTool[]> {
   return result.tools;
 }
 
+export async function listCatalogMcpServers(token: string): Promise<CatalogMcpServer[]> {
+  const result = await requestJson<{ mcp_servers: CatalogMcpServer[] }>("/v1/catalog/mcp-servers", { token });
+  return result.mcp_servers;
+}
+
 export async function createCatalogTool(input: CatalogToolMutationInput, token: string): Promise<CatalogTool> {
   const result = await requestJson<{ tool: CatalogTool }>("/v1/catalog/tools", {
     method: "POST",
@@ -207,11 +288,54 @@ export async function updateCatalogTool(toolId: string, input: CatalogToolMutati
   return result.tool;
 }
 
+export async function createCatalogMcpServer(input: CatalogMcpServerMutationInput, token: string): Promise<CatalogMcpServer> {
+  const result = await requestJson<{ mcp_server: CatalogMcpServer }>("/v1/catalog/mcp-servers", {
+    method: "POST",
+    token,
+    body: input,
+  });
+  return result.mcp_server;
+}
+
+export async function updateCatalogMcpServer(mcpServerId: string, input: CatalogMcpServerMutationInput, token: string): Promise<CatalogMcpServer> {
+  const result = await requestJson<{ mcp_server: CatalogMcpServer }>(`/v1/catalog/mcp-servers/${encodeURIComponent(mcpServerId)}`, {
+    method: "PUT",
+    token,
+    body: input,
+  });
+  return result.mcp_server;
+}
+
+export async function deleteCatalogMcpServer(mcpServerId: string, token: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/catalog/mcp-servers/${encodeURIComponent(mcpServerId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 export async function validateCatalogTool(toolId: string, token: string): Promise<CatalogToolValidation> {
   return requestJson<CatalogToolValidation>(`/v1/catalog/tools/${encodeURIComponent(toolId)}/validate`, {
     method: "POST",
     token,
   });
+}
+
+export async function validateCatalogMcpServer(mcpServerId: string, token: string): Promise<CatalogMcpServerValidation> {
+  return requestJson<CatalogMcpServerValidation>(`/v1/catalog/mcp-servers/${encodeURIComponent(mcpServerId)}/validate`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function setCatalogMcpServerEnabled(mcpServerId: string, enabled: boolean, token: string): Promise<CatalogMcpServer> {
+  const result = await requestJson<{ mcp_server: CatalogMcpServer }>(
+    `/v1/catalog/mcp-servers/${encodeURIComponent(mcpServerId)}/${enabled ? "enable" : "disable"}`,
+    {
+      method: "POST",
+      token,
+    },
+  );
+  return result.mcp_server;
 }
 
 export async function testCatalogTool(

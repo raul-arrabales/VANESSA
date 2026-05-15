@@ -1708,7 +1708,8 @@
       "aria": "Catalog control sections",
       "overview": "Overview",
       "tools": "Tools",
-      "agents": "Agents"
+      "agents": "Agents",
+      "mcp": "MCP Gateway"
     },
     "home": {
       "description": "Review the catalog dashboard, then move into tools or agents for focused catalog administration.",
@@ -1718,7 +1719,9 @@
       "toolsTitle": "Tools",
       "toolsDescription": "Browse platform tools, validate runtime compatibility, and move into create or edit flows.",
       "agentsTitle": "Agents",
-      "agentsDescription": "Browse platform agents, review validation results, and continue create or edit work."
+      "agentsDescription": "Browse platform agents, review validation results, and continue create or edit work.",
+      "mcpTitle": "MCP Gateway",
+      "mcpDescription": "Manage MCP server exposures backed by validated internal tools."
     },
     "state": {
       "idle": "Idle",
@@ -1733,8 +1736,10 @@
     "summary": {
       "agents": "Agents",
       "tools": "Tools",
+      "mcpServers": "MCP servers",
       "models": "Enabled models",
       "publishedCount": "{{count}} published",
+      "enabledCount": "{{count}} enabled",
       "version": "Current version: {{version}}"
     },
     "actions": {
@@ -1748,22 +1753,30 @@
       "testingTool": "Testing...",
       "delete": "Delete",
       "deleting": "Deleting...",
+      "enable": "Enable",
+      "disable": "Disable",
       "createAgent": "Create agent",
       "updateAgent": "Update agent",
       "newAgent": "New agent",
       "createTool": "Create tool",
       "updateTool": "Update tool",
-      "newTool": "New tool"
+      "newTool": "New tool",
+      "createMcpServer": "Create MCP server",
+      "updateMcpServer": "Update MCP server",
+      "newMcpServer": "New MCP server"
     },
     "badges": {
       "draft": "Draft",
       "published": "Published",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
       "yes": "Yes",
       "no": "No"
     },
-    "transport": {
-      "mcp": "MCP",
-      "sandbox": "Sandbox"
+    "executionBackend": {
+      "sandboxPython": "Python sandbox",
+      "webSearch": "Gateway web search",
+      "internalHttp": "Internal HTTP"
     },
     "agents": {
       "title": "Platform agents",
@@ -1795,14 +1808,15 @@
     "tools": {
       "title": "Platform tools",
       "pageDescription": "Browse platform tools or move into the create flow to add or update catalog-backed tool definitions.",
-      "description": "Define tool transport, schemas, and safety policy, then validate active runtime compatibility.",
-      "transportLabel": "Transport: {{transport}}",
+      "description": "Define the internal execution backend, schemas, and safety policy, then validate runtime compatibility.",
+      "backendLabel": "Backend: {{backend}}",
+      "validationLabel": "Validation: {{status}}",
       "listTitle": "Platform tools",
       "createTitle": "Create tool",
       "createDescription": "Create a new platform tool or continue editing an existing one from this form.",
       "editing": "Editing an existing platform tool.",
       "testTitle": "Test tool",
-      "testDescription": "Run a live test against {{name}} using its current runtime transport and input schema.",
+      "testDescription": "Run a live test against {{name}} using its internal execution backend and input schema.",
       "testHelper": "Submit a JSON object matching the tool input schema to inspect the live runtime response.",
       "testMissing": "Select a platform tool before opening its test view.",
       "testResultTitle": "Test result",
@@ -1815,6 +1829,23 @@
         "tools": "Platform tools",
         "create": "Create tool",
         "test": "Test tool"
+      }
+    },
+    "mcp": {
+      "title": "MCP Gateway",
+      "pageDescription": "Manage gateway-hosted MCP server exposures backed by validated internal tools.",
+      "registryTitle": "MCP Registry",
+      "searchPlaceholder": "Search MCP servers",
+      "backingToolLabel": "Backing tool: {{tool}}",
+      "domainLabel": "Agent domains: {{domains}}",
+      "updatedLabel": "Last updated: {{updated}}",
+      "createTitle": "Create MCP server",
+      "createDescription": "Expose a validated internal tool through a gateway-hosted MCP server.",
+      "editing": "Editing an existing MCP server exposure.",
+      "views": {
+        "aria": "MCP Gateway sections",
+        "registry": "MCP Registry",
+        "create": "Create MCP server"
       }
     },
     "forms": {
@@ -1830,6 +1861,8 @@
         "defaultModel": "Default model",
         "noDefaultModel": "No default model",
         "toolRefs": "Tool refs",
+        "mcpServerRefs": "MCP server refs",
+        "agentDomain": "Agent domain",
         "internetRequired": "Internet required",
         "sandboxRequired": "Sandbox required"
       },
@@ -1837,13 +1870,31 @@
         "id": "Tool ID",
         "name": "Name",
         "description": "Description",
-        "transport": "Transport",
-        "toolName": "Runtime tool name",
+        "executionBackend": "Execution backend",
         "offlineCompatible": "Offline compatible",
         "inputSchema": "Input schema",
         "outputSchema": "Output schema",
         "safetyPolicy": "Safety policy",
-        "connectionProfile": "Connection profile: default"
+        "executionConfig": "Execution config",
+        "permissions": "Permissions"
+      },
+      "mcp": {
+        "id": "MCP server ID",
+        "name": "Name",
+        "slug": "Slug",
+        "description": "Description for agents",
+        "enabled": "Status",
+        "backingTool": "Backing internal tool",
+        "noBackingTool": "Select a validated tool",
+        "exposedToolName": "Exposed MCP tool name",
+        "inputSchema": "Input schema",
+        "outputSchema": "Output schema",
+        "agentIds": "Allowed agent IDs",
+        "agentDomains": "Allowed agent domains",
+        "agentRoles": "Allowed agent roles",
+        "userRoles": "Allowed user roles",
+        "userIds": "Allowed user IDs",
+        "userGroupIds": "Allowed user group IDs"
       },
       "toolTest": {
         "input": "Test input"
@@ -1867,6 +1918,10 @@
       "toolUpdated": "Updated tool {{name}}.",
       "agentValidated": "Validated agent {{name}}.",
       "toolValidated": "Validated tool {{name}}.",
+      "mcpCreated": "Created MCP server {{name}}.",
+      "mcpUpdated": "Updated MCP server {{name}}.",
+      "mcpDeleted": "Deleted MCP server {{name}}.",
+      "mcpValidated": "Validated MCP server {{name}}.",
       "toolTestFailed": "Unable to test this tool."
     }
   },
@@ -1890,6 +1945,8 @@
       "retrievalInstructions": "Retrieval instructions",
       "defaultModelRef": "Default model ref",
       "toolRefs": "Tool refs",
+      "mcpServerRefs": "MCP server refs",
+      "agentDomain": "Agent domain",
       "workflowDefinition": "Workflow definition",
       "toolPolicy": "Tool policy",
       "internetRequired": "Internet required",

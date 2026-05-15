@@ -11,6 +11,8 @@ export type AgentProjectSpec = {
   };
   default_model_ref: string | null;
   tool_refs: string[];
+  mcp_server_refs?: string[];
+  agent_domain?: string;
   workflow_definition: Record<string, unknown>;
   tool_policy: Record<string, unknown>;
   runtime_constraints: {
@@ -44,8 +46,15 @@ export type AgentProjectValidation = {
     resolved_tools: Array<{
       id: string;
       name: string;
-      transport: string;
+      execution_backend: string;
       offline_compatible: boolean;
+    }>;
+    resolved_mcp_servers?: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      backing_tool_id: string;
+      enabled: boolean;
     }>;
     derived_runtime_requirements: {
       internet_required: boolean;
@@ -63,9 +72,21 @@ export type AgentProjectPublishResult = {
   };
 };
 
+export type AgentProjectDefaults = {
+  agent: {
+    runtime_prompts: {
+      retrieval_context: string;
+    };
+  };
+};
+
 export async function listAgentProjects(token: string): Promise<AgentProject[]> {
   const result = await requestJson<{ agent_projects: AgentProject[] }>("/v1/agent-projects", { token });
   return result.agent_projects;
+}
+
+export async function getAgentProjectDefaults(token: string): Promise<AgentProjectDefaults> {
+  return requestJson<AgentProjectDefaults>("/v1/catalog/defaults", { token });
 }
 
 export async function createAgentProject(input: AgentProjectMutationInput, token: string): Promise<AgentProject> {

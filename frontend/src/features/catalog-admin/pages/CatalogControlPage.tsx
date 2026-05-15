@@ -7,6 +7,8 @@ import { useAuth } from "../../../auth/AuthProvider";
 import type { CatalogAgent } from "../../../api/catalog";
 import CatalogAgentFormPanel from "../components/CatalogAgentFormPanel";
 import CatalogAgentsDirectory from "../components/CatalogAgentsDirectory";
+import CatalogMcpRegistry from "../components/CatalogMcpRegistry";
+import CatalogMcpServerFormPanel from "../components/CatalogMcpServerFormPanel";
 import CatalogOverviewSection from "../components/CatalogOverviewSection";
 import CatalogPageLayout from "../components/CatalogPageLayout";
 import CatalogToolFormPanel from "../components/CatalogToolFormPanel";
@@ -17,6 +19,8 @@ import {
   buildCatalogControlUrl,
   resolveCatalogAgentsView,
   resolveCatalogControlSection,
+  resolveCatalogMcpServerId,
+  resolveCatalogMcpView,
   resolveCatalogToolId,
   resolveCatalogToolsView,
 } from "../routes";
@@ -31,45 +35,60 @@ export default function CatalogControlPage(): JSX.Element {
   const activeSection = resolveCatalogControlSection(searchParams.get("section"));
   const activeToolsView = resolveCatalogToolsView(searchParams.get("view"));
   const activeAgentsView = resolveCatalogAgentsView(searchParams.get("view"));
+  const activeMcpView = resolveCatalogMcpView(searchParams.get("view"));
   const activeToolId = resolveCatalogToolId(searchParams.get("toolId"));
+  const activeMcpServerId = resolveCatalogMcpServerId(searchParams.get("id"));
   const {
     state,
     errorMessage,
     agents,
     tools,
+    mcpServers,
     models,
     agentForm,
     setAgentForm,
     toolForm,
     setToolForm,
+    mcpServerForm,
+    setMcpServerForm,
     toolTestForm,
     setToolTestForm,
     agentValidationResults,
     toolValidationResults,
+    mcpValidationResults,
     toolTestResult,
     toolTestError,
     validatingAgentId,
     validatingToolId,
+    validatingMcpServerId,
     deletingAgentId,
     agentPromptPreview,
     agentPromptPreviewLoading,
     testingToolId,
     savingAgent,
     savingTool,
+    savingMcpServer,
     loadCatalogState,
     handleAgentValidate,
     handleAgentDelete,
     handleToolValidate,
+    handleMcpValidate,
     handleAgentSubmit,
     handleToolSubmit,
+    handleMcpSubmit,
+    handleMcpDelete,
+    handleMcpToggle,
     handleToolTest,
     openAgentEditor,
     openToolEditor,
+    openMcpEditor,
     openToolTester,
     resetAgentForm,
     resetToolForm,
+    resetMcpServerForm,
     publishedAgents,
     publishedTools,
+    enabledMcpServers,
   } = useCatalogControl(token);
   const selectedTestTool = tools.find((tool) => tool.id === activeToolId) ?? null;
   const platformAgents = useMemo(
@@ -80,6 +99,7 @@ export default function CatalogControlPage(): JSX.Element {
     () => agents.filter((agent) => !(agent.is_platform_agent || agent.agent_kind === "platform")),
     [agents],
   );
+  const selectedMcpServer = mcpServers.find((server) => server.id === activeMcpServerId) ?? null;
   const canDeleteAgent = (agent: CatalogAgent): boolean => {
     if (agent.is_platform_agent || agent.agent_kind === "platform") {
       return false;
@@ -95,6 +115,15 @@ export default function CatalogControlPage(): JSX.Element {
       openToolTester(selectedTestTool);
     }
   }, [activeSection, activeToolsView, openToolTester, selectedTestTool, toolTestForm.toolId]);
+
+  useEffect(() => {
+    if (activeSection !== "mcp" || activeMcpView !== "edit" || !selectedMcpServer) {
+      return;
+    }
+    if (mcpServerForm.mcpServerId !== selectedMcpServer.id) {
+      openMcpEditor(selectedMcpServer);
+    }
+  }, [activeMcpView, activeSection, mcpServerForm.mcpServerId, openMcpEditor, selectedMcpServer]);
 
   const toolsSubmenuItems = useMemo(
     () => {
@@ -147,21 +176,44 @@ export default function CatalogControlPage(): JSX.Element {
     ],
     [activeAgentsView, t],
   );
+  const mcpSubmenuItems = useMemo(
+    () => [
+      {
+        id: "mcp-registry",
+        label: t("catalogControl.mcp.views.registry"),
+        isActive: activeMcpView === "registry",
+        to: buildCatalogControlUrl("mcp", "registry"),
+      },
+      {
+        id: "create-mcp",
+        label: t("catalogControl.mcp.views.create"),
+        isActive: activeMcpView === "create",
+        to: buildCatalogControlUrl("mcp", "create"),
+      },
+    ],
+    [activeMcpView, t],
+  );
 
   const pageTitle = activeSection === "tools"
     ? t("catalogControl.tools.title")
     : activeSection === "agents"
       ? t("catalogControl.agents.title")
+      : activeSection === "mcp"
+        ? t("catalogControl.mcp.title")
       : t("catalogControl.title");
   const pageDescription = activeSection === "tools"
     ? t("catalogControl.tools.pageDescription")
     : activeSection === "agents"
       ? t("catalogControl.agents.pageDescription")
+      : activeSection === "mcp"
+        ? t("catalogControl.mcp.pageDescription")
       : t("catalogControl.home.description");
   const secondaryNavigation = activeSection === "tools"
     ? <PageSubmenuBar items={toolsSubmenuItems} ariaLabel={t("catalogControl.tools.views.aria")} />
     : activeSection === "agents"
       ? <PageSubmenuBar items={agentsSubmenuItems} ariaLabel={t("catalogControl.agents.views.aria")} />
+      : activeSection === "mcp"
+        ? <PageSubmenuBar items={mcpSubmenuItems} ariaLabel={t("catalogControl.mcp.views.aria")} />
       : undefined;
 
   return (
@@ -184,6 +236,8 @@ export default function CatalogControlPage(): JSX.Element {
           publishedAgents={publishedAgents}
           toolCount={tools.length}
           publishedTools={publishedTools}
+          mcpServerCount={mcpServers.length}
+          enabledMcpServers={enabledMcpServers}
           modelCount={models.length}
         />
       ) : null}
@@ -273,6 +327,7 @@ export default function CatalogControlPage(): JSX.Element {
         <CatalogAgentFormPanel
           form={agentForm}
           tools={tools}
+          mcpServers={mcpServers}
           models={models}
           saving={savingAgent}
           promptPreview={agentPromptPreview}
@@ -283,6 +338,36 @@ export default function CatalogControlPage(): JSX.Element {
             void handleAgentSubmit();
           }}
           onReset={resetAgentForm}
+        />
+      ) : null}
+
+      {activeSection === "mcp" && activeMcpView === "registry" ? (
+        <CatalogMcpRegistry
+          mcpServers={mcpServers}
+          tools={tools}
+          validationResults={mcpValidationResults}
+          validatingMcpServerId={validatingMcpServerId}
+          onEdit={(server) => {
+            openMcpEditor(server);
+            navigate(buildCatalogControlUrl("mcp", "edit", { mcpServerId: server.id }));
+          }}
+          onDelete={(server) => void handleMcpDelete(server)}
+          onToggle={(server) => void handleMcpToggle(server)}
+          onValidate={(serverId) => void handleMcpValidate(serverId)}
+        />
+      ) : null}
+
+      {activeSection === "mcp" && (activeMcpView === "create" || activeMcpView === "edit") ? (
+        <CatalogMcpServerFormPanel
+          form={activeMcpView === "edit" && selectedMcpServer ? mcpServerForm : mcpServerForm}
+          tools={tools}
+          saving={savingMcpServer}
+          onChange={setMcpServerForm}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleMcpSubmit();
+          }}
+          onReset={resetMcpServerForm}
         />
       ) : null}
       {agentPendingDelete ? (

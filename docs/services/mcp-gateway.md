@@ -1,12 +1,13 @@
 # MCP Gateway
 
-The MCP gateway is the normalized HTTP provider for MCP-backed tool execution.
+The MCP gateway is the normalized HTTP provider for gateway-hosted MCP server exposures.
 
 ## Responsibilities
 
-- Hide raw MCP session and transport details behind a provider boundary
-- Expose stable HTTP readiness and invoke APIs to backend and agent engine
-- Host or bridge built-in and remote/general-purpose tools used by agents
+- Expose stable HTTP readiness, discovery, and invoke APIs to backend and agent engine
+- Delegate registry lookup, authorization, schema validation, dispatch, and audit logging to backend
+- Carry agent identity, delegated user identity, and agent domain metadata on invocation
+- Keep SearXNG-backed web search behind the gateway through a private internal runner
 
 ## API Surface
 
@@ -16,13 +17,13 @@ The MCP gateway is the normalized HTTP provider for MCP-backed tool execution.
 
 Current built-in v1 tool:
 
-- `web_search`, backed by local SearXNG through its JSON Search API
+- `mcp.web_search`, backed by the internal `tool.web_search` catalog tool and local SearXNG through its JSON Search API
 
-This service is part of the default local-staging stack. Backend seeds the `mcp_gateway_local` provider from `MCP_GATEWAY_URL` and binds it to `mcp_runtime` in the default local deployment profiles. Agent engine then uses that binding for LLM-driven tool calls such as `tool.web_search`.
+This service is part of the default local-staging stack. Backend seeds the `mcp_gateway_local` provider from `MCP_GATEWAY_URL` and binds it to `mcp_runtime` in the default local deployment profiles. Agent engine then uses that binding for LLM-driven tool calls against authorized MCP server exposures such as `mcp.web_search`.
 
 In local staging, `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080`. The container listens on port `8080`, while Docker publishes it on host port `6100` to avoid conflicting with Weaviate on `8080`.
 
-`web_search` reaches SearXNG at `SEARXNG_URL` (`http://searxng:8080` by default). This path does not require search API tokens, but it is online-only because SearXNG must query upstream internet search engines. Frontend, backend, and agent_engine should continue to treat MCP Gateway as the only web-search runtime boundary.
+Gateway-to-backend internal discovery and invocation use `MCP_GATEWAY_SERVICE_TOKEN`. `web_search` reaches SearXNG at `SEARXNG_URL` (`http://searxng:8080` by default) through the gateway-private `/v1/internal/tools/web-search` runner. This path does not require search API tokens, but it is online-only because SearXNG must query upstream internet search engines. Frontend, backend, and agent_engine should continue to treat MCP Gateway as the only web-search runtime boundary.
 
 Canonical service notes: [`mcp_gateway/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/mcp_gateway/README.md).
 

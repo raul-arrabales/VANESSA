@@ -11,6 +11,8 @@ export type AgentProjectFormState = {
   retrievalContext: string;
   defaultModelRef: string;
   toolRefsText: string;
+  mcpServerRefsText: string;
+  agentDomain: string;
   workflowDefinitionText: string;
   toolPolicyText: string;
   internetRequired: boolean;
@@ -29,6 +31,8 @@ export function buildDefaultAgentProjectForm(defaults: CatalogDefaults | null): 
     retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
     defaultModelRef: "",
     toolRefsText: "",
+    mcpServerRefsText: "",
+    agentDomain: "default",
     workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",
     toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
     internetRequired: false,
@@ -68,6 +72,8 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     retrievalContext: project.spec.runtime_prompts.retrieval_context,
     defaultModelRef: project.spec.default_model_ref ?? "",
     toolRefsText: project.spec.tool_refs.join(", "),
+    mcpServerRefsText: (project.spec.mcp_server_refs ?? []).join(", "),
+    agentDomain: project.spec.agent_domain ?? "default",
     workflowDefinitionText: JSON.stringify(project.spec.workflow_definition, null, 2),
     toolPolicyText: JSON.stringify(project.spec.tool_policy, null, 2),
     internetRequired: project.spec.runtime_constraints.internet_required,
@@ -99,6 +105,11 @@ export function toAgentProjectMutationInput(
       .split(/\r?\n|,/)
       .map((item) => item.trim())
       .filter(Boolean),
+    mcp_server_refs: form.mcpServerRefsText
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    agent_domain: form.agentDomain.trim() || "default",
     workflow_definition: parseJsonObject(form.workflowDefinitionText, invalidWorkflowMessage),
     tool_policy: parseJsonObject(form.toolPolicyText, invalidToolPolicyMessage),
     runtime_constraints: {
@@ -124,6 +135,11 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
       .split(/\r?\n|,/)
       .map((item) => item.trim())
       .filter(Boolean),
+    mcp_server_refs: form.mcpServerRefsText
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    agent_domain: form.agentDomain.trim() || "default",
     runtime_constraints: {
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,

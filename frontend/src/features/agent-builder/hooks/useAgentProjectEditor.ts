@@ -162,6 +162,8 @@ const DEFAULT_EMPTY_FORM: AgentProjectFormState = {
   retrievalContext: "",
   defaultModelRef: "",
   toolRefsText: "",
+  mcpServerRefsText: "",
+  agentDomain: "default",
   workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",
   toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
   internetRequired: false,

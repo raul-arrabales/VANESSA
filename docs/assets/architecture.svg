@@ -42,11 +42,12 @@
 <line id="edge-kws-backend" class="architecture-edge architecture-edge-event" x1="416" y1="282" x2="416" y2="74" marker-end="url(#architecture-arrow)" />
 <line id="edge-llm-llm_runtime_embeddings" class="architecture-edge architecture-edge-internal" x1="956" y1="158" x2="956" y2="322" marker-end="url(#architecture-arrow)" />
 <line id="edge-llm-llm_runtime_inference" class="architecture-edge architecture-edge-internal" x1="956" y1="158" x2="956" y2="198" marker-end="url(#architecture-arrow)" />
+<line id="edge-mcp_gateway-backend" class="architecture-edge architecture-edge-internal" x1="846" y1="736" x2="526" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-mcp_gateway-searxng" class="architecture-edge architecture-edge-http" x1="956" y1="778" x2="956" y2="570" marker-end="url(#architecture-arrow)" />
 </g>
 <g id="architecture-edge-labels">
 <text class="edge-label" x="821" y="110">HTTP - Agent LLM requests</text>
-<text class="edge-label" x="821" y="420">HTTP - Agent MCP tool invocation</text>
+<text class="edge-label" x="821" y="420">HTTP - Agent MCP discovery and invocation with identity metadata</text>
 <text class="edge-label" x="956" y="234">SQL - Agent structured persistence</text>
 <text class="edge-label" x="956" y="172">HTTP - Optional vector search and retrieval via alternate provider binding</text>
 <text class="edge-label" x="821" y="482">HTTP - Agent sandbox execution</text>
@@ -54,7 +55,7 @@
 <text class="edge-label" x="551" y="110">HTTP - Agent orchestration calls</text>
 <text class="edge-label" x="686" y="296">HTTP - Optional direct llama.cpp inference via platform provider binding</text>
 <text class="edge-label" x="686" y="110">HTTP - Model inference and discovery</text>
-<text class="edge-label" x="686" y="420">HTTP - Optional MCP runtime validation and control-plane provider checks</text>
+<text class="edge-label" x="686" y="420">HTTP - MCP provider checks and private gateway-backed tool adapters</text>
 <text class="edge-label" x="821" y="234">SQL - Structured data access</text>
 <text class="edge-label" x="821" y="172">HTTP - Optional semantic retrieval operations via alternate provider binding</text>
 <text class="edge-label" x="686" y="482">HTTP - Controlled code execution</text>
@@ -63,6 +64,7 @@
 <text class="edge-label" x="416" y="172">HTTP webhook - Wake event emission</text>
 <text class="edge-label" x="956" y="234">Internal HTTP - Runtime embeddings execution path</text>
 <text class="edge-label" x="956" y="172">Internal HTTP - Runtime text generation path</text>
+<text class="edge-label" x="686" y="420">compose - Startup dependency</text>
 <text class="edge-label" x="956" y="668">HTTP - Web search queries through the local SearXNG JSON API</text>
 </g>
 <g id="architecture-nodes">

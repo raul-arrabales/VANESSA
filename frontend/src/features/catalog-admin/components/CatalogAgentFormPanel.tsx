@@ -1,12 +1,13 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { CatalogTool } from "../../../api/catalog";
+import type { CatalogMcpServer, CatalogTool } from "../../../api/catalog";
 import type { ModelCatalogItem } from "../../../api/modelops";
 import type { AgentFormState } from "../hooks/useCatalogControl";
 
 type CatalogAgentFormPanelProps = {
   form: AgentFormState;
   tools: CatalogTool[];
+  mcpServers: CatalogMcpServer[];
   models: ModelCatalogItem[];
   saving: boolean;
   promptPreview: string;
@@ -19,6 +20,7 @@ type CatalogAgentFormPanelProps = {
 export default function CatalogAgentFormPanel({
   form,
   tools,
+  mcpServers,
   models,
   saving,
   promptPreview,
@@ -128,7 +130,31 @@ export default function CatalogAgentFormPanel({
             ))}
           </select>
         </label>
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.agent.mcpServerRefs")}</span>
+          <select
+            className="field-input catalog-multiselect"
+            multiple
+            value={form.mcp_server_refs}
+            onChange={(event) =>
+              onChange({
+                ...form,
+                mcp_server_refs: Array.from(event.currentTarget.selectedOptions).map((option) => option.value),
+              })
+            }
+          >
+            {mcpServers.filter((server) => server.spec.enabled).map((server) => (
+              <option key={server.id} value={server.spec.slug}>
+                {server.spec.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="form-grid">
+          <label className="card-stack">
+            <span className="field-label">{t("catalogControl.forms.agent.agentDomain")}</span>
+            <input className="field-input" value={form.agent_domain} onChange={(event) => onChange({ ...form, agent_domain: event.target.value })} />
+          </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.internetRequired")}</span>
             <select

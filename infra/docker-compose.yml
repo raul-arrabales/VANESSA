@@ -167,7 +167,10 @@ services:
         required: false
     environment:
       MCP_GATEWAY_PORT: 8080
+      BACKEND_URL: http://backend:5000
+      MCP_GATEWAY_SERVICE_TOKEN: ${MCP_GATEWAY_SERVICE_TOKEN:-dev-mcp-gateway-token}
     depends_on:
+      - backend
       - searxng
 
   agent_engine:
@@ -187,6 +190,8 @@ services:
         required: true
       - path: .env.local
         required: false
+    environment:
+      MCP_GATEWAY_SERVICE_TOKEN: ${MCP_GATEWAY_SERVICE_TOKEN:-dev-mcp-gateway-token}
 
   sandbox:
     build:

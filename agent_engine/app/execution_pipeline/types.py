@@ -10,7 +10,7 @@ from ..retrieval.types import RetrievalRequest
 class ToolInvocation:
     tool_ref: str
     tool_name: str
-    transport: str
+    mcp_server_slug: str
     arguments: dict[str, Any] = field(default_factory=dict)
 
 

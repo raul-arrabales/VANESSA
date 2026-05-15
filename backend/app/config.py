@@ -17,6 +17,7 @@ DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 60
 DEFAULT_LLM_LOCAL_MODEL_PATH = "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
 DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
+DEFAULT_MCP_GATEWAY_SERVICE_TOKEN = "dev-mcp-gateway-token"
 DEFAULT_SANDBOX_URL = "http://sandbox:6000"
 DEFAULT_MCP_GATEWAY_URL = "http://mcp_gateway:8080"
 DEFAULT_KWS_URL = "http://kws:10400"
@@ -40,6 +41,7 @@ class BackendRuntimeConfig:
     llm_embeddings_runtime_url: str = DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
     agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
     agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+    mcp_gateway_service_token: str = DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
     sandbox_url: str = DEFAULT_SANDBOX_URL
     mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
     kws_url: str = DEFAULT_KWS_URL
@@ -78,6 +80,7 @@ class AuthConfig:
     hf_token: str = ""
     agent_engine_url: str = DEFAULT_AGENT_ENGINE_URL
     agent_engine_service_token: str = DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+    mcp_gateway_service_token: str = DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
     agent_execution_via_engine: bool = True
     agent_execution_fallback: bool = False
     frontend_url: str = DEFAULT_FRONTEND_URL
@@ -215,6 +218,8 @@ def get_auth_config() -> AuthConfig:
         agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
         agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
         or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
+        mcp_gateway_service_token=os.getenv("MCP_GATEWAY_SERVICE_TOKEN", DEFAULT_MCP_GATEWAY_SERVICE_TOKEN).strip()
+        or DEFAULT_MCP_GATEWAY_SERVICE_TOKEN,
         agent_execution_via_engine=_get_bool_env("AGENT_EXECUTION_VIA_ENGINE", True),
         agent_execution_fallback=_get_bool_env("AGENT_EXECUTION_FALLBACK", False),
         frontend_url=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,

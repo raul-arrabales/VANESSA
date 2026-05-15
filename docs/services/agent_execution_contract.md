@@ -201,12 +201,11 @@ The streaming endpoint returns server-sent events:
       "output_text": "Here is the final answer after using a tool.",
       "tool_calls": [
         {
-          "tool_ref": "tool.python_exec",
+          "mcp_server_slug": "python-exec",
           "tool_name": "python_exec",
-          "transport": "sandbox_http",
-          "runtime_capability": "sandbox_execution",
-          "provider_slug": "sandbox-local",
-          "provider_key": "sandbox_local",
+          "runtime_capability": "mcp_runtime",
+          "provider_slug": "mcp-gateway-local",
+          "provider_key": "mcp_gateway_local",
           "deployment_profile_slug": "local-default",
           "status_code": 200,
           "arguments": {
@@ -294,10 +293,11 @@ Detailed retrieval semantics, normalized result fields, and ownership boundaries
 
 `input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.resources`. When omitted, the active binding default resource is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 
-Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent tool catalog requires them. In the current convergence phase:
+Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent catalog requires them. In the current MCP exposure model:
 
-- `tool.web_search` uses `transport: mcp` and requires `platform_runtime.capabilities.mcp_runtime`
-- `tool.python_exec` uses `transport: sandbox_http` and requires `platform_runtime.capabilities.sandbox_execution`
+- agents reference authorized `mcp_server_refs`; MCP calls require `platform_runtime.capabilities.mcp_runtime`
+- `mcp.web_search` is backed by internal `tool.web_search` and requires online runtime
+- `tool.python_exec` remains an internal `sandbox_python` tool and can be exposed through an MCP server definition
 
 Tool loops are LLM-driven and bounded to three rounds.
 

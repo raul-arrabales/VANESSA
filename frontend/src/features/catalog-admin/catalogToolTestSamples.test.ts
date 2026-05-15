@@ -13,9 +13,9 @@ function buildTool(overrides: Partial<CatalogTool> = {}): CatalogTool {
     spec: {
       name: "Example",
       description: "desc",
-      transport: "mcp",
-      connection_profile_ref: "default",
-      tool_name: "example_tool",
+      execution_backend: "internal_http",
+      execution_config: {},
+      permissions: {},
       input_schema: {},
       output_schema: {},
       safety_policy: {},
@@ -31,7 +31,7 @@ describe("buildSampleToolInput", () => {
       id: "tool.web_search",
       spec: {
         ...buildTool().spec,
-        tool_name: "web_search",
+        execution_backend: "mcp_gateway_web_search",
       },
     }))).toEqual({
       query: "OpenAI platform runtime",
@@ -44,8 +44,7 @@ describe("buildSampleToolInput", () => {
       id: "tool.python_exec",
       spec: {
         ...buildTool().spec,
-        transport: "sandbox_http",
-        tool_name: "python_exec",
+        execution_backend: "sandbox_python",
       },
     }))).toEqual({
       code: "numbers = input_payload.get('numbers', [1, 2, 3])\nresult = sum(numbers)\nprint(f'Sum: {result}')",

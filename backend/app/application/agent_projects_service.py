@@ -115,19 +115,45 @@ def validate_agent_project(
             errors.append(f"Tool '{tool_ref}' does not exist.")
             continue
         tool_spec = tool_row.get("current_spec") if isinstance(tool_row.get("current_spec"), dict) else {}
-        transport = str(tool_spec.get("transport", "")).strip().lower()
+        execution_backend = str(tool_spec.get("execution_backend", "")).strip().lower()
         offline_compatible = bool(tool_spec.get("offline_compatible", False))
         resolved_tools.append(
             {
                 "id": str(tool_row.get("entity_id", "")),
                 "name": str(tool_spec.get("name", "")),
-                "transport": transport,
+                "execution_backend": execution_backend,
                 "offline_compatible": offline_compatible,
             }
         )
-        if transport == "sandbox_http":
+        if execution_backend == "sandbox_python":
             derived_runtime_requirements["sandbox_required"] = True
         if not offline_compatible:
+            derived_runtime_requirements["internet_required"] = True
+    resolved_mcp_servers: list[dict[str, Any]] = []
+    for mcp_ref in spec.get("mcp_server_refs", []):
+        mcp_server = _find_mcp_server_by_slug(database_url, slug=str(mcp_ref))
+        if mcp_server is None:
+            errors.append(f"MCP server '{mcp_ref}' does not exist.")
+            continue
+        mcp_spec = mcp_server.get("current_spec") if isinstance(mcp_server.get("current_spec"), dict) else {}
+        backing_tool_id = str(mcp_spec.get("backing_tool_id", "")).strip()
+        tool_row = find_registry_entity(database_url, entity_type="tool", entity_id=backing_tool_id)
+        if tool_row is None:
+            errors.append(f"MCP server '{mcp_ref}' references missing tool '{backing_tool_id}'.")
+            continue
+        tool_spec = tool_row.get("current_spec") if isinstance(tool_row.get("current_spec"), dict) else {}
+        resolved_mcp_servers.append(
+            {
+                "id": str(mcp_server.get("entity_id", "")),
+                "slug": str(mcp_spec.get("slug", "")),
+                "name": str(mcp_spec.get("name", "")),
+                "backing_tool_id": backing_tool_id,
+                "enabled": bool(mcp_spec.get("enabled", False)),
+            }
+        )
+        if str(tool_spec.get("execution_backend", "")).strip().lower() == "sandbox_python":
+            derived_runtime_requirements["sandbox_required"] = True
+        if not bool(tool_spec.get("offline_compatible", False)):
             derived_runtime_requirements["internet_required"] = True
 
     runtime_constraints = spec.get("runtime_constraints") if isinstance(spec.get("runtime_constraints"), dict) else {}
@@ -143,6 +169,7 @@ def validate_agent_project(
             "errors": errors,
             "warnings": warnings,
             "resolved_tools": resolved_tools,
+            "resolved_mcp_servers": resolved_mcp_servers,
             "derived_runtime_requirements": derived_runtime_requirements,
         },
     }
@@ -213,6 +240,8 @@ def build_agent_project_preview(
         "playground_kind": "chat",
         "default_model_ref": spec.get("default_model_ref"),
         "tool_refs": list(spec.get("tool_refs", [])),
+        "mcp_server_refs": list(spec.get("mcp_server_refs", [])),
+        "agent_domain": str(spec.get("agent_domain") or "default"),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),
     }
@@ -249,6 +278,8 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
             "runtime_prompts": normalize_agent_runtime_prompts(row.get("runtime_prompts")),
             "default_model_ref": _string_or_none(row.get("default_model_ref")),
             "tool_refs": list(row.get("tool_refs") or []),
+            "mcp_server_refs": list(row.get("mcp_server_refs") or []),
+            "agent_domain": str(row.get("agent_domain") or "default"),
             "workflow_definition": dict(row.get("workflow_definition") or {}),
             "tool_policy": dict(row.get("tool_policy") or {}),
             "runtime_constraints": dict(row.get("runtime_constraints") or {}),
@@ -276,6 +307,9 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
     tool_refs_raw = payload.get("tool_refs", [])
     if not isinstance(tool_refs_raw, list):
         raise AgentProjectError("invalid_tool_refs", "tool_refs must be an array")
+    mcp_server_refs_raw = payload.get("mcp_server_refs", [])
+    if not isinstance(mcp_server_refs_raw, list):
+        raise AgentProjectError("invalid_mcp_server_refs", "mcp_server_refs must be an array")
     runtime_constraints = payload.get("runtime_constraints")
     if not isinstance(runtime_constraints, dict):
         raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints must be an object")
@@ -298,6 +332,8 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "runtime_prompts": coerced_runtime_prompts,
         "default_model_ref": default_model_ref or None,
         "tool_refs": [str(item).strip() for item in tool_refs_raw if str(item).strip()],
+        "mcp_server_refs": [str(item).strip() for item in mcp_server_refs_raw if str(item).strip()],
+        "agent_domain": str(payload.get("agent_domain") or "default").strip() or "default",
         "workflow_definition": workflow_definition,
         "tool_policy": tool_policy,
         "runtime_constraints": {
@@ -305,6 +341,22 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
             "sandbox_required": bool(runtime_constraints["sandbox_required"]),
         },
     }
+
+
+def _find_mcp_server_by_slug(database_url: str, *, slug: str) -> dict[str, Any] | None:
+    normalized_slug = str(slug).strip().lower()
+    if not normalized_slug:
+        return None
+    with_candidates = []
+    # Keep the repository boundary simple here; MCP servers are versioned registry entities.
+    from ..repositories.registry import list_registry_entities
+
+    with_candidates = list_registry_entities(database_url, entity_type="mcp_server")
+    for row in with_candidates:
+        spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
+        if str(spec.get("slug", "")).strip().lower() == normalized_slug:
+            return row
+    return None
 
 
 def _coerce_visibility(raw_value: Any) -> str:

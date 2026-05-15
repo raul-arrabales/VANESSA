@@ -26,7 +26,7 @@ Best for: local AI experimentation, agent and tool orchestration, platform gover
 - Local-first runtime with optional cloud providers behind a backend-owned control plane
 - Explicit `capabilities`, `providers`, and `deployment profiles` for runtime switching and governance
 - Separate ModelOps domain for managed model catalog, validation, lifecycle, and sharing
-- Agent orchestration with converged tool runtime support for MCP-backed tools and sandboxed Python execution
+- Agent orchestration with MCP server exposures backed by internal tools, plus sandboxed Python execution
 - Product-facing AI surfaces for playgrounds, builder workflows, catalog administration, and first-party Vanessa behavior
 - Modular container topology that stays extensible without collapsing control, runtime, and product concerns into one service
 
@@ -65,7 +65,7 @@ VANESSA is organized around a few clear domains:
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
-- Tool runtimes: MCP gateway for remote/general-purpose tools, SearXNG-backed web search, and sandbox for isolated Python execution
+- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, SearXNG-backed web search, and sandboxed Python execution
 - Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
 
 For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).
@@ -89,7 +89,7 @@ VANESSA currently uses global runtime profile semantics for safety gates and pro
 - `online` allows cloud-capable runtime behavior where configured
 - `offline` blocks cloud provider validation, deployment activation, runtime resolution, and invocation before any provider client is created
 - In online mode, cloud/external call metadata is published through backend cloud-traffic events so the topbar can indicate upload/download activity; optional local JSONL logging records only sanitized metadata.
-- MCP-backed web search is governed by the same runtime contract, while sandbox-backed Python execution can remain available offline when the optional capability is bound
+- MCP-exposed web search is governed by the same runtime contract, while sandbox-backed Python execution can remain available offline when the optional capability is bound
 
 ## Product Areas
 
@@ -143,7 +143,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `backend/`: Flask API, control plane, ModelOps, orchestration, and HTTP domains
 - `agent_engine/`: execution pipeline, retrieval, and tool runtime orchestration
 - `sandbox/`: isolated Python execution runtime
-- `mcp_gateway/`: MCP-backed tool runtime provider
+- `mcp_gateway/`: gateway-hosted MCP server exposure provider
 - `infra/searxng/`: local SearXNG configuration used by MCP web search
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance

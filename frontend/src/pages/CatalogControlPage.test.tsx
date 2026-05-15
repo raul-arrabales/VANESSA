@@ -29,6 +29,12 @@ vi.mock("../api/catalog", () => ({
   updateCatalogTool: vi.fn(),
   validateCatalogTool: vi.fn(),
   testCatalogTool: vi.fn(),
+  listCatalogMcpServers: vi.fn(),
+  createCatalogMcpServer: vi.fn(),
+  updateCatalogMcpServer: vi.fn(),
+  deleteCatalogMcpServer: vi.fn(),
+  validateCatalogMcpServer: vi.fn(),
+  toggleCatalogMcpServer: vi.fn(),
 }));
 
 vi.mock("../api/modelops", () => ({
@@ -88,9 +94,9 @@ const toolFixture = {
   spec: {
     name: "Web search",
     description: "Tool description",
-    transport: "mcp" as const,
-    connection_profile_ref: "default" as const,
-    tool_name: "web_search",
+    execution_backend: "mcp_gateway_web_search" as const,
+    execution_config: {},
+    permissions: { scopes: [] },
     input_schema: {
       type: "object",
       properties: {
@@ -103,6 +109,13 @@ const toolFixture = {
     output_schema: {},
     safety_policy: {},
     offline_compatible: false,
+  },
+  validation_status: {
+    last_validation_status: "success",
+    is_validation_current: true,
+    validated_version: "v1",
+    last_validated_at: "2026-01-01T00:00:00+00:00",
+    validation_errors: [],
   },
 };
 
@@ -129,6 +142,7 @@ describe("CatalogControlPage", () => {
     });
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([]);
     vi.mocked(modelApi.listEnabledModels).mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
     vi.mocked(catalogApi.createCatalogAgent).mockResolvedValue(agentFixture);
     vi.mocked(catalogApi.updateCatalogAgent).mockResolvedValue({ ...agentFixture, published: true });
@@ -148,7 +162,7 @@ describe("CatalogControlPage", () => {
         valid: true,
         errors: [],
         warnings: [],
-        resolved_tools: [{ id: "tool.web_search", name: "Web search", transport: "mcp", offline_compatible: false }],
+        resolved_tools: [{ id: "tool.web_search", name: "Web search", execution_backend: "mcp_gateway_web_search", offline_compatible: false }],
         derived_runtime_requirements: { internet_required: true, sandbox_required: false },
       },
     });
