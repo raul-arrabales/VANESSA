@@ -1824,6 +1824,15 @@
       "createTitle": "Crear servidor MCP",
       "createDescription": "Expone una herramienta interna validada mediante un servidor MCP alojado en el gateway.",
       "editing": "Editando una exposicion MCP existente.",
+      "chooseToolFirst": "Selecciona una herramienta interna validada para generar los detalles del servidor MCP.",
+      "noEligibleTools": "No hay herramientas publicadas y validadas disponibles para exponer por MCP.",
+      "selectedToolMeta": "{{toolId}} - {{backend}}",
+      "steps": {
+        "backingTool": "1. Herramienta base",
+        "identity": "2. Identidad MCP",
+        "schemas": "3. Esquemas",
+        "accessPolicy": "4. Politica de acceso"
+      },
       "views": {
         "aria": "Secciones de MCP Gateway",
         "registry": "Registro MCP",

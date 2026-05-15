@@ -361,6 +361,7 @@ export default function CatalogControlPage(): JSX.Element {
         <CatalogMcpServerFormPanel
           form={activeMcpView === "edit" && selectedMcpServer ? mcpServerForm : mcpServerForm}
           tools={tools}
+          mcpServers={mcpServers}
           saving={savingMcpServer}
           onChange={setMcpServerForm}
           onSubmit={(event) => {

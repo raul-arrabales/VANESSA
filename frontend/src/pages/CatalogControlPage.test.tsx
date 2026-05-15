@@ -119,6 +119,40 @@ const toolFixture = {
   },
 };
 
+const mcpServerFixture = {
+  id: "mcp.web_search",
+  entity: { id: "mcp.web_search", type: "mcp_server" as const, owner_user_id: 1, visibility: "private" as const },
+  current_version: "v1",
+  status: "published",
+  published: true,
+  published_at: "2026-01-01T00:00:00+00:00",
+  spec: {
+    name: "Web search MCP",
+    slug: "web_search",
+    description: "Expose Web search through the MCP gateway.",
+    backing_tool_id: "tool.web_search",
+    exposed_tool_name: "web_search",
+    input_schema: toolFixture.spec.input_schema,
+    output_schema: toolFixture.spec.output_schema,
+    authorization_policy: {
+      agent_ids: ["*"],
+      agent_domains: ["*"],
+      agent_roles: ["*"],
+      user_roles: ["*"],
+      user_ids: ["*"],
+      user_group_ids: ["*"],
+    },
+    enabled: true,
+  },
+  runtime_status: {
+    runtime_status: "success",
+    is_validation_current: true,
+    validated_version: "v1",
+    last_validated_at: "2026-01-01T00:00:00+00:00",
+    validation_errors: [],
+  },
+};
+
 async function renderPage(): Promise<void> {
   await renderWithAppProviders(<CatalogControlPage />);
 }
@@ -143,6 +177,7 @@ describe("CatalogControlPage", () => {
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([]);
+    vi.mocked(catalogApi.createCatalogMcpServer).mockResolvedValue(mcpServerFixture);
     vi.mocked(modelApi.listEnabledModels).mockResolvedValue([{ id: "safe-small", name: "Safe Small" }]);
     vi.mocked(catalogApi.createCatalogAgent).mockResolvedValue(agentFixture);
     vi.mocked(catalogApi.updateCatalogAgent).mockResolvedValue({ ...agentFixture, published: true });
@@ -331,5 +366,38 @@ describe("CatalogControlPage", () => {
     const resultPanel = await screen.findByTestId("catalog-tool-test-result");
     expect(resultPanel).toBeVisible();
     expect(resultPanel).toHaveTextContent("Example result");
+  });
+
+  it("starts MCP server creation from the backing tool and fills defaults", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=create" });
+
+    expect(await screen.findByRole("heading", { name: "Create MCP server" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create MCP server" })).toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText("Backing internal tool"), "tool.web_search");
+
+    expect(screen.getByLabelText("MCP server ID")).toHaveValue("mcp.web_search");
+    expect(screen.getByLabelText("Name")).toHaveValue("Web search MCP");
+    expect(screen.getByLabelText("Slug")).toHaveValue("web_search");
+    expect(screen.getByLabelText("Exposed MCP tool name")).toHaveValue("web_search");
+    expect(screen.getByLabelText("Description for agents")).toHaveValue("Expose Web search through the MCP gateway.");
+    expect(screen.getByLabelText("Input schema")).toHaveValue(JSON.stringify(toolFixture.spec.input_schema, null, 2));
+
+    await user.click(screen.getByRole("button", { name: "Create MCP server" }));
+
+    await waitFor(() => {
+      expect(catalogApi.createCatalogMcpServer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "mcp.web_search",
+          backing_tool_id: "tool.web_search",
+          slug: "web_search",
+          exposed_tool_name: "web_search",
+          name: "Web search MCP",
+        }),
+        "token",
+      );
+    });
   });
 });
