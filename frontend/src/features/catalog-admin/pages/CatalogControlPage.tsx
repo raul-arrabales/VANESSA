@@ -386,7 +386,6 @@ export default function CatalogControlPage(): JSX.Element {
             event.preventDefault();
             void handleMcpSubmit();
           }}
-          onReset={resetMcpServerForm}
         />
       ) : null}
       {agentPendingDelete ? (

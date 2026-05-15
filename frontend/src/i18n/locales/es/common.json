@@ -1744,8 +1744,7 @@
       "updateTool": "Actualizar herramienta",
       "newTool": "Nueva herramienta",
       "createMcpServer": "Crear servidor MCP",
-      "updateMcpServer": "Actualizar servidor MCP",
-      "newMcpServer": "Nuevo servidor MCP"
+      "updateMcpServer": "Actualizar servidor MCP"
     },
     "badges": {
       "draft": "Borrador",

@@ -1762,8 +1762,7 @@
       "updateTool": "Update tool",
       "newTool": "New tool",
       "createMcpServer": "Create MCP server",
-      "updateMcpServer": "Update MCP server",
-      "newMcpServer": "New MCP server"
+      "updateMcpServer": "Update MCP server"
     },
     "badges": {
       "draft": "Draft",

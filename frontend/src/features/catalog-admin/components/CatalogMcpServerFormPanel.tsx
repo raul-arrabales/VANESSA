@@ -10,7 +10,6 @@ type CatalogMcpServerFormPanelProps = {
   saving: boolean;
   onChange: (value: McpServerFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onReset: () => void;
 };
 
 function toolKey(tool: CatalogTool): string {
@@ -69,7 +68,6 @@ export default function CatalogMcpServerFormPanel({
   saving,
   onChange,
   onSubmit,
-  onReset,
 }: CatalogMcpServerFormPanelProps): JSX.Element {
   const { t } = useTranslation("common");
   const eligibleTools = tools.filter((tool) =>
@@ -221,7 +219,6 @@ export default function CatalogMcpServerFormPanel({
         ) : null}
         <div className="status-row">
           <button type="submit" className="btn btn-primary" disabled={saving || !selectedTool}>{saving ? t("catalogControl.actions.saving") : t(form.mode === "create" ? "catalogControl.actions.createMcpServer" : "catalogControl.actions.updateMcpServer")}</button>
-          <button type="button" className="btn btn-secondary" onClick={onReset}>{t("catalogControl.actions.newMcpServer")}</button>
         </div>
       </form>
     </article>
