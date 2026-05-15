@@ -212,6 +212,15 @@ describe("CatalogControlPage", () => {
         runtime_checks: { tool_discovered: false },
       },
     });
+    vi.mocked(catalogApi.validateCatalogMcpServer).mockResolvedValue({
+      mcp_server: mcpServerFixture,
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: [],
+        runtime_checks: {},
+      },
+    });
     vi.mocked(catalogApi.testCatalogTool).mockResolvedValue({
       tool: toolFixture,
       execution: {
@@ -468,6 +477,8 @@ describe("CatalogControlPage", () => {
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
 
     expect(await screen.findByRole("heading", { name: "Web search MCP" })).toBeVisible();
+    expect(screen.getByText("Enabled")).toBeVisible();
+    expect(screen.getByText("Validated")).toBeVisible();
     expect(screen.getByText("Expose Web search through the MCP gateway with a long agent-facing description that explains safe research...")).toBeVisible();
     expect(screen.queryByText(mcpServerFixture.spec.description)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edit Web search MCP" })).toHaveAttribute("title", "Edit Web search MCP");
@@ -479,5 +490,30 @@ describe("CatalogControlPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Web search MCP description" });
     expect(within(dialog).getByText(mcpServerFixture.spec.description)).toBeVisible();
+  });
+
+  it("updates the MCP validation badge after validation runs", async () => {
+    const user = userEvent.setup();
+    const unvalidatedServer = {
+      ...mcpServerFixture,
+      runtime_status: {
+        ...mcpServerFixture.runtime_status,
+        runtime_status: "unknown",
+        is_validation_current: false,
+        validated_version: null,
+      },
+    };
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([unvalidatedServer]);
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
+
+    expect(await screen.findByText("Needs validation")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Validate Web search MCP" }));
+
+    await waitFor(() => {
+      expect(catalogApi.validateCatalogMcpServer).toHaveBeenCalledWith("mcp.web_search", "token");
+    });
+    expect(await screen.findByText("Validated")).toBeVisible();
   });
 });

@@ -1855,6 +1855,13 @@
         "validating": "Validating {{name}}",
         "delete": "Delete {{name}}"
       },
+      "validationBadges": {
+        "validated": "Validated",
+        "failed": "Validation failed",
+        "stale": "Validation stale",
+        "unvalidated": "Needs validation",
+        "validating": "Validating"
+      },
       "descriptionDialog": {
         "title": "{{name}} description",
         "description": "Full description for agents.",

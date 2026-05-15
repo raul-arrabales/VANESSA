@@ -15,6 +15,10 @@ type CatalogMcpRegistryProps = {
 };
 
 type McpRegistryIconName = "edit" | "enable" | "disable" | "validate" | "delete" | "description";
+type McpValidationBadge = {
+  label: string;
+  tone: "active" | "inactive" | "optional" | "required";
+};
 
 function truncateWords(value: string, limit = 16): string {
   const words = value.trim().split(/\s+/).filter(Boolean);
@@ -67,6 +71,49 @@ function McpRegistryIcon({ name }: { name: McpRegistryIconName }): JSX.Element {
   );
 }
 
+function mcpValidationBadge(
+  server: CatalogMcpServer,
+  validation: CatalogMcpServerValidation["validation"] | undefined,
+  isValidating: boolean,
+  t: (key: string) => string,
+): McpValidationBadge {
+  if (isValidating) {
+    return {
+      label: t("catalogControl.mcp.validationBadges.validating"),
+      tone: "optional",
+    };
+  }
+  if (validation) {
+    return validation.valid
+      ? { label: t("catalogControl.mcp.validationBadges.validated"), tone: "active" }
+      : { label: t("catalogControl.mcp.validationBadges.failed"), tone: "inactive" };
+  }
+
+  const runtimeStatus = String(server.runtime_status.runtime_status || "unknown").toLowerCase();
+  if (runtimeStatus === "success" && server.runtime_status.is_validation_current) {
+    return {
+      label: t("catalogControl.mcp.validationBadges.validated"),
+      tone: "active",
+    };
+  }
+  if (runtimeStatus === "failed") {
+    return {
+      label: t("catalogControl.mcp.validationBadges.failed"),
+      tone: "inactive",
+    };
+  }
+  if (runtimeStatus === "success" && !server.runtime_status.is_validation_current) {
+    return {
+      label: t("catalogControl.mcp.validationBadges.stale"),
+      tone: "optional",
+    };
+  }
+  return {
+    label: t("catalogControl.mcp.validationBadges.unvalidated"),
+    tone: "required",
+  };
+}
+
 export default function CatalogMcpRegistry({
   mcpServers,
   tools,
@@ -103,6 +150,8 @@ export default function CatalogMcpRegistry({
       <div className="catalog-mcp-registry-list" role="list">
         {filteredServers.map((server) => {
           const validation = validationResults[server.id]?.validation;
+          const isValidating = validatingMcpServerId === server.id;
+          const validationBadge = mcpValidationBadge(server, validation, isValidating, t);
           const backingToolName = toolNames.get(server.spec.backing_tool_id) ?? server.spec.backing_tool_id;
           const toggleLabel = server.spec.enabled
             ? t("catalogControl.mcp.actionLabels.disable", { name: server.spec.name })
@@ -114,6 +163,9 @@ export default function CatalogMcpRegistry({
                   <h4 className="section-title">{server.spec.name}</h4>
                   <span className="platform-badge" data-tone={server.spec.enabled ? "active" : "required"}>
                     {server.spec.enabled ? t("catalogControl.badges.enabled") : t("catalogControl.badges.disabled")}
+                  </span>
+                  <span className="platform-badge" data-tone={validationBadge.tone}>
+                    {validationBadge.label}
                   </span>
                 </div>
                 <p className="status-text catalog-mcp-description-preview">{truncateWords(server.spec.description)}</p>
@@ -134,7 +186,7 @@ export default function CatalogMcpRegistry({
                 <button type="button" className="catalog-icon-button" onClick={() => onToggle(server)} aria-label={toggleLabel} title={toggleLabel}>
                   <McpRegistryIcon name={server.spec.enabled ? "disable" : "enable"} />
                 </button>
-                <button type="button" className="catalog-icon-button" onClick={() => onValidate(server.id)} disabled={validatingMcpServerId === server.id} aria-label={validatingMcpServerId === server.id ? t("catalogControl.mcp.actionLabels.validating", { name: server.spec.name }) : t("catalogControl.mcp.actionLabels.validate", { name: server.spec.name })} title={validatingMcpServerId === server.id ? t("catalogControl.mcp.actionLabels.validating", { name: server.spec.name }) : t("catalogControl.mcp.actionLabels.validate", { name: server.spec.name })}>
+                <button type="button" className="catalog-icon-button" onClick={() => onValidate(server.id)} disabled={isValidating} aria-label={isValidating ? t("catalogControl.mcp.actionLabels.validating", { name: server.spec.name }) : t("catalogControl.mcp.actionLabels.validate", { name: server.spec.name })} title={isValidating ? t("catalogControl.mcp.actionLabels.validating", { name: server.spec.name }) : t("catalogControl.mcp.actionLabels.validate", { name: server.spec.name })}>
                   <McpRegistryIcon name="validate" />
                 </button>
                 <button type="button" className="catalog-icon-button catalog-icon-button-danger" onClick={() => onDelete(server)} aria-label={t("catalogControl.mcp.actionLabels.delete", { name: server.spec.name })} title={t("catalogControl.mcp.actionLabels.delete", { name: server.spec.name })}>
