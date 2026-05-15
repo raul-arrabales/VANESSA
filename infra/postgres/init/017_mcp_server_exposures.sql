@@ -199,7 +199,9 @@ BEGIN
           ON v.entity_id = e.entity_id AND v.is_current = TRUE
         WHERE v.spec_json->>'backing_tool_id' = refs.value;
 
-        IF current_spec ? 'tool_refs' THEN
+        IF current_spec->'tool_refs' IS DISTINCT FROM new_tool_refs
+           OR current_spec->'mcp_server_refs' IS DISTINCT FROM new_mcp_refs
+           OR coalesce(current_spec->>'agent_domain', '') = '' THEN
             next_version := 'v' || (
                 SELECT COALESCE(MAX(NULLIF(regexp_replace(version, '\D', '', 'g'), '')::INTEGER), 1) + 1
                 FROM registry_versions

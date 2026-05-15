@@ -342,6 +342,7 @@ def run_auth_schema_migration(database_url: str) -> None:
     run_quotes_schema_migration(database_url)
     run_chat_conversations_schema_migration(database_url)
     run_agent_projects_schema_migration(database_url)
+    run_mcp_server_exposures_schema_migration(database_url)
 
 
 def run_registry_schema_migration(database_url: str) -> None:
@@ -569,6 +570,21 @@ def run_agent_projects_schema_migration(database_url: str) -> None:
         / "postgres"
         / "init"
         / "015_agent_projects.sql"
+    )
+    migration_sql = migration_file.read_text(encoding="utf-8")
+
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(migration_sql)
+
+
+def run_mcp_server_exposures_schema_migration(database_url: str) -> None:
+    migration_file = (
+        Path(__file__).resolve().parents[2]
+        / "infra"
+        / "postgres"
+        / "init"
+        / "017_mcp_server_exposures.sql"
     )
     migration_sql = migration_file.read_text(encoding="utf-8")
 

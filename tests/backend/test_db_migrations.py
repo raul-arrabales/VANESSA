@@ -46,6 +46,8 @@ def test_run_auth_schema_migration_invokes_registry_migration(monkeypatch):
     monkeypatch.setattr(db, "run_modelops_testing_schema_migration", lambda _db: call_order.append("modelops_testing"))
     monkeypatch.setattr(db, "run_quotes_schema_migration", lambda _db: call_order.append("quotes"))
     monkeypatch.setattr(db, "run_chat_conversations_schema_migration", lambda _db: call_order.append("chat"))
+    monkeypatch.setattr(db, "run_agent_projects_schema_migration", lambda _db: call_order.append("agent_projects"))
+    monkeypatch.setattr(db, "run_mcp_server_exposures_schema_migration", lambda _db: call_order.append("mcp_exposures"))
 
     db.run_auth_schema_migration("postgresql://ignored")
 
@@ -58,6 +60,8 @@ def test_run_auth_schema_migration_invokes_registry_migration(monkeypatch):
         "modelops_testing",
         "quotes",
         "chat",
+        "agent_projects",
+        "mcp_exposures",
     ]
 
 
