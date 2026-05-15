@@ -125,6 +125,13 @@ export default function CatalogControlPage(): JSX.Element {
     }
   }, [activeMcpView, activeSection, mcpServerForm.mcpServerId, openMcpEditor, selectedMcpServer]);
 
+  useEffect(() => {
+    if (activeSection !== "mcp" || activeMcpView !== "create" || mcpServerForm.mode === "create") {
+      return;
+    }
+    resetMcpServerForm();
+  }, [activeMcpView, activeSection, mcpServerForm.mode, resetMcpServerForm]);
+
   const toolsSubmenuItems = useMemo(
     () => {
       const items = [

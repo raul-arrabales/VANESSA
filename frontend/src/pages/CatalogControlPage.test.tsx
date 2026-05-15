@@ -437,4 +437,28 @@ describe("CatalogControlPage", () => {
       );
     });
   });
+
+  it("resets the MCP form when moving from edit back to create", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture]);
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("heading", { name: "Edit Web search MCP" })).toBeVisible();
+    expect(screen.getByLabelText("Backing internal tool")).toBeDisabled();
+
+    const subNav = screen.getByRole("navigation", { name: "MCP Gateway sections" });
+    await user.click(within(subNav).getByRole("link", { name: "Create MCP server" }));
+
+    expect(await screen.findByRole("heading", { name: "Create MCP server" })).toBeVisible();
+    expect(screen.getByLabelText("Backing internal tool")).not.toBeDisabled();
+    expect(screen.getByLabelText("Backing internal tool")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Create MCP server" })).toBeDisabled();
+
+    await user.selectOptions(screen.getByLabelText("Backing internal tool"), "tool.web_search");
+
+    expect(screen.getByLabelText("MCP server ID")).toHaveValue("mcp.web_search_2");
+    expect(screen.getByRole("button", { name: "Create MCP server" })).not.toBeDisabled();
+  });
 });
