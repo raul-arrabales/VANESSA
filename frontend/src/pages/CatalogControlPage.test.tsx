@@ -129,7 +129,7 @@ const mcpServerFixture = {
   spec: {
     name: "Web search MCP",
     slug: "web_search",
-    description: "Expose Web search through the MCP gateway.",
+    description: "Expose Web search through the MCP gateway with a long agent-facing description that explains safe research behavior, citation expectations, result limits, and when the agent should avoid using web search.",
     backing_tool_id: "tool.web_search",
     exposed_tool_name: "web_search",
     input_schema: toolFixture.spec.input_schema,
@@ -414,7 +414,7 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(await screen.findByRole("button", { name: "Edit Web search MCP" }));
 
     expect(await screen.findByRole("heading", { name: "Edit Web search MCP" })).toBeVisible();
     const subNav = screen.getByRole("navigation", { name: "MCP Gateway sections" });
@@ -444,7 +444,7 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(await screen.findByRole("button", { name: "Edit Web search MCP" }));
     expect(await screen.findByRole("heading", { name: "Edit Web search MCP" })).toBeVisible();
     expect(screen.getByLabelText("Backing internal tool")).toBeDisabled();
 
@@ -460,5 +460,25 @@ describe("CatalogControlPage", () => {
 
     expect(screen.getByLabelText("MCP server ID")).toHaveValue("mcp.web_search_2");
     expect(screen.getByRole("button", { name: "Create MCP server" })).not.toBeDisabled();
+  });
+
+  it("renders a compact MCP registry and opens full descriptions in a modal", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture]);
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
+
+    expect(await screen.findByRole("heading", { name: "Web search MCP" })).toBeVisible();
+    expect(screen.getByText("Expose Web search through the MCP gateway with a long agent-facing description that explains safe research...")).toBeVisible();
+    expect(screen.queryByText(mcpServerFixture.spec.description)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Web search MCP" })).toHaveAttribute("title", "Edit Web search MCP");
+    expect(screen.getByRole("button", { name: "Disable Web search MCP" })).toHaveAttribute("title", "Disable Web search MCP");
+    expect(screen.getByRole("button", { name: "Validate Web search MCP" })).toHaveAttribute("title", "Validate Web search MCP");
+    expect(screen.getByRole("button", { name: "Delete Web search MCP" })).toHaveAttribute("title", "Delete Web search MCP");
+
+    await user.click(screen.getByRole("button", { name: "View full description for Web search MCP" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Web search MCP description" });
+    expect(within(dialog).getByText(mcpServerFixture.spec.description)).toBeVisible();
   });
 });

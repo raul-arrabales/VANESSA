@@ -9,6 +9,7 @@
 @import "./styles/shared/overlays.css";
 @import "./styles/features/quote-management.css";
 @import "./styles/features/platform-control.css";
+@import "./styles/features/catalog-admin.css";
 @import "./styles/features/context-management.css";
 @import "./styles/features/modelops.css";
 @import "./styles/features/theme-admin.css";

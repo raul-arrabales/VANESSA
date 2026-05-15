@@ -1846,6 +1846,21 @@
       "chooseToolFirst": "Select a validated internal tool to generate the MCP server details.",
       "noEligibleTools": "No published, validated tools are available for MCP exposure.",
       "selectedToolMeta": "{{toolId}} - {{backend}}",
+      "actionsFor": "MCP server actions for {{name}}",
+      "actionLabels": {
+        "description": "View full description for {{name}}",
+        "edit": "Edit {{name}}",
+        "enable": "Enable {{name}}",
+        "disable": "Disable {{name}}",
+        "validate": "Validate {{name}}",
+        "validating": "Validating {{name}}",
+        "delete": "Delete {{name}}"
+      },
+      "descriptionDialog": {
+        "title": "{{name}} description",
+        "description": "Full description for agents.",
+        "close": "Close"
+      },
       "steps": {
         "backingTool": "1. Backing tool",
         "identity": "2. MCP identity",

@@ -1828,6 +1828,21 @@
       "chooseToolFirst": "Selecciona una herramienta interna validada para generar los detalles del servidor MCP.",
       "noEligibleTools": "No hay herramientas publicadas y validadas disponibles para exponer por MCP.",
       "selectedToolMeta": "{{toolId}} - {{backend}}",
+      "actionsFor": "Acciones de servidor MCP para {{name}}",
+      "actionLabels": {
+        "description": "Ver descripcion completa de {{name}}",
+        "edit": "Editar {{name}}",
+        "enable": "Habilitar {{name}}",
+        "disable": "Deshabilitar {{name}}",
+        "validate": "Validar {{name}}",
+        "validating": "Validando {{name}}",
+        "delete": "Eliminar {{name}}"
+      },
+      "descriptionDialog": {
+        "title": "Descripcion de {{name}}",
+        "description": "Descripcion completa para agentes.",
+        "close": "Cerrar"
+      },
       "steps": {
         "backingTool": "1. Herramienta base",
         "identity": "2. Identidad MCP",
