@@ -772,7 +772,7 @@ def _serialize_catalog_row(
             status = get_mcp_server_status(database_url, mcp_server_id=serialized["id"])
         except Exception:
             status = None
-        serialized["runtime_status"] = _serialize_mcp_runtime_status(status, serialized["current_version"])
+        serialized["validation_status"] = _serialize_mcp_validation_status(status, serialized["current_version"])
     return serialized
 
 
@@ -801,11 +801,11 @@ def _serialize_tool_validation_status(status: dict[str, Any] | None, current_ver
     }
 
 
-def _serialize_mcp_runtime_status(status: dict[str, Any] | None, current_version: str) -> dict[str, Any]:
+def _serialize_mcp_validation_status(status: dict[str, Any] | None, current_version: str) -> dict[str, Any]:
     status = status if isinstance(status, dict) else {}
     validated_version = str(status.get("validated_version") or "")
     return {
-        "runtime_status": str(status.get("runtime_status") or "unknown"),
+        "last_validation_status": str(status.get("runtime_status") or "unknown"),
         "is_validation_current": bool(validated_version and validated_version == str(current_version or "")),
         "validated_version": validated_version or None,
         "last_validated_at": status.get("last_validated_at"),

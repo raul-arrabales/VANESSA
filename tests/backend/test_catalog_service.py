@@ -14,6 +14,26 @@ def test_catalog_defaults_expose_backend_owned_agent_runtime_prompts():
     assert defaults["agent"]["runtime_prompts"] == catalog_service.default_agent_runtime_prompts()
 
 
+def test_mcp_server_status_serializes_as_validation_status():
+    status = catalog_service._serialize_mcp_validation_status(
+        {
+            "runtime_status": "success",
+            "validated_version": "v2",
+            "last_validated_at": "2026-01-01T00:00:00+00:00",
+            "validation_errors": [],
+        },
+        "v2",
+    )
+
+    assert status == {
+        "last_validation_status": "success",
+        "is_validation_current": True,
+        "validated_version": "v2",
+        "last_validated_at": "2026-01-01T00:00:00+00:00",
+        "validation_errors": [],
+    }
+
+
 def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pytest.MonkeyPatch):
     entities: dict[str, dict] = {}
 

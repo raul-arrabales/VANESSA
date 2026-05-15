@@ -108,13 +108,7 @@ export type CatalogMcpServer = {
   created_at?: string | null;
   updated_at?: string | null;
   spec: CatalogMcpServerSpec;
-  runtime_status: {
-    runtime_status: string;
-    is_validation_current: boolean;
-    validated_version: string | null;
-    last_validated_at: string | null;
-    validation_errors: string[];
-  };
+  validation_status: CatalogValidationStatus;
 };
 
 export type CatalogAgentMutationInput = {

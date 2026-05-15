@@ -144,8 +144,8 @@ const mcpServerFixture = {
     },
     enabled: true,
   },
-  runtime_status: {
-    runtime_status: "success",
+  validation_status: {
+    last_validation_status: "success",
     is_validation_current: true,
     validated_version: "v1",
     last_validated_at: "2026-01-01T00:00:00+00:00",
@@ -496,9 +496,9 @@ describe("CatalogControlPage", () => {
     const user = userEvent.setup();
     const unvalidatedServer = {
       ...mcpServerFixture,
-      runtime_status: {
-        ...mcpServerFixture.runtime_status,
-        runtime_status: "unknown",
+      validation_status: {
+        ...mcpServerFixture.validation_status,
+        last_validation_status: "unknown",
         is_validation_current: false,
         validated_version: null,
       },
