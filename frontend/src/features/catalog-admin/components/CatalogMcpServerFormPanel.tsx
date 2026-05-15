@@ -77,9 +77,23 @@ export default function CatalogMcpServerFormPanel({
     && tool.validation_status?.last_validation_status === "success"
     && tool.validation_status?.is_validation_current
   );
-  const selectedTool = eligibleTools.find((tool) => tool.id === form.backing_tool_id) ?? null;
+  const backingTool = tools.find((tool) => tool.id === form.backing_tool_id) ?? null;
+  const selectedTool = form.mode === "edit" ? backingTool : eligibleTools.find((tool) => tool.id === form.backing_tool_id) ?? null;
+  const backingToolOptions = form.mode === "edit" && backingTool && !eligibleTools.some((tool) => tool.id === backingTool.id)
+    ? [backingTool, ...eligibleTools]
+    : eligibleTools;
+  const title = form.mode === "create"
+    ? t("catalogControl.mcp.createTitle")
+    : t("catalogControl.mcp.editTitle", { name: form.name || form.mcpServerId });
+  const description = form.mode === "create"
+    ? t("catalogControl.mcp.createDescription")
+    : t("catalogControl.mcp.editDescription", { name: form.name || form.mcpServerId });
 
   function handleBackingToolChange(toolId: string): void {
+    if (form.mode === "edit") {
+      return;
+    }
+
     const selected = eligibleTools.find((tool) => tool.id === toolId);
     if (!selected) {
       onChange({
@@ -89,29 +103,17 @@ export default function CatalogMcpServerFormPanel({
       return;
     }
 
-    if (form.mode === "create") {
-      onChange({
-        ...form,
-        ...buildDefaultsForTool(selected, mcpServers, form.mcpServerId),
-      });
-      return;
-    }
-
     onChange({
       ...form,
-      backing_tool_id: selected.id,
-      input_schema: selected.spec.input_schema,
-      output_schema: selected.spec.output_schema,
-      inputSchemaText: JSON.stringify(selected.spec.input_schema, null, 2),
-      outputSchemaText: JSON.stringify(selected.spec.output_schema, null, 2),
+      ...buildDefaultsForTool(selected, mcpServers, form.mcpServerId),
     });
   }
 
   return (
     <article className="panel card-stack">
       <div className="status-row">
-        <h3 className="section-title">{t("catalogControl.mcp.createTitle")}</h3>
-        <p className="status-text">{form.mode === "create" ? t("catalogControl.mcp.createDescription") : t("catalogControl.mcp.editing")}</p>
+        <h3 className="section-title">{title}</h3>
+        <p className="status-text">{description}</p>
       </div>
       <form className="card-stack" onSubmit={onSubmit}>
         <section className="panel panel-nested card-stack">
@@ -126,10 +128,11 @@ export default function CatalogMcpServerFormPanel({
             <select
               className="field-input"
               value={form.backing_tool_id}
+              disabled={form.mode === "edit"}
               onChange={(event) => handleBackingToolChange(event.target.value)}
             >
               <option value="">{t("catalogControl.forms.mcp.noBackingTool")}</option>
-              {eligibleTools.map((tool) => (
+              {backingToolOptions.map((tool) => (
                 <option key={tool.id} value={tool.id}>{tool.spec.name}</option>
               ))}
             </select>

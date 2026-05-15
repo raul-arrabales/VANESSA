@@ -1841,7 +1841,8 @@
       "updatedLabel": "Last updated: {{updated}}",
       "createTitle": "Create MCP server",
       "createDescription": "Expose a validated internal tool through a gateway-hosted MCP server.",
-      "editing": "Editing an existing MCP server exposure.",
+      "editTitle": "Edit {{name}}",
+      "editDescription": "Update this MCP server exposure while keeping its backing internal tool fixed.",
       "chooseToolFirst": "Select a validated internal tool to generate the MCP server details.",
       "noEligibleTools": "No published, validated tools are available for MCP exposure.",
       "selectedToolMeta": "{{toolId}} - {{backend}}",
@@ -1854,7 +1855,8 @@
       "views": {
         "aria": "MCP Gateway sections",
         "registry": "MCP Registry",
-        "create": "Create MCP server"
+        "create": "Create MCP server",
+        "edit": "Edit {{name}}"
       }
     },
     "forms": {

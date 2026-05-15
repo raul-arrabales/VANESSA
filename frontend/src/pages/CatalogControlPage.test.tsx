@@ -400,4 +400,41 @@ describe("CatalogControlPage", () => {
       );
     });
   });
+
+  it("opens a dedicated MCP edit flow with the backing tool locked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture]);
+    vi.mocked(catalogApi.updateCatalogMcpServer).mockResolvedValue({
+      ...mcpServerFixture,
+      spec: {
+        ...mcpServerFixture.spec,
+        name: "Web search MCP updated",
+      },
+    });
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByRole("heading", { name: "Edit Web search MCP" })).toBeVisible();
+    const subNav = screen.getByRole("navigation", { name: "MCP Gateway sections" });
+    expect(within(subNav).getByRole("link", { name: "Edit Web search MCP" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Backing internal tool")).toBeDisabled();
+    expect(screen.getByLabelText("Backing internal tool")).toHaveValue("tool.web_search");
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Web search MCP updated");
+    await user.click(screen.getByRole("button", { name: "Update MCP server" }));
+
+    await waitFor(() => {
+      expect(catalogApi.updateCatalogMcpServer).toHaveBeenCalledWith(
+        "mcp.web_search",
+        expect.objectContaining({
+          name: "Web search MCP updated",
+          backing_tool_id: "tool.web_search",
+        }),
+        "token",
+      );
+    });
+  });
 });

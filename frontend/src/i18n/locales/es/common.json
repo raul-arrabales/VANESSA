@@ -1823,7 +1823,8 @@
       "updatedLabel": "Ultima actualizacion: {{updated}}",
       "createTitle": "Crear servidor MCP",
       "createDescription": "Expone una herramienta interna validada mediante un servidor MCP alojado en el gateway.",
-      "editing": "Editando una exposicion MCP existente.",
+      "editTitle": "Editar {{name}}",
+      "editDescription": "Actualiza esta exposicion MCP manteniendo fija su herramienta interna base.",
       "chooseToolFirst": "Selecciona una herramienta interna validada para generar los detalles del servidor MCP.",
       "noEligibleTools": "No hay herramientas publicadas y validadas disponibles para exponer por MCP.",
       "selectedToolMeta": "{{toolId}} - {{backend}}",
@@ -1836,7 +1837,8 @@
       "views": {
         "aria": "Secciones de MCP Gateway",
         "registry": "Registro MCP",
-        "create": "Crear servidor MCP"
+        "create": "Crear servidor MCP",
+        "edit": "Editar {{name}}"
       }
     },
     "forms": {
