@@ -9,8 +9,8 @@ export const CATALOG_CONTROL_NAV_ITEMS: ReadonlyArray<{
 }> = [
   { id: "overview", labelKey: "catalogControl.navigation.overview" },
   { id: "tools", labelKey: "catalogControl.navigation.tools" },
-  { id: "agents", labelKey: "catalogControl.navigation.agents" },
   { id: "mcp", labelKey: "catalogControl.navigation.mcp" },
+  { id: "agents", labelKey: "catalogControl.navigation.agents" },
 ];
 
 export function resolveCatalogControlSection(value: string | null): CatalogControlSection {

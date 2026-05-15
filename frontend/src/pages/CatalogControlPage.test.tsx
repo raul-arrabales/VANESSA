@@ -230,8 +230,7 @@ describe("CatalogControlPage", () => {
     expect(await screen.findByRole("heading", { name: "Agent and tool catalog" })).toBeVisible();
     const topNav = screen.getByRole("navigation", { name: "Catalog control sections" });
     expect(within(topNav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-    expect(within(topNav).getByRole("link", { name: "Tools" })).toBeVisible();
-    expect(within(topNav).getByRole("link", { name: "Agents" })).toBeVisible();
+    expect(within(topNav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Overview", "Tools", "MCP Gateway", "Agents"]);
     expect(screen.getByText("Catalog areas")).toBeVisible();
     expect(screen.queryByRole("navigation", { name: "Tool catalog sections" })).not.toBeInTheDocument();
   });
