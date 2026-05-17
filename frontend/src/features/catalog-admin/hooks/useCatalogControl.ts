@@ -7,6 +7,7 @@ import {
   deleteCatalogAgent,
   deleteCatalogMcpServer,
   getCatalogDefaults,
+  getCatalogMcpCreationOptions,
   getCatalogToolCreationOptions,
   listCatalogAgents,
   listCatalogMcpServers,
@@ -17,6 +18,7 @@ import {
   type CatalogAgentValidation,
   type CatalogDefaults,
   type CatalogMcpServer,
+  type CatalogMcpCreationOptions,
   type CatalogMcpServerMutationInput,
   type CatalogMcpServerSpec,
   type CatalogMcpServerValidation,
@@ -297,6 +299,7 @@ export function useCatalogControl(token: string) {
   const [mcpServers, setMcpServers] = useState<CatalogMcpServer[]>([]);
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
   const [toolCreationOptions, setToolCreationOptions] = useState<CatalogToolCreationOptions | null>(null);
+  const [mcpCreationOptions, setMcpCreationOptions] = useState<CatalogMcpCreationOptions | null>(null);
   const [agentForm, setAgentForm] = useState<AgentFormState>(() => buildDefaultAgentForm(null));
   const [toolForm, setToolForm] = useState<ToolFormState>(DEFAULT_TOOL_FORM);
   const [mcpServerForm, setMcpServerForm] = useState<McpServerFormState>(DEFAULT_MCP_SERVER_FORM);
@@ -328,13 +331,22 @@ export function useCatalogControl(token: string) {
     setErrorMessage("");
 
     try {
-      const [defaultsPayload, agentsPayload, toolsPayload, mcpServersPayload, modelsPayload, toolCreationOptionsPayload] = await Promise.all([
+      const [
+        defaultsPayload,
+        agentsPayload,
+        toolsPayload,
+        mcpServersPayload,
+        modelsPayload,
+        toolCreationOptionsPayload,
+        mcpCreationOptionsPayload,
+      ] = await Promise.all([
         getCatalogDefaults(token),
         listCatalogAgents(token),
         listCatalogTools(token),
         listCatalogMcpServers(token),
         listEnabledModels(token),
         getCatalogToolCreationOptions(token),
+        getCatalogMcpCreationOptions(token),
       ]);
       const previousDefaults = catalogDefaultsRef.current;
       catalogDefaultsRef.current = defaultsPayload;
@@ -343,6 +355,7 @@ export function useCatalogControl(token: string) {
       setMcpServers(mcpServersPayload);
       setModels(modelsPayload);
       setToolCreationOptions(toolCreationOptionsPayload);
+      setMcpCreationOptions(mcpCreationOptionsPayload);
       setAgentForm((current) => {
         if (current.mode !== "create") {
           return current;
@@ -681,6 +694,7 @@ export function useCatalogControl(token: string) {
     mcpServers,
     models,
     toolCreationOptions,
+    mcpCreationOptions,
     agentForm,
     setAgentForm,
     toolForm,

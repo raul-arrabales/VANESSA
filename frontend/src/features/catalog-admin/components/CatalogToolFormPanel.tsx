@@ -1,6 +1,7 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogToolCreationOptions, CatalogToolExecutionBackend, CatalogToolMutationInput } from "../../../api/catalog";
+import { catalogToolBackendLabelKey } from "../catalogToolBackends";
 import type { ToolFormState } from "../hooks/useCatalogControl";
 
 type CatalogToolFormPanelProps = {
@@ -36,19 +37,6 @@ function formFromTemplate(
   };
 }
 
-function backendLabelKey(executionBackend: string): string {
-  if (executionBackend === "sandbox_python") {
-    return "sandboxPython";
-  }
-  if (executionBackend === "mcp_gateway_web_search") {
-    return "webSearch";
-  }
-  if (executionBackend === "knowledge_base_retrieval") {
-    return "knowledgeBaseRetrieval";
-  }
-  return "internalHttp";
-}
-
 export default function CatalogToolFormPanel({
   form,
   toolCreationOptions,
@@ -60,7 +48,8 @@ export default function CatalogToolFormPanel({
   const { t } = useTranslation("common");
   const backendOptions = toolCreationOptions?.execution_backends ?? [];
   const selectedBackend = backendOptions.find((option) => option.execution_backend === form.execution_backend) ?? null;
-  const knowledgeBases = selectedBackend?.knowledge_bases ?? toolCreationOptions?.knowledge_bases ?? [];
+  const selectedKnowledgeBackend = selectedBackend?.requires_knowledge_base ? selectedBackend : null;
+  const knowledgeBases = selectedKnowledgeBackend?.knowledge_bases ?? toolCreationOptions?.knowledge_bases ?? [];
   const requiresKnowledgeBase = form.execution_backend === "knowledge_base_retrieval";
   const detailsReady = form.mode === "edit" || Boolean(form.execution_backend && (!requiresKnowledgeBase || form.selectedKnowledgeBaseId));
 
@@ -83,7 +72,7 @@ export default function CatalogToolFormPanel({
       const defaultKnowledgeBaseId = toolCreationOptions?.selection_required
         ? ""
         : toolCreationOptions?.default_knowledge_base_id ?? option.knowledge_bases?.[0]?.id ?? "";
-      const template = defaultKnowledgeBaseId ? option.templates_by_knowledge_base_id?.[defaultKnowledgeBaseId] : undefined;
+      const template = defaultKnowledgeBaseId ? option.templates_by_knowledge_base_id[defaultKnowledgeBaseId] : undefined;
       if (template) {
         onChange(formFromTemplate(form, template, { selectedKnowledgeBaseId: defaultKnowledgeBaseId }));
         return;
@@ -116,7 +105,7 @@ export default function CatalogToolFormPanel({
   }
 
   function handleKnowledgeBaseChange(knowledgeBaseId: string): void {
-    const template = selectedBackend?.templates_by_knowledge_base_id?.[knowledgeBaseId];
+    const template = selectedKnowledgeBackend?.templates_by_knowledge_base_id[knowledgeBaseId];
     if (template) {
       onChange(formFromTemplate(form, template, { selectedKnowledgeBaseId: knowledgeBaseId }));
       return;
@@ -147,7 +136,7 @@ export default function CatalogToolFormPanel({
               <option value="">{t("catalogControl.forms.tool.noExecutionBackend")}</option>
               {backendOptions.map((option) => (
                 <option key={option.execution_backend} value={option.execution_backend}>
-                  {t(`catalogControl.executionBackend.${backendLabelKey(option.execution_backend)}`)}
+                  {t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(option.execution_backend)}`)}
                 </option>
               ))}
             </select>

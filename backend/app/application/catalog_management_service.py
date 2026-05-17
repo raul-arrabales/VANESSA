@@ -14,6 +14,7 @@ from ..services.catalog_service import (
     get_catalog_agent as _get_catalog_agent,
     get_catalog_defaults as _get_catalog_defaults,
     get_catalog_mcp_server as _get_catalog_mcp_server,
+    get_catalog_mcp_creation_options as _get_catalog_mcp_creation_options,
     get_catalog_tool as _get_catalog_tool,
     get_catalog_tool_creation_options as _get_catalog_tool_creation_options,
     invoke_catalog_mcp_server as _invoke_catalog_mcp_server,
@@ -114,6 +115,10 @@ def get_catalog_defaults() -> dict[str, Any]:
 
 def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict[str, Any]:
     return _get_catalog_tool_creation_options(database_url, config=config)
+
+
+def get_catalog_mcp_creation_options(database_url: str) -> dict[str, Any]:
+    return _get_catalog_mcp_creation_options(database_url)
 
 
 def get_catalog_tool(database_url: str, *, tool_id: str) -> dict[str, Any]:

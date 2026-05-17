@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .context_management_retrieval_schema import RETRIEVAL_QUERY_PREPROCESSING_MODES, RETRIEVAL_SEARCH_METHODS
 from .context_management_serialization import _normalize_schema
 from .context_management_retrieval_types import KnowledgeBaseRetrievalOptions
 from .platform_types import PlatformControlPlaneError
@@ -31,10 +32,10 @@ def _normalize_top_k(value: Any) -> int:
 
 def _normalize_search_method(value: Any) -> str:
     normalized = str(value or "semantic").strip().lower() or "semantic"
-    if normalized not in {"semantic", "keyword", "hybrid"}:
+    if normalized not in RETRIEVAL_SEARCH_METHODS:
         raise PlatformControlPlaneError(
             "invalid_search_method",
-            "search_method must be one of semantic, keyword, or hybrid",
+            f"search_method must be one of {', '.join(RETRIEVAL_SEARCH_METHODS)}",
             status_code=400,
         )
     return normalized
@@ -42,10 +43,10 @@ def _normalize_search_method(value: Any) -> str:
 
 def _normalize_query_preprocessing(value: Any) -> str:
     normalized = str(value or "none").strip().lower() or "none"
-    if normalized not in {"none", "normalize"}:
+    if normalized not in RETRIEVAL_QUERY_PREPROCESSING_MODES:
         raise PlatformControlPlaneError(
             "invalid_query_preprocessing",
-            "query_preprocessing must be one of none or normalize",
+            f"query_preprocessing must be one of {', '.join(RETRIEVAL_QUERY_PREPROCESSING_MODES)}",
             status_code=400,
         )
     return normalized

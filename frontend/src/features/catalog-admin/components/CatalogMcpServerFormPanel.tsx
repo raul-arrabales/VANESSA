@@ -1,12 +1,13 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { CatalogMcpServer, CatalogMcpServerSpec, CatalogTool } from "../../../api/catalog";
+import type { CatalogMcpCreationOptions, CatalogMcpServer, CatalogMcpServerSpec, CatalogTool } from "../../../api/catalog";
 import type { McpServerFormState } from "../hooks/useCatalogControl";
 
 type CatalogMcpServerFormPanelProps = {
   form: McpServerFormState;
   tools: CatalogTool[];
   mcpServers: CatalogMcpServer[];
+  mcpCreationOptions: CatalogMcpCreationOptions | null;
   saving: boolean;
   onChange: (value: McpServerFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -52,47 +53,7 @@ function uniqueValue(base: string, existingValues: Set<string>): string {
   return candidate;
 }
 
-function metadataDefaultsForTool(tool: CatalogTool): CatalogMcpServerSpec["metadata"] {
-  const executionBackend = tool.spec.execution_backend ?? "internal_http";
-  if (executionBackend === "sandbox_python") {
-    return {
-      category: "code_execution",
-      capabilities: ["python", "code-execution", "calculation", "data-transformation", "sandboxed-execution"],
-      local: true,
-      stateless: true,
-      sandboxed: true,
-      risk_level: "high",
-      data_access: "none",
-      output_freshness: "runtime_generated",
-      audit_level: "elevated",
-    };
-  }
-  if (executionBackend === "mcp_gateway_web_search") {
-    return {
-      category: "web_search",
-      capabilities: ["web-search", "fresh-information", "source-discovery", "fact-checking", "public-research"],
-      local: false,
-      stateless: true,
-      sandboxed: false,
-      risk_level: "medium",
-      data_access: "public_web",
-      output_freshness: "fresh",
-      audit_level: "standard",
-    };
-  }
-  if (executionBackend === "knowledge_base_retrieval") {
-    return {
-      category: "knowledge_retrieval",
-      capabilities: ["knowledge-base", "retrieval", "semantic-search", "source-grounding"],
-      local: Boolean(tool.spec.offline_compatible),
-      stateless: true,
-      sandboxed: false,
-      risk_level: "low",
-      data_access: "workspace",
-      output_freshness: "static",
-      audit_level: "standard",
-    };
-  }
+function fallbackMetadataDefaultsForTool(tool: CatalogTool): CatalogMcpServerSpec["metadata"] {
   return {
     category: "custom",
     capabilities: [],
@@ -106,7 +67,16 @@ function metadataDefaultsForTool(tool: CatalogTool): CatalogMcpServerSpec["metad
   };
 }
 
-function buildDefaultsForTool(tool: CatalogTool, mcpServers: CatalogMcpServer[], currentServerId: string): Partial<McpServerFormState> {
+function metadataDefaultsForTool(tool: CatalogTool, mcpCreationOptions: CatalogMcpCreationOptions | null): CatalogMcpServerSpec["metadata"] {
+  return mcpCreationOptions?.tools.find((item) => item.tool_id === tool.id)?.metadata_defaults ?? fallbackMetadataDefaultsForTool(tool);
+}
+
+function buildDefaultsForTool(
+  tool: CatalogTool,
+  mcpServers: CatalogMcpServer[],
+  currentServerId: string,
+  mcpCreationOptions: CatalogMcpCreationOptions | null,
+): Partial<McpServerFormState> {
   const existingIds = new Set(mcpServers.filter((server) => server.id !== currentServerId).map((server) => server.id));
   const existingSlugs = new Set(mcpServers.filter((server) => server.id !== currentServerId).map((server) => server.spec.slug));
   const baseSlug = slugFromTool(tool);
@@ -114,7 +84,7 @@ function buildDefaultsForTool(tool: CatalogTool, mcpServers: CatalogMcpServer[],
   const id = uniqueValue(`mcp.${baseSlug}`, existingIds);
   const inputSchemaText = JSON.stringify(tool.spec.input_schema, null, 2);
   const outputSchemaText = JSON.stringify(tool.spec.output_schema, null, 2);
-  const metadata = metadataDefaultsForTool(tool);
+  const metadata = metadataDefaultsForTool(tool, mcpCreationOptions);
   return {
     id,
     mcpServerId: id,
@@ -136,6 +106,7 @@ export default function CatalogMcpServerFormPanel({
   form,
   tools,
   mcpServers,
+  mcpCreationOptions,
   saving,
   onChange,
   onSubmit,
@@ -174,7 +145,7 @@ export default function CatalogMcpServerFormPanel({
 
     onChange({
       ...form,
-      ...buildDefaultsForTool(selected, mcpServers, form.mcpServerId),
+      ...buildDefaultsForTool(selected, mcpServers, form.mcpServerId, mcpCreationOptions),
     });
   }
 

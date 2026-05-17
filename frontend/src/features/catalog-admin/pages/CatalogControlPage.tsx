@@ -51,6 +51,7 @@ export default function CatalogControlPage(): JSX.Element {
     toolForm,
     setToolForm,
     toolCreationOptions,
+    mcpCreationOptions,
     mcpServerForm,
     setMcpServerForm,
     toolTestForm,
@@ -349,6 +350,7 @@ export default function CatalogControlPage(): JSX.Element {
           form={activeMcpView === "edit" && selectedMcpServer ? mcpServerForm : mcpServerForm}
           tools={tools}
           mcpServers={mcpServers}
+          mcpCreationOptions={mcpCreationOptions}
           saving={savingMcpServer}
           onChange={setMcpServerForm}
           onSubmit={(event) => {

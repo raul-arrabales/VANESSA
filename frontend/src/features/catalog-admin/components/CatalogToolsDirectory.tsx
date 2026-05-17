@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { CatalogTool, CatalogToolValidation } from "../../../api/catalog";
+import { catalogToolBackendLabelKey } from "../catalogToolBackends";
 
 type CatalogToolsDirectoryProps = {
   tools: CatalogTool[];
@@ -44,7 +45,7 @@ export default function CatalogToolsDirectory({
               </p>
               <p className="status-text">
                 {t("catalogControl.tools.backendLabel", {
-                  backend: t(`catalogControl.executionBackend.${tool.spec.execution_backend === "sandbox_python" ? "sandboxPython" : tool.spec.execution_backend === "mcp_gateway_web_search" ? "webSearch" : tool.spec.execution_backend === "knowledge_base_retrieval" ? "knowledgeBaseRetrieval" : "internalHttp"}`),
+                  backend: t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(tool.spec.execution_backend)}`),
                 })}
               </p>
               <p className="status-text">

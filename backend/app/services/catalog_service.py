@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from time import monotonic
-from dataclasses import dataclass
 from typing import Any, Literal
 
 try:
@@ -39,25 +38,27 @@ from .agent_prompt_defaults import (
     normalize_agent_runtime_prompts,
 )
 from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
-from .platform_adapters import http_json_request
-from .context_management_runtime import list_active_runtime_knowledge_bases, query_knowledge_base
-from .platform_service import get_active_platform_runtime, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
+from .catalog_errors import CatalogError
+from .catalog_tool_backends import (
+    TOOL_BACKEND_INTERNAL_HTTP as _TOOL_BACKEND_INTERNAL_HTTP,
+    TOOL_BACKEND_KB_RETRIEVAL as _TOOL_BACKEND_KB_RETRIEVAL,
+    TOOL_BACKEND_SANDBOX as _TOOL_BACKEND_SANDBOX,
+    TOOL_BACKEND_WEB_SEARCH as _TOOL_BACKEND_WEB_SEARCH,
+    VALID_TOOL_BACKENDS as _VALID_TOOL_BACKENDS,
+    build_tool_creation_options,
+    ensure_execution_config,
+    execute_backend,
+    mcp_metadata_defaults_for_tool_spec,
+    tool_execution_backend,
+    validate_backend,
+)
+from .platform_service import resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
 
 _ENTITY_TYPE_AGENT = "agent"
 _ENTITY_TYPE_TOOL = "tool"
 _ENTITY_TYPE_MCP_SERVER = "mcp_server"
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
-_TOOL_BACKEND_SANDBOX = "sandbox_python"
-_TOOL_BACKEND_WEB_SEARCH = "mcp_gateway_web_search"
-_TOOL_BACKEND_INTERNAL_HTTP = "internal_http"
-_TOOL_BACKEND_KB_RETRIEVAL = "knowledge_base_retrieval"
-_VALID_TOOL_BACKENDS = {
-    _TOOL_BACKEND_SANDBOX,
-    _TOOL_BACKEND_WEB_SEARCH,
-    _TOOL_BACKEND_INTERNAL_HTTP,
-    _TOOL_BACKEND_KB_RETRIEVAL,
-}
 _VALID_MCP_METADATA_CATEGORIES = {
     "web_search",
     "knowledge_retrieval",
@@ -75,14 +76,6 @@ _VERSION_PATTERN = re.compile(r"^v(?P<number>\d+)$", re.IGNORECASE)
 _PLATFORM_AGENT_IDS = {KNOWLEDGE_CHAT_AGENT_ID}
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 _TAG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-
-
-@dataclass(slots=True)
-class CatalogError(RuntimeError):
-    code: str
-    message: str
-    status_code: int = 400
-    details: dict[str, Any] | None = None
 
 
 def list_catalog_agents(database_url: str) -> list[dict[str, Any]]:
@@ -115,36 +108,18 @@ def get_catalog_defaults() -> dict[str, Any]:
 
 
 def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict[str, Any]:
-    runtime_payload, platform_runtime = _active_runtime_knowledge_base_payload(database_url, config)
-    knowledge_bases = list(runtime_payload.get("knowledge_bases") or [])
-    offline_compatible = _knowledge_retrieval_runtime_is_local(platform_runtime)
-    execution_backends: list[dict[str, Any]] = [
-        _tool_creation_backend_option(_TOOL_BACKEND_SANDBOX, _build_sandbox_tool_template()),
-        _tool_creation_backend_option(_TOOL_BACKEND_WEB_SEARCH, _build_web_search_tool_template()),
-        _tool_creation_backend_option(_TOOL_BACKEND_INTERNAL_HTTP, _build_internal_http_tool_template()),
-    ]
-    if knowledge_bases:
-        execution_backends.append(
-            {
-                "execution_backend": _TOOL_BACKEND_KB_RETRIEVAL,
-                "requires_knowledge_base": True,
-                "knowledge_bases": knowledge_bases,
-                "templates_by_knowledge_base_id": {
-                    str(knowledge_base.get("id") or ""): _build_knowledge_base_retrieval_tool_template(
-                        knowledge_base,
-                        offline_compatible=offline_compatible,
-                    )
-                    for knowledge_base in knowledge_bases
-                    if str(knowledge_base.get("id") or "").strip()
-                },
-            }
-        )
+    return build_tool_creation_options(database_url, config=config)
+
+
+def get_catalog_mcp_creation_options(database_url: str) -> dict[str, Any]:
     return {
-        "execution_backends": execution_backends,
-        "knowledge_bases": knowledge_bases,
-        "default_knowledge_base_id": runtime_payload.get("default_knowledge_base_id"),
-        "selection_required": bool(runtime_payload.get("selection_required", False)),
-        "configuration_message": runtime_payload.get("configuration_message"),
+        "tools": [
+            {
+                "tool_id": tool["id"],
+                "metadata_defaults": mcp_metadata_defaults_for_tool_spec(tool.get("spec") if isinstance(tool.get("spec"), dict) else {}),
+            }
+            for tool in list_catalog_tools(database_url)
+        ],
     }
 
 
@@ -894,228 +869,6 @@ def _find_mcp_server_by_slug(database_url: str, slug: str) -> dict[str, Any] | N
     return None
 
 
-def _active_runtime_knowledge_base_payload(database_url: str, config: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-    try:
-        platform_runtime = get_active_platform_runtime(database_url, config)
-        return list_active_runtime_knowledge_bases(platform_runtime, database_url=database_url), platform_runtime
-    except PlatformControlPlaneError as exc:
-        return {
-            "knowledge_bases": [],
-            "default_knowledge_base_id": None,
-            "selection_required": False,
-            "configuration_message": exc.message,
-        }, {}
-
-
-def _active_bound_knowledge_bases(database_url: str, config: Any) -> list[dict[str, Any]]:
-    platform_runtime = get_active_platform_runtime(database_url, config)
-    payload = list_active_runtime_knowledge_bases(platform_runtime, database_url=database_url)
-    return [item for item in payload.get("knowledge_bases", []) if isinstance(item, dict)]
-
-
-def _find_active_bound_knowledge_base(database_url: str, config: Any, *, knowledge_base_id: str) -> dict[str, Any]:
-    normalized = str(knowledge_base_id or "").strip()
-    if not normalized:
-        raise CatalogError("invalid_execution_config", "execution_config.knowledge_base_id is required")
-    try:
-        for knowledge_base in _active_bound_knowledge_bases(database_url, config):
-            if str(knowledge_base.get("id") or "").strip() == normalized:
-                return knowledge_base
-    except PlatformControlPlaneError as exc:
-        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-    raise CatalogError(
-        "knowledge_base_not_bound",
-        "Knowledge base retrieval tools must reference a knowledge base bound to the active deployment vector store.",
-        status_code=409,
-        details={"knowledge_base_id": normalized},
-    )
-
-
-def _knowledge_retrieval_runtime_is_local(platform_runtime: dict[str, Any]) -> bool:
-    capabilities = platform_runtime.get("capabilities") if isinstance(platform_runtime.get("capabilities"), dict) else {}
-    for capability_key in ["embeddings", "vector_store"]:
-        binding = capabilities.get(capability_key) if isinstance(capabilities.get(capability_key), dict) else {}
-        if str(binding.get("provider_origin") or "local").strip().lower() == "cloud":
-            return False
-    return True
-
-
-def _tool_creation_backend_option(execution_backend: str, template: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "execution_backend": execution_backend,
-        "requires_knowledge_base": False,
-        "template": template,
-    }
-
-
-def _build_sandbox_tool_template() -> dict[str, Any]:
-    return {
-        "id": "tool.custom_python_exec",
-        "visibility": "private",
-        "publish": False,
-        "name": "Python Execution",
-        "description": "Runs constrained Python code in the sandbox runtime.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "code": {"type": "string"},
-                "input": {},
-                "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 30},
-            },
-            "required": ["code"],
-            "additionalProperties": False,
-        },
-        "output_schema": {
-            "type": "object",
-            "properties": {
-                "stdout": {"type": "string"},
-                "stderr": {"type": "string"},
-                "result": {},
-                "error": {},
-            },
-            "required": ["stdout", "stderr"],
-            "additionalProperties": True,
-        },
-        "safety_policy": {"timeout_seconds": 5, "network_access": False, "allow_imports": False},
-        "offline_compatible": True,
-        "execution_backend": _TOOL_BACKEND_SANDBOX,
-        "execution_config": {},
-        "permissions": {},
-    }
-
-
-def _build_web_search_tool_template() -> dict[str, Any]:
-    return {
-        "id": "tool.custom_web_search",
-        "visibility": "private",
-        "publish": False,
-        "name": "Web Search",
-        "description": "Searches the web through the MCP gateway's SearXNG-backed runner.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "top_k": {"type": "integer", "minimum": 1, "maximum": 10},
-                "language": {"type": "string"},
-                "time_range": {"type": "string", "enum": ["day", "month", "year"]},
-                "safesearch": {"type": "integer", "enum": [0, 1, 2]},
-                "categories": {"type": "string"},
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-        "output_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "results": {"type": "array", "items": {"type": "object"}, "additionalProperties": True},
-            },
-            "required": ["query", "results"],
-            "additionalProperties": True,
-        },
-        "safety_policy": {"timeout_seconds": 8, "network_access": True},
-        "offline_compatible": False,
-        "execution_backend": _TOOL_BACKEND_WEB_SEARCH,
-        "execution_config": {
-            "internal_tool_name": "web_search",
-            "gateway_internal_path": "/v1/internal/tools/web-search",
-        },
-        "permissions": {},
-    }
-
-
-def _build_internal_http_tool_template() -> dict[str, Any]:
-    return {
-        "id": "tool.internal_http",
-        "visibility": "private",
-        "publish": False,
-        "name": "Internal HTTP Tool",
-        "description": "Calls a backend-owned internal HTTP integration.",
-        "input_schema": {"type": "object", "additionalProperties": True},
-        "output_schema": {"type": "object", "additionalProperties": True},
-        "safety_policy": {},
-        "offline_compatible": True,
-        "execution_backend": _TOOL_BACKEND_INTERNAL_HTTP,
-        "execution_config": {},
-        "permissions": {},
-    }
-
-
-def _build_knowledge_base_retrieval_input_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            "query_text": {"type": "string"},
-            "top_k": {"type": "integer", "minimum": 1},
-            "search_method": {"type": "string", "enum": ["semantic", "keyword", "hybrid"]},
-            "query_preprocessing": {"type": "string", "enum": ["none", "normalize"]},
-            "hybrid_alpha": {"type": "number", "minimum": 0, "maximum": 1},
-            "filters": {"type": "object", "additionalProperties": True},
-        },
-        "required": ["query_text"],
-        "additionalProperties": False,
-    }
-
-
-def _build_knowledge_base_retrieval_output_schema() -> dict[str, Any]:
-    return {
-        "type": "object",
-        "properties": {
-            "knowledge_base_id": {"type": "string"},
-            "retrieval": {
-                "type": "object",
-                "properties": {
-                    "index": {"type": "string"},
-                    "result_count": {"type": "integer"},
-                    "top_k": {"type": "integer"},
-                    "search_method": {"type": "string"},
-                    "query_preprocessing": {"type": "string"},
-                    "hybrid_alpha": {"type": "number"},
-                },
-                "required": ["index", "result_count", "top_k", "search_method"],
-                "additionalProperties": True,
-            },
-            "results": {"type": "array", "items": {"type": "object"}, "additionalProperties": True},
-        },
-        "required": ["knowledge_base_id", "retrieval", "results"],
-        "additionalProperties": True,
-    }
-
-
-def _tool_identifier_part(value: Any) -> str:
-    normalized = str(value or "").strip().lower().replace("_", "-")
-    normalized = re.sub(r"[^a-z0-9.-]+", "-", normalized)
-    normalized = re.sub(r"-+", "-", normalized).strip(".-")
-    return normalized or "knowledge-base"
-
-
-def _build_knowledge_base_retrieval_tool_template(knowledge_base: dict[str, Any], *, offline_compatible: bool) -> dict[str, Any]:
-    knowledge_base_id = str(knowledge_base.get("id") or "").strip()
-    slug = str(knowledge_base.get("slug") or knowledge_base_id).strip()
-    display_name = str(knowledge_base.get("display_name") or slug or knowledge_base_id).strip()
-    return {
-        "id": f"tool.kb_retrieval.{_tool_identifier_part(slug or knowledge_base_id)}",
-        "visibility": "private",
-        "publish": False,
-        "name": f"{display_name} Retrieval",
-        "description": f"Retrieves relevant passages from {display_name}.",
-        "input_schema": _build_knowledge_base_retrieval_input_schema(),
-        "output_schema": _build_knowledge_base_retrieval_output_schema(),
-        "safety_policy": {"timeout_seconds": 8, "network_access": not offline_compatible},
-        "offline_compatible": offline_compatible,
-        "execution_backend": _TOOL_BACKEND_KB_RETRIEVAL,
-        "execution_config": {
-            "knowledge_base_id": knowledge_base_id,
-            "retrieval_defaults": {
-                "top_k": 5,
-                "search_method": "semantic",
-                "query_preprocessing": "none",
-            },
-        },
-        "permissions": {},
-    }
-
-
 def _validate_catalog_tool_definition(
     *,
     database_url: str,
@@ -1135,17 +888,7 @@ def _validate_catalog_tool_definition(
     except CatalogError as exc:
         errors.append(exc.message)
 
-    execution_backend = runtime_checks["execution_backend"]
-    if execution_backend == _TOOL_BACKEND_SANDBOX:
-        _validate_sandbox_tool_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
-    elif execution_backend == _TOOL_BACKEND_WEB_SEARCH:
-        _validate_mcp_gateway_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
-    elif execution_backend == _TOOL_BACKEND_KB_RETRIEVAL:
-        _validate_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
-    elif execution_backend == _TOOL_BACKEND_INTERNAL_HTTP:
-        runtime_checks["provider_reachable"] = True
-    else:
-        errors.append(f"Unsupported execution backend '{execution_backend}'.")
+    validate_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
     return runtime_checks, errors
 
 
@@ -1185,96 +928,6 @@ def _validate_mcp_server_definition(
         errors.append(exc.message)
         runtime_checks["provider_status_code"] = exc.status_code
     return runtime_checks, errors
-
-
-def _validate_sandbox_tool_backend(
-    *,
-    database_url: str,
-    config: Any,
-    spec: dict[str, Any],
-    runtime_checks: dict[str, Any],
-    errors: list[str],
-) -> None:
-    try:
-        adapter = resolve_sandbox_execution_adapter(database_url, config)
-        health = adapter.health()
-        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
-        runtime_checks["provider_status_code"] = health.get("status_code")
-        safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
-        dry_run_payload, dry_run_status = adapter.execute(
-            code=str(safety_policy.get("dry_run_code", "result = {'status': 'ok'}")),
-            language="python",
-            input_payload={},
-            timeout_seconds=int(safety_policy.get("timeout_seconds", 5) or 5),
-            policy=safety_policy,
-        )
-        dry_run_ok = dry_run_payload is not None and 200 <= dry_run_status < 300 and not dry_run_payload.get("error")
-        runtime_checks["sandbox_dry_run_ok"] = dry_run_ok
-        runtime_checks["sandbox_dry_run_status_code"] = dry_run_status
-        if not runtime_checks["provider_reachable"]:
-            errors.append("Sandbox runtime provider is not reachable.")
-        if not dry_run_ok:
-            errors.append("Sandbox dry-run execution failed.")
-    except PlatformControlPlaneError as exc:
-        errors.append(exc.message)
-        runtime_checks["provider_status_code"] = exc.status_code
-        runtime_checks["sandbox_dry_run_ok"] = False
-
-
-def _validate_mcp_gateway_backend(
-    *,
-    database_url: str,
-    config: Any,
-    runtime_checks: dict[str, Any],
-    errors: list[str],
-) -> None:
-    try:
-        adapter = resolve_mcp_runtime_adapter(database_url, config)
-        health = adapter.health()
-        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
-        runtime_checks["provider_status_code"] = health.get("status_code")
-        if hasattr(adapter, "list_tools"):
-            tools_payload, tools_status = adapter.list_tools()
-            runtime_checks["tools_status_code"] = tools_status
-            tools = tools_payload.get("tools") if isinstance(tools_payload, dict) else []
-            available_names = {
-                str(item.get("tool_name", "")).strip()
-                for item in tools
-                if isinstance(item, dict) and str(item.get("tool_name", "")).strip()
-            }
-            runtime_checks["available_tool_names"] = sorted(available_names)
-            runtime_checks["tool_discovered"] = "web_search" in available_names if available_names else runtime_checks["provider_reachable"]
-        if not runtime_checks["provider_reachable"]:
-            errors.append("MCP gateway provider is not reachable.")
-    except PlatformControlPlaneError as exc:
-        errors.append(exc.message)
-        runtime_checks["provider_status_code"] = exc.status_code
-
-
-def _validate_knowledge_base_retrieval_backend(
-    *,
-    database_url: str,
-    config: Any,
-    spec: dict[str, Any],
-    runtime_checks: dict[str, Any],
-    errors: list[str],
-) -> None:
-    execution_config = spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}
-    knowledge_base_id = str(execution_config.get("knowledge_base_id") or "").strip()
-    runtime_checks["knowledge_base_id"] = knowledge_base_id or None
-    runtime_checks["knowledge_base_bound"] = False
-    try:
-        if not knowledge_base_id:
-            raise CatalogError("invalid_execution_config", "execution_config.knowledge_base_id is required")
-        knowledge_base = _find_active_bound_knowledge_base(database_url, config, knowledge_base_id=knowledge_base_id)
-        runtime_checks["knowledge_base_bound"] = True
-        runtime_checks["knowledge_base_display_name"] = knowledge_base.get("display_name")
-        runtime_checks["provider_reachable"] = True
-    except CatalogError as exc:
-        errors.append(exc.message)
-    except PlatformControlPlaneError as exc:
-        errors.append(exc.message)
-        runtime_checks["provider_status_code"] = exc.status_code
 
 
 def _runtime_capability_for_transport(transport: str) -> str:
@@ -1434,31 +1087,13 @@ def _execute_internal_tool(
     if input_errors:
         raise CatalogError("invalid_tool_input", "Tool input does not match schema", details={"errors": input_errors})
 
-    execution_backend = _tool_execution_backend(spec)
-    if execution_backend == _TOOL_BACKEND_SANDBOX:
-        result_payload, status_code = _execute_sandbox_tool_backend(
-            database_url=database_url,
-            config=config,
-            spec=spec,
-            tool_input=tool_input,
-        )
-    elif execution_backend == _TOOL_BACKEND_WEB_SEARCH:
-        result_payload, status_code = _execute_mcp_gateway_web_search_backend(
-            database_url=database_url,
-            config=config,
-            spec=spec,
-            tool_input=tool_input,
-            request_metadata=request_metadata,
-        )
-    elif execution_backend == _TOOL_BACKEND_KB_RETRIEVAL:
-        result_payload, status_code = _execute_knowledge_base_retrieval_backend(
-            database_url=database_url,
-            config=config,
-            spec=spec,
-            tool_input=tool_input,
-        )
-    else:
-        raise CatalogError("invalid_execution_backend", f"Unsupported execution backend '{execution_backend}'.")
+    result_payload, status_code = execute_backend(
+        database_url=database_url,
+        config=config,
+        spec=spec,
+        tool_input=tool_input,
+        request_metadata=request_metadata,
+    )
 
     payload = result_payload if isinstance(result_payload, dict) else {}
     if 200 <= status_code < 300 and not payload.get("error"):
@@ -1467,90 +1102,6 @@ def _execute_internal_tool(
         if output_errors:
             return {"error": "invalid_tool_output", "message": "Tool output does not match schema", "details": {"errors": output_errors}}, 502
     return result_payload, status_code
-
-
-def _execute_sandbox_tool_backend(
-    *,
-    database_url: str,
-    config: Any,
-    spec: dict[str, Any],
-    tool_input: dict[str, Any],
-) -> tuple[dict[str, Any] | None, int]:
-    code = str(tool_input.get("code", "")).strip()
-    if not code:
-        raise CatalogError("invalid_tool_input", "Sandbox tools require input.code")
-    safety_policy = spec.get("safety_policy") if isinstance(spec.get("safety_policy"), dict) else {}
-    timeout_seconds = int(tool_input.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
-    try:
-        adapter = resolve_sandbox_execution_adapter(database_url, config)
-        return adapter.execute(
-            code=code,
-            language="python",
-            input_payload=tool_input.get("input", {}),
-            timeout_seconds=timeout_seconds,
-            policy=safety_policy,
-        )
-    except PlatformControlPlaneError as exc:
-        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-
-
-def _execute_knowledge_base_retrieval_backend(
-    *,
-    database_url: str,
-    config: Any,
-    spec: dict[str, Any],
-    tool_input: dict[str, Any],
-) -> tuple[dict[str, Any] | None, int]:
-    execution_config = spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}
-    knowledge_base_id = str(execution_config.get("knowledge_base_id") or "").strip()
-    if not knowledge_base_id:
-        raise CatalogError("invalid_execution_config", "execution_config.knowledge_base_id is required")
-    retrieval_defaults = execution_config.get("retrieval_defaults") if isinstance(execution_config.get("retrieval_defaults"), dict) else {}
-    payload = {**retrieval_defaults, **tool_input}
-    try:
-        _find_active_bound_knowledge_base(database_url, config, knowledge_base_id=knowledge_base_id)
-        return query_knowledge_base(
-            database_url,
-            config=config,
-            knowledge_base_id=knowledge_base_id,
-            payload=payload,
-        ), 200
-    except PlatformControlPlaneError as exc:
-        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-
-
-def _execute_mcp_gateway_web_search_backend(
-    *,
-    database_url: str,
-    config: Any,
-    spec: dict[str, Any],
-    tool_input: dict[str, Any],
-    request_metadata: dict[str, Any],
-) -> tuple[dict[str, Any] | None, int]:
-    try:
-        adapter = resolve_mcp_runtime_adapter(database_url, config)
-    except PlatformControlPlaneError as exc:
-        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-
-    if str(spec.get("transport", "")).strip().lower() == "mcp" and hasattr(adapter, "invoke"):
-        return adapter.invoke(
-            tool_name=str(spec.get("tool_name") or "web_search"),
-            arguments=tool_input,
-            request_metadata=request_metadata,
-        )
-
-    endpoint_url = str(adapter.binding.endpoint_url).rstrip("/")
-    path = str((spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}).get("gateway_internal_path", "/v1/internal/tools/web-search"))
-    payload, status_code = http_json_request(
-        endpoint_url + path,
-        method="POST",
-        payload={
-            "arguments": tool_input,
-            "request_metadata": request_metadata,
-        },
-        headers={"X-Service-Token": str(config.mcp_gateway_service_token)},
-    )
-    return payload if isinstance(payload, dict) else None, status_code
 
 
 def _execute_mcp_tool_transport(
@@ -1703,8 +1254,7 @@ def _coerce_tool_spec(database_url: str, payload: dict[str, Any], *, config: Any
     offline_compatible = payload.get("offline_compatible")
     if not isinstance(offline_compatible, bool):
         raise CatalogError("invalid_offline_compatible", "offline_compatible must be a boolean")
-    if execution_backend == _TOOL_BACKEND_KB_RETRIEVAL:
-        _ensure_knowledge_base_retrieval_config(database_url, config=config, execution_config=execution_config)
+    ensure_execution_config(database_url, config=config, execution_backend=execution_backend, execution_config=execution_config)
     return {
         "name": name,
         "description": description,
@@ -1716,17 +1266,6 @@ def _coerce_tool_spec(database_url: str, payload: dict[str, Any], *, config: Any
         "execution_config": execution_config,
         "permissions": permissions,
     }
-
-
-def _ensure_knowledge_base_retrieval_config(database_url: str, *, config: Any | None, execution_config: dict[str, Any]) -> None:
-    knowledge_base_id = str(execution_config.get("knowledge_base_id") or "").strip()
-    if not knowledge_base_id:
-        raise CatalogError("invalid_execution_config", "execution_config.knowledge_base_id is required for knowledge_base_retrieval tools")
-    retrieval_defaults = execution_config.get("retrieval_defaults", {})
-    if retrieval_defaults is not None and not isinstance(retrieval_defaults, dict):
-        raise CatalogError("invalid_execution_config", "execution_config.retrieval_defaults must be an object")
-    if config is not None:
-        _find_active_bound_knowledge_base(database_url, config, knowledge_base_id=knowledge_base_id)
 
 
 def _coerce_mcp_server_spec(database_url: str, payload: dict[str, Any], *, current_id: str | None) -> dict[str, Any]:
@@ -1922,16 +1461,7 @@ def _metadata_string(metadata: dict[str, Any], key: str) -> str | None:
 
 
 def _tool_execution_backend(spec: dict[str, Any]) -> str:
-    execution_backend = str(spec.get("execution_backend", "")).strip().lower()
-    if execution_backend:
-        return execution_backend
-    legacy_transport = str(spec.get("transport", "")).strip().lower()
-    if legacy_transport == "sandbox_http":
-        return _TOOL_BACKEND_SANDBOX
-    if legacy_transport == "mcp":
-        legacy_tool_name = str(spec.get("tool_name", "")).strip().lower()
-        return _TOOL_BACKEND_WEB_SEARCH if legacy_tool_name in {"", "web_search"} else _TOOL_BACKEND_INTERNAL_HTTP
-    return ""
+    return tool_execution_backend(spec)
 
 
 def _metadata_int(metadata: dict[str, Any], key: str) -> int | None:

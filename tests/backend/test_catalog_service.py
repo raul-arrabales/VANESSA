@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import catalog_service  # noqa: E402
+from app.services import catalog_tool_backends  # noqa: E402
 from app.services import tool_registry_bootstrap  # noqa: E402
 from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 
@@ -250,8 +251,8 @@ def _knowledge_base_retrieval_tool_payload() -> dict[str, object]:
     return {
         "name": "Product Docs Retrieval",
         "description": "Retrieves relevant passages from Product Docs.",
-        "input_schema": catalog_service._build_knowledge_base_retrieval_input_schema(),
-        "output_schema": catalog_service._build_knowledge_base_retrieval_output_schema(),
+        "input_schema": catalog_tool_backends.knowledge_base_retrieval_input_schema(),
+        "output_schema": catalog_tool_backends.knowledge_base_retrieval_output_schema(),
         "safety_policy": {"timeout_seconds": 8, "network_access": False},
         "offline_compatible": True,
         "execution_backend": "knowledge_base_retrieval",
@@ -281,9 +282,9 @@ def test_tool_creation_options_include_retrieval_template_for_active_bound_knowl
         "index_name": "kb_product_docs",
         "is_default": True,
     }
-    monkeypatch.setattr(catalog_service, "get_active_platform_runtime", lambda _db, _config: runtime)
+    monkeypatch.setattr(catalog_tool_backends, "get_active_platform_runtime", lambda _db, _config: runtime)
     monkeypatch.setattr(
-        catalog_service,
+        catalog_tool_backends,
         "list_active_runtime_knowledge_bases",
         lambda _runtime, *, database_url: {
             "knowledge_bases": [knowledge_base],
@@ -315,7 +316,7 @@ def test_coerce_tool_spec_validates_knowledge_base_retrieval_config(monkeypatch:
     assert missing_exc.value.code == "invalid_execution_config"
 
     unbound_payload = _knowledge_base_retrieval_tool_payload()
-    monkeypatch.setattr(catalog_service, "_active_bound_knowledge_bases", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(catalog_tool_backends, "active_bound_knowledge_bases", lambda *_args, **_kwargs: [])
 
     with pytest.raises(catalog_service.CatalogError) as unbound_exc:
         catalog_service._coerce_tool_spec("ignored", unbound_payload, config=SimpleNamespace())
@@ -323,8 +324,8 @@ def test_coerce_tool_spec_validates_knowledge_base_retrieval_config(monkeypatch:
     assert unbound_exc.value.code == "knowledge_base_not_bound"
 
     monkeypatch.setattr(
-        catalog_service,
-        "_active_bound_knowledge_bases",
+        catalog_tool_backends,
+        "active_bound_knowledge_bases",
         lambda *_args, **_kwargs: [{"id": "kb-product-docs", "display_name": "Product Docs"}],
     )
     spec = catalog_service._coerce_tool_spec("ignored", unbound_payload, config=SimpleNamespace())
@@ -336,8 +337,8 @@ def test_coerce_tool_spec_validates_knowledge_base_retrieval_config(monkeypatch:
 def test_validate_catalog_tool_reports_knowledge_base_binding(monkeypatch: pytest.MonkeyPatch):
     payload = _knowledge_base_retrieval_tool_payload()
     monkeypatch.setattr(
-        catalog_service,
-        "_find_active_bound_knowledge_base",
+        catalog_tool_backends,
+        "find_active_bound_knowledge_base",
         lambda *_args, **_kwargs: {"id": "kb-product-docs", "display_name": "Product Docs"},
     )
 
@@ -369,12 +370,12 @@ def test_execute_catalog_tool_invokes_knowledge_base_retrieval_with_merged_defau
     captured: dict[str, object] = {}
     monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
     monkeypatch.setattr(
-        catalog_service,
-        "_find_active_bound_knowledge_base",
+        catalog_tool_backends,
+        "find_active_bound_knowledge_base",
         lambda *_args, **_kwargs: {"id": "kb-product-docs", "display_name": "Product Docs"},
     )
     monkeypatch.setattr(
-        catalog_service,
+        catalog_tool_backends,
         "query_knowledge_base",
         lambda _db, *, config, knowledge_base_id, payload: captured.update(
             {"knowledge_base_id": knowledge_base_id, "payload": payload}
@@ -430,7 +431,7 @@ def test_execute_catalog_tool_rejects_unbound_knowledge_base(monkeypatch: pytest
     def _raise_unbound(*_args, **_kwargs):
         raise catalog_service.CatalogError("knowledge_base_not_bound", "Knowledge base is not bound.", status_code=409)
 
-    monkeypatch.setattr(catalog_service, "_find_active_bound_knowledge_base", _raise_unbound)
+    monkeypatch.setattr(catalog_tool_backends, "find_active_bound_knowledge_base", _raise_unbound)
 
     with pytest.raises(catalog_service.CatalogError) as exc:
         catalog_service.execute_catalog_tool(
@@ -442,6 +443,29 @@ def test_execute_catalog_tool_rejects_unbound_knowledge_base(monkeypatch: pytest
         )
 
     assert exc.value.code == "knowledge_base_not_bound"
+
+
+def test_mcp_creation_options_use_backend_metadata_defaults(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        catalog_service,
+        "list_catalog_tools",
+        lambda _db: [
+            {
+                "id": "tool.kb_retrieval.product-docs",
+                "spec": {
+                    "name": "Product Docs Retrieval",
+                    "execution_backend": "knowledge_base_retrieval",
+                    "offline_compatible": True,
+                },
+            }
+        ],
+    )
+
+    options = catalog_service.get_catalog_mcp_creation_options("ignored")
+
+    assert options["tools"][0]["tool_id"] == "tool.kb_retrieval.product-docs"
+    assert options["tools"][0]["metadata_defaults"]["category"] == "knowledge_retrieval"
+    assert options["tools"][0]["metadata_defaults"]["data_access"] == "workspace"
 
 
 def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pytest.MonkeyPatch):
@@ -737,14 +761,14 @@ def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(m
             return {"tools": [{"tool_name": "web_search"}]}, 200
 
     result_ok = None
-    monkeypatch.setattr(catalog_service, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
+    monkeypatch.setattr(catalog_tool_backends, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
     result_ok = catalog_service.validate_catalog_tool("ignored", config=SimpleNamespace(), tool_id="tool.web_search")
 
     assert result_ok["validation"]["valid"] is True
     assert result_ok["validation"]["runtime_checks"]["tool_discovered"] is True
 
     monkeypatch.setattr(
-        catalog_service,
+        catalog_tool_backends,
         "resolve_mcp_runtime_adapter",
         lambda _db, config: (_ for _ in ()).throw(
             PlatformControlPlaneError("missing_active_binding", "Active platform runtime is missing capability 'mcp_runtime'", status_code=404)
@@ -788,7 +812,7 @@ def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatc
             captured["request_metadata"] = request_metadata
             return {"results": [{"title": "Example"}]}, 200
 
-    monkeypatch.setattr(catalog_service, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
+    monkeypatch.setattr(catalog_tool_backends, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
 
     result = catalog_service.execute_catalog_tool(
         "ignored",
@@ -841,7 +865,7 @@ def test_execute_catalog_tool_invokes_sandbox_runtime(monkeypatch: pytest.Monkey
             captured["policy"] = policy
             return {"stdout": "3\n", "stderr": "", "result": 3}, 200
 
-    monkeypatch.setattr(catalog_service, "resolve_sandbox_execution_adapter", lambda _db, config: HealthySandboxAdapter())
+    monkeypatch.setattr(catalog_tool_backends, "resolve_sandbox_execution_adapter", lambda _db, config: HealthySandboxAdapter())
 
     result = catalog_service.execute_catalog_tool(
         "ignored",

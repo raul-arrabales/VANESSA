@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import type { AuthUser } from "../auth/types";
+import type { CatalogToolCreationOptions } from "../api/catalog";
 import CatalogControlPage from "./CatalogControlPage";
 import * as catalogApi from "../api/catalog";
 
@@ -19,6 +20,7 @@ vi.mock("../auth/AuthProvider", () => ({
 vi.mock("../api/catalog", () => ({
   getCatalogDefaults: vi.fn(),
   getCatalogToolCreationOptions: vi.fn(),
+  getCatalogMcpCreationOptions: vi.fn(),
   listCatalogAgents: vi.fn(),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
@@ -163,7 +165,7 @@ const knowledgeBaseRetrievalTemplate = {
   offline_compatible: true,
 };
 
-const toolCreationOptionsFixture = {
+const toolCreationOptionsFixture: CatalogToolCreationOptions = {
   execution_backends: [
     {
       execution_backend: "mcp_gateway_web_search" as const,
@@ -243,6 +245,39 @@ const kbRetrievalToolFixture = {
   },
 };
 
+const mcpCreationOptionsFixture = {
+  tools: [
+    {
+      tool_id: "tool.web_search",
+      metadata_defaults: {
+        category: "web_search" as const,
+        capabilities: ["web-search", "fresh-information", "source-discovery", "fact-checking", "public-research"],
+        local: false,
+        stateless: true,
+        sandboxed: false,
+        risk_level: "medium" as const,
+        data_access: "public_web" as const,
+        output_freshness: "fresh" as const,
+        audit_level: "standard" as const,
+      },
+    },
+    {
+      tool_id: "tool.kb_retrieval.product-docs",
+      metadata_defaults: {
+        category: "knowledge_retrieval" as const,
+        capabilities: ["knowledge-base", "retrieval", "semantic-search", "source-grounding"],
+        local: true,
+        stateless: true,
+        sandboxed: false,
+        risk_level: "low" as const,
+        data_access: "workspace" as const,
+        output_freshness: "static" as const,
+        audit_level: "standard" as const,
+      },
+    },
+  ],
+};
+
 const mcpServerFixture = {
   id: "mcp.web_search",
   entity: { id: "mcp.web_search", type: "mcp_server" as const, owner_user_id: 1, visibility: "private" as const },
@@ -310,6 +345,7 @@ describe("CatalogControlPage", () => {
       },
     });
     vi.mocked(catalogApi.getCatalogToolCreationOptions).mockResolvedValue(toolCreationOptionsFixture);
+    vi.mocked(catalogApi.getCatalogMcpCreationOptions).mockResolvedValue(mcpCreationOptionsFixture);
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([]);

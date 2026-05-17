@@ -39,27 +39,30 @@ export type CatalogToolSpec = {
 
 export type CatalogToolExecutionBackend = NonNullable<CatalogToolSpec["execution_backend"]>;
 
+export type CatalogKnowledgeBaseOption = {
+  id: string;
+  display_name: string;
+  slug?: string | null;
+  index_name?: string | null;
+  is_default?: boolean;
+};
+
+export type CatalogToolCreationBackendOption =
+  | {
+      execution_backend: Exclude<CatalogToolExecutionBackend, "knowledge_base_retrieval">;
+      requires_knowledge_base: false;
+      template: CatalogToolMutationInput;
+    }
+  | {
+      execution_backend: "knowledge_base_retrieval";
+      requires_knowledge_base: true;
+      knowledge_bases: CatalogKnowledgeBaseOption[];
+      templates_by_knowledge_base_id: Record<string, CatalogToolMutationInput>;
+    };
+
 export type CatalogToolCreationOptions = {
-  execution_backends: Array<{
-    execution_backend: CatalogToolExecutionBackend;
-    requires_knowledge_base: boolean;
-    template?: CatalogToolMutationInput;
-    knowledge_bases?: Array<{
-      id: string;
-      display_name: string;
-      slug?: string | null;
-      index_name?: string | null;
-      is_default?: boolean;
-    }>;
-    templates_by_knowledge_base_id?: Record<string, CatalogToolMutationInput>;
-  }>;
-  knowledge_bases: Array<{
-    id: string;
-    display_name: string;
-    slug?: string | null;
-    index_name?: string | null;
-    is_default?: boolean;
-  }>;
+  execution_backends: CatalogToolCreationBackendOption[];
+  knowledge_bases: CatalogKnowledgeBaseOption[];
   default_knowledge_base_id?: string | null;
   selection_required: boolean;
   configuration_message?: string | null;
@@ -101,6 +104,13 @@ export type CatalogMcpServerSpec = {
     user_group_ids: string[];
   };
   enabled: boolean;
+};
+
+export type CatalogMcpCreationOptions = {
+  tools: Array<{
+    tool_id: string;
+    metadata_defaults: CatalogMcpServerSpec["metadata"];
+  }>;
 };
 
 type CatalogEntityMeta = {
@@ -301,6 +311,10 @@ export async function listCatalogTools(token: string): Promise<CatalogTool[]> {
 
 export async function getCatalogToolCreationOptions(token: string): Promise<CatalogToolCreationOptions> {
   return requestJson<CatalogToolCreationOptions>("/v1/catalog/tool-creation-options", { token });
+}
+
+export async function getCatalogMcpCreationOptions(token: string): Promise<CatalogMcpCreationOptions> {
+  return requestJson<CatalogMcpCreationOptions>("/v1/catalog/mcp-creation-options", { token });
 }
 
 export async function listCatalogMcpServers(token: string): Promise<CatalogMcpServer[]> {

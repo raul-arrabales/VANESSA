@@ -14,6 +14,7 @@ from ...application.catalog_management_service import (
     get_catalog_agent,
     get_catalog_defaults,
     get_catalog_mcp_server,
+    get_catalog_mcp_creation_options,
     get_catalog_tool,
     get_catalog_tool_creation_options,
     invoke_catalog_mcp_server,
@@ -252,6 +253,16 @@ def list_catalog_mcp_servers_route():
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"mcp_servers": servers}), 200
+
+
+@bp.get("/v1/catalog/mcp-creation-options")
+@require_role("superadmin")
+def get_catalog_mcp_creation_options_route():
+    try:
+        payload = get_catalog_mcp_creation_options(_database_url())
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
 
 
 @bp.post("/v1/catalog/mcp-servers")

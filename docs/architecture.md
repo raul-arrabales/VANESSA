@@ -105,6 +105,7 @@ Agent tools now use a catalog-backed split:
 - Catalog tool creation is template-driven by backend execution backends. The first selection is the execution backend, and backend-owned templates prefill the editable tool definition.
 - `knowledge_base_retrieval` is a catalog execution backend for one active deployment-bound knowledge base. It stores `execution_config.knowledge_base_id`, optional retrieval defaults, validates the KB against the active `vector_store` resources, and executes through the backend KB query path.
 - MCP is no longer a tool transport field. An MCP server is a separate registry entity backed by one published, validation-current internal tool.
+- MCP creation defaults, including discovery metadata derived from the backing tool backend, are backend-owned and exposed to the admin UI as creation options.
 - Agents discover and invoke authorized MCP server exposures via `mcp_server_refs`, while direct internal tool references remain available for platform-owned execution paths that need them.
 - MCP server definitions carry their own exposed tool name, schemas, metadata for agent discovery/platform management, enabled state, and authorization policy for agent IDs, agent domains, user roles, user IDs, and user group IDs.
 

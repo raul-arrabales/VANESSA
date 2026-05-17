@@ -3,6 +3,8 @@ import {
   createCatalogAgent,
   createCatalogTool,
   getCatalogDefaults,
+  getCatalogMcpCreationOptions,
+  getCatalogToolCreationOptions,
   listCatalogAgents,
   listCatalogTools,
   previewCatalogAgentPrompt,
@@ -26,12 +28,20 @@ describe("catalog api", () => {
         if (url.endsWith("/defaults")) {
           return JSON.stringify({ defaults: { agent: { runtime_prompts: { retrieval_context: "API retrieval default" } } } });
         }
+        if (url.endsWith("/tool-creation-options")) {
+          return JSON.stringify({ execution_backends: [], knowledge_bases: [], selection_required: false });
+        }
+        if (url.endsWith("/mcp-creation-options")) {
+          return JSON.stringify({ tools: [] });
+        }
         return url.endsWith("/agents") ? JSON.stringify({ agents: [] }) : JSON.stringify({ tools: [] });
       },
     }));
     vi.stubGlobal("fetch", fetchMock);
 
     await getCatalogDefaults("token");
+    await getCatalogToolCreationOptions("token");
+    await getCatalogMcpCreationOptions("token");
     await listCatalogAgents("token");
     await listCatalogTools("token");
 
@@ -44,13 +54,27 @@ describe("catalog api", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/v1/catalog/agents",
+      "/api/v1/catalog/tool-creation-options",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
+      "/api/v1/catalog/mcp-creation-options",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "/api/v1/catalog/agents",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       "/api/v1/catalog/tools",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
