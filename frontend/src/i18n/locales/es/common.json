@@ -1852,8 +1852,41 @@
       "steps": {
         "backingTool": "1. Herramienta base",
         "identity": "2. Identidad MCP",
-        "schemas": "3. Esquemas",
-        "accessPolicy": "4. Politica de acceso"
+        "metadata": "3. Metadatos",
+        "schemas": "4. Esquemas",
+        "accessPolicy": "5. Politica de acceso"
+      },
+      "metadata": {
+        "category": {
+          "web_search": "Busqueda web",
+          "knowledge_retrieval": "Recuperacion de conocimiento",
+          "code_execution": "Ejecucion de codigo",
+          "data_analysis": "Analisis de datos",
+          "automation": "Automatizacion",
+          "communication": "Comunicacion",
+          "custom": "Personalizado"
+        },
+        "riskLevel": {
+          "low": "Bajo",
+          "medium": "Medio",
+          "high": "Alto"
+        },
+        "dataAccess": {
+          "none": "Ninguno",
+          "public_web": "Web publica",
+          "workspace": "Workspace",
+          "user_data": "Datos de usuario",
+          "secrets_or_credentials": "Secretos o credenciales"
+        },
+        "outputFreshness": {
+          "static": "Estatico",
+          "fresh": "Reciente",
+          "runtime_generated": "Generado en ejecucion"
+        },
+        "auditLevel": {
+          "standard": "Estandar",
+          "elevated": "Elevado"
+        }
       },
       "views": {
         "aria": "Secciones de MCP Gateway",
@@ -1901,6 +1934,15 @@
         "backingTool": "Herramienta interna base",
         "noBackingTool": "Selecciona una herramienta validada",
         "exposedToolName": "Nombre de herramienta MCP expuesta",
+        "category": "Categoria",
+        "capabilities": "Capacidades",
+        "local": "Local",
+        "stateless": "Sin estado",
+        "sandboxed": "En sandbox",
+        "riskLevel": "Nivel de riesgo",
+        "dataAccess": "Acceso a datos",
+        "outputFreshness": "Frescura de salida",
+        "auditLevel": "Nivel de auditoria",
         "inputSchema": "Esquema de entrada",
         "outputSchema": "Esquema de salida",
         "agentIds": "IDs de agentes permitidos",

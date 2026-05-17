@@ -297,7 +297,7 @@ Tool execution is also execution-scoped. Backend may include optional `mcp_runti
 
 - agents reference authorized `mcp_server_refs`; MCP calls require `platform_runtime.capabilities.mcp_runtime`
 - `mcp.web_search` is backed by internal `tool.web_search` and requires online runtime
-- `tool.python_exec` remains an internal `sandbox_python` tool and can be exposed through an MCP server definition
+- `mcp.python_exec` is backed by internal `tool.python_exec` and requires sandbox runtime
 
 Tool loops are LLM-driven and bounded to three rounds.
 

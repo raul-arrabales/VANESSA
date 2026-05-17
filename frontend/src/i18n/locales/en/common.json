@@ -1870,8 +1870,41 @@
       "steps": {
         "backingTool": "1. Backing tool",
         "identity": "2. MCP identity",
-        "schemas": "3. Schemas",
-        "accessPolicy": "4. Access policy"
+        "metadata": "3. Metadata",
+        "schemas": "4. Schemas",
+        "accessPolicy": "5. Access policy"
+      },
+      "metadata": {
+        "category": {
+          "web_search": "Web search",
+          "knowledge_retrieval": "Knowledge retrieval",
+          "code_execution": "Code execution",
+          "data_analysis": "Data analysis",
+          "automation": "Automation",
+          "communication": "Communication",
+          "custom": "Custom"
+        },
+        "riskLevel": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        },
+        "dataAccess": {
+          "none": "None",
+          "public_web": "Public web",
+          "workspace": "Workspace",
+          "user_data": "User data",
+          "secrets_or_credentials": "Secrets or credentials"
+        },
+        "outputFreshness": {
+          "static": "Static",
+          "fresh": "Fresh",
+          "runtime_generated": "Runtime generated"
+        },
+        "auditLevel": {
+          "standard": "Standard",
+          "elevated": "Elevated"
+        }
       },
       "views": {
         "aria": "MCP Gateway sections",
@@ -1919,6 +1952,15 @@
         "backingTool": "Backing internal tool",
         "noBackingTool": "Select a validated tool",
         "exposedToolName": "Exposed MCP tool name",
+        "category": "Category",
+        "capabilities": "Capabilities",
+        "local": "Local",
+        "stateless": "Stateless",
+        "sandboxed": "Sandboxed",
+        "riskLevel": "Risk level",
+        "dataAccess": "Data access",
+        "outputFreshness": "Output freshness",
+        "auditLevel": "Audit level",
         "inputSchema": "Input schema",
         "outputSchema": "Output schema",
         "agentIds": "Allowed agent IDs",

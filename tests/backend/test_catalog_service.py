@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import catalog_service  # noqa: E402
+from app.services import tool_registry_bootstrap  # noqa: E402
 from app.services.platform_types import PlatformControlPlaneError  # noqa: E402
 
 
@@ -32,6 +33,217 @@ def test_mcp_server_status_serializes_as_validation_status():
         "last_validated_at": "2026-01-01T00:00:00+00:00",
         "validation_errors": [],
     }
+
+
+def test_coerce_mcp_server_spec_accepts_and_normalizes_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(catalog_service, "_ensure_unique_mcp_slug", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(catalog_service, "_ensure_tool_eligible_for_mcp", lambda *_args, **_kwargs: {})
+
+    spec = catalog_service._coerce_mcp_server_spec(
+        "ignored",
+        {
+            "name": "Web Search MCP",
+            "slug": "web_search",
+            "description": "Expose web search.",
+            "backing_tool_id": "tool.web_search",
+            "exposed_tool_name": "web_search",
+            "input_schema": {},
+            "output_schema": {},
+            "metadata": {
+                "category": "web_search",
+                "capabilities": ["Web Search", "fresh_information", "web-search"],
+                "local": False,
+                "stateless": True,
+                "sandboxed": False,
+                "risk_level": "medium",
+                "data_access": "public_web",
+                "output_freshness": "fresh",
+                "audit_level": "standard",
+            },
+            "authorization_policy": {},
+            "enabled": True,
+        },
+        current_id=None,
+    )
+
+    assert spec["metadata"] == {
+        "category": "web_search",
+        "capabilities": ["web-search", "fresh-information"],
+        "local": False,
+        "stateless": True,
+        "sandboxed": False,
+        "risk_level": "medium",
+        "data_access": "public_web",
+        "output_freshness": "fresh",
+        "audit_level": "standard",
+    }
+
+
+def test_coerce_mcp_server_spec_rejects_invalid_metadata(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(catalog_service, "_ensure_unique_mcp_slug", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(catalog_service, "_ensure_tool_eligible_for_mcp", lambda *_args, **_kwargs: {})
+
+    with pytest.raises(catalog_service.CatalogError) as exc:
+        catalog_service._coerce_mcp_server_spec(
+            "ignored",
+            {
+                "name": "Web Search MCP",
+                "slug": "web_search",
+                "description": "Expose web search.",
+                "backing_tool_id": "tool.web_search",
+                "exposed_tool_name": "web_search",
+                "input_schema": {},
+                "output_schema": {},
+                "metadata": {
+                    "category": "web_search",
+                    "capabilities": ["web-search"],
+                    "local": "false",
+                    "stateless": True,
+                    "sandboxed": False,
+                    "risk_level": "medium",
+                    "data_access": "public_web",
+                    "output_freshness": "fresh",
+                    "audit_level": "standard",
+                },
+                "authorization_policy": {},
+                "enabled": True,
+            },
+            current_id=None,
+        )
+
+    assert exc.value.code == "invalid_mcp_metadata"
+    assert "metadata.local" in exc.value.message
+
+
+def test_discover_authorized_mcp_servers_includes_metadata(monkeypatch: pytest.MonkeyPatch):
+    metadata = {
+        "category": "web_search",
+        "capabilities": ["web-search"],
+        "local": False,
+        "stateless": True,
+        "sandboxed": False,
+        "risk_level": "medium",
+        "data_access": "public_web",
+        "output_freshness": "fresh",
+        "audit_level": "standard",
+    }
+    monkeypatch.setattr(catalog_service, "list_user_group_ids", lambda *_args, **_kwargs: set())
+    monkeypatch.setattr(
+        catalog_service,
+        "list_catalog_mcp_servers",
+        lambda _db: [
+            {
+                "id": "mcp.web_search",
+                "published_at": "2026-01-01T00:00:00+00:00",
+                "spec": {
+                    "slug": "web_search",
+                    "exposed_tool_name": "web_search",
+                    "description": "desc",
+                    "input_schema": {},
+                    "output_schema": {},
+                    "backing_tool_id": "tool.web_search",
+                    "metadata": metadata,
+                    "authorization_policy": {
+                        "agent_ids": ["*"],
+                        "agent_domains": ["*"],
+                        "user_roles": ["*"],
+                        "user_ids": ["*"],
+                        "user_group_ids": ["*"],
+                    },
+                    "enabled": True,
+                },
+            }
+        ],
+    )
+
+    discovered = catalog_service.discover_authorized_mcp_servers(
+        "ignored",
+        agent_id="agent.alpha",
+        agent_domain="default",
+        delegated_user_id=None,
+        delegated_user_role=None,
+    )
+
+    assert discovered[0]["metadata"] == metadata
+
+
+def test_builtin_mcp_servers_include_metadata_and_python_execution():
+    web_search = tool_registry_bootstrap._BUILTIN_MCP_SERVERS["mcp.web_search"]
+    python_exec = tool_registry_bootstrap._BUILTIN_MCP_SERVERS["mcp.python_exec"]
+
+    assert web_search["metadata"]["category"] == "web_search"
+    assert web_search["metadata"]["local"] is False
+    assert python_exec["backing_tool_id"] == "tool.python_exec"
+    assert python_exec["exposed_tool_name"] == "python_exec"
+    assert python_exec["metadata"]["category"] == "code_execution"
+    assert python_exec["metadata"]["risk_level"] == "high"
+
+
+def test_builtin_mcp_seed_reconciles_changed_specs(monkeypatch: pytest.MonkeyPatch):
+    entities = {
+        "mcp_server:mcp.web_search": {
+            "entity_id": "mcp.web_search",
+            "entity_type": "mcp_server",
+            "owner_user_id": 1,
+            "visibility": "private",
+            "status": "published",
+            "current_version": "v1",
+            "current_spec": {"name": "Old Web Search MCP"},
+            "published_at": "2026-01-01T00:00:00+00:00",
+        }
+    }
+    versions: list[dict[str, object]] = [{"entity_id": "mcp.web_search", "version": "v1"}]
+    status_upserts: list[str] = []
+
+    monkeypatch.setattr(tool_registry_bootstrap, "list_users", lambda _db, is_active=None: [{"id": 1, "role": "superadmin"}])
+    monkeypatch.setattr(
+        tool_registry_bootstrap,
+        "find_registry_entity",
+        lambda _db, *, entity_type, entity_id: entities.get(f"{entity_type}:{entity_id}"),
+    )
+    monkeypatch.setattr(
+        tool_registry_bootstrap,
+        "create_registry_entity",
+        lambda _db, **kwargs: entities.setdefault(
+            f"{kwargs['entity_type']}:{kwargs['entity_id']}",
+            {
+                "entity_id": kwargs["entity_id"],
+                "entity_type": kwargs["entity_type"],
+                "owner_user_id": kwargs["owner_user_id"],
+                "visibility": kwargs["visibility"],
+                "status": kwargs["status"],
+                "current_version": None,
+                "current_spec": None,
+                "published_at": None,
+            },
+        ),
+    )
+
+    def _create_registry_version(_db, *, entity_id, version, spec_json, set_current, published):
+        del set_current
+        key = f"{'tool' if entity_id.startswith('tool.') else 'mcp_server'}:{entity_id}"
+        entities[key]["current_version"] = version
+        entities[key]["current_spec"] = spec_json
+        entities[key]["published_at"] = "2026-01-01T00:00:00+00:00" if published else None
+        versions.append({"entity_id": entity_id, "version": version})
+        return {"entity_id": entity_id, "version": version, "spec_json": spec_json}
+
+    monkeypatch.setattr(tool_registry_bootstrap, "create_registry_version", _create_registry_version)
+    monkeypatch.setattr(tool_registry_bootstrap, "list_registry_versions", lambda _db, *, entity_id: [row for row in versions if row["entity_id"] == entity_id])
+    monkeypatch.setattr(tool_registry_bootstrap, "upsert_tool_runtime_status", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        tool_registry_bootstrap,
+        "upsert_mcp_server_status",
+        lambda _db, *, mcp_server_id, **_kwargs: status_upserts.append(mcp_server_id),
+    )
+
+    assert tool_registry_bootstrap.ensure_builtin_tools("ignored") is True
+
+    assert entities["mcp_server:mcp.web_search"]["current_version"] == "v2"
+    assert entities["mcp_server:mcp.web_search"]["current_spec"]["metadata"]["category"] == "web_search"
+    assert entities["mcp_server:mcp.python_exec"]["current_spec"]["metadata"]["category"] == "code_execution"
+    assert "mcp.web_search" in status_upserts
+    assert "mcp.python_exec" in status_upserts
 
 
 def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pytest.MonkeyPatch):

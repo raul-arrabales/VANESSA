@@ -85,6 +85,17 @@ BEGIN
                 'exposed_tool_name', coalesce(current_spec->>'tool_name', exposed_slug),
                 'input_schema', coalesce(current_spec->'input_schema', '{}'::jsonb),
                 'output_schema', coalesce(current_spec->'output_schema', '{}'::jsonb),
+                'metadata', jsonb_build_object(
+                    'category', 'custom',
+                    'capabilities', '[]'::jsonb,
+                    'local', coalesce((current_spec->>'offline_compatible')::boolean, false),
+                    'stateless', true,
+                    'sandboxed', false,
+                    'risk_level', 'medium',
+                    'data_access', 'none',
+                    'output_freshness', 'runtime_generated',
+                    'audit_level', 'standard'
+                ),
                 'authorization_policy', jsonb_build_object(
                     'agent_ids', jsonb_build_array('*'),
                     'agent_domains', jsonb_build_array('*'),

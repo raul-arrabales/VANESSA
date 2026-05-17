@@ -313,3 +313,89 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     assert execute_tool.status_code == 200
     assert execute_tool.get_json()["execution"]["ok"] is True
     assert execute_tool.get_json()["execution"]["result"]["results"][0]["title"] == "Example"
+
+
+def test_superadmin_mcp_routes_round_trip_metadata(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, user_store = client
+    root = _root_user(user_store)
+    token = _login(test_client, root["username"], "root-pass-123").get_json()["access_token"]
+    metadata = {
+        "category": "web_search",
+        "capabilities": ["web-search", "fresh-information"],
+        "local": False,
+        "stateless": True,
+        "sandboxed": False,
+        "risk_level": "medium",
+        "data_access": "public_web",
+        "output_freshness": "fresh",
+        "audit_level": "standard",
+    }
+    mcp_row = {
+        "id": "mcp.web_search",
+        "entity": {"id": "mcp.web_search", "type": "mcp_server", "owner_user_id": root["id"], "visibility": "private"},
+        "current_version": "v1",
+        "status": "published",
+        "published": True,
+        "published_at": "2026-01-01T00:00:00+00:00",
+        "spec": {
+            "name": "Web Search MCP",
+            "slug": "web_search",
+            "description": "Expose web search.",
+            "backing_tool_id": "tool.web_search",
+            "exposed_tool_name": "web_search",
+            "input_schema": {},
+            "output_schema": {},
+            "metadata": metadata,
+            "authorization_policy": {
+                "agent_ids": ["*"],
+                "agent_domains": ["*"],
+                "agent_roles": ["*"],
+                "user_roles": ["*"],
+                "user_ids": ["*"],
+                "user_group_ids": ["*"],
+            },
+            "enabled": True,
+        },
+        "validation_status": {
+            "last_validation_status": "success",
+            "is_validation_current": True,
+            "validated_version": "v1",
+            "last_validated_at": "2026-01-01T00:00:00+00:00",
+            "validation_errors": [],
+        },
+    }
+    seen_payloads: list[dict[str, object]] = []
+
+    monkeypatch.setattr(catalog_routes, "list_catalog_mcp_servers", lambda _db: [mcp_row])
+    monkeypatch.setattr(catalog_routes, "get_catalog_mcp_server", lambda _db, *, mcp_server_id: dict(mcp_row, id=mcp_server_id))
+    monkeypatch.setattr(
+        catalog_routes,
+        "create_catalog_mcp_server",
+        lambda _db, *, payload, owner_user_id: seen_payloads.append(payload) or dict(mcp_row, id=payload["id"], spec={**mcp_row["spec"], "metadata": payload["metadata"]}),
+    )
+    monkeypatch.setattr(
+        catalog_routes,
+        "update_catalog_mcp_server",
+        lambda _db, *, mcp_server_id, payload: seen_payloads.append(payload) or dict(mcp_row, id=mcp_server_id, spec={**mcp_row["spec"], "metadata": payload["metadata"]}),
+    )
+
+    list_response = test_client.get("/v1/catalog/mcp-servers", headers=_auth(token))
+    create_response = test_client.post(
+        "/v1/catalog/mcp-servers",
+        headers=_auth(token),
+        json={**mcp_row["spec"], "id": "mcp.web_search", "publish": True, "visibility": "private"},
+    )
+    update_response = test_client.put(
+        "/v1/catalog/mcp-servers/mcp.web_search",
+        headers=_auth(token),
+        json={**mcp_row["spec"], "publish": True, "visibility": "private"},
+    )
+
+    assert list_response.status_code == 200
+    assert list_response.get_json()["mcp_servers"][0]["spec"]["metadata"] == metadata
+    assert create_response.status_code == 201
+    assert create_response.get_json()["mcp_server"]["spec"]["metadata"] == metadata
+    assert update_response.status_code == 200
+    assert update_response.get_json()["mcp_server"]["spec"]["metadata"] == metadata
+    assert seen_payloads[0]["metadata"] == metadata
+    assert seen_payloads[1]["metadata"] == metadata

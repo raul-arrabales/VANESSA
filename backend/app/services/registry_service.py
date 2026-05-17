@@ -71,6 +71,7 @@ def _validate_spec(entity_type: str, spec: dict[str, Any]) -> None:
             "exposed_tool_name",
             "input_schema",
             "output_schema",
+            "metadata",
             "authorization_policy",
             "enabled",
         ]

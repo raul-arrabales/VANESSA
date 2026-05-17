@@ -163,6 +163,7 @@ Split local runtime selection:
 - `mcp_gateway` is part of the default local-staging stack, like `sandbox`.
 - The gateway listens on container port `8080`; local staging publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
+- The built-in MCP exposures are `mcp.web_search` and `mcp.python_exec`; discovery includes metadata for category, capabilities, locality, sandboxing, risk, data access, freshness, and audit level.
 - The built-in `web_search` tool calls SearXNG at `SEARXNG_URL`, defaulting to `http://searxng:8080`.
 - This is token-free but still online-only because SearXNG queries upstream internet search engines.
 

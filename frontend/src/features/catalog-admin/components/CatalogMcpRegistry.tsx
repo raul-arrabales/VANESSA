@@ -34,7 +34,14 @@ export default function CatalogMcpRegistry({
     if (!needle) {
       return true;
     }
-    return [server.spec.name, server.spec.slug, server.spec.backing_tool_id].some((value) => value.toLowerCase().includes(needle));
+    return [
+      server.spec.name,
+      server.spec.slug,
+      server.spec.backing_tool_id,
+      server.spec.metadata.category,
+      server.spec.metadata.risk_level,
+      ...server.spec.metadata.capabilities,
+    ].some((value) => value.toLowerCase().includes(needle));
   });
 
   return (

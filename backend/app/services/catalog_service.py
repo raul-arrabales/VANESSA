@@ -48,9 +48,23 @@ _ENTITY_TYPE_TOOL = "tool"
 _ENTITY_TYPE_MCP_SERVER = "mcp_server"
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
 _VALID_TOOL_BACKENDS = {"sandbox_python", "mcp_gateway_web_search", "internal_http"}
+_VALID_MCP_METADATA_CATEGORIES = {
+    "web_search",
+    "knowledge_retrieval",
+    "code_execution",
+    "data_analysis",
+    "automation",
+    "communication",
+    "custom",
+}
+_VALID_MCP_METADATA_RISK_LEVELS = {"low", "medium", "high"}
+_VALID_MCP_METADATA_DATA_ACCESS = {"none", "public_web", "workspace", "user_data", "secrets_or_credentials"}
+_VALID_MCP_METADATA_OUTPUT_FRESHNESS = {"static", "fresh", "runtime_generated"}
+_VALID_MCP_METADATA_AUDIT_LEVELS = {"standard", "elevated"}
 _VERSION_PATTERN = re.compile(r"^v(?P<number>\d+)$", re.IGNORECASE)
 _PLATFORM_AGENT_IDS = {KNOWLEDGE_CHAT_AGENT_ID}
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
+_TAG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 @dataclass(slots=True)
@@ -532,6 +546,7 @@ def discover_authorized_mcp_servers(
                 "input_schema": spec.get("input_schema"),
                 "output_schema": spec.get("output_schema"),
                 "backing_tool_id": spec.get("backing_tool_id"),
+                "metadata": spec.get("metadata"),
                 "enabled": spec.get("enabled"),
                 "updated_at": server.get("published_at"),
             }
@@ -689,6 +704,7 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
                 "name": mcp_spec.get("name"),
                 "backing_tool_id": backing_tool["id"],
                 "enabled": bool(mcp_spec.get("enabled", False)),
+                "metadata": mcp_spec.get("metadata"),
             }
         )
         if _tool_execution_backend(tool_spec) == "sandbox_python":
@@ -740,6 +756,8 @@ def _serialize_catalog_row(
     current_spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
     if entity_type == _ENTITY_TYPE_AGENT:
         current_spec = _normalize_agent_spec_for_response(current_spec)
+    if entity_type == _ENTITY_TYPE_MCP_SERVER:
+        current_spec = _normalize_mcp_server_spec_for_response(current_spec)
     published = row.get("published_at") is not None
     serialized = {
         "id": str(row.get("entity_id", "")),
@@ -786,6 +804,12 @@ def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
     normalized["tool_refs"] = list(normalized.get("tool_refs") or [])
     normalized["mcp_server_refs"] = list(normalized.get("mcp_server_refs") or [])
+    return normalized
+
+
+def _normalize_mcp_server_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(spec)
+    normalized["metadata"] = _coerce_mcp_metadata(normalized.get("metadata"), require_all=False)
     return normalized
 
 
@@ -1398,9 +1422,87 @@ def _coerce_mcp_server_spec(database_url: str, payload: dict[str, Any], *, curre
         "exposed_tool_name": exposed_tool_name,
         "input_schema": input_schema,
         "output_schema": output_schema,
+        "metadata": _coerce_mcp_metadata(payload.get("metadata"), require_all=True),
         "authorization_policy": _coerce_authorization_policy(payload.get("authorization_policy")),
         "enabled": enabled,
     }
+
+
+def _coerce_mcp_metadata(value: Any, *, require_all: bool) -> dict[str, Any]:
+    if value is None and not require_all:
+        raw: dict[str, Any] = {}
+    elif isinstance(value, dict):
+        raw = value
+    else:
+        raise CatalogError("invalid_mcp_metadata", "metadata must be an object")
+
+    defaults: dict[str, Any] = {
+        "category": "custom",
+        "capabilities": [],
+        "local": False,
+        "stateless": True,
+        "sandboxed": False,
+        "risk_level": "medium",
+        "data_access": "none",
+        "output_freshness": "runtime_generated",
+        "audit_level": "standard",
+    }
+    required_fields = set(defaults)
+    if require_all:
+        missing = sorted(field for field in required_fields if field not in raw)
+        if missing:
+            raise CatalogError("invalid_mcp_metadata", f"metadata is missing required fields: {', '.join(missing)}")
+
+    category = _coerce_enum_metadata(raw.get("category", defaults["category"]), _VALID_MCP_METADATA_CATEGORIES, field_name="category")
+    risk_level = _coerce_enum_metadata(raw.get("risk_level", defaults["risk_level"]), _VALID_MCP_METADATA_RISK_LEVELS, field_name="risk_level")
+    data_access = _coerce_enum_metadata(raw.get("data_access", defaults["data_access"]), _VALID_MCP_METADATA_DATA_ACCESS, field_name="data_access")
+    output_freshness = _coerce_enum_metadata(
+        raw.get("output_freshness", defaults["output_freshness"]),
+        _VALID_MCP_METADATA_OUTPUT_FRESHNESS,
+        field_name="output_freshness",
+    )
+    audit_level = _coerce_enum_metadata(raw.get("audit_level", defaults["audit_level"]), _VALID_MCP_METADATA_AUDIT_LEVELS, field_name="audit_level")
+    capabilities = raw.get("capabilities", defaults["capabilities"])
+    if not isinstance(capabilities, list):
+        raise CatalogError("invalid_mcp_metadata", "metadata.capabilities must be an array")
+    normalized_capabilities: list[str] = []
+    seen_capabilities: set[str] = set()
+    for item in capabilities:
+        tag = str(item).strip().lower().replace("_", "-")
+        tag = re.sub(r"[^a-z0-9-]+", "-", tag)
+        tag = re.sub(r"-+", "-", tag).strip("-")
+        if not tag:
+            continue
+        if not _TAG_PATTERN.match(tag):
+            raise CatalogError("invalid_mcp_metadata", "metadata.capabilities entries must be lowercase slug tags")
+        if tag not in seen_capabilities:
+            normalized_capabilities.append(tag)
+            seen_capabilities.add(tag)
+
+    return {
+        "category": category,
+        "capabilities": normalized_capabilities,
+        "local": _coerce_boolean_metadata(raw.get("local", defaults["local"]), field_name="local"),
+        "stateless": _coerce_boolean_metadata(raw.get("stateless", defaults["stateless"]), field_name="stateless"),
+        "sandboxed": _coerce_boolean_metadata(raw.get("sandboxed", defaults["sandboxed"]), field_name="sandboxed"),
+        "risk_level": risk_level,
+        "data_access": data_access,
+        "output_freshness": output_freshness,
+        "audit_level": audit_level,
+    }
+
+
+def _coerce_enum_metadata(value: Any, allowed_values: set[str], *, field_name: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized not in allowed_values:
+        raise CatalogError("invalid_mcp_metadata", f"metadata.{field_name} must be one of {', '.join(sorted(allowed_values))}")
+    return normalized
+
+
+def _coerce_boolean_metadata(value: Any, *, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise CatalogError("invalid_mcp_metadata", f"metadata.{field_name} must be a boolean")
+    return value
 
 
 def _coerce_authorization_policy(value: Any) -> dict[str, list[str]]:

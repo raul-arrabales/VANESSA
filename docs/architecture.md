@@ -104,12 +104,12 @@ Agent tools now use a catalog-backed split:
 - Internal tools are backend-owned registry entities with explicit input/output schemas, validation state, permissions, safety policy, offline compatibility, and an `execution_backend`.
 - MCP is no longer a tool transport field. An MCP server is a separate registry entity backed by one published, validation-current internal tool.
 - Agents discover and invoke authorized MCP server exposures via `mcp_server_refs`, while direct internal tool references remain available for platform-owned execution paths that need them.
-- MCP server definitions carry their own exposed tool name, schemas, enabled state, and authorization policy for agent IDs, agent domains, user roles, user IDs, and user group IDs.
+- MCP server definitions carry their own exposed tool name, schemas, metadata for agent discovery/platform management, enabled state, and authorization policy for agent IDs, agent domains, user roles, user IDs, and user group IDs.
 
 Current canonical tools and exposures:
 
 - `tool.web_search` -> `execution_backend: mcp_gateway_web_search`; the default `mcp.web_search` exposure is served by MCP Gateway through local SearXNG and is token-free but internet-required.
-- `tool.python_exec` -> `execution_backend: sandbox_python`; it can be exposed through one or more MCP server definitions when a superadmin chooses to publish that surface.
+- `tool.python_exec` -> `execution_backend: sandbox_python`; the default `mcp.python_exec` exposure is local, sandboxed, and elevated-risk.
 
 Tool execution is LLM-driven. Agent engine passes authorized MCP exposure definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the active MCP gateway provider with agent/user/domain identity metadata, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.
 

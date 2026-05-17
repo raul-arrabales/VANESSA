@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import type { CatalogMcpServer, CatalogTool } from "../../../api/catalog";
+import type { CatalogMcpServer, CatalogMcpServerSpec, CatalogTool } from "../../../api/catalog";
 import type { McpServerFormState } from "../hooks/useCatalogControl";
 
 type CatalogMcpServerFormPanelProps = {
@@ -11,6 +11,20 @@ type CatalogMcpServerFormPanelProps = {
   onChange: (value: McpServerFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
+
+const METADATA_CATEGORY_OPTIONS: CatalogMcpServerSpec["metadata"]["category"][] = [
+  "web_search",
+  "knowledge_retrieval",
+  "code_execution",
+  "data_analysis",
+  "automation",
+  "communication",
+  "custom",
+];
+const RISK_LEVEL_OPTIONS: CatalogMcpServerSpec["metadata"]["risk_level"][] = ["low", "medium", "high"];
+const DATA_ACCESS_OPTIONS: CatalogMcpServerSpec["metadata"]["data_access"][] = ["none", "public_web", "workspace", "user_data", "secrets_or_credentials"];
+const OUTPUT_FRESHNESS_OPTIONS: CatalogMcpServerSpec["metadata"]["output_freshness"][] = ["static", "fresh", "runtime_generated"];
+const AUDIT_LEVEL_OPTIONS: CatalogMcpServerSpec["metadata"]["audit_level"][] = ["standard", "elevated"];
 
 function toolKey(tool: CatalogTool): string {
   return tool.id.replace(/^tool[._-]?/i, "").trim() || tool.id;
@@ -38,6 +52,47 @@ function uniqueValue(base: string, existingValues: Set<string>): string {
   return candidate;
 }
 
+function metadataDefaultsForTool(tool: CatalogTool): CatalogMcpServerSpec["metadata"] {
+  const executionBackend = tool.spec.execution_backend ?? "internal_http";
+  if (executionBackend === "sandbox_python") {
+    return {
+      category: "code_execution",
+      capabilities: ["python", "code-execution", "calculation", "data-transformation", "sandboxed-execution"],
+      local: true,
+      stateless: true,
+      sandboxed: true,
+      risk_level: "high",
+      data_access: "none",
+      output_freshness: "runtime_generated",
+      audit_level: "elevated",
+    };
+  }
+  if (executionBackend === "mcp_gateway_web_search") {
+    return {
+      category: "web_search",
+      capabilities: ["web-search", "fresh-information", "source-discovery", "fact-checking", "public-research"],
+      local: false,
+      stateless: true,
+      sandboxed: false,
+      risk_level: "medium",
+      data_access: "public_web",
+      output_freshness: "fresh",
+      audit_level: "standard",
+    };
+  }
+  return {
+    category: "custom",
+    capabilities: [],
+    local: Boolean(tool.spec.offline_compatible),
+    stateless: true,
+    sandboxed: false,
+    risk_level: "medium",
+    data_access: "none",
+    output_freshness: "runtime_generated",
+    audit_level: "standard",
+  };
+}
+
 function buildDefaultsForTool(tool: CatalogTool, mcpServers: CatalogMcpServer[], currentServerId: string): Partial<McpServerFormState> {
   const existingIds = new Set(mcpServers.filter((server) => server.id !== currentServerId).map((server) => server.id));
   const existingSlugs = new Set(mcpServers.filter((server) => server.id !== currentServerId).map((server) => server.spec.slug));
@@ -46,6 +101,7 @@ function buildDefaultsForTool(tool: CatalogTool, mcpServers: CatalogMcpServer[],
   const id = uniqueValue(`mcp.${baseSlug}`, existingIds);
   const inputSchemaText = JSON.stringify(tool.spec.input_schema, null, 2);
   const outputSchemaText = JSON.stringify(tool.spec.output_schema, null, 2);
+  const metadata = metadataDefaultsForTool(tool);
   return {
     id,
     mcpServerId: id,
@@ -56,8 +112,10 @@ function buildDefaultsForTool(tool: CatalogTool, mcpServers: CatalogMcpServer[],
     exposed_tool_name: slug,
     input_schema: tool.spec.input_schema,
     output_schema: tool.spec.output_schema,
+    metadata,
     inputSchemaText,
     outputSchemaText,
+    capabilitiesText: metadata.capabilities.join(", "),
   };
 }
 
@@ -189,6 +247,67 @@ export default function CatalogMcpServerFormPanel({
               <label className="card-stack">
                 <span className="field-label">{t("catalogControl.forms.mcp.description")}</span>
                 <textarea className="field-input form-textarea" value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} />
+              </label>
+            </section>
+
+            <section className="panel panel-nested card-stack">
+              <h4 className="section-title">{t("catalogControl.mcp.steps.metadata")}</h4>
+              <div className="form-grid">
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.category")}</span>
+                  <select className="field-input" value={form.metadata.category} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, category: event.target.value as CatalogMcpServerSpec["metadata"]["category"] } })}>
+                    {METADATA_CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.category.${option}`)}</option>)}
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.local")}</span>
+                  <select className="field-input" value={form.metadata.local ? "true" : "false"} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, local: event.target.value === "true" } })}>
+                    <option value="true">{t("catalogControl.badges.yes")}</option>
+                    <option value="false">{t("catalogControl.badges.no")}</option>
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.stateless")}</span>
+                  <select className="field-input" value={form.metadata.stateless ? "true" : "false"} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, stateless: event.target.value === "true" } })}>
+                    <option value="true">{t("catalogControl.badges.yes")}</option>
+                    <option value="false">{t("catalogControl.badges.no")}</option>
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.sandboxed")}</span>
+                  <select className="field-input" value={form.metadata.sandboxed ? "true" : "false"} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, sandboxed: event.target.value === "true" } })}>
+                    <option value="true">{t("catalogControl.badges.yes")}</option>
+                    <option value="false">{t("catalogControl.badges.no")}</option>
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.riskLevel")}</span>
+                  <select className="field-input" value={form.metadata.risk_level} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, risk_level: event.target.value as CatalogMcpServerSpec["metadata"]["risk_level"] } })}>
+                    {RISK_LEVEL_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.riskLevel.${option}`)}</option>)}
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.dataAccess")}</span>
+                  <select className="field-input" value={form.metadata.data_access} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, data_access: event.target.value as CatalogMcpServerSpec["metadata"]["data_access"] } })}>
+                    {DATA_ACCESS_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.dataAccess.${option}`)}</option>)}
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.outputFreshness")}</span>
+                  <select className="field-input" value={form.metadata.output_freshness} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, output_freshness: event.target.value as CatalogMcpServerSpec["metadata"]["output_freshness"] } })}>
+                    {OUTPUT_FRESHNESS_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.outputFreshness.${option}`)}</option>)}
+                  </select>
+                </label>
+                <label className="card-stack">
+                  <span className="field-label">{t("catalogControl.forms.mcp.auditLevel")}</span>
+                  <select className="field-input" value={form.metadata.audit_level} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, audit_level: event.target.value as CatalogMcpServerSpec["metadata"]["audit_level"] } })}>
+                    {AUDIT_LEVEL_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.auditLevel.${option}`)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="card-stack">
+                <span className="field-label">{t("catalogControl.forms.mcp.capabilities")}</span>
+                <input className="field-input" value={form.capabilitiesText} onChange={(event) => onChange({ ...form, capabilitiesText: event.target.value })} />
               </label>
             </section>
 

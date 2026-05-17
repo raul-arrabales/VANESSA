@@ -53,7 +53,7 @@ These seams are intended to support future Vanessa-specific planner, memory/retr
 Current canonical built-in tool surfaces:
 
 - `mcp.web_search` backed by `tool.web_search`; the gateway resolves it through local SearXNG, so it requires online runtime
-- `tool.python_exec` remains an internal `sandbox_python` tool and can be exposed through an MCP server definition when needed
+- `mcp.python_exec` backed by `tool.python_exec`; the gateway resolves it through the sandbox runtime, so it requires sandbox execution
 
 Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and canonical `retrieval_calls`.
 

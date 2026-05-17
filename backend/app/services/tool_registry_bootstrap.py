@@ -92,6 +92,15 @@ _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
     },
 }
 
+_DEFAULT_MCP_AUTHORIZATION_POLICY: dict[str, list[str]] = {
+    "agent_ids": ["*"],
+    "agent_domains": ["*"],
+    "agent_roles": ["*"],
+    "user_roles": ["*"],
+    "user_ids": ["*"],
+    "user_group_ids": ["*"],
+}
+
 _BUILTIN_MCP_SERVERS: dict[str, dict[str, object]] = {
     "mcp.web_search": {
         "name": "Web Search MCP",
@@ -101,14 +110,40 @@ _BUILTIN_MCP_SERVERS: dict[str, dict[str, object]] = {
         "exposed_tool_name": "web_search",
         "input_schema": _BUILTIN_TOOLS["tool.web_search"]["input_schema"],
         "output_schema": _BUILTIN_TOOLS["tool.web_search"]["output_schema"],
-        "authorization_policy": {
-            "agent_ids": ["*"],
-            "agent_domains": ["*"],
-            "agent_roles": ["*"],
-            "user_roles": ["*"],
-            "user_ids": ["*"],
-            "user_group_ids": ["*"],
+        "metadata": {
+            "category": "web_search",
+            "capabilities": ["web-search", "fresh-information", "source-discovery", "fact-checking", "public-research"],
+            "local": False,
+            "stateless": True,
+            "sandboxed": False,
+            "risk_level": "medium",
+            "data_access": "public_web",
+            "output_freshness": "fresh",
+            "audit_level": "standard",
         },
+        "authorization_policy": _DEFAULT_MCP_AUTHORIZATION_POLICY,
+        "enabled": True,
+    },
+    "mcp.python_exec": {
+        "name": "Python Execution MCP",
+        "slug": "python_exec",
+        "description": "Expose the internal Python execution tool through the MCP gateway.",
+        "backing_tool_id": "tool.python_exec",
+        "exposed_tool_name": "python_exec",
+        "input_schema": _BUILTIN_TOOLS["tool.python_exec"]["input_schema"],
+        "output_schema": _BUILTIN_TOOLS["tool.python_exec"]["output_schema"],
+        "metadata": {
+            "category": "code_execution",
+            "capabilities": ["python", "code-execution", "calculation", "data-transformation", "sandboxed-execution"],
+            "local": True,
+            "stateless": True,
+            "sandboxed": True,
+            "risk_level": "high",
+            "data_access": "none",
+            "output_freshness": "runtime_generated",
+            "audit_level": "elevated",
+        },
+        "authorization_policy": _DEFAULT_MCP_AUTHORIZATION_POLICY,
         "enabled": True,
     },
 }
@@ -214,6 +249,30 @@ def ensure_builtin_tools(database_url: str) -> bool:
                 set_current=True,
                 published=True,
             )
+        elif existing.get("current_version") is None:
+            create_registry_version(
+                database_url,
+                entity_id=entity_id,
+                version="v1",
+                spec_json=dict(spec),
+                set_current=True,
+                published=True,
+            )
+        else:
+            current_spec = existing.get("current_spec") if isinstance(existing.get("current_spec"), dict) else {}
+            if current_spec != spec:
+                create_registry_version(
+                    database_url,
+                    entity_id=entity_id,
+                    version=_next_builtin_version(
+                        database_url,
+                        entity_id=entity_id,
+                        current_version=existing.get("current_version"),
+                    ),
+                    spec_json=dict(spec),
+                    set_current=True,
+                    published=True,
+                )
         latest = find_registry_entity(database_url, entity_type="mcp_server", entity_id=entity_id)
         upsert_mcp_server_status(
             database_url,

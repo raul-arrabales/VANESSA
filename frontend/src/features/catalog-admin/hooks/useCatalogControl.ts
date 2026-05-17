@@ -17,6 +17,7 @@ import {
   type CatalogDefaults,
   type CatalogMcpServer,
   type CatalogMcpServerMutationInput,
+  type CatalogMcpServerSpec,
   type CatalogMcpServerValidation,
   type CatalogTool,
   type CatalogToolMutationInput,
@@ -56,6 +57,7 @@ export type McpServerFormState = CatalogMcpServerMutationInput & {
   mcpServerId: string;
   inputSchemaText: string;
   outputSchemaText: string;
+  capabilitiesText: string;
   agentIdsText: string;
   agentDomainsText: string;
   agentRolesText: string;
@@ -129,6 +131,17 @@ export const DEFAULT_MCP_SERVER_FORM: McpServerFormState = {
   exposed_tool_name: "",
   input_schema: {},
   output_schema: {},
+  metadata: {
+    category: "custom",
+    capabilities: [],
+    local: false,
+    stateless: true,
+    sandboxed: false,
+    risk_level: "medium",
+    data_access: "none",
+    output_freshness: "runtime_generated",
+    audit_level: "standard",
+  },
   authorization_policy: {
     agent_ids: ["*"],
     agent_domains: ["*"],
@@ -140,6 +153,7 @@ export const DEFAULT_MCP_SERVER_FORM: McpServerFormState = {
   enabled: true,
   inputSchemaText: "{}",
   outputSchemaText: "{}",
+  capabilitiesText: "",
   agentIdsText: "*",
   agentDomainsText: "*",
   agentRolesText: "*",
@@ -225,12 +239,20 @@ function textToList(text: string): string[] {
   return items.length > 0 ? items : ["*"];
 }
 
+function textToTags(text: string): string[] {
+  return text.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
 function listToText(items: string[]): string {
   return items.join(", ");
 }
 
 export function buildMcpServerForm(server: CatalogMcpServer): McpServerFormState {
   const policy = server.spec.authorization_policy;
+  const metadata: CatalogMcpServerSpec["metadata"] = {
+    ...DEFAULT_MCP_SERVER_FORM.metadata,
+    ...server.spec.metadata,
+  };
   return {
     mode: "edit",
     mcpServerId: server.id,
@@ -244,10 +266,12 @@ export function buildMcpServerForm(server: CatalogMcpServer): McpServerFormState
     exposed_tool_name: server.spec.exposed_tool_name,
     input_schema: server.spec.input_schema,
     output_schema: server.spec.output_schema,
+    metadata,
     authorization_policy: policy,
     enabled: server.spec.enabled,
     inputSchemaText: stringifyJson(server.spec.input_schema),
     outputSchemaText: stringifyJson(server.spec.output_schema),
+    capabilitiesText: listToText(metadata.capabilities),
     agentIdsText: listToText(policy.agent_ids),
     agentDomainsText: listToText(policy.agent_domains),
     agentRolesText: listToText(policy.agent_roles),
@@ -577,6 +601,10 @@ export function useCatalogControl(token: string) {
         exposed_tool_name: mcpServerForm.exposed_tool_name,
         input_schema: inputSchema,
         output_schema: outputSchema,
+        metadata: {
+          ...mcpServerForm.metadata,
+          capabilities: textToTags(mcpServerForm.capabilitiesText),
+        },
         authorization_policy: {
           agent_ids: textToList(mcpServerForm.agentIdsText),
           agent_domains: textToList(mcpServerForm.agentDomainsText),

@@ -53,6 +53,17 @@ export type CatalogMcpServerSpec = {
   exposed_tool_name: string;
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
+  metadata: {
+    category: "web_search" | "knowledge_retrieval" | "code_execution" | "data_analysis" | "automation" | "communication" | "custom";
+    capabilities: string[];
+    local: boolean;
+    stateless: boolean;
+    sandboxed: boolean;
+    risk_level: "low" | "medium" | "high";
+    data_access: "none" | "public_web" | "workspace" | "user_data" | "secrets_or_credentials";
+    output_freshness: "static" | "fresh" | "runtime_generated";
+    audit_level: "standard" | "elevated";
+  };
   authorization_policy: {
     agent_ids: string[];
     agent_domains: string[];
@@ -147,6 +158,7 @@ export type CatalogAgentValidation = {
       name: string;
       backing_tool_id: string;
       enabled: boolean;
+      metadata?: CatalogMcpServerSpec["metadata"];
     }>;
     derived_runtime_requirements: {
       internet_required: boolean;

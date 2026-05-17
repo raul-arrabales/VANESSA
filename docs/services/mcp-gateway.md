@@ -15,11 +15,12 @@ The MCP gateway is the normalized HTTP provider for gateway-hosted MCP server ex
 - `GET /v1/tools`
 - `POST /v1/tools/invoke`
 
-Current built-in v1 tool:
+Current built-in MCP exposures:
 
 - `mcp.web_search`, backed by the internal `tool.web_search` catalog tool and local SearXNG through its JSON Search API
+- `mcp.python_exec`, backed by the internal `tool.python_exec` catalog tool and the sandbox runtime
 
-This service is part of the default local-staging stack. Backend seeds the `mcp_gateway_local` provider from `MCP_GATEWAY_URL` and binds it to `mcp_runtime` in the default local deployment profiles. Agent engine then uses that binding for LLM-driven tool calls against authorized MCP server exposures such as `mcp.web_search`.
+This service is part of the default local-staging stack. Backend seeds the `mcp_gateway_local` provider from `MCP_GATEWAY_URL` and binds it to `mcp_runtime` in the default local deployment profiles. Agent engine then uses that binding for LLM-driven tool calls against authorized MCP server exposures such as `mcp.web_search` and `mcp.python_exec`. Discovery responses include MCP server metadata such as category, capabilities, locality, statelessness, sandboxing, risk level, data access, output freshness, and audit level.
 
 In local staging, `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080`. The container listens on port `8080`, while Docker publishes it on host port `6100` to avoid conflicting with Weaviate on `8080`.
 

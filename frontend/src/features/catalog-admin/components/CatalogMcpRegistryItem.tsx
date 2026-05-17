@@ -55,12 +55,17 @@ export default function CatalogMcpRegistryItem({
           <span className="platform-badge" data-tone={validationBadge.tone}>
             {validationBadge.label}
           </span>
+          <span className="platform-badge">{t(`catalogControl.mcp.metadata.category.${server.spec.metadata.category}`)}</span>
+          <span className="platform-badge" data-tone={server.spec.metadata.risk_level === "high" ? "required" : "active"}>
+            {t(`catalogControl.mcp.metadata.riskLevel.${server.spec.metadata.risk_level}`)}
+          </span>
         </div>
         <p className="status-text catalog-mcp-description-preview">{truncateWords(server.spec.description)}</p>
         <div className="catalog-mcp-meta-row">
           <code className="code-inline">{server.spec.slug}</code>
           <span>{t("catalogControl.mcp.backingToolLabel", { tool: backingToolName })}</span>
           <span>{t("catalogControl.mcp.domainLabel", { domains: server.spec.authorization_policy.agent_domains.join(", ") })}</span>
+          {server.spec.metadata.capabilities.length > 0 ? <span>{server.spec.metadata.capabilities.slice(0, 3).join(", ")}</span> : null}
           <span>{t("catalogControl.mcp.updatedLabel", { updated: server.updated_at ?? server.published_at ?? "-" })}</span>
         </div>
       </div>

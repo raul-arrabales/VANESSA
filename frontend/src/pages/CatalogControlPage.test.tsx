@@ -134,6 +134,17 @@ const mcpServerFixture = {
     exposed_tool_name: "web_search",
     input_schema: toolFixture.spec.input_schema,
     output_schema: toolFixture.spec.output_schema,
+    metadata: {
+      category: "web_search" as const,
+      capabilities: ["web-search", "fresh-information", "source-discovery", "fact-checking", "public-research"],
+      local: false,
+      stateless: true,
+      sandboxed: false,
+      risk_level: "medium" as const,
+      data_access: "public_web" as const,
+      output_freshness: "fresh" as const,
+      audit_level: "standard" as const,
+    },
     authorization_policy: {
       agent_ids: ["*"],
       agent_domains: ["*"],
@@ -391,6 +402,8 @@ describe("CatalogControlPage", () => {
     expect(screen.getByLabelText("Slug")).toHaveValue("web_search");
     expect(screen.getByLabelText("Exposed MCP tool name")).toHaveValue("web_search");
     expect(screen.getByLabelText("Description for agents")).toHaveValue("Expose Web search through the MCP gateway.");
+    expect(screen.getByLabelText("Category")).toHaveValue("web_search");
+    expect(screen.getByLabelText("Capabilities")).toHaveValue("web-search, fresh-information, source-discovery, fact-checking, public-research");
     expect(screen.getByLabelText("Input schema")).toHaveValue(JSON.stringify(toolFixture.spec.input_schema, null, 2));
 
     await user.click(screen.getByRole("button", { name: "Create MCP server" }));
@@ -403,6 +416,11 @@ describe("CatalogControlPage", () => {
           slug: "web_search",
           exposed_tool_name: "web_search",
           name: "Web search MCP",
+          metadata: expect.objectContaining({
+            category: "web_search",
+            risk_level: "medium",
+            local: false,
+          }),
         }),
         "token",
       );
