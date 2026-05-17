@@ -24,6 +24,63 @@
   flex-wrap: wrap;
 }
 
+.modelops-catalog-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.modelops-catalog-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.modelops-catalog-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.modelops-catalog-heading,
+.modelops-catalog-meta-row,
+.modelops-catalog-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.modelops-catalog-heading {
+  gap: var(--space-2);
+}
+
+.modelops-catalog-heading .section-title {
+  font-size: 1rem;
+}
+
+.modelops-catalog-meta-row {
+  gap: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.modelops-catalog-meta-row .code-inline {
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.82rem;
+}
+
+.modelops-catalog-actions {
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
 .modelops-discovery-row {
   display: flex;
   align-items: flex-start;
@@ -111,4 +168,14 @@
 .modelops-access-toggle input {
   width: 1.1rem;
   height: 1.1rem;
+}
+
+@media (max-width: 720px) {
+  .modelops-catalog-item {
+    grid-template-columns: 1fr;
+  }
+
+  .modelops-catalog-actions {
+    justify-content: flex-start;
+  }
 }

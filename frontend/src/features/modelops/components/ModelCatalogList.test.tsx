@@ -51,8 +51,9 @@ describe("ModelCatalogList", () => {
 
     expect(screen.getByText("Validated")).toBeInTheDocument();
     expect(screen.getByText("Not validated")).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Test model" })).toHaveLength(1);
-    expect(screen.getByRole("link", { name: "Test model" })).toHaveAttribute("href", "/control/models/gpt-4/test");
-    expect(screen.getAllByRole("link", { name: "Open details" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Test model: GPT-4" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Test model: GPT-4" })).toHaveAttribute("href", "/control/models/gpt-4/test");
+    expect(screen.getByRole("link", { name: "Open details: GPT-4" })).toHaveAttribute("href", "/control/models/gpt-4");
+    expect(screen.getByRole("link", { name: "Open details: Draft model" })).toHaveAttribute("href", "/control/models/draft-model");
   });
 });
