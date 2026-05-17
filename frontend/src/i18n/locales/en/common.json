@@ -1787,11 +1787,30 @@
       "platformDescription": "Review built-in Vanessa platform agents. They can be edited or deactivated, but not deleted.",
       "userListTitle": "User agents",
       "userDescription": "Review user-created catalog agents. Owners can delete these agents when they are no longer needed.",
+      "updatedLabel": "Last updated: {{updated}}",
+      "modelLabel": "Model: {{model}}",
+      "toolsLabel": "Tools: {{count}}",
+      "internetRequired": "Internet required",
+      "sandboxRequired": "Sandbox required",
       "emptyPlatform": "No platform agents are available.",
       "emptyUser": "No user agents are available.",
       "createTitle": "Create agent",
       "createDescription": "Create a new platform agent or continue editing an existing one from this form.",
       "editing": "Editing an existing platform agent.",
+      "actionsFor": "Agent actions for {{name}}",
+      "actionLabels": {
+        "edit": "Edit {{name}}",
+        "validate": "Validate {{name}}",
+        "validating": "Validating {{name}}",
+        "delete": "Delete {{name}}",
+        "deleting": "Deleting {{name}}"
+      },
+      "validationBadges": {
+        "validated": "Validated",
+        "failed": "Validation failed",
+        "unvalidated": "Needs validation",
+        "validating": "Validating"
+      },
       "views": {
         "aria": "Agent catalog sections",
         "agents": "Platform agents",

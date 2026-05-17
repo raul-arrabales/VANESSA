@@ -1769,11 +1769,30 @@
       "platformDescription": "Revisa los agentes integrados de la plataforma Vanessa. Se pueden editar o desactivar, pero no eliminar.",
       "userListTitle": "Agentes de usuario",
       "userDescription": "Revisa agentes del catalogo creados por usuarios. Sus propietarios pueden eliminarlos cuando ya no sean necesarios.",
+      "updatedLabel": "Ultima actualizacion: {{updated}}",
+      "modelLabel": "Modelo: {{model}}",
+      "toolsLabel": "Herramientas: {{count}}",
+      "internetRequired": "Requiere internet",
+      "sandboxRequired": "Requiere sandbox",
       "emptyPlatform": "No hay agentes de plataforma disponibles.",
       "emptyUser": "No hay agentes de usuario disponibles.",
       "createTitle": "Crear agente",
       "createDescription": "Crea un nuevo agente de plataforma o continua editando uno existente desde este formulario.",
       "editing": "Editando un agente de plataforma existente.",
+      "actionsFor": "Acciones de agente para {{name}}",
+      "actionLabels": {
+        "edit": "Editar {{name}}",
+        "validate": "Validar {{name}}",
+        "validating": "Validando {{name}}",
+        "delete": "Eliminar {{name}}",
+        "deleting": "Eliminando {{name}}"
+      },
+      "validationBadges": {
+        "validated": "Validado",
+        "failed": "Validacion fallida",
+        "unvalidated": "Requiere validacion",
+        "validating": "Validando"
+      },
       "views": {
         "aria": "Secciones del catalogo de agentes",
         "agents": "Agentes de plataforma",

@@ -467,13 +467,15 @@ describe("CatalogControlPage", () => {
     expect(userAgentsLink).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Knowledge Chat" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Agent Alpha" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete Knowledge Chat" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Knowledge Chat" })).toHaveAttribute("title", "Edit Knowledge Chat");
+    expect(screen.getByRole("button", { name: "Validate Knowledge Chat" })).toHaveAttribute("title", "Validate Knowledge Chat");
 
     await user.click(userAgentsLink);
 
     expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Delete Agent Alpha" })).toHaveAttribute("title", "Delete Agent Alpha");
   });
 
   it("deletes a user agent after confirmation", async () => {
@@ -481,7 +483,7 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=user-agents" });
 
-    await user.click(await screen.findByRole("button", { name: "Delete" }));
+    await user.click(await screen.findByRole("button", { name: "Delete Agent Alpha" }));
     const dialog = await screen.findByRole("dialog", { name: "Delete user agent" });
     expect(within(dialog).getByText("Delete Agent Alpha? This removes the catalog agent and its versions.")).toBeVisible();
 
