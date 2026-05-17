@@ -965,9 +965,9 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("button", { name: "Existing Sources" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Docs folder" }).closest(".panel-nested")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Docs folder" }).closest(".context-compact-list-item")).toBeTruthy();
 
-    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sync Docs folder" }));
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
   });
 
@@ -991,7 +991,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
     expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit Docs folder" }));
     expect(await screen.findByRole("heading", { name: "Edit source" })).toBeVisible();
     expect(screen.getByDisplayValue("Docs folder")).toBeVisible();
     expect(screen.getByDisplayValue("product_docs")).toBeVisible();
@@ -1037,7 +1037,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     await screen.findByRole("heading", { name: "Add source" });
     await userEvent.click(screen.getByRole("button", { name: "Existing Sources" }));
-    await userEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sync Docs folder" }));
 
     expect(await screen.findByText(/chunk length 300 exceeds the safe maximum 254 tokens/i)).toBeVisible();
   });
@@ -1401,16 +1401,16 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     expect(await screen.findByRole("heading", { name: "Manage manual documents" })).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Edit Manual Note" })).toHaveLength(1);
 
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit Manual Note" }));
     expect(screen.getByRole("button", { name: "Manual Document" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Manual document" })).toBeVisible();
     expect(screen.getByDisplayValue("Manual Note")).toBeVisible();
     expect(screen.getByDisplayValue("Operator note")).toBeVisible();
     expect(screen.getByDisplayValue("memo")).toBeVisible();
     expect(screen.getByDisplayValue("2")).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit Manual Note" })).not.toBeInTheDocument();
   });
 
   it("submits manual-document metadata using schema-driven fields", async () => {
@@ -1480,21 +1480,21 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(await screen.findByRole("heading", { name: "Browse documents" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".panel-nested")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Manual Note" }).closest(".panel-nested")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".context-compact-list-item")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Manual Note" }).closest(".context-compact-list-item")).toBeTruthy();
 
-    const openLinks = screen.getAllByRole("link", { name: "Open text" });
+    const openLinks = screen.getAllByRole("link", { name: /Open text for/ });
     expect(openLinks).toHaveLength(2);
     expect(openLinks[0]).toHaveAttribute("target", "_blank");
     expect(openLinks[0]).toHaveAttribute("href", "/control/context/kb-primary/documents/doc-1/view");
-    expect(screen.getAllByRole("button", { name: "View metadata" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /View metadata for/ })).toHaveLength(2);
   });
 
   it("shows effective metadata in a modal from the browse documents page", async () => {
     await renderContextWorkspace("/control/context/kb-primary/documents");
 
     await screen.findByRole("heading", { name: "Browse documents" });
-    await userEvent.click(screen.getAllByRole("button", { name: "View metadata" })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: /View metadata for/ })[0]);
 
     expect(await screen.findByRole("dialog", { name: "Metadata for Architecture Overview" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Close" })).toBeVisible();
@@ -1518,7 +1518,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     await renderContextWorkspace("/control/context/kb-primary/sources?view=list");
 
     await screen.findByRole("heading", { name: "Existing sources" });
-    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Edit Docs folder" }));
 
     expect(await screen.findByRole("heading", { name: "Edit source" })).toBeVisible();
     expect(screen.getByDisplayValue("guide")).toBeVisible();

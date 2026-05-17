@@ -542,6 +542,17 @@
       "expandChunkResult": "Expandir resultado de recuperacion para {{title}}",
       "collapseChunkResult": "Contraer resultado de recuperacion para {{title}}"
     },
+    "actionLabels": {
+      "sourceActionsFor": "Acciones de fuente para {{name}}",
+      "syncSource": "Sincronizar {{name}}",
+      "syncingSource": "Sincronizando {{name}}",
+      "editSource": "Editar {{name}}",
+      "deleteSource": "Eliminar {{name}}",
+      "editDocument": "Editar {{title}}",
+      "deleteDocument": "Eliminar {{title}}",
+      "viewMetadata": "Ver metadatos de {{title}}",
+      "openText": "Abrir texto de {{title}}"
+    },
     "fields": {
       "provider": "Proveedor de respaldo",
       "indexedFiles": "Archivos indexados",

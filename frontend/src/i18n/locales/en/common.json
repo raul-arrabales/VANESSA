@@ -550,6 +550,17 @@
       "openText": "Open text",
       "backToDocuments": "Back to documents"
     },
+    "actionLabels": {
+      "sourceActionsFor": "Source actions for {{name}}",
+      "syncSource": "Sync {{name}}",
+      "syncingSource": "Syncing {{name}}",
+      "editSource": "Edit {{name}}",
+      "deleteSource": "Delete {{name}}",
+      "editDocument": "Edit {{title}}",
+      "deleteDocument": "Delete {{title}}",
+      "viewMetadata": "View metadata for {{title}}",
+      "openText": "Open text for {{title}}"
+    },
     "fields": {
       "provider": "Backing provider",
       "indexedFiles": "Indexed files",

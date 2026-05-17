@@ -1,8 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
+import IconButton from "../../../components/IconButton";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { KnowledgeBaseMetadataEditor } from "../components/KnowledgeBaseMetadataEditor";
 import { KnowledgeBaseDocumentCard } from "../components/KnowledgeBaseDocumentCard";
+import ContextActionIcon from "../components/ContextActionIcon";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
 import { isManualKnowledgeBaseDocument } from "../documentPresentation";
 import { metadataEntriesFromRecord } from "../metadataEditor";
@@ -192,32 +194,26 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
               </div>
               {!detail.isSuperadmin ? <p className="status-text">{t("contextManagement.states.readOnlyUpload")}</p> : null}
               {manualDocuments.length === 0 ? <p className="status-text">{t("contextManagement.states.noManualDocuments")}</p> : null}
-              {manualDocuments.map((document) => (
-                <KnowledgeBaseDocumentCard
-                  key={document.id}
-                  document={document}
-                  titleAs="h5"
-                  excerptLength={180}
-                  actions={detail.isSuperadmin ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => handleEditDocument(document)}
-                      >
-                        {t("contextManagement.actions.edit")}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => void detail.handleDeleteDocument(document.id)}
-                      >
-                        {t("contextManagement.actions.deleteDocument")}
-                      </button>
-                    </>
-                  ) : null}
-                />
-              ))}
+              <div className="context-compact-list" role="list">
+                {manualDocuments.map((document) => (
+                  <KnowledgeBaseDocumentCard
+                    key={document.id}
+                    document={document}
+                    titleAs="h5"
+                    excerptLength={180}
+                    actions={detail.isSuperadmin ? (
+                      <>
+                        <IconButton label={t("contextManagement.actionLabels.editDocument", { title: document.title })} onClick={() => handleEditDocument(document)}>
+                          <ContextActionIcon name="edit" />
+                        </IconButton>
+                        <IconButton label={t("contextManagement.actionLabels.deleteDocument", { title: document.title })} tone="danger" onClick={() => void detail.handleDeleteDocument(document.id)}>
+                          <ContextActionIcon name="delete" />
+                        </IconButton>
+                      </>
+                    ) : null}
+                  />
+                ))}
+              </div>
             </section>
           ) : null}
         </section>

@@ -71,6 +71,70 @@
   overflow-wrap: anywhere;
 }
 
+.context-compact-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.context-compact-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--bg-surface) 88%, transparent);
+}
+
+.context-compact-list-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.context-compact-list-heading,
+.context-compact-meta-row,
+.context-compact-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.context-compact-list-heading {
+  gap: var(--space-2);
+}
+
+.context-compact-list-heading .section-title {
+  font-size: 1rem;
+}
+
+.context-compact-description {
+  max-width: 78ch;
+}
+
+.context-compact-meta-row {
+  gap: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.context-compact-meta-row .code-inline {
+  padding: var(--space-1) var(--space-2);
+  font-size: 0.82rem;
+}
+
+.context-compact-actions {
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.context-compact-progress {
+  grid-column: 1 / -1;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-muted);
+}
+
 @keyframes context-sync-progress-indeterminate {
   0% {
     transform: translateX(-110%);
@@ -237,5 +301,15 @@
 @media (max-width: 880px) {
   .context-metadata-editor-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .context-compact-list-item {
+    grid-template-columns: 1fr;
+  }
+
+  .context-compact-actions {
+    justify-content: flex-start;
   }
 }

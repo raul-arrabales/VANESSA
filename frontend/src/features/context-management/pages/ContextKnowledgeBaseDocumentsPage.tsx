@@ -2,7 +2,9 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeDocument } from "../../../api/context";
+import IconButton from "../../../components/IconButton";
 import ModalDialog from "../../../components/ModalDialog";
+import ContextActionIcon from "../components/ContextActionIcon";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
 import { KnowledgeBaseDocumentCard } from "../components/KnowledgeBaseDocumentCard";
 import { useContextKnowledgeBaseDocuments } from "../hooks/useContextKnowledgeBaseDocuments";
@@ -25,32 +27,32 @@ export default function ContextKnowledgeBaseDocumentsPage(): JSX.Element {
             </div>
           </div>
           {detail.documents.length === 0 ? <p className="status-text">{t("contextManagement.states.noDocuments")}</p> : null}
-          {detail.documents.map((document) => (
-            <KnowledgeBaseDocumentCard
-              key={document.id}
-              document={document}
-              showStatusChip
-              actions={
-                <>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setSelectedDocument(document)}
-                  >
-                    {t("contextManagement.actions.viewMetadata")}
-                  </button>
-                  <Link
-                    className="btn btn-secondary"
-                    to={buildKnowledgeBaseDocumentViewPath(knowledgeBase.id, document.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {t("contextManagement.actions.openText")}
-                  </Link>
-                </>
-              }
-            />
-          ))}
+          <div className="context-compact-list" role="list">
+            {detail.documents.map((document) => (
+              <KnowledgeBaseDocumentCard
+                key={document.id}
+                document={document}
+                showStatusChip
+                actions={
+                  <>
+                    <IconButton label={t("contextManagement.actionLabels.viewMetadata", { title: document.title })} onClick={() => setSelectedDocument(document)}>
+                      <ContextActionIcon name="metadata" />
+                    </IconButton>
+                    <Link
+                      className="icon-button"
+                      to={buildKnowledgeBaseDocumentViewPath(knowledgeBase.id, document.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={t("contextManagement.actionLabels.openText", { title: document.title })}
+                      title={t("contextManagement.actionLabels.openText", { title: document.title })}
+                    >
+                      <ContextActionIcon name="open" />
+                    </Link>
+                  </>
+                }
+              />
+            ))}
+          </div>
           {selectedDocument ? (
             <ModalDialog
               title={t("contextManagement.metadataViewer.title", { title: selectedDocument.title })}
