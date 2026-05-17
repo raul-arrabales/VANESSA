@@ -500,7 +500,7 @@ describe("CatalogControlPage", () => {
     const subNav = await screen.findByRole("navigation", { name: "Tool catalog sections" });
     expect(within(subNav).getByRole("link", { name: "Platform tools" })).toHaveAttribute("aria-current", "page");
 
-    await user.click(await screen.findByRole("button", { name: "Validate" }));
+    await user.click(await screen.findByRole("button", { name: "Validate Web search" }));
 
     await waitFor(() => {
       expect(catalogApi.validateCatalogTool).toHaveBeenCalledWith("tool.web_search", "token");
@@ -572,7 +572,7 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(await screen.findByRole("button", { name: "Edit Web search" }));
 
     expect(await screen.findByRole("heading", { name: "Create tool" })).toBeVisible();
     expect(screen.getByLabelText("Tool ID")).toHaveValue("tool.web_search");
@@ -585,7 +585,7 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
 
-    await user.click(await screen.findByRole("button", { name: "Test" }));
+    await user.click(await screen.findByRole("button", { name: "Test Web search" }));
 
     expect(await screen.findByRole("heading", { name: "Test tool" })).toBeVisible();
     const subNav = screen.getByRole("navigation", { name: "Tool catalog sections" });

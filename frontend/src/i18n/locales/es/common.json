@@ -1793,6 +1793,9 @@
       "description": "Define backend de ejecucion interno, esquemas y politica de seguridad, y valida la compatibilidad con el runtime activo.",
       "backendLabel": "Backend: {{backend}}",
       "validationLabel": "Validacion: {{status}}",
+      "updatedLabel": "Ultima actualizacion: {{updated}}",
+      "offlineCompatible": "Compatible offline",
+      "networkRequired": "Requiere red",
       "listTitle": "Herramientas de plataforma",
       "createTitle": "Crear herramienta",
       "createDescription": "Crea una nueva herramienta de plataforma o continua editando una existente desde este formulario.",
@@ -1807,6 +1810,20 @@
       "requestTitle": "Entrada enviada",
       "responseTitle": "Resultado del runtime",
       "noKnowledgeBases": "El despliegue activo no tiene bases de conocimiento enlazadas disponibles para herramientas de recuperacion.",
+      "actionsFor": "Acciones de herramienta para {{name}}",
+      "actionLabels": {
+        "edit": "Editar {{name}}",
+        "test": "Probar {{name}}",
+        "validate": "Validar {{name}}",
+        "validating": "Validando {{name}}"
+      },
+      "validationBadges": {
+        "validated": "Validado",
+        "failed": "Validacion fallida",
+        "stale": "Validacion desactualizada",
+        "unvalidated": "Requiere validacion",
+        "validating": "Validando"
+      },
       "steps": {
         "executionBackend": "1. Backend de ejecucion"
       },

@@ -1811,6 +1811,9 @@
       "description": "Define the internal execution backend, schemas, and safety policy, then validate runtime compatibility.",
       "backendLabel": "Backend: {{backend}}",
       "validationLabel": "Validation: {{status}}",
+      "updatedLabel": "Last updated: {{updated}}",
+      "offlineCompatible": "Offline compatible",
+      "networkRequired": "Network required",
       "listTitle": "Platform tools",
       "createTitle": "Create tool",
       "createDescription": "Create a new platform tool or continue editing an existing one from this form.",
@@ -1825,6 +1828,20 @@
       "requestTitle": "Submitted input",
       "responseTitle": "Runtime result",
       "noKnowledgeBases": "The active deployment has no bound knowledge bases available for retrieval tools.",
+      "actionsFor": "Tool actions for {{name}}",
+      "actionLabels": {
+        "edit": "Edit {{name}}",
+        "test": "Test {{name}}",
+        "validate": "Validate {{name}}",
+        "validating": "Validating {{name}}"
+      },
+      "validationBadges": {
+        "validated": "Validated",
+        "failed": "Validation failed",
+        "stale": "Validation stale",
+        "unvalidated": "Needs validation",
+        "validating": "Validating"
+      },
       "steps": {
         "executionBackend": "1. Execution backend"
       },

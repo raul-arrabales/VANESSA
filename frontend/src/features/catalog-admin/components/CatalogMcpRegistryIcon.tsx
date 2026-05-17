@@ -1,4 +1,4 @@
-export type McpRegistryIconName = "edit" | "enable" | "disable" | "validate" | "delete" | "description";
+export type McpRegistryIconName = "edit" | "enable" | "disable" | "validate" | "delete" | "description" | "test";
 
 export default function CatalogMcpRegistryIcon({ name }: { name: McpRegistryIconName }): JSX.Element {
   if (name === "edit") {
@@ -26,6 +26,13 @@ export default function CatalogMcpRegistryIcon({ name }: { name: McpRegistryIcon
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1.1 13.7-3.6-3.6 1.4-1.4 2.2 2.17 4.78-4.77 1.42 1.42-6.2 6.18Z" />
+      </svg>
+    );
+  }
+  if (name === "test") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M8 5v14l11-7L8 5Zm2 3.65L15.25 12 10 15.35v-6.7ZM4 5h2v14H4V5Z" />
       </svg>
     );
   }
