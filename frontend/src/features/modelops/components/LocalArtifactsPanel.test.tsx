@@ -81,7 +81,7 @@ describe("LocalArtifactsPanel", () => {
     });
 
     expect(await screen.findByText("Phi Local")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: "Register Phi Local" }));
 
     expect(modelApiMocks.registerExistingManagedModel).toHaveBeenCalledWith("phi-local", "token");
     expect(await screen.findByText("Artifact registered successfully.")).toBeVisible();
@@ -99,7 +99,7 @@ describe("LocalArtifactsPanel", () => {
     });
 
     expect(await screen.findByText("Phi Local")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Register" }));
+    await user.click(screen.getByRole("button", { name: "Register Phi Local" }));
 
     expect(await screen.findByText("Artifact cannot be registered")).toBeVisible();
   });

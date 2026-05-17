@@ -1260,6 +1260,15 @@
     "artifacts": {
       "title": "Local artifacts",
       "description": "Review local artifacts, check readiness, and register artifacts that are ready to move into the catalog lifecycle.",
+      "listAria": "Local artifact list",
+      "ready": "Ready",
+      "notReady": "Not ready",
+      "actionsFor": "Artifact actions for {{name}}",
+      "actionLabels": {
+        "openDetail": "Open details for {{name}}",
+        "register": "Register {{name}}",
+        "registering": "Registering {{name}}"
+      },
       "registered": "Artifact registered successfully.",
       "registerFailed": "Unable to register artifact."
     },

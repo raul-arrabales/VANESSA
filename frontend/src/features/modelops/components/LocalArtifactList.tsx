@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import type { LocalModelArtifact } from "../../../api/modelops/types";
 import { useTranslation } from "react-i18next";
+import IconButton from "../../../components/IconButton";
+import ModelCatalogActionIcon from "./ModelCatalogActionIcon";
 
 type LocalArtifactListProps = {
   artifacts: LocalModelArtifact[];
@@ -20,38 +22,54 @@ export default function LocalArtifactList({
   }
 
   return (
-    <ul className="card-stack" aria-label="Local artifact list">
-      {artifacts.map((artifact) => (
-        <li key={artifact.artifact_id} className="panel card-stack">
-          <div className="modelops-card-header">
-            <div className="card-stack">
-              <strong>{artifact.name ?? artifact.suggested_model_id ?? artifact.artifact_id}</strong>
-              <span className="status-text">{artifact.storage_path ?? artifact.source_id ?? artifact.artifact_id}</span>
+    <ul className="modelops-catalog-list" aria-label={t("modelOps.artifacts.listAria")}>
+      {artifacts.map((artifact) => {
+        const displayName = artifact.name ?? artifact.suggested_model_id ?? artifact.artifact_id;
+        const isRegistering = registeringArtifactId === artifact.artifact_id;
+        const detailLabel = t("modelOps.artifacts.actionLabels.openDetail", { name: displayName });
+        const registerLabel = isRegistering
+          ? t("modelOps.artifacts.actionLabels.registering", { name: displayName })
+          : t("modelOps.artifacts.actionLabels.register", { name: displayName });
+
+        return (
+          <li key={artifact.artifact_id} className="modelops-catalog-item">
+            <div className="modelops-catalog-main">
+              <div className="modelops-catalog-heading">
+                <h3 className="section-title">{displayName}</h3>
+                <span className="status-chip status-chip-neutral">{artifact.artifact_status ?? "unknown"}</span>
+                <span className="status-chip status-chip-neutral">{artifact.lifecycle_state ?? "unknown"}</span>
+                <span className={`status-chip ${artifact.ready_for_registration ? "status-chip-success" : "status-chip-warning"}`}>
+                  {artifact.ready_for_registration ? t("modelOps.artifacts.ready") : t("modelOps.artifacts.notReady")}
+                </span>
+              </div>
+              <div className="modelops-catalog-meta-row">
+                <code className="code-inline">{artifact.artifact_id}</code>
+                <span>{artifact.storage_path ?? artifact.source_id ?? "-"}</span>
+                <span>{artifact.task_key ?? "unknown"}</span>
+                <span>{artifact.validation_hint ?? "unknown"}</span>
+                {artifact.suggested_model_id ? <span>{artifact.suggested_model_id}</span> : null}
+              </div>
             </div>
-            <span className="status-chip status-chip-neutral">{artifact.artifact_status ?? "unknown"}</span>
-          </div>
-          <p className="status-text">
-            {artifact.task_key ?? "unknown"} · {artifact.lifecycle_state ?? "unknown"} · {artifact.validation_hint ?? "unknown"}
-          </p>
-          <div className="button-row">
-            {artifact.linked_model_id && (
-              <Link className="btn btn-secondary" to={`/control/models/${encodeURIComponent(artifact.linked_model_id)}`}>
-                {t("modelOps.actions.openDetail")}
-              </Link>
-            )}
-            {artifact.ready_for_registration && artifact.suggested_model_id && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={registeringArtifactId === artifact.artifact_id}
-                onClick={() => void onRegister(artifact)}
-              >
-                {t("modelOps.actions.register")}
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
+            <div className="modelops-catalog-actions" role="group" aria-label={t("modelOps.artifacts.actionsFor", { name: displayName })}>
+              {artifact.linked_model_id ? (
+                <Link
+                  className="icon-button"
+                  to={`/control/models/${encodeURIComponent(artifact.linked_model_id)}`}
+                  aria-label={detailLabel}
+                  title={detailLabel}
+                >
+                  <ModelCatalogActionIcon name="details" />
+                </Link>
+              ) : null}
+              {artifact.ready_for_registration && artifact.suggested_model_id ? (
+                <IconButton label={registerLabel} disabled={isRegistering} onClick={() => void onRegister(artifact)}>
+                  <ModelCatalogActionIcon name="register" />
+                </IconButton>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -1252,6 +1252,15 @@
     "artifacts": {
       "title": "Artefactos locales",
       "description": "Revisa artefactos locales, comprueba su estado y registra los que ya estan listos para pasar al catalogo.",
+      "listAria": "Lista de artefactos locales",
+      "ready": "Listo",
+      "notReady": "No listo",
+      "actionsFor": "Acciones de artefacto para {{name}}",
+      "actionLabels": {
+        "openDetail": "Abrir detalle de {{name}}",
+        "register": "Registrar {{name}}",
+        "registering": "Registrando {{name}}"
+      },
       "registered": "Artefacto registrado correctamente.",
       "registerFailed": "No se pudo registrar el artefacto."
     },
