@@ -55,6 +55,7 @@ def test_catalog_routes_require_superadmin(client):
         test_client.put("/v1/catalog/agents/agent.alpha", headers=_auth(token), json={}),
         test_client.post("/v1/catalog/agents/agent.alpha/validate", headers=_auth(token)),
         test_client.get("/v1/catalog/tools", headers=_auth(token)),
+        test_client.get("/v1/catalog/tool-creation-options", headers=_auth(token)),
         test_client.post("/v1/catalog/tools", headers=_auth(token), json={}),
         test_client.get("/v1/catalog/tools/tool.alpha", headers=_auth(token)),
         test_client.put("/v1/catalog/tools/tool.alpha", headers=_auth(token), json={}),
@@ -173,9 +174,26 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     )
 
     monkeypatch.setattr(catalog_routes, "list_catalog_tools", lambda _db: [tool_row])
+    monkeypatch.setattr(
+        catalog_routes,
+        "get_catalog_tool_creation_options",
+        lambda _db, *, config: {
+            "execution_backends": [
+                {
+                    "execution_backend": "mcp_gateway_web_search",
+                    "requires_knowledge_base": False,
+                    "template": {**tool_row["spec"], "id": "tool.web_search", "publish": True, "visibility": "private"},
+                }
+            ],
+            "knowledge_bases": [],
+            "default_knowledge_base_id": None,
+            "selection_required": False,
+            "configuration_message": None,
+        },
+    )
     monkeypatch.setattr(catalog_routes, "get_catalog_tool", lambda _db, *, tool_id: dict(tool_row, id=tool_id))
-    monkeypatch.setattr(catalog_routes, "create_catalog_tool", lambda _db, *, payload, owner_user_id: dict(tool_row, id=payload["id"]))
-    monkeypatch.setattr(catalog_routes, "update_catalog_tool", lambda _db, *, tool_id, payload: dict(tool_row, id=tool_id, published=payload["publish"]))
+    monkeypatch.setattr(catalog_routes, "create_catalog_tool", lambda _db, *, config, payload, owner_user_id: dict(tool_row, id=payload["id"]))
+    monkeypatch.setattr(catalog_routes, "update_catalog_tool", lambda _db, *, config, tool_id, payload: dict(tool_row, id=tool_id, published=payload["publish"]))
     monkeypatch.setattr(
         catalog_routes,
         "validate_catalog_tool",
@@ -246,6 +264,7 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     delete_agent = test_client.delete("/v1/catalog/agents/agent.alpha", headers=_auth(token))
 
     tools = test_client.get("/v1/catalog/tools", headers=_auth(token))
+    tool_creation_options = test_client.get("/v1/catalog/tool-creation-options", headers=_auth(token))
     create_tool = test_client.post(
         "/v1/catalog/tools",
         headers=_auth(token),
@@ -305,6 +324,8 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
 
     assert tools.status_code == 200
     assert tools.get_json()["tools"][0]["id"] == "tool.web_search"
+    assert tool_creation_options.status_code == 200
+    assert tool_creation_options.get_json()["execution_backends"][0]["execution_backend"] == "mcp_gateway_web_search"
     assert create_tool.status_code == 201
     assert update_tool.status_code == 200
     assert update_tool.get_json()["tool"]["published"] is False

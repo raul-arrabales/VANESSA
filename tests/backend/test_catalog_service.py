@@ -246,6 +246,204 @@ def test_builtin_mcp_seed_reconciles_changed_specs(monkeypatch: pytest.MonkeyPat
     assert "mcp.python_exec" in status_upserts
 
 
+def _knowledge_base_retrieval_tool_payload() -> dict[str, object]:
+    return {
+        "name": "Product Docs Retrieval",
+        "description": "Retrieves relevant passages from Product Docs.",
+        "input_schema": catalog_service._build_knowledge_base_retrieval_input_schema(),
+        "output_schema": catalog_service._build_knowledge_base_retrieval_output_schema(),
+        "safety_policy": {"timeout_seconds": 8, "network_access": False},
+        "offline_compatible": True,
+        "execution_backend": "knowledge_base_retrieval",
+        "execution_config": {
+            "knowledge_base_id": "kb-product-docs",
+            "retrieval_defaults": {
+                "top_k": 5,
+                "search_method": "semantic",
+                "query_preprocessing": "none",
+            },
+        },
+        "permissions": {},
+    }
+
+
+def test_tool_creation_options_include_retrieval_template_for_active_bound_knowledge_bases(monkeypatch: pytest.MonkeyPatch):
+    runtime = {
+        "capabilities": {
+            "embeddings": {"provider_origin": "local"},
+            "vector_store": {"provider_origin": "local"},
+        }
+    }
+    knowledge_base = {
+        "id": "kb-product-docs",
+        "display_name": "Product Docs",
+        "slug": "product-docs",
+        "index_name": "kb_product_docs",
+        "is_default": True,
+    }
+    monkeypatch.setattr(catalog_service, "get_active_platform_runtime", lambda _db, _config: runtime)
+    monkeypatch.setattr(
+        catalog_service,
+        "list_active_runtime_knowledge_bases",
+        lambda _runtime, *, database_url: {
+            "knowledge_bases": [knowledge_base],
+            "default_knowledge_base_id": "kb-product-docs",
+            "selection_required": False,
+            "configuration_message": None,
+        },
+    )
+
+    options = catalog_service.get_catalog_tool_creation_options("ignored", config=SimpleNamespace())
+    retrieval_option = next(item for item in options["execution_backends"] if item["execution_backend"] == "knowledge_base_retrieval")
+    template = retrieval_option["templates_by_knowledge_base_id"]["kb-product-docs"]
+
+    assert options["default_knowledge_base_id"] == "kb-product-docs"
+    assert retrieval_option["requires_knowledge_base"] is True
+    assert template["id"] == "tool.kb_retrieval.product-docs"
+    assert template["name"] == "Product Docs Retrieval"
+    assert template["execution_config"]["knowledge_base_id"] == "kb-product-docs"
+    assert template["offline_compatible"] is True
+
+
+def test_coerce_tool_spec_validates_knowledge_base_retrieval_config(monkeypatch: pytest.MonkeyPatch):
+    missing_payload = _knowledge_base_retrieval_tool_payload()
+    missing_payload["execution_config"] = {}
+
+    with pytest.raises(catalog_service.CatalogError) as missing_exc:
+        catalog_service._coerce_tool_spec("ignored", missing_payload, config=SimpleNamespace())
+
+    assert missing_exc.value.code == "invalid_execution_config"
+
+    unbound_payload = _knowledge_base_retrieval_tool_payload()
+    monkeypatch.setattr(catalog_service, "_active_bound_knowledge_bases", lambda *_args, **_kwargs: [])
+
+    with pytest.raises(catalog_service.CatalogError) as unbound_exc:
+        catalog_service._coerce_tool_spec("ignored", unbound_payload, config=SimpleNamespace())
+
+    assert unbound_exc.value.code == "knowledge_base_not_bound"
+
+    monkeypatch.setattr(
+        catalog_service,
+        "_active_bound_knowledge_bases",
+        lambda *_args, **_kwargs: [{"id": "kb-product-docs", "display_name": "Product Docs"}],
+    )
+    spec = catalog_service._coerce_tool_spec("ignored", unbound_payload, config=SimpleNamespace())
+
+    assert spec["execution_backend"] == "knowledge_base_retrieval"
+    assert spec["execution_config"]["knowledge_base_id"] == "kb-product-docs"
+
+
+def test_validate_catalog_tool_reports_knowledge_base_binding(monkeypatch: pytest.MonkeyPatch):
+    payload = _knowledge_base_retrieval_tool_payload()
+    monkeypatch.setattr(
+        catalog_service,
+        "_find_active_bound_knowledge_base",
+        lambda *_args, **_kwargs: {"id": "kb-product-docs", "display_name": "Product Docs"},
+    )
+
+    runtime_checks, errors = catalog_service._validate_catalog_tool_definition(
+        database_url="ignored",
+        config=SimpleNamespace(),
+        spec=payload,
+    )
+
+    assert errors == []
+    assert runtime_checks["knowledge_base_id"] == "kb-product-docs"
+    assert runtime_checks["knowledge_base_bound"] is True
+    assert runtime_checks["knowledge_base_display_name"] == "Product Docs"
+    assert runtime_checks["provider_reachable"] is True
+
+
+def test_execute_catalog_tool_invokes_knowledge_base_retrieval_with_merged_defaults(monkeypatch: pytest.MonkeyPatch):
+    payload = _knowledge_base_retrieval_tool_payload()
+    tool_row = {
+        "entity_id": "tool.kb_retrieval.product-docs",
+        "entity_type": "tool",
+        "owner_user_id": 1,
+        "visibility": "private",
+        "status": "published",
+        "current_version": "v1",
+        "published_at": "2026-01-01T00:00:00+00:00",
+        "current_spec": payload,
+    }
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
+    monkeypatch.setattr(
+        catalog_service,
+        "_find_active_bound_knowledge_base",
+        lambda *_args, **_kwargs: {"id": "kb-product-docs", "display_name": "Product Docs"},
+    )
+    monkeypatch.setattr(
+        catalog_service,
+        "query_knowledge_base",
+        lambda _db, *, config, knowledge_base_id, payload: captured.update(
+            {"knowledge_base_id": knowledge_base_id, "payload": payload}
+        )
+        or {
+            "knowledge_base_id": knowledge_base_id,
+            "retrieval": {
+                "index": "kb_product_docs",
+                "result_count": 1,
+                "top_k": payload["top_k"],
+                "search_method": payload["search_method"],
+                "query_preprocessing": payload["query_preprocessing"],
+            },
+            "results": [{"chunk_id": "chunk-1", "text": "Relevant passage"}],
+        },
+    )
+
+    result = catalog_service.execute_catalog_tool(
+        "ignored",
+        config=SimpleNamespace(),
+        tool_id="tool.kb_retrieval.product-docs",
+        payload={"input": {"query_text": "How do deployments work?", "top_k": 2}},
+        actor_user_id=7,
+    )
+
+    assert captured == {
+        "knowledge_base_id": "kb-product-docs",
+        "payload": {
+            "top_k": 2,
+            "search_method": "semantic",
+            "query_preprocessing": "none",
+            "query_text": "How do deployments work?",
+        },
+    }
+    assert result["execution"]["ok"] is True
+    assert result["execution"]["result"]["results"][0]["text"] == "Relevant passage"
+
+
+def test_execute_catalog_tool_rejects_unbound_knowledge_base(monkeypatch: pytest.MonkeyPatch):
+    payload = _knowledge_base_retrieval_tool_payload()
+    tool_row = {
+        "entity_id": "tool.kb_retrieval.product-docs",
+        "entity_type": "tool",
+        "owner_user_id": 1,
+        "visibility": "private",
+        "status": "published",
+        "current_version": "v1",
+        "published_at": "2026-01-01T00:00:00+00:00",
+        "current_spec": payload,
+    }
+    monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
+
+    def _raise_unbound(*_args, **_kwargs):
+        raise catalog_service.CatalogError("knowledge_base_not_bound", "Knowledge base is not bound.", status_code=409)
+
+    monkeypatch.setattr(catalog_service, "_find_active_bound_knowledge_base", _raise_unbound)
+
+    with pytest.raises(catalog_service.CatalogError) as exc:
+        catalog_service.execute_catalog_tool(
+            "ignored",
+            config=SimpleNamespace(),
+            tool_id="tool.kb_retrieval.product-docs",
+            payload={"input": {"query_text": "How do deployments work?"}},
+            actor_user_id=7,
+        )
+
+    assert exc.value.code == "knowledge_base_not_bound"
+
+
 def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pytest.MonkeyPatch):
     entities: dict[str, dict] = {}
 

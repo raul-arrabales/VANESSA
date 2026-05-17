@@ -5,6 +5,9 @@ function buildSampleValueFromSchema(schema: unknown, propertyName = ""): unknown
     if (propertyName === "query") {
       return "OpenAI platform runtime";
     }
+    if (propertyName === "query_text") {
+      return "How do active deployments resolve resources?";
+    }
     if (propertyName === "code") {
       return "print('Hello from VANESSA')";
     }
@@ -55,6 +58,9 @@ function buildSampleValueFromSchema(schema: unknown, propertyName = ""): unknown
   if (propertyName === "query") {
     return "OpenAI platform runtime";
   }
+  if (propertyName === "query_text") {
+    return "How do active deployments resolve resources?";
+  }
   if (propertyName === "code") {
     return "print('Hello from VANESSA')";
   }
@@ -76,6 +82,15 @@ export function buildSampleToolInput(tool: CatalogTool): Record<string, unknown>
         numbers: [1, 2, 3],
       },
       timeout_seconds: 5,
+    };
+  }
+
+  if (tool.spec.execution_backend === "knowledge_base_retrieval") {
+    return {
+      query_text: "How do active deployments resolve resources?",
+      top_k: 5,
+      search_method: "semantic",
+      query_preprocessing: "none",
     };
   }
 

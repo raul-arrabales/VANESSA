@@ -80,6 +80,19 @@ function metadataDefaultsForTool(tool: CatalogTool): CatalogMcpServerSpec["metad
       audit_level: "standard",
     };
   }
+  if (executionBackend === "knowledge_base_retrieval") {
+    return {
+      category: "knowledge_retrieval",
+      capabilities: ["knowledge-base", "retrieval", "semantic-search", "source-grounding"],
+      local: Boolean(tool.spec.offline_compatible),
+      stateless: true,
+      sandboxed: false,
+      risk_level: "low",
+      data_access: "workspace",
+      output_freshness: "static",
+      audit_level: "standard",
+    };
+  }
   return {
     category: "custom",
     capabilities: [],

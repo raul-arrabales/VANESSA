@@ -102,6 +102,8 @@ Current provider proof state:
 Agent tools now use a catalog-backed split:
 
 - Internal tools are backend-owned registry entities with explicit input/output schemas, validation state, permissions, safety policy, offline compatibility, and an `execution_backend`.
+- Catalog tool creation is template-driven by backend execution backends. The first selection is the execution backend, and backend-owned templates prefill the editable tool definition.
+- `knowledge_base_retrieval` is a catalog execution backend for one active deployment-bound knowledge base. It stores `execution_config.knowledge_base_id`, optional retrieval defaults, validates the KB against the active `vector_store` resources, and executes through the backend KB query path.
 - MCP is no longer a tool transport field. An MCP server is a separate registry entity backed by one published, validation-current internal tool.
 - Agents discover and invoke authorized MCP server exposures via `mcp_server_refs`, while direct internal tool references remain available for platform-owned execution paths that need them.
 - MCP server definitions carry their own exposed tool name, schemas, metadata for agent discovery/platform management, enabled state, and authorization policy for agent IDs, agent domains, user roles, user IDs, and user group IDs.
@@ -110,6 +112,7 @@ Current canonical tools and exposures:
 
 - `tool.web_search` -> `execution_backend: mcp_gateway_web_search`; the default `mcp.web_search` exposure is served by MCP Gateway through local SearXNG and is token-free but internet-required.
 - `tool.python_exec` -> `execution_backend: sandbox_python`; the default `mcp.python_exec` exposure is local, sandboxed, and elevated-risk.
+- KB retrieval tools are not globally seeded because their valid configuration depends on the currently active deployment-bound knowledge bases. When exposed through MCP, their default discovery metadata is `category=knowledge_retrieval`, workspace data access, static freshness, and low risk.
 
 Tool execution is LLM-driven. Agent engine passes authorized MCP exposure definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the active MCP gateway provider with agent/user/domain identity metadata, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.
 

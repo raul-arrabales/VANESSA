@@ -50,6 +50,7 @@ export default function CatalogControlPage(): JSX.Element {
     setAgentForm,
     toolForm,
     setToolForm,
+    toolCreationOptions,
     mcpServerForm,
     setMcpServerForm,
     toolTestForm,
@@ -247,6 +248,7 @@ export default function CatalogControlPage(): JSX.Element {
       {activeSection === "tools" && activeToolsView === "create" ? (
         <CatalogToolFormPanel
           form={toolForm}
+          toolCreationOptions={toolCreationOptions}
           saving={savingTool}
           onChange={setToolForm}
           onSubmit={(event) => {

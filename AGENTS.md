@@ -443,7 +443,7 @@ Keep these current repo truths in mind:
 - Active runtime selection happens through deployment profiles.
 - Model-bearing bindings are multi-model and require an explicit default.
 - `agent_engine` executes against backend-provided `platform_runtime`.
-- Internal tools are backend-owned catalog capabilities; MCP server definitions are separate gateway-hosted exposures backed by validated tools.
+- Internal tools are backend-owned catalog capabilities; KB retrieval tools bind exactly one active deployment-bound knowledge base; MCP server definitions are separate gateway-hosted exposures backed by validated tools.
 - Product-facing AI interaction is standardized on `/v1/playgrounds/*`, while end-user agent authoring now lives under `/v1/agent-projects/*`.
 
 ---

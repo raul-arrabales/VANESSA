@@ -39,10 +39,12 @@ The backend is the HTTP entrypoint for frontend and service orchestration.
 - `DELETE /v1/catalog/agents/{id}` (owner or superadmin; platform agents are blocked)
 - `POST /v1/catalog/agents/{id}/validate` (superadmin)
 - `GET /v1/catalog/tools` (superadmin)
+- `GET /v1/catalog/tool-creation-options` (superadmin)
 - `POST /v1/catalog/tools` (superadmin)
 - `GET /v1/catalog/tools/{id}` (superadmin)
 - `PUT /v1/catalog/tools/{id}` (superadmin)
 - `POST /v1/catalog/tools/{id}/validate` (superadmin)
+- `POST /v1/catalog/tools/{id}/test` (superadmin)
 
 Catalog orchestration now resolves through the application-layer catalog-management service, while the generic registry surface remains the lower-level runtime artifact store behind those typed catalog DTOs.
 
@@ -207,7 +209,9 @@ Bootstrap defaults:
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible, but incomplete resource/default configuration is reported through readiness metadata instead of blocking activation.
 - Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
-- Tool definitions remain registry entities, but MCP is modeled as a separate catalog exposure instead of a tool transport. Backend bootstraps `tool.web_search` and `tool.python_exec` as internal tools with explicit schemas, execution backend, permissions, safety policy, offline compatibility, and persisted validation state. Backend also bootstraps `mcp.web_search` and `mcp.python_exec` as gateway-hosted MCP server definitions backed by those tools.
+- Tool definitions remain registry entities, but MCP is modeled as a separate catalog exposure instead of a tool transport. Backend bootstraps `tool.web_search` and `tool.python_exec` as internal tools with explicit schemas, execution backend, permissions, safety policy, offline compatibility, and persisted validation state. Superadmin tool creation starts from backend-owned execution backend templates, including `knowledge_base_retrieval` templates generated from active deployment-bound knowledge bases.
+- `knowledge_base_retrieval` tools bind exactly one active, ready knowledge base from the active deployment `vector_store` resources. Validation and execution fail if the active deployment changes and the configured KB is no longer bound. Invocation merges tool `retrieval_defaults` with call input and uses the same backend KB query path as the context-management retrieval QA surface.
+- Backend also bootstraps `mcp.web_search` and `mcp.python_exec` as gateway-hosted MCP server definitions backed by those tools. MCP defaults derived from retrieval tools classify them as `knowledge_retrieval` with workspace data access and static freshness.
 - Superadmins manage MCP server definitions from `/v1/catalog/mcp-servers`. Backend validates MCP schemas and discovery metadata before save, filters discovery by agent/user/domain policy, validates inbound and outbound invocation payloads, dispatches to the backing internal tool, and records every MCP invocation in the audit log.
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.
   Each catalog create/update writes a new registry version under the hood, so runtime consumers

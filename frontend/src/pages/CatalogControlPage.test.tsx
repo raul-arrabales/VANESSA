@@ -18,6 +18,7 @@ vi.mock("../auth/AuthProvider", () => ({
 
 vi.mock("../api/catalog", () => ({
   getCatalogDefaults: vi.fn(),
+  getCatalogToolCreationOptions: vi.fn(),
   listCatalogAgents: vi.fn(),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
@@ -119,6 +120,129 @@ const toolFixture = {
   },
 };
 
+const knowledgeBaseRetrievalTemplate = {
+  id: "tool.kb_retrieval.product-docs",
+  visibility: "private" as const,
+  publish: false,
+  name: "Product Docs Retrieval",
+  description: "Retrieves relevant passages from Product Docs.",
+  execution_backend: "knowledge_base_retrieval" as const,
+  execution_config: {
+    knowledge_base_id: "kb-product-docs",
+    retrieval_defaults: {
+      top_k: 5,
+      search_method: "semantic",
+      query_preprocessing: "none",
+    },
+  },
+  permissions: {},
+  input_schema: {
+    type: "object",
+    properties: {
+      query_text: { type: "string" },
+      top_k: { type: "integer", minimum: 1 },
+      search_method: { type: "string", enum: ["semantic", "keyword", "hybrid"] },
+      query_preprocessing: { type: "string", enum: ["none", "normalize"] },
+      hybrid_alpha: { type: "number", minimum: 0, maximum: 1 },
+      filters: { type: "object", additionalProperties: true },
+    },
+    required: ["query_text"],
+    additionalProperties: false,
+  },
+  output_schema: {
+    type: "object",
+    properties: {
+      knowledge_base_id: { type: "string" },
+      retrieval: { type: "object", additionalProperties: true },
+      results: { type: "array", items: { type: "object" } },
+    },
+    required: ["knowledge_base_id", "retrieval", "results"],
+    additionalProperties: true,
+  },
+  safety_policy: { timeout_seconds: 8, network_access: false },
+  offline_compatible: true,
+};
+
+const toolCreationOptionsFixture = {
+  execution_backends: [
+    {
+      execution_backend: "mcp_gateway_web_search" as const,
+      requires_knowledge_base: false,
+      template: {
+        ...toolFixture.spec,
+        id: "tool.custom_web_search",
+        visibility: "private" as const,
+        publish: false,
+        name: "Web Search",
+        description: "Searches the web through the MCP gateway's SearXNG-backed runner.",
+      },
+    },
+    {
+      execution_backend: "sandbox_python" as const,
+      requires_knowledge_base: false,
+      template: {
+        id: "tool.custom_python_exec",
+        visibility: "private" as const,
+        publish: false,
+        name: "Python Execution",
+        description: "Runs constrained Python code in the sandbox runtime.",
+        execution_backend: "sandbox_python" as const,
+        execution_config: {},
+        permissions: {},
+        input_schema: { type: "object", properties: { code: { type: "string" } }, required: ["code"], additionalProperties: false },
+        output_schema: { type: "object", additionalProperties: true },
+        safety_policy: { timeout_seconds: 5, network_access: false },
+        offline_compatible: true,
+      },
+    },
+    {
+      execution_backend: "knowledge_base_retrieval" as const,
+      requires_knowledge_base: true,
+      knowledge_bases: [
+        {
+          id: "kb-product-docs",
+          display_name: "Product Docs",
+          slug: "product-docs",
+          index_name: "kb_product_docs",
+          is_default: true,
+        },
+      ],
+      templates_by_knowledge_base_id: {
+        "kb-product-docs": knowledgeBaseRetrievalTemplate,
+      },
+    },
+  ],
+  knowledge_bases: [
+    {
+      id: "kb-product-docs",
+      display_name: "Product Docs",
+      slug: "product-docs",
+      index_name: "kb_product_docs",
+      is_default: true,
+    },
+  ],
+  default_knowledge_base_id: "kb-product-docs",
+  selection_required: false,
+  configuration_message: null,
+};
+
+const kbRetrievalToolFixture = {
+  ...toolFixture,
+  id: "tool.kb_retrieval.product-docs",
+  entity: { id: "tool.kb_retrieval.product-docs", type: "tool" as const, owner_user_id: 1, visibility: "private" as const },
+  spec: {
+    name: knowledgeBaseRetrievalTemplate.name,
+    description: knowledgeBaseRetrievalTemplate.description,
+    execution_backend: "knowledge_base_retrieval" as const,
+    execution_config: knowledgeBaseRetrievalTemplate.execution_config,
+    permissions: {},
+    input_schema: knowledgeBaseRetrievalTemplate.input_schema,
+    output_schema: knowledgeBaseRetrievalTemplate.output_schema,
+    safety_policy: knowledgeBaseRetrievalTemplate.safety_policy,
+    offline_compatible: true,
+  },
+};
+
 const mcpServerFixture = {
   id: "mcp.web_search",
   entity: { id: "mcp.web_search", type: "mcp_server" as const, owner_user_id: 1, visibility: "private" as const },
@@ -185,6 +309,7 @@ describe("CatalogControlPage", () => {
         },
       },
     });
+    vi.mocked(catalogApi.getCatalogToolCreationOptions).mockResolvedValue(toolCreationOptionsFixture);
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([]);
@@ -348,6 +473,64 @@ describe("CatalogControlPage", () => {
     expect(screen.getByText("MCP gateway does not expose tool 'web_search'.")).toBeVisible();
   });
 
+  it("creates a tool from backend-owned execution templates", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=create" });
+
+    expect(await screen.findByRole("heading", { name: "Create tool" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create tool" })).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText("Execution backend"), "mcp_gateway_web_search");
+
+    expect(screen.getByLabelText("Tool ID")).toHaveValue("tool.custom_web_search");
+    expect(screen.getByLabelText("Name")).toHaveValue("Web Search");
+    expect(screen.getByLabelText("Input schema")).toHaveValue(JSON.stringify(toolFixture.spec.input_schema, null, 2));
+    expect(screen.getByRole("button", { name: "Create tool" })).not.toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+
+    await waitFor(() => {
+      expect(catalogApi.createCatalogTool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "tool.custom_web_search",
+          execution_backend: "mcp_gateway_web_search",
+          name: "Web Search",
+        }),
+        "token",
+      );
+    });
+  });
+
+  it("creates a knowledge-base retrieval tool for a bound knowledge base", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=create" });
+
+    expect(await screen.findByRole("heading", { name: "Create tool" })).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Execution backend"), "knowledge_base_retrieval");
+
+    expect(screen.getByLabelText("Knowledge base")).toHaveValue("kb-product-docs");
+    expect(screen.getByLabelText("Tool ID")).toHaveValue("tool.kb_retrieval.product-docs");
+    expect(screen.getByLabelText("Name")).toHaveValue("Product Docs Retrieval");
+    expect(screen.getByLabelText("Execution config")).toHaveValue(JSON.stringify(knowledgeBaseRetrievalTemplate.execution_config, null, 2));
+
+    await user.click(screen.getByRole("button", { name: "Create tool" }));
+
+    await waitFor(() => {
+      expect(catalogApi.createCatalogTool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "tool.kb_retrieval.product-docs",
+          execution_backend: "knowledge_base_retrieval",
+          execution_config: expect.objectContaining({
+            knowledge_base_id: "kb-product-docs",
+          }),
+          offline_compatible: true,
+        }),
+        "token",
+      );
+    });
+  });
+
   it("opens the edit flow from the tools directory", async () => {
     const user = userEvent.setup();
 
@@ -425,6 +608,24 @@ describe("CatalogControlPage", () => {
         "token",
       );
     });
+  });
+
+  it("fills MCP metadata defaults for knowledge-base retrieval tools", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture, kbRetrievalToolFixture]);
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=create" });
+
+    expect(await screen.findByRole("heading", { name: "Create MCP server" })).toBeVisible();
+    await user.selectOptions(screen.getByLabelText("Backing internal tool"), "tool.kb_retrieval.product-docs");
+
+    expect(screen.getByLabelText("MCP server ID")).toHaveValue("mcp.kb_retrieval.product-docs");
+    expect(screen.getByLabelText("Category")).toHaveValue("knowledge_retrieval");
+    expect(screen.getByLabelText("Capabilities")).toHaveValue("knowledge-base, retrieval, semantic-search, source-grounding");
+    expect(screen.getByLabelText("Local")).toHaveValue("true");
+    expect(screen.getByLabelText("Risk level")).toHaveValue("low");
+    expect(screen.getByLabelText("Data access")).toHaveValue("workspace");
+    expect(screen.getByLabelText("Output freshness")).toHaveValue("static");
   });
 
   it("opens a dedicated MCP edit flow with the backing tool locked", async () => {

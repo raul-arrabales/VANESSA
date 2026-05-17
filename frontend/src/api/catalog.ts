@@ -32,9 +32,37 @@ export type CatalogToolSpec = {
   output_schema: Record<string, unknown>;
   safety_policy: Record<string, unknown>;
   offline_compatible: boolean;
-  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http";
+  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http" | "knowledge_base_retrieval";
   execution_config?: Record<string, unknown>;
   permissions?: Record<string, unknown>;
+};
+
+export type CatalogToolExecutionBackend = NonNullable<CatalogToolSpec["execution_backend"]>;
+
+export type CatalogToolCreationOptions = {
+  execution_backends: Array<{
+    execution_backend: CatalogToolExecutionBackend;
+    requires_knowledge_base: boolean;
+    template?: CatalogToolMutationInput;
+    knowledge_bases?: Array<{
+      id: string;
+      display_name: string;
+      slug?: string | null;
+      index_name?: string | null;
+      is_default?: boolean;
+    }>;
+    templates_by_knowledge_base_id?: Record<string, CatalogToolMutationInput>;
+  }>;
+  knowledge_bases: Array<{
+    id: string;
+    display_name: string;
+    slug?: string | null;
+    index_name?: string | null;
+    is_default?: boolean;
+  }>;
+  default_knowledge_base_id?: string | null;
+  selection_required: boolean;
+  configuration_message?: string | null;
 };
 
 export type CatalogValidationStatus = {
@@ -269,6 +297,10 @@ export async function getCatalogAgentPromptPreview(agentId: string, token: strin
 export async function listCatalogTools(token: string): Promise<CatalogTool[]> {
   const result = await requestJson<{ tools: CatalogTool[] }>("/v1/catalog/tools", { token });
   return result.tools;
+}
+
+export async function getCatalogToolCreationOptions(token: string): Promise<CatalogToolCreationOptions> {
+  return requestJson<CatalogToolCreationOptions>("/v1/catalog/tool-creation-options", { token });
 }
 
 export async function listCatalogMcpServers(token: string): Promise<CatalogMcpServer[]> {

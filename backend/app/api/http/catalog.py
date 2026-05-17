@@ -15,6 +15,7 @@ from ...application.catalog_management_service import (
     get_catalog_defaults,
     get_catalog_mcp_server,
     get_catalog_tool,
+    get_catalog_tool_creation_options,
     invoke_catalog_mcp_server,
     list_catalog_agents,
     list_catalog_mcp_servers,
@@ -176,7 +177,12 @@ def list_catalog_tools_route():
 @require_role("superadmin")
 def create_catalog_tool_route():
     try:
-        tool = create_catalog_tool(_database_url(), payload=request.get_json(silent=True), owner_user_id=int(g.current_user["id"]))
+        tool = create_catalog_tool(
+            _database_url(),
+            config=_config(),
+            payload=request.get_json(silent=True),
+            owner_user_id=int(g.current_user["id"]),
+        )
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"tool": tool}), 201
@@ -196,10 +202,20 @@ def get_catalog_tool_route(tool_id: str):
 @require_role("superadmin")
 def update_catalog_tool_route(tool_id: str):
     try:
-        tool = update_catalog_tool(_database_url(), tool_id=tool_id, payload=request.get_json(silent=True))
+        tool = update_catalog_tool(_database_url(), config=_config(), tool_id=tool_id, payload=request.get_json(silent=True))
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"tool": tool}), 200
+
+
+@bp.get("/v1/catalog/tool-creation-options")
+@require_role("superadmin")
+def get_catalog_tool_creation_options_route():
+    try:
+        payload = get_catalog_tool_creation_options(_database_url(), config=_config())
+    except CatalogError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload), 200
 
 
 @bp.post("/v1/catalog/tools/<tool_id>/validate")

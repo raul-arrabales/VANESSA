@@ -1757,6 +1757,7 @@
     "executionBackend": {
       "sandboxPython": "Sandbox Python",
       "webSearch": "Busqueda web del gateway",
+      "knowledgeBaseRetrieval": "Recuperacion de conocimiento",
       "internalHttp": "HTTP interno"
     },
     "agents": {
@@ -1805,6 +1806,10 @@
       "inputSchemaTitle": "Esquema de entrada",
       "requestTitle": "Entrada enviada",
       "responseTitle": "Resultado del runtime",
+      "noKnowledgeBases": "El despliegue activo no tiene bases de conocimiento enlazadas disponibles para herramientas de recuperacion.",
+      "steps": {
+        "executionBackend": "1. Backend de ejecucion"
+      },
       "views": {
         "aria": "Secciones del catalogo de herramientas",
         "tools": "Herramientas de plataforma",
@@ -1918,6 +1923,9 @@
         "name": "Nombre",
         "description": "Descripcion",
         "executionBackend": "Backend de ejecucion",
+        "noExecutionBackend": "Selecciona un backend de ejecucion",
+        "knowledgeBase": "Base de conocimiento",
+        "noKnowledgeBase": "Selecciona una base de conocimiento",
         "offlineCompatible": "Compatible sin conexion",
         "inputSchema": "Esquema de entrada",
         "outputSchema": "Esquema de salida",
@@ -1967,6 +1975,7 @@
       "deleteFailed": "No se pudo eliminar este agente del catalogo.",
       "validationFailed": "No se pudo validar esta entrada del catalogo.",
       "invalidJson": "{{field}} debe ser JSON valido.",
+      "executionBackendRequired": "Selecciona un backend de ejecucion antes de guardar esta herramienta.",
       "agentCreated": "Agente {{name}} creado.",
       "agentUpdated": "Agente {{name}} actualizado.",
       "agentDeleted": "Agente {{name}} eliminado.",

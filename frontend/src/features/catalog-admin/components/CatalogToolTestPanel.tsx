@@ -50,7 +50,7 @@ export default function CatalogToolTestPanel({
 
       <div className="card-stack">
         <span className="field-label">{t("catalogControl.tools.backendLabel", {
-          backend: t(`catalogControl.executionBackend.${tool.spec.execution_backend === "sandbox_python" ? "sandboxPython" : tool.spec.execution_backend === "mcp_gateway_web_search" ? "webSearch" : "internalHttp"}`),
+          backend: t(`catalogControl.executionBackend.${tool.spec.execution_backend === "sandbox_python" ? "sandboxPython" : tool.spec.execution_backend === "mcp_gateway_web_search" ? "webSearch" : tool.spec.execution_backend === "knowledge_base_retrieval" ? "knowledgeBaseRetrieval" : "internalHttp"}`),
         })}</span>
         <code className="code-inline">{tool.id}</code>
       </div>

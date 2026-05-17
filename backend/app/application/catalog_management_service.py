@@ -15,6 +15,7 @@ from ..services.catalog_service import (
     get_catalog_defaults as _get_catalog_defaults,
     get_catalog_mcp_server as _get_catalog_mcp_server,
     get_catalog_tool as _get_catalog_tool,
+    get_catalog_tool_creation_options as _get_catalog_tool_creation_options,
     invoke_catalog_mcp_server as _invoke_catalog_mcp_server,
     list_catalog_agents as _list_catalog_agents,
     list_catalog_mcp_servers as _list_catalog_mcp_servers,
@@ -111,6 +112,10 @@ def get_catalog_defaults() -> dict[str, Any]:
     return _get_catalog_defaults()
 
 
+def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict[str, Any]:
+    return _get_catalog_tool_creation_options(database_url, config=config)
+
+
 def get_catalog_tool(database_url: str, *, tool_id: str) -> dict[str, Any]:
     return _get_catalog_tool(database_url, tool_id=tool_id)
 
@@ -124,11 +129,13 @@ def create_catalog_tool(
     *,
     payload: Any,
     owner_user_id: int,
+    config: Any | None = None,
 ) -> dict[str, Any]:
     return _create_catalog_tool(
         database_url,
         payload=_require_json_object(payload),
         owner_user_id=owner_user_id,
+        config=config,
     )
 
 
@@ -137,11 +144,13 @@ def update_catalog_tool(
     *,
     tool_id: str,
     payload: Any,
+    config: Any | None = None,
 ) -> dict[str, Any]:
     return _update_catalog_tool(
         database_url,
         tool_id=tool_id,
         payload=_require_json_object(payload),
+        config=config,
     )
 
 

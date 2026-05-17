@@ -51,6 +51,7 @@ Canonical example:
 ## Canonical Result Shape
 
 Agent engine emits normalized retrieval call metadata plus per-result canonical relevance fields.
+Backend-owned catalog retrieval tools expose the same retrieval controls with `query_text` as the input query field and return `{knowledge_base_id, retrieval, results}` from the backend KB query path. Their `execution_config.retrieval_defaults` use the defaults below unless an invocation overrides them.
 
 Canonical retrieval call metadata:
 

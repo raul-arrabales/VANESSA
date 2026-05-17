@@ -7,6 +7,7 @@ import {
   deleteCatalogAgent,
   deleteCatalogMcpServer,
   getCatalogDefaults,
+  getCatalogToolCreationOptions,
   listCatalogAgents,
   listCatalogMcpServers,
   listCatalogTools,
@@ -20,6 +21,8 @@ import {
   type CatalogMcpServerSpec,
   type CatalogMcpServerValidation,
   type CatalogTool,
+  type CatalogToolCreationOptions,
+  type CatalogToolExecutionBackend,
   type CatalogToolMutationInput,
   type CatalogToolValidation,
   setCatalogMcpServerEnabled,
@@ -42,9 +45,11 @@ export type AgentFormState = CatalogAgentMutationInput & {
   agentId: string;
 };
 
-export type ToolFormState = CatalogToolMutationInput & {
+export type ToolFormState = Omit<CatalogToolMutationInput, "execution_backend"> & {
+  execution_backend: CatalogToolExecutionBackend | "";
   mode: FormMode;
   toolId: string;
+  selectedKnowledgeBaseId: string;
   inputSchemaText: string;
   outputSchemaText: string;
   safetyPolicyText: string;
@@ -108,9 +113,10 @@ export const DEFAULT_TOOL_FORM: ToolFormState = {
   output_schema: {},
   safety_policy: {},
   offline_compatible: false,
-  execution_backend: "sandbox_python",
+  execution_backend: "",
   execution_config: {},
   permissions: {},
+  selectedKnowledgeBaseId: "",
   inputSchemaText: "{}",
   outputSchemaText: "{}",
   safetyPolicyText: "{}",
@@ -226,6 +232,7 @@ export function buildToolForm(tool: CatalogTool): ToolFormState {
     execution_backend: tool.spec.execution_backend ?? "internal_http",
     execution_config: tool.spec.execution_config ?? {},
     permissions: tool.spec.permissions ?? {},
+    selectedKnowledgeBaseId: String((tool.spec.execution_config ?? {}).knowledge_base_id ?? ""),
     inputSchemaText: stringifyJson(tool.spec.input_schema),
     outputSchemaText: stringifyJson(tool.spec.output_schema),
     safetyPolicyText: stringifyJson(tool.spec.safety_policy),
@@ -289,6 +296,7 @@ export function useCatalogControl(token: string) {
   const [tools, setTools] = useState<CatalogTool[]>([]);
   const [mcpServers, setMcpServers] = useState<CatalogMcpServer[]>([]);
   const [models, setModels] = useState<ModelCatalogItem[]>([]);
+  const [toolCreationOptions, setToolCreationOptions] = useState<CatalogToolCreationOptions | null>(null);
   const [agentForm, setAgentForm] = useState<AgentFormState>(() => buildDefaultAgentForm(null));
   const [toolForm, setToolForm] = useState<ToolFormState>(DEFAULT_TOOL_FORM);
   const [mcpServerForm, setMcpServerForm] = useState<McpServerFormState>(DEFAULT_MCP_SERVER_FORM);
@@ -320,12 +328,13 @@ export function useCatalogControl(token: string) {
     setErrorMessage("");
 
     try {
-      const [defaultsPayload, agentsPayload, toolsPayload, mcpServersPayload, modelsPayload] = await Promise.all([
+      const [defaultsPayload, agentsPayload, toolsPayload, mcpServersPayload, modelsPayload, toolCreationOptionsPayload] = await Promise.all([
         getCatalogDefaults(token),
         listCatalogAgents(token),
         listCatalogTools(token),
         listCatalogMcpServers(token),
         listEnabledModels(token),
+        getCatalogToolCreationOptions(token),
       ]);
       const previousDefaults = catalogDefaultsRef.current;
       catalogDefaultsRef.current = defaultsPayload;
@@ -333,6 +342,7 @@ export function useCatalogControl(token: string) {
       setTools(toolsPayload);
       setMcpServers(mcpServersPayload);
       setModels(modelsPayload);
+      setToolCreationOptions(toolCreationOptionsPayload);
       setAgentForm((current) => {
         if (current.mode !== "create") {
           return current;
@@ -541,6 +551,9 @@ export function useCatalogControl(token: string) {
         toolForm.permissionsText,
         t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.tool.permissions") }),
       );
+      if (!toolForm.execution_backend) {
+        throw new Error(t("catalogControl.feedback.executionBackendRequired"));
+      }
 
       const payload: CatalogToolMutationInput = {
         id: toolForm.id || undefined,
@@ -667,6 +680,7 @@ export function useCatalogControl(token: string) {
     tools,
     mcpServers,
     models,
+    toolCreationOptions,
     agentForm,
     setAgentForm,
     toolForm,

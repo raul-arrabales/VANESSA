@@ -26,7 +26,7 @@ Best for: local AI experimentation, agent and tool orchestration, platform gover
 - Local-first runtime with optional cloud providers behind a backend-owned control plane
 - Explicit `capabilities`, `providers`, and `deployment profiles` for runtime switching and governance
 - Separate ModelOps domain for managed model catalog, validation, lifecycle, and sharing
-- Agent orchestration with MCP server exposures backed by internal tools, plus sandboxed Python execution
+- Agent orchestration with MCP server exposures backed by internal tools, KB retrieval tools, plus sandboxed Python execution
 - Product-facing AI surfaces for playgrounds, builder workflows, catalog administration, and first-party Vanessa behavior
 - Modular container topology that stays extensible without collapsing control, runtime, and product concerns into one service
 
@@ -65,7 +65,7 @@ VANESSA is organized around a few clear domains:
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
-- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, SearXNG-backed web search, and sandboxed Python execution
+- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, deployment-bound KB retrieval, SearXNG-backed web search, and sandboxed Python execution
 - Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
 
 For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).

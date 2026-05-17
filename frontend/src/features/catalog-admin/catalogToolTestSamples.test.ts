@@ -55,6 +55,20 @@ describe("buildSampleToolInput", () => {
     });
   });
 
+  it("returns the curated knowledge-base retrieval sample", () => {
+    expect(buildSampleToolInput(buildTool({
+      spec: {
+        ...buildTool().spec,
+        execution_backend: "knowledge_base_retrieval",
+      },
+    }))).toEqual({
+      query_text: "How do active deployments resolve resources?",
+      top_k: 5,
+      search_method: "semantic",
+      query_preprocessing: "none",
+    });
+  });
+
   it("builds a generic schema-based sample for other tools", () => {
     expect(buildSampleToolInput(buildTool({
       spec: {
