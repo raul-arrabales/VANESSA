@@ -1912,6 +1912,7 @@
       "noKnowledgeBases": "The active deployment has no bound knowledge bases available for retrieval tools.",
       "actionsFor": "Tool actions for {{name}}",
       "actionLabels": {
+        "lifecycle": "View lifecycle for {{name}}",
         "edit": "Edit {{name}}",
         "test": "Test {{name}}",
         "validate": "Validate {{name}}",
@@ -1923,6 +1924,52 @@
         "stale": "Validation stale",
         "unvalidated": "Needs validation",
         "validating": "Validating"
+      },
+      "lifecycle": {
+        "title": "Tool lifecycle",
+        "summaryDescription": "Readiness stages for catalog tools before agents and MCP servers depend on them.",
+        "modalTitle": "Tool lifecycle: {{name}}",
+        "modalDescription": "Current readiness, validation, and publication path for this catalog tool.",
+        "currentState": "Current",
+        "summary": "Backend: {{backend}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | {{compatibility}}",
+        "states": {
+          "draft": "Draft",
+          "published_unvalidated": "Published, unvalidated",
+          "validation_failed": "Validation failed",
+          "validation_stale": "Validation stale",
+          "ready": "Ready",
+          "unknown": "Unknown"
+        },
+        "validation": {
+          "success": "Success",
+          "failed": "Failed",
+          "failure": "Failed",
+          "unknown": "Unknown"
+        },
+        "transitions": {
+          "draft": {
+            "published_unvalidated": "Publish"
+          },
+          "published_unvalidated": {
+            "ready": "Validate successfully",
+            "validation_failed": "Validation fails",
+            "draft": "Move back to draft"
+          },
+          "validation_failed": {
+            "published_unvalidated": "Edit for revalidation",
+            "ready": "Validate successfully",
+            "draft": "Move back to draft"
+          },
+          "ready": {
+            "validation_stale": "Edit current version",
+            "draft": "Move back to draft"
+          },
+          "validation_stale": {
+            "ready": "Revalidate successfully",
+            "validation_failed": "Revalidation fails",
+            "draft": "Move back to draft"
+          }
+        }
       },
       "steps": {
         "executionBackend": "1. Execution backend"

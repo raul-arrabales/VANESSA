@@ -441,6 +441,10 @@ describe("CatalogControlPage", () => {
     expect(within(topNav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(within(topNav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Overview", "Tools", "MCP Gateway", "Agents"]);
     expect(screen.getByText("Catalog areas")).toBeVisible();
+    const lifecyclePanel = screen.getByRole("heading", { name: "Tool lifecycle" }).closest("article");
+    expect(lifecyclePanel).toBeTruthy();
+    expect(within(lifecyclePanel as HTMLElement).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
+    expect(within(lifecyclePanel as HTMLElement).getAllByText("1").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("navigation", { name: "Tool catalog sections" })).not.toBeInTheDocument();
   });
 

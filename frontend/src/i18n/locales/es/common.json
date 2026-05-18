@@ -1894,6 +1894,7 @@
       "noKnowledgeBases": "El despliegue activo no tiene bases de conocimiento enlazadas disponibles para herramientas de recuperacion.",
       "actionsFor": "Acciones de herramienta para {{name}}",
       "actionLabels": {
+        "lifecycle": "Ver ciclo de vida de {{name}}",
         "edit": "Editar {{name}}",
         "test": "Probar {{name}}",
         "validate": "Validar {{name}}",
@@ -1905,6 +1906,52 @@
         "stale": "Validacion desactualizada",
         "unvalidated": "Requiere validacion",
         "validating": "Validando"
+      },
+      "lifecycle": {
+        "title": "Ciclo de vida de herramienta",
+        "summaryDescription": "Etapas de preparacion de las herramientas de catalogo antes de que agentes y servidores MCP dependan de ellas.",
+        "modalTitle": "Ciclo de vida de herramienta: {{name}}",
+        "modalDescription": "Preparacion, validacion y publicacion actuales de esta herramienta de catalogo.",
+        "currentState": "Actual",
+        "summary": "Backend: {{backend}} | Estado: {{publishStatus}} | Validacion: {{validationStatus}} | {{compatibility}}",
+        "states": {
+          "draft": "Borrador",
+          "published_unvalidated": "Publicada sin validar",
+          "validation_failed": "Validacion fallida",
+          "validation_stale": "Validacion desactualizada",
+          "ready": "Lista",
+          "unknown": "Desconocido"
+        },
+        "validation": {
+          "success": "Correcta",
+          "failed": "Fallida",
+          "failure": "Fallida",
+          "unknown": "Desconocida"
+        },
+        "transitions": {
+          "draft": {
+            "published_unvalidated": "Publicar"
+          },
+          "published_unvalidated": {
+            "ready": "Validar correctamente",
+            "validation_failed": "La validacion falla",
+            "draft": "Volver a borrador"
+          },
+          "validation_failed": {
+            "published_unvalidated": "Editar para revalidar",
+            "ready": "Validar correctamente",
+            "draft": "Volver a borrador"
+          },
+          "ready": {
+            "validation_stale": "Editar version actual",
+            "draft": "Volver a borrador"
+          },
+          "validation_stale": {
+            "ready": "Revalidar correctamente",
+            "validation_failed": "La revalidacion falla",
+            "draft": "Volver a borrador"
+          }
+        }
       },
       "steps": {
         "executionBackend": "1. Backend de ejecucion"

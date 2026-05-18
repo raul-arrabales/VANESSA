@@ -1,6 +1,8 @@
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import ActionIcon from "../../../components/ActionIcon";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import {
   CompactRegistryActions,
   CompactRegistryDescription,
@@ -14,6 +16,7 @@ import {
 import IconButton from "../../../components/IconButton";
 import type { CatalogTool, CatalogToolValidation } from "../../../api/catalog";
 import { catalogToolBackendLabelKey } from "../catalogToolBackends";
+import { createCatalogToolLifecycleGraphDefinition, getCatalogToolLifecycleState, getCatalogToolLifecycleSummary } from "../catalogToolLifecycleGraph";
 
 type CatalogToolsDirectoryProps = {
   tools: CatalogTool[];
@@ -82,81 +85,102 @@ export default function CatalogToolsDirectory({
   onValidate,
 }: CatalogToolsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
+  const [selectedLifecycleTool, setSelectedLifecycleTool] = useState<CatalogTool | null>(null);
+  const lifecycleDefinition = useMemo(() => createCatalogToolLifecycleGraphDefinition(t), [t]);
 
   return (
-    <article className="panel card-stack">
-      <div className="status-row">
-        <h3 className="section-title">{t("catalogControl.tools.listTitle")}</h3>
-        <p className="status-text">{t("catalogControl.tools.description")}</p>
-      </div>
+    <>
+      <article className="panel card-stack">
+        <div className="status-row">
+          <h3 className="section-title">{t("catalogControl.tools.listTitle")}</h3>
+          <p className="status-text">{t("catalogControl.tools.description")}</p>
+        </div>
 
-      <CompactRegistryList>
-        {tools.map((tool) => {
-          const validation = validationResults[tool.id]?.validation;
-          const isValidating = validatingToolId === tool.id;
-          const validationBadge = getToolValidationBadge(tool, validation, isValidating, t);
-          const backendLabel = t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(tool.spec.execution_backend)}`);
-          const validateLabel = isValidating
-            ? t("catalogControl.tools.actionLabels.validating", { name: tool.spec.name })
-            : t("catalogControl.tools.actionLabels.validate", { name: tool.spec.name });
-          return (
-            <CompactRegistryItem key={tool.id}>
-              <CompactRegistryMain>
-                <CompactRegistryHeading>
-                  <h4 className="section-title">{tool.spec.name}</h4>
-                  <span className="platform-badge" data-tone={tool.published ? "active" : "required"}>
-                    {tool.published ? t("catalogControl.badges.published") : t("catalogControl.badges.draft")}
-                  </span>
-                  <span className="platform-badge" data-tone={validationBadge.tone}>
-                    {validationBadge.label}
-                  </span>
-                  <span className="platform-badge">{backendLabel}</span>
-                  <span className="platform-badge" data-tone={tool.spec.offline_compatible ? "active" : "optional"}>
-                    {tool.spec.offline_compatible
-                      ? t("catalogControl.tools.offlineCompatible")
-                      : t("catalogControl.tools.networkRequired")}
-                  </span>
-                </CompactRegistryHeading>
-                <CompactRegistryDescription>{tool.spec.description}</CompactRegistryDescription>
-                <CompactRegistryMeta>
-                  <code className="code-inline">{tool.id}</code>
-                  <span>{t("catalogControl.tools.backendLabel", { backend: backendLabel })}</span>
-                  <span>
-                    {t("catalogControl.tools.updatedLabel", {
-                      updated: tool.updated_at ?? tool.published_at ?? "-",
-                    })}
-                  </span>
-                </CompactRegistryMeta>
-              </CompactRegistryMain>
-              <CompactRegistryActions label={t("catalogControl.tools.actionsFor", { name: tool.spec.name })}>
-                <IconButton label={t("catalogControl.tools.actionLabels.edit", { name: tool.spec.name })} onClick={() => onEdit(tool)}>
-                  <ActionIcon name="edit" />
-                </IconButton>
-                <IconButton label={t("catalogControl.tools.actionLabels.test", { name: tool.spec.name })} onClick={() => onTest(tool)}>
-                  <ActionIcon name="test" />
-                </IconButton>
-                <IconButton label={validateLabel} onClick={() => onValidate(tool.id)} disabled={isValidating}>
-                  <ActionIcon name="validate" />
-                </IconButton>
-              </CompactRegistryActions>
-              {validation ? (
-                <CompactRegistryProgress>
-                  <span className="field-label">
-                    {validation.valid ? t("catalogControl.validation.valid") : t("catalogControl.validation.invalid")}
-                  </span>
-                  {validation.errors.length > 0 ? (
-                    <ul className="status-text">
-                      {validation.errors.map((message) => (
-                        <li key={message}>{message}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </CompactRegistryProgress>
-              ) : null}
-            </CompactRegistryItem>
-          );
-        })}
-      </CompactRegistryList>
-    </article>
+        <CompactRegistryList>
+          {tools.map((tool) => {
+            const validation = validationResults[tool.id]?.validation;
+            const isValidating = validatingToolId === tool.id;
+            const validationBadge = getToolValidationBadge(tool, validation, isValidating, t);
+            const backendLabel = t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(tool.spec.execution_backend)}`);
+            const validateLabel = isValidating
+              ? t("catalogControl.tools.actionLabels.validating", { name: tool.spec.name })
+              : t("catalogControl.tools.actionLabels.validate", { name: tool.spec.name });
+            return (
+              <CompactRegistryItem key={tool.id}>
+                <CompactRegistryMain>
+                  <CompactRegistryHeading>
+                    <h4 className="section-title">{tool.spec.name}</h4>
+                    <span className="platform-badge" data-tone={tool.published ? "active" : "required"}>
+                      {tool.published ? t("catalogControl.badges.published") : t("catalogControl.badges.draft")}
+                    </span>
+                    <span className="platform-badge" data-tone={validationBadge.tone}>
+                      {validationBadge.label}
+                    </span>
+                    <span className="platform-badge">{backendLabel}</span>
+                    <span className="platform-badge" data-tone={tool.spec.offline_compatible ? "active" : "optional"}>
+                      {tool.spec.offline_compatible
+                        ? t("catalogControl.tools.offlineCompatible")
+                        : t("catalogControl.tools.networkRequired")}
+                    </span>
+                  </CompactRegistryHeading>
+                  <CompactRegistryDescription>{tool.spec.description}</CompactRegistryDescription>
+                  <CompactRegistryMeta>
+                    <code className="code-inline">{tool.id}</code>
+                    <span>{t("catalogControl.tools.backendLabel", { backend: backendLabel })}</span>
+                    <span>
+                      {t("catalogControl.tools.updatedLabel", {
+                        updated: tool.updated_at ?? tool.published_at ?? "-",
+                      })}
+                    </span>
+                  </CompactRegistryMeta>
+                </CompactRegistryMain>
+                <CompactRegistryActions label={t("catalogControl.tools.actionsFor", { name: tool.spec.name })}>
+                  <IconButton label={t("catalogControl.tools.actionLabels.lifecycle", { name: tool.spec.name })} onClick={() => setSelectedLifecycleTool(tool)}>
+                    <ActionIcon name="lifecycle" />
+                  </IconButton>
+                  <IconButton label={t("catalogControl.tools.actionLabels.edit", { name: tool.spec.name })} onClick={() => onEdit(tool)}>
+                    <ActionIcon name="edit" />
+                  </IconButton>
+                  <IconButton label={t("catalogControl.tools.actionLabels.test", { name: tool.spec.name })} onClick={() => onTest(tool)}>
+                    <ActionIcon name="test" />
+                  </IconButton>
+                  <IconButton label={validateLabel} onClick={() => onValidate(tool.id)} disabled={isValidating}>
+                    <ActionIcon name="validate" />
+                  </IconButton>
+                </CompactRegistryActions>
+                {validation ? (
+                  <CompactRegistryProgress>
+                    <span className="field-label">
+                      {validation.valid ? t("catalogControl.validation.valid") : t("catalogControl.validation.invalid")}
+                    </span>
+                    {validation.errors.length > 0 ? (
+                      <ul className="status-text">
+                        {validation.errors.map((message) => (
+                          <li key={message}>{message}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </CompactRegistryProgress>
+                ) : null}
+              </CompactRegistryItem>
+            );
+          })}
+        </CompactRegistryList>
+      </article>
+
+      {selectedLifecycleTool ? (
+        <LifecycleGraphModal
+          title={t("catalogControl.tools.lifecycle.modalTitle", { name: selectedLifecycleTool.spec.name })}
+          description={t("catalogControl.tools.lifecycle.modalDescription")}
+          closeLabel={t("actionFeedback.dialog.close")}
+          definition={lifecycleDefinition}
+          currentState={getCatalogToolLifecycleState(selectedLifecycleTool)}
+          supportingText={getCatalogToolLifecycleSummary(t, selectedLifecycleTool)}
+          currentLabel={t("catalogControl.tools.lifecycle.currentState")}
+          unknownLabel={t("catalogControl.tools.lifecycle.states.unknown")}
+          onClose={() => setSelectedLifecycleTool(null)}
+        />
+      ) : null}
+    </>
   );
 }

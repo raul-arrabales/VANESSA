@@ -2,8 +2,10 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { OptionCardItem } from "../../../components/OptionCardGrid";
 import OptionCardGrid from "../../../components/OptionCardGrid";
+import type { CatalogTool } from "../../../api/catalog";
 import type { CatalogLoadState } from "../hooks/useCatalogControl";
 import { buildCatalogControlUrl } from "../routes";
+import CatalogToolLifecycleSummaryPanel from "./CatalogToolLifecycleSummaryPanel";
 
 type CatalogOverviewSectionProps = {
   state: CatalogLoadState;
@@ -11,6 +13,7 @@ type CatalogOverviewSectionProps = {
   publishedAgents: number;
   toolCount: number;
   publishedTools: number;
+  tools: CatalogTool[];
   mcpServerCount: number;
   enabledMcpServers: number;
   modelCount: number;
@@ -22,6 +25,7 @@ export default function CatalogOverviewSection({
   publishedAgents,
   toolCount,
   publishedTools,
+  tools,
   mcpServerCount,
   enabledMcpServers,
   modelCount,
@@ -77,6 +81,8 @@ export default function CatalogOverviewSection({
           </div>
         </div>
       </article>
+
+      <CatalogToolLifecycleSummaryPanel tools={tools} />
 
       <article className="panel card-stack">
         <div className="status-row">
