@@ -1916,7 +1916,7 @@
         "summary": "Backend: {{backend}} | Estado: {{publishStatus}} | Validacion: {{validationStatus}} | {{compatibility}}",
         "states": {
           "draft": "Borrador",
-          "published_unvalidated": "Publicada sin validar",
+          "published_unvalidated": "Sin validar",
           "validation_failed": "Validacion fallida",
           "validation_stale": "Validacion desactualizada",
           "ready": "Lista",

@@ -1934,7 +1934,7 @@
         "summary": "Backend: {{backend}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | {{compatibility}}",
         "states": {
           "draft": "Draft",
-          "published_unvalidated": "Published, unvalidated",
+          "published_unvalidated": "Unvalidated",
           "validation_failed": "Validation failed",
           "validation_stale": "Validation stale",
           "ready": "Ready",
