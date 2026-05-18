@@ -309,6 +309,98 @@
   border-top: 1px solid var(--border-muted);
 }
 
+.lifecycle-graph {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.lifecycle-graph-svg {
+  width: 100%;
+  max-width: 56rem;
+  min-height: 14rem;
+  justify-self: center;
+  overflow: visible;
+}
+
+.lifecycle-graph-edge {
+  fill: none;
+  stroke: color-mix(in oklab, var(--border-muted) 74%, var(--accent-secondary));
+  stroke-width: 2.5;
+}
+
+.lifecycle-graph-edge[data-available="true"] {
+  stroke: var(--accent-primary);
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 0.18rem color-mix(in oklab, var(--accent-primary) 38%, transparent));
+}
+
+.lifecycle-graph-arrow {
+  fill: color-mix(in oklab, var(--border-muted) 74%, var(--accent-secondary));
+}
+
+.lifecycle-graph-arrow-available {
+  fill: var(--accent-primary);
+}
+
+.lifecycle-graph-node rect {
+  fill: color-mix(in oklab, var(--bg-surface) 92%, transparent);
+  stroke: var(--border-muted);
+  stroke-width: 2;
+}
+
+.lifecycle-graph-node text {
+  fill: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lifecycle-graph-node-count {
+  fill: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.lifecycle-graph-node[data-current="true"] rect {
+  fill: color-mix(in oklab, var(--accent-primary) 16%, var(--bg-surface));
+  stroke: var(--accent-primary);
+  filter: drop-shadow(0 0 0.22rem color-mix(in oklab, var(--accent-primary) 42%, transparent));
+}
+
+.lifecycle-graph-node[data-current="true"] text {
+  fill: var(--accent-primary);
+}
+
+.lifecycle-graph-supporting-text {
+  justify-self: center;
+  text-align: center;
+}
+
+.lifecycle-graph-fallback {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.lifecycle-graph-fallback-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 46%, transparent);
+}
+
+.lifecycle-graph-fallback-row[data-current="true"] {
+  border-color: color-mix(in oklab, var(--accent-primary) 54%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-primary) 10%, var(--bg-surface));
+}
+
 .nav-logout {
   border-radius: 999px;
   padding: var(--space-2) var(--space-3);

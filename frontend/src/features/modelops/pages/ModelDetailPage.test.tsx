@@ -108,6 +108,24 @@ describe("ModelDetailPage", () => {
     expect(screen.queryByRole("link", { name: "Test model" })).toBeNull();
   });
 
+  it("opens the model lifecycle graph from the detail header", async () => {
+    const user = userEvent.setup();
+    mockUser = { id: 1, username: "tester", email: "t@example.com", role: "user", is_active: true };
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/models/:modelId" element={<ModelDetailPage />} />
+      </Routes>,
+      { route: "/control/models/gpt-private" },
+    );
+
+    await user.click(await screen.findByRole("button", { name: "View lifecycle for GPT Private" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Model lifecycle: GPT Private" });
+    expect(within(dialog).getAllByText("Registered").length).toBeGreaterThanOrEqual(1);
+    expect(within(dialog).getByText("Current")).toBeVisible();
+    expect(within(dialog).getByText("Validation: pending")).toBeVisible();
+  });
+
   it("enables activate when validation is current and successful", async () => {
     mockUser = { id: 1, username: "tester", email: "t@example.com", role: "user", is_active: true };
     modelApiMocks.getManagedModel.mockResolvedValue({

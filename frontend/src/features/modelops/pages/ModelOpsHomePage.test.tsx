@@ -83,5 +83,10 @@ describe("ModelOpsHomePage", () => {
     expect(screen.getByText("Modelos activos")).toBeVisible();
     expect(screen.getByText("Modelos locales")).toBeVisible();
     expect(screen.getByText("Descargas activas")).toBeVisible();
+    const lifecyclePanel = screen.getByRole("heading", { name: "Ciclo de vida del modelo" }).closest("article");
+    expect(lifecyclePanel).toBeTruthy();
+    expect(within(lifecyclePanel as HTMLElement).getAllByText("Activo").length).toBeGreaterThanOrEqual(1);
+    expect(within(lifecyclePanel as HTMLElement).getAllByText("Registrado").length).toBeGreaterThanOrEqual(1);
+    expect(within(lifecyclePanel as HTMLElement).getAllByText("1").length).toBeGreaterThanOrEqual(2);
   });
 });

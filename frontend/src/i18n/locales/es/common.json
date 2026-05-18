@@ -1131,11 +1131,48 @@
       "actionsFor": "Acciones del modelo para {{name}}",
       "actionLabels": {
         "openDetail": "Abrir detalles: {{name}}",
-        "testModel": "Probar modelo: {{name}}"
+        "testModel": "Probar modelo: {{name}}",
+        "lifecycle": "Ver ciclo de vida de {{name}}"
       },
       "empty": "Ningun modelo coincide con los filtros actuales.",
       "validatedBadge": "Validado",
       "notValidatedBadge": "No validado"
+    },
+    "lifecycle": {
+      "title": "Ciclo de vida del modelo",
+      "summaryDescription": "Conteo actual de modelos por etapa del ciclo de vida.",
+      "modalTitle": "Ciclo de vida del modelo: {{name}}",
+      "modalDescription": "Estado actual y transiciones posibles para este modelo.",
+      "viewFor": "Ver ciclo de vida de {{name}}",
+      "currentState": "Actual",
+      "states": {
+        "created": "Creado",
+        "registered": "Registrado",
+        "validated": "Validado",
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "unregistered": "No registrado",
+        "deleted": "Eliminado",
+        "unknown": "Desconocido"
+      },
+      "transitions": {
+        "created_registered": "Registrar",
+        "unregistered_registered": "Registrar de nuevo",
+        "registered_validated": "Validar",
+        "validated_active": "Activar",
+        "active_inactive": "Desactivar",
+        "inactive_active": "Reactivar",
+        "validated_unregistered": "Anular registro",
+        "inactive_unregistered": "Anular registro",
+        "registered_unregistered": "Anular registro",
+        "unregistered_deleted": "Eliminar"
+      },
+      "validation": {
+        "current": "Validacion: exito vigente",
+        "stale": "Validacion: exito desactualizado",
+        "pending": "Validacion: pendiente",
+        "failed": "Validacion: fallida"
+      }
     },
     "cloud": {
       "title": "Registro de modelos cloud",

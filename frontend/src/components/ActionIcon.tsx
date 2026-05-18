@@ -5,6 +5,7 @@ export type ActionIconName =
   | "disable"
   | "edit"
   | "enable"
+  | "lifecycle"
   | "metadata"
   | "open"
   | "register"
@@ -73,6 +74,13 @@ export default function ActionIcon({ name }: { name: ActionIconName }): JSX.Elem
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="M5 5h7v2H7v10h10v-5h2v7H5V5Zm9 0h5v5h-2V8.41l-6.3 6.3-1.4-1.42 6.29-6.29H14V5Z" />
+      </svg>
+    );
+  }
+  if (name === "lifecycle") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M6 5a3 3 0 1 1 2.83 4H8v2h8V9h-.83A3 3 0 1 1 18 11v4a3 3 0 1 1-2.83 4h-6.34A3 3 0 1 1 6 15v-4a2 2 0 0 1 2-2h1V7H8.83A3 3 0 0 1 6 5Zm0-1a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm12 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM6 17a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm12 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" />
       </svg>
     );
   }

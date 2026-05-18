@@ -3,13 +3,14 @@ import { useAuth } from "../../../auth/AuthProvider";
 import ModelSummaryCards from "../components/ModelSummaryCards";
 import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
+import ModelLifecycleSummaryPanel from "../components/ModelLifecycleSummaryPanel";
 import { useModelOpsSummary } from "../hooks/useModelOpsSummary";
 
 export default function ModelOpsHomePage(): JSX.Element {
   const { t } = useTranslation("common");
   const { token, user } = useAuth();
   const role = user?.role;
-  const { cards, error, isLoading } = useModelOpsSummary(token, role);
+  const { cards, error, isLoading, summary } = useModelOpsSummary(token, role);
 
   return (
     <ModelOpsWorkspaceFrame secondaryNavigation={<ModelOpsModelsSubmenu activeView="summary" />}>
@@ -18,6 +19,7 @@ export default function ModelOpsHomePage(): JSX.Element {
         {isLoading ? <p className="status-text">{t("modelOps.states.loading")}</p> : <ModelSummaryCards items={cards} />}
         {error && <p className="error-text">{error}</p>}
       </article>
+      {!isLoading ? <ModelLifecycleSummaryPanel models={summary.models} /> : null}
     </ModelOpsWorkspaceFrame>
   );
 }

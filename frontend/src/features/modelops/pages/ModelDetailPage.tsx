@@ -2,6 +2,9 @@ import { type FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
+import ActionIcon from "../../../components/ActionIcon";
+import IconButton from "../../../components/IconButton";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
@@ -9,6 +12,7 @@ import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
 import { CLOUD_PROVIDER_OPTIONS, canAccessModelTesting, getModelLifecyclePermissions, isModelTestEligible } from "../domain";
+import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummary } from "../modelLifecycleGraph";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -18,7 +22,9 @@ export default function ModelDetailPage(): JSX.Element {
   const permissions = getModelLifecyclePermissions(user, detail.model);
   const canTest = canAccessModelTesting(user);
   const [replacementCredentialId, setReplacementCredentialId] = useState("");
+  const [showLifecycleGraph, setShowLifecycleGraph] = useState(false);
   const modelName = detail.model?.name ?? modelId ?? "";
+  const lifecycleDefinition = createModelLifecycleGraphDefinition(t);
   const modelDetailSubmenu = (
     <ModelOpsModelsSubmenu
       activeView="detail"
@@ -68,37 +74,54 @@ export default function ModelDetailPage(): JSX.Element {
   return (
     <ModelOpsWorkspaceFrame secondaryNavigation={modelDetailSubmenu}>
       <section className="card-stack">
-      <article className="panel card-stack">
-        <div className="modelops-card-header">
-          <div className="card-stack">
-            <h2 className="section-title">{model.name}</h2>
-            <p className="status-text">{model.id}</p>
+        <article className="panel card-stack">
+          <div className="modelops-card-header">
+            <div className="card-stack">
+              <h2 className="section-title">{model.name}</h2>
+              <p className="status-text">{model.id}</p>
+            </div>
+            <div className="button-row">
+              <IconButton label={t("modelOps.lifecycle.viewFor", { name: model.name })} onClick={() => setShowLifecycleGraph(true)}>
+                <ActionIcon name="lifecycle" />
+              </IconButton>
+              {(user?.role === "admin" || user?.role === "superadmin") && (
+                <Link className="btn btn-secondary" to={`/control/models/access?modelId=${encodeURIComponent(model.id)}`}>
+                  {t("modelOps.actions.manageAccess")}
+                </Link>
+              )}
+            </div>
           </div>
-          <div className="button-row">
-            {(user?.role === "admin" || user?.role === "superadmin") && (
-              <Link className="btn btn-secondary" to={`/control/models/access?modelId=${encodeURIComponent(model.id)}`}>
-                {t("modelOps.actions.manageAccess")}
-              </Link>
-            )}
-          </div>
-        </div>
-        <p className="status-text">
-          {`${model.provider} · ${model.task_key ?? "unknown"} · ${model.lifecycle_state ?? "unknown"} · ${model.hosting ?? model.backend}`}
-        </p>
-        <p className="status-text">
-          {`${model.owner_type ?? "unknown"} · ${model.visibility_scope ?? "private"} · Validation: ${model.last_validation_status ?? "pending"}`}
-        </p>
-        <ModelLifecycleActions
-          model={model}
-          permissions={permissions}
-          isPending={detail.isMutating}
-          onRegister={detail.register}
-          onActivate={detail.activate}
-          onDeactivate={detail.deactivate}
-          onUnregister={detail.unregister}
-          onDelete={detail.remove}
+          <p className="status-text">
+            {`${model.provider} · ${model.task_key ?? "unknown"} · ${model.lifecycle_state ?? "unknown"} · ${model.hosting ?? model.backend}`}
+          </p>
+          <p className="status-text">
+            {`${model.owner_type ?? "unknown"} · ${model.visibility_scope ?? "private"} · Validation: ${model.last_validation_status ?? "pending"}`}
+          </p>
+          <ModelLifecycleActions
+            model={model}
+            permissions={permissions}
+            isPending={detail.isMutating}
+            onRegister={detail.register}
+            onActivate={detail.activate}
+            onDeactivate={detail.deactivate}
+            onUnregister={detail.unregister}
+            onDelete={detail.remove}
+          />
+        </article>
+
+      {showLifecycleGraph ? (
+        <LifecycleGraphModal
+          title={t("modelOps.lifecycle.modalTitle", { name: model.name })}
+          description={t("modelOps.lifecycle.modalDescription")}
+          closeLabel={t("actionFeedback.dialog.close")}
+          definition={lifecycleDefinition}
+          currentState={getModelLifecycleState(model)}
+          supportingText={getModelValidationLifecycleSummary(t, model)}
+          currentLabel={t("modelOps.lifecycle.currentState")}
+          unknownLabel={t("modelOps.lifecycle.states.unknown")}
+          onClose={() => setShowLifecycleGraph(false)}
         />
-      </article>
+      ) : null}
 
       {model.backend === "external_api" && credentialStatus !== "not_required" ? (
         <article className="panel card-stack">

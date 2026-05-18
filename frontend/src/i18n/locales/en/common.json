@@ -1139,11 +1139,48 @@
       "actionsFor": "Model actions for {{name}}",
       "actionLabels": {
         "openDetail": "Open details: {{name}}",
-        "testModel": "Test model: {{name}}"
+        "testModel": "Test model: {{name}}",
+        "lifecycle": "View lifecycle for {{name}}"
       },
       "empty": "No models matched the current filters.",
       "validatedBadge": "Validated",
       "notValidatedBadge": "Not validated"
+    },
+    "lifecycle": {
+      "title": "Model lifecycle",
+      "summaryDescription": "Current model counts by lifecycle stage.",
+      "modalTitle": "Model lifecycle: {{name}}",
+      "modalDescription": "Current state and possible transitions for this model.",
+      "viewFor": "View lifecycle for {{name}}",
+      "currentState": "Current",
+      "states": {
+        "created": "Created",
+        "registered": "Registered",
+        "validated": "Validated",
+        "active": "Active",
+        "inactive": "Inactive",
+        "unregistered": "Unregistered",
+        "deleted": "Deleted",
+        "unknown": "Unknown"
+      },
+      "transitions": {
+        "created_registered": "Register",
+        "unregistered_registered": "Register again",
+        "registered_validated": "Validate",
+        "validated_active": "Activate",
+        "active_inactive": "Deactivate",
+        "inactive_active": "Reactivate",
+        "validated_unregistered": "Unregister",
+        "inactive_unregistered": "Unregister",
+        "registered_unregistered": "Unregister",
+        "unregistered_deleted": "Delete"
+      },
+      "validation": {
+        "current": "Validation: current successful",
+        "stale": "Validation: stale successful result",
+        "pending": "Validation: pending",
+        "failed": "Validation: failed"
+      }
     },
     "cloud": {
       "title": "Cloud model registration",
