@@ -55,8 +55,6 @@ export default function ModelCatalogPage(): JSX.Element {
         <ModelCatalogList
           models={filteredModels}
           emptyLabel={t("modelOps.catalog.empty")}
-          detailLabel={t("modelOps.actions.openDetail")}
-          testLabel={t("modelOps.actions.testModel")}
           validatedLabel={t("modelOps.catalog.validatedBadge")}
           notValidatedLabel={t("modelOps.catalog.notValidatedBadge")}
           canTest={canTest}

@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeDocument } from "../../../api/context";
+import ActionIcon from "../../../components/ActionIcon";
+import { CompactRegistryList } from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
+import IconLink from "../../../components/IconLink";
 import ModalDialog from "../../../components/ModalDialog";
-import ContextActionIcon from "../components/ContextActionIcon";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
 import { KnowledgeBaseDocumentCard } from "../components/KnowledgeBaseDocumentCard";
 import { useContextKnowledgeBaseDocuments } from "../hooks/useContextKnowledgeBaseDocuments";
@@ -27,7 +28,7 @@ export default function ContextKnowledgeBaseDocumentsPage(): JSX.Element {
             </div>
           </div>
           {detail.documents.length === 0 ? <p className="status-text">{t("contextManagement.states.noDocuments")}</p> : null}
-          <div className="context-compact-list" role="list">
+          <CompactRegistryList>
             {detail.documents.map((document) => (
               <KnowledgeBaseDocumentCard
                 key={document.id}
@@ -36,23 +37,21 @@ export default function ContextKnowledgeBaseDocumentsPage(): JSX.Element {
                 actions={
                   <>
                     <IconButton label={t("contextManagement.actionLabels.viewMetadata", { title: document.title })} onClick={() => setSelectedDocument(document)}>
-                      <ContextActionIcon name="metadata" />
+                      <ActionIcon name="metadata" />
                     </IconButton>
-                    <Link
-                      className="icon-button"
+                    <IconLink
                       to={buildKnowledgeBaseDocumentViewPath(knowledgeBase.id, document.id)}
                       target="_blank"
                       rel="noreferrer"
-                      aria-label={t("contextManagement.actionLabels.openText", { title: document.title })}
-                      title={t("contextManagement.actionLabels.openText", { title: document.title })}
+                      label={t("contextManagement.actionLabels.openText", { title: document.title })}
                     >
-                      <ContextActionIcon name="open" />
-                    </Link>
+                      <ActionIcon name="open" />
+                    </IconLink>
                   </>
                 }
               />
             ))}
-          </div>
+          </CompactRegistryList>
           {selectedDocument ? (
             <ModalDialog
               title={t("contextManagement.metadataViewer.title", { title: selectedDocument.title })}

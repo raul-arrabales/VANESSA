@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer, CatalogMcpServerValidation, CatalogTool } from "../../../api/catalog";
+import { CompactRegistryList } from "../../../components/CompactRegistryList";
 import CatalogMcpDescriptionModal from "./CatalogMcpDescriptionModal";
 import CatalogMcpRegistryItem from "./CatalogMcpRegistryItem";
 
@@ -55,7 +56,7 @@ export default function CatalogMcpRegistry({
           placeholder={t("catalogControl.mcp.searchPlaceholder")}
         />
       </div>
-      <div className="catalog-mcp-registry-list" role="list">
+      <CompactRegistryList>
         {filteredServers.map((server) => (
           <CatalogMcpRegistryItem
             key={server.id}
@@ -70,7 +71,7 @@ export default function CatalogMcpRegistry({
             onViewDescription={setDescriptionServer}
           />
         ))}
-      </div>
+      </CompactRegistryList>
       {descriptionServer ? (
         <CatalogMcpDescriptionModal server={descriptionServer} onClose={() => setDescriptionServer(null)} />
       ) : null}

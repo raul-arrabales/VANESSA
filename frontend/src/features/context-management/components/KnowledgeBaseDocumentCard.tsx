@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  CompactRegistryActions,
+  CompactRegistryDescription,
+  CompactRegistryHeading,
+  CompactRegistryItem,
+  CompactRegistryMain,
+  CompactRegistryMeta,
+} from "../../../components/CompactRegistryList";
 import type { KnowledgeDocument } from "../../../api/context";
 import { buildKnowledgeBaseDocumentExcerpt } from "../documentPresentation";
 
@@ -28,9 +36,9 @@ export function KnowledgeBaseDocumentCard({
   const TitleTag = titleAs;
 
   return (
-    <article className="context-compact-list-item" role="listitem">
-      <div className="context-compact-list-main">
-        <div className="context-compact-list-heading">
+    <CompactRegistryItem>
+      <CompactRegistryMain>
+        <CompactRegistryHeading>
           <TitleTag className="section-title">{document.title}</TitleTag>
           {showStatusChip ? (
             <span className="status-chip status-chip-neutral">
@@ -39,17 +47,17 @@ export function KnowledgeBaseDocumentCard({
                 : t("contextManagement.states.manualDocument")}
             </span>
           ) : null}
-        </div>
-        <p className="status-text context-compact-description">{buildKnowledgeBaseDocumentExcerpt(document.text, excerptLength)}</p>
-        <div className="context-compact-meta-row">
+        </CompactRegistryHeading>
+        <CompactRegistryDescription>{buildKnowledgeBaseDocumentExcerpt(document.text, excerptLength)}</CompactRegistryDescription>
+        <CompactRegistryMeta>
           <code className="code-inline">{document.id}</code>
           <span>{sourceLabel}</span>
           {document.uri ? <span>{document.uri}</span> : null}
           {document.source_path ? <span>{t("contextManagement.fields.sourcePath")}: {document.source_path}</span> : null}
           <span>{t("contextManagement.fields.chunkCount")}: {document.chunk_count}</span>
-        </div>
-      </div>
-      {actions ? <div className="context-compact-actions">{actions}</div> : null}
-    </article>
+        </CompactRegistryMeta>
+      </CompactRegistryMain>
+      {actions ? <CompactRegistryActions>{actions}</CompactRegistryActions> : null}
+    </CompactRegistryItem>
   );
 }

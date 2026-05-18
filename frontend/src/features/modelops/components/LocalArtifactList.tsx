@@ -1,8 +1,16 @@
-import { Link } from "react-router-dom";
 import type { LocalModelArtifact } from "../../../api/modelops/types";
 import { useTranslation } from "react-i18next";
+import ActionIcon from "../../../components/ActionIcon";
+import {
+  CompactRegistryActions,
+  CompactRegistryHeading,
+  CompactRegistryItem,
+  CompactRegistryList,
+  CompactRegistryMain,
+  CompactRegistryMeta,
+} from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
-import ModelCatalogActionIcon from "./ModelCatalogActionIcon";
+import IconLink from "../../../components/IconLink";
 
 type LocalArtifactListProps = {
   artifacts: LocalModelArtifact[];
@@ -22,7 +30,7 @@ export default function LocalArtifactList({
   }
 
   return (
-    <ul className="modelops-catalog-list" aria-label={t("modelOps.artifacts.listAria")}>
+    <CompactRegistryList ariaLabel={t("modelOps.artifacts.listAria")}>
       {artifacts.map((artifact) => {
         const displayName = artifact.name ?? artifact.suggested_model_id ?? artifact.artifact_id;
         const isRegistering = registeringArtifactId === artifact.artifact_id;
@@ -32,44 +40,42 @@ export default function LocalArtifactList({
           : t("modelOps.artifacts.actionLabels.register", { name: displayName });
 
         return (
-          <li key={artifact.artifact_id} className="modelops-catalog-item">
-            <div className="modelops-catalog-main">
-              <div className="modelops-catalog-heading">
+          <CompactRegistryItem key={artifact.artifact_id}>
+            <CompactRegistryMain>
+              <CompactRegistryHeading>
                 <h3 className="section-title">{displayName}</h3>
                 <span className="status-chip status-chip-neutral">{artifact.artifact_status ?? "unknown"}</span>
                 <span className="status-chip status-chip-neutral">{artifact.lifecycle_state ?? "unknown"}</span>
                 <span className={`status-chip ${artifact.ready_for_registration ? "status-chip-success" : "status-chip-warning"}`}>
                   {artifact.ready_for_registration ? t("modelOps.artifacts.ready") : t("modelOps.artifacts.notReady")}
                 </span>
-              </div>
-              <div className="modelops-catalog-meta-row">
+              </CompactRegistryHeading>
+              <CompactRegistryMeta>
                 <code className="code-inline">{artifact.artifact_id}</code>
                 <span>{artifact.storage_path ?? artifact.source_id ?? "-"}</span>
                 <span>{artifact.task_key ?? "unknown"}</span>
                 <span>{artifact.validation_hint ?? "unknown"}</span>
                 {artifact.suggested_model_id ? <span>{artifact.suggested_model_id}</span> : null}
-              </div>
-            </div>
-            <div className="modelops-catalog-actions" role="group" aria-label={t("modelOps.artifacts.actionsFor", { name: displayName })}>
+              </CompactRegistryMeta>
+            </CompactRegistryMain>
+            <CompactRegistryActions label={t("modelOps.artifacts.actionsFor", { name: displayName })}>
               {artifact.linked_model_id ? (
-                <Link
-                  className="icon-button"
+                <IconLink
                   to={`/control/models/${encodeURIComponent(artifact.linked_model_id)}`}
-                  aria-label={detailLabel}
-                  title={detailLabel}
+                  label={detailLabel}
                 >
-                  <ModelCatalogActionIcon name="details" />
-                </Link>
+                  <ActionIcon name="details" />
+                </IconLink>
               ) : null}
               {artifact.ready_for_registration && artifact.suggested_model_id ? (
                 <IconButton label={registerLabel} disabled={isRegistering} onClick={() => void onRegister(artifact)}>
-                  <ModelCatalogActionIcon name="register" />
+                  <ActionIcon name="register" />
                 </IconButton>
               ) : null}
-            </div>
-          </li>
+            </CompactRegistryActions>
+          </CompactRegistryItem>
         );
       })}
-    </ul>
+    </CompactRegistryList>
   );
 }

@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { expectCompactRegistryRowForHeading } from "../../../test/compactRegistryAssertions";
 import { renderWithAppProviders } from "../../../test/renderWithAppProviders";
 import { KnowledgeBaseDocumentCard } from "./KnowledgeBaseDocumentCard";
 
@@ -34,6 +35,6 @@ describe("KnowledgeBaseDocumentCard", () => {
     expect(screen.getByText("Managed by Docs folder (product_docs/overview.txt)")).toBeVisible();
     expect(screen.getByText("Hello wor...")).toBeVisible();
     expect(screen.getByRole("button", { name: "Open text" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".context-compact-list-item")).toBeTruthy();
+    expectCompactRegistryRowForHeading("Architecture Overview");
   });
 });

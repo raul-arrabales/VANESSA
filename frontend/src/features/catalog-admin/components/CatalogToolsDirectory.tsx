@@ -1,9 +1,19 @@
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import ActionIcon from "../../../components/ActionIcon";
+import {
+  CompactRegistryActions,
+  CompactRegistryDescription,
+  CompactRegistryHeading,
+  CompactRegistryItem,
+  CompactRegistryList,
+  CompactRegistryMain,
+  CompactRegistryMeta,
+  CompactRegistryProgress,
+} from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
 import type { CatalogTool, CatalogToolValidation } from "../../../api/catalog";
 import { catalogToolBackendLabelKey } from "../catalogToolBackends";
-import CatalogMcpRegistryIcon from "./CatalogMcpRegistryIcon";
 
 type CatalogToolsDirectoryProps = {
   tools: CatalogTool[];
@@ -80,7 +90,7 @@ export default function CatalogToolsDirectory({
         <p className="status-text">{t("catalogControl.tools.description")}</p>
       </div>
 
-      <div className="catalog-mcp-registry-list" role="list">
+      <CompactRegistryList>
         {tools.map((tool) => {
           const validation = validationResults[tool.id]?.validation;
           const isValidating = validatingToolId === tool.id;
@@ -90,9 +100,9 @@ export default function CatalogToolsDirectory({
             ? t("catalogControl.tools.actionLabels.validating", { name: tool.spec.name })
             : t("catalogControl.tools.actionLabels.validate", { name: tool.spec.name });
           return (
-            <article key={tool.id} className="catalog-mcp-registry-item" role="listitem">
-              <div className="catalog-mcp-registry-main">
-                <div className="catalog-mcp-registry-heading">
+            <CompactRegistryItem key={tool.id}>
+              <CompactRegistryMain>
+                <CompactRegistryHeading>
                   <h4 className="section-title">{tool.spec.name}</h4>
                   <span className="platform-badge" data-tone={tool.published ? "active" : "required"}>
                     {tool.published ? t("catalogControl.badges.published") : t("catalogControl.badges.draft")}
@@ -106,9 +116,9 @@ export default function CatalogToolsDirectory({
                       ? t("catalogControl.tools.offlineCompatible")
                       : t("catalogControl.tools.networkRequired")}
                   </span>
-                </div>
-                <p className="status-text catalog-mcp-description-preview">{tool.spec.description}</p>
-                <div className="catalog-mcp-meta-row">
+                </CompactRegistryHeading>
+                <CompactRegistryDescription>{tool.spec.description}</CompactRegistryDescription>
+                <CompactRegistryMeta>
                   <code className="code-inline">{tool.id}</code>
                   <span>{t("catalogControl.tools.backendLabel", { backend: backendLabel })}</span>
                   <span>
@@ -116,21 +126,21 @@ export default function CatalogToolsDirectory({
                       updated: tool.updated_at ?? tool.published_at ?? "-",
                     })}
                   </span>
-                </div>
-              </div>
-              <div className="catalog-mcp-registry-actions" role="group" aria-label={t("catalogControl.tools.actionsFor", { name: tool.spec.name })}>
+                </CompactRegistryMeta>
+              </CompactRegistryMain>
+              <CompactRegistryActions label={t("catalogControl.tools.actionsFor", { name: tool.spec.name })}>
                 <IconButton label={t("catalogControl.tools.actionLabels.edit", { name: tool.spec.name })} onClick={() => onEdit(tool)}>
-                  <CatalogMcpRegistryIcon name="edit" />
+                  <ActionIcon name="edit" />
                 </IconButton>
                 <IconButton label={t("catalogControl.tools.actionLabels.test", { name: tool.spec.name })} onClick={() => onTest(tool)}>
-                  <CatalogMcpRegistryIcon name="test" />
+                  <ActionIcon name="test" />
                 </IconButton>
                 <IconButton label={validateLabel} onClick={() => onValidate(tool.id)} disabled={isValidating}>
-                  <CatalogMcpRegistryIcon name="validate" />
+                  <ActionIcon name="validate" />
                 </IconButton>
-              </div>
+              </CompactRegistryActions>
               {validation ? (
-                <div className="catalog-mcp-validation">
+                <CompactRegistryProgress>
                   <span className="field-label">
                     {validation.valid ? t("catalogControl.validation.valid") : t("catalogControl.validation.invalid")}
                   </span>
@@ -141,12 +151,12 @@ export default function CatalogToolsDirectory({
                       ))}
                     </ul>
                   ) : null}
-                </div>
+                </CompactRegistryProgress>
               ) : null}
-            </article>
+            </CompactRegistryItem>
           );
         })}
-      </div>
+      </CompactRegistryList>
     </article>
   );
 }

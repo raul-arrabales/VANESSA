@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
+import { expectCompactRegistryRowForHeading, expectNamedIconAction, expectNoGenericCompactActions } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import type { CatalogToolCreationOptions } from "../api/catalog";
 import CatalogControlPage from "./CatalogControlPage";
@@ -466,16 +467,19 @@ describe("CatalogControlPage", () => {
     expect(within(subNav).getByRole("link", { name: "Platform agents" })).toHaveAttribute("aria-current", "page");
     expect(userAgentsLink).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Knowledge Chat" })).toBeVisible();
+    expectCompactRegistryRowForHeading("Knowledge Chat");
     expect(screen.queryByRole("heading", { name: "Agent Alpha" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete Knowledge Chat" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit Knowledge Chat" })).toHaveAttribute("title", "Edit Knowledge Chat");
-    expect(screen.getByRole("button", { name: "Validate Knowledge Chat" })).toHaveAttribute("title", "Validate Knowledge Chat");
+    expectNamedIconAction("button", "Edit Knowledge Chat");
+    expectNamedIconAction("button", "Validate Knowledge Chat");
+    expectNoGenericCompactActions(["Edit", "Validate", "Delete"]);
 
     await user.click(userAgentsLink);
 
     expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
+    expectCompactRegistryRowForHeading("Agent Alpha");
     expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete Agent Alpha" })).toHaveAttribute("title", "Delete Agent Alpha");
+    expectNamedIconAction("button", "Delete Agent Alpha");
   });
 
   it("deletes a user agent after confirmation", async () => {
@@ -734,14 +738,16 @@ describe("CatalogControlPage", () => {
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
 
     expect(await screen.findByRole("heading", { name: "Web search MCP" })).toBeVisible();
+    expectCompactRegistryRowForHeading("Web search MCP");
     expect(screen.getByText("Enabled")).toBeVisible();
     expect(screen.getByText("Validated")).toBeVisible();
     expect(screen.getByText("Expose Web search through the MCP gateway with a long agent-facing description that explains safe research...")).toBeVisible();
     expect(screen.queryByText(mcpServerFixture.spec.description)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit Web search MCP" })).toHaveAttribute("title", "Edit Web search MCP");
-    expect(screen.getByRole("button", { name: "Disable Web search MCP" })).toHaveAttribute("title", "Disable Web search MCP");
-    expect(screen.getByRole("button", { name: "Validate Web search MCP" })).toHaveAttribute("title", "Validate Web search MCP");
-    expect(screen.getByRole("button", { name: "Delete Web search MCP" })).toHaveAttribute("title", "Delete Web search MCP");
+    expectNamedIconAction("button", "Edit Web search MCP");
+    expectNamedIconAction("button", "Disable Web search MCP");
+    expectNamedIconAction("button", "Validate Web search MCP");
+    expectNamedIconAction("button", "Delete Web search MCP");
+    expectNoGenericCompactActions(["Edit", "Disable", "Validate", "Delete"]);
 
     await user.click(screen.getByRole("button", { name: "View full description for Web search MCP" }));
 

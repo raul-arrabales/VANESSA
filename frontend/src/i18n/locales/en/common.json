@@ -1135,6 +1135,12 @@
         "testModel": "Test model: {{name}}"
       },
       "loadFailed": "Unable to load models.",
+      "listAria": "Model catalog list",
+      "actionsFor": "Model actions for {{name}}",
+      "actionLabels": {
+        "openDetail": "Open details: {{name}}",
+        "testModel": "Test model: {{name}}"
+      },
       "empty": "No models matched the current filters.",
       "validatedBadge": "Validated",
       "notValidatedBadge": "Not validated"

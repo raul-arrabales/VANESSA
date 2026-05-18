@@ -1127,6 +1127,12 @@
         "testModel": "Probar modelo: {{name}}"
       },
       "loadFailed": "No se pudieron cargar los modelos.",
+      "listAria": "Lista del catalogo de modelos",
+      "actionsFor": "Acciones del modelo para {{name}}",
+      "actionLabels": {
+        "openDetail": "Abrir detalles: {{name}}",
+        "testModel": "Probar modelo: {{name}}"
+      },
       "empty": "Ningun modelo coincide con los filtros actuales.",
       "validatedBadge": "Validado",
       "notValidatedBadge": "No validado"

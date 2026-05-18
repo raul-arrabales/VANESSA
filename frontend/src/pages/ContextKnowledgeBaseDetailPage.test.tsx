@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
+import { expectCompactRegistryRowForHeading, expectNamedIconAction } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import { ApiError } from "../auth/authApi";
 import type { KnowledgeBaseQueryPreprocessing, KnowledgeSource } from "../api/context";
@@ -965,7 +966,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(screen.getByRole("button", { name: "Existing Sources" })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("heading", { name: "Existing sources" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Add source" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Docs folder" }).closest(".context-compact-list-item")).toBeTruthy();
+    expectCompactRegistryRowForHeading("Docs folder");
 
     await userEvent.click(screen.getByRole("button", { name: "Sync Docs folder" }));
     await waitFor(() => expect(contextApiMocks.syncKnowledgeSource).toHaveBeenCalledWith("kb-primary", "source-1", "token"));
@@ -1480,13 +1481,14 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(await screen.findByRole("heading", { name: "Browse documents" })).toBeVisible();
     expect(screen.getByText("Architecture Overview")).toBeVisible();
     expect(screen.getByText("Manual Note")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Architecture Overview" }).closest(".context-compact-list-item")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Manual Note" }).closest(".context-compact-list-item")).toBeTruthy();
+    expectCompactRegistryRowForHeading("Architecture Overview");
+    expectCompactRegistryRowForHeading("Manual Note");
 
     const openLinks = screen.getAllByRole("link", { name: /Open text for/ });
     expect(openLinks).toHaveLength(2);
     expect(openLinks[0]).toHaveAttribute("target", "_blank");
     expect(openLinks[0]).toHaveAttribute("href", "/control/context/kb-primary/documents/doc-1/view");
+    expectNamedIconAction("link", "Open text for Architecture Overview");
     expect(screen.getAllByRole("button", { name: /View metadata for/ })).toHaveLength(2);
   });
 

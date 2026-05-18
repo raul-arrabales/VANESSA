@@ -1,8 +1,18 @@
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import ActionIcon from "../../../components/ActionIcon";
+import {
+  CompactRegistryActions,
+  CompactRegistryDescription,
+  CompactRegistryHeading,
+  CompactRegistryItem,
+  CompactRegistryList,
+  CompactRegistryMain,
+  CompactRegistryMeta,
+  CompactRegistryProgress,
+} from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
 import type { CatalogAgent, CatalogAgentValidation } from "../../../api/catalog";
-import CatalogMcpRegistryIcon from "./CatalogMcpRegistryIcon";
 
 type CatalogAgentsDirectoryProps = {
   agents: CatalogAgent[];
@@ -65,7 +75,7 @@ export default function CatalogAgentsDirectory({
         <p className="status-text">{description}</p>
       </div>
 
-      <div className="catalog-mcp-registry-list" role="list">
+      <CompactRegistryList>
         {agents.length === 0 ? <p className="status-text">{emptyMessage}</p> : null}
         {agents.map((agent) => {
           const validation = validationResults[agent.id]?.validation;
@@ -80,9 +90,9 @@ export default function CatalogAgentsDirectory({
             : t("catalogControl.agents.actionLabels.delete", { name: agent.spec.name });
 
           return (
-            <article key={agent.id} className="catalog-mcp-registry-item" role="listitem">
-              <div className="catalog-mcp-registry-main">
-                <div className="catalog-mcp-registry-heading">
+            <CompactRegistryItem key={agent.id}>
+              <CompactRegistryMain>
+                <CompactRegistryHeading>
                   <h4 className="section-title">{agent.spec.name}</h4>
                   <span className="platform-badge" data-tone={agent.published ? "active" : "required"}>
                     {agent.published ? t("catalogControl.badges.published") : t("catalogControl.badges.draft")}
@@ -100,9 +110,9 @@ export default function CatalogAgentsDirectory({
                       {t("catalogControl.agents.sandboxRequired")}
                     </span>
                   ) : null}
-                </div>
-                <p className="status-text catalog-mcp-description-preview">{agent.spec.description}</p>
-                <div className="catalog-mcp-meta-row">
+                </CompactRegistryHeading>
+                <CompactRegistryDescription>{agent.spec.description}</CompactRegistryDescription>
+                <CompactRegistryMeta>
                   <code className="code-inline">{agent.id}</code>
                   <span>{t("catalogControl.summary.version", { version: agent.current_version })}</span>
                   <span>{t("catalogControl.agents.modelLabel", { model: agent.spec.default_model_ref ?? "-" })}</span>
@@ -112,23 +122,23 @@ export default function CatalogAgentsDirectory({
                       updated: agent.updated_at ?? agent.published_at ?? "-",
                     })}
                   </span>
-                </div>
-              </div>
-              <div className="catalog-mcp-registry-actions" role="group" aria-label={t("catalogControl.agents.actionsFor", { name: agent.spec.name })}>
+                </CompactRegistryMeta>
+              </CompactRegistryMain>
+              <CompactRegistryActions label={t("catalogControl.agents.actionsFor", { name: agent.spec.name })}>
                 <IconButton label={t("catalogControl.agents.actionLabels.edit", { name: agent.spec.name })} onClick={() => onEdit(agent)}>
-                  <CatalogMcpRegistryIcon name="edit" />
+                  <ActionIcon name="edit" />
                 </IconButton>
                 <IconButton label={validateLabel} onClick={() => onValidate(agent.id)} disabled={isValidating}>
-                  <CatalogMcpRegistryIcon name="validate" />
+                  <ActionIcon name="validate" />
                 </IconButton>
                 {onDelete ? (
                   <IconButton label={deleteLabel} tone="danger" onClick={() => onDelete(agent)} disabled={isDeleting}>
-                    <CatalogMcpRegistryIcon name="delete" />
+                    <ActionIcon name="delete" />
                   </IconButton>
                 ) : null}
-              </div>
+              </CompactRegistryActions>
               {validation ? (
-                <div className="catalog-mcp-validation">
+                <CompactRegistryProgress>
                   <span className="field-label">
                     {validation.valid ? t("catalogControl.validation.valid") : t("catalogControl.validation.invalid")}
                   </span>
@@ -139,12 +149,12 @@ export default function CatalogAgentsDirectory({
                       ))}
                     </ul>
                   ) : null}
-                </div>
+                </CompactRegistryProgress>
               ) : null}
-            </article>
+            </CompactRegistryItem>
           );
         })}
-      </div>
+      </CompactRegistryList>
     </article>
   );
 }

@@ -1,6 +1,18 @@
-export type McpRegistryIconName = "edit" | "enable" | "disable" | "validate" | "delete" | "description" | "test";
+export type ActionIconName =
+  | "delete"
+  | "description"
+  | "details"
+  | "disable"
+  | "edit"
+  | "enable"
+  | "metadata"
+  | "open"
+  | "register"
+  | "sync"
+  | "test"
+  | "validate";
 
-export default function CatalogMcpRegistryIcon({ name }: { name: McpRegistryIconName }): JSX.Element {
+export default function ActionIcon({ name }: { name: ActionIconName }): JSX.Element {
   if (name === "edit") {
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -43,6 +55,28 @@ export default function CatalogMcpRegistryIcon({ name }: { name: McpRegistryIcon
       </svg>
     );
   }
+  if (name === "register") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7V4Z" />
+      </svg>
+    );
+  }
+  if (name === "sync") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M17.65 6.35A8 8 0 0 0 4.08 10H2l3 3 3-3H6.13a6 6 0 0 1 10.11-2.24L17.65 6.35ZM22 14l-3-3-3 3h1.87a6 6 0 0 1-10.11 2.24l-1.41 1.41A8 8 0 0 0 19.92 14H22Z" />
+      </svg>
+    );
+  }
+  if (name === "open") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M5 5h7v2H7v10h10v-5h2v7H5V5Zm9 0h5v5h-2V8.41l-6.3 6.3-1.4-1.42 6.29-6.29H14V5Z" />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <path d="M4 4h16v16H4V4Zm3 4h10V6H7v2Zm0 4h10v-2H7v2Zm0 4h7v-2H7v2Z" />

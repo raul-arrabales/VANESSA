@@ -1,10 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
+import ActionIcon from "../../../components/ActionIcon";
+import { CompactRegistryList } from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { KnowledgeBaseMetadataEditor } from "../components/KnowledgeBaseMetadataEditor";
 import { KnowledgeBaseDocumentCard } from "../components/KnowledgeBaseDocumentCard";
-import ContextActionIcon from "../components/ContextActionIcon";
 import { ContextKnowledgeBaseWorkspaceFrame } from "../components/ContextKnowledgeBaseWorkspaceFrame";
 import { isManualKnowledgeBaseDocument } from "../documentPresentation";
 import { metadataEntriesFromRecord } from "../metadataEditor";
@@ -194,7 +195,7 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
               </div>
               {!detail.isSuperadmin ? <p className="status-text">{t("contextManagement.states.readOnlyUpload")}</p> : null}
               {manualDocuments.length === 0 ? <p className="status-text">{t("contextManagement.states.noManualDocuments")}</p> : null}
-              <div className="context-compact-list" role="list">
+              <CompactRegistryList>
                 {manualDocuments.map((document) => (
                   <KnowledgeBaseDocumentCard
                     key={document.id}
@@ -204,16 +205,16 @@ export default function ContextKnowledgeBaseUploadPage(): JSX.Element {
                     actions={detail.isSuperadmin ? (
                       <>
                         <IconButton label={t("contextManagement.actionLabels.editDocument", { title: document.title })} onClick={() => handleEditDocument(document)}>
-                          <ContextActionIcon name="edit" />
+                          <ActionIcon name="edit" />
                         </IconButton>
                         <IconButton label={t("contextManagement.actionLabels.deleteDocument", { title: document.title })} tone="danger" onClick={() => void detail.handleDeleteDocument(document.id)}>
-                          <ContextActionIcon name="delete" />
+                          <ActionIcon name="delete" />
                         </IconButton>
                       </>
                     ) : null}
                   />
                 ))}
-              </div>
+              </CompactRegistryList>
             </section>
           ) : null}
         </section>
