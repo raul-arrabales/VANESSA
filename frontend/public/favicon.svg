@@ -19,7 +19,6 @@
   </defs>
   <rect x="4" y="4" width="56" height="56" rx="12" fill="url(#screen)" />
   <rect x="5.5" y="5.5" width="53" height="53" rx="10.5" fill="none" stroke="#30455f" stroke-width="3" />
-  <path d="M11 16v32" stroke="#ffb56f" stroke-width="4" stroke-linecap="round" opacity="0.95" />
   <path
     d="M17 17 29 47c1.1 2.8 4.9 2.8 6 0l12-30"
     fill="none"
