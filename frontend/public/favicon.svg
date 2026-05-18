@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VANESSA">
+  <defs>
+    <filter id="phosphor-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <linearGradient id="screen" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#14243a" />
+      <stop offset="1" stop-color="#08111e" />
+    </linearGradient>
+    <linearGradient id="v-stroke" x1="14" x2="50" y1="16" y2="50">
+      <stop offset="0" stop-color="#73d1f1" />
+      <stop offset="0.52" stop-color="#e3eefc" />
+      <stop offset="1" stop-color="#78b3ff" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="12" fill="url(#screen)" />
+  <rect x="5.5" y="5.5" width="53" height="53" rx="10.5" fill="none" stroke="#30455f" stroke-width="3" />
+  <path d="M11 16v32" stroke="#ffb56f" stroke-width="4" stroke-linecap="round" opacity="0.95" />
+  <path
+    d="M17 17 29 47c1.1 2.8 4.9 2.8 6 0l12-30"
+    fill="none"
+    stroke="#78b3ff"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.32"
+    filter="url(#phosphor-glow)"
+  />
+  <path
+    d="M17 17 29 47c1.1 2.8 4.9 2.8 6 0l12-30"
+    fill="none"
+    stroke="url(#v-stroke)"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
