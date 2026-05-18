@@ -1986,6 +1986,7 @@
       },
       "actionsFor": "Acciones de servidor MCP para {{name}}",
       "actionLabels": {
+        "lifecycle": "Ver ciclo de vida de {{name}}",
         "description": "Ver descripcion completa de {{name}}",
         "edit": "Editar {{name}}",
         "enable": "Habilitar {{name}}",
@@ -2000,6 +2001,70 @@
         "stale": "Validacion desactualizada",
         "unvalidated": "Requiere validacion",
         "validating": "Validando"
+      },
+      "lifecycle": {
+        "title": "Ciclo de vida MCP",
+        "summaryDescription": "Preparacion de exposicion para servidores MCP alojados en el gateway antes de que los agentes puedan descubrirlos e invocarlos.",
+        "modalTitle": "Ciclo de vida MCP: {{name}}",
+        "modalDescription": "Publicacion, exposicion, validacion y metadatos actuales de este servidor MCP.",
+        "currentState": "Actual",
+        "summary": "Categoria: {{category}} | Riesgo: {{risk}} | Herramienta base: {{backingTool}} | Estado: {{exposureStatus}} | Validacion: {{validationStatus}} | {{flags}}",
+        "states": {
+          "draft": "Borrador",
+          "disabled": "Deshabilitado",
+          "enabled_unvalidated": "Sin validar",
+          "validation_failed": "Validacion fallida",
+          "validation_stale": "Validacion desactualizada",
+          "enabled_ready": "Listo",
+          "unknown": "Desconocido"
+        },
+        "validation": {
+          "success": "Correcta",
+          "failed": "Fallida",
+          "failure": "Fallida",
+          "unknown": "Desconocida"
+        },
+        "flags": {
+          "local": "Local",
+          "network": "Requiere red",
+          "stateless": "Sin estado",
+          "stateful": "Con estado",
+          "sandboxed": "En sandbox",
+          "unsandboxed": "Sin sandbox"
+        },
+        "transitions": {
+          "draft": {
+            "enabled_unvalidated": "Publicar habilitado",
+            "disabled": "Publicar deshabilitado"
+          },
+          "disabled": {
+            "enabled_unvalidated": "Habilitar",
+            "draft": "Volver a borrador"
+          },
+          "enabled_unvalidated": {
+            "enabled_ready": "Validar correctamente",
+            "validation_failed": "La validacion falla",
+            "draft": "Volver a borrador",
+            "disabled": "Deshabilitar"
+          },
+          "validation_failed": {
+            "enabled_unvalidated": "Editar para revalidar",
+            "enabled_ready": "Validar correctamente",
+            "draft": "Volver a borrador",
+            "disabled": "Deshabilitar"
+          },
+          "enabled_ready": {
+            "validation_stale": "Editar version actual",
+            "draft": "Volver a borrador",
+            "disabled": "Deshabilitar"
+          },
+          "validation_stale": {
+            "enabled_ready": "Revalidar correctamente",
+            "validation_failed": "La revalidacion falla",
+            "draft": "Volver a borrador",
+            "disabled": "Deshabilitar"
+          }
+        }
       },
       "descriptionDialog": {
         "title": "Descripcion de {{name}}",

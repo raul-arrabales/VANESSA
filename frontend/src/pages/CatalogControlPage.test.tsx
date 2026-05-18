@@ -434,6 +434,8 @@ describe("CatalogControlPage", () => {
   });
 
   it("loads the overview dashboard with first-level navigation", async () => {
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture]);
+
     await renderPage();
 
     expect(await screen.findByRole("heading", { name: "Agent and tool catalog" })).toBeVisible();
@@ -445,6 +447,10 @@ describe("CatalogControlPage", () => {
     expect(lifecyclePanel).toBeTruthy();
     expect(within(lifecyclePanel as HTMLElement).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
     expect(within(lifecyclePanel as HTMLElement).getAllByText("1").length).toBeGreaterThanOrEqual(1);
+    const mcpLifecyclePanel = screen.getByRole("heading", { name: "MCP lifecycle" }).closest("article");
+    expect(mcpLifecyclePanel).toBeTruthy();
+    expect(within(mcpLifecyclePanel as HTMLElement).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
+    expect(within(mcpLifecyclePanel as HTMLElement).getAllByText("1").length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("navigation", { name: "Tool catalog sections" })).not.toBeInTheDocument();
   });
 

@@ -2004,6 +2004,7 @@
       },
       "actionsFor": "MCP server actions for {{name}}",
       "actionLabels": {
+        "lifecycle": "View lifecycle for {{name}}",
         "description": "View full description for {{name}}",
         "edit": "Edit {{name}}",
         "enable": "Enable {{name}}",
@@ -2018,6 +2019,70 @@
         "stale": "Validation stale",
         "unvalidated": "Needs validation",
         "validating": "Validating"
+      },
+      "lifecycle": {
+        "title": "MCP lifecycle",
+        "summaryDescription": "Exposure readiness for gateway-hosted MCP servers before agents can discover and invoke them.",
+        "modalTitle": "MCP lifecycle: {{name}}",
+        "modalDescription": "Current publication, exposure, validation, and metadata posture for this MCP server.",
+        "currentState": "Current",
+        "summary": "Category: {{category}} | Risk: {{risk}} | Backing tool: {{backingTool}} | Status: {{exposureStatus}} | Validation: {{validationStatus}} | {{flags}}",
+        "states": {
+          "draft": "Draft",
+          "disabled": "Disabled",
+          "enabled_unvalidated": "Unvalidated",
+          "validation_failed": "Validation failed",
+          "validation_stale": "Validation stale",
+          "enabled_ready": "Ready",
+          "unknown": "Unknown"
+        },
+        "validation": {
+          "success": "Success",
+          "failed": "Failed",
+          "failure": "Failed",
+          "unknown": "Unknown"
+        },
+        "flags": {
+          "local": "Local",
+          "network": "Network required",
+          "stateless": "Stateless",
+          "stateful": "Stateful",
+          "sandboxed": "Sandboxed",
+          "unsandboxed": "Unsandboxed"
+        },
+        "transitions": {
+          "draft": {
+            "enabled_unvalidated": "Publish enabled",
+            "disabled": "Publish disabled"
+          },
+          "disabled": {
+            "enabled_unvalidated": "Enable",
+            "draft": "Move back to draft"
+          },
+          "enabled_unvalidated": {
+            "enabled_ready": "Validate successfully",
+            "validation_failed": "Validation fails",
+            "draft": "Move back to draft",
+            "disabled": "Disable"
+          },
+          "validation_failed": {
+            "enabled_unvalidated": "Edit for revalidation",
+            "enabled_ready": "Validate successfully",
+            "draft": "Move back to draft",
+            "disabled": "Disable"
+          },
+          "enabled_ready": {
+            "validation_stale": "Edit current version",
+            "draft": "Move back to draft",
+            "disabled": "Disable"
+          },
+          "validation_stale": {
+            "enabled_ready": "Revalidate successfully",
+            "validation_failed": "Revalidation fails",
+            "draft": "Move back to draft",
+            "disabled": "Disable"
+          }
+        }
       },
       "descriptionDialog": {
         "title": "{{name}} description",

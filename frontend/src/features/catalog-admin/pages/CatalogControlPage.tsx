@@ -224,6 +224,7 @@ export default function CatalogControlPage(): JSX.Element {
           toolCount={tools.length}
           publishedTools={publishedTools}
           tools={tools}
+          mcpServers={mcpServers}
           mcpServerCount={mcpServers.length}
           enabledMcpServers={enabledMcpServers}
           modelCount={models.length}

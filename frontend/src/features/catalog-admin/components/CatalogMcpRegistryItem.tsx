@@ -23,6 +23,7 @@ type CatalogMcpRegistryItemProps = {
   onToggle: (server: CatalogMcpServer) => void;
   onValidate: (serverId: string) => void;
   onViewDescription: (server: CatalogMcpServer) => void;
+  onViewLifecycle: (server: CatalogMcpServer) => void;
 };
 
 function truncateWords(value: string, limit = 16): string {
@@ -43,6 +44,7 @@ export default function CatalogMcpRegistryItem({
   onToggle,
   onValidate,
   onViewDescription,
+  onViewLifecycle,
 }: CatalogMcpRegistryItemProps): JSX.Element {
   const { t } = useTranslation("common");
   const validationBadge = getMcpValidationBadge(server, validation, isValidating, t);
@@ -79,6 +81,9 @@ export default function CatalogMcpRegistryItem({
         </CompactRegistryMeta>
       </CompactRegistryMain>
       <CompactRegistryActions label={t("catalogControl.mcp.actionsFor", { name: server.spec.name })}>
+        <IconButton label={t("catalogControl.mcp.actionLabels.lifecycle", { name: server.spec.name })} onClick={() => onViewLifecycle(server)}>
+          <ActionIcon name="lifecycle" />
+        </IconButton>
         <IconButton label={t("catalogControl.mcp.actionLabels.description", { name: server.spec.name })} onClick={() => onViewDescription(server)}>
           <ActionIcon name="description" />
         </IconButton>
