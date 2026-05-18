@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpCreationOptions, CatalogMcpServer, CatalogMcpServerSpec, CatalogTool } from "../../../api/catalog";
 import type { McpServerFormState } from "../hooks/useCatalogControl";
+import { MCP_METADATA_CATEGORY_OPTIONS } from "../mcpMetadataOptions";
 
 type CatalogMcpServerFormPanelProps = {
   form: McpServerFormState;
@@ -13,15 +14,6 @@ type CatalogMcpServerFormPanelProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-const METADATA_CATEGORY_OPTIONS: CatalogMcpServerSpec["metadata"]["category"][] = [
-  "web_search",
-  "knowledge_retrieval",
-  "code_execution",
-  "data_analysis",
-  "automation",
-  "communication",
-  "custom",
-];
 const RISK_LEVEL_OPTIONS: CatalogMcpServerSpec["metadata"]["risk_level"][] = ["low", "medium", "high"];
 const DATA_ACCESS_OPTIONS: CatalogMcpServerSpec["metadata"]["data_access"][] = ["none", "public_web", "workspace", "user_data", "secrets_or_credentials"];
 const OUTPUT_FRESHNESS_OPTIONS: CatalogMcpServerSpec["metadata"]["output_freshness"][] = ["static", "fresh", "runtime_generated"];
@@ -240,7 +232,7 @@ export default function CatalogMcpServerFormPanel({
                 <label className="card-stack">
                   <span className="field-label">{t("catalogControl.forms.mcp.category")}</span>
                   <select className="field-input" value={form.metadata.category} onChange={(event) => onChange({ ...form, metadata: { ...form.metadata, category: event.target.value as CatalogMcpServerSpec["metadata"]["category"] } })}>
-                    {METADATA_CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.category.${option}`)}</option>)}
+                    {MCP_METADATA_CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{t(`catalogControl.mcp.metadata.category.${option}`)}</option>)}
                   </select>
                 </label>
                 <label className="card-stack">

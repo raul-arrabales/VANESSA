@@ -1902,6 +1902,7 @@
       "pageDescription": "Manage gateway-hosted MCP server exposures backed by validated internal tools.",
       "registryTitle": "MCP Registry",
       "searchPlaceholder": "Search MCP servers",
+      "noMatches": "No MCP servers match the current filters.",
       "backingToolLabel": "Backing tool: {{tool}}",
       "domainLabel": "Agent domains: {{domains}}",
       "updatedLabel": "Last updated: {{updated}}",
@@ -1912,6 +1913,11 @@
       "chooseToolFirst": "Select a validated internal tool to generate the MCP server details.",
       "noEligibleTools": "No published, validated tools are available for MCP exposure.",
       "selectedToolMeta": "{{toolId}} - {{backend}}",
+      "filters": {
+        "search": "Search",
+        "type": "MCP server type",
+        "allTypes": "All types"
+      },
       "actionsFor": "MCP server actions for {{name}}",
       "actionLabels": {
         "description": "View full description for {{name}}",

@@ -4,6 +4,7 @@ import type { CatalogMcpServer, CatalogMcpServerValidation, CatalogTool } from "
 import { CompactRegistryList } from "../../../components/CompactRegistryList";
 import CatalogMcpDescriptionModal from "./CatalogMcpDescriptionModal";
 import CatalogMcpRegistryItem from "./CatalogMcpRegistryItem";
+import { MCP_METADATA_CATEGORY_OPTIONS } from "../mcpMetadataOptions";
 
 type CatalogMcpRegistryProps = {
   mcpServers: CatalogMcpServer[];
@@ -28,9 +29,13 @@ export default function CatalogMcpRegistry({
 }: CatalogMcpRegistryProps): JSX.Element {
   const { t } = useTranslation("common");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<CatalogMcpServer["spec"]["metadata"]["category"] | "">("");
   const [descriptionServer, setDescriptionServer] = useState<CatalogMcpServer | null>(null);
   const toolNames = useMemo(() => new Map(tools.map((tool) => [tool.id, tool.spec.name])), [tools]);
   const filteredServers = mcpServers.filter((server) => {
+    if (categoryFilter && server.spec.metadata.category !== categoryFilter) {
+      return false;
+    }
     const needle = query.trim().toLowerCase();
     if (!needle) {
       return true;
@@ -49,13 +54,36 @@ export default function CatalogMcpRegistry({
     <article className="panel card-stack">
       <div className="status-row">
         <h3 className="section-title">{t("catalogControl.mcp.registryTitle")}</h3>
-        <input
-          className="field-input"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("catalogControl.mcp.searchPlaceholder")}
-        />
+        <div className="platform-filter-grid">
+          <label className="card-stack" htmlFor="catalog-mcp-search">
+            <span className="field-label">{t("catalogControl.mcp.filters.search")}</span>
+            <input
+              id="catalog-mcp-search"
+              className="field-input"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("catalogControl.mcp.searchPlaceholder")}
+            />
+          </label>
+          <label className="card-stack" htmlFor="catalog-mcp-type-filter">
+            <span className="field-label">{t("catalogControl.mcp.filters.type")}</span>
+            <select
+              id="catalog-mcp-type-filter"
+              className="field-input"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value as CatalogMcpServer["spec"]["metadata"]["category"] | "")}
+            >
+              <option value="">{t("catalogControl.mcp.filters.allTypes")}</option>
+              {MCP_METADATA_CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>
+                  {t(`catalogControl.mcp.metadata.category.${category}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
+      {filteredServers.length === 0 ? <p className="status-text">{t("catalogControl.mcp.noMatches")}</p> : null}
       <CompactRegistryList>
         {filteredServers.map((server) => (
           <CatalogMcpRegistryItem

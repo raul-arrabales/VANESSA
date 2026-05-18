@@ -324,6 +324,33 @@ const mcpServerFixture = {
   },
 };
 
+const kbMcpServerFixture = {
+  ...mcpServerFixture,
+  id: "mcp.kb_retrieval.product-docs",
+  entity: { id: "mcp.kb_retrieval.product-docs", type: "mcp_server" as const, owner_user_id: 1, visibility: "private" as const },
+  spec: {
+    ...mcpServerFixture.spec,
+    name: "Product Docs Retrieval MCP",
+    slug: "kb_retrieval_product_docs",
+    description: "Expose Product Docs retrieval through the MCP gateway.",
+    backing_tool_id: "tool.kb_retrieval.product-docs",
+    exposed_tool_name: "kb_retrieval_product_docs",
+    input_schema: knowledgeBaseRetrievalTemplate.input_schema,
+    output_schema: knowledgeBaseRetrievalTemplate.output_schema,
+    metadata: {
+      category: "knowledge_retrieval" as const,
+      capabilities: ["knowledge-base", "retrieval", "semantic-search", "source-grounding"],
+      local: true,
+      stateless: true,
+      sandboxed: false,
+      risk_level: "low" as const,
+      data_access: "workspace" as const,
+      output_freshness: "static" as const,
+      audit_level: "standard" as const,
+    },
+  },
+};
+
 async function renderPage(): Promise<void> {
   await renderWithAppProviders(<CatalogControlPage />);
 }
@@ -753,6 +780,28 @@ describe("CatalogControlPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Web search MCP description" });
     expect(within(dialog).getByText(mcpServerFixture.spec.description)).toBeVisible();
+  });
+
+  it("filters the MCP registry by server type", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture, kbRetrievalToolFixture]);
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture, kbMcpServerFixture]);
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=mcp&view=registry" });
+
+    expect(await screen.findByRole("heading", { name: "Web search MCP" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Product Docs Retrieval MCP" })).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText("MCP server type"), "knowledge_retrieval");
+
+    expect(screen.queryByRole("heading", { name: "Web search MCP" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Product Docs Retrieval MCP" })).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText("MCP server type"), "code_execution");
+
+    expect(screen.queryByRole("heading", { name: "Web search MCP" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Product Docs Retrieval MCP" })).not.toBeInTheDocument();
+    expect(screen.getByText("No MCP servers match the current filters.")).toBeVisible();
   });
 
   it("updates the MCP validation badge after validation runs", async () => {
