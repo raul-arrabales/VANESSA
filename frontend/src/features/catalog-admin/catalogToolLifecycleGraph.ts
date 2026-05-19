@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 import type { CatalogTool } from "../../api/catalog";
 import { catalogToolBackendLabelKey } from "./catalogToolBackends";
 
@@ -63,7 +63,7 @@ export function getCatalogToolLifecycleState(tool: CatalogTool): CatalogToolLife
   return "published_unvalidated";
 }
 
-export function getCatalogToolLifecycleSummary(t: TFunction<"common">, tool: CatalogTool): string {
+export function getCatalogToolLifecycleSummaryRows(t: TFunction<"common">, tool: CatalogTool): LifecycleSummaryRow[] {
   const backend = t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(tool.spec.execution_backend)}`);
   const publishStatus = tool.published ? t("catalogControl.badges.published") : t("catalogControl.badges.draft");
   const validationStatus = String(tool.validation_status?.last_validation_status || "unknown").toLowerCase();
@@ -74,10 +74,10 @@ export function getCatalogToolLifecycleSummary(t: TFunction<"common">, tool: Cat
     ? t("catalogControl.tools.offlineCompatible")
     : t("catalogControl.tools.networkRequired");
 
-  return t("catalogControl.tools.lifecycle.summary", {
-    backend,
-    publishStatus,
-    validationStatus: validationLabel,
-    compatibility,
-  });
+  return [
+    { label: t("catalogControl.tools.lifecycle.summaryLabels.backend"), value: backend },
+    { label: t("catalogControl.tools.lifecycle.summaryLabels.status"), value: publishStatus, tone: tool.published ? "active" : "required" },
+    { label: t("catalogControl.tools.lifecycle.summaryLabels.validation"), value: validationLabel },
+    { label: t("catalogControl.tools.lifecycle.summaryLabels.compatibility"), value: compatibility, tone: tool.spec.offline_compatible ? "active" : "optional" },
+  ];
 }

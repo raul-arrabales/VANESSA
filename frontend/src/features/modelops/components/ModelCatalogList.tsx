@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import ActionIcon from "../../../components/ActionIcon";
 import {
@@ -11,10 +11,10 @@ import {
 } from "../../../components/CompactRegistryList";
 import IconLink from "../../../components/IconLink";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import type { ManagedModel } from "../../../api/modelops/types";
 import { isModelTestEligible } from "../domain";
-import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummary } from "../modelLifecycleGraph";
+import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummaryRows } from "../modelLifecycleGraph";
 import ModelStatusBadge from "./ModelStatusBadge";
 
 type ModelCatalogListProps = {
@@ -33,7 +33,7 @@ export default function ModelCatalogList({
   canTest = false,
 }: ModelCatalogListProps): JSX.Element {
   const { t } = useTranslation("common");
-  const [selectedLifecycleModel, setSelectedLifecycleModel] = useState<ManagedModel | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<ManagedModel>();
   const lifecycleDefinition = useMemo(() => createModelLifecycleGraphDefinition(t), [t]);
 
   if (models.length === 0) {
@@ -79,7 +79,7 @@ export default function ModelCatalogList({
                 </CompactRegistryMeta>
               </CompactRegistryMain>
               <CompactRegistryActions label={t("modelOps.catalog.actionsFor", { name: model.name })}>
-                <IconButton label={lifecycleActionLabel} onClick={() => setSelectedLifecycleModel(model)}>
+                <IconButton label={lifecycleActionLabel} onClick={() => openLifecycleItem(model)}>
                   <ActionIcon name="lifecycle" />
                 </IconButton>
                 {canTest && isModelTestEligible(model) && (
@@ -102,16 +102,16 @@ export default function ModelCatalogList({
         })}
       </CompactRegistryList>
       <LifecycleGraphActionModal
-        item={selectedLifecycleModel}
+        item={selectedLifecycleItem}
         getTitle={(model) => t("modelOps.lifecycle.modalTitle", { name: model.name })}
         description={t("modelOps.lifecycle.modalDescription")}
         closeLabel={t("actionFeedback.dialog.close")}
         definition={lifecycleDefinition}
         getCurrentState={getModelLifecycleState}
-        getSupportingText={(model) => getModelValidationLifecycleSummary(t, model)}
+        getSummaryRows={(model) => getModelValidationLifecycleSummaryRows(t, model)}
         currentLabel={t("modelOps.lifecycle.currentState")}
         unknownLabel={t("modelOps.lifecycle.states.unknown")}
-        onClose={() => setSelectedLifecycleModel(null)}
+        onClose={closeLifecycleItem}
       />
     </>
   );

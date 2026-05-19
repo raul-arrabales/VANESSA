@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/lifecycle-graph";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
 import {
   createPlatformProviderLifecycleGraphDefinition,
   getPlatformProviderLifecycleState,
-  getPlatformProviderLifecycleSummary,
+  getPlatformProviderLifecycleSummaryRows,
 } from "../platformProviderLifecycleGraph";
 
 type PlatformProviderOverviewSectionProps = {
@@ -88,7 +88,7 @@ export default function PlatformProviderOverviewSection({
         description={t("platformControl.providers.lifecycle.modalDescription")}
         definition={lifecycleDefinition}
         getCurrentState={(selectedProvider) => getPlatformProviderLifecycleState(selectedProvider, deployments)}
-        getSupportingText={(selectedProvider) => getPlatformProviderLifecycleSummary(t, selectedProvider, deployments, providerFamily, activeDeployment)}
+        getSummaryRows={(selectedProvider) => getPlatformProviderLifecycleSummaryRows(t, selectedProvider, deployments, providerFamily, activeDeployment)}
         currentLabel={t("platformControl.providers.lifecycle.currentState")}
         unknownLabel={t("platformControl.summary.unknown")}
         closeLabel={t("platformControl.actions.cancel")}

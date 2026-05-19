@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../api/platform";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 import { getActiveDeployment, getProviderUsageEntries } from "./platformTopology";
 
 const ACTIVE_ATTENTION_LOAD_STATES = new Set(["empty", "loading", "reconciling", "error"]);
@@ -72,13 +72,13 @@ export function getPlatformProviderLifecycleState(
   return loadState && ACTIVE_ATTENTION_LOAD_STATES.has(loadState) ? "active_attention" : "active_ready";
 }
 
-export function getPlatformProviderLifecycleSummary(
+export function getPlatformProviderLifecycleSummaryRows(
   t: TFunction<"common">,
   provider: PlatformProvider,
   deployments: PlatformDeploymentProfile[],
   providerFamily?: PlatformProviderFamily | null,
   activeDeployment: PlatformDeploymentProfile | null = getActiveDeployment(deployments),
-): string {
+): LifecycleSummaryRow[] {
   const usageEntries = getProviderUsageEntries(provider.id, deployments);
   const usesActiveDeployment = usageEntries.some((entry) => entry.deployment.is_active);
   const loadedResource =
@@ -87,26 +87,37 @@ export function getPlatformProviderLifecycleSummary(
     provider.loaded_local_path ??
     provider.loaded_source_id ??
     t("platformControl.summary.none");
-  const loadError = provider.load_error
-    ? t("platformControl.providers.lifecycle.loadErrorSuffix", { error: provider.load_error })
-    : "";
+  const activeDeploymentLabel = activeDeployment
+    ? `${activeDeployment.display_name} (${activeDeployment.slug})`
+    : t("platformControl.summary.none");
 
-  return t("platformControl.providers.lifecycle.summary", {
-    enabledStatus: provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled"),
-    origin: t(`platformControl.badges.${provider.provider_origin}`),
-    capability: provider.capability,
-    providerFamily: providerFamily?.display_name ?? provider.provider_key,
-    adapter: provider.adapter_kind,
-    usageCount: usageEntries.length,
-    activeUsage: usesActiveDeployment
+  const rows: LifecycleSummaryRow[] = [
+    { label: t("platformControl.providers.lifecycle.summaryLabels.status"), value: provider.enabled ? t("platformControl.badges.enabled") : t("platformControl.badges.disabled"), tone: provider.enabled ? "enabled" : "disabled" },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.origin"), value: t(`platformControl.badges.${provider.provider_origin}`) },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.capability"), value: provider.capability },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.family"), value: providerFamily?.display_name ?? provider.provider_key },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.adapter"), value: provider.adapter_kind },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.referencedDeployments"), value: usageEntries.length },
+    {
+      label: t("platformControl.providers.lifecycle.summaryLabels.activeUsage"),
+      value: usesActiveDeployment
       ? t("platformControl.providers.activeReference")
       : t("platformControl.providers.inactiveReference"),
-    activeDeployment: activeDeployment
-      ? `${activeDeployment.display_name} (${activeDeployment.slug})`
-      : t("platformControl.summary.none"),
-    loadState: provider.load_state ?? t("platformControl.summary.none"),
-    loadedResource,
-    endpoint: provider.endpoint_url,
-    loadError,
-  });
+      tone: usesActiveDeployment ? "active" : "inactive",
+    },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.activeDeployment"), value: activeDeploymentLabel },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.loadState"), value: provider.load_state ?? t("platformControl.summary.none") },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.loadedResource"), value: loadedResource },
+    { label: t("platformControl.providers.lifecycle.summaryLabels.endpoint"), value: provider.endpoint_url },
+  ];
+
+  if (provider.load_error) {
+    rows.push({
+      label: t("platformControl.providers.lifecycle.summaryLabels.loadError"),
+      value: provider.load_error,
+      tone: "danger",
+    });
+  }
+
+  return rows;
 }

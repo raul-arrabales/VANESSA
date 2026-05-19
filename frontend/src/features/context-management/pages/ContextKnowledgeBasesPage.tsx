@@ -1,21 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal, LifecycleGraphPanel } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, LifecycleGraphPanel, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import {
   createKnowledgeBaseLifecycleGraphDefinition,
   getKnowledgeBaseLifecycleState,
-  getKnowledgeBaseLifecycleSummary,
+  getKnowledgeBaseLifecycleSummaryRows,
 } from "../knowledgeBaseLifecycleGraph";
 import { useContextKnowledgeBaseList } from "../hooks/useContextKnowledgeBaseList";
 
 export default function ContextKnowledgeBasesPage(): JSX.Element {
   const { t } = useTranslation("common");
   const { knowledgeBases, errorMessage, loading, isSuperadmin } = useContextKnowledgeBaseList();
-  const [lifecycleKnowledgeBase, setLifecycleKnowledgeBase] = useState<KnowledgeBase | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<KnowledgeBase>();
   const lifecycleDefinition = useMemo(() => createKnowledgeBaseLifecycleGraphDefinition(t), [t]);
 
   return (
@@ -70,7 +70,7 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
                     <div className="compact-registry-actions">
                       <IconButton
                         label={t("contextManagement.lifecycle.actionLabel", { name: knowledgeBase.display_name })}
-                        onClick={() => setLifecycleKnowledgeBase(knowledgeBase)}
+                        onClick={() => openLifecycleItem(knowledgeBase)}
                       >
                         <ActionIcon name="lifecycle" />
                       </IconButton>
@@ -100,16 +100,16 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
         />
       ) : null}
       <LifecycleGraphActionModal
-        item={lifecycleKnowledgeBase}
+        item={selectedLifecycleItem}
         getTitle={(knowledgeBase) => t("contextManagement.lifecycle.modalTitle", { name: knowledgeBase.display_name })}
         description={t("contextManagement.lifecycle.modalDescription")}
         definition={lifecycleDefinition}
         getCurrentState={getKnowledgeBaseLifecycleState}
-        getSupportingText={(knowledgeBase) => getKnowledgeBaseLifecycleSummary(t, knowledgeBase)}
+        getSummaryRows={(knowledgeBase) => getKnowledgeBaseLifecycleSummaryRows(t, knowledgeBase)}
         currentLabel={t("contextManagement.lifecycle.currentState")}
         unknownLabel={t("platformControl.summary.unknown")}
         closeLabel={t("contextManagement.actions.cancel")}
-        onClose={() => setLifecycleKnowledgeBase(null)}
+        onClose={closeLifecycleItem}
       />
     </section>
   );

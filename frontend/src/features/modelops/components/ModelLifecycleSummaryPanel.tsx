@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ManagedModel } from "../../../api/modelops/types";
-import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/lifecycle-graph";
 import { createModelLifecycleGraphDefinition, getModelLifecycleState } from "../modelLifecycleGraph";
 
 type ModelLifecycleSummaryPanelProps = {

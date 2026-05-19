@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { KnowledgeBase } from "../../api/context";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 
 export const KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS = [
   "empty",
@@ -74,7 +74,7 @@ export function getKnowledgeBaseLifecycleState(knowledgeBase: KnowledgeBase): Kn
   return "ready_unbound";
 }
 
-export function getKnowledgeBaseLifecycleSummary(t: TFunction<"common">, knowledgeBase: KnowledgeBase): string {
+export function getKnowledgeBaseLifecycleSummaryRows(t: TFunction<"common">, knowledgeBase: KnowledgeBase): LifecycleSummaryRow[] {
   const noneLabel = t("platformControl.summary.none");
   const backingProvider =
     knowledgeBase.backing_provider?.display_name ??
@@ -94,19 +94,25 @@ export function getKnowledgeBaseLifecycleSummary(t: TFunction<"common">, knowled
   const eligibility = knowledgeBase.eligible_for_binding
     ? t("contextManagement.states.eligible")
     : t("contextManagement.states.ineligible");
-  const syncError = knowledgeBase.last_sync_error
-    ? t("contextManagement.lifecycle.syncErrorSuffix", { error: knowledgeBase.last_sync_error })
-    : "";
 
-  return t("contextManagement.lifecycle.summary", {
-    lifecycleState: knowledgeBase.lifecycle_state,
-    syncStatus: knowledgeBase.sync_status,
-    documentCount: knowledgeBase.document_count,
-    bindingCount: knowledgeBase.binding_count ?? 0,
-    eligibility,
-    backingProvider,
-    embeddingProvider,
-    embeddingResource,
-    syncError,
-  });
+  const rows: LifecycleSummaryRow[] = [
+    { label: t("contextManagement.lifecycle.summaryLabels.lifecycleState"), value: knowledgeBase.lifecycle_state },
+    { label: t("contextManagement.lifecycle.summaryLabels.syncStatus"), value: knowledgeBase.sync_status },
+    { label: t("contextManagement.lifecycle.summaryLabels.documents"), value: knowledgeBase.document_count },
+    { label: t("contextManagement.lifecycle.summaryLabels.bindings"), value: knowledgeBase.binding_count ?? 0 },
+    { label: t("contextManagement.lifecycle.summaryLabels.eligibility"), value: eligibility, tone: knowledgeBase.eligible_for_binding ? "success" : "warning" },
+    { label: t("contextManagement.lifecycle.summaryLabels.provider"), value: backingProvider },
+    { label: t("contextManagement.lifecycle.summaryLabels.embeddingProvider"), value: embeddingProvider },
+    { label: t("contextManagement.lifecycle.summaryLabels.embeddingResource"), value: embeddingResource },
+  ];
+
+  if (knowledgeBase.last_sync_error) {
+    rows.push({
+      label: t("contextManagement.lifecycle.summaryLabels.lastError"),
+      value: knowledgeBase.last_sync_error,
+      tone: "danger",
+    });
+  }
+
+  return rows;
 }

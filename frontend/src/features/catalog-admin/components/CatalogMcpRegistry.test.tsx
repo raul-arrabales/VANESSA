@@ -106,6 +106,13 @@ describe("CatalogMcpRegistry", () => {
     const dialog = await screen.findByRole("dialog", { name: "MCP lifecycle: Web search MCP" });
     expect(within(dialog).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
     expect(within(dialog).getByText("Current")).toBeVisible();
-    expect(within(dialog).getByText("Category: Web search | Risk: Medium | Backing tool: Web search | Status: Enabled | Validation: Success | Network required, Stateless, Unsandboxed")).toBeVisible();
+    expect(within(dialog).getByText("Category")).toBeVisible();
+    expect(within(dialog).getAllByText("Web search").length).toBeGreaterThanOrEqual(2);
+    expect(within(dialog).getByText("Medium")).toBeVisible();
+    expect(within(dialog).getByText("Enabled")).toBeVisible();
+    expect(within(dialog).getByText("Success")).toBeVisible();
+    expect(within(dialog).getByText("Network required")).toBeVisible();
+    expect(within(dialog).getByText("Stateless")).toBeVisible();
+    expect(within(dialog).getByText("Unsandboxed")).toBeVisible();
   });
 });

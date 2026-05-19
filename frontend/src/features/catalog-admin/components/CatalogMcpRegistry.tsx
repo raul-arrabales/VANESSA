@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer, CatalogMcpServerValidation, CatalogTool } from "../../../api/catalog";
 import { CompactRegistryList } from "../../../components/CompactRegistryList";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
-import { createCatalogMcpLifecycleGraphDefinition, getCatalogMcpLifecycleState, getCatalogMcpLifecycleSummary } from "../catalogMcpLifecycleGraph";
+import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
+import { createCatalogMcpLifecycleGraphDefinition, getCatalogMcpLifecycleState, getCatalogMcpLifecycleSummaryRows } from "../catalogMcpLifecycleGraph";
 import CatalogMcpDescriptionModal from "./CatalogMcpDescriptionModal";
 import CatalogMcpRegistryItem from "./CatalogMcpRegistryItem";
 import { MCP_METADATA_CATEGORY_OPTIONS } from "../mcpMetadataOptions";
@@ -33,7 +33,7 @@ export default function CatalogMcpRegistry({
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<CatalogMcpServer["spec"]["metadata"]["category"] | "">("");
   const [descriptionServer, setDescriptionServer] = useState<CatalogMcpServer | null>(null);
-  const [lifecycleServer, setLifecycleServer] = useState<CatalogMcpServer | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<CatalogMcpServer>();
   const lifecycleDefinition = useMemo(() => createCatalogMcpLifecycleGraphDefinition(t), [t]);
   const toolNames = useMemo(() => new Map(tools.map((tool) => [tool.id, tool.spec.name])), [tools]);
   const filteredServers = mcpServers.filter((server) => {
@@ -101,7 +101,7 @@ export default function CatalogMcpRegistry({
             onToggle={onToggle}
             onValidate={onValidate}
             onViewDescription={setDescriptionServer}
-            onViewLifecycle={setLifecycleServer}
+            onViewLifecycle={openLifecycleItem}
           />
         ))}
       </CompactRegistryList>
@@ -109,20 +109,20 @@ export default function CatalogMcpRegistry({
         <CatalogMcpDescriptionModal server={descriptionServer} onClose={() => setDescriptionServer(null)} />
       ) : null}
       <LifecycleGraphActionModal
-        item={lifecycleServer}
+        item={selectedLifecycleItem}
         getTitle={(server) => t("catalogControl.mcp.lifecycle.modalTitle", { name: server.spec.name })}
         description={t("catalogControl.mcp.lifecycle.modalDescription")}
         closeLabel={t("actionFeedback.dialog.close")}
         definition={lifecycleDefinition}
         getCurrentState={getCatalogMcpLifecycleState}
-        getSupportingText={(server) => getCatalogMcpLifecycleSummary(
+        getSummaryRows={(server) => getCatalogMcpLifecycleSummaryRows(
           t,
           server,
           toolNames.get(server.spec.backing_tool_id) ?? server.spec.backing_tool_id,
         )}
         currentLabel={t("catalogControl.mcp.lifecycle.currentState")}
         unknownLabel={t("catalogControl.mcp.lifecycle.states.unknown")}
-        onClose={() => setLifecycleServer(null)}
+        onClose={closeLifecycleItem}
       />
     </article>
   );

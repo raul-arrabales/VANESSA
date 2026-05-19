@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import type { LifecycleGraphDefinition, LifecycleCounts, LifecycleTransitionDefinition } from "../components/LifecycleGraph";
+import type { LifecycleGraphDefinition, LifecycleCounts, LifecycleTransitionDefinition } from "../components/lifecycle-graph";
 
 export function expectLifecycleDefinition(
   definition: LifecycleGraphDefinition,

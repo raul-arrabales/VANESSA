@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/lifecycle-graph";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider";

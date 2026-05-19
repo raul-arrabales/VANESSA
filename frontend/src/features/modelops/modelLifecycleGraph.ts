@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ManagedModel } from "../../api/modelops/types";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow } from "../../components/lifecycle-graph";
 
 export const MODEL_LIFECYCLE_STATE_IDS = [
   "created",
@@ -50,15 +50,25 @@ export function getModelLifecycleState(model: ManagedModel): string | null | und
   return model.lifecycle_state;
 }
 
-export function getModelValidationLifecycleSummary(t: TFunction<"common">, model: ManagedModel): string {
+export function getModelValidationLifecycleSummaryRows(t: TFunction<"common">, model: ManagedModel): LifecycleSummaryRow[] {
+  let validation = t("modelOps.lifecycle.validation.pending");
+  let tone: LifecycleSummaryRow["tone"] = "optional";
   if (model.is_validation_current && model.last_validation_status === "success") {
-    return t("modelOps.lifecycle.validation.current");
+    validation = t("modelOps.lifecycle.validation.current");
+    tone = "success";
+  } else if (model.last_validation_status === "failure") {
+    validation = t("modelOps.lifecycle.validation.failed");
+    tone = "danger";
+  } else if (model.last_validation_status === "success") {
+    validation = t("modelOps.lifecycle.validation.stale");
+    tone = "warning";
   }
-  if (model.last_validation_status === "failure") {
-    return t("modelOps.lifecycle.validation.failed");
-  }
-  if (model.last_validation_status === "success") {
-    return t("modelOps.lifecycle.validation.stale");
-  }
-  return t("modelOps.lifecycle.validation.pending");
+
+  return [
+    {
+      label: t("modelOps.lifecycle.summaryLabels.validation"),
+      value: validation,
+      tone,
+    },
+  ];
 }

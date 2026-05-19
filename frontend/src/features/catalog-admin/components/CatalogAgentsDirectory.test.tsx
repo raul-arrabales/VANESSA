@@ -87,6 +87,13 @@ describe("CatalogAgentsDirectory", () => {
     const dialog = await screen.findByRole("dialog", { name: "Agent lifecycle: Knowledge Chat" });
     expect(within(dialog).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
     expect(within(dialog).getByText("Current")).toBeVisible();
-    expect(within(dialog).getByText("Kind: Platform | Status: Published | Validation: Valid | Model: safe-small | Tools: 1 | MCP servers: 1 | Internet required, No sandbox")).toBeVisible();
+    expect(within(dialog).getByText("Kind")).toBeVisible();
+    expect(within(dialog).getByText("Platform")).toBeVisible();
+    expect(within(dialog).getByText("Published")).toBeVisible();
+    expect(within(dialog).getByText("Valid")).toBeVisible();
+    expect(within(dialog).getByText("safe-small")).toBeVisible();
+    expect(within(dialog).getAllByText("1").length).toBeGreaterThanOrEqual(2);
+    expect(within(dialog).getByText("Internet required")).toBeVisible();
+    expect(within(dialog).getByText("No sandbox")).toBeVisible();
   });
 });

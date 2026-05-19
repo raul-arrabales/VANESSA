@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import ActionIcon from "../../../components/ActionIcon";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import {
   CompactRegistryActions,
   CompactRegistryDescription,
@@ -15,7 +15,7 @@ import {
 } from "../../../components/CompactRegistryList";
 import IconButton from "../../../components/IconButton";
 import type { CatalogAgent, CatalogAgentValidation } from "../../../api/catalog";
-import { createCatalogAgentLifecycleGraphDefinition, getCatalogAgentLifecycleState, getCatalogAgentLifecycleSummary } from "../catalogAgentLifecycleGraph";
+import { createCatalogAgentLifecycleGraphDefinition, getCatalogAgentLifecycleState, getCatalogAgentLifecycleSummaryRows } from "../catalogAgentLifecycleGraph";
 
 type CatalogAgentsDirectoryProps = {
   agents: CatalogAgent[];
@@ -70,7 +70,7 @@ export default function CatalogAgentsDirectory({
   onDelete,
 }: CatalogAgentsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
-  const [selectedLifecycleAgent, setSelectedLifecycleAgent] = useState<CatalogAgent | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<CatalogAgent>();
   const lifecycleDefinition = useMemo(() => createCatalogAgentLifecycleGraphDefinition(t), [t]);
 
   return (
@@ -132,7 +132,7 @@ export default function CatalogAgentsDirectory({
                   </CompactRegistryMeta>
                 </CompactRegistryMain>
                 <CompactRegistryActions label={t("catalogControl.agents.actionsFor", { name: agent.spec.name })}>
-                  <IconButton label={t("catalogControl.agents.actionLabels.lifecycle", { name: agent.spec.name })} onClick={() => setSelectedLifecycleAgent(agent)}>
+                  <IconButton label={t("catalogControl.agents.actionLabels.lifecycle", { name: agent.spec.name })} onClick={() => openLifecycleItem(agent)}>
                     <ActionIcon name="lifecycle" />
                   </IconButton>
                   <IconButton label={t("catalogControl.agents.actionLabels.edit", { name: agent.spec.name })} onClick={() => onEdit(agent)}>
@@ -168,16 +168,16 @@ export default function CatalogAgentsDirectory({
       </article>
 
       <LifecycleGraphActionModal
-        item={selectedLifecycleAgent}
+        item={selectedLifecycleItem}
         getTitle={(agent) => t("catalogControl.agents.lifecycle.modalTitle", { name: agent.spec.name })}
         description={t("catalogControl.agents.lifecycle.modalDescription")}
         closeLabel={t("actionFeedback.dialog.close")}
         definition={lifecycleDefinition}
         getCurrentState={(agent) => getCatalogAgentLifecycleState(agent, validationResults[agent.id])}
-        getSupportingText={(agent) => getCatalogAgentLifecycleSummary(t, agent, validationResults[agent.id])}
+        getSummaryRows={(agent) => getCatalogAgentLifecycleSummaryRows(t, agent, validationResults[agent.id])}
         currentLabel={t("catalogControl.agents.lifecycle.currentState")}
         unknownLabel={t("catalogControl.agents.lifecycle.states.unknown")}
-        onClose={() => setSelectedLifecycleAgent(null)}
+        onClose={closeLifecycleItem}
       />
     </>
   );

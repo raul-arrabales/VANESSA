@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformDeploymentProfile, PlatformProvider } from "../../api/platform";
-import { deriveLifecycleCounts } from "../../components/LifecycleGraph";
+import { deriveLifecycleCounts } from "../../components/lifecycle-graph";
 import { expectLifecycleDefinition, expectTerminalStateUncounted } from "../../test/lifecycleGraphAssertions";
 import { deploymentsFixture, providersFixture } from "../../test/platformControlFixtures";
 import {

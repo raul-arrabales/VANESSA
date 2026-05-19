@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import ActionIcon from "../../../components/ActionIcon";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import {
   CompactRegistryActions,
   CompactRegistryDescription,
@@ -16,7 +16,7 @@ import {
 import IconButton from "../../../components/IconButton";
 import type { CatalogTool, CatalogToolValidation } from "../../../api/catalog";
 import { catalogToolBackendLabelKey } from "../catalogToolBackends";
-import { createCatalogToolLifecycleGraphDefinition, getCatalogToolLifecycleState, getCatalogToolLifecycleSummary } from "../catalogToolLifecycleGraph";
+import { createCatalogToolLifecycleGraphDefinition, getCatalogToolLifecycleState, getCatalogToolLifecycleSummaryRows } from "../catalogToolLifecycleGraph";
 
 type CatalogToolsDirectoryProps = {
   tools: CatalogTool[];
@@ -85,7 +85,7 @@ export default function CatalogToolsDirectory({
   onValidate,
 }: CatalogToolsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
-  const [selectedLifecycleTool, setSelectedLifecycleTool] = useState<CatalogTool | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<CatalogTool>();
   const lifecycleDefinition = useMemo(() => createCatalogToolLifecycleGraphDefinition(t), [t]);
 
   return (
@@ -135,7 +135,7 @@ export default function CatalogToolsDirectory({
                   </CompactRegistryMeta>
                 </CompactRegistryMain>
                 <CompactRegistryActions label={t("catalogControl.tools.actionsFor", { name: tool.spec.name })}>
-                  <IconButton label={t("catalogControl.tools.actionLabels.lifecycle", { name: tool.spec.name })} onClick={() => setSelectedLifecycleTool(tool)}>
+                  <IconButton label={t("catalogControl.tools.actionLabels.lifecycle", { name: tool.spec.name })} onClick={() => openLifecycleItem(tool)}>
                     <ActionIcon name="lifecycle" />
                   </IconButton>
                   <IconButton label={t("catalogControl.tools.actionLabels.edit", { name: tool.spec.name })} onClick={() => onEdit(tool)}>
@@ -169,16 +169,16 @@ export default function CatalogToolsDirectory({
       </article>
 
       <LifecycleGraphActionModal
-        item={selectedLifecycleTool}
+        item={selectedLifecycleItem}
         getTitle={(tool) => t("catalogControl.tools.lifecycle.modalTitle", { name: tool.spec.name })}
         description={t("catalogControl.tools.lifecycle.modalDescription")}
         closeLabel={t("actionFeedback.dialog.close")}
         definition={lifecycleDefinition}
         getCurrentState={getCatalogToolLifecycleState}
-        getSupportingText={(tool) => getCatalogToolLifecycleSummary(t, tool)}
+        getSummaryRows={(tool) => getCatalogToolLifecycleSummaryRows(t, tool)}
         currentLabel={t("catalogControl.tools.lifecycle.currentState")}
         unknownLabel={t("catalogControl.tools.lifecycle.states.unknown")}
-        onClose={() => setSelectedLifecycleTool(null)}
+        onClose={closeLifecycleItem}
       />
     </>
   );

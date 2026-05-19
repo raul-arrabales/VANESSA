@@ -379,6 +379,34 @@
   text-align: center;
 }
 
+.lifecycle-graph-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.lifecycle-graph-summary-row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 42%, transparent);
+}
+
+.lifecycle-graph-summary-row dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.lifecycle-graph-summary-row .platform-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
 .lifecycle-graph-fallback {
   display: grid;
   gap: var(--space-2);

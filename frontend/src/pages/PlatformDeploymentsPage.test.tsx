@@ -77,10 +77,13 @@ describe("PlatformDeploymentsPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "View lifecycle for Local Default" }));
 
-    expect(await screen.findByRole("dialog")).toBeVisible();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
     expect(screen.getByText("Deployment lifecycle: Local Default")).toBeVisible();
-    expect(screen.getByText(/Status: Active/)).toBeVisible();
-    expect(screen.getByText(/Bindings: 3\/3 ready/)).toBeVisible();
+    expect(within(dialog).getByText("Status")).toBeVisible();
+    expect(within(dialog).getByText("Active")).toBeVisible();
+    expect(within(dialog).getByText("Ready bindings")).toBeVisible();
+    expect(within(dialog).getByText("3/3")).toBeVisible();
   });
 
   it("filters deployments by search text", async () => {

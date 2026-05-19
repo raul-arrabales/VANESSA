@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/lifecycle-graph";
 import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
@@ -12,7 +12,7 @@ import UsageSummaryPanel from "../components/UsageSummaryPanel";
 import ValidationHistoryPanel from "../components/ValidationHistoryPanel";
 import { useManagedModelDetail } from "../hooks/useManagedModelDetail";
 import { CLOUD_PROVIDER_OPTIONS, canAccessModelTesting, getModelLifecyclePermissions, isModelTestEligible } from "../domain";
-import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummary } from "../modelLifecycleGraph";
+import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummaryRows } from "../modelLifecycleGraph";
 
 export default function ModelDetailPage(): JSX.Element {
   const { t } = useTranslation("common");
@@ -116,7 +116,7 @@ export default function ModelDetailPage(): JSX.Element {
         closeLabel={t("actionFeedback.dialog.close")}
         definition={lifecycleDefinition}
         getCurrentState={getModelLifecycleState}
-        getSupportingText={(selectedModel) => getModelValidationLifecycleSummary(t, selectedModel)}
+        getSummaryRows={(selectedModel) => getModelValidationLifecycleSummaryRows(t, selectedModel)}
         currentLabel={t("modelOps.lifecycle.currentState")}
         unknownLabel={t("modelOps.lifecycle.states.unknown")}
         onClose={() => setShowLifecycleGraph(false)}

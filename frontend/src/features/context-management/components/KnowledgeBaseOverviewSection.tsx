@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { KnowledgeBase, KnowledgeSyncRun } from "../../../api/context";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/lifecycle-graph";
 import ModalDialog from "../../../components/ModalDialog";
 import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
 import { KnowledgeBaseSyncProgress } from "./KnowledgeBaseSyncProgress";
@@ -11,7 +11,7 @@ import type { KnowledgeBaseOverviewFormState } from "../types";
 import {
   createKnowledgeBaseLifecycleGraphDefinition,
   getKnowledgeBaseLifecycleState,
-  getKnowledgeBaseLifecycleSummary,
+  getKnowledgeBaseLifecycleSummaryRows,
 } from "../knowledgeBaseLifecycleGraph";
 
 type Props = {
@@ -322,7 +322,7 @@ export function KnowledgeBaseOverviewSection({
         description={t("contextManagement.lifecycle.modalDescription")}
         definition={lifecycleDefinition}
         getCurrentState={getKnowledgeBaseLifecycleState}
-        getSupportingText={(item) => getKnowledgeBaseLifecycleSummary(t, item)}
+        getSummaryRows={(item) => getKnowledgeBaseLifecycleSummaryRows(t, item)}
         currentLabel={t("contextManagement.lifecycle.currentState")}
         unknownLabel={t("platformControl.summary.unknown")}
         closeLabel={t("contextManagement.actions.cancel")}

@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/lifecycle-graph";
 import type { PlatformDeploymentProfile } from "../../../api/platform";
 import {
   createPlatformDeploymentLifecycleGraphDefinition,
   getPlatformDeploymentLifecycleState,
-  getPlatformDeploymentLifecycleSummary,
+  getPlatformDeploymentLifecycleSummaryRows,
 } from "../platformDeploymentLifecycleGraph";
 import { summarizeBindingResources } from "../platformTopology";
 
@@ -126,7 +126,7 @@ export default function PlatformDeploymentOverviewSection({
         description={t("platformControl.deployments.lifecycle.modalDescription")}
         definition={lifecycleDefinition}
         getCurrentState={getPlatformDeploymentLifecycleState}
-        getSupportingText={(selectedDeployment) => getPlatformDeploymentLifecycleSummary(t, selectedDeployment, activeDeployment)}
+        getSummaryRows={(selectedDeployment) => getPlatformDeploymentLifecycleSummaryRows(t, selectedDeployment, activeDeployment)}
         currentLabel={t("platformControl.deployments.lifecycle.currentState")}
         unknownLabel={t("platformControl.summary.unknown")}
         closeLabel={t("platformControl.actions.cancel")}

@@ -78,10 +78,13 @@ describe("PlatformProvidersPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "View lifecycle for vLLM local gateway" }));
 
-    expect(await screen.findByRole("dialog")).toBeVisible();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
     expect(screen.getByText("Provider lifecycle: vLLM local gateway")).toBeVisible();
-    expect(screen.getByText(/Status: Enabled/)).toBeVisible();
-    expect(screen.getByText(/Referenced deployments: 2/)).toBeVisible();
+    expect(within(dialog).getByText("Status")).toBeVisible();
+    expect(within(dialog).getByText("Enabled")).toBeVisible();
+    expect(within(dialog).getByText("Referenced deployments")).toBeVisible();
+    expect(within(dialog).getByText("2")).toBeVisible();
   });
 
   it("labels cloud providers distinctly from local providers", async () => {

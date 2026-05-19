@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { PlatformDeploymentProfile } from "../../api/platform";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 
 export const PLATFORM_DEPLOYMENT_LIFECYCLE_STATE_IDS = [
   "incomplete",
@@ -51,11 +51,11 @@ export function getPlatformDeploymentLifecycleState(
   return deployment.configuration_status?.is_ready === true ? "ready_inactive" : "incomplete";
 }
 
-export function getPlatformDeploymentLifecycleSummary(
+export function getPlatformDeploymentLifecycleSummaryRows(
   t: TFunction<"common">,
   deployment: PlatformDeploymentProfile,
   activeDeployment?: PlatformDeploymentProfile | null,
-): string {
+): LifecycleSummaryRow[] {
   const activeStatus = deployment.is_active
     ? t("platformControl.badges.active")
     : t("platformControl.badges.inactive");
@@ -74,15 +74,14 @@ export function getPlatformDeploymentLifecycleSummary(
     ? `${activeDeployment.display_name} (${activeDeployment.slug})`
     : t("platformControl.summary.none");
 
-  return t("platformControl.deployments.lifecycle.summary", {
-    activeStatus,
-    readinessStatus,
-    readinessSummary,
-    bindingCount,
-    readyBindingCount,
-    incompleteCapabilityCount,
-    providerCount,
-    resourceCount,
-    activeDeployment: activeDeploymentLabel,
-  });
+  return [
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.status"), value: activeStatus, tone: deployment.is_active ? "active" : "inactive" },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.readiness"), value: readinessStatus, tone: deployment.configuration_status?.is_ready ? "success" : "warning" },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.readinessSummary"), value: readinessSummary },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.readyBindings"), value: `${readyBindingCount}/${bindingCount}` },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.incompleteCapabilities"), value: incompleteCapabilityCount, tone: incompleteCapabilityCount > 0 ? "warning" : "success" },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.providers"), value: providerCount },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.resources"), value: resourceCount },
+    { label: t("platformControl.deployments.lifecycle.summaryLabels.activeDeployment"), value: activeDeploymentLabel },
+  ];
 }

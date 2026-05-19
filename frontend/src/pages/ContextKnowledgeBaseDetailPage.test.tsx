@@ -664,9 +664,11 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
 
     const lifecycleButton = expectNamedIconAction("button", "View lifecycle for Product Docs");
     await user.click(lifecycleButton);
-    expect(await screen.findByRole("dialog")).toBeVisible();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
     expect(screen.getByText("Knowledge base lifecycle: Product Docs")).toBeVisible();
-    expect(screen.getByText(/Lifecycle: active/)).toBeVisible();
+    expect(within(dialog).getByText("Lifecycle")).toBeVisible();
+    expect(within(dialog).getByText("active")).toBeVisible();
   });
 
   it("lets superadmins resync from the overview page", async () => {

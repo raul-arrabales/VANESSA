@@ -131,8 +131,10 @@ describe("PlatformDeploymentDetailPage", () => {
     const lifecycleDialog = await screen.findByRole("dialog", {
       name: "Deployment lifecycle: Staging Profile",
     });
-    expect(within(lifecycleDialog).getByText(/Status: Inactive/)).toBeVisible();
-    expect(within(lifecycleDialog).getByText(/Active deployment: Local Default \(local-default\)/)).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Status")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Inactive")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Active deployment")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Local Default (local-default)")).toBeVisible();
     await userEvent.click(within(lifecycleDialog).getByRole("button", { name: await t("platformControl.actions.cancel") }));
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.activate") }));

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/lifecycle-graph";
 import type { CatalogTool } from "../../../api/catalog";
 import { createCatalogToolLifecycleGraphDefinition, getCatalogToolLifecycleState } from "../catalogToolLifecycleGraph";
 

@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
@@ -103,9 +103,14 @@ describe("ContextKnowledgeBasesPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "View lifecycle for Product Docs" }));
 
-    expect(await screen.findByRole("dialog")).toBeVisible();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeVisible();
     expect(screen.getByText("Knowledge base lifecycle: Product Docs")).toBeVisible();
-    expect(screen.getByText(/Provider: Weaviate local/)).toBeVisible();
-    expect(screen.getByText(/Embeddings local \/ text-embedding-3-small/)).toBeVisible();
+    expect(within(dialog).getByText("Provider")).toBeVisible();
+    expect(within(dialog).getByText("Weaviate local")).toBeVisible();
+    expect(within(dialog).getByText("Embedding provider")).toBeVisible();
+    expect(within(dialog).getByText("Embeddings local")).toBeVisible();
+    expect(within(dialog).getByText("Embedding resource")).toBeVisible();
+    expect(within(dialog).getByText("text-embedding-3-small")).toBeVisible();
   });
 });

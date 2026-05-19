@@ -58,6 +58,10 @@ describe("CatalogToolsDirectory", () => {
     const dialog = await screen.findByRole("dialog", { name: "Tool lifecycle: Web search" });
     expect(within(dialog).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
     expect(within(dialog).getByText("Current")).toBeVisible();
-    expect(within(dialog).getByText("Backend: Gateway web search | Status: Published | Validation: Success | Network required")).toBeVisible();
+    expect(within(dialog).getByText("Backend")).toBeVisible();
+    expect(within(dialog).getByText("Gateway web search")).toBeVisible();
+    expect(within(dialog).getByText("Published")).toBeVisible();
+    expect(within(dialog).getByText("Success")).toBeVisible();
+    expect(within(dialog).getByText("Network required")).toBeVisible();
   });
 });

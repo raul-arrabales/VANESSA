@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 import type { CatalogMcpServer } from "../../api/catalog";
 
 export const CATALOG_MCP_LIFECYCLE_STATE_IDS = [
@@ -74,11 +74,11 @@ export function getCatalogMcpLifecycleState(server: CatalogMcpServer): CatalogMc
   return "enabled_unvalidated";
 }
 
-export function getCatalogMcpLifecycleSummary(
+export function getCatalogMcpLifecycleSummaryRows(
   t: TFunction<"common">,
   server: CatalogMcpServer,
   backingToolName: string,
-): string {
+): LifecycleSummaryRow[] {
   const metadata = server.spec.metadata;
   const category = t(`catalogControl.mcp.metadata.category.${metadata.category}`);
   const risk = t(`catalogControl.mcp.metadata.riskLevel.${metadata.risk_level}`);
@@ -91,12 +91,14 @@ export function getCatalogMcpLifecycleSummary(
   const statefulness = metadata.stateless ? t("catalogControl.mcp.lifecycle.flags.stateless") : t("catalogControl.mcp.lifecycle.flags.stateful");
   const sandbox = metadata.sandboxed ? t("catalogControl.mcp.lifecycle.flags.sandboxed") : t("catalogControl.mcp.lifecycle.flags.unsandboxed");
 
-  return t("catalogControl.mcp.lifecycle.summary", {
-    category,
-    risk,
-    backingTool: backingToolName,
-    exposureStatus,
-    validationStatus: validationLabel,
-    flags: [locality, statefulness, sandbox].join(", "),
-  });
+  return [
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.category"), value: category },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.risk"), value: risk, tone: metadata.risk_level === "high" ? "danger" : metadata.risk_level === "medium" ? "warning" : "success" },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.backingTool"), value: backingToolName },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.status"), value: exposureStatus, tone: server.spec.enabled ? "enabled" : "disabled" },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.validation"), value: validationLabel },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.locality"), value: locality },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.statefulness"), value: statefulness },
+    { label: t("catalogControl.mcp.lifecycle.summaryLabels.sandbox"), value: sandbox },
+  ];
 }

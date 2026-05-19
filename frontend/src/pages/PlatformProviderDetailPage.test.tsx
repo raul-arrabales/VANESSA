@@ -154,8 +154,10 @@ describe("PlatformProviderDetailPage", () => {
     const lifecycleDialog = await screen.findByRole("dialog", {
       name: "Provider lifecycle: vLLM local gateway",
     });
-    expect(within(lifecycleDialog).getByText(/Status: Enabled/)).toBeVisible();
-    expect(within(lifecycleDialog).getByText(/Active deployment: Local Default \(local-default\)/)).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Status")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Enabled")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Active deployment")).toBeVisible();
+    expect(within(lifecycleDialog).getByText("Local Default (local-default)")).toBeVisible();
     await userEvent.click(within(lifecycleDialog).getByRole("button", { name: await t("platformControl.actions.cancel") }));
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.validate") }));

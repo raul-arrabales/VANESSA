@@ -505,6 +505,17 @@
       "currentState": "Current",
       "actionLabel": "View lifecycle for {{name}}",
       "summary": "Lifecycle: {{lifecycleState}} | Sync: {{syncStatus}} | Documents: {{documentCount}} | Bindings: {{bindingCount}} | {{eligibility}} | Provider: {{backingProvider}} | Embeddings: {{embeddingProvider}} / {{embeddingResource}}{{syncError}}",
+      "summaryLabels": {
+        "lifecycleState": "Lifecycle",
+        "syncStatus": "Sync",
+        "documents": "Documents",
+        "bindings": "Bindings",
+        "eligibility": "Eligibility",
+        "provider": "Provider",
+        "embeddingProvider": "Embedding provider",
+        "embeddingResource": "Embedding resource",
+        "lastError": "Last error"
+      },
       "syncErrorSuffix": " | Last error: {{error}}",
       "states": {
         "empty": "Empty",
@@ -1232,6 +1243,9 @@
         "stale": "Validation: stale successful result",
         "pending": "Validation: pending",
         "failed": "Validation: failed"
+      },
+      "summaryLabels": {
+        "validation": "Validation"
       }
     },
     "cloud": {
@@ -1676,6 +1690,20 @@
         "currentState": "Current",
         "actionLabel": "View lifecycle for {{name}}",
         "summary": "Status: {{enabledStatus}} | Origin: {{origin}} | Capability: {{capability}} | Family: {{providerFamily}} | Adapter: {{adapter}} | Referenced deployments: {{usageCount}} | {{activeUsage}} | Active deployment: {{activeDeployment}} | Load state: {{loadState}} | Loaded resource: {{loadedResource}} | Endpoint: {{endpoint}}{{loadError}}",
+        "summaryLabels": {
+          "status": "Status",
+          "origin": "Origin",
+          "capability": "Capability",
+          "family": "Family",
+          "adapter": "Adapter",
+          "referencedDeployments": "Referenced deployments",
+          "activeUsage": "Active usage",
+          "activeDeployment": "Active deployment",
+          "loadState": "Load state",
+          "loadedResource": "Loaded resource",
+          "endpoint": "Endpoint",
+          "loadError": "Load error"
+        },
         "loadErrorSuffix": " | Load error: {{error}}",
         "states": {
           "disabled": "Disabled",
@@ -1764,6 +1792,16 @@
         "currentState": "Current",
         "actionLabel": "View lifecycle for {{name}}",
         "summary": "Status: {{activeStatus}} | Readiness: {{readinessStatus}} | {{readinessSummary}} | Bindings: {{readyBindingCount}}/{{bindingCount}} ready | Incomplete capabilities: {{incompleteCapabilityCount}} | Providers: {{providerCount}} | Resources: {{resourceCount}} | Active deployment: {{activeDeployment}}",
+        "summaryLabels": {
+          "status": "Status",
+          "readiness": "Readiness",
+          "readinessSummary": "Readiness summary",
+          "readyBindings": "Ready bindings",
+          "incompleteCapabilities": "Incomplete capabilities",
+          "providers": "Providers",
+          "resources": "Resources",
+          "activeDeployment": "Active deployment"
+        },
         "states": {
           "incomplete": "Incomplete",
           "ready_inactive": "Ready inactive",
@@ -2015,6 +2053,16 @@
         "modalDescription": "Current publication, validation, model, tool, and runtime readiness for this catalog agent.",
         "currentState": "Current",
         "summary": "Kind: {{kind}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | Model: {{model}} | Tools: {{toolCount}} | MCP servers: {{mcpCount}} | {{runtimeConstraints}}",
+        "summaryLabels": {
+          "kind": "Kind",
+          "status": "Status",
+          "validation": "Validation",
+          "model": "Model",
+          "tools": "Tools",
+          "mcpServers": "MCP servers",
+          "internet": "Internet",
+          "sandbox": "Sandbox"
+        },
         "kind": {
           "platform": "Platform",
           "user": "User"
@@ -2112,6 +2160,12 @@
         "modalDescription": "Current readiness, validation, and publication path for this catalog tool.",
         "currentState": "Current",
         "summary": "Backend: {{backend}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | {{compatibility}}",
+        "summaryLabels": {
+          "backend": "Backend",
+          "status": "Status",
+          "validation": "Validation",
+          "compatibility": "Compatibility"
+        },
         "states": {
           "draft": "Draft",
           "published_unvalidated": "Unvalidated",
@@ -2207,6 +2261,16 @@
         "modalDescription": "Current publication, exposure, validation, and metadata posture for this MCP server.",
         "currentState": "Current",
         "summary": "Category: {{category}} | Risk: {{risk}} | Backing tool: {{backingTool}} | Status: {{exposureStatus}} | Validation: {{validationStatus}} | {{flags}}",
+        "summaryLabels": {
+          "category": "Category",
+          "risk": "Risk",
+          "backingTool": "Backing tool",
+          "status": "Status",
+          "validation": "Validation",
+          "locality": "Locality",
+          "statefulness": "Statefulness",
+          "sandbox": "Sandbox"
+        },
         "states": {
           "draft": "Draft",
           "disabled": "Disabled",

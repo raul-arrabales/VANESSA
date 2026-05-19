@@ -1,14 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
 import {
   createPlatformDeploymentLifecycleGraphDefinition,
   getPlatformDeploymentLifecycleState,
-  getPlatformDeploymentLifecycleSummary,
+  getPlatformDeploymentLifecycleSummaryRows,
 } from "../platformDeploymentLifecycleGraph";
 import { summarizeBindingResources } from "../platformTopology";
 
@@ -24,7 +24,7 @@ export default function PlatformDeploymentsDirectory({
   activeDeployment = null,
 }: PlatformDeploymentsDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
-  const [lifecycleDeployment, setLifecycleDeployment] = useState<PlatformDeploymentProfile | null>(null);
+  const { selectedLifecycleItem, openLifecycleItem, closeLifecycleItem } = useSelectedLifecycleItem<PlatformDeploymentProfile>();
   const lifecycleDefinition = useMemo(() => createPlatformDeploymentLifecycleGraphDefinition(t), [t]);
   const capabilityLabelByKey = new Map(capabilities.map((capability) => [capability.capability, capability.display_name]));
 
@@ -104,7 +104,7 @@ export default function PlatformDeploymentsDirectory({
           <div className="inline-meta-list">
             <IconButton
               label={t("platformControl.deployments.lifecycle.actionLabel", { name: deployment.display_name })}
-              onClick={() => setLifecycleDeployment(deployment)}
+              onClick={() => openLifecycleItem(deployment)}
             >
               <ActionIcon name="lifecycle" />
             </IconButton>
@@ -115,16 +115,16 @@ export default function PlatformDeploymentsDirectory({
         </article>
       ))}
       <LifecycleGraphActionModal
-        item={lifecycleDeployment}
+        item={selectedLifecycleItem}
         getTitle={(deployment) => t("platformControl.deployments.lifecycle.modalTitle", { name: deployment.display_name })}
         description={t("platformControl.deployments.lifecycle.modalDescription")}
         definition={lifecycleDefinition}
         getCurrentState={getPlatformDeploymentLifecycleState}
-        getSupportingText={(deployment) => getPlatformDeploymentLifecycleSummary(t, deployment, activeDeployment)}
+        getSummaryRows={(deployment) => getPlatformDeploymentLifecycleSummaryRows(t, deployment, activeDeployment)}
         currentLabel={t("platformControl.deployments.lifecycle.currentState")}
         unknownLabel={t("platformControl.summary.unknown")}
         closeLabel={t("platformControl.actions.cancel")}
-        onClose={() => setLifecycleDeployment(null)}
+        onClose={closeLifecycleItem}
       />
     </div>
   );

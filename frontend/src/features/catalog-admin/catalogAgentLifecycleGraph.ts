@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CatalogAgent, CatalogAgentValidation } from "../../api/catalog";
-import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleSummaryRow, type LifecycleTransitionDefinition } from "../../components/lifecycle-graph";
 
 export const CATALOG_AGENT_LIFECYCLE_STATE_IDS = [
   "draft",
@@ -50,11 +50,11 @@ export function getCatalogAgentLifecycleState(
   return validationResult.validation.valid ? "ready" : "validation_failed";
 }
 
-export function getCatalogAgentLifecycleSummary(
+export function getCatalogAgentLifecycleSummaryRows(
   t: TFunction<"common">,
   agent: CatalogAgent,
   validationResult?: CatalogAgentValidation,
-): string {
+): LifecycleSummaryRow[] {
   const kind = agent.is_platform_agent || agent.agent_kind === "platform"
     ? t("catalogControl.agents.lifecycle.kind.platform")
     : t("catalogControl.agents.lifecycle.kind.user");
@@ -71,15 +71,16 @@ export function getCatalogAgentLifecycleSummary(
     agent.spec.runtime_constraints.sandbox_required
       ? t("catalogControl.agents.sandboxRequired")
       : t("catalogControl.agents.lifecycle.constraints.noSandbox"),
-  ].join(", ");
+  ];
 
-  return t("catalogControl.agents.lifecycle.summary", {
-    kind,
-    publishStatus,
-    validationStatus,
-    model: agent.spec.default_model_ref ?? t("platformControl.summary.none"),
-    toolCount: agent.spec.tool_refs.length,
-    mcpCount: agent.spec.mcp_server_refs?.length ?? 0,
-    runtimeConstraints,
-  });
+  return [
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.kind"), value: kind },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.status"), value: publishStatus, tone: agent.published ? "active" : "required" },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.validation"), value: validationStatus, tone: validationResult?.validation.valid ? "success" : validationResult ? "danger" : "optional" },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.model"), value: agent.spec.default_model_ref ?? t("platformControl.summary.none") },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.tools"), value: agent.spec.tool_refs.length },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.mcpServers"), value: agent.spec.mcp_server_refs?.length ?? 0 },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.internet"), value: runtimeConstraints[0], tone: agent.spec.runtime_constraints.internet_required ? "optional" : "active" },
+    { label: t("catalogControl.agents.lifecycle.summaryLabels.sandbox"), value: runtimeConstraints[1], tone: agent.spec.runtime_constraints.sandbox_required ? "optional" : "active" },
+  ];
 }

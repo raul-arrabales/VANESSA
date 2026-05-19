@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer } from "../../../api/catalog";
-import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/lifecycle-graph";
 import { createCatalogMcpLifecycleGraphDefinition, getCatalogMcpLifecycleState } from "../catalogMcpLifecycleGraph";
 
 type CatalogMcpLifecycleSummaryPanelProps = {

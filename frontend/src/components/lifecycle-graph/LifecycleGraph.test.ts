@@ -5,7 +5,7 @@ import {
   getLifecycleNodeLabelLines,
   resolveLifecycleHighlight,
   type LifecycleGraphDefinition,
-} from "./LifecycleGraph";
+} from ".";
 
 const t = ((key: string) => key) as never;
 
