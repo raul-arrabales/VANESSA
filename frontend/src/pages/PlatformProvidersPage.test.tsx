@@ -68,6 +68,11 @@ describe("PlatformProvidersPage", () => {
         ?.compareDocumentPosition(screen.getByRole("heading", { name: "Provider lifecycle" })),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expectNamedIconAction("button", "View lifecycle for vLLM local gateway");
+    expect(expectNamedIconAction("link", "Open provider: vLLM local gateway")).toHaveAttribute(
+      "href",
+      "/control/platform/providers/provider-1",
+    );
+    expect(screen.queryByRole("link", { name: await t("platformControl.actions.openProvider") })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(await t("platformControl.forms.provider.slug"))).not.toBeInTheDocument();
   });
 

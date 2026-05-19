@@ -67,6 +67,11 @@ describe("PlatformDeploymentsPage", () => {
         ?.compareDocumentPosition(screen.getByRole("heading", { name: "Deployment lifecycle" })),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expectNamedIconAction("button", "View lifecycle for Local Default");
+    expect(expectNamedIconAction("link", "Open deployment: Local Default")).toHaveAttribute(
+      "href",
+      "/control/platform/deployments/deployment-1",
+    );
+    expect(screen.queryByRole("link", { name: await t("platformControl.actions.openDeployment") })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: await t("platformControl.actions.createDeployment") })).not.toBeInTheDocument();
   });
 

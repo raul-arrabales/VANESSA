@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
+import IconLink from "../../../components/IconLink";
 import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
 import {
@@ -111,9 +111,12 @@ export default function PlatformProvidersDirectory({
               >
                 <ActionIcon name="lifecycle" />
               </IconButton>
-              <Link className="btn btn-secondary" to={`/control/platform/providers/${provider.id}`}>
-                {t("platformControl.actions.openProvider")}
-              </Link>
+              <IconLink
+                to={`/control/platform/providers/${provider.id}`}
+                label={t("platformControl.actions.openProviderFor", { name: provider.display_name })}
+              >
+                <ActionIcon name="open" />
+              </IconLink>
             </div>
           </article>
         );

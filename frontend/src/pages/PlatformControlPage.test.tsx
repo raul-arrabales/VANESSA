@@ -6,6 +6,7 @@ import { t } from "../test/translation";
 import type { AuthUser } from "../auth/types";
 import PlatformControlPage from "./PlatformControlPage";
 import * as platformApi from "../api/platform";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import { deploymentsFixture, primePlatformControlMocks } from "../test/platformControlFixtures";
 
 let mockUser: AuthUser | null = null;
@@ -72,6 +73,12 @@ describe("PlatformControlPage", () => {
     expect(document.querySelector(".platform-capability-grid")).toHaveClass("platform-capability-list");
     expect((await screen.findAllByText(await t("platformControl.capabilities.servedArtifacts"))).length).toBeGreaterThan(0);
     expect(await screen.findByText("GPT-5 (+1)")).toBeVisible();
+    expectNamedIconAction("link", "Open provider: vLLM local gateway");
+    const openDeploymentLinks = screen.getAllByRole("link", { name: "Open deployment: Local Default" });
+    expect(openDeploymentLinks.length).toBeGreaterThan(0);
+    expect(openDeploymentLinks.every((link) => link.getAttribute("title") === "Open deployment: Local Default")).toBe(true);
+    expect(screen.queryByRole("link", { name: "Open provider" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open deployment" })).not.toBeInTheDocument();
     const providerLinks = await screen.findAllByRole("link", { name: await t("platformControl.home.providersTitle") });
     expect(providerLinks.some((link) => link.getAttribute("href") === "/control/platform/providers")).toBe(true);
     const deploymentLinks = await screen.findAllByRole("link", { name: await t("platformControl.home.deploymentsTitle") });

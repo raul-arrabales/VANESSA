@@ -1873,6 +1873,8 @@
       "active": "Active",
       "openProvider": "Open provider",
       "openDeployment": "Open deployment",
+      "openProviderFor": "Open provider: {{name}}",
+      "openDeploymentFor": "Open deployment: {{name}}",
       "viewProviders": "View providers",
       "viewDeployments": "View deployments",
       "edit": "Edit",

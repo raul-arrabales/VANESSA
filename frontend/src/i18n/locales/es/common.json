@@ -1859,6 +1859,8 @@
       "active": "Activo",
       "openProvider": "Abrir proveedor",
       "openDeployment": "Abrir despliegue",
+      "openProviderFor": "Abrir proveedor: {{name}}",
+      "openDeploymentFor": "Abrir despliegue: {{name}}",
       "viewProviders": "Ver proveedores",
       "viewDeployments": "Ver despliegues",
       "edit": "Editar",

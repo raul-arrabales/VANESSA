@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
+import IconLink from "../../../components/IconLink";
 import { LifecycleGraphActionModal, useSelectedLifecycleItem } from "../../../components/lifecycle-graph";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
 import {
@@ -108,9 +108,12 @@ export default function PlatformDeploymentsDirectory({
             >
               <ActionIcon name="lifecycle" />
             </IconButton>
-            <Link className="btn btn-secondary" to={`/control/platform/deployments/${deployment.id}`}>
-              {t("platformControl.actions.openDeployment")}
-            </Link>
+            <IconLink
+              to={`/control/platform/deployments/${deployment.id}`}
+              label={t("platformControl.actions.openDeploymentFor", { name: deployment.display_name })}
+            >
+              <ActionIcon name="open" />
+            </IconLink>
           </div>
         </article>
       ))}
