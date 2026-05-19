@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { deriveLifecycleCounts, LifecycleGraph } from "../../../components/LifecycleGraph";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider";
@@ -9,6 +10,11 @@ import PlatformDeploymentCreatePanel from "../components/PlatformDeploymentCreat
 import PlatformDeploymentsDirectory from "../components/PlatformDeploymentsDirectory";
 import PlatformPageLayout from "../components/PlatformPageLayout";
 import { usePlatformOverview } from "../hooks/usePlatformOverview";
+import {
+  createPlatformDeploymentLifecycleGraphDefinition,
+  getPlatformDeploymentLifecycleState,
+} from "../platformDeploymentLifecycleGraph";
+import { getActiveDeployment } from "../platformTopology";
 
 type PlatformDeploymentsView = "profiles" | "history" | "create";
 
@@ -35,6 +41,8 @@ export default function PlatformDeploymentsPage(): JSX.Element {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const activeView = resolvePlatformDeploymentsView(searchParams.get("view"));
+  const activeDeployment = getActiveDeployment(deployments);
+  const lifecycleDefinition = useMemo(() => createPlatformDeploymentLifecycleGraphDefinition(t), [t]);
   const submenuItems = PLATFORM_DEPLOYMENTS_VIEW_ORDER.map((view) => ({
     id: view,
     label: t(`platformControl.deployments.views.${view}`),
@@ -54,6 +62,10 @@ export default function PlatformDeploymentsPage(): JSX.Element {
       return matchesSearch && matchesActive;
     });
   }, [activeFilter, deployments, search]);
+  const lifecycleCounts = useMemo(
+    () => deriveLifecycleCounts(filteredDeployments, lifecycleDefinition, getPlatformDeploymentLifecycleState),
+    [filteredDeployments, lifecycleDefinition],
+  );
 
   function handleChangeView(view: PlatformDeploymentsView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -92,8 +104,29 @@ export default function PlatformDeploymentsPage(): JSX.Element {
               <h3 className="section-title">{t("platformControl.sections.deployments")}</h3>
               <p className="status-text">{t("platformControl.deployments.directoryDescription", { count: filteredDeployments.length })}</p>
             </div>
-            <PlatformDeploymentsDirectory deployments={filteredDeployments} capabilities={capabilities} />
+            <PlatformDeploymentsDirectory
+              deployments={filteredDeployments}
+              capabilities={capabilities}
+              activeDeployment={activeDeployment}
+            />
           </article>
+
+          {filteredDeployments.length > 0 ? (
+            <article className="panel card-stack">
+              <div className="platform-card-header">
+                <div className="card-stack">
+                  <h3 className="section-title">{t("platformControl.deployments.lifecycle.title")}</h3>
+                  <p className="status-text">{t("platformControl.deployments.lifecycle.description")}</p>
+                </div>
+              </div>
+              <LifecycleGraph
+                definition={lifecycleDefinition}
+                counts={lifecycleCounts}
+                currentLabel={t("platformControl.deployments.lifecycle.currentState")}
+                unknownLabel={t("platformControl.summary.unknown")}
+              />
+            </article>
+          ) : null}
         </>
       ) : null}
 

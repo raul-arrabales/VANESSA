@@ -1712,6 +1712,43 @@
       "recentActivations": "Recent activations for this deployment",
       "recentActivationsDescription": "Review when this deployment profile was promoted and what it replaced.",
       "notFound": "The requested deployment profile could not be found.",
+      "lifecycle": {
+        "title": "Deployment lifecycle",
+        "description": "Activation and configuration readiness across deployment profiles.",
+        "modalTitle": "Deployment lifecycle: {{name}}",
+        "modalDescription": "Current activation state, configuration readiness, bindings, providers, and resources for this deployment profile.",
+        "currentState": "Current",
+        "actionLabel": "View lifecycle for {{name}}",
+        "summary": "Status: {{activeStatus}} | Readiness: {{readinessStatus}} | {{readinessSummary}} | Bindings: {{readyBindingCount}}/{{bindingCount}} ready | Incomplete capabilities: {{incompleteCapabilityCount}} | Providers: {{providerCount}} | Resources: {{resourceCount}} | Active deployment: {{activeDeployment}}",
+        "states": {
+          "incomplete": "Incomplete",
+          "ready_inactive": "Ready inactive",
+          "active_ready": "Active ready",
+          "active_degraded": "Active degraded",
+          "deleted": "Deleted"
+        },
+        "transitions": {
+          "incomplete": {
+            "ready_inactive": "Complete configuration",
+            "deleted": "Delete"
+          },
+          "ready_inactive": {
+            "incomplete": "Configuration becomes incomplete",
+            "active_ready": "Activate",
+            "deleted": "Delete"
+          },
+          "active_ready": {
+            "ready_inactive": "Deactivate by replacement",
+            "active_degraded": "Configuration degrades",
+            "deleted": "Delete"
+          },
+          "active_degraded": {
+            "active_ready": "Restore readiness",
+            "ready_inactive": "Deactivate by replacement",
+            "deleted": "Delete"
+          }
+        }
+      },
       "views": {
         "aria": "Deployment management sections",
         "profiles": "Deployment profiles",

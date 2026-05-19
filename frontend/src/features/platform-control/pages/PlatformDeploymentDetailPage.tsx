@@ -96,6 +96,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
       {deployment ? (
         <>
           <PlatformDeploymentOverviewSection
+            activeDeployment={activeDeployment}
             activating={activating}
             capabilityLabelByKey={capabilityLabelByKey}
             deployment={deployment}

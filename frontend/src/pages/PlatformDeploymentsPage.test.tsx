@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import PlatformDeploymentsPage from "./PlatformDeploymentsPage";
 import { primePlatformControlMocks } from "../test/platformControlFixtures";
@@ -58,7 +59,28 @@ describe("PlatformDeploymentsPage", () => {
     expect(screen.queryByRole("table", { name: await t("platformControl.audit.tableAria") })).not.toBeInTheDocument();
     expect(screen.queryByText("Ready.")).not.toBeInTheDocument();
     expect(screen.getAllByText(await t("platformControl.badges.ready")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Deployment lifecycle" })).toBeVisible();
+    expect(
+      screen
+        .getByRole("heading", { name: await t("platformControl.sections.deployments"), level: 3 })
+        .closest("article")
+        ?.compareDocumentPosition(screen.getByRole("heading", { name: "Deployment lifecycle" })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expectNamedIconAction("button", "View lifecycle for Local Default");
     expect(screen.queryByRole("link", { name: await t("platformControl.actions.createDeployment") })).not.toBeInTheDocument();
+  });
+
+  it("opens a deployment lifecycle modal from a profile row", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<PlatformDeploymentsPage />);
+
+    await user.click(await screen.findByRole("button", { name: "View lifecycle for Local Default" }));
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Deployment lifecycle: Local Default")).toBeVisible();
+    expect(screen.getByText(/Status: Active/)).toBeVisible();
+    expect(screen.getByText(/Bindings: 3\/3 ready/)).toBeVisible();
   });
 
   it("filters deployments by search text", async () => {

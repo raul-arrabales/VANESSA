@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import { ApiError } from "../auth/authApi";
 import type { AuthUser } from "../auth/types";
 import PlatformDeploymentDetailPage from "./PlatformDeploymentDetailPage";
@@ -124,6 +125,15 @@ describe("PlatformDeploymentDetailPage", () => {
       name: await t("platformControl.deployments.tableAria", { name: "Staging Profile" }),
     });
     expect(within(topologyTable).getByText("GPT-5")).toBeVisible();
+
+    const lifecycleButton = expectNamedIconAction("button", "View lifecycle for Staging Profile");
+    await userEvent.click(lifecycleButton);
+    const lifecycleDialog = await screen.findByRole("dialog", {
+      name: "Deployment lifecycle: Staging Profile",
+    });
+    expect(within(lifecycleDialog).getByText(/Status: Inactive/)).toBeVisible();
+    expect(within(lifecycleDialog).getByText(/Active deployment: Local Default \(local-default\)/)).toBeVisible();
+    await userEvent.click(within(lifecycleDialog).getByRole("button", { name: await t("platformControl.actions.cancel") }));
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.activate") }));
 

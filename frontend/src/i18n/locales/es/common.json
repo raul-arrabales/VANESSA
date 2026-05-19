@@ -1700,6 +1700,43 @@
       "recentActivations": "Activaciones recientes de este despliegue",
       "recentActivationsDescription": "Revisa cuando se promovio este perfil y que reemplazo.",
       "notFound": "No se pudo encontrar el perfil de despliegue solicitado.",
+      "lifecycle": {
+        "title": "Ciclo de vida del despliegue",
+        "description": "Activacion y preparacion de configuracion en perfiles de despliegue.",
+        "modalTitle": "Ciclo de vida del despliegue: {{name}}",
+        "modalDescription": "Estado de activacion, preparacion, enlaces, proveedores y recursos de este perfil de despliegue.",
+        "currentState": "Actual",
+        "actionLabel": "Ver ciclo de vida de {{name}}",
+        "summary": "Estado: {{activeStatus}} | Preparacion: {{readinessStatus}} | {{readinessSummary}} | Enlaces: {{readyBindingCount}}/{{bindingCount}} listos | Capacidades incompletas: {{incompleteCapabilityCount}} | Proveedores: {{providerCount}} | Recursos: {{resourceCount}} | Despliegue activo: {{activeDeployment}}",
+        "states": {
+          "incomplete": "Incompleto",
+          "ready_inactive": "Listo inactivo",
+          "active_ready": "Activo listo",
+          "active_degraded": "Activo degradado",
+          "deleted": "Eliminado"
+        },
+        "transitions": {
+          "incomplete": {
+            "ready_inactive": "Completar configuracion",
+            "deleted": "Eliminar"
+          },
+          "ready_inactive": {
+            "incomplete": "La configuracion queda incompleta",
+            "active_ready": "Activar",
+            "deleted": "Eliminar"
+          },
+          "active_ready": {
+            "ready_inactive": "Desactivar por reemplazo",
+            "active_degraded": "La configuracion se degrada",
+            "deleted": "Eliminar"
+          },
+          "active_degraded": {
+            "active_ready": "Restaurar preparacion",
+            "ready_inactive": "Desactivar por reemplazo",
+            "deleted": "Eliminar"
+          }
+        }
+      },
       "views": {
         "aria": "Secciones de gestion de despliegues",
         "profiles": "Perfiles de despliegue",

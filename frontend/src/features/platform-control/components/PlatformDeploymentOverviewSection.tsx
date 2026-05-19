@@ -1,9 +1,19 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import ActionIcon from "../../../components/ActionIcon";
+import IconButton from "../../../components/IconButton";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import type { PlatformDeploymentProfile } from "../../../api/platform";
+import {
+  createPlatformDeploymentLifecycleGraphDefinition,
+  getPlatformDeploymentLifecycleState,
+  getPlatformDeploymentLifecycleSummary,
+} from "../platformDeploymentLifecycleGraph";
 import { summarizeBindingResources } from "../platformTopology";
 
 type PlatformDeploymentOverviewSectionProps = {
+  activeDeployment?: PlatformDeploymentProfile | null;
   activating: boolean;
   capabilityLabelByKey: Map<string, string>;
   deployment: PlatformDeploymentProfile;
@@ -11,12 +21,15 @@ type PlatformDeploymentOverviewSectionProps = {
 };
 
 export default function PlatformDeploymentOverviewSection({
+  activeDeployment = null,
   activating,
   capabilityLabelByKey,
   deployment,
   onActivate,
 }: PlatformDeploymentOverviewSectionProps): JSX.Element {
   const { t } = useTranslation("common");
+  const [isLifecycleModalOpen, setIsLifecycleModalOpen] = useState(false);
+  const lifecycleDefinition = useMemo(() => createPlatformDeploymentLifecycleGraphDefinition(t), [t]);
 
   return (
     <article className="panel card-stack">
@@ -30,6 +43,12 @@ export default function PlatformDeploymentOverviewSection({
         <span className="platform-badge" data-tone={deployment.is_active ? "active" : "inactive"}>
           {deployment.is_active ? t("platformControl.badges.active") : t("platformControl.badges.inactive")}
         </span>
+        <IconButton
+          label={t("platformControl.deployments.lifecycle.actionLabel", { name: deployment.display_name })}
+          onClick={() => setIsLifecycleModalOpen(true)}
+        >
+          <ActionIcon name="lifecycle" />
+        </IconButton>
       </div>
       {deployment.configuration_status ? (
         <div className="status-row">
@@ -101,6 +120,19 @@ export default function PlatformDeploymentOverviewSection({
               : t("platformControl.actions.activate")}
         </button>
       </div>
+      {isLifecycleModalOpen ? (
+        <LifecycleGraphModal
+          title={t("platformControl.deployments.lifecycle.modalTitle", { name: deployment.display_name })}
+          description={t("platformControl.deployments.lifecycle.modalDescription")}
+          definition={lifecycleDefinition}
+          currentState={getPlatformDeploymentLifecycleState(deployment)}
+          supportingText={getPlatformDeploymentLifecycleSummary(t, deployment, activeDeployment)}
+          currentLabel={t("platformControl.deployments.lifecycle.currentState")}
+          unknownLabel={t("platformControl.summary.unknown")}
+          closeLabel={t("platformControl.actions.cancel")}
+          onClose={() => setIsLifecycleModalOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }
