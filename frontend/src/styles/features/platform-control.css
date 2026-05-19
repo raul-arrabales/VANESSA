@@ -110,11 +110,6 @@
   margin-top: 0;
 }
 
-.platform-deployment-readiness {
-  min-width: min(18rem, 100%);
-  flex: 1 1 18rem;
-}
-
 .platform-deployment-actions {
   justify-content: flex-end;
   margin-top: 0;

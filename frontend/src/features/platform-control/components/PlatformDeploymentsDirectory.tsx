@@ -81,9 +81,6 @@ export default function PlatformDeploymentsDirectory({
                   <span className="platform-badge" data-tone="local">
                     {t("platformControl.deployments.bindingCount", { count: deployment.bindings.length })}
                   </span>
-                  {deployment.configuration_status ? (
-                    <span className="status-text platform-deployment-readiness">{deployment.configuration_status.summary}</span>
-                  ) : null}
                 </div>
               </div>
               <div className="inline-meta-list platform-deployment-actions">
