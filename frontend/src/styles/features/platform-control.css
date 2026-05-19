@@ -75,6 +75,31 @@
   align-items: start;
 }
 
+.platform-deployment-card[data-expanded="false"] {
+  gap: var(--space-2);
+}
+
+.platform-deployment-card-header {
+  align-items: center;
+}
+
+.platform-deployment-summary,
+.platform-deployment-bindings,
+.platform-deployment-actions {
+  min-width: 0;
+}
+
+.platform-deployment-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.platform-deployment-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
 .platform-capability-summary,
 .platform-capability-details,
 .platform-capability-actions {

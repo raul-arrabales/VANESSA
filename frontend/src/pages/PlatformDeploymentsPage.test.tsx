@@ -66,6 +66,13 @@ describe("PlatformDeploymentsPage", () => {
         .closest("article")
         ?.compareDocumentPosition(screen.getByRole("heading", { name: "Deployment lifecycle" })),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getAllByText("3 capability bindings").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("table", { name: "Bindings for Local Default" })).not.toBeInTheDocument();
+    const expandButton = expectNamedIconAction("button", "Show capability bindings for Local Default");
+    expect(expandButton).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(expandButton);
+    expect(screen.getByRole("table", { name: "Bindings for Local Default" })).toBeVisible();
+    expect(expectNamedIconAction("button", "Hide capability bindings for Local Default")).toHaveAttribute("aria-expanded", "true");
     expectNamedIconAction("button", "View lifecycle for Local Default");
     expect(expectNamedIconAction("link", "Open deployment: Local Default")).toHaveAttribute(
       "href",

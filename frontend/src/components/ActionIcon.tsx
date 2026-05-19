@@ -5,6 +5,8 @@ export type ActionIconName =
   | "disable"
   | "edit"
   | "enable"
+  | "collapse"
+  | "expand"
   | "lifecycle"
   | "metadata"
   | "open"
@@ -74,6 +76,20 @@ export default function ActionIcon({ name }: { name: ActionIconName }): JSX.Elem
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="M5 5h7v2H7v10h10v-5h2v7H5V5Zm9 0h5v5h-2V8.41l-6.3 6.3-1.4-1.42 6.29-6.29H14V5Z" />
+      </svg>
+    );
+  }
+  if (name === "expand") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="m7.4 8.6 4.6 4.6 4.6-4.6L18 10l-6 6-6-6 1.4-1.4Z" />
+      </svg>
+    );
+  }
+  if (name === "collapse") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M7.4 15.4 6 14l6-6 6 6-1.4 1.4-4.6-4.6-4.6 4.6Z" />
       </svg>
     );
   }
