@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import type { PlatformCapability, PlatformDeploymentProfile } from "../../../api/platform";
 import {
   createPlatformDeploymentLifecycleGraphDefinition,
@@ -114,19 +114,18 @@ export default function PlatformDeploymentsDirectory({
           </div>
         </article>
       ))}
-      {lifecycleDeployment ? (
-        <LifecycleGraphModal
-          title={t("platformControl.deployments.lifecycle.modalTitle", { name: lifecycleDeployment.display_name })}
-          description={t("platformControl.deployments.lifecycle.modalDescription")}
-          definition={lifecycleDefinition}
-          currentState={getPlatformDeploymentLifecycleState(lifecycleDeployment)}
-          supportingText={getPlatformDeploymentLifecycleSummary(t, lifecycleDeployment, activeDeployment)}
-          currentLabel={t("platformControl.deployments.lifecycle.currentState")}
-          unknownLabel={t("platformControl.summary.unknown")}
-          closeLabel={t("platformControl.actions.cancel")}
-          onClose={() => setLifecycleDeployment(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={lifecycleDeployment}
+        getTitle={(deployment) => t("platformControl.deployments.lifecycle.modalTitle", { name: deployment.display_name })}
+        description={t("platformControl.deployments.lifecycle.modalDescription")}
+        definition={lifecycleDefinition}
+        getCurrentState={getPlatformDeploymentLifecycleState}
+        getSupportingText={(deployment) => getPlatformDeploymentLifecycleSummary(t, deployment, activeDeployment)}
+        currentLabel={t("platformControl.deployments.lifecycle.currentState")}
+        unknownLabel={t("platformControl.summary.unknown")}
+        closeLabel={t("platformControl.actions.cancel")}
+        onClose={() => setLifecycleDeployment(null)}
+      />
     </div>
   );
 }

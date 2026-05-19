@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { KnowledgeBase, KnowledgeSyncRun } from "../../../api/context";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import ModalDialog from "../../../components/ModalDialog";
 import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
 import { KnowledgeBaseSyncProgress } from "./KnowledgeBaseSyncProgress";
@@ -316,19 +316,18 @@ export function KnowledgeBaseOverviewSection({
           )}
         />
       ) : null}
-      {isLifecycleModalOpen ? (
-        <LifecycleGraphModal
-          title={t("contextManagement.lifecycle.modalTitle", { name: knowledgeBase.display_name })}
-          description={t("contextManagement.lifecycle.modalDescription")}
-          definition={lifecycleDefinition}
-          currentState={getKnowledgeBaseLifecycleState(knowledgeBase)}
-          supportingText={getKnowledgeBaseLifecycleSummary(t, knowledgeBase)}
-          currentLabel={t("contextManagement.lifecycle.currentState")}
-          unknownLabel={t("platformControl.summary.unknown")}
-          closeLabel={t("contextManagement.actions.cancel")}
-          onClose={() => setIsLifecycleModalOpen(false)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={isLifecycleModalOpen ? knowledgeBase : null}
+        getTitle={(item) => t("contextManagement.lifecycle.modalTitle", { name: item.display_name })}
+        description={t("contextManagement.lifecycle.modalDescription")}
+        definition={lifecycleDefinition}
+        getCurrentState={getKnowledgeBaseLifecycleState}
+        getSupportingText={(item) => getKnowledgeBaseLifecycleSummary(t, item)}
+        currentLabel={t("contextManagement.lifecycle.currentState")}
+        unknownLabel={t("platformControl.summary.unknown")}
+        closeLabel={t("contextManagement.actions.cancel")}
+        onClose={() => setIsLifecycleModalOpen(false)}
+      />
     </section>
   );
 }

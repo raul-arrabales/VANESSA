@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import ActionIcon from "../../../components/ActionIcon";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import {
   CompactRegistryActions,
   CompactRegistryDescription,
@@ -167,19 +167,18 @@ export default function CatalogAgentsDirectory({
         </CompactRegistryList>
       </article>
 
-      {selectedLifecycleAgent ? (
-        <LifecycleGraphModal
-          title={t("catalogControl.agents.lifecycle.modalTitle", { name: selectedLifecycleAgent.spec.name })}
-          description={t("catalogControl.agents.lifecycle.modalDescription")}
-          closeLabel={t("actionFeedback.dialog.close")}
-          definition={lifecycleDefinition}
-          currentState={getCatalogAgentLifecycleState(selectedLifecycleAgent, validationResults[selectedLifecycleAgent.id])}
-          supportingText={getCatalogAgentLifecycleSummary(t, selectedLifecycleAgent, validationResults[selectedLifecycleAgent.id])}
-          currentLabel={t("catalogControl.agents.lifecycle.currentState")}
-          unknownLabel={t("catalogControl.agents.lifecycle.states.unknown")}
-          onClose={() => setSelectedLifecycleAgent(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={selectedLifecycleAgent}
+        getTitle={(agent) => t("catalogControl.agents.lifecycle.modalTitle", { name: agent.spec.name })}
+        description={t("catalogControl.agents.lifecycle.modalDescription")}
+        closeLabel={t("actionFeedback.dialog.close")}
+        definition={lifecycleDefinition}
+        getCurrentState={(agent) => getCatalogAgentLifecycleState(agent, validationResults[agent.id])}
+        getSupportingText={(agent) => getCatalogAgentLifecycleSummary(t, agent, validationResults[agent.id])}
+        currentLabel={t("catalogControl.agents.lifecycle.currentState")}
+        unknownLabel={t("catalogControl.agents.lifecycle.states.unknown")}
+        onClose={() => setSelectedLifecycleAgent(null)}
+      />
     </>
   );
 }

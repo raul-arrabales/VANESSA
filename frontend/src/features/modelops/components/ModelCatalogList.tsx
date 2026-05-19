@@ -11,7 +11,7 @@ import {
 } from "../../../components/CompactRegistryList";
 import IconLink from "../../../components/IconLink";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import type { ManagedModel } from "../../../api/modelops/types";
 import { isModelTestEligible } from "../domain";
 import { createModelLifecycleGraphDefinition, getModelLifecycleState, getModelValidationLifecycleSummary } from "../modelLifecycleGraph";
@@ -101,19 +101,18 @@ export default function ModelCatalogList({
           );
         })}
       </CompactRegistryList>
-      {selectedLifecycleModel ? (
-        <LifecycleGraphModal
-          title={t("modelOps.lifecycle.modalTitle", { name: selectedLifecycleModel.name })}
-          description={t("modelOps.lifecycle.modalDescription")}
-          closeLabel={t("actionFeedback.dialog.close")}
-          definition={lifecycleDefinition}
-          currentState={getModelLifecycleState(selectedLifecycleModel)}
-          supportingText={getModelValidationLifecycleSummary(t, selectedLifecycleModel)}
-          currentLabel={t("modelOps.lifecycle.currentState")}
-          unknownLabel={t("modelOps.lifecycle.states.unknown")}
-          onClose={() => setSelectedLifecycleModel(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={selectedLifecycleModel}
+        getTitle={(model) => t("modelOps.lifecycle.modalTitle", { name: model.name })}
+        description={t("modelOps.lifecycle.modalDescription")}
+        closeLabel={t("actionFeedback.dialog.close")}
+        definition={lifecycleDefinition}
+        getCurrentState={getModelLifecycleState}
+        getSupportingText={(model) => getModelValidationLifecycleSummary(t, model)}
+        currentLabel={t("modelOps.lifecycle.currentState")}
+        unknownLabel={t("modelOps.lifecycle.states.unknown")}
+        onClose={() => setSelectedLifecycleModel(null)}
+      />
     </>
   );
 }

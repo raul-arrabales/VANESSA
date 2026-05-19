@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../api/platform";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 import { getActiveDeployment, getProviderUsageEntries } from "./platformTopology";
 
 const ACTIVE_ATTENTION_LOAD_STATES = new Set(["empty", "loading", "reconciling", "error"]);
@@ -34,19 +34,20 @@ export const PLATFORM_PROVIDER_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefinit
 ];
 
 export function createPlatformProviderLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "platform-provider",
-    states: PLATFORM_PROVIDER_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`platformControl.providers.lifecycle.states.${stateId}`),
-      x: [90, 255, 420, 585, 420, 675][index],
-      y: [82, 82, 82, 82, 214, 214][index],
-    })),
-    transitions: PLATFORM_PROVIDER_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`platformControl.providers.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: PLATFORM_PROVIDER_LIFECYCLE_STATE_IDS,
+    i18nBase: "platformControl.providers.lifecycle",
+    positions: [
+      { x: 90, y: 82 },
+      { x: 255, y: 82 },
+      { x: 420, y: 82 },
+      { x: 585, y: 82 },
+      { x: 420, y: 214 },
+      { x: 675, y: 214 },
+    ],
+    transitions: PLATFORM_PROVIDER_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getPlatformProviderLifecycleState(

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
 import {
   createPlatformProviderLifecycleGraphDefinition,
@@ -118,25 +118,24 @@ export default function PlatformProvidersDirectory({
           </article>
         );
       })}
-      {lifecycleProvider ? (
-        <LifecycleGraphModal
-          title={t("platformControl.providers.lifecycle.modalTitle", { name: lifecycleProvider.display_name })}
-          description={t("platformControl.providers.lifecycle.modalDescription")}
-          definition={lifecycleDefinition}
-          currentState={getPlatformProviderLifecycleState(lifecycleProvider, deployments)}
-          supportingText={getPlatformProviderLifecycleSummary(
-            t,
-            lifecycleProvider,
-            deployments,
-            providerFamilyByKey.get(lifecycleProvider.provider_key),
-            activeDeployment,
-          )}
-          currentLabel={t("platformControl.providers.lifecycle.currentState")}
-          unknownLabel={t("platformControl.summary.unknown")}
-          closeLabel={t("platformControl.actions.cancel")}
-          onClose={() => setLifecycleProvider(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={lifecycleProvider}
+        getTitle={(provider) => t("platformControl.providers.lifecycle.modalTitle", { name: provider.display_name })}
+        description={t("platformControl.providers.lifecycle.modalDescription")}
+        definition={lifecycleDefinition}
+        getCurrentState={(provider) => getPlatformProviderLifecycleState(provider, deployments)}
+        getSupportingText={(provider) => getPlatformProviderLifecycleSummary(
+          t,
+          provider,
+          deployments,
+          providerFamilyByKey.get(provider.provider_key),
+          activeDeployment,
+        )}
+        currentLabel={t("platformControl.providers.lifecycle.currentState")}
+        unknownLabel={t("platformControl.summary.unknown")}
+        closeLabel={t("platformControl.actions.cancel")}
+        onClose={() => setLifecycleProvider(null)}
+      />
     </div>
   );
 }

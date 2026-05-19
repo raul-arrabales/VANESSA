@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 import type { CatalogMcpServer } from "../../api/catalog";
 
 export const CATALOG_MCP_LIFECYCLE_STATE_IDS = [
@@ -36,19 +36,20 @@ export const CATALOG_MCP_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefinition[] 
 ];
 
 export function createCatalogMcpLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "catalog-mcp",
-    states: CATALOG_MCP_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`catalogControl.mcp.lifecycle.states.${stateId}`),
-      x: [90, 250, 410, 570, 250, 570][index],
-      y: [80, 80, 80, 80, 210, 210][index],
-    })),
-    transitions: CATALOG_MCP_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`catalogControl.mcp.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: CATALOG_MCP_LIFECYCLE_STATE_IDS,
+    i18nBase: "catalogControl.mcp.lifecycle",
+    positions: [
+      { x: 90, y: 80 },
+      { x: 250, y: 80 },
+      { x: 410, y: 80 },
+      { x: 570, y: 80 },
+      { x: 250, y: 210 },
+      { x: 570, y: 210 },
+    ],
+    transitions: CATALOG_MCP_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getCatalogMcpLifecycleState(server: CatalogMcpServer): CatalogMcpLifecycleState {

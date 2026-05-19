@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../auth/AuthProvider";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import ModelOpsModelsSubmenu from "../components/ModelOpsModelsSubmenu";
 import ModelLifecycleActions from "../components/ModelLifecycleActions";
 import { ModelOpsWorkspaceFrame } from "../components/ModelOpsWorkspaceFrame";
@@ -109,19 +109,18 @@ export default function ModelDetailPage(): JSX.Element {
           />
         </article>
 
-      {showLifecycleGraph ? (
-        <LifecycleGraphModal
-          title={t("modelOps.lifecycle.modalTitle", { name: model.name })}
-          description={t("modelOps.lifecycle.modalDescription")}
-          closeLabel={t("actionFeedback.dialog.close")}
-          definition={lifecycleDefinition}
-          currentState={getModelLifecycleState(model)}
-          supportingText={getModelValidationLifecycleSummary(t, model)}
-          currentLabel={t("modelOps.lifecycle.currentState")}
-          unknownLabel={t("modelOps.lifecycle.states.unknown")}
-          onClose={() => setShowLifecycleGraph(false)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={showLifecycleGraph ? model : null}
+        getTitle={(selectedModel) => t("modelOps.lifecycle.modalTitle", { name: selectedModel.name })}
+        description={t("modelOps.lifecycle.modalDescription")}
+        closeLabel={t("actionFeedback.dialog.close")}
+        definition={lifecycleDefinition}
+        getCurrentState={getModelLifecycleState}
+        getSupportingText={(selectedModel) => getModelValidationLifecycleSummary(t, selectedModel)}
+        currentLabel={t("modelOps.lifecycle.currentState")}
+        unknownLabel={t("modelOps.lifecycle.states.unknown")}
+        onClose={() => setShowLifecycleGraph(false)}
+      />
 
       {model.backend === "external_api" && credentialStatus !== "not_required" ? (
         <article className="panel card-stack">

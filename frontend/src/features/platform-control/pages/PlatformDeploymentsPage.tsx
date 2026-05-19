@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { deriveLifecycleCounts, LifecycleGraph } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider";
@@ -62,10 +62,6 @@ export default function PlatformDeploymentsPage(): JSX.Element {
       return matchesSearch && matchesActive;
     });
   }, [activeFilter, deployments, search]);
-  const lifecycleCounts = useMemo(
-    () => deriveLifecycleCounts(filteredDeployments, lifecycleDefinition, getPlatformDeploymentLifecycleState),
-    [filteredDeployments, lifecycleDefinition],
-  );
 
   function handleChangeView(view: PlatformDeploymentsView): void {
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -112,20 +108,17 @@ export default function PlatformDeploymentsPage(): JSX.Element {
           </article>
 
           {filteredDeployments.length > 0 ? (
-            <article className="panel card-stack">
-              <div className="platform-card-header">
-                <div className="card-stack">
-                  <h3 className="section-title">{t("platformControl.deployments.lifecycle.title")}</h3>
-                  <p className="status-text">{t("platformControl.deployments.lifecycle.description")}</p>
-                </div>
-              </div>
-              <LifecycleGraph
-                definition={lifecycleDefinition}
-                counts={lifecycleCounts}
-                currentLabel={t("platformControl.deployments.lifecycle.currentState")}
-                unknownLabel={t("platformControl.summary.unknown")}
-              />
-            </article>
+            <LifecycleGraphPanel
+              title={t("platformControl.deployments.lifecycle.title")}
+              description={t("platformControl.deployments.lifecycle.description")}
+              definition={lifecycleDefinition}
+              items={filteredDeployments}
+              getState={getPlatformDeploymentLifecycleState}
+              currentLabel={t("platformControl.deployments.lifecycle.currentState")}
+              unknownLabel={t("platformControl.summary.unknown")}
+              headerClassName="platform-card-header"
+              headerContentClassName="card-stack"
+            />
           ) : null}
         </>
       ) : null}

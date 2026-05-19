@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import type { PlatformDeploymentProfile } from "../../../api/platform";
 import {
   createPlatformDeploymentLifecycleGraphDefinition,
@@ -120,19 +120,18 @@ export default function PlatformDeploymentOverviewSection({
               : t("platformControl.actions.activate")}
         </button>
       </div>
-      {isLifecycleModalOpen ? (
-        <LifecycleGraphModal
-          title={t("platformControl.deployments.lifecycle.modalTitle", { name: deployment.display_name })}
-          description={t("platformControl.deployments.lifecycle.modalDescription")}
-          definition={lifecycleDefinition}
-          currentState={getPlatformDeploymentLifecycleState(deployment)}
-          supportingText={getPlatformDeploymentLifecycleSummary(t, deployment, activeDeployment)}
-          currentLabel={t("platformControl.deployments.lifecycle.currentState")}
-          unknownLabel={t("platformControl.summary.unknown")}
-          closeLabel={t("platformControl.actions.cancel")}
-          onClose={() => setIsLifecycleModalOpen(false)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={isLifecycleModalOpen ? deployment : null}
+        getTitle={(selectedDeployment) => t("platformControl.deployments.lifecycle.modalTitle", { name: selectedDeployment.display_name })}
+        description={t("platformControl.deployments.lifecycle.modalDescription")}
+        definition={lifecycleDefinition}
+        getCurrentState={getPlatformDeploymentLifecycleState}
+        getSupportingText={(selectedDeployment) => getPlatformDeploymentLifecycleSummary(t, selectedDeployment, activeDeployment)}
+        currentLabel={t("platformControl.deployments.lifecycle.currentState")}
+        unknownLabel={t("platformControl.summary.unknown")}
+        closeLabel={t("platformControl.actions.cancel")}
+        onClose={() => setIsLifecycleModalOpen(false)}
+      />
     </article>
   );
 }

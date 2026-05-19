@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { ManagedModel } from "../../api/modelops/types";
-import type { LifecycleGraphDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition } from "../../components/LifecycleGraph";
 
 export const MODEL_LIFECYCLE_STATE_IDS = [
   "created",
@@ -36,18 +36,14 @@ const MODEL_LIFECYCLE_STATE_POSITIONS: Record<(typeof MODEL_LIFECYCLE_STATE_IDS)
 };
 
 export function createModelLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "model",
-    states: MODEL_LIFECYCLE_STATE_IDS.map((state) => ({
-      id: state,
-      label: t(`modelOps.lifecycle.states.${state}`),
-      ...MODEL_LIFECYCLE_STATE_POSITIONS[state],
-    })),
-    transitions: MODEL_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`modelOps.lifecycle.transitions.${transition.from}_${transition.to}`),
-    })),
-  };
+    stateIds: MODEL_LIFECYCLE_STATE_IDS,
+    i18nBase: "modelOps.lifecycle",
+    positions: MODEL_LIFECYCLE_STATE_POSITIONS,
+    transitions: MODEL_LIFECYCLE_TRANSITIONS,
+    transitionLabelKey: (transition) => `modelOps.lifecycle.transitions.${transition.from}_${transition.to}`,
+  });
 }
 
 export function getModelLifecycleState(model: ManagedModel): string | null | undefined {

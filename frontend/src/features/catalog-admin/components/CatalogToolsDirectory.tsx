@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import ActionIcon from "../../../components/ActionIcon";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import {
   CompactRegistryActions,
   CompactRegistryDescription,
@@ -168,19 +168,18 @@ export default function CatalogToolsDirectory({
         </CompactRegistryList>
       </article>
 
-      {selectedLifecycleTool ? (
-        <LifecycleGraphModal
-          title={t("catalogControl.tools.lifecycle.modalTitle", { name: selectedLifecycleTool.spec.name })}
-          description={t("catalogControl.tools.lifecycle.modalDescription")}
-          closeLabel={t("actionFeedback.dialog.close")}
-          definition={lifecycleDefinition}
-          currentState={getCatalogToolLifecycleState(selectedLifecycleTool)}
-          supportingText={getCatalogToolLifecycleSummary(t, selectedLifecycleTool)}
-          currentLabel={t("catalogControl.tools.lifecycle.currentState")}
-          unknownLabel={t("catalogControl.tools.lifecycle.states.unknown")}
-          onClose={() => setSelectedLifecycleTool(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={selectedLifecycleTool}
+        getTitle={(tool) => t("catalogControl.tools.lifecycle.modalTitle", { name: tool.spec.name })}
+        description={t("catalogControl.tools.lifecycle.modalDescription")}
+        closeLabel={t("actionFeedback.dialog.close")}
+        definition={lifecycleDefinition}
+        getCurrentState={getCatalogToolLifecycleState}
+        getSupportingText={(tool) => getCatalogToolLifecycleSummary(t, tool)}
+        currentLabel={t("catalogControl.tools.lifecycle.currentState")}
+        unknownLabel={t("catalogControl.tools.lifecycle.states.unknown")}
+        onClose={() => setSelectedLifecycleTool(null)}
+      />
     </>
   );
 }

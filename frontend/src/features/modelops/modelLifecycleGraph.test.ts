@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { MODEL_LIFECYCLE_STATE_IDS, MODEL_LIFECYCLE_TRANSITIONS } from "./modelLifecycleGraph";
+import { expectLifecycleDefinition } from "../../test/lifecycleGraphAssertions";
+import { createModelLifecycleGraphDefinition, MODEL_LIFECYCLE_STATE_IDS, MODEL_LIFECYCLE_TRANSITIONS } from "./modelLifecycleGraph";
+
+const t = ((key: string) => key) as never;
 
 describe("model lifecycle graph definition", () => {
   it("includes the model lifecycle states and transitions", () => {
-    expect(MODEL_LIFECYCLE_STATE_IDS).toEqual([
-      "created",
-      "registered",
-      "validated",
-      "active",
-      "inactive",
-      "unregistered",
-      "deleted",
-    ]);
+    const definition = createModelLifecycleGraphDefinition(t);
+
+    expectLifecycleDefinition(definition, {
+      stateIds: MODEL_LIFECYCLE_STATE_IDS,
+      transitions: MODEL_LIFECYCLE_TRANSITIONS,
+      i18nBase: "modelOps.lifecycle",
+      transitionLabelKey: (transition) => `modelOps.lifecycle.transitions.${transition.from}_${transition.to}`,
+    });
     expect(MODEL_LIFECYCLE_TRANSITIONS).toEqual([
       { from: "created", to: "registered" },
       { from: "unregistered", to: "registered" },

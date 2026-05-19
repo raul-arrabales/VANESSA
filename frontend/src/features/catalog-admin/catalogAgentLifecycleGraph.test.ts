@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogAgent, CatalogAgentValidation } from "../../api/catalog";
-import { CATALOG_AGENT_LIFECYCLE_STATE_IDS, CATALOG_AGENT_LIFECYCLE_TRANSITIONS, getCatalogAgentLifecycleState } from "./catalogAgentLifecycleGraph";
+import { expectLifecycleDefinition } from "../../test/lifecycleGraphAssertions";
+import {
+  CATALOG_AGENT_LIFECYCLE_STATE_IDS,
+  CATALOG_AGENT_LIFECYCLE_TRANSITIONS,
+  createCatalogAgentLifecycleGraphDefinition,
+  getCatalogAgentLifecycleState,
+} from "./catalogAgentLifecycleGraph";
+
+const t = ((key: string) => key) as never;
 
 function agent(overrides: Partial<CatalogAgent> = {}): CatalogAgent {
   return {
@@ -46,12 +54,13 @@ function validation(valid: boolean): CatalogAgentValidation {
 
 describe("catalog agent lifecycle graph definition", () => {
   it("includes the agent lifecycle states and transitions", () => {
-    expect(CATALOG_AGENT_LIFECYCLE_STATE_IDS).toEqual([
-      "draft",
-      "published_unvalidated",
-      "validation_failed",
-      "ready",
-    ]);
+    const definition = createCatalogAgentLifecycleGraphDefinition(t);
+
+    expectLifecycleDefinition(definition, {
+      stateIds: CATALOG_AGENT_LIFECYCLE_STATE_IDS,
+      transitions: CATALOG_AGENT_LIFECYCLE_TRANSITIONS,
+      i18nBase: "catalogControl.agents.lifecycle",
+    });
     expect(CATALOG_AGENT_LIFECYCLE_TRANSITIONS).toEqual([
       { from: "draft", to: "published_unvalidated" },
       { from: "published_unvalidated", to: "ready" },

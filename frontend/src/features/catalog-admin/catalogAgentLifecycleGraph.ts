@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CatalogAgent, CatalogAgentValidation } from "../../api/catalog";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 
 export const CATALOG_AGENT_LIFECYCLE_STATE_IDS = [
   "draft",
@@ -23,19 +23,18 @@ export const CATALOG_AGENT_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefinition[
 ];
 
 export function createCatalogAgentLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "catalog-agent",
-    states: CATALOG_AGENT_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`catalogControl.agents.lifecycle.states.${stateId}`),
-      x: [90, 290, 490, 670][index],
-      y: [90, 90, 90, 210][index],
-    })),
-    transitions: CATALOG_AGENT_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`catalogControl.agents.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: CATALOG_AGENT_LIFECYCLE_STATE_IDS,
+    i18nBase: "catalogControl.agents.lifecycle",
+    positions: [
+      { x: 90, y: 90 },
+      { x: 290, y: 90 },
+      { x: 490, y: 90 },
+      { x: 670, y: 210 },
+    ],
+    transitions: CATALOG_AGENT_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getCatalogAgentLifecycleState(

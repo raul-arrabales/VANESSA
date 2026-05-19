@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 import type { CatalogTool } from "../../api/catalog";
 import { catalogToolBackendLabelKey } from "./catalogToolBackends";
 
@@ -29,19 +29,19 @@ export const CATALOG_TOOL_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefinition[]
 ];
 
 export function createCatalogToolLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "catalog-tool",
-    states: CATALOG_TOOL_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`catalogControl.tools.lifecycle.states.${stateId}`),
-      x: [90, 270, 450, 630, 450][index],
-      y: [80, 80, 80, 80, 210][index],
-    })),
-    transitions: CATALOG_TOOL_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`catalogControl.tools.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: CATALOG_TOOL_LIFECYCLE_STATE_IDS,
+    i18nBase: "catalogControl.tools.lifecycle",
+    positions: [
+      { x: 90, y: 80 },
+      { x: 270, y: 80 },
+      { x: 450, y: 80 },
+      { x: 630, y: 80 },
+      { x: 450, y: 210 },
+    ],
+    transitions: CATALOG_TOOL_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getCatalogToolLifecycleState(tool: CatalogTool): CatalogToolLifecycleState {

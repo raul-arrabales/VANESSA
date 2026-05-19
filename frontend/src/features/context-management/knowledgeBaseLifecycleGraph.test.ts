@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeBase } from "../../api/context";
+import { expectLifecycleDefinition } from "../../test/lifecycleGraphAssertions";
 import {
   createKnowledgeBaseLifecycleGraphDefinition,
   getKnowledgeBaseLifecycleState,
@@ -43,13 +44,11 @@ describe("knowledgeBaseLifecycleGraph", () => {
   it("defines the knowledge-base lifecycle states and transitions", () => {
     const definition = createKnowledgeBaseLifecycleGraphDefinition(t);
 
-    expect(definition.states.map((state) => state.id)).toEqual([...KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS]);
-    expect(definition.transitions).toEqual(
-      KNOWLEDGE_BASE_LIFECYCLE_TRANSITIONS.map((transition) => ({
-        ...transition,
-        label: `contextManagement.lifecycle.transitions.${transition.from}.${transition.to}`,
-      })),
-    );
+    expectLifecycleDefinition(definition, {
+      stateIds: KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS,
+      transitions: KNOWLEDGE_BASE_LIFECYCLE_TRANSITIONS,
+      i18nBase: "contextManagement.lifecycle",
+    });
   });
 
   it.each([

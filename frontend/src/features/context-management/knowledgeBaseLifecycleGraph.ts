@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { KnowledgeBase } from "../../api/context";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 
 export const KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS = [
   "empty",
@@ -35,19 +35,21 @@ export const KNOWLEDGE_BASE_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefinition
 ];
 
 export function createKnowledgeBaseLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "knowledge-base",
-    states: KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`contextManagement.lifecycle.states.${stateId}`),
-      x: [90, 240, 390, 540, 150, 370, 620][index],
-      y: [82, 82, 82, 82, 214, 214, 214][index],
-    })),
-    transitions: KNOWLEDGE_BASE_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`contextManagement.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: KNOWLEDGE_BASE_LIFECYCLE_STATE_IDS,
+    i18nBase: "contextManagement.lifecycle",
+    positions: [
+      { x: 90, y: 82 },
+      { x: 240, y: 82 },
+      { x: 390, y: 82 },
+      { x: 540, y: 82 },
+      { x: 150, y: 214 },
+      { x: 370, y: 214 },
+      { x: 620, y: 214 },
+    ],
+    transitions: KNOWLEDGE_BASE_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getKnowledgeBaseLifecycleState(knowledgeBase: KnowledgeBase): KnowledgeBaseLifecycleState {

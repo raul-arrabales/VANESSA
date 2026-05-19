@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogTool } from "../../api/catalog";
-import { CATALOG_TOOL_LIFECYCLE_STATE_IDS, CATALOG_TOOL_LIFECYCLE_TRANSITIONS, getCatalogToolLifecycleState } from "./catalogToolLifecycleGraph";
+import { expectLifecycleDefinition } from "../../test/lifecycleGraphAssertions";
+import {
+  CATALOG_TOOL_LIFECYCLE_STATE_IDS,
+  CATALOG_TOOL_LIFECYCLE_TRANSITIONS,
+  createCatalogToolLifecycleGraphDefinition,
+  getCatalogToolLifecycleState,
+} from "./catalogToolLifecycleGraph";
+
+const t = ((key: string) => key) as never;
 
 function tool(overrides: Partial<CatalogTool> = {}): CatalogTool {
   return {
@@ -27,13 +35,13 @@ function tool(overrides: Partial<CatalogTool> = {}): CatalogTool {
 
 describe("catalog tool lifecycle graph definition", () => {
   it("includes the tool readiness states and transitions", () => {
-    expect(CATALOG_TOOL_LIFECYCLE_STATE_IDS).toEqual([
-      "draft",
-      "published_unvalidated",
-      "validation_failed",
-      "validation_stale",
-      "ready",
-    ]);
+    const definition = createCatalogToolLifecycleGraphDefinition(t);
+
+    expectLifecycleDefinition(definition, {
+      stateIds: CATALOG_TOOL_LIFECYCLE_STATE_IDS,
+      transitions: CATALOG_TOOL_LIFECYCLE_TRANSITIONS,
+      i18nBase: "catalogControl.tools.lifecycle",
+    });
     expect(CATALOG_TOOL_LIFECYCLE_TRANSITIONS).toEqual([
       { from: "draft", to: "published_unvalidated" },
       { from: "published_unvalidated", to: "ready" },

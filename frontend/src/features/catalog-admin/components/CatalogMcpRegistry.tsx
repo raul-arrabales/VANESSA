@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer, CatalogMcpServerValidation, CatalogTool } from "../../../api/catalog";
 import { CompactRegistryList } from "../../../components/CompactRegistryList";
-import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal } from "../../../components/LifecycleGraph";
 import { createCatalogMcpLifecycleGraphDefinition, getCatalogMcpLifecycleState, getCatalogMcpLifecycleSummary } from "../catalogMcpLifecycleGraph";
 import CatalogMcpDescriptionModal from "./CatalogMcpDescriptionModal";
 import CatalogMcpRegistryItem from "./CatalogMcpRegistryItem";
@@ -108,23 +108,22 @@ export default function CatalogMcpRegistry({
       {descriptionServer ? (
         <CatalogMcpDescriptionModal server={descriptionServer} onClose={() => setDescriptionServer(null)} />
       ) : null}
-      {lifecycleServer ? (
-        <LifecycleGraphModal
-          title={t("catalogControl.mcp.lifecycle.modalTitle", { name: lifecycleServer.spec.name })}
-          description={t("catalogControl.mcp.lifecycle.modalDescription")}
-          closeLabel={t("actionFeedback.dialog.close")}
-          definition={lifecycleDefinition}
-          currentState={getCatalogMcpLifecycleState(lifecycleServer)}
-          supportingText={getCatalogMcpLifecycleSummary(
-            t,
-            lifecycleServer,
-            toolNames.get(lifecycleServer.spec.backing_tool_id) ?? lifecycleServer.spec.backing_tool_id,
-          )}
-          currentLabel={t("catalogControl.mcp.lifecycle.currentState")}
-          unknownLabel={t("catalogControl.mcp.lifecycle.states.unknown")}
-          onClose={() => setLifecycleServer(null)}
-        />
-      ) : null}
+      <LifecycleGraphActionModal
+        item={lifecycleServer}
+        getTitle={(server) => t("catalogControl.mcp.lifecycle.modalTitle", { name: server.spec.name })}
+        description={t("catalogControl.mcp.lifecycle.modalDescription")}
+        closeLabel={t("actionFeedback.dialog.close")}
+        definition={lifecycleDefinition}
+        getCurrentState={getCatalogMcpLifecycleState}
+        getSupportingText={(server) => getCatalogMcpLifecycleSummary(
+          t,
+          server,
+          toolNames.get(server.spec.backing_tool_id) ?? server.spec.backing_tool_id,
+        )}
+        currentLabel={t("catalogControl.mcp.lifecycle.currentState")}
+        unknownLabel={t("catalogControl.mcp.lifecycle.states.unknown")}
+        onClose={() => setLifecycleServer(null)}
+      />
     </article>
   );
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlatformDeploymentProfile, PlatformProvider } from "../../api/platform";
 import { deriveLifecycleCounts } from "../../components/LifecycleGraph";
+import { expectLifecycleDefinition, expectTerminalStateUncounted } from "../../test/lifecycleGraphAssertions";
 import { deploymentsFixture, providersFixture } from "../../test/platformControlFixtures";
 import {
   createPlatformProviderLifecycleGraphDefinition,
@@ -48,13 +49,11 @@ describe("platformProviderLifecycleGraph", () => {
   it("defines provider lifecycle states and transitions", () => {
     const definition = createPlatformProviderLifecycleGraphDefinition(t);
 
-    expect(definition.states.map((state) => state.id)).toEqual([...PLATFORM_PROVIDER_LIFECYCLE_STATE_IDS]);
-    expect(definition.transitions).toEqual(
-      PLATFORM_PROVIDER_LIFECYCLE_TRANSITIONS.map((transition) => ({
-        ...transition,
-        label: `platformControl.providers.lifecycle.transitions.${transition.from}.${transition.to}`,
-      })),
-    );
+    expectLifecycleDefinition(definition, {
+      stateIds: PLATFORM_PROVIDER_LIFECYCLE_STATE_IDS,
+      transitions: PLATFORM_PROVIDER_LIFECYCLE_TRANSITIONS,
+      i18nBase: "platformControl.providers.lifecycle",
+    });
   });
 
   it.each([
@@ -102,7 +101,7 @@ describe("platformProviderLifecycleGraph", () => {
     expect(counts.byState.active_ready).toBe(1);
     expect(counts.byState.bound_inactive).toBe(1);
     expect(counts.byState.disabled).toBe(1);
-    expect(counts.byState.deleted).toBe(0);
+    expectTerminalStateUncounted(counts);
     expect(counts.unknown).toBe(0);
   });
 });

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogMcpServer } from "../../api/catalog";
-import { CATALOG_MCP_LIFECYCLE_STATE_IDS, CATALOG_MCP_LIFECYCLE_TRANSITIONS, getCatalogMcpLifecycleState } from "./catalogMcpLifecycleGraph";
+import { expectLifecycleDefinition } from "../../test/lifecycleGraphAssertions";
+import {
+  CATALOG_MCP_LIFECYCLE_STATE_IDS,
+  CATALOG_MCP_LIFECYCLE_TRANSITIONS,
+  createCatalogMcpLifecycleGraphDefinition,
+  getCatalogMcpLifecycleState,
+} from "./catalogMcpLifecycleGraph";
+
+const t = ((key: string) => key) as never;
 
 function server(overrides: Partial<CatalogMcpServer> = {}): CatalogMcpServer {
   return {
@@ -52,14 +60,13 @@ function server(overrides: Partial<CatalogMcpServer> = {}): CatalogMcpServer {
 
 describe("catalog MCP lifecycle graph definition", () => {
   it("includes the MCP exposure readiness states and transitions", () => {
-    expect(CATALOG_MCP_LIFECYCLE_STATE_IDS).toEqual([
-      "draft",
-      "disabled",
-      "enabled_unvalidated",
-      "validation_failed",
-      "validation_stale",
-      "enabled_ready",
-    ]);
+    const definition = createCatalogMcpLifecycleGraphDefinition(t);
+
+    expectLifecycleDefinition(definition, {
+      stateIds: CATALOG_MCP_LIFECYCLE_STATE_IDS,
+      transitions: CATALOG_MCP_LIFECYCLE_TRANSITIONS,
+      i18nBase: "catalogControl.mcp.lifecycle",
+    });
     expect(CATALOG_MCP_LIFECYCLE_TRANSITIONS).toEqual([
       { from: "draft", to: "enabled_unvalidated" },
       { from: "draft", to: "disabled" },

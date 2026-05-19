@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { KnowledgeBase } from "../../../api/context";
 import ActionIcon from "../../../components/ActionIcon";
 import IconButton from "../../../components/IconButton";
-import { deriveLifecycleCounts, LifecycleGraph, LifecycleGraphModal } from "../../../components/LifecycleGraph";
+import { LifecycleGraphActionModal, LifecycleGraphPanel } from "../../../components/LifecycleGraph";
 import {
   createKnowledgeBaseLifecycleGraphDefinition,
   getKnowledgeBaseLifecycleState,
@@ -17,10 +17,6 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
   const { knowledgeBases, errorMessage, loading, isSuperadmin } = useContextKnowledgeBaseList();
   const [lifecycleKnowledgeBase, setLifecycleKnowledgeBase] = useState<KnowledgeBase | null>(null);
   const lifecycleDefinition = useMemo(() => createKnowledgeBaseLifecycleGraphDefinition(t), [t]);
-  const lifecycleCounts = useMemo(
-    () => deriveLifecycleCounts(knowledgeBases, lifecycleDefinition, getKnowledgeBaseLifecycleState),
-    [knowledgeBases, lifecycleDefinition],
-  );
 
   return (
     <section className="panel card-stack">
@@ -90,34 +86,31 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
         </div>
       ) : null}
       {knowledgeBases.length > 0 ? (
-        <article className="panel panel-nested card-stack">
-          <div className="platform-card-header">
-            <div className="card-stack">
-              <h3 className="section-title">{t("contextManagement.lifecycle.title")}</h3>
-              <p className="status-text">{t("contextManagement.lifecycle.summaryDescription")}</p>
-            </div>
-          </div>
-          <LifecycleGraph
-            definition={lifecycleDefinition}
-            counts={lifecycleCounts}
-            currentLabel={t("contextManagement.lifecycle.currentState")}
-            unknownLabel={t("platformControl.summary.unknown")}
-          />
-        </article>
-      ) : null}
-      {lifecycleKnowledgeBase ? (
-        <LifecycleGraphModal
-          title={t("contextManagement.lifecycle.modalTitle", { name: lifecycleKnowledgeBase.display_name })}
-          description={t("contextManagement.lifecycle.modalDescription")}
+        <LifecycleGraphPanel
+          title={t("contextManagement.lifecycle.title")}
+          description={t("contextManagement.lifecycle.summaryDescription")}
           definition={lifecycleDefinition}
-          currentState={getKnowledgeBaseLifecycleState(lifecycleKnowledgeBase)}
-          supportingText={getKnowledgeBaseLifecycleSummary(t, lifecycleKnowledgeBase)}
+          items={knowledgeBases}
+          getState={getKnowledgeBaseLifecycleState}
           currentLabel={t("contextManagement.lifecycle.currentState")}
           unknownLabel={t("platformControl.summary.unknown")}
-          closeLabel={t("contextManagement.actions.cancel")}
-          onClose={() => setLifecycleKnowledgeBase(null)}
+          className="panel panel-nested card-stack"
+          headerClassName="platform-card-header"
+          headerContentClassName="card-stack"
         />
       ) : null}
+      <LifecycleGraphActionModal
+        item={lifecycleKnowledgeBase}
+        getTitle={(knowledgeBase) => t("contextManagement.lifecycle.modalTitle", { name: knowledgeBase.display_name })}
+        description={t("contextManagement.lifecycle.modalDescription")}
+        definition={lifecycleDefinition}
+        getCurrentState={getKnowledgeBaseLifecycleState}
+        getSupportingText={(knowledgeBase) => getKnowledgeBaseLifecycleSummary(t, knowledgeBase)}
+        currentLabel={t("contextManagement.lifecycle.currentState")}
+        unknownLabel={t("platformControl.summary.unknown")}
+        closeLabel={t("contextManagement.actions.cancel")}
+        onClose={() => setLifecycleKnowledgeBase(null)}
+      />
     </section>
   );
 }

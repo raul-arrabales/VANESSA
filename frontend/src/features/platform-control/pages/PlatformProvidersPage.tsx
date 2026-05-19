@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { deriveLifecycleCounts, LifecycleGraph } from "../../../components/LifecycleGraph";
+import { LifecycleGraphPanel } from "../../../components/LifecycleGraph";
 import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider";
@@ -67,14 +67,6 @@ export default function PlatformProvidersPage(): JSX.Element {
   const activeView = resolvePlatformProvidersView(searchParams.get("view"));
   const activeDeployment = getActiveDeployment(deployments);
   const lifecycleDefinition = useMemo(() => createPlatformProviderLifecycleGraphDefinition(t), [t]);
-  const lifecycleCounts = useMemo(
-    () => deriveLifecycleCounts(
-      filteredProviders,
-      lifecycleDefinition,
-      (provider) => getPlatformProviderLifecycleState(provider, deployments),
-    ),
-    [deployments, filteredProviders, lifecycleDefinition],
-  );
   const submenuItems = PLATFORM_PROVIDERS_VIEW_ORDER.map((view) => ({
     id: view,
     label: t(`platformControl.providers.views.${view}`),
@@ -165,20 +157,17 @@ export default function PlatformProvidersPage(): JSX.Element {
           </article>
 
           {filteredProviders.length > 0 ? (
-            <article className="panel card-stack">
-              <div className="platform-card-header">
-                <div className="card-stack">
-                  <h3 className="section-title">{t("platformControl.providers.lifecycle.title")}</h3>
-                  <p className="status-text">{t("platformControl.providers.lifecycle.description")}</p>
-                </div>
-              </div>
-              <LifecycleGraph
-                definition={lifecycleDefinition}
-                counts={lifecycleCounts}
-                currentLabel={t("platformControl.providers.lifecycle.currentState")}
-                unknownLabel={t("platformControl.summary.unknown")}
-              />
-            </article>
+            <LifecycleGraphPanel
+              title={t("platformControl.providers.lifecycle.title")}
+              description={t("platformControl.providers.lifecycle.description")}
+              definition={lifecycleDefinition}
+              items={filteredProviders}
+              getState={(provider) => getPlatformProviderLifecycleState(provider, deployments)}
+              currentLabel={t("platformControl.providers.lifecycle.currentState")}
+              unknownLabel={t("platformControl.summary.unknown")}
+              headerClassName="platform-card-header"
+              headerContentClassName="card-stack"
+            />
           ) : null}
         </>
       ) : null}

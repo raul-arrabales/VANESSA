@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { PlatformDeploymentProfile } from "../../api/platform";
-import type { LifecycleGraphDefinition, LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
+import { buildLifecycleGraphDefinition, type LifecycleGraphDefinition, type LifecycleTransitionDefinition } from "../../components/LifecycleGraph";
 
 export const PLATFORM_DEPLOYMENT_LIFECYCLE_STATE_IDS = [
   "incomplete",
@@ -27,19 +27,19 @@ export const PLATFORM_DEPLOYMENT_LIFECYCLE_TRANSITIONS: LifecycleTransitionDefin
 ];
 
 export function createPlatformDeploymentLifecycleGraphDefinition(t: TFunction<"common">): LifecycleGraphDefinition {
-  return {
+  return buildLifecycleGraphDefinition(t, {
     artifactType: "platform-deployment",
-    states: PLATFORM_DEPLOYMENT_LIFECYCLE_STATE_IDS.map((stateId, index) => ({
-      id: stateId,
-      label: t(`platformControl.deployments.lifecycle.states.${stateId}`),
-      x: [90, 285, 480, 480, 675][index],
-      y: [82, 82, 82, 214, 214][index],
-    })),
-    transitions: PLATFORM_DEPLOYMENT_LIFECYCLE_TRANSITIONS.map((transition) => ({
-      ...transition,
-      label: t(`platformControl.deployments.lifecycle.transitions.${transition.from}.${transition.to}`),
-    })),
-  };
+    stateIds: PLATFORM_DEPLOYMENT_LIFECYCLE_STATE_IDS,
+    i18nBase: "platformControl.deployments.lifecycle",
+    positions: [
+      { x: 90, y: 82 },
+      { x: 285, y: 82 },
+      { x: 480, y: 82 },
+      { x: 480, y: 214 },
+      { x: 675, y: 214 },
+    ],
+    transitions: PLATFORM_DEPLOYMENT_LIFECYCLE_TRANSITIONS,
+  });
 }
 
 export function getPlatformDeploymentLifecycleState(

@@ -1,4 +1,5 @@
 import { useId, useMemo, useRef } from "react";
+import type { TFunction } from "i18next";
 import ModalDialog from "./ModalDialog";
 
 export type LifecycleStateDefinition = {
@@ -31,7 +32,7 @@ export type LifecycleHighlight = {
   outgoingTransitions: Set<string>;
 };
 
-type LifecycleGraphProps = {
+export type LifecycleGraphProps = {
   definition: LifecycleGraphDefinition;
   counts?: LifecycleCounts;
   currentState?: string | null;
@@ -40,15 +41,125 @@ type LifecycleGraphProps = {
   unknownLabel?: string;
 };
 
-type LifecycleGraphModalProps = LifecycleGraphProps & {
+export type LifecycleGraphModalProps = LifecycleGraphProps & {
   title: string;
   description?: string;
   closeLabel: string;
   onClose: () => void;
 };
 
+export type LifecycleGraphDefinitionOptions<StateId extends string = string> = {
+  artifactType: string;
+  stateIds: readonly StateId[];
+  i18nBase: string;
+  transitions: readonly LifecycleTransitionDefinition[];
+  positions?: Partial<Record<StateId, { x: number; y: number }>> | readonly { x: number; y: number }[];
+  transitionLabelKey?: (transition: LifecycleTransitionDefinition) => string;
+};
+
+export type LifecycleGraphPanelProps<T> = {
+  title: string;
+  description: string;
+  definition: LifecycleGraphDefinition;
+  items: T[];
+  getState: (item: T) => string | null | undefined;
+  currentLabel: string;
+  unknownLabel: string;
+  titleAs?: "h2" | "h3";
+  className?: string;
+  headerClassName?: string;
+  headerContentClassName?: string;
+};
+
+export type LifecycleGraphActionModalProps<T> = Omit<LifecycleGraphModalProps, "title" | "currentState" | "supportingText" | "onClose"> & {
+  item: T | null;
+  getTitle: (item: T) => string;
+  getCurrentState: (item: T) => string | null | undefined;
+  getSupportingText: (item: T) => string;
+  onClose: () => void;
+};
+
+function isPositionRecord<StateId extends string>(
+  positions: LifecycleGraphDefinitionOptions<StateId>["positions"],
+): positions is Partial<Record<StateId, { x: number; y: number }>> {
+  return Boolean(positions) && !Array.isArray(positions);
+}
+
 function transitionId(transition: LifecycleTransitionDefinition): string {
   return `${transition.from}->${transition.to}`;
+}
+
+export function buildLifecycleGraphDefinition<StateId extends string>(
+  t: TFunction<"common">,
+  options: LifecycleGraphDefinitionOptions<StateId>,
+): LifecycleGraphDefinition {
+  return {
+    artifactType: options.artifactType,
+    states: options.stateIds.map((stateId, index) => {
+      const position = Array.isArray(options.positions)
+        ? options.positions[index]
+        : isPositionRecord(options.positions)
+          ? options.positions[stateId]
+          : undefined;
+      return {
+        id: stateId,
+        label: t(`${options.i18nBase}.states.${stateId}`),
+        ...position,
+      };
+    }),
+    transitions: options.transitions.map((transition) => ({
+      ...transition,
+      label: t(options.transitionLabelKey?.(transition) ?? `${options.i18nBase}.transitions.${transition.from}.${transition.to}`),
+    })),
+  };
+}
+
+function truncateLifecycleLabelLine(line: string, maxLineLength: number): string {
+  if (line.length <= maxLineLength) {
+    return line;
+  }
+  if (maxLineLength <= 3) {
+    return line.slice(0, maxLineLength);
+  }
+  return `${line.slice(0, maxLineLength - 3)}...`;
+}
+
+export function getLifecycleNodeLabelLines(label: string, maxLineLength = 16, maxLines = 2): string[] {
+  const normalizedLabel = label.trim().replace(/\s+/g, " ");
+  if (!normalizedLabel) {
+    return [""];
+  }
+
+  const words = normalizedLabel.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+    if (nextLine.length <= maxLineLength) {
+      currentLine = nextLine;
+      continue;
+    }
+    if (currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      lines.push(truncateLifecycleLabelLine(word, maxLineLength));
+      currentLine = "";
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  if (lines.length <= maxLines) {
+    return lines.map((line) => truncateLifecycleLabelLine(line, maxLineLength));
+  }
+
+  const visibleLines = lines.slice(0, maxLines);
+  visibleLines[maxLines - 1] = truncateLifecycleLabelLine(lines.slice(maxLines - 1).join(" "), maxLineLength);
+  return visibleLines;
 }
 
 function statePosition(state: LifecycleStateDefinition, index: number, total: number): { x: number; y: number } {
@@ -161,6 +272,8 @@ export function LifecycleGraph({
           const position = positions.get(state.id) ?? statePosition(state, index, definition.states.length);
           const isCurrent = highlight.currentState === state.id;
           const count = counts?.byState[state.id] ?? null;
+          const labelLines = getLifecycleNodeLabelLines(state.label);
+          const labelStartY = labelLines.length === 1 ? 24 : 17;
           return (
             <g
               key={state.id}
@@ -168,9 +281,14 @@ export function LifecycleGraph({
               data-current={isCurrent ? "true" : undefined}
               transform={`translate(${position.x - 70} ${position.y - 28})`}
             >
+              <title>{state.label}</title>
               <rect width="140" height="56" rx="8" />
-              <text x="70" y="25" textAnchor="middle">{state.label}</text>
-              {count !== null ? <text className="lifecycle-graph-node-count" x="70" y="43" textAnchor="middle">{count}</text> : null}
+              <text x="70" y={labelStartY} textAnchor="middle">
+                {labelLines.map((line, lineIndex) => (
+                  <tspan key={`${state.id}-${lineIndex}`} x="70" dy={lineIndex === 0 ? 0 : 13}>{line}</tspan>
+                ))}
+              </text>
+              {count !== null ? <text className="lifecycle-graph-node-count" x="70" y="46" textAnchor="middle">{count}</text> : null}
             </g>
           );
         })}
@@ -192,6 +310,46 @@ export function LifecycleGraph({
         ) : null}
       </div>
     </div>
+  );
+}
+
+export function LifecycleGraphPanel<T>({
+  title,
+  description,
+  definition,
+  items,
+  getState,
+  currentLabel,
+  unknownLabel,
+  titleAs = "h3",
+  className = "panel card-stack",
+  headerClassName = "status-row",
+  headerContentClassName,
+}: LifecycleGraphPanelProps<T>): JSX.Element {
+  const Heading = titleAs;
+  const counts = useMemo(
+    () => deriveLifecycleCounts(items, definition, getState),
+    [definition, getState, items],
+  );
+  const headerContent = (
+    <>
+      <Heading className="section-title">{title}</Heading>
+      <p className="status-text">{description}</p>
+    </>
+  );
+
+  return (
+    <article className={className}>
+      <div className={headerClassName}>
+        {headerContentClassName ? <div className={headerContentClassName}>{headerContent}</div> : headerContent}
+      </div>
+      <LifecycleGraph
+        definition={definition}
+        counts={counts}
+        currentLabel={currentLabel}
+        unknownLabel={unknownLabel}
+      />
+    </article>
   );
 }
 
@@ -219,5 +377,26 @@ export function LifecycleGraphModal({
     >
       <LifecycleGraph {...graphProps} />
     </ModalDialog>
+  );
+}
+
+export function LifecycleGraphActionModal<T>({
+  item,
+  getTitle,
+  getCurrentState,
+  getSupportingText,
+  ...modalProps
+}: LifecycleGraphActionModalProps<T>): JSX.Element | null {
+  if (!item) {
+    return null;
+  }
+
+  return (
+    <LifecycleGraphModal
+      {...modalProps}
+      title={getTitle(item)}
+      currentState={getCurrentState(item)}
+      supportingText={getSupportingText(item)}
+    />
   );
 }
