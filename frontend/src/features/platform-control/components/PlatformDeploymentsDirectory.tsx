@@ -60,13 +60,14 @@ export default function PlatformDeploymentsDirectory({
           <article key={deployment.id} className="platform-deployment-card" data-expanded={isExpanded ? "true" : "false"}>
             <div className="platform-card-header platform-deployment-card-header">
               <div className="platform-deployment-summary">
-                <div className="status-row">
+                <div className="platform-deployment-title-row">
                   <h3 className="section-title">{deployment.display_name}</h3>
                   <span className="status-text">
                     <code className="code-inline">{deployment.slug}</code>
                   </span>
                 </div>
-                <div className="inline-meta-list">
+                <p className="status-text">{deployment.description || t("platformControl.deployments.noDescription")}</p>
+                <div className="inline-meta-list platform-deployment-state-row">
                   <span className="platform-badge" data-tone={deployment.is_active ? "active" : "inactive"}>
                     {deployment.is_active ? t("platformControl.badges.active") : t("platformControl.badges.inactive")}
                   </span>
@@ -80,11 +81,10 @@ export default function PlatformDeploymentsDirectory({
                   <span className="platform-badge" data-tone="local">
                     {t("platformControl.deployments.bindingCount", { count: deployment.bindings.length })}
                   </span>
+                  {deployment.configuration_status ? (
+                    <span className="status-text platform-deployment-readiness">{deployment.configuration_status.summary}</span>
+                  ) : null}
                 </div>
-                {deployment.configuration_status ? (
-                  <p className="status-text">{deployment.configuration_status.summary}</p>
-                ) : null}
-                <p className="status-text">{deployment.description || t("platformControl.deployments.noDescription")}</p>
               </div>
               <div className="inline-meta-list platform-deployment-actions">
                 <IconButton

@@ -94,6 +94,27 @@
   gap: var(--space-2);
 }
 
+.platform-deployment-title-row,
+.platform-deployment-state-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.platform-deployment-title-row .section-title {
+  margin: 0;
+}
+
+.platform-deployment-state-row {
+  margin-top: 0;
+}
+
+.platform-deployment-readiness {
+  min-width: min(18rem, 100%);
+  flex: 1 1 18rem;
+}
+
 .platform-deployment-actions {
   justify-content: flex-end;
   margin-top: 0;
