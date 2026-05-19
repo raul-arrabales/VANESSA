@@ -1844,6 +1844,7 @@
       "editing": "Editando un agente de plataforma existente.",
       "actionsFor": "Acciones de agente para {{name}}",
       "actionLabels": {
+        "lifecycle": "Ver ciclo de vida de {{name}}",
         "edit": "Editar {{name}}",
         "validate": "Validar {{name}}",
         "validating": "Validando {{name}}",
@@ -1855,6 +1856,52 @@
         "failed": "Validacion fallida",
         "unvalidated": "Requiere validacion",
         "validating": "Validando"
+      },
+      "lifecycle": {
+        "title": "Ciclo de vida de agente",
+        "summaryDescription": "Preparacion de publicacion y validacion en agentes de plataforma y de usuario.",
+        "modalTitle": "Ciclo de vida de agente: {{name}}",
+        "modalDescription": "Publicacion, validacion, modelo, herramientas y runtime actuales de este agente de catalogo.",
+        "currentState": "Actual",
+        "summary": "Tipo: {{kind}} | Estado: {{publishStatus}} | Validacion: {{validationStatus}} | Modelo: {{model}} | Herramientas: {{toolCount}} | Servidores MCP: {{mcpCount}} | {{runtimeConstraints}}",
+        "kind": {
+          "platform": "Plataforma",
+          "user": "Usuario"
+        },
+        "states": {
+          "draft": "Borrador",
+          "published_unvalidated": "Sin validar",
+          "validation_failed": "Validacion fallida",
+          "ready": "Listo",
+          "unknown": "Desconocido"
+        },
+        "validation": {
+          "valid": "Valido",
+          "invalid": "Invalido",
+          "unvalidated": "Sin validar"
+        },
+        "constraints": {
+          "offline": "Compatible offline",
+          "noSandbox": "Sin sandbox"
+        },
+        "transitions": {
+          "draft": {
+            "published_unvalidated": "Publicar"
+          },
+          "published_unvalidated": {
+            "ready": "Validar correctamente",
+            "validation_failed": "La validacion falla",
+            "draft": "Volver a borrador"
+          },
+          "validation_failed": {
+            "published_unvalidated": "Editar para revalidar",
+            "ready": "Validar correctamente",
+            "draft": "Volver a borrador"
+          },
+          "ready": {
+            "draft": "Volver a borrador"
+          }
+        }
       },
       "views": {
         "aria": "Secciones del catalogo de agentes",

@@ -443,6 +443,11 @@ describe("CatalogControlPage", () => {
     expect(within(topNav).getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     expect(within(topNav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Overview", "Tools", "MCP Gateway", "Agents"]);
     expect(screen.getByText("Catalog areas")).toBeVisible();
+    const agentLifecyclePanel = screen.getByRole("heading", { name: "Agent lifecycle" }).closest("article");
+    expect(agentLifecyclePanel).toBeTruthy();
+    expect(within(agentLifecyclePanel as HTMLElement).getAllByText("Draft").length).toBeGreaterThanOrEqual(1);
+    expect(within(agentLifecyclePanel as HTMLElement).getAllByText("Unvalidated").length).toBeGreaterThanOrEqual(1);
+    expect(within(agentLifecyclePanel as HTMLElement).getAllByText("1").length).toBeGreaterThanOrEqual(2);
     const lifecyclePanel = screen.getByRole("heading", { name: "Tool lifecycle" }).closest("article");
     expect(lifecyclePanel).toBeTruthy();
     expect(within(lifecyclePanel as HTMLElement).getAllByText("Ready").length).toBeGreaterThanOrEqual(1);
@@ -507,15 +512,17 @@ describe("CatalogControlPage", () => {
     expectCompactRegistryRowForHeading("Knowledge Chat");
     expect(screen.queryByRole("heading", { name: "Agent Alpha" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete Knowledge Chat" })).not.toBeInTheDocument();
+    expectNamedIconAction("button", "View lifecycle for Knowledge Chat");
     expectNamedIconAction("button", "Edit Knowledge Chat");
     expectNamedIconAction("button", "Validate Knowledge Chat");
-    expectNoGenericCompactActions(["Edit", "Validate", "Delete"]);
+    expectNoGenericCompactActions(["View lifecycle", "Edit", "Validate", "Delete"]);
 
     await user.click(userAgentsLink);
 
     expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
     expectCompactRegistryRowForHeading("Agent Alpha");
     expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
+    expectNamedIconAction("button", "View lifecycle for Agent Alpha");
     expectNamedIconAction("button", "Delete Agent Alpha");
   });
 

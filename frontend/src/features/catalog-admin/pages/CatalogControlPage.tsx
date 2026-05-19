@@ -219,6 +219,8 @@ export default function CatalogControlPage(): JSX.Element {
       {activeSection === "overview" ? (
         <CatalogOverviewSection
           state={state}
+          agents={agents}
+          agentValidationResults={agentValidationResults}
           agentCount={agents.length}
           publishedAgents={publishedAgents}
           toolCount={tools.length}

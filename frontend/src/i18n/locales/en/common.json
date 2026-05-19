@@ -1862,6 +1862,7 @@
       "editing": "Editing an existing platform agent.",
       "actionsFor": "Agent actions for {{name}}",
       "actionLabels": {
+        "lifecycle": "View lifecycle for {{name}}",
         "edit": "Edit {{name}}",
         "validate": "Validate {{name}}",
         "validating": "Validating {{name}}",
@@ -1873,6 +1874,52 @@
         "failed": "Validation failed",
         "unvalidated": "Needs validation",
         "validating": "Validating"
+      },
+      "lifecycle": {
+        "title": "Agent lifecycle",
+        "summaryDescription": "Publication and validation readiness across platform and user catalog agents.",
+        "modalTitle": "Agent lifecycle: {{name}}",
+        "modalDescription": "Current publication, validation, model, tool, and runtime readiness for this catalog agent.",
+        "currentState": "Current",
+        "summary": "Kind: {{kind}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | Model: {{model}} | Tools: {{toolCount}} | MCP servers: {{mcpCount}} | {{runtimeConstraints}}",
+        "kind": {
+          "platform": "Platform",
+          "user": "User"
+        },
+        "states": {
+          "draft": "Draft",
+          "published_unvalidated": "Unvalidated",
+          "validation_failed": "Validation failed",
+          "ready": "Ready",
+          "unknown": "Unknown"
+        },
+        "validation": {
+          "valid": "Valid",
+          "invalid": "Invalid",
+          "unvalidated": "Unvalidated"
+        },
+        "constraints": {
+          "offline": "Offline compatible",
+          "noSandbox": "No sandbox"
+        },
+        "transitions": {
+          "draft": {
+            "published_unvalidated": "Publish"
+          },
+          "published_unvalidated": {
+            "ready": "Validate successfully",
+            "validation_failed": "Validation fails",
+            "draft": "Move back to draft"
+          },
+          "validation_failed": {
+            "published_unvalidated": "Edit for revalidation",
+            "ready": "Validate successfully",
+            "draft": "Move back to draft"
+          },
+          "ready": {
+            "draft": "Move back to draft"
+          }
+        }
       },
       "views": {
         "aria": "Agent catalog sections",

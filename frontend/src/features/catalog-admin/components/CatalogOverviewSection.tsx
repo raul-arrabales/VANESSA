@@ -2,14 +2,17 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { OptionCardItem } from "../../../components/OptionCardGrid";
 import OptionCardGrid from "../../../components/OptionCardGrid";
-import type { CatalogMcpServer, CatalogTool } from "../../../api/catalog";
+import type { CatalogAgent, CatalogAgentValidation, CatalogMcpServer, CatalogTool } from "../../../api/catalog";
 import type { CatalogLoadState } from "../hooks/useCatalogControl";
 import { buildCatalogControlUrl } from "../routes";
+import CatalogAgentLifecycleSummaryPanel from "./CatalogAgentLifecycleSummaryPanel";
 import CatalogMcpLifecycleSummaryPanel from "./CatalogMcpLifecycleSummaryPanel";
 import CatalogToolLifecycleSummaryPanel from "./CatalogToolLifecycleSummaryPanel";
 
 type CatalogOverviewSectionProps = {
   state: CatalogLoadState;
+  agents: CatalogAgent[];
+  agentValidationResults: Record<string, CatalogAgentValidation>;
   agentCount: number;
   publishedAgents: number;
   toolCount: number;
@@ -23,6 +26,8 @@ type CatalogOverviewSectionProps = {
 
 export default function CatalogOverviewSection({
   state,
+  agents,
+  agentValidationResults,
   agentCount,
   publishedAgents,
   toolCount,
@@ -85,6 +90,7 @@ export default function CatalogOverviewSection({
         </div>
       </article>
 
+      <CatalogAgentLifecycleSummaryPanel agents={agents} validationResults={agentValidationResults} />
       <CatalogToolLifecycleSummaryPanel tools={tools} />
       <CatalogMcpLifecycleSummaryPanel mcpServers={mcpServers} />
 
