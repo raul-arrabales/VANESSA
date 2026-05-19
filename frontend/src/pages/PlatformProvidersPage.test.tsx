@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import PlatformProvidersPage from "./PlatformProvidersPage";
 import * as platformApi from "../api/platform";
@@ -59,7 +60,28 @@ describe("PlatformProvidersPage", () => {
     expect((await screen.findAllByText(await t("platformControl.providers.usedByDeployments"))).length).toBeGreaterThan(0);
     expect(document.querySelector(".platform-directory-grid")).toHaveClass("platform-provider-list");
     expect(screen.getAllByText(await t("platformControl.badges.local")).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Provider lifecycle" })).toBeVisible();
+    expect(
+      screen
+        .getByRole("heading", { name: await t("platformControl.sections.providers"), level: 3 })
+        .closest("article")
+        ?.compareDocumentPosition(screen.getByRole("heading", { name: "Provider lifecycle" })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expectNamedIconAction("button", "View lifecycle for vLLM local gateway");
     expect(screen.queryByLabelText(await t("platformControl.forms.provider.slug"))).not.toBeInTheDocument();
+  });
+
+  it("opens a provider lifecycle modal from a provider row", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<PlatformProvidersPage />);
+
+    await user.click(await screen.findByRole("button", { name: "View lifecycle for vLLM local gateway" }));
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Provider lifecycle: vLLM local gateway")).toBeVisible();
+    expect(screen.getByText(/Status: Enabled/)).toBeVisible();
+    expect(screen.getByText(/Referenced deployments: 2/)).toBeVisible();
   });
 
   it("labels cloud providers distinctly from local providers", async () => {

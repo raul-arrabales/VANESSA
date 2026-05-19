@@ -1,22 +1,34 @@
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import ActionIcon from "../../../components/ActionIcon";
+import IconButton from "../../../components/IconButton";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
+import {
+  createPlatformProviderLifecycleGraphDefinition,
+  getPlatformProviderLifecycleState,
+  getPlatformProviderLifecycleSummary,
+} from "../platformProviderLifecycleGraph";
 import { getActiveDeployment, getProviderUsageEntries } from "../platformTopology";
 
 type PlatformProvidersDirectoryProps = {
   providers: PlatformProvider[];
   providerFamilies: PlatformProviderFamily[];
   deployments: PlatformDeploymentProfile[];
+  activeDeployment?: PlatformDeploymentProfile | null;
 };
 
 export default function PlatformProvidersDirectory({
   providers,
   providerFamilies,
   deployments,
+  activeDeployment = getActiveDeployment(deployments),
 }: PlatformProvidersDirectoryProps): JSX.Element {
   const { t } = useTranslation("common");
+  const [lifecycleProvider, setLifecycleProvider] = useState<PlatformProvider | null>(null);
+  const lifecycleDefinition = useMemo(() => createPlatformProviderLifecycleGraphDefinition(t), [t]);
   const providerFamilyByKey = new Map(providerFamilies.map((family) => [family.provider_key, family]));
-  const activeDeployment = getActiveDeployment(deployments);
 
   if (providers.length === 0) {
     return <p className="status-text">{t("platformControl.providers.empty")}</p>;
@@ -93,6 +105,12 @@ export default function PlatformProvidersDirectory({
               </div>
             </div>
             <div className="inline-meta-list platform-provider-actions">
+              <IconButton
+                label={t("platformControl.providers.lifecycle.actionLabel", { name: provider.display_name })}
+                onClick={() => setLifecycleProvider(provider)}
+              >
+                <ActionIcon name="lifecycle" />
+              </IconButton>
               <Link className="btn btn-secondary" to={`/control/platform/providers/${provider.id}`}>
                 {t("platformControl.actions.openProvider")}
               </Link>
@@ -100,6 +118,25 @@ export default function PlatformProvidersDirectory({
           </article>
         );
       })}
+      {lifecycleProvider ? (
+        <LifecycleGraphModal
+          title={t("platformControl.providers.lifecycle.modalTitle", { name: lifecycleProvider.display_name })}
+          description={t("platformControl.providers.lifecycle.modalDescription")}
+          definition={lifecycleDefinition}
+          currentState={getPlatformProviderLifecycleState(lifecycleProvider, deployments)}
+          supportingText={getPlatformProviderLifecycleSummary(
+            t,
+            lifecycleProvider,
+            deployments,
+            providerFamilyByKey.get(lifecycleProvider.provider_key),
+            activeDeployment,
+          )}
+          currentLabel={t("platformControl.providers.lifecycle.currentState")}
+          unknownLabel={t("platformControl.summary.unknown")}
+          closeLabel={t("platformControl.actions.cancel")}
+          onClose={() => setLifecycleProvider(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,8 +1,18 @@
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import ActionIcon from "../../../components/ActionIcon";
+import IconButton from "../../../components/IconButton";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import type { PlatformDeploymentProfile, PlatformProvider, PlatformProviderFamily } from "../../../api/platform";
+import {
+  createPlatformProviderLifecycleGraphDefinition,
+  getPlatformProviderLifecycleState,
+  getPlatformProviderLifecycleSummary,
+} from "../platformProviderLifecycleGraph";
 
 type PlatformProviderOverviewSectionProps = {
   activeDeployment: PlatformDeploymentProfile | null;
+  deployments?: PlatformDeploymentProfile[];
   isUsedByActiveDeployment: boolean;
   provider: PlatformProvider;
   providerFamily: PlatformProviderFamily | null;
@@ -10,11 +20,14 @@ type PlatformProviderOverviewSectionProps = {
 
 export default function PlatformProviderOverviewSection({
   activeDeployment,
+  deployments = activeDeployment ? [activeDeployment] : [],
   isUsedByActiveDeployment,
   provider,
   providerFamily,
 }: PlatformProviderOverviewSectionProps): JSX.Element {
   const { t } = useTranslation("common");
+  const [isLifecycleModalOpen, setIsLifecycleModalOpen] = useState(false);
+  const lifecycleDefinition = useMemo(() => createPlatformProviderLifecycleGraphDefinition(t), [t]);
 
   return (
     <article className="panel card-stack">
@@ -34,6 +47,12 @@ export default function PlatformProviderOverviewSection({
               {t("platformControl.badges.activeDeployment")}
             </span>
           ) : null}
+          <IconButton
+            label={t("platformControl.providers.lifecycle.actionLabel", { name: provider.display_name })}
+            onClick={() => setIsLifecycleModalOpen(true)}
+          >
+            <ActionIcon name="lifecycle" />
+          </IconButton>
         </div>
       </div>
       <p className="status-text">{provider.description || t("platformControl.providers.noDescription")}</p>
@@ -63,6 +82,19 @@ export default function PlatformProviderOverviewSection({
           </span>
         </div>
       </div>
+      {isLifecycleModalOpen ? (
+        <LifecycleGraphModal
+          title={t("platformControl.providers.lifecycle.modalTitle", { name: provider.display_name })}
+          description={t("platformControl.providers.lifecycle.modalDescription")}
+          definition={lifecycleDefinition}
+          currentState={getPlatformProviderLifecycleState(provider, deployments)}
+          supportingText={getPlatformProviderLifecycleSummary(t, provider, deployments, providerFamily, activeDeployment)}
+          currentLabel={t("platformControl.providers.lifecycle.currentState")}
+          unknownLabel={t("platformControl.summary.unknown")}
+          closeLabel={t("platformControl.actions.cancel")}
+          onClose={() => setIsLifecycleModalOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }

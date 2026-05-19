@@ -1668,6 +1668,50 @@
       "empty": "No providers are registered.",
       "createHelp": "Create a new provider instance or edit an existing one.",
       "editing": "Editing provider {{slug}}.",
+      "lifecycle": {
+        "title": "Provider lifecycle",
+        "description": "Enablement, deployment usage, and local load readiness across provider instances.",
+        "modalTitle": "Provider lifecycle: {{name}}",
+        "modalDescription": "Current enablement, deployment usage, runtime load posture, endpoint, and provider family for this provider.",
+        "currentState": "Current",
+        "actionLabel": "View lifecycle for {{name}}",
+        "summary": "Status: {{enabledStatus}} | Origin: {{origin}} | Capability: {{capability}} | Family: {{providerFamily}} | Adapter: {{adapter}} | Referenced deployments: {{usageCount}} | {{activeUsage}} | Active deployment: {{activeDeployment}} | Load state: {{loadState}} | Loaded resource: {{loadedResource}} | Endpoint: {{endpoint}}{{loadError}}",
+        "loadErrorSuffix": " | Load error: {{error}}",
+        "states": {
+          "disabled": "Disabled",
+          "enabled_unbound": "Enabled unbound",
+          "bound_inactive": "Bound inactive",
+          "active_ready": "Active ready",
+          "active_attention": "Active attention",
+          "deleted": "Deleted"
+        },
+        "transitions": {
+          "disabled": {
+            "enabled_unbound": "Enable provider",
+            "deleted": "Delete"
+          },
+          "enabled_unbound": {
+            "disabled": "Disable provider",
+            "bound_inactive": "Bind to inactive deployment",
+            "deleted": "Delete"
+          },
+          "bound_inactive": {
+            "enabled_unbound": "Remove deployment references",
+            "active_ready": "Activate deployment",
+            "deleted": "Delete"
+          },
+          "active_ready": {
+            "bound_inactive": "Deactivate by deployment switch",
+            "active_attention": "Runtime needs attention",
+            "deleted": "Delete"
+          },
+          "active_attention": {
+            "active_ready": "Restore runtime readiness",
+            "bound_inactive": "Deactivate by deployment switch",
+            "deleted": "Delete"
+          }
+        }
+      },
       "views": {
         "aria": "Provider management sections",
         "providers": "Platform providers",

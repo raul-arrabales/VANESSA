@@ -1656,6 +1656,50 @@
       "empty": "No hay proveedores registrados.",
       "createHelp": "Crea una nueva instancia de proveedor o edita una existente.",
       "editing": "Editando proveedor {{slug}}.",
+      "lifecycle": {
+        "title": "Ciclo de vida del proveedor",
+        "description": "Habilitacion, uso en despliegues y preparacion de carga local en instancias de proveedor.",
+        "modalTitle": "Ciclo de vida del proveedor: {{name}}",
+        "modalDescription": "Habilitacion actual, uso en despliegues, estado de carga del runtime, endpoint y familia de este proveedor.",
+        "currentState": "Actual",
+        "actionLabel": "Ver ciclo de vida de {{name}}",
+        "summary": "Estado: {{enabledStatus}} | Origen: {{origin}} | Capacidad: {{capability}} | Familia: {{providerFamily}} | Adaptador: {{adapter}} | Despliegues referenciados: {{usageCount}} | {{activeUsage}} | Despliegue activo: {{activeDeployment}} | Estado de carga: {{loadState}} | Recurso cargado: {{loadedResource}} | Endpoint: {{endpoint}}{{loadError}}",
+        "loadErrorSuffix": " | Error de carga: {{error}}",
+        "states": {
+          "disabled": "Deshabilitado",
+          "enabled_unbound": "Habilitado libre",
+          "bound_inactive": "Enlace inactivo",
+          "active_ready": "Activo listo",
+          "active_attention": "Activo con alerta",
+          "deleted": "Eliminado"
+        },
+        "transitions": {
+          "disabled": {
+            "enabled_unbound": "Habilitar proveedor",
+            "deleted": "Eliminar"
+          },
+          "enabled_unbound": {
+            "disabled": "Deshabilitar proveedor",
+            "bound_inactive": "Enlazar a despliegue inactivo",
+            "deleted": "Eliminar"
+          },
+          "bound_inactive": {
+            "enabled_unbound": "Quitar referencias de despliegue",
+            "active_ready": "Activar despliegue",
+            "deleted": "Eliminar"
+          },
+          "active_ready": {
+            "bound_inactive": "Desactivar por cambio de despliegue",
+            "active_attention": "El runtime requiere atencion",
+            "deleted": "Eliminar"
+          },
+          "active_attention": {
+            "active_ready": "Restaurar preparacion del runtime",
+            "bound_inactive": "Desactivar por cambio de despliegue",
+            "deleted": "Eliminar"
+          }
+        }
+      },
       "views": {
         "aria": "Secciones de gestion de proveedores",
         "providers": "Proveedores de plataforma",

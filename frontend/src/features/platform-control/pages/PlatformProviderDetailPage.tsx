@@ -99,6 +99,7 @@ export default function PlatformProviderDetailPage(): JSX.Element {
         <>
           <PlatformProviderOverviewSection
             activeDeployment={activeDeployment}
+            deployments={deployments}
             isUsedByActiveDeployment={isUsedByActiveDeployment}
             provider={provider}
             providerFamily={providerFamily}

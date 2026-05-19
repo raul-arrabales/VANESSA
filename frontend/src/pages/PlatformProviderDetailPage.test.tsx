@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
 import { t } from "../test/translation";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import PlatformProviderDetailPage from "./PlatformProviderDetailPage";
 import * as platformApi from "../api/platform";
@@ -147,6 +148,15 @@ describe("PlatformProviderDetailPage", () => {
     expect(screen.queryByRole("link", { name: await t("platformControl.actions.viewProviders") })).not.toBeInTheDocument();
     expect(await screen.findByText(await t("platformControl.sections.usage"))).toBeVisible();
     expect(await screen.findByRole("heading", { name: "Local Default", level: 4 })).toBeVisible();
+
+    const lifecycleButton = expectNamedIconAction("button", "View lifecycle for vLLM local gateway");
+    await userEvent.click(lifecycleButton);
+    const lifecycleDialog = await screen.findByRole("dialog", {
+      name: "Provider lifecycle: vLLM local gateway",
+    });
+    expect(within(lifecycleDialog).getByText(/Status: Enabled/)).toBeVisible();
+    expect(within(lifecycleDialog).getByText(/Active deployment: Local Default \(local-default\)/)).toBeVisible();
+    await userEvent.click(within(lifecycleDialog).getByRole("button", { name: await t("platformControl.actions.cancel") }));
 
     await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.validate") }));
 
