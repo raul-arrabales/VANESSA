@@ -498,7 +498,6 @@
       "modalDescription": "Preparacion actual para recuperacion, salud de sincronizacion, proveedor y vinculaciones de esta base de conocimiento.",
       "currentState": "Actual",
       "actionLabel": "Ver ciclo de vida de {{name}}",
-      "summary": "Ciclo de vida: {{lifecycleState}} | Sincronizacion: {{syncStatus}} | Documentos: {{documentCount}} | Vinculaciones: {{bindingCount}} | {{eligibility}} | Proveedor: {{backingProvider}} | Embeddings: {{embeddingProvider}} / {{embeddingResource}}{{syncError}}",
       "summaryLabels": {
         "lifecycleState": "Ciclo de vida",
         "syncStatus": "Sincronizacion",
@@ -510,7 +509,6 @@
         "embeddingResource": "Recurso de embeddings",
         "lastError": "Ultimo error"
       },
-      "syncErrorSuffix": " | Ultimo error: {{error}}",
       "states": {
         "empty": "Vacia",
         "syncing": "Sincronizando",
@@ -1677,7 +1675,6 @@
         "modalDescription": "Habilitacion actual, uso en despliegues, estado de carga del runtime, endpoint y familia de este proveedor.",
         "currentState": "Actual",
         "actionLabel": "Ver ciclo de vida de {{name}}",
-        "summary": "Estado: {{enabledStatus}} | Origen: {{origin}} | Capacidad: {{capability}} | Familia: {{providerFamily}} | Adaptador: {{adapter}} | Despliegues referenciados: {{usageCount}} | {{activeUsage}} | Despliegue activo: {{activeDeployment}} | Estado de carga: {{loadState}} | Recurso cargado: {{loadedResource}} | Endpoint: {{endpoint}}{{loadError}}",
         "summaryLabels": {
           "status": "Estado",
           "origin": "Origen",
@@ -1692,7 +1689,6 @@
           "endpoint": "Endpoint",
           "loadError": "Error de carga"
         },
-        "loadErrorSuffix": " | Error de carga: {{error}}",
         "states": {
           "disabled": "Deshabilitado",
           "enabled_unbound": "Habilitado libre",
@@ -1779,7 +1775,6 @@
         "modalDescription": "Estado de activacion, preparacion, enlaces, proveedores y recursos de este perfil de despliegue.",
         "currentState": "Actual",
         "actionLabel": "Ver ciclo de vida de {{name}}",
-        "summary": "Estado: {{activeStatus}} | Preparacion: {{readinessStatus}} | {{readinessSummary}} | Enlaces: {{readyBindingCount}}/{{bindingCount}} listos | Capacidades incompletas: {{incompleteCapabilityCount}} | Proveedores: {{providerCount}} | Recursos: {{resourceCount}} | Despliegue activo: {{activeDeployment}}",
         "summaryLabels": {
           "status": "Estado",
           "readiness": "Preparacion",
@@ -2034,7 +2029,6 @@
         "modalTitle": "Ciclo de vida de agente: {{name}}",
         "modalDescription": "Publicacion, validacion, modelo, herramientas y runtime actuales de este agente de catalogo.",
         "currentState": "Actual",
-        "summary": "Tipo: {{kind}} | Estado: {{publishStatus}} | Validacion: {{validationStatus}} | Modelo: {{model}} | Herramientas: {{toolCount}} | Servidores MCP: {{mcpCount}} | {{runtimeConstraints}}",
         "summaryLabels": {
           "kind": "Tipo",
           "status": "Estado",
@@ -2141,7 +2135,6 @@
         "modalTitle": "Ciclo de vida de herramienta: {{name}}",
         "modalDescription": "Preparacion, validacion y publicacion actuales de esta herramienta de catalogo.",
         "currentState": "Actual",
-        "summary": "Backend: {{backend}} | Estado: {{publishStatus}} | Validacion: {{validationStatus}} | {{compatibility}}",
         "summaryLabels": {
           "backend": "Backend",
           "status": "Estado",
@@ -2242,7 +2235,6 @@
         "modalTitle": "Ciclo de vida MCP: {{name}}",
         "modalDescription": "Publicacion, exposicion, validacion y metadatos actuales de este servidor MCP.",
         "currentState": "Actual",
-        "summary": "Categoria: {{category}} | Riesgo: {{risk}} | Herramienta base: {{backingTool}} | Estado: {{exposureStatus}} | Validacion: {{validationStatus}} | {{flags}}",
         "summaryLabels": {
           "category": "Categoria",
           "risk": "Riesgo",

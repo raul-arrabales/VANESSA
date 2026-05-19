@@ -504,7 +504,6 @@
       "modalDescription": "Current retrieval readiness, sync health, provider, and binding posture for this knowledge base.",
       "currentState": "Current",
       "actionLabel": "View lifecycle for {{name}}",
-      "summary": "Lifecycle: {{lifecycleState}} | Sync: {{syncStatus}} | Documents: {{documentCount}} | Bindings: {{bindingCount}} | {{eligibility}} | Provider: {{backingProvider}} | Embeddings: {{embeddingProvider}} / {{embeddingResource}}{{syncError}}",
       "summaryLabels": {
         "lifecycleState": "Lifecycle",
         "syncStatus": "Sync",
@@ -516,7 +515,6 @@
         "embeddingResource": "Embedding resource",
         "lastError": "Last error"
       },
-      "syncErrorSuffix": " | Last error: {{error}}",
       "states": {
         "empty": "Empty",
         "syncing": "Syncing",
@@ -1689,7 +1687,6 @@
         "modalDescription": "Current enablement, deployment usage, runtime load posture, endpoint, and provider family for this provider.",
         "currentState": "Current",
         "actionLabel": "View lifecycle for {{name}}",
-        "summary": "Status: {{enabledStatus}} | Origin: {{origin}} | Capability: {{capability}} | Family: {{providerFamily}} | Adapter: {{adapter}} | Referenced deployments: {{usageCount}} | {{activeUsage}} | Active deployment: {{activeDeployment}} | Load state: {{loadState}} | Loaded resource: {{loadedResource}} | Endpoint: {{endpoint}}{{loadError}}",
         "summaryLabels": {
           "status": "Status",
           "origin": "Origin",
@@ -1704,7 +1701,6 @@
           "endpoint": "Endpoint",
           "loadError": "Load error"
         },
-        "loadErrorSuffix": " | Load error: {{error}}",
         "states": {
           "disabled": "Disabled",
           "enabled_unbound": "Enabled unbound",
@@ -1791,7 +1787,6 @@
         "modalDescription": "Current activation state, configuration readiness, bindings, providers, and resources for this deployment profile.",
         "currentState": "Current",
         "actionLabel": "View lifecycle for {{name}}",
-        "summary": "Status: {{activeStatus}} | Readiness: {{readinessStatus}} | {{readinessSummary}} | Bindings: {{readyBindingCount}}/{{bindingCount}} ready | Incomplete capabilities: {{incompleteCapabilityCount}} | Providers: {{providerCount}} | Resources: {{resourceCount}} | Active deployment: {{activeDeployment}}",
         "summaryLabels": {
           "status": "Status",
           "readiness": "Readiness",
@@ -2052,7 +2047,6 @@
         "modalTitle": "Agent lifecycle: {{name}}",
         "modalDescription": "Current publication, validation, model, tool, and runtime readiness for this catalog agent.",
         "currentState": "Current",
-        "summary": "Kind: {{kind}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | Model: {{model}} | Tools: {{toolCount}} | MCP servers: {{mcpCount}} | {{runtimeConstraints}}",
         "summaryLabels": {
           "kind": "Kind",
           "status": "Status",
@@ -2159,7 +2153,6 @@
         "modalTitle": "Tool lifecycle: {{name}}",
         "modalDescription": "Current readiness, validation, and publication path for this catalog tool.",
         "currentState": "Current",
-        "summary": "Backend: {{backend}} | Status: {{publishStatus}} | Validation: {{validationStatus}} | {{compatibility}}",
         "summaryLabels": {
           "backend": "Backend",
           "status": "Status",
@@ -2260,7 +2253,6 @@
         "modalTitle": "MCP lifecycle: {{name}}",
         "modalDescription": "Current publication, exposure, validation, and metadata posture for this MCP server.",
         "currentState": "Current",
-        "summary": "Category: {{category}} | Risk: {{risk}} | Backing tool: {{backingTool}} | Status: {{exposureStatus}} | Validation: {{validationStatus}} | {{flags}}",
         "summaryLabels": {
           "category": "Category",
           "risk": "Risk",
