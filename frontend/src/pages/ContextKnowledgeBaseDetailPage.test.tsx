@@ -99,6 +99,7 @@ const contextApiMocks = vi.hoisted(() => ({
       },
     },
     document_count: 2,
+    binding_count: 1,
     deployment_usage: [
       {
         deployment_profile: {
@@ -567,6 +568,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
   });
 
   it("renders the overview page with metadata and workspace subnav", async () => {
+    const user = userEvent.setup();
     contextApiMocks.listKnowledgeSources.mockResolvedValueOnce([
       {
         id: "source-1",
@@ -659,6 +661,12 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
     expect(within(usageCard as HTMLElement).getByText("local-default · vector_store")).toBeVisible();
 
     expect(screen.getByText(/Managed knowledge base index is ready\./i)).toBeVisible();
+
+    const lifecycleButton = expectNamedIconAction("button", "View lifecycle for Product Docs");
+    await user.click(lifecycleButton);
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Knowledge base lifecycle: Product Docs")).toBeVisible();
+    expect(screen.getByText(/Lifecycle: active/)).toBeVisible();
   });
 
   it("lets superadmins resync from the overview page", async () => {
@@ -740,6 +748,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         },
       },
       document_count: 0,
+      binding_count: 0,
       deployment_usage: [],
     });
     contextApiMocks.updateKnowledgeBase.mockResolvedValueOnce({
@@ -796,6 +805,7 @@ describe("ContextKnowledgeBaseWorkspace pages", () => {
         },
       },
       document_count: 0,
+      binding_count: 0,
       deployment_usage: [],
     });
 

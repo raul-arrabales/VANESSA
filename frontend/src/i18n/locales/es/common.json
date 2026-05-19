@@ -491,6 +491,58 @@
       "upload": "Subir documentos",
       "documents": "Explorar documentos"
     },
+    "lifecycle": {
+      "title": "Ciclo de vida de la base de conocimiento",
+      "summaryDescription": "Preparacion para recuperacion segun sincronizacion, elegibilidad y vinculacion a despliegues.",
+      "modalTitle": "Ciclo de vida de la base de conocimiento: {{name}}",
+      "modalDescription": "Preparacion actual para recuperacion, salud de sincronizacion, proveedor y vinculaciones de esta base de conocimiento.",
+      "currentState": "Actual",
+      "actionLabel": "Ver ciclo de vida de {{name}}",
+      "summary": "Ciclo de vida: {{lifecycleState}} | Sincronizacion: {{syncStatus}} | Documentos: {{documentCount}} | Vinculaciones: {{bindingCount}} | {{eligibility}} | Proveedor: {{backingProvider}} | Embeddings: {{embeddingProvider}} / {{embeddingResource}}{{syncError}}",
+      "syncErrorSuffix": " | Ultimo error: {{error}}",
+      "states": {
+        "empty": "Vacia",
+        "syncing": "Sincronizando",
+        "sync_error": "Error de sync",
+        "ineligible": "No elegible",
+        "ready_unbound": "Sin vinculo",
+        "ready_bound": "Vinculada",
+        "archived": "Archivada"
+      },
+      "transitions": {
+        "empty": {
+          "syncing": "Iniciar sincronizacion",
+          "archived": "Archivar"
+        },
+        "syncing": {
+          "sync_error": "Fallo de sincronizacion",
+          "ready_unbound": "Sincronizacion lista",
+          "ready_bound": "Lista y vinculada",
+          "archived": "Archivar"
+        },
+        "sync_error": {
+          "syncing": "Reintentar sincronizacion",
+          "archived": "Archivar"
+        },
+        "ineligible": {
+          "syncing": "Resincronizar",
+          "archived": "Archivar"
+        },
+        "ready_unbound": {
+          "syncing": "Resincronizar",
+          "ready_bound": "Vincular a despliegue",
+          "archived": "Archivar"
+        },
+        "ready_bound": {
+          "syncing": "Resincronizar",
+          "ready_unbound": "Desvincular de despliegue",
+          "archived": "Archivar"
+        },
+        "archived": {
+          "empty": "Restaurar"
+        }
+      }
+    },
     "advancedSettings": {
       "title": "Configuracion avanzada",
       "description": "Elige como esta base de conocimiento obtendra sus vectores antes de empezar a ingerir documentos.",

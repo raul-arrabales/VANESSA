@@ -1,10 +1,18 @@
-import { useRef, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeBase, KnowledgeSyncRun } from "../../../api/context";
+import ActionIcon from "../../../components/ActionIcon";
+import IconButton from "../../../components/IconButton";
+import { LifecycleGraphModal } from "../../../components/LifecycleGraph";
 import ModalDialog from "../../../components/ModalDialog";
 import { KnowledgeBaseChunkingEditor } from "./KnowledgeBaseChunkingEditor";
 import { KnowledgeBaseSyncProgress } from "./KnowledgeBaseSyncProgress";
 import type { KnowledgeBaseOverviewFormState } from "../types";
+import {
+  createKnowledgeBaseLifecycleGraphDefinition,
+  getKnowledgeBaseLifecycleState,
+  getKnowledgeBaseLifecycleSummary,
+} from "../knowledgeBaseLifecycleGraph";
 
 type Props = {
   knowledgeBase: KnowledgeBase;
@@ -59,6 +67,8 @@ export function KnowledgeBaseOverviewSection({
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const [isLifecycleModalOpen, setIsLifecycleModalOpen] = useState(false);
+  const lifecycleDefinition = useMemo(() => createKnowledgeBaseLifecycleGraphDefinition(t), [t]);
   const noneLabel = t("platformControl.summary.none");
   const vectorizationModeLabel =
     knowledgeBase.vectorization.mode === "self_provided"
@@ -105,6 +115,12 @@ export function KnowledgeBaseOverviewSection({
         <span className="platform-badge" data-tone={knowledgeBase.sync_status === "ready" ? "enabled" : "disabled"}>
           {`${knowledgeBase.lifecycle_state} / ${knowledgeBase.sync_status}`}
         </span>
+        <IconButton
+          label={t("contextManagement.lifecycle.actionLabel", { name: knowledgeBase.display_name })}
+          onClick={() => setIsLifecycleModalOpen(true)}
+        >
+          <ActionIcon name="lifecycle" />
+        </IconButton>
       </div>
       <div className="platform-detail-grid context-kb-summary-grid">
         <SummaryCard
@@ -298,6 +314,19 @@ export function KnowledgeBaseOverviewSection({
               </button>
             </>
           )}
+        />
+      ) : null}
+      {isLifecycleModalOpen ? (
+        <LifecycleGraphModal
+          title={t("contextManagement.lifecycle.modalTitle", { name: knowledgeBase.display_name })}
+          description={t("contextManagement.lifecycle.modalDescription")}
+          definition={lifecycleDefinition}
+          currentState={getKnowledgeBaseLifecycleState(knowledgeBase)}
+          supportingText={getKnowledgeBaseLifecycleSummary(t, knowledgeBase)}
+          currentLabel={t("contextManagement.lifecycle.currentState")}
+          unknownLabel={t("platformControl.summary.unknown")}
+          closeLabel={t("contextManagement.actions.cancel")}
+          onClose={() => setIsLifecycleModalOpen(false)}
         />
       ) : null}
     </section>

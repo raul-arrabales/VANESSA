@@ -497,6 +497,58 @@
       "upload": "Upload Documents",
       "documents": "Browse Documents"
     },
+    "lifecycle": {
+      "title": "Knowledge base lifecycle",
+      "summaryDescription": "Retrieval readiness across sync, eligibility, and deployment binding states.",
+      "modalTitle": "Knowledge base lifecycle: {{name}}",
+      "modalDescription": "Current retrieval readiness, sync health, provider, and binding posture for this knowledge base.",
+      "currentState": "Current",
+      "actionLabel": "View lifecycle for {{name}}",
+      "summary": "Lifecycle: {{lifecycleState}} | Sync: {{syncStatus}} | Documents: {{documentCount}} | Bindings: {{bindingCount}} | {{eligibility}} | Provider: {{backingProvider}} | Embeddings: {{embeddingProvider}} / {{embeddingResource}}{{syncError}}",
+      "syncErrorSuffix": " | Last error: {{error}}",
+      "states": {
+        "empty": "Empty",
+        "syncing": "Syncing",
+        "sync_error": "Sync error",
+        "ineligible": "Ineligible",
+        "ready_unbound": "Ready unbound",
+        "ready_bound": "Ready bound",
+        "archived": "Archived"
+      },
+      "transitions": {
+        "empty": {
+          "syncing": "Start sync",
+          "archived": "Archive"
+        },
+        "syncing": {
+          "sync_error": "Sync failed",
+          "ready_unbound": "Sync ready",
+          "ready_bound": "Sync ready and bound",
+          "archived": "Archive"
+        },
+        "sync_error": {
+          "syncing": "Retry sync",
+          "archived": "Archive"
+        },
+        "ineligible": {
+          "syncing": "Resync",
+          "archived": "Archive"
+        },
+        "ready_unbound": {
+          "syncing": "Resync",
+          "ready_bound": "Bind to deployment",
+          "archived": "Archive"
+        },
+        "ready_bound": {
+          "syncing": "Resync",
+          "ready_unbound": "Unbind from deployment",
+          "archived": "Archive"
+        },
+        "archived": {
+          "empty": "Restore"
+        }
+      }
+    },
     "advancedSettings": {
       "title": "Advanced settings",
       "description": "Choose how this knowledge base will get vectors before you start ingesting documents.",

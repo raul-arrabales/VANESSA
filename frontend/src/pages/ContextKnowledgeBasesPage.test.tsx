@@ -1,6 +1,8 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
+import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import type { AuthUser } from "../auth/types";
 import ContextKnowledgeBasesPage from "./ContextKnowledgeBasesPage";
 
@@ -82,7 +84,23 @@ describe("ContextKnowledgeBasesPage", () => {
     await renderWithAppProviders(<ContextKnowledgeBasesPage />, { route: "/control/context" });
 
     expect(await screen.findByRole("heading", { name: "Context management" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Knowledge base lifecycle" })).toBeVisible();
     expect(screen.getByText("Product Docs")).toBeVisible();
     expect(screen.getByText("kb_product_docs")).toBeVisible();
+    expect(screen.getAllByText("Ready bound").length).toBeGreaterThan(0);
+    expectNamedIconAction("button", "View lifecycle for Product Docs");
+  });
+
+  it("opens a lifecycle modal from an inventory row", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<ContextKnowledgeBasesPage />, { route: "/control/context" });
+
+    await user.click(await screen.findByRole("button", { name: "View lifecycle for Product Docs" }));
+
+    expect(await screen.findByRole("dialog")).toBeVisible();
+    expect(screen.getByText("Knowledge base lifecycle: Product Docs")).toBeVisible();
+    expect(screen.getByText(/Provider: Weaviate local/)).toBeVisible();
+    expect(screen.getByText(/Embeddings local \/ text-embedding-3-small/)).toBeVisible();
   });
 });
