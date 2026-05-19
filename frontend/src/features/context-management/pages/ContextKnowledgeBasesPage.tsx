@@ -41,23 +41,6 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
       {!loading && knowledgeBases.length === 0 ? <p className="status-text">{t("contextManagement.states.empty")}</p> : null}
 
       {knowledgeBases.length > 0 ? (
-        <article className="panel panel-nested card-stack">
-          <div className="platform-card-header">
-            <div className="card-stack">
-              <h3 className="section-title">{t("contextManagement.lifecycle.title")}</h3>
-              <p className="status-text">{t("contextManagement.lifecycle.summaryDescription")}</p>
-            </div>
-          </div>
-          <LifecycleGraph
-            definition={lifecycleDefinition}
-            counts={lifecycleCounts}
-            currentLabel={t("contextManagement.lifecycle.currentState")}
-            unknownLabel={t("platformControl.summary.unknown")}
-          />
-        </article>
-      ) : null}
-
-      {knowledgeBases.length > 0 ? (
         <div className="health-table-wrap">
           <table className="health-table" aria-label={t("contextManagement.aria.table")}>
             <thead>
@@ -105,6 +88,22 @@ export default function ContextKnowledgeBasesPage(): JSX.Element {
             </tbody>
           </table>
         </div>
+      ) : null}
+      {knowledgeBases.length > 0 ? (
+        <article className="panel panel-nested card-stack">
+          <div className="platform-card-header">
+            <div className="card-stack">
+              <h3 className="section-title">{t("contextManagement.lifecycle.title")}</h3>
+              <p className="status-text">{t("contextManagement.lifecycle.summaryDescription")}</p>
+            </div>
+          </div>
+          <LifecycleGraph
+            definition={lifecycleDefinition}
+            counts={lifecycleCounts}
+            currentLabel={t("contextManagement.lifecycle.currentState")}
+            unknownLabel={t("platformControl.summary.unknown")}
+          />
+        </article>
       ) : null}
       {lifecycleKnowledgeBase ? (
         <LifecycleGraphModal

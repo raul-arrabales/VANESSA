@@ -85,6 +85,11 @@ describe("ContextKnowledgeBasesPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Context management" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Knowledge base lifecycle" })).toBeVisible();
+    expect(
+      screen
+        .getByRole("table", { name: "Knowledge base inventory" })
+        .compareDocumentPosition(screen.getByRole("heading", { name: "Knowledge base lifecycle" })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getByText("Product Docs")).toBeVisible();
     expect(screen.getByText("kb_product_docs")).toBeVisible();
     expect(screen.getAllByText("Ready bound").length).toBeGreaterThan(0);

@@ -206,6 +206,7 @@ export function LifecycleGraphModal({
 
   return (
     <ModalDialog
+      className="lifecycle-graph-modal"
       title={title}
       description={description}
       onClose={onClose}

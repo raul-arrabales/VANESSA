@@ -13,9 +13,17 @@
 
 .modal-card {
   width: min(32rem, 100%);
+  max-height: calc(100dvh - 2rem);
   padding-right: var(--space-6);
+  overflow-y: auto;
+  box-sizing: border-box;
   box-shadow: var(--shadow-3);
   animation: modal-enter var(--duration-base) var(--easing-standard);
+}
+
+.lifecycle-graph-modal {
+  width: min(62rem, 100%);
+  overscroll-behavior: contain;
 }
 
 .modal-title {
