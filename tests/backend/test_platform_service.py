@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.repositories import platform_control_plane as platform_repo  # noqa: E402
 from app.services import (  # noqa: E402
     platform_adapters,
     platform_bootstrap,
@@ -1305,6 +1306,10 @@ def test_binding_input_coerces_json_null_default_resource_to_none(monkeypatch: p
     )
 
     assert binding.default_resource_id is None
+
+
+def test_repository_accepts_image_analysis_as_known_capability():
+    assert "image_analysis" in platform_repo._CAPABILITIES  # type: ignore[attr-defined]
 
 
 def test_model_binding_rejects_cloud_model_for_local_provider(monkeypatch: pytest.MonkeyPatch):

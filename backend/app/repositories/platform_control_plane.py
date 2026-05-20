@@ -7,7 +7,7 @@ from psycopg.types.json import Jsonb
 
 from ..db import get_connection
 
-_CAPABILITIES = {"llm_inference", "embeddings", "vector_store", "mcp_runtime", "sandbox_execution"}
+_CAPABILITIES = {"llm_inference", "embeddings", "vector_store", "mcp_runtime", "sandbox_execution", "image_analysis"}
 
 
 def ensure_capability(
