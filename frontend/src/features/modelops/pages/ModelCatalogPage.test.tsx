@@ -50,4 +50,14 @@ describe("ModelCatalogPage", () => {
     expect(screen.getByRole("heading", { name: "Model catalog" })).toBeVisible();
     expect(await screen.findByText("Alpha")).toBeVisible();
   });
+
+  it("offers image analysis tasks in the task filter", async () => {
+    await renderWithAppProviders(<ModelCatalogPage />, { route: "/control/models/catalog" });
+
+    const taskFilter = screen.getByLabelText("Task");
+    expect(within(taskFilter).getByRole("option", { name: "Image plate detection" })).toHaveValue("image_plate_detection");
+    expect(within(taskFilter).getByRole("option", { name: "Image plate OCR" })).toHaveValue("image_plate_ocr");
+    expect(within(taskFilter).getByRole("option", { name: "Object detection" })).toHaveValue("object_detection");
+    expect(within(taskFilter).getByRole("option", { name: "Image captioning" })).toHaveValue("image_captioning");
+  });
 });

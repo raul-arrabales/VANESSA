@@ -1,3 +1,5 @@
+import { TASK_OPTIONS } from "../domain";
+
 type ModelCatalogFiltersProps = {
   search: string;
   taskFilter: string;
@@ -29,10 +31,9 @@ export default function ModelCatalogFilters({
         <span className="field-label">Task</span>
         <select className="field-input" value={taskFilter} onChange={(event) => onTaskFilterChange(event.currentTarget.value)}>
           <option value="">All</option>
-          <option value="llm">LLM</option>
-          <option value="embeddings">Embeddings</option>
-          <option value="translation">Translation</option>
-          <option value="classification">Classification</option>
+          {TASK_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </label>
       <label className="card-stack">
