@@ -92,7 +92,7 @@ def _coerce_binding_input(
     binding_config = item.get("config") if isinstance(item.get("config"), dict) else {}
     resource_policy = item.get("resource_policy") if isinstance(item.get("resource_policy"), dict) else {}
     resources = _coerce_binding_resources(item.get("resources"))
-    default_resource_id = str(item.get("default_resource_id", "")).strip() or None
+    default_resource_id = str(item.get("default_resource_id") or "").strip() or None
     return DeploymentBindingInput(
         capability_key=normalized_capability_key,
         provider_instance_id=provider_instance_id,

@@ -1290,6 +1290,23 @@ def test_image_analysis_binding_rejects_global_default(monkeypatch: pytest.Monke
     assert exc_info.value.code == "default_resource_not_supported"
 
 
+def test_binding_input_coerces_json_null_default_resource_to_none(monkeypatch: pytest.MonkeyPatch):
+    bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
+    monkeypatch.setattr(bindings_module, "_known_capability_keys", lambda _db: {"image_analysis"})
+
+    binding = bindings_module._coerce_binding_input(
+        "ignored",
+        item={
+            "provider_id": "provider-image",
+            "default_resource_id": None,
+            "resource_policy": {"selection_mode": "task_defaults"},
+        },
+        capability_key="image_analysis",
+    )
+
+    assert binding.default_resource_id is None
+
+
 def test_model_binding_rejects_cloud_model_for_local_provider(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         platform_service._platform_bindings_module,
