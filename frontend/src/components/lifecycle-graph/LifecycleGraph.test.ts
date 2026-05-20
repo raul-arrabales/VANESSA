@@ -80,8 +80,17 @@ describe("LifecycleGraph utilities", () => {
     expect(getLifecycleNodeLabelLines("one two three four five")).toEqual(["one two three", "four five"]);
   });
 
-  it("builds curved edge paths from natural node boundary anchors", () => {
-    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 300, y: 100 })).toBe("M 170 100 C 190.4 112, 209.6 112, 230 100");
-    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 100, y: 220 })).toBe("M 100 128 C 88 149.76, 88 170.24, 100 192");
+  it("uses straight edge paths for adjacent node connections", () => {
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 300, y: 100 })).toBe("M 170 100 L 230 100");
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 100, y: 220 })).toBe("M 100 128 L 100 192");
+  });
+
+  it("keeps distant node connections curved", () => {
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 500, y: 100 })).toBe("M 170 100 C 258.4 131.2, 341.6 131.2, 430 100");
+  });
+
+  it("separates reciprocal edge paths into parallel lanes", () => {
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 300, y: 100 }, { laneOffset: 6 })).toBe("M 170 106 L 230 106");
+    expect(buildLifecycleEdgePath({ x: 300, y: 100 }, { x: 100, y: 100 }, { laneOffset: 6 })).toBe("M 230 94 L 170 94");
   });
 });

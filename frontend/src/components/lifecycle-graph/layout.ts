@@ -4,6 +4,7 @@ const LIFECYCLE_NODE_WIDTH = 140;
 const LIFECYCLE_NODE_HEIGHT = 56;
 const LIFECYCLE_NODE_HORIZONTAL_INSET = 14;
 const LIFECYCLE_NODE_VERTICAL_INSET = 10;
+const LIFECYCLE_ADJACENT_CENTER_DISTANCE = 225;
 
 type LifecyclePoint = {
   x: number;
@@ -13,6 +14,10 @@ type LifecyclePoint = {
 type LifecycleAnchor = LifecyclePoint & {
   normalX: number;
   normalY: number;
+};
+
+type LifecycleEdgePathOptions = {
+  laneOffset?: number;
 };
 
 function truncateLifecycleLabelLine(line: string, maxLineLength: number): string {
@@ -142,7 +147,11 @@ function getLifecycleControlDistance(start: LifecyclePoint, end: LifecyclePoint)
   return clampCoordinate(distance * 0.34, 8, 108);
 }
 
-export function buildLifecycleEdgePath(start: LifecyclePoint, end: LifecyclePoint): string {
+function isAdjacentLifecycleEdge(start: LifecyclePoint, end: LifecyclePoint): boolean {
+  return Math.hypot(end.x - start.x, end.y - start.y) <= LIFECYCLE_ADJACENT_CENTER_DISTANCE;
+}
+
+export function buildLifecycleEdgePath(start: LifecyclePoint, end: LifecyclePoint, options: LifecycleEdgePathOptions = {}): string {
   const startAnchor = getLifecycleNodeAnchor(start, end);
   const endAnchor = getLifecycleNodeAnchor(end, start);
   const distance = Math.hypot(endAnchor.x - startAnchor.x, endAnchor.y - startAnchor.y);
@@ -159,21 +168,38 @@ export function buildLifecycleEdgePath(start: LifecyclePoint, end: LifecyclePoin
 
   const perpendicularX = -(endAnchor.y - startAnchor.y) / distance;
   const perpendicularY = (endAnchor.x - startAnchor.x) / distance;
+  const laneOffset = options.laneOffset ?? 0;
+  const shiftedStart = {
+    x: startAnchor.x + perpendicularX * laneOffset,
+    y: startAnchor.y + perpendicularY * laneOffset,
+  };
+  const shiftedEnd = {
+    x: endAnchor.x + perpendicularX * laneOffset,
+    y: endAnchor.y + perpendicularY * laneOffset,
+  };
+
+  if (isAdjacentLifecycleEdge(start, end)) {
+    return [
+      `M ${formatLifecycleCoordinate(shiftedStart.x)} ${formatLifecycleCoordinate(shiftedStart.y)}`,
+      `L ${formatLifecycleCoordinate(shiftedEnd.x)} ${formatLifecycleCoordinate(shiftedEnd.y)}`,
+    ].join(" ");
+  }
+
   const bend = getLifecycleCurveBend(startAnchor, endAnchor);
   const controlDistance = getLifecycleControlDistance(startAnchor, endAnchor);
   const startControl = {
-    x: startAnchor.x + startAnchor.normalX * controlDistance + perpendicularX * bend,
-    y: startAnchor.y + startAnchor.normalY * controlDistance + perpendicularY * bend,
+    x: startAnchor.x + startAnchor.normalX * controlDistance + perpendicularX * (bend + laneOffset),
+    y: startAnchor.y + startAnchor.normalY * controlDistance + perpendicularY * (bend + laneOffset),
   };
   const endControl = {
-    x: endAnchor.x + endAnchor.normalX * controlDistance + perpendicularX * bend,
-    y: endAnchor.y + endAnchor.normalY * controlDistance + perpendicularY * bend,
+    x: endAnchor.x + endAnchor.normalX * controlDistance + perpendicularX * (bend + laneOffset),
+    y: endAnchor.y + endAnchor.normalY * controlDistance + perpendicularY * (bend + laneOffset),
   };
 
   return [
-    `M ${formatLifecycleCoordinate(startAnchor.x)} ${formatLifecycleCoordinate(startAnchor.y)}`,
+    `M ${formatLifecycleCoordinate(shiftedStart.x)} ${formatLifecycleCoordinate(shiftedStart.y)}`,
     `C ${formatLifecycleCoordinate(startControl.x)} ${formatLifecycleCoordinate(startControl.y)},`,
     `${formatLifecycleCoordinate(endControl.x)} ${formatLifecycleCoordinate(endControl.y)},`,
-    `${formatLifecycleCoordinate(endAnchor.x)} ${formatLifecycleCoordinate(endAnchor.y)}`,
+    `${formatLifecycleCoordinate(shiftedEnd.x)} ${formatLifecycleCoordinate(shiftedEnd.y)}`,
   ].join(" ");
 }

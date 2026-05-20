@@ -20,6 +20,10 @@ function LifecycleSummaryRows({ rows }: { rows: LifecycleSummaryRow[] }): JSX.El
   );
 }
 
+function lifecycleTransitionPairId(from: string, to: string): string {
+  return [from, to].sort().join("<->");
+}
+
 export default function LifecycleGraph({
   definition,
   counts,
@@ -40,6 +44,19 @@ export default function LifecycleGraph({
     () => new Map(definition.states.map((state, index) => [state.id, getLifecycleStatePosition(state, index, definition.states.length)])),
     [definition.states],
   );
+  const transitionLaneOffsets = useMemo(() => {
+    const pairCounts = new Map<string, number>();
+    for (const transition of definition.transitions) {
+      const pairId = lifecycleTransitionPairId(transition.from, transition.to);
+      pairCounts.set(pairId, (pairCounts.get(pairId) ?? 0) + 1);
+    }
+    return new Map(
+      definition.transitions.map((transition) => [
+        lifecycleTransitionId(transition),
+        (pairCounts.get(lifecycleTransitionPairId(transition.from, transition.to)) ?? 0) > 1 ? 6 : 0,
+      ]),
+    );
+  }, [definition.transitions]);
 
   return (
     <div className="lifecycle-graph">
@@ -59,7 +76,7 @@ export default function LifecycleGraph({
             return null;
           }
           const isAvailable = highlight.outgoingTransitions.has(lifecycleTransitionId(transition));
-          const path = buildLifecycleEdgePath(start, end);
+          const path = buildLifecycleEdgePath(start, end, { laneOffset: transitionLaneOffsets.get(lifecycleTransitionId(transition)) });
           return (
             <path
               key={lifecycleTransitionId(transition)}
