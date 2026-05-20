@@ -177,6 +177,8 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
+      args:
+        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
     container_name: vanessa-image-analysis
     profiles:
       - image_analysis

@@ -109,6 +109,8 @@ Supported launcher variables:
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
 - `IMAGE_ANALYSIS_URL` (blank by default; set to `http://image_analysis:8090` to enable the optional `image_analysis` compose profile and backend bootstrap binding)
+- `IMAGE_ANALYSIS_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
+- `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real vision model dependencies)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
 - `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
@@ -166,6 +168,7 @@ Split local runtime selection:
 - Local-staging scripts automatically add the `image_analysis` compose profile when enabled.
 - The service mounts `models/image_analysis` and exposes local plate recognition, object detection, and captioning through the `image_analysis` platform capability.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
+- Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 
 `mcp_gateway` behavior:
 
@@ -374,18 +377,6 @@ Use the targeted restart script when only one service changed:
   - On GPU hosts, verify Docker GPU access works before starting VANESSA:
     `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
   - The default GPU runtime image is CUDA 12 based. Older NVIDIA GPUs below compute capability `6.0` can be visible to Docker and still fail during vLLM startup.
-- `llama_cpp` fails to start:
-  - Confirm `LLAMA_CPP_URL` is set and `LLAMA_CPP_MODEL_PATH` points to an existing GGUF file.
-  - Run `./ops/local-staging/restart-service.sh --service llama_cpp`.
-  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/v1/models` inside the container.
-- `qdrant` fails to start:
-  - Confirm `QDRANT_URL` is set.
-  - Run `./ops/local-staging/restart-service.sh --service qdrant`.
-  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/healthz` inside the container.
-- `image_analysis` fails to start:
-  - Confirm `IMAGE_ANALYSIS_URL=http://image_analysis:8090` is set.
-  - Run `./ops/local-staging/restart-service.sh --service image_analysis`.
-  - Use `IMAGE_ANALYSIS_FAKE_MODE=1` for a lightweight smoke path before downloading full vision model assets.
     - Example: GTX 960 (`compute capability 5.2`) is too old for the shipped GPU image.
     - In that case, use CPU mode (`LLM_RUNTIME_ACCELERATOR=cpu`) or run on a newer NVIDIA GPU.
   - If host `nvidia-smi` works but Docker fails with `could not select device driver "" with capabilities: [[gpu]]`:
@@ -399,13 +390,26 @@ Use the targeted restart script when only one service changed:
   - If startup fails with exit code `132`, the host likely needs a different CPU build variant or does not meet the minimum supported ISA.
   - If you intentionally want to run without local vLLM on an unsupported CPU host:
     - set `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU=true`
+    - choose a routing mode that does not require local runtime
+- `llama_cpp` fails to start:
+  - Confirm `LLAMA_CPP_URL` is set and `LLAMA_CPP_MODEL_PATH` points to an existing GGUF file.
+  - Run `./ops/local-staging/restart-service.sh --service llama_cpp`.
+  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/v1/models` inside the container.
+- `qdrant` fails to start:
+  - Confirm `QDRANT_URL` is set.
+  - Run `./ops/local-staging/restart-service.sh --service qdrant`.
+  - Validate readiness with `./ops/local-staging/health.sh`; the launcher checks `/healthz` inside the container.
+- `image_analysis` fails to start:
+  - Confirm `IMAGE_ANALYSIS_URL=http://image_analysis:8090` is set.
+  - Run `./ops/local-staging/restart-service.sh --service image_analysis`.
+  - Use `IMAGE_ANALYSIS_FAKE_MODE=1` for a lightweight smoke path before downloading full vision model assets.
+  - If installing real runtime dependencies, RF-DETR requires Transformers 5.x; rebuild after setting `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1`.
 - `health.sh` reports `llm_runtime_embeddings_slot: FAIL` even though `llm_runtime_embeddings: OK`:
   - This means the split embeddings runtime is healthy but is not advertising the embeddings model that the backend provider slot expects.
   - Retrieval and knowledge-base query flows will fail with embeddings errors until the slot is reapplied.
   - Run `./ops/local-staging/reconcile-local-model-slot.sh`.
   - Restart or verify `llm_runtime_embeddings` and `llm`, then re-run `./ops/local-staging/health.sh`.
   - Confirm both `llm_runtime_embeddings_slot: OK` and that `http://localhost:8000/v1/models` includes the expected embeddings model before retrying KB retrieval.
-    - choose a routing mode that does not require local runtime
 - `health.sh` reports `llm_runtime_embeddings_slot: WAIT`:
   - This means Platform Control still expects an embeddings slot and `llm_runtime_embeddings` is currently `loading` or `reconciling`.
   - This is expected during local startup and can last several minutes while the embeddings model warms.

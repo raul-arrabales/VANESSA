@@ -1,0 +1,7 @@
+numpy==2.2.6
+fast-alpr[onnx]==0.4.0
+fast-plate-ocr==1.1.0
+open-image-models==0.5.1
+rfdetr==1.6.5.post0
+transformers>=5.1.0,<6.0.0
+torch==2.9.1

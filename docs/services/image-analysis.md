@@ -29,7 +29,9 @@ V1 defaults are local open-source models:
 - Object detection: RF-DETR
 - Captioning: Florence-2
 
-CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. In normal mode, model libraries are imported lazily when their task is requested.
+CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want to install the real ANPR, RF-DETR, Florence, and Torch runtime dependencies.
+
+The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
 
 ## Control Plane Binding
 
