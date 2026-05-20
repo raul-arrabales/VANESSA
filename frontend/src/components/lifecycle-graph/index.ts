@@ -1,5 +1,5 @@
 export { buildLifecycleGraphDefinition, deriveLifecycleCounts, lifecycleTransitionId, resolveLifecycleHighlight } from "./definition";
-export { getLifecycleNodeLabelLines, getLifecycleStatePosition } from "./layout";
+export { buildLifecycleEdgePath, getLifecycleNodeLabelLines, getLifecycleStatePosition } from "./layout";
 export { default as LifecycleGraph } from "./LifecycleGraph";
 export { default as LifecycleGraphActionModal } from "./LifecycleGraphActionModal";
 export { LifecycleGraphModal } from "./LifecycleGraphModal";

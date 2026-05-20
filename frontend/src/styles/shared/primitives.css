@@ -326,6 +326,8 @@
   fill: none;
   stroke: color-mix(in oklab, var(--border-muted) 74%, var(--accent-secondary));
   stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .lifecycle-graph-edge[data-available="true"] {

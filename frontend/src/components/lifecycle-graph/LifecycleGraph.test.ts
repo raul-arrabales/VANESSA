@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLifecycleGraphDefinition,
+  buildLifecycleEdgePath,
   deriveLifecycleCounts,
   getLifecycleNodeLabelLines,
   resolveLifecycleHighlight,
@@ -77,5 +78,10 @@ describe("LifecycleGraph utilities", () => {
     expect(getLifecycleNodeLabelLines("Enabled unbound provider")).toEqual(["Enabled unbound", "provider"]);
     expect(getLifecycleNodeLabelLines("supercalifragilistic")).toEqual(["supercalifrag..."]);
     expect(getLifecycleNodeLabelLines("one two three four five")).toEqual(["one two three", "four five"]);
+  });
+
+  it("builds curved edge paths from natural node boundary anchors", () => {
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 300, y: 100 })).toBe("M 170 100 C 190.4 112, 209.6 112, 230 100");
+    expect(buildLifecycleEdgePath({ x: 100, y: 100 }, { x: 100, y: 220 })).toBe("M 100 128 C 88 149.76, 88 170.24, 100 192");
   });
 });

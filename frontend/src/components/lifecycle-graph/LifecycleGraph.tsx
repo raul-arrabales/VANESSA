@@ -1,6 +1,6 @@
 import { useId, useMemo } from "react";
 import { lifecycleTransitionId, resolveLifecycleHighlight } from "./definition";
-import { getLifecycleNodeLabelLines, getLifecycleStatePosition } from "./layout";
+import { buildLifecycleEdgePath, getLifecycleNodeLabelLines, getLifecycleStatePosition } from "./layout";
 import type { LifecycleGraphProps, LifecycleSummaryRow } from "./types";
 
 function LifecycleSummaryRows({ rows }: { rows: LifecycleSummaryRow[] }): JSX.Element {
@@ -45,11 +45,11 @@ export default function LifecycleGraph({
     <div className="lifecycle-graph">
       <svg className="lifecycle-graph-svg" viewBox="0 0 760 300" role="img" aria-label={`${definition.artifactType} lifecycle graph`}>
         <defs>
-          <marker id={arrowMarkerId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path className="lifecycle-graph-arrow" d="M 0 0 L 10 5 L 0 10 z" />
+          <marker id={arrowMarkerId} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="4.6" markerHeight="4.6" orient="auto-start-reverse">
+            <path className="lifecycle-graph-arrow" d="M 0 1 L 7 4 L 0 7 z" />
           </marker>
-          <marker id={availableArrowMarkerId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path className="lifecycle-graph-arrow-available" d="M 0 0 L 10 5 L 0 10 z" />
+          <marker id={availableArrowMarkerId} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="4.6" markerHeight="4.6" orient="auto-start-reverse">
+            <path className="lifecycle-graph-arrow-available" d="M 0 1 L 7 4 L 0 7 z" />
           </marker>
         </defs>
         {definition.transitions.map((transition) => {
@@ -59,10 +59,7 @@ export default function LifecycleGraph({
             return null;
           }
           const isAvailable = highlight.outgoingTransitions.has(lifecycleTransitionId(transition));
-          const isSelfColumn = start.x === end.x;
-          const path = isSelfColumn
-            ? `M ${start.x + 72} ${start.y + 26} C ${start.x + 142} ${start.y + 34}, ${end.x + 142} ${end.y - 34}, ${end.x + 72} ${end.y - 26}`
-            : `M ${start.x + 72} ${start.y} L ${end.x - 72} ${end.y}`;
+          const path = buildLifecycleEdgePath(start, end);
           return (
             <path
               key={lifecycleTransitionId(transition)}
