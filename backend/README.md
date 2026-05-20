@@ -14,6 +14,7 @@ System diagnostics endpoints:
   - Includes optional `llama_cpp` reachability when `LLAMA_CPP_URL` is configured.
   - Includes optional `qdrant` reachability when `QDRANT_URL` is configured.
   - Includes `mcp_gateway` reachability by default in local staging and whenever `MCP_GATEWAY_URL` is non-empty.
+  - Includes optional `image_analysis` reachability when `IMAGE_ANALYSIS_URL` is configured.
 - `GET /system/architecture` returns generated architecture graph JSON.
 - `GET /system/architecture.svg` returns generated architecture diagram SVG.
 

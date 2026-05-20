@@ -51,6 +51,7 @@ const initialServices: ServiceRow[] = [
   { service: "LLM Runtime Embeddings", container: "llm_runtime_embeddings", target: "http://llm_runtime_embeddings:8000", status: "unknown" },
   { service: "Agent Engine", container: "agent_engine", target: "http://agent_engine:7000", status: "unknown" },
   { service: "Sandbox", container: "sandbox", target: "http://sandbox:6000", status: "unknown" },
+  { service: "Image Analysis", container: "image_analysis", target: "http://image_analysis:8090", status: "unknown" },
   { service: "KWS", container: "kws", target: "http://kws:10400", status: "unknown" },
   { service: "Weaviate", container: "weaviate", target: "http://weaviate:8080", status: "unknown" },
   { service: "PostgreSQL", container: "postgres", target: "postgresql", status: "unknown" },

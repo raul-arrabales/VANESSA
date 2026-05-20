@@ -111,3 +111,24 @@ def test_system_health_includes_mcp_gateway_service_by_default(client, monkeypat
     payload = response.get_json()
     assert any(service["container"] == "mcp_gateway" for service in payload["services"])
     assert "http://mcp_gateway:8080/health" in seen_urls
+
+
+def test_system_health_includes_image_analysis_service_when_configured(client, monkeypatch: pytest.MonkeyPatch):
+    config = build_test_auth_config(backend_app_module.AuthConfig, image_analysis_url="http://image_analysis:8090")
+    seen_urls: list[str] = []
+
+    def _http_ok(url: str) -> bool:
+        seen_urls.append(url)
+        return True
+
+    monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
+    monkeypatch.setattr(backend_app_module, "_http_json_ok", _http_ok)
+    monkeypatch.setattr(backend_app_module, "_postgres_ok", lambda _db: True)
+    monkeypatch.setattr(backend_app_module, "get_active_capability_statuses", lambda _db, _config: [])
+
+    response = client.get("/system/health")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert any(service["container"] == "image_analysis" for service in payload["services"])
+    assert "http://image_analysis:8090/health" in seen_urls

@@ -51,6 +51,7 @@ describe("BackendHealthPage", () => {
             status: "ok",
             services: [
               { service: "Backend", container: "backend", target: "http://backend:5000", reachable: true },
+              { service: "Image Analysis", container: "image_analysis", target: "http://image_analysis:8090", reachable: true },
               { service: "KWS", container: "kws", target: "http://kws:10400", reachable: false },
             ],
           }),
@@ -65,6 +66,7 @@ describe("BackendHealthPage", () => {
             generated_at: "2026-01-01T00:00:00+00:00",
             nodes: [
               { id: "backend", container: "backend", label: "Backend", group: "api", description: "Backend" },
+              { id: "image_analysis", container: "image_analysis", label: "Image Analysis", group: "runtime", description: "Image Analysis" },
               { id: "kws", container: "kws", label: "KWS", group: "api", description: "KWS" },
             ],
             edges: [{ id: "kws-backend", from: "kws", to: "backend", protocol: "HTTP", purpose: "Wake", kind: "event", direction: "outbound" }],
@@ -78,6 +80,7 @@ describe("BackendHealthPage", () => {
           text: async () => [
             "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">",
             "<g id=\"node-backend\" data-container=\"backend\"><rect x=\"1\" y=\"1\" width=\"10\" height=\"10\"/></g>",
+            "<g id=\"node-image_analysis\" data-container=\"image_analysis\"><rect x=\"10\" y=\"10\" width=\"10\" height=\"10\"/></g>",
             "<g id=\"node-kws\" data-container=\"kws\"><rect x=\"20\" y=\"20\" width=\"10\" height=\"10\"/></g>",
             "</svg>",
           ].join(""),
@@ -91,12 +94,16 @@ describe("BackendHealthPage", () => {
     const { container } = render(<BackendHealthPage />);
     await userEvent.click(screen.getByRole("button", { name: "Check all services" }));
 
-    await screen.findByText("Nodes: 2 | Edges: 1 | Generated: 2026-01-01T00:00:00+00:00");
+    await screen.findByText("Nodes: 3 | Edges: 1 | Generated: 2026-01-01T00:00:00+00:00");
 
     await waitFor(() => {
       expect(container.querySelector('[data-container="backend"]')?.getAttribute("data-status")).toBe("up");
+      expect(container.querySelector('[data-container="image_analysis"]')?.getAttribute("data-status")).toBe("up");
       expect(container.querySelector('[data-container="kws"]')?.getAttribute("data-status")).toBe("down");
     });
+
+    expect(screen.getByText("Image Analysis")).toBeInTheDocument();
+    expect(screen.getByText("image_analysis")).toBeInTheDocument();
   });
 
   it("keeps service checks working when architecture artifacts are unavailable", async () => {
