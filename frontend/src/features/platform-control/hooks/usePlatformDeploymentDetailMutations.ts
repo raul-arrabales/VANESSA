@@ -146,7 +146,7 @@ export function usePlatformDeploymentDetailMutations({
       const updated = await upsertDeploymentBinding(
         deployment.id,
         capabilityKey,
-        buildDeploymentBindingMutationInput(capability, form, knowledgeBases),
+        buildDeploymentBindingMutationInput(capability, form, knowledgeBases, modelResourcesByCapability),
         token,
       );
       setLocalDeployment(updated);

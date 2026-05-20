@@ -12,7 +12,9 @@ import * as platformApi from "../api/platform";
 import * as modelopsApi from "../api/modelops";
 import {
   activationAuditFixture,
+  capabilitiesFixture,
   deploymentsFixture,
+  embeddingsModelsFixture,
   llmModelsFixture,
   primePlatformControlMocks,
   providersFixture,
@@ -383,6 +385,150 @@ describe("PlatformDeploymentDetailPage", () => {
         "sandbox_execution",
         expect.objectContaining({
           provider_id: "provider-sandbox",
+        }),
+        "token",
+      );
+    });
+  });
+
+  it("saves image analysis binding with task defaults from the detail page", async () => {
+    const imageModels = [
+      {
+        id: "image-analysis-plate-detector",
+        name: "License plate detector",
+        provider: "image_analysis_local",
+        backend: "local",
+        source: "local_folder",
+        availability: "offline_ready",
+        task_key: "image_plate_detection",
+        category: "predictive" as const,
+        lifecycle_state: "active" as const,
+        is_validation_current: true,
+        last_validation_status: "success",
+      },
+      {
+        id: "image-analysis-plate-ocr",
+        name: "License plate OCR",
+        provider: "image_analysis_local",
+        backend: "local",
+        source: "local_folder",
+        availability: "offline_ready",
+        task_key: "image_plate_ocr",
+        category: "predictive" as const,
+        lifecycle_state: "active" as const,
+        is_validation_current: true,
+        last_validation_status: "success",
+      },
+      {
+        id: "image-analysis-object-detector",
+        name: "Object detector",
+        provider: "image_analysis_local",
+        backend: "local",
+        source: "local_folder",
+        availability: "offline_ready",
+        task_key: "object_detection",
+        category: "predictive" as const,
+        lifecycle_state: "active" as const,
+        is_validation_current: true,
+        last_validation_status: "success",
+      },
+      {
+        id: "image-analysis-captioner",
+        name: "Image captioner",
+        provider: "image_analysis_local",
+        backend: "local",
+        source: "local_folder",
+        availability: "offline_ready",
+        task_key: "image_captioning",
+        category: "predictive" as const,
+        lifecycle_state: "active" as const,
+        is_validation_current: true,
+        last_validation_status: "success",
+      },
+    ];
+    vi.mocked(platformApi.listPlatformCapabilities).mockResolvedValue([
+      ...capabilitiesFixture,
+      {
+        capability: "image_analysis",
+        display_name: "Image analysis",
+        description: "Image capability.",
+        required: false,
+        active_provider: null,
+      },
+    ]);
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([
+      ...buildDeploymentProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-image",
+        slug: "image-analysis-local",
+        provider_key: "image_analysis_local",
+        provider_origin: "local",
+        capability: "image_analysis",
+        adapter_kind: "image_analysis_http",
+        display_name: "Image analysis local",
+        description: "Local image analysis endpoint.",
+        endpoint_url: "http://image_analysis:8090",
+        healthcheck_url: "http://image_analysis:8090/health",
+      },
+    ]);
+    vi.mocked(modelopsApi.listModelOpsModels).mockImplementation(async (_token, options) => {
+      if (options?.capability === "llm_inference") {
+        return llmModelsFixture;
+      }
+      if (options?.capability === "embeddings") {
+        return embeddingsModelsFixture;
+      }
+      if (options?.capability === "image_analysis") {
+        return imageModels;
+      }
+      return [...llmModelsFixture, ...embeddingsModelsFixture, ...imageModels];
+    });
+    vi.mocked(platformApi.upsertDeploymentBinding).mockResolvedValue(deploymentsFixture[0]);
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-2" },
+    );
+
+    const addCapabilityRow = await screen.findByTestId("deployment-add-capability-row");
+    await userEvent.click(within(addCapabilityRow).getByRole("button", { name: await t("platformControl.actions.addCapability") }));
+
+    const imageRow = await screen.findByTestId("deployment-binding-row-image_analysis");
+    await userEvent.selectOptions(
+      within(imageRow).getByLabelText(
+        await t("platformControl.forms.deployment.providerForCapability", { capability: "Image analysis" }),
+      ),
+      "provider-image",
+    );
+    await userEvent.click(
+      within(imageRow).getByRole("button", {
+        name: await t("platformControl.forms.deployment.resourcesForCapability", { capability: "Image analysis" }),
+      }),
+    );
+    for (const model of imageModels) {
+      await userEvent.click(within(imageRow).getByLabelText(model.name));
+    }
+    await userEvent.click(within(imageRow).getByRole("button", { name: await t("platformControl.actions.saveBinding") }));
+
+    await waitFor(() => {
+      expect(platformApi.upsertDeploymentBinding).toHaveBeenCalledWith(
+        "deployment-2",
+        "image_analysis",
+        expect.objectContaining({
+          provider_id: "provider-image",
+          default_resource_id: null,
+          resource_policy: {
+            selection_mode: "task_defaults",
+            task_defaults: {
+              plate_detector: "image-analysis-plate-detector",
+              plate_ocr: "image-analysis-plate-ocr",
+              object_detector: "image-analysis-object-detector",
+              captioner: "image-analysis-captioner",
+            },
+          },
         }),
         "token",
       );
