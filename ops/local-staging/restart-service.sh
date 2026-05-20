@@ -50,6 +50,7 @@ check_service_ready() {
     llm_runtime_embeddings) llm_runtime_internal_http_ok "llm_runtime_embeddings" "/health" ;;
     llama_cpp) llama_cpp_internal_http_ok "/v1/models" ;;
     qdrant) qdrant_internal_http_ok "/healthz" ;;
+    image_analysis) image_analysis_internal_http_ok "/health" ;;
     searxng) searxng_internal_http_ok "/" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
@@ -154,6 +155,9 @@ if [[ "${target_service}" == "llama_cpp" ]]; then
 fi
 if [[ "${target_service}" == "qdrant" ]]; then
   qdrant_enabled_requested || die "qdrant is disabled. Set QDRANT_URL to enable the optional Qdrant runtime."
+fi
+if [[ "${target_service}" == "image_analysis" ]]; then
+  image_analysis_enabled_requested || die "image_analysis is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
 fi
 validate_llm_cpu_thread_binding
 

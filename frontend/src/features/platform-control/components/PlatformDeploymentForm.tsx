@@ -10,7 +10,7 @@ import {
   type DeploymentFormState,
 } from "../deploymentEditor";
 import { buildDeploymentCapabilitySectionState } from "../deploymentFormSections";
-import { capabilityRequiresModelResource } from "../capabilities";
+import { capabilityRequiresModelResource, capabilityUsesTaskDefaults } from "../capabilities";
 import { filterModelsForProviderOrigin } from "../deploymentModelCompatibility";
 import PlatformDeploymentCapabilitySection from "./PlatformDeploymentCapabilitySection";
 
@@ -89,7 +89,9 @@ export default function PlatformDeploymentForm({
       ? previousResourceIds.filter((resourceId) => compatibleModelIds.has(resourceId))
       : previousResourceIds;
     const previousDefault = value.defaultResourceIdsByCapability[capability] ?? "";
-    const nextDefault = nextResourceIds.includes(previousDefault) ? previousDefault : (nextResourceIds[0] ?? "");
+    const nextDefault = capabilityUsesTaskDefaults(capability)
+      ? ""
+      : nextResourceIds.includes(previousDefault) ? previousDefault : (nextResourceIds[0] ?? "");
     onChange({
       ...value,
       providerIdsByCapability: {
@@ -109,7 +111,9 @@ export default function PlatformDeploymentForm({
 
   const updateCapabilityResources = (capability: string, resourceIds: string[]): void => {
     const previousDefault = value.defaultResourceIdsByCapability[capability] ?? "";
-    const nextDefault = resourceIds.includes(previousDefault) ? previousDefault : (resourceIds[0] ?? "");
+    const nextDefault = capabilityUsesTaskDefaults(capability)
+      ? ""
+      : resourceIds.includes(previousDefault) ? previousDefault : (resourceIds[0] ?? "");
     onChange({
       ...value,
       resourceIdsByCapability: {

@@ -1234,6 +1234,62 @@ def test_resolve_deployment_bindings_keeps_cross_capability_kb_checks_out_of_sav
     ]
 
 
+def test_image_analysis_binding_resources_use_task_defaults(monkeypatch: pytest.MonkeyPatch):
+    bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
+    model_rows = {
+        "plate-detector": {"model_id": "plate-detector", "name": "Plate detector", "provider_model_id": "plate-detector", "backend_kind": "local", "task_key": "image_plate_detection", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+        "plate-ocr": {"model_id": "plate-ocr", "name": "Plate OCR", "provider_model_id": "plate-ocr", "backend_kind": "local", "task_key": "image_plate_ocr", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+        "object-detector": {"model_id": "object-detector", "name": "Object detector", "provider_model_id": "object-detector", "backend_kind": "local", "task_key": "object_detection", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+        "captioner": {"model_id": "captioner", "name": "Captioner", "provider_model_id": "captioner", "backend_kind": "local", "task_key": "image_captioning", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+    }
+    monkeypatch.setattr(bindings_module, "get_model_by_id", lambda _db, model_id: model_rows.get(model_id))
+
+    result = bindings_module._validate_binding_resources(
+        "ignored",
+        provider_row={"provider_origin": "local", "capability_key": "image_analysis"},
+        capability_key="image_analysis",
+        resources=[
+            {"id": resource_id, "resource_kind": "model", "ref_type": "managed_model", "managed_model_id": resource_id}
+            for resource_id in model_rows
+        ],
+        default_resource_id=None,
+        resource_policy={
+            "selection_mode": "task_defaults",
+            "task_defaults": {
+                "plate_detector": "plate-detector",
+                "plate_ocr": "plate-ocr",
+                "object_detector": "object-detector",
+                "captioner": "captioner",
+            },
+        },
+    )
+
+    assert result["default_resource_id"] is None
+    assert {resource["metadata"]["task_key"] for resource in result["resources"]} == {
+        "image_plate_detection",
+        "image_plate_ocr",
+        "object_detection",
+        "image_captioning",
+    }
+
+
+def test_image_analysis_binding_rejects_global_default(monkeypatch: pytest.MonkeyPatch):
+    bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
+    monkeypatch.setattr(bindings_module, "get_model_by_id", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        bindings_module._validate_binding_resources(
+            "ignored",
+            provider_row={"provider_origin": "local", "capability_key": "image_analysis"},
+            capability_key="image_analysis",
+            resources=[],
+            default_resource_id="plate-detector",
+            resource_policy={"selection_mode": "task_defaults"},
+        )
+
+    assert exc_info.value.code == "default_resource_not_supported"
+
+
 def test_model_binding_rejects_cloud_model_for_local_provider(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         platform_service._platform_bindings_module,
@@ -2700,6 +2756,7 @@ def test_ensure_platform_bootstrap_state_seeds_provider_family_origins(monkeypat
         "qdrant_local": "local",
         "mcp_gateway_local": "local",
         "sandbox_local": "local",
+        "image_analysis_local": "local",
     }
 
 
@@ -3431,6 +3488,8 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
         if capability_key == "sandbox_execution":
             return None
         if capability_key == "mcp_runtime":
+            return None
+        if capability_key == "image_analysis":
             return None
         return {
             "capability_key": "vector_store",

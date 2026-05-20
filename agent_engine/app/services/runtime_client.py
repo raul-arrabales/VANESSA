@@ -5,6 +5,8 @@ from typing import Any
 from .runtime_clients.base import (
     EmbeddingsRuntimeClient,
     EmbeddingsRuntimeClientError,
+    ImageAnalysisRuntimeClient,
+    ImageAnalysisRuntimeClientError,
     LlmRuntimeClient,
     LlmRuntimeClientError,
     McpToolRuntimeClient,
@@ -20,7 +22,7 @@ from .runtime_clients.resolution import (
     require_binding,
     require_supported_adapter_kind,
 )
-from .runtime_clients.tool_runtime import HttpMcpToolRuntimeClient, HttpSandboxToolRuntimeClient
+from .runtime_clients.tool_runtime import HttpImageAnalysisRuntimeClient, HttpMcpToolRuntimeClient, HttpSandboxToolRuntimeClient
 from .runtime_clients.transport import (
     DEFAULT_HTTP_TIMEOUT_SECONDS as _DEFAULT_HTTP_TIMEOUT_SECONDS,
     http_json_request as _http_json_request,
@@ -162,9 +164,50 @@ def build_sandbox_tool_runtime_client(platform_runtime: dict[str, Any]) -> Sandb
     )
 
 
+def build_image_analysis_runtime_client(platform_runtime: dict[str, Any]) -> ImageAnalysisRuntimeClient:
+    deployment_profile, capabilities = coerce_platform_runtime(
+        platform_runtime,
+        error_cls=ImageAnalysisRuntimeClientError,
+    )
+    image_binding = require_binding(
+        capabilities,
+        capability_key="image_analysis",
+        missing_code="missing_image_analysis_runtime",
+        missing_message="platform_runtime is missing image_analysis binding",
+        error_cls=ImageAnalysisRuntimeClientError,
+    )
+    require_supported_adapter_kind(
+        image_binding,
+        supported={"image_analysis_http"},
+        unsupported_message="Unsupported image analysis runtime adapter",
+        error_cls=ImageAnalysisRuntimeClientError,
+    )
+    resource_policy = image_binding.get("resource_policy") if isinstance(image_binding.get("resource_policy"), dict) else {}
+    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+    missing_defaults = [
+        key
+        for key in ["plate_detector", "plate_ocr", "object_detector", "captioner"]
+        if not str(task_defaults.get(key) or "").strip()
+    ]
+    if missing_defaults:
+        raise ImageAnalysisRuntimeClientError(
+            code="missing_image_analysis_task_defaults",
+            message="platform_runtime image_analysis binding is missing task defaults",
+            status_code=409,
+            details={"missing_task_defaults": missing_defaults},
+        )
+    return HttpImageAnalysisRuntimeClient(
+        deployment_profile=deployment_profile,
+        image_binding=image_binding,
+        request_json=http_json_request,
+    )
+
+
 __all__ = [
     "EmbeddingsRuntimeClient",
     "EmbeddingsRuntimeClientError",
+    "ImageAnalysisRuntimeClient",
+    "ImageAnalysisRuntimeClientError",
     "LlmRuntimeClient",
     "LlmRuntimeClientError",
     "McpToolRuntimeClient",
@@ -174,6 +217,7 @@ __all__ = [
     "VectorStoreRuntimeClientError",
     "_DEFAULT_HTTP_TIMEOUT_SECONDS",
     "build_embeddings_runtime_client",
+    "build_image_analysis_runtime_client",
     "build_llm_runtime_client",
     "build_mcp_tool_runtime_client",
     "build_sandbox_tool_runtime_client",

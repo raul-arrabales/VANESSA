@@ -26,7 +26,7 @@ Best for: local AI experimentation, agent and tool orchestration, platform gover
 - Local-first runtime with optional cloud providers behind a backend-owned control plane
 - Explicit `capabilities`, `providers`, and `deployment profiles` for runtime switching and governance
 - Separate ModelOps domain for managed model catalog, validation, lifecycle, and sharing
-- Agent orchestration with MCP server exposures backed by internal tools, KB retrieval tools, plus sandboxed Python execution
+- Agent orchestration with MCP server exposures backed by internal tools, KB retrieval tools, sandboxed Python execution, and optional local image-analysis tools
 - Product-facing AI surfaces for playgrounds, builder workflows, catalog administration, and first-party Vanessa behavior
 - Modular container topology that stays extensible without collapsing control, runtime, and product concerns into one service
 
@@ -65,7 +65,7 @@ VANESSA is organized around a few clear domains:
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
-- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, deployment-bound KB retrieval, SearXNG-backed web search, and sandboxed Python execution
+- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, deployment-bound KB retrieval, SearXNG-backed web search, sandboxed Python execution, and optional local image analysis
 - Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
 
 For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).
@@ -74,8 +74,8 @@ For the full architecture narrative and generated diagram source of truth, see [
 
 The runtime architecture is intentionally explicit:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
-- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `sandbox_local`, or OpenAI-compatible cloud families
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`
+- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `sandbox_local`, `image_analysis_local`, or OpenAI-compatible cloud families
 - `deployment profile`: the named set of active capability bindings used to resolve a runtime snapshot
 - `provider_origin`: backend-owned `local` or `cloud` classification inherited by provider instances and runtime payloads
 - `platform_runtime`: the resolved runtime snapshot passed from backend to `agent_engine`
@@ -89,7 +89,7 @@ VANESSA currently uses global runtime profile semantics for safety gates and pro
 - `online` allows cloud-capable runtime behavior where configured
 - `offline` blocks cloud provider validation, deployment activation, runtime resolution, and invocation before any provider client is created
 - In online mode, cloud/external call metadata is published through backend cloud-traffic events so the topbar can indicate upload/download activity; optional local JSONL logging records only sanitized metadata.
-- MCP-exposed web search is governed by the same runtime contract, while sandbox-backed Python execution can remain available offline when the optional capability is bound
+- MCP-exposed web search is governed by the same runtime contract, while sandbox-backed Python execution and local image analysis can remain available offline when their optional capabilities are bound
 
 ## Product Areas
 
@@ -116,7 +116,7 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp` and `qdrant` profiles can be enabled through environment variables
+- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -132,6 +132,7 @@ Start here for deeper project documentation:
 - [Contributing](docs/contributing.md)
 - [Backend Service](docs/services/backend.md)
 - [ModelOps](docs/services/modelops.md)
+- [Image Analysis](docs/services/image-analysis.md)
 - [Sandbox](docs/services/sandbox.md)
 - [Agent Engine](docs/services/agent-engine.md)
 
@@ -144,6 +145,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `agent_engine/`: execution pipeline, retrieval, and tool runtime orchestration
 - `sandbox/`: isolated Python execution runtime
 - `mcp_gateway/`: gateway-hosted MCP server exposure provider
+- `image_analysis/`: optional local image understanding provider for plate recognition, object detection, and captioning
 - `infra/searxng/`: local SearXNG configuration used by MCP web search
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance

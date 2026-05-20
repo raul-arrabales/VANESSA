@@ -11,6 +11,10 @@ from ..db import get_connection
 
 TASK_EMBEDDINGS = "embeddings"
 TASK_LLM = "llm"
+TASK_IMAGE_PLATE_DETECTION = "image_plate_detection"
+TASK_IMAGE_PLATE_OCR = "image_plate_ocr"
+TASK_OBJECT_DETECTION = "object_detection"
+TASK_IMAGE_CAPTIONING = "image_captioning"
 OWNER_PLATFORM = "platform"
 OWNER_USER = "user"
 LIFECYCLE_CREATED = "created"
@@ -35,6 +39,10 @@ def infer_task_key(row: dict[str, Any]) -> str:
 def infer_category(task_key: str) -> str:
     predictive_tasks = {
         TASK_EMBEDDINGS,
+        TASK_IMAGE_PLATE_DETECTION,
+        TASK_IMAGE_PLATE_OCR,
+        TASK_OBJECT_DETECTION,
+        TASK_IMAGE_CAPTIONING,
         "ocr",
         "vision",
         "speech_to_text",
@@ -441,6 +449,8 @@ def _eligible_clause(*, require_active: bool, capability_key: str | None) -> str
         conditions.append("m.task_key = 'embeddings'")
     elif capability_key == "llm_inference":
         conditions.append("m.task_key = 'llm'")
+    elif capability_key == "image_analysis":
+        conditions.append("m.task_key IN ('image_plate_detection', 'image_plate_ocr', 'object_detection', 'image_captioning')")
     return " AND ".join(conditions)
 
 

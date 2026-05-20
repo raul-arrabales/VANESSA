@@ -88,6 +88,7 @@ def test_expected_routes_are_registered() -> None:
         "/v1/platform/vector/documents/upsert",
         "/v1/platform/vector/query",
         "/v1/platform/vector/documents/delete",
+        "/v1/platform/image-analysis/analyze",
         "/v1/catalog/agents",
         "/v1/catalog/agents/<agent_id>",
         "/v1/catalog/agents/<agent_id>/validate",

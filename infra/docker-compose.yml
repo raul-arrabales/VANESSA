@@ -173,6 +173,27 @@ services:
       - backend
       - searxng
 
+  image_analysis:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_analysis/Dockerfile
+    container_name: vanessa-image-analysis
+    profiles:
+      - image_analysis
+    ports:
+      - "8090:8090"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_ANALYSIS_PORT: 8090
+      IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis
+      IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+    volumes:
+      - ../models/image_analysis:/models/image_analysis
+
   agent_engine:
     build:
       context: ..

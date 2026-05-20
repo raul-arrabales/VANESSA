@@ -30,6 +30,10 @@ class ToolRuntimeClientError(RuntimeClientError):
     pass
 
 
+class ImageAnalysisRuntimeClientError(RuntimeClientError):
+    pass
+
+
 class LlmRuntimeClient(ABC):
     def __init__(self, *, deployment_profile: dict[str, Any], llm_binding: dict[str, Any]):
         self.deployment_profile = deployment_profile
@@ -119,4 +123,14 @@ class SandboxToolRuntimeClient(ABC):
         timeout_seconds: int,
         policy: dict[str, Any],
     ) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class ImageAnalysisRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], image_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.image_binding = image_binding
+
+    @abstractmethod
+    def analyze(self, *, payload: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError

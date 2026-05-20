@@ -60,6 +60,10 @@ qdrant_ready_ok() {
   qdrant_internal_http_ok "/healthz"
 }
 
+image_analysis_ready_ok() {
+  image_analysis_internal_http_ok "/health"
+}
+
 searxng_ready_ok() {
   searxng_internal_http_ok "/"
 }
@@ -299,6 +303,17 @@ run_checks() {
     fi
   else
     printf 'qdrant: SKIP (QDRANT_URL not set)\n'
+  fi
+
+  if image_analysis_enabled_requested; then
+    if image_analysis_ready_ok; then
+      printf 'image_analysis: OK (/health)\n'
+    else
+      printf 'image_analysis: FAIL\n'
+      failures=$((failures + 1))
+    fi
+  else
+    printf 'image_analysis: SKIP (IMAGE_ANALYSIS_URL not set)\n'
   fi
 
   if searxng_ready_ok; then

@@ -103,7 +103,9 @@ export function usePlatformDeploymentEditor({
 
       return {
         validationError,
-        mutationInput: validationError ? null : buildDeploymentMutationInput(capabilitiesToPersist, form, knowledgeBases),
+        mutationInput: validationError
+          ? null
+          : buildDeploymentMutationInput(capabilitiesToPersist, form, knowledgeBases, modelResourcesByCapability),
       };
     },
     [capabilities, knowledgeBases, modelResourcesByCapability, providersByCapability, requiredCapabilities, t],

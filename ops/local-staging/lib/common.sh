@@ -25,7 +25,7 @@ LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MO
 LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant image_analysis searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -282,9 +282,18 @@ qdrant_enabled_requested() {
   [[ -n "${QDRANT_URL:-}" ]]
 }
 
+image_analysis_enabled_requested() {
+  [[ -n "${IMAGE_ANALYSIS_URL:-}" ]]
+}
+
 qdrant_internal_http_ok() {
   local path="$1"
   compose exec -T qdrant python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6333${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
+image_analysis_internal_http_ok() {
+  local path="$1"
+  compose exec -T image_analysis python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8090${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
 }
 
 searxng_internal_http_ok() {
@@ -413,6 +422,9 @@ compose() {
   if qdrant_enabled_requested; then
     cmd+=(--profile qdrant)
   fi
+  if image_analysis_enabled_requested; then
+    cmd+=(--profile image_analysis)
+  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -432,6 +444,9 @@ stack_services_for_start() {
       continue
     fi
     if [[ "${service}" == "qdrant" ]] && ! qdrant_enabled_requested; then
+      continue
+    fi
+    if [[ "${service}" == "image_analysis" ]] && ! image_analysis_enabled_requested; then
       continue
     fi
     services_to_start+=("${service}")

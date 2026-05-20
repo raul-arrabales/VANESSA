@@ -8,6 +8,7 @@ from .platform_resources import _runtime_identifier_for_resource
 from .platform_serialization import _serialize_deployment_profile
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_VECTOR_STORE,
     REQUIRED_CAPABILITIES,
@@ -19,6 +20,7 @@ def _describe_capability(capability_key: str) -> str:
         CAPABILITY_LLM_INFERENCE: "LLM inference",
         CAPABILITY_EMBEDDINGS: "Embeddings",
         CAPABILITY_VECTOR_STORE: "Vector store",
+        CAPABILITY_IMAGE_ANALYSIS: "Image analysis",
     }
     return labels.get(capability_key, capability_key)
 
@@ -66,6 +68,46 @@ def _binding_configuration_status(
                     _issue(
                         "resource_provider_origin_mismatch",
                         f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is local and cannot be served by a cloud provider.",
+                    )
+                )
+    elif capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        if not resources:
+            issues.append(_issue("resources_missing", "Image analysis requires detector, OCR, object detection, and captioning model resources."))
+        resource_policy = dict(binding.get("resource_policy") or {})
+        task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+        task_key_by_resource_id = {
+            str(resource.get("id") or "").strip(): str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+            for resource in resources
+        }
+        required_defaults = {
+            "plate_detector": "image_plate_detection",
+            "plate_ocr": "image_plate_ocr",
+            "object_detector": "object_detection",
+            "captioner": "image_captioning",
+        }
+        for default_key, expected_task_key in required_defaults.items():
+            resource_id = str(task_defaults.get(default_key) or "").strip()
+            if not resource_id:
+                issues.append(_issue("task_default_missing", f"Select an image analysis default for {default_key}."))
+                continue
+            if task_key_by_resource_id.get(resource_id) != expected_task_key:
+                issues.append(_issue("task_default_invalid", f"Image analysis default {default_key} must reference a {expected_task_key} model."))
+        provider_origin = str(binding.get("provider_origin") or "local").strip().lower()
+        for resource in resources:
+            metadata = dict(resource.get("metadata") or {})
+            backend = str(metadata.get("backend") or "").strip().lower()
+            if provider_origin == "cloud" and backend and backend != "external_api":
+                issues.append(
+                    _issue(
+                        "resource_provider_origin_mismatch",
+                        f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is local and cannot be served by a cloud provider.",
+                    )
+                )
+            elif provider_origin != "cloud" and backend and backend != "local":
+                issues.append(
+                    _issue(
+                        "resource_provider_origin_mismatch",
+                        f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is cloud-hosted and cannot be served by a local provider.",
                     )
                 )
             elif provider_origin != "cloud" and backend and backend != "local":

@@ -6,6 +6,7 @@ from typing import Any
 from ..services.policy_runtime_gate import ExecutionBlockedError
 from ..services.runtime_client import (
     ToolRuntimeClientError,
+    build_image_analysis_runtime_client,
     build_mcp_tool_runtime_client,
     build_sandbox_tool_runtime_client,
 )
@@ -15,8 +16,25 @@ def runtime_capability_for_mcp_server() -> str:
     return "mcp_runtime"
 
 
+def effective_tool_spec(tool_entity: dict[str, Any]) -> dict[str, Any]:
+    backing_tool = tool_entity.get("backing_tool") if isinstance(tool_entity.get("backing_tool"), dict) else {}
+    backing_spec = backing_tool.get("current_spec") if isinstance(backing_tool.get("current_spec"), dict) else {}
+    server_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
+    return {**backing_spec, **server_spec}
+
+
+def runtime_capability_for_tool_spec(tool_spec: dict[str, Any]) -> str:
+    transport = str(tool_spec.get("transport", "")).strip().lower()
+    execution_backend = str(tool_spec.get("execution_backend", "")).strip().lower()
+    if transport == "sandbox_http" or execution_backend == "sandbox_python":
+        return "sandbox_execution"
+    if transport == "image_analysis_http" or execution_backend == "image_analysis":
+        return "image_analysis"
+    return runtime_capability_for_mcp_server()
+
+
 def build_tool_definition(mcp_server_entity: dict[str, Any]) -> dict[str, Any]:
-    tool_spec = mcp_server_entity.get("current_spec") if isinstance(mcp_server_entity.get("current_spec"), dict) else {}
+    tool_spec = effective_tool_spec(mcp_server_entity)
     tool_name = str(tool_spec.get("exposed_tool_name") or tool_spec.get("tool_name") or "").strip()
     return {
         "type": "function",
@@ -30,6 +48,16 @@ def build_tool_definition(mcp_server_entity: dict[str, Any]) -> dict[str, Any]:
 
 def tool_message_content(payload: Any) -> list[dict[str, str]]:
     return [{"type": "text", "text": dumps(payload, sort_keys=True, separators=(",", ":"))}]
+
+
+def _redact_image_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
+    redacted = dict(arguments)
+    image = redacted.get("image") if isinstance(redacted.get("image"), dict) else None
+    if image is not None and "data_base64" in image:
+        redacted["image"] = {**image, "data_base64": "<redacted>"}
+    if "data_base64" in redacted:
+        redacted["data_base64"] = "<redacted>"
+    return redacted
 
 
 def resolve_tool_runtime_binding(*, platform_runtime: dict[str, Any], capability_key: str) -> dict[str, Any]:
@@ -77,8 +105,8 @@ def invoke_tool_call(
     delegated_user_id: int,
     delegated_user_role: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    tool_spec = tool_entity.get("current_spec") if isinstance(tool_entity.get("current_spec"), dict) else {}
-    runtime_capability = "sandbox_execution" if str(tool_spec.get("transport", "")).strip().lower() == "sandbox_http" else runtime_capability_for_mcp_server()
+    tool_spec = effective_tool_spec(tool_entity)
+    runtime_capability = runtime_capability_for_tool_spec(tool_spec)
     binding = resolve_tool_runtime_binding(platform_runtime=platform_runtime, capability_key=runtime_capability)
     deployment_profile = platform_runtime.get("deployment_profile") if isinstance(platform_runtime.get("deployment_profile"), dict) else {}
     tool_name = str(tool_spec.get("exposed_tool_name") or tool_spec.get("tool_name") or "").strip()
@@ -129,7 +157,9 @@ def invoke_tool_call(
         )
 
     try:
-        if str(tool_spec.get("transport", "")).strip().lower() == "sandbox_http":
+        execution_backend = str(tool_spec.get("execution_backend", "")).strip().lower()
+        transport = str(tool_spec.get("transport", "")).strip().lower()
+        if runtime_capability == "sandbox_execution":
             runtime_client = build_sandbox_tool_runtime_client(platform_runtime)
             safety_policy = dict(tool_spec.get("safety_policy") or {})
             timeout_seconds = int(arguments.get("timeout_seconds") or safety_policy.get("timeout_seconds") or 5)
@@ -139,6 +169,9 @@ def invoke_tool_call(
                 timeout_seconds=timeout_seconds,
                 policy=safety_policy,
             )
+        elif runtime_capability == "image_analysis":
+            runtime_client = build_image_analysis_runtime_client(platform_runtime)
+            runtime_payload = runtime_client.analyze(payload=_image_analysis_payload(tool_spec, arguments))
         else:
             runtime_client = build_mcp_tool_runtime_client(platform_runtime)
             runtime_payload = runtime_client.invoke(
@@ -169,7 +202,7 @@ def invoke_tool_call(
         "provider_key": binding.get("provider_key"),
         "deployment_profile_slug": deployment_profile.get("slug"),
         "status_code": status_code,
-        "arguments": arguments,
+        "arguments": _redact_image_arguments(arguments) if runtime_capability == "image_analysis" else arguments,
     }
     if str(tool_spec.get("transport", "")).strip():
         call_record["transport"] = str(tool_spec.get("transport", "")).strip()
@@ -178,3 +211,31 @@ def invoke_tool_call(
         return call_record, error_payload
     call_record["result"] = result_payload
     return call_record, result_payload
+
+
+def _image_analysis_payload(tool_spec: dict[str, Any], arguments: dict[str, Any]) -> dict[str, Any]:
+    task = str(arguments.get("task") or "").strip().lower()
+    tasks = arguments.get("tasks") if isinstance(arguments.get("tasks"), list) else []
+    normalized_tasks = [str(item).strip().lower() for item in tasks if str(item).strip()]
+    execution_config = tool_spec.get("execution_config") if isinstance(tool_spec.get("execution_config"), dict) else {}
+    configured_tasks = execution_config.get("tasks") if isinstance(execution_config.get("tasks"), list) else []
+    for configured_task in configured_tasks:
+        normalized = str(configured_task).strip().lower()
+        if normalized and normalized not in normalized_tasks:
+            normalized_tasks.append(normalized)
+    if task and task not in normalized_tasks:
+        normalized_tasks.append(task)
+    if not normalized_tasks:
+        normalized_tasks = ["license_plate_recognition", "object_detection", "captioning"]
+    image = arguments.get("image") if isinstance(arguments.get("image"), dict) else {}
+    if not image:
+        image = {
+            "data_base64": str(arguments.get("data_base64") or "").strip(),
+            "mime_type": str(arguments.get("mime_type") or "").strip(),
+        }
+    options = arguments.get("options") if isinstance(arguments.get("options"), dict) else {}
+    return {
+        "image": image,
+        "tasks": normalized_tasks,
+        "options": options,
+    }

@@ -55,6 +55,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
         activationAuditPayload,
         llmModelsPayload,
         embeddingsModelsPayload,
+        imageAnalysisModelsPayload,
         knowledgeBasesPayload,
       ] = await Promise.all([
         listPlatformCapabilities(token),
@@ -63,6 +64,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
         listPlatformActivationAudit(token),
         listModelOpsModels(token, { eligible: true, capability: "llm_inference" }),
         listModelOpsModels(token, { eligible: true, capability: "embeddings" }),
+        listModelOpsModels(token, { eligible: true, capability: "image_analysis" }),
         listKnowledgeBases(token, { eligible: true }),
       ]);
 
@@ -73,6 +75,7 @@ export function usePlatformDeploymentEditorData(token: string): PlatformDeployme
       setEligibleModelsByCapability({
         llm_inference: llmModelsPayload,
         embeddings: embeddingsModelsPayload,
+        image_analysis: imageAnalysisModelsPayload,
       });
       setKnowledgeBases(knowledgeBasesPayload);
       setState("success");

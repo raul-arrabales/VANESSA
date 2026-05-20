@@ -17,6 +17,7 @@ rendering:
     - llama_cpp
     - searxng
     - mcp_gateway
+    - image_analysis
     - sandbox
     - weaviate
     - qdrant
@@ -82,6 +83,12 @@ services:
     description: HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.
     public_exposed: true
     criticality: medium
+  image_analysis:
+    label: Image Analysis
+    group: runtime
+    description: Optional local image understanding service for plate recognition, object detection, and captioning.
+    public_exposed: true
+    criticality: medium
   searxng:
     label: SearXNG
     group: runtime
@@ -144,6 +151,12 @@ edges:
     kind: http
     direction: outbound
   - from: backend
+    to: image_analysis
+    protocol: HTTP
+    purpose: Optional image-analysis provider validation and superadmin smoke tests
+    kind: http
+    direction: outbound
+  - from: backend
     to: weaviate
     protocol: HTTP
     purpose: Semantic retrieval operations
@@ -177,6 +190,12 @@ edges:
     to: mcp_gateway
     protocol: HTTP
     purpose: Agent MCP discovery and invocation with identity metadata
+    kind: http
+    direction: outbound
+  - from: agent_engine
+    to: image_analysis
+    protocol: HTTP
+    purpose: Agent image-analysis tool invocation through resolved platform runtime bindings
     kind: http
     direction: outbound
   - from: mcp_gateway

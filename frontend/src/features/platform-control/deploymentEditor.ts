@@ -8,8 +8,20 @@ import type {
   PlatformDeploymentProfile,
   PlatformProvider,
 } from "../../api/platform";
-import { capabilityRequiresModelResource, capabilitySupportsResources } from "./capabilities";
+import {
+  CAPABILITY_IMAGE_ANALYSIS,
+  capabilityRequiresModelResource,
+  capabilitySupportsResources,
+  capabilityUsesTaskDefaults,
+} from "./capabilities";
 import { filterModelsForProviderOrigin } from "./deploymentModelCompatibility";
+
+const IMAGE_ANALYSIS_TASK_DEFAULTS: Record<string, string> = {
+  plate_detector: "image_plate_detection",
+  plate_ocr: "image_plate_ocr",
+  object_detector: "object_detection",
+  captioner: "image_captioning",
+};
 
 export type DeploymentFormState = {
   slug: string;
@@ -54,6 +66,23 @@ type DeploymentFormValidationOptions = {
 
 function uniqueCapabilityKeys(capabilityKeys: string[]): string[] {
   return Array.from(new Set(capabilityKeys));
+}
+
+function buildImageAnalysisTaskDefaults(
+  resourceIds: string[],
+  modelResources: ManagedModel[],
+): Record<string, string> {
+  const selectedResourceIds = new Set(resourceIds);
+  const selectedModelsByTask = new Map(
+    modelResources
+      .filter((model) => selectedResourceIds.has(model.id))
+      .map((model) => [String(model.task_key ?? ""), model.id]),
+  );
+  return Object.fromEntries(
+    Object.entries(IMAGE_ANALYSIS_TASK_DEFAULTS)
+      .map(([defaultKey, taskKey]) => [defaultKey, selectedModelsByTask.get(taskKey) ?? ""])
+      .filter(([, resourceId]) => resourceId),
+  );
 }
 
 export function createDefaultDeploymentForm(requiredCapabilities: PlatformCapability[]): DeploymentFormState {
@@ -145,6 +174,9 @@ export function validateDeploymentForm(
     if (!capabilityRequiresModelResource(capability.capability)) {
       return false;
     }
+    if (capabilityUsesTaskDefaults(capability.capability)) {
+      return false;
+    }
     const resourceIds = form.resourceIdsByCapability[capability.capability] ?? [];
     const defaultResourceId = form.defaultResourceIdsByCapability[capability.capability] ?? "";
     return !defaultResourceId || !resourceIds.includes(defaultResourceId);
@@ -152,6 +184,21 @@ export function validateDeploymentForm(
   if (missingDefaultModelBinding) {
     return options.defaultResourceRequiredMessage?.(missingDefaultModelBinding)
       ?? `${missingDefaultModelBinding.display_name} requires a default resource.`;
+  }
+
+  const missingImageTaskDefault = capabilitiesToValidate.find((capability) => {
+    if (capability.capability !== CAPABILITY_IMAGE_ANALYSIS || !options.modelResourcesByCapability) {
+      return false;
+    }
+    const resourceIds = form.resourceIdsByCapability[capability.capability] ?? [];
+    const taskDefaults = buildImageAnalysisTaskDefaults(
+      resourceIds,
+      options.modelResourcesByCapability[capability.capability] ?? [],
+    );
+    return Object.keys(IMAGE_ANALYSIS_TASK_DEFAULTS).some((taskDefaultKey) => !taskDefaults[taskDefaultKey]);
+  });
+  if (missingImageTaskDefault) {
+    return `${missingImageTaskDefault.display_name} requires bound resources for plate detection, plate OCR, object detection, and captioning.`;
   }
 
   if (options.providersByCapability && options.modelResourcesByCapability) {
@@ -211,6 +258,7 @@ export function buildDeploymentBindingMutationInput(
   capability: PlatformCapability,
   form: DeploymentFormState,
   knowledgeBases: KnowledgeBase[],
+  modelResourcesByCapability: Record<string, ManagedModel[]> = {},
 ): PlatformDeploymentBindingMutationInput {
   if (!capabilitySupportsResources(capability.capability)) {
     return {
@@ -220,10 +268,15 @@ export function buildDeploymentBindingMutationInput(
   }
 
   const knowledgeBasesById = new Map(knowledgeBases.map((knowledgeBase) => [knowledgeBase.id, knowledgeBase]));
+  const managedModelsById = new Map((modelResourcesByCapability[capability.capability] ?? []).map((model) => [model.id, model]));
+  const selectedResourceIds = form.resourceIdsByCapability[capability.capability] ?? [];
+  const imageAnalysisTaskDefaults = capability.capability === CAPABILITY_IMAGE_ANALYSIS
+    ? buildImageAnalysisTaskDefaults(selectedResourceIds, modelResourcesByCapability[capability.capability] ?? [])
+    : {};
   return {
     provider_id: form.providerIdsByCapability[capability.capability],
     resources: capability.capability === "vector_store"
-      ? (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => {
+      ? selectedResourceIds.map((resourceId) => {
           const knowledgeBase = knowledgeBasesById.get(resourceId);
           if (knowledgeBase) {
             return {
@@ -251,16 +304,23 @@ export function buildDeploymentBindingMutationInput(
             metadata: {},
           };
         })
-      : (form.resourceIdsByCapability[capability.capability] ?? []).map((resourceId) => ({
-          id: resourceId,
-          resource_kind: "model",
-          ref_type: "managed_model",
-          managed_model_id: resourceId,
-          display_name: resourceId,
-          metadata: {},
-        })),
-    default_resource_id: capabilitySupportsResources(capability.capability)
-      ? form.defaultResourceIdsByCapability[capability.capability] || null
+      : selectedResourceIds.map((resourceId) => {
+          const model = managedModelsById.get(resourceId);
+          return {
+            id: resourceId,
+            resource_kind: "model",
+            ref_type: "managed_model",
+            managed_model_id: resourceId,
+            display_name: model?.name ?? resourceId,
+            metadata: {
+              ...(model?.task_key ? { task_key: model.task_key } : {}),
+            },
+          };
+        }),
+    default_resource_id: capabilityUsesTaskDefaults(capability.capability)
+      ? null
+      : capabilitySupportsResources(capability.capability)
+        ? form.defaultResourceIdsByCapability[capability.capability] || null
       : null,
     resource_policy: capability.capability === "vector_store"
       ? {
@@ -268,6 +328,11 @@ export function buildDeploymentBindingMutationInput(
             String(form.resourcePolicyByCapability[capability.capability]?.selection_mode ?? "explicit"),
           ...(form.resourcePolicyByCapability[capability.capability] ?? {}),
         }
+      : capability.capability === CAPABILITY_IMAGE_ANALYSIS
+        ? {
+            selection_mode: "task_defaults",
+            task_defaults: imageAnalysisTaskDefaults,
+          }
       : (capabilitySupportsResources(capability.capability)
           ? form.resourcePolicyByCapability[capability.capability] ?? {}
           : {}),
@@ -279,12 +344,13 @@ export function buildDeploymentMutationInput(
   capabilitiesToInclude: PlatformCapability[],
   form: DeploymentFormState,
   knowledgeBases: KnowledgeBase[],
+  modelResourcesByCapability: Record<string, ManagedModel[]> = {},
 ): PlatformDeploymentMutationInput {
   return {
     ...buildDeploymentIdentityMutationInput(form),
     bindings: capabilitiesToInclude.map((capability) => ({
       capability: capability.capability,
-      ...buildDeploymentBindingMutationInput(capability, form, knowledgeBases),
+      ...buildDeploymentBindingMutationInput(capability, form, knowledgeBases, modelResourcesByCapability),
     })),
   };
 }

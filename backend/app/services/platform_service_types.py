@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, TypeAlias, TypedDict
 
-from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_LLM_INFERENCE
+from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_LLM_INFERENCE
 
 ProviderRow: TypeAlias = dict[str, Any]
 ProviderFamilyRow: TypeAlias = dict[str, Any]
@@ -73,10 +73,21 @@ _QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
 _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
 _TASK_KEY_EMBEDDINGS = "embeddings"
 _TASK_KEY_LLM = "llm"
+_TASK_KEY_IMAGE_PLATE_DETECTION = "image_plate_detection"
+_TASK_KEY_IMAGE_PLATE_OCR = "image_plate_ocr"
+_TASK_KEY_OBJECT_DETECTION = "object_detection"
+_TASK_KEY_IMAGE_CAPTIONING = "image_captioning"
+_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS = {
+    "plate_detector": _TASK_KEY_IMAGE_PLATE_DETECTION,
+    "plate_ocr": _TASK_KEY_IMAGE_PLATE_OCR,
+    "object_detector": _TASK_KEY_OBJECT_DETECTION,
+    "captioner": _TASK_KEY_IMAGE_CAPTIONING,
+}
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
-_MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS}
+_MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS}
 _VECTOR_SELECTION_EXPLICIT = "explicit"
 _VECTOR_SELECTION_DYNAMIC_NAMESPACE = "dynamic_namespace"
+_IMAGE_SELECTION_TASK_DEFAULTS = "task_defaults"
 _LOCAL_SLOT_STATE_EMPTY = "empty"
 _LOCAL_SLOT_STATE_LOADING = "loading"
 _LOCAL_SLOT_STATE_RECONCILING = "reconciling"

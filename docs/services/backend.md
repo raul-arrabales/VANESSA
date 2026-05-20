@@ -108,6 +108,7 @@ Agent-project semantics:
 - `POST /v1/platform/vector/documents/upsert` (superadmin)
 - `POST /v1/platform/vector/query` (superadmin)
 - `POST /v1/platform/vector/documents/delete` (superadmin)
+- `POST /v1/platform/image-analysis/analyze` (superadmin smoke-test proxy; JSON base64 images only)
 
 Platform-control request parsing and response shaping are now owned by the application-layer platform-control service behind the canonical `api/http` module.
 
@@ -169,8 +170,8 @@ Context-management semantics:
 
 Key terms:
 
-- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`
-- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`
+- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`
+- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, or `image_analysis_local`
 - `provider_origin`: family-owned origin classification, `local` or `cloud`, inherited by provider instances and serialized in provider, deployment-binding, runtime, and active-provider payloads
 - `deployment profile`: named set of active capability bindings
 - `binding resource`: capability-scoped resource explicitly bound at the deployment-binding layer, such as a ModelOps-managed model or a vector-store index
@@ -186,10 +187,12 @@ Bootstrap defaults:
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - `sandbox_local` is seeded from `SANDBOX_URL` and bound as optional `sandbox_execution` into local deployment profiles when available.
 - `mcp_gateway_local` is seeded from `MCP_GATEWAY_URL` and, in default local staging, is bound into local deployment profiles as `mcp_runtime`.
+- `image_analysis_local` is seeded only when `IMAGE_ANALYSIS_URL` is configured. It is a local-only provider for license plate recognition, object detection, and captioning.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code. Built-in families seed explicit `provider_origin`; only the OpenAI-compatible cloud LLM and embeddings families are `cloud`.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Model-bearing deployment bindings now require a selected provider, but may be saved temporarily with zero resources and no default until the capability is fully configured.
 - Deployment bindings may reference only ModelOps models that are already `active`, `is_validation_current=true`, and `last_validation_status=success`.
+- `image_analysis` is model-bearing but uses `resource_policy.selection_mode="task_defaults"` with `plate_detector`, `plate_ocr`, `object_detector`, and `captioner` resource ids instead of `default_resource_id`.
 - The runtime snapshot now serializes generic binding `resources`, `default_resource_id`, `default_resource`, and `resource_policy` for every capability binding.
 - Deployment list/detail responses now include `configuration_status` for both the deployment and each binding so the UI can show partial or mismatched configuration without inventing its own readiness rules.
 - Direct backend inference and agent-engine runtime selection both enforce active-binding membership: requested LLM model ids must be present in the active `llm_inference` binding and omitted requests fall back to the binding default.
@@ -203,7 +206,7 @@ Bootstrap defaults:
 - Local cloud-traffic JSONL logging is controlled by `CLOUD_TRAFFIC_LOG_ENABLED`, `CLOUD_TRAFFIC_LOG_PATH`, and `CLOUD_TRAFFIC_LOG_MAX_BYTES`. The compose backend mounts `../logs` to `/var/log/vanessa` and rotates `cloud-traffic.jsonl` to `.1` when the configured size is exceeded.
 - Backend owns product/public retrieval request shaping, active KB selection, deployment-runtime resolution, and knowledge-chat/source projection. It forwards canonical `input.retrieval` payloads to `agent_engine`, which executes semantic / keyword / hybrid retrieval against the active runtime bindings.
 - Canonical backend ↔ agent-engine retrieval semantics are documented in [Retrieval Contract](retrieval_contract.md).
-- Backend also forwards optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
+- Backend also forwards optional `platform_runtime.capabilities.mcp_runtime`, `platform_runtime.capabilities.sandbox_execution`, and `platform_runtime.capabilities.image_analysis` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
 - `GET /v1/playgrounds/options` exposes runtime-allowed models, assistants, and deployment-bound knowledge bases for user-facing playground selection.
 - `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
@@ -213,6 +216,7 @@ Bootstrap defaults:
 - Tool definitions remain registry entities, but MCP is modeled as a separate catalog exposure instead of a tool transport. Backend bootstraps `tool.web_search` and `tool.python_exec` as internal tools with explicit schemas, execution backend, permissions, safety policy, offline compatibility, and persisted validation state. Superadmin tool creation starts from backend-owned execution backend templates, including `knowledge_base_retrieval` templates generated from active deployment-bound knowledge bases.
 - `knowledge_base_retrieval` tools bind exactly one active, ready knowledge base from the active deployment `vector_store` resources. Validation and execution fail if the active deployment changes and the configured KB is no longer bound. Invocation merges tool `retrieval_defaults` with call input and uses the same backend KB query path as the context-management retrieval QA surface.
 - Backend also bootstraps `mcp.web_search` and `mcp.python_exec` as gateway-hosted MCP server definitions backed by those tools. MCP creation defaults are backend-owned through `/v1/catalog/mcp-creation-options`; retrieval-backed tools classify as `knowledge_retrieval` with workspace data access and static freshness.
+- Backend also bootstraps image-analysis internal tools and MCP exposures for plate recognition, object detection, and captioning. These tools require the active `image_analysis` binding and never log or persist image payload bytes.
 - Superadmins manage MCP server definitions from `/v1/catalog/mcp-servers`. Backend validates MCP schemas and discovery metadata before save, filters discovery by agent/user/domain policy, validates inbound and outbound invocation payloads, dispatches to the backing internal tool, and records every MCP invocation in the audit log.
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.
   Each catalog create/update writes a new registry version under the hood, so runtime consumers

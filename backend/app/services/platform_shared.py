@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from .platform_service_types import _TASK_KEY_EMBEDDINGS, _TASK_KEY_LLM
-from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_LLM_INFERENCE
+from .platform_service_types import (
+    _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    _TASK_KEY_EMBEDDINGS,
+    _TASK_KEY_LLM,
+)
+from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_LLM_INFERENCE
 
 
 def _runtime_model_entries_for_capability(
@@ -35,3 +39,10 @@ def _runtime_model_entries_for_capability(
 
 def _expected_task_key(capability_key: str) -> str:
     return _TASK_KEY_LLM if capability_key == CAPABILITY_LLM_INFERENCE else _TASK_KEY_EMBEDDINGS
+
+
+def _expected_task_keys(capability_key: str) -> set[str]:
+    normalized = capability_key.strip().lower()
+    if normalized == CAPABILITY_IMAGE_ANALYSIS:
+        return set(_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.values())
+    return {_expected_task_key(normalized)}

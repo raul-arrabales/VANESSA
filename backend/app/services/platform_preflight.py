@@ -4,6 +4,7 @@ from typing import Any
 
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -31,6 +32,8 @@ def _operation_reachable(capability_key: str, validation: dict[str, Any]) -> boo
         return _bool_or_none(validation.get("execute_reachable"))
     if capability_key == CAPABILITY_MCP_RUNTIME:
         return _bool_or_none(validation.get("invoke_reachable"))
+    if capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        return _bool_or_none(validation.get("resources_reachable"))
     return _health_reachable(validation)
 
 
@@ -41,6 +44,8 @@ def _operation_failure_code(capability_key: str) -> str:
         return "execute_unreachable"
     if capability_key == CAPABILITY_MCP_RUNTIME:
         return "invoke_unreachable"
+    if capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        return "image_analysis_unreachable"
     return "resources_unreachable"
 
 
@@ -54,6 +59,9 @@ def _operation_failure_message(capability_key: str, validation: dict[str, Any]) 
     if capability_key == CAPABILITY_MCP_RUNTIME:
         status = validation.get("invoke_status_code")
         return f"MCP health tool invocation failed with HTTP {status}" if status else "MCP health tool invocation failed"
+    if capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        status = validation.get("resources_status_code")
+        return f"Image analysis resources could not be listed with HTTP {status}" if status else "Image analysis resources could not be listed"
     status = validation.get("resources_status_code")
     return f"Provider resources could not be listed with HTTP {status}" if status else "Provider resources could not be listed"
 

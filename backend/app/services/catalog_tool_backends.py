@@ -11,18 +11,20 @@ from .context_management_retrieval_schema import (
 )
 from .context_management_runtime import list_active_runtime_knowledge_bases, query_knowledge_base
 from .platform_adapters import http_json_request
-from .platform_service import get_active_platform_runtime, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
+from .platform_service import get_active_platform_runtime, resolve_image_analysis_adapter, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
 
 TOOL_BACKEND_SANDBOX = "sandbox_python"
 TOOL_BACKEND_WEB_SEARCH = "mcp_gateway_web_search"
 TOOL_BACKEND_INTERNAL_HTTP = "internal_http"
 TOOL_BACKEND_KB_RETRIEVAL = "knowledge_base_retrieval"
+TOOL_BACKEND_IMAGE_ANALYSIS = "image_analysis"
 VALID_TOOL_BACKENDS = {
     TOOL_BACKEND_SANDBOX,
     TOOL_BACKEND_WEB_SEARCH,
     TOOL_BACKEND_INTERNAL_HTTP,
     TOOL_BACKEND_KB_RETRIEVAL,
+    TOOL_BACKEND_IMAGE_ANALYSIS,
 }
 
 
@@ -194,6 +196,45 @@ def _build_internal_http_tool_template() -> dict[str, Any]:
     }
 
 
+def _build_image_analysis_tool_template() -> dict[str, Any]:
+    return {
+        "id": "tool.custom_image_analysis",
+        "visibility": "private",
+        "publish": False,
+        "name": "Image Analysis",
+        "description": "Analyzes local image payloads for license plates, objects, and captions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "image": {
+                    "type": "object",
+                    "properties": {
+                        "data_base64": {"type": "string"},
+                        "mime_type": {"type": "string"},
+                    },
+                    "required": ["data_base64", "mime_type"],
+                    "additionalProperties": False,
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["license_plate_recognition", "object_detection", "captioning"]},
+                    "minItems": 1,
+                },
+                "options": {"type": "object", "additionalProperties": True},
+            },
+            "required": ["image", "tasks"],
+            "additionalProperties": False,
+        },
+        "output_schema": {"type": "object", "additionalProperties": True},
+        "safety_policy": {"timeout_seconds": 30, "network_access": False},
+        "offline_compatible": True,
+        "execution_backend": TOOL_BACKEND_IMAGE_ANALYSIS,
+        "transport": "image_analysis_http",
+        "execution_config": {},
+        "permissions": {},
+    }
+
+
 def _tool_identifier_part(value: Any) -> str:
     normalized = str(value or "").strip().lower().replace("_", "-")
     normalized = re.sub(r"[^a-z0-9.-]+", "-", normalized)
@@ -232,6 +273,7 @@ def build_tool_creation_options(database_url: str, *, config: Any) -> dict[str, 
         _tool_creation_backend_option(TOOL_BACKEND_SANDBOX, _build_sandbox_tool_template()),
         _tool_creation_backend_option(TOOL_BACKEND_WEB_SEARCH, _build_web_search_tool_template()),
         _tool_creation_backend_option(TOOL_BACKEND_INTERNAL_HTTP, _build_internal_http_tool_template()),
+        _tool_creation_backend_option(TOOL_BACKEND_IMAGE_ANALYSIS, _build_image_analysis_tool_template()),
     ]
     if knowledge_bases:
         execution_backends.append(
@@ -288,6 +330,8 @@ def validate_backend(
         _validate_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
     elif execution_backend == TOOL_BACKEND_INTERNAL_HTTP:
         runtime_checks["provider_reachable"] = True
+    elif execution_backend == TOOL_BACKEND_IMAGE_ANALYSIS:
+        _validate_image_analysis_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
     else:
         errors.append(f"Unsupported execution backend '{execution_backend}'.")
 
@@ -403,7 +447,31 @@ def execute_backend(
         )
     if execution_backend == TOOL_BACKEND_KB_RETRIEVAL:
         return _execute_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
+    if execution_backend == TOOL_BACKEND_IMAGE_ANALYSIS:
+        return _execute_image_analysis_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
     raise CatalogError("invalid_execution_backend", f"Unsupported execution backend '{execution_backend}'.")
+
+
+def _validate_image_analysis_backend(
+    *,
+    database_url: str,
+    config: Any,
+    runtime_checks: dict[str, Any],
+    errors: list[str],
+) -> None:
+    try:
+        adapter = resolve_image_analysis_adapter(database_url, config)
+        health = adapter.health()
+        resources, resources_status = adapter.list_resources()
+        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
+        runtime_checks["provider_status_code"] = health.get("status_code")
+        runtime_checks["resources_status_code"] = resources_status
+        runtime_checks["resource_count"] = len(resources)
+        if not runtime_checks["provider_reachable"]:
+            errors.append("Image analysis runtime provider is not reachable.")
+    except PlatformControlPlaneError as exc:
+        errors.append(exc.message)
+        runtime_checks["provider_status_code"] = exc.status_code
 
 
 def _execute_sandbox_backend(
@@ -489,6 +557,40 @@ def _execute_mcp_gateway_web_search_backend(
     return payload if isinstance(payload, dict) else None, status_code
 
 
+def _execute_image_analysis_backend(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    tool_input: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int]:
+    image = tool_input.get("image")
+    tasks = tool_input.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        execution_config = spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}
+        tasks = execution_config.get("tasks")
+    if not isinstance(image, dict):
+        raise CatalogError("invalid_tool_input", "Image analysis tools require input.image")
+    if not isinstance(tasks, list) or not tasks:
+        raise CatalogError("invalid_tool_input", "Image analysis tools require input.tasks")
+    try:
+        adapter = resolve_image_analysis_adapter(database_url, config)
+        resource_policy = dict(adapter.binding.resource_policy or {})
+        return adapter.analyze(
+            payload={
+                "image": image,
+                "tasks": tasks,
+                "options": dict(tool_input.get("options") or {}) if isinstance(tool_input.get("options"), dict) else {},
+                "runtime": {
+                    "resources": [dict(resource) for resource in adapter.binding.resources],
+                    "task_defaults": dict(resource_policy.get("task_defaults") or {}),
+                },
+            }
+        )
+    except PlatformControlPlaneError as exc:
+        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
+
+
 def mcp_metadata_defaults_for_tool_spec(tool_spec: dict[str, Any]) -> dict[str, Any]:
     execution_backend = tool_execution_backend(tool_spec) or TOOL_BACKEND_INTERNAL_HTTP
     if execution_backend == TOOL_BACKEND_SANDBOX:
@@ -525,6 +627,18 @@ def mcp_metadata_defaults_for_tool_spec(tool_spec: dict[str, Any]) -> dict[str, 
             "risk_level": "low",
             "data_access": "workspace",
             "output_freshness": "static",
+            "audit_level": "standard",
+        }
+    if execution_backend == TOOL_BACKEND_IMAGE_ANALYSIS:
+        return {
+            "category": "data_analysis",
+            "capabilities": ["image-analysis", "license-plate-recognition", "object-detection", "image-captioning"],
+            "local": True,
+            "stateless": True,
+            "sandboxed": False,
+            "risk_level": "medium",
+            "data_access": "user_data",
+            "output_freshness": "runtime_generated",
             "audit_level": "standard",
         }
     return {

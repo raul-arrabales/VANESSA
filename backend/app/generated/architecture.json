@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-15T12:35:58+00:00",
+  "generated_at": "2026-05-20T13:07:20+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -93,6 +93,15 @@
       "criticality": "medium"
     },
     {
+      "id": "image_analysis",
+      "container": "image_analysis",
+      "label": "Image Analysis",
+      "group": "runtime",
+      "description": "Optional local image understanding service for plate recognition, object detection, and captioning.",
+      "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
       "id": "sandbox",
       "container": "sandbox",
       "label": "Sandbox",
@@ -130,6 +139,15 @@
     }
   ],
   "edges": [
+    {
+      "id": "agent_engine-image_analysis",
+      "from": "agent_engine",
+      "to": "image_analysis",
+      "protocol": "HTTP",
+      "purpose": "Agent image-analysis tool invocation through resolved platform runtime bindings",
+      "kind": "http",
+      "direction": "outbound"
+    },
     {
       "id": "agent_engine-llm",
       "from": "agent_engine",
@@ -190,6 +208,15 @@
       "to": "agent_engine",
       "protocol": "HTTP",
       "purpose": "Agent orchestration calls",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-image_analysis",
+      "from": "backend",
+      "to": "image_analysis",
+      "protocol": "HTTP",
+      "purpose": "Optional image-analysis provider validation and superadmin smoke tests",
       "kind": "http",
       "direction": "outbound"
     },
@@ -380,9 +407,15 @@
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "image_analysis": {
         "x": 846,
         "y": 818,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 942,
         "width": 220,
         "height": 84
       },
@@ -406,5 +439,5 @@
       }
     }
   },
-  "source_hash": "fc0e59eb9291fc29c04b744574fcc26a6811332ef66e4678c1bdfc1493733ff9"
+  "source_hash": "117fdfd7f726093db9bc142631c562283451cf38fa9bc68a00d06cf988854196"
 }

@@ -17,16 +17,37 @@ from .platform_service import (
     _effective_local_slot,
     ensure_platform_bootstrap_state,
     resolve_embeddings_adapter,
+    resolve_image_analysis_adapter,
     resolve_llm_inference_adapter,
 )
 from .runtime_profile_service import resolve_runtime_profile
 
 _TASK_LLM = modelops_repo.TASK_LLM
 _TASK_EMBEDDINGS = modelops_repo.TASK_EMBEDDINGS
+_TASK_IMAGE_PLATE_DETECTION = modelops_repo.TASK_IMAGE_PLATE_DETECTION
+_TASK_IMAGE_PLATE_OCR = modelops_repo.TASK_IMAGE_PLATE_OCR
+_TASK_OBJECT_DETECTION = modelops_repo.TASK_OBJECT_DETECTION
+_TASK_IMAGE_CAPTIONING = modelops_repo.TASK_IMAGE_CAPTIONING
+_IMAGE_TASKS = {
+    _TASK_IMAGE_PLATE_DETECTION,
+    _TASK_IMAGE_PLATE_OCR,
+    _TASK_OBJECT_DETECTION,
+    _TASK_IMAGE_CAPTIONING,
+}
+_IMAGE_ANALYSIS_RUNTIME_TASK_BY_MODEL_TASK = {
+    _TASK_IMAGE_PLATE_DETECTION: "license_plate_recognition",
+    _TASK_IMAGE_PLATE_OCR: "license_plate_recognition",
+    _TASK_OBJECT_DETECTION: "object_detection",
+    _TASK_IMAGE_CAPTIONING: "captioning",
+}
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
 _LOCAL_TEST_CAPABILITY_BY_TASK = {
     _TASK_LLM: "llm_inference",
     _TASK_EMBEDDINGS: "embeddings",
+    _TASK_IMAGE_PLATE_DETECTION: "image_analysis",
+    _TASK_IMAGE_PLATE_OCR: "image_analysis",
+    _TASK_OBJECT_DETECTION: "image_analysis",
+    _TASK_IMAGE_CAPTIONING: "image_analysis",
 }
 
 
@@ -63,6 +84,12 @@ def _normalize_model_test_inputs(task_key: str, inputs: dict[str, Any]) -> dict[
         if not text:
             raise ModelOpsError("invalid_test_input", "text is required", status_code=400)
         return {"text": text}
+    if normalized_task in _IMAGE_TASKS:
+        image_base64 = str(inputs.get("image_base64") or inputs.get("data_base64") or "").strip()
+        mime_type = str(inputs.get("mime_type") or "image/png").strip()
+        if not image_base64:
+            raise ModelOpsError("invalid_test_input", "image_base64 is required", status_code=400)
+        return {"image_base64": image_base64, "mime_type": mime_type}
     raise ModelOpsError("model_test_unsupported", "Testing is not supported for this model type", status_code=409)
 
 
@@ -420,6 +447,54 @@ def _inspect_local_llm_test_runtime(
             config,
             provider_instance_id=provider_instance_id,
         )
+    elif capability_key == "image_analysis":
+        adapter = resolve_image_analysis_adapter(
+            database_url,
+            config,
+            provider_instance_id=provider_instance_id,
+        )
+        resources_payload, status_code = adapter.list_resources()
+        runtime_models = resources_payload if isinstance(resources_payload, list) else []
+        available_models = [item for item in runtime_models if isinstance(item, dict)]
+        reachable = 200 <= status_code < 300
+        managed_model_id = str(model_row.get("model_id") or "").strip()
+        managed_identifiers = {managed_model_id.lower()}
+        managed_identifiers.update(candidate for _label, value in _managed_model_identifiers(model_row) for candidate in _normalized_identifier_candidates(value))
+        match = next(
+            (
+                item
+                for item in available_models
+                if str(item.get("id") or "").strip().lower() in managed_identifiers
+                or str(item.get("provider_resource_id") or "").strip().lower() in managed_identifiers
+            ),
+            None,
+        )
+        return {
+            "provider_instance_id": provider_instance_id,
+            "slug": str(provider_row.get("slug") or "").strip(),
+            "display_name": str(provider_row.get("display_name") or provider_row.get("slug") or "").strip(),
+            "provider_key": str(provider_row.get("provider_key") or "").strip(),
+            "endpoint_url": str(provider_row.get("endpoint_url") or "").strip(),
+            "adapter_kind": str(provider_row.get("adapter_kind") or "").strip(),
+            "enabled": bool(provider_row.get("enabled")),
+            "is_active": is_active,
+            "reachable": reachable,
+            "status_code": status_code,
+            "matches_model": match is not None,
+            "matched_model_id": str((match or {}).get("id") or "").strip() or None,
+            "matched_model_display_name": str((match or {}).get("display_name") or (match or {}).get("id") or "").strip() or None,
+            "match_source": "managed_model -> image_analysis_resource" if match is not None else None,
+            "matched_value": str((match or {}).get("id") or "").strip() or None,
+            "advertised_model_ids": _runtime_advertised_model_ids(available_models),
+            "advertised_models": [_serialize_runtime_inventory_entry(item) for item in available_models],
+            "message": (
+                "Runtime advertises the selected image model"
+                if match
+                else "Runtime does not currently advertise the selected image model"
+                if reachable
+                else "Runtime is unavailable"
+            ),
+        }
     else:
         raise ModelOpsError("test_runtime_not_supported", "Provider does not support local model testing", status_code=409)
     models_payload, status_code = adapter.list_models()
@@ -733,6 +808,73 @@ def _execute_local_embeddings_test(
     return "Local embeddings test succeeded", request_payload, response_payload, result_payload, latency_ms
 
 
+def _execute_local_image_analysis_test(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    row: dict[str, Any],
+    normalized_inputs: dict[str, str],
+    provider_instance_id: str,
+    runtime_task: str,
+) -> tuple[str, dict[str, Any], dict[str, Any], dict[str, Any], float]:
+    adapter = resolve_image_analysis_adapter(
+        database_url,
+        config,
+        provider_instance_id=provider_instance_id,
+    )
+    request_payload = {
+        "image": {
+            "data_base64": normalized_inputs["image_base64"],
+            "mime_type": normalized_inputs["mime_type"],
+        },
+        "tasks": [runtime_task],
+        "runtime": {
+            "task_defaults": {
+                "plate_detector": str(row.get("model_id") or "").strip(),
+                "plate_ocr": str(row.get("model_id") or "").strip(),
+                "object_detector": str(row.get("model_id") or "").strip(),
+                "captioner": str(row.get("model_id") or "").strip(),
+            }
+        },
+    }
+    stored_request_payload = {
+        **request_payload,
+        "image": {
+            "data_base64": "<redacted>",
+            "mime_type": normalized_inputs["mime_type"],
+        },
+    }
+    started_at = perf_counter()
+    payload, status_code = adapter.analyze(payload=request_payload)
+    latency_ms = (perf_counter() - started_at) * 1000
+    response_payload = payload if isinstance(payload, dict) else {}
+    if payload is None or status_code >= 400:
+        message = str(response_payload.get("message") or response_payload.get("error") or "Local image analysis test failed")
+        raise ModelOpsError(
+            "model_test_failed",
+            message,
+            status_code=409,
+            details={
+                "summary": "Local image analysis test failed",
+                "output_payload": response_payload,
+                "error_details": {"status_code": status_code, "message": message},
+                "latency_ms": latency_ms,
+            },
+        )
+    result_payload = {
+        "kind": str(row.get("task_key") or "").strip().lower(),
+        "success": True,
+        "latency_ms": latency_ms,
+        "metadata": {
+            "provider_instance_id": provider_instance_id,
+            "runtime_task": runtime_task,
+            "managed_model_id": str(row.get("model_id") or "").strip(),
+            "status_code": status_code,
+        },
+    }
+    return "Local image analysis test succeeded", stored_request_payload, response_payload, result_payload, latency_ms
+
+
 def run_model_test(
     database_url: str,
     *,
@@ -786,7 +928,7 @@ def run_model_test(
             details={"test_run": serialize_model_test_run(test_run)},
         )
 
-    if backend_kind == "local" and task_key in {_TASK_LLM, _TASK_EMBEDDINGS}:
+    if backend_kind == "local" and task_key in {_TASK_LLM, _TASK_EMBEDDINGS, *_IMAGE_TASKS}:
         normalized_provider_instance_id = str(provider_instance_id or "").strip() or None
         if actor_role.strip().lower() != "superadmin":
             test_run = _append_failed_test_run(
@@ -912,7 +1054,7 @@ def run_model_test(
                     provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
                     runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
                 )
-            else:
+            elif task_key == _TASK_EMBEDDINGS:
                 summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_embeddings_test(
                     database_url,
                     config=config,
@@ -920,6 +1062,15 @@ def run_model_test(
                     text=normalized_inputs["text"],
                     provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
                     runtime_model_id=str(selected_runtime.get("matched_model_id") or "").strip(),
+                )
+            else:
+                summary, request_payload, output_payload, result_payload, latency_ms = _execute_local_image_analysis_test(
+                    database_url,
+                    config=config,
+                    row=row,
+                    normalized_inputs=normalized_inputs,
+                    provider_instance_id=str(selected_runtime.get("provider_instance_id") or "").strip(),
+                    runtime_task=_IMAGE_ANALYSIS_RUNTIME_TASK_BY_MODEL_TASK[task_key],
                 )
             test_run = modelops_repo.append_model_test_run(
                 database_url,

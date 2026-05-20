@@ -16,7 +16,7 @@ Current architectural pillars:
 - **GenAI control plane**
   - Owned by the backend and PostgreSQL.
   - Manages platform `capabilities`, `providers`, `deployment_profile`s, and binding-level resource selection.
-  - Chooses which infrastructure implementation is active for inference, embeddings, vector retrieval, sandbox execution, and MCP tool runtime.
+  - Chooses which infrastructure implementation is active for inference, embeddings, vector retrieval, sandbox execution, MCP tool runtime, and optional image analysis.
 
 - **ModelOps**
   - Separate managed-model domain layered on top of the control plane.
@@ -32,7 +32,7 @@ Current architectural pillars:
   - `llm` is the normalized private LLM gateway.
   - `llm_runtime_inference`, `llm_runtime_embeddings`, and optional `llama_cpp` are local runtime/provider options behind the control plane.
   - Weaviate and optional Qdrant are alternate `vector_store` providers.
-  - Sandbox and MCP gateway are runtime capabilities selected by the control plane, not generic sidecars.
+  - Sandbox, MCP gateway, and image analysis are runtime capabilities selected by the control plane, not generic sidecars.
   - SearXNG is the local token-free metasearch backend consumed only by MCP gateway web search tools.
 
 Design goals:
@@ -57,10 +57,10 @@ Important current product-stage guidance:
 Use these terms consistently:
 
 - `capability`
-  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, or `sandbox_execution`.
+  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`.
 
 - `provider`
-  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, or `sandbox_local`.
+  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, or `image_analysis_local`.
   - Provider families own `provider_origin` (`local` or `cloud`); provider instances inherit that value and must not override it.
 
 - `adapter`
@@ -108,6 +108,7 @@ Current runtime ownership:
 For model-bearing capabilities:
 
 - `llm_inference` and `embeddings` bindings use managed-model `resources` plus `default_resource_id`.
+- `image_analysis` bindings use managed-model `resources` plus `resource_policy.selection_mode="task_defaults"` and task defaults for `plate_detector`, `plate_ocr`, `object_detector`, and `captioner`; they do not use a global `default_resource_id`.
 - Requested models must belong to the active binding.
 - If no model is requested, the binding default is used.
 - In `offline` runtime profile, any provider with `provider_origin="cloud"` must be blocked before validation, activation, runtime resolution, adapter creation, or provider invocation.
@@ -163,19 +164,25 @@ Respect these runtime boundaries when generating code or configuration.
     - Requires internet access even though it runs as a local container.
     - Must stay behind MCP gateway and not become a platform capability by itself.
 
-11. **Wake-word service (`kws`)**
+11. **Image Analysis (`image_analysis`)**
+   - Optional local HTTP provider for image understanding.
+   - Supports license plate recognition, generic object detection, and image captioning.
+   - Must be accessed through backend/agent runtime adapters and active `image_analysis` bindings; frontend must not call it directly.
+   - Image payload bytes must not be logged, stored, or included in telemetry.
+
+12. **Wake-word service (`kws`)**
    - Offline wake-word detection and wake-event emission.
    - Integrates with backend via webhook/event flow.
 
-12. **Weaviate**
+13. **Weaviate**
     - Persistent vector index.
     - One possible `vector_store` provider.
 
-13. **Optional Qdrant (`qdrant`)**
+14. **Optional Qdrant (`qdrant`)**
     - Alternate vector database.
     - Alternate `vector_store` provider selected by deployment profile.
 
-14. **PostgreSQL**
+15. **PostgreSQL**
     - Persistent relational storage for auth, metadata, control-plane state, ModelOps state, and execution metadata.
 
 ---
@@ -202,6 +209,11 @@ Respect these runtime boundaries when generating code or configuration.
 - `mcp_gateway/`
   - Gateway-hosted MCP server exposure provider.
   - Owns the SearXNG-backed private web-search runner exposed through catalog-managed MCP server definitions.
+
+- `image_analysis/`
+  - Optional local image-analysis provider service.
+  - Exposes `/health`, `/v1/resources`, and `/v1/analyze`.
+  - Uses local open-source model pipelines for plate recognition, object detection, and captioning.
 
 - `kws/`
   - Wake-word service.
@@ -275,6 +287,7 @@ This should start the current local stack, including at least:
 - Sandbox
 - MCP gateway
 - SearXNG
+- Optional image analysis
 - Optional llama.cpp
 - Optional Qdrant
 
@@ -312,6 +325,7 @@ Prefer current platform terms:
 - `default_resource_id`
 - `platform_runtime`
 - `ModelOps`
+- `image_analysis`
 
 Avoid reviving outdated singular terminology such as binding everything around one `served_model_id` when the current design is resource-oriented and multi-model.
 
@@ -372,6 +386,7 @@ When making changes:
 - Use data access layers/repositories instead of inline SQL in feature code.
 - Keep internal tool definitions in the registry and model MCP as separate gateway-hosted exposure definitions backed by validated tools.
 - Bind concrete managed models and other provider resources at the deployment-binding layer through `resources` and `default_resource_id`, not by attaching a single model directly to a provider instance.
+- For `image_analysis`, bind concrete managed models through `resources` and `resource_policy.task_defaults`, not `default_resource_id`.
 
 4. Keep backend and docs aligned with current architecture.
 - If a change affects topology, interfaces, runtime selection, provider binding, or architectural contracts, update the corresponding docs in the same change.
@@ -382,6 +397,7 @@ When making changes:
 - `llm_runtime_inference`, `llm_runtime_embeddings`, and `llama_cpp` are provider/runtime options behind control-plane selection.
 - Weaviate and Qdrant are alternate `vector_store` providers.
 - Sandbox and MCP gateway are runtime capabilities, not generic utilities to call directly from anywhere.
+- Image analysis is a runtime capability, not a generic utility to call directly from frontend or product code.
 
 6. Be safe with the sandbox.
 - Any code-execution feature must integrate through approved backend/agent_engine abstractions and governance checks.

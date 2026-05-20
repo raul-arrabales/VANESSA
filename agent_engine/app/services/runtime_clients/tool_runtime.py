@@ -3,7 +3,7 @@ from __future__ import annotations
 from time import monotonic
 from typing import Any
 
-from .base import McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
+from .base import ImageAnalysisRuntimeClient, ImageAnalysisRuntimeClientError, McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
 from .resolution import binding_timeout_seconds
 from .transport import JsonRequestFn, request_json_or_raise
 from ..cloud_traffic import report_cloud_traffic_for_binding
@@ -176,3 +176,51 @@ class HttpSandboxToolRuntimeClient(SandboxToolRuntimeClient):
         execute_path = str(config.get("execute_path", "/v1/execute")).strip() or "/v1/execute"
         endpoint_url = str(self.sandbox_binding.get("endpoint_url", "")).rstrip("/")
         return endpoint_url + execute_path
+
+
+class HttpImageAnalysisRuntimeClient(ImageAnalysisRuntimeClient):
+    def __init__(
+        self,
+        *,
+        deployment_profile: dict[str, Any],
+        image_binding: dict[str, Any],
+        request_json: JsonRequestFn,
+    ):
+        super().__init__(deployment_profile=deployment_profile, image_binding=image_binding)
+        self.request_json = request_json
+
+    def analyze(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+        analysis_payload = {
+            **payload,
+            "runtime": {
+                "resources": list(self.image_binding.get("resources") or []),
+                "task_defaults": dict(
+                    (
+                        self.image_binding.get("resource_policy")
+                        if isinstance(self.image_binding.get("resource_policy"), dict)
+                        else {}
+                    ).get("task_defaults")
+                    or {}
+                ),
+            },
+        }
+        response_payload, status_code = request_json_or_raise(
+            request_json=self.request_json,
+            error_cls=ImageAnalysisRuntimeClientError,
+            binding=self.image_binding,
+            url=self._analyze_url(),
+            method="POST",
+            payload=analysis_payload,
+            timeout_seconds=binding_timeout_seconds(self.image_binding),
+            unavailable_code=tool_unavailable_code,
+            unavailable_message="Image analysis runtime unavailable",
+            request_failed_code=tool_request_failed_code,
+            request_failed_message="Image analysis runtime request failed",
+        )
+        return {"status_code": status_code, "result": response_payload}
+
+    def _analyze_url(self) -> str:
+        config = self.image_binding.get("config") if isinstance(self.image_binding.get("config"), dict) else {}
+        analyze_path = str(config.get("analyze_path", "/v1/analyze")).strip() or "/v1/analyze"
+        endpoint_url = str(self.image_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + analyze_path

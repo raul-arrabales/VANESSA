@@ -30,6 +30,7 @@ def _platform_runtime(
     vector_config: dict[str, object] | None = None,
     include_mcp_runtime: bool = False,
     include_sandbox_runtime: bool = False,
+    include_image_analysis_runtime: bool = False,
 ) -> dict[str, object]:
     capabilities: dict[str, object] = {
         "llm_inference": {
@@ -154,6 +155,36 @@ def _platform_runtime(
             "healthcheck_url": "http://sandbox:6000/health",
             "enabled": True,
             "config": {"execute_path": "/v1/execute"},
+            "binding_config": {},
+        }
+    if include_image_analysis_runtime:
+        capabilities["image_analysis"] = {
+            "id": "provider-image",
+            "slug": "image-analysis-local",
+            "provider_key": "image_analysis_local",
+            "display_name": "Image analysis",
+            "description": "desc",
+            "adapter_kind": "image_analysis_http",
+            "endpoint_url": "http://image_analysis:8090",
+            "healthcheck_url": "http://image_analysis:8090/health",
+            "enabled": True,
+            "config": {"analyze_path": "/v1/analyze", "request_timeout_seconds": 30},
+            "resources": [
+                {"id": "plate-detector", "metadata": {"task_key": "image_plate_detection"}},
+                {"id": "plate-ocr", "metadata": {"task_key": "image_plate_ocr"}},
+                {"id": "object-detector", "metadata": {"task_key": "object_detection"}},
+                {"id": "captioner", "metadata": {"task_key": "image_captioning"}},
+            ],
+            "default_resource_id": None,
+            "resource_policy": {
+                "selection_mode": "task_defaults",
+                "task_defaults": {
+                    "plate_detector": "plate-detector",
+                    "plate_ocr": "plate-ocr",
+                    "object_detector": "object-detector",
+                    "captioner": "captioner",
+                },
+            },
             "binding_config": {},
         }
     return {
@@ -871,3 +902,59 @@ def test_sandbox_tool_runtime_client_executes_python(monkeypatch: pytest.MonkeyP
 
     assert payload["result"] == {"ok": True}
     assert seen_payloads[0]["language"] == "python"
+
+
+def test_image_analysis_runtime_client_sends_bound_task_defaults(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del method, headers
+        assert url == "http://image_analysis:8090/v1/analyze"
+        assert timeout_seconds == 30.0
+        seen_payloads.append(dict(payload or {}))
+        return {"image": {"width": 1, "height": 1}, "license_plates": []}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_image_analysis_runtime_client(_platform_runtime(include_image_analysis_runtime=True))
+
+    payload = client.analyze(
+        payload={
+            "image": {"data_base64": "abc", "mime_type": "image/png"},
+            "tasks": ["license_plate_recognition"],
+        }
+    )
+
+    assert payload["status_code"] == 200
+    assert seen_payloads[0]["runtime"] == {
+        "resources": [
+            {"id": "plate-detector", "metadata": {"task_key": "image_plate_detection"}},
+            {"id": "plate-ocr", "metadata": {"task_key": "image_plate_ocr"}},
+            {"id": "object-detector", "metadata": {"task_key": "object_detection"}},
+            {"id": "captioner", "metadata": {"task_key": "image_captioning"}},
+        ],
+        "task_defaults": {
+            "plate_detector": "plate-detector",
+            "plate_ocr": "plate-ocr",
+            "object_detector": "object-detector",
+            "captioner": "captioner",
+        },
+    }
+
+
+def test_image_analysis_runtime_client_requires_binding() -> None:
+    with pytest.raises(runtime_client.ImageAnalysisRuntimeClientError) as exc_info:
+        runtime_client.build_image_analysis_runtime_client(_platform_runtime())
+
+    assert exc_info.value.code == "missing_image_analysis_runtime"
+
+
+def test_image_analysis_runtime_client_requires_task_defaults() -> None:
+    runtime = _platform_runtime(include_image_analysis_runtime=True)
+    image_binding = runtime["capabilities"]["image_analysis"]
+    assert isinstance(image_binding, dict)
+    image_binding["resource_policy"] = {"selection_mode": "task_defaults", "task_defaults": {}}
+
+    with pytest.raises(runtime_client.ImageAnalysisRuntimeClientError) as exc_info:
+        runtime_client.build_image_analysis_runtime_client(runtime)
+
+    assert exc_info.value.code == "missing_image_analysis_task_defaults"

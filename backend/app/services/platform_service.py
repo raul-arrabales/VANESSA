@@ -76,6 +76,7 @@ from .platform_runtime import (
     get_active_capability_statuses,
     get_active_platform_runtime,
     resolve_embeddings_adapter,
+    resolve_image_analysis_adapter,
     resolve_llm_inference_adapter,
     resolve_mcp_runtime_adapter,
     resolve_sandbox_execution_adapter,
@@ -97,6 +98,7 @@ from .platform_shared import _expected_task_key, _runtime_model_entries_for_capa
 from .platform_types import (
     ALL_CAPABILITIES,
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,

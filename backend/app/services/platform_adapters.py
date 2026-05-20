@@ -704,6 +704,23 @@ class McpRuntimeAdapter(ABC):
         raise NotImplementedError
 
 
+class ImageAnalysisAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def analyze(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
     def _request_headers(self) -> dict[str, str]:
         return _openai_compatible_headers(self.binding)
@@ -1665,6 +1682,78 @@ class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
 
     def list_tools(self) -> tuple[dict[str, Any] | None, int]:
         return http_json_request(self._tools_url(), method="GET")
+
+
+class HttpImageAnalysisAdapter(ImageAnalysisAdapter):
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        return self.binding.endpoint_url.rstrip("/") + "/health"
+
+    def _resources_url(self) -> str:
+        path = str(self.binding.config.get("resources_path", "/v1/resources")).strip() or "/v1/resources"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def _analyze_url(self) -> str:
+        path = str(self.binding.config.get("analyze_path", "/v1/analyze")).strip() or "/v1/analyze"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def _request_timeout_seconds(self) -> float:
+        return _binding_timeout_seconds(self.binding.config)
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(
+            self._health_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = http_json_request(
+            self._resources_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+        raw_resources = payload.get("resources") if isinstance(payload, dict) else []
+        resources: list[dict[str, Any]] = []
+        if isinstance(raw_resources, list):
+            for item in raw_resources:
+                if not isinstance(item, dict):
+                    continue
+                resource_id = str(item.get("id") or item.get("provider_resource_id") or "").strip()
+                if not resource_id:
+                    continue
+                resources.append(
+                    {
+                        "id": resource_id,
+                        "resource_kind": "model",
+                        "ref_type": "provider_resource",
+                        "managed_model_id": None,
+                        "provider_resource_id": str(item.get("provider_resource_id") or resource_id).strip(),
+                        "display_name": item.get("display_name") or resource_id,
+                        "metadata": {
+                            key: value
+                            for key, value in dict(item.get("metadata") or {}).items()
+                            if value not in {None, ""}
+                        },
+                    }
+                )
+        return resources, status_code
+
+    def analyze(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+        return http_json_request(
+            self._analyze_url(),
+            method="POST",
+            payload=payload,
+            timeout_seconds=self._request_timeout_seconds(),
+        )
 
 
 def _is_model_not_found(payload: dict[str, Any] | None) -> bool:

@@ -28,6 +28,7 @@ from .platform_runtime import (
 from .platform_serialization import _serialize_binding_resource, _serialize_provider_family_row, _serialize_provider_row
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -329,6 +330,20 @@ def validate_provider(
                 "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
                 "invoke_status_code": invoke_status,
             }),
+        }
+
+    if binding.capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        adapter = _adapter_from_binding(binding)
+        resources, resources_status = _list_adapter_resources(adapter)
+        validation_payload = {
+            "health": adapter.health(),
+            "resources_reachable": 200 <= resources_status < 300,
+            "resources_status_code": resources_status,
+            "resources": [_serialize_binding_resource(resource) for resource in resources],
+        }
+        return {
+            "provider": _serialize_provider_row(provider_row),
+            "validation": _annotate_provider_validation(binding.capability_key, validation_payload),
         }
 
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)

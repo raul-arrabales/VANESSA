@@ -22,6 +22,7 @@ from .platform_service_types import (
 from .platform_local_slots import reconcile_local_provider_slots
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -61,6 +62,8 @@ def _upsert_bootstrap_binding(
             if isinstance(resource, dict)
         ]
         effective_default_resource_id = str(existing_binding.get("default_resource_id") or "").strip() or None
+        if isinstance(existing_binding.get("resource_policy"), dict):
+            effective_resource_policy = dict(existing_binding.get("resource_policy") or {})
     if capability_key == CAPABILITY_VECTOR_STORE and isinstance(existing_binding, dict):
         existing_resources = [
             dict(resource)
@@ -140,6 +143,7 @@ def _existing_bindings_by_capability(
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
     sandbox_url = str(getattr(config, "sandbox_url", "") or "").strip()
     mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
+    image_analysis_url = str(getattr(config, "image_analysis_url", "") or "").strip()
     llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
     llm_local_upstream_model = str(
         getattr(config, "llm_local_upstream_model", "") or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
@@ -154,6 +158,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_VECTOR_STORE, display_name="Vector store", description="Semantic retrieval capability for embeddings and document search.", is_required=True)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_MCP_RUNTIME, display_name="MCP runtime", description="Gateway capability for MCP-hosted tool execution.", is_required=False)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_SANDBOX_EXECUTION, display_name="Sandbox execution", description="Isolated code-execution capability for agent tools.", is_required=False)
+    platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_IMAGE_ANALYSIS, display_name="Image analysis", description="Local image understanding capability for license plates, object detection, and captioning.", is_required=False)
 
     platform_repo.ensure_provider_family(
         database_url,
@@ -235,6 +240,15 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         provider_origin="local",
         display_name="Sandbox local",
         description="Local sandbox execution runtime for agent tools.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="image_analysis_local",
+        capability_key=CAPABILITY_IMAGE_ANALYSIS,
+        adapter_kind="image_analysis_http",
+        provider_origin="local",
+        display_name="Image analysis local",
+        description="Optional local image-analysis runtime for ANPR, object detection, and captioning.",
     )
 
     vllm_provider = platform_repo.ensure_provider_instance(
@@ -362,6 +376,23 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             enabled=True,
             config_json={"invoke_path": "/v1/tools/invoke", "list_tools_path": "/v1/tools", "healthcheck_tool_name": "web_search"},
         )
+    image_analysis_provider = None
+    if image_analysis_url:
+        image_analysis_provider = platform_repo.ensure_provider_instance(
+            database_url,
+            slug="image-analysis-local",
+            provider_key="image_analysis_local",
+            display_name="Image analysis local",
+            description="Optional local image-analysis runtime.",
+            endpoint_url=image_analysis_url,
+            healthcheck_url=image_analysis_url.rstrip("/") + "/health",
+            enabled=True,
+            config_json={
+                "resources_path": "/v1/resources",
+                "analyze_path": "/v1/analyze",
+                "request_timeout_seconds": llm_request_timeout_seconds,
+            },
+        )
 
     reconciled_providers = {
         str(item.get("slug") or "").strip(): item
@@ -388,6 +419,18 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
     if mcp_gateway_provider is not None:
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+    if image_analysis_provider is not None:
+        _upsert_bootstrap_binding(
+            database_url,
+            deployment_profile_id=str(profile["id"]),
+            capability_key=CAPABILITY_IMAGE_ANALYSIS,
+            provider_instance_id=str(image_analysis_provider["id"]),
+            resources=[],
+            default_resource_id=None,
+            binding_config={},
+            resource_policy={},
+            existing_binding=default_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS),
+        )
 
     if getattr(config, "llama_cpp_url", "").strip():
         llama_profile = platform_repo.ensure_deployment_profile(database_url, slug=_LLAMA_CPP_DEPLOYMENT_SLUG, display_name=_LLAMA_CPP_DEPLOYMENT_NAME, description=_LLAMA_CPP_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
@@ -399,6 +442,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+        if image_analysis_provider is not None:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if qdrant_provider is not None:
         qdrant_profile = platform_repo.ensure_deployment_profile(database_url, slug=_QDRANT_DEPLOYMENT_SLUG, display_name=_QDRANT_DEPLOYMENT_NAME, description=_QDRANT_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
@@ -410,6 +455,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+        if image_analysis_provider is not None:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if platform_repo.get_active_deployment(database_url) is None:
         platform_repo.activate_deployment_profile(database_url, deployment_profile_id=str(profile["id"]), activated_by_user_id=None)

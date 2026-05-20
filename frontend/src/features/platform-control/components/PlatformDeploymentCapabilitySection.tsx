@@ -21,6 +21,7 @@ type ModelCapabilityFieldsProps = {
   section: DeploymentCapabilitySectionState;
   onResourceChange: (resourceIds: string[]) => void;
   onDefaultResourceChange: (resourceId: string) => void;
+  showDefaultResource: boolean;
 };
 
 type VectorCapabilityFieldsProps = {
@@ -116,6 +117,7 @@ function ModelCapabilityFields({
   section,
   onResourceChange,
   onDefaultResourceChange,
+  showDefaultResource,
 }: ModelCapabilityFieldsProps): JSX.Element {
   const { t } = useTranslation("common");
 
@@ -132,25 +134,27 @@ function ModelCapabilityFields({
         ].filter((hint): hint is string => Boolean(hint))}
         onResourceChange={onResourceChange}
       />
-      <label className="card-stack deployment-binding-field">
-        <span className="field-label">{t("platformControl.forms.deployment.defaultResource")}</span>
-        <select
-          className="field-input"
-          aria-label={t("platformControl.forms.deployment.defaultResourceForCapability", {
-            capability: section.capability.display_name,
-          })}
-          value={section.defaultResourceId}
-          disabled={section.modelOptions.length === 0}
-          onChange={(event) => onDefaultResourceChange(event.target.value)}
-        >
-          <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
-          {section.availableDefaultResources.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showDefaultResource ? (
+        <label className="card-stack deployment-binding-field">
+          <span className="field-label">{t("platformControl.forms.deployment.defaultResource")}</span>
+          <select
+            className="field-input"
+            aria-label={t("platformControl.forms.deployment.defaultResourceForCapability", {
+              capability: section.capability.display_name,
+            })}
+            value={section.defaultResourceId}
+            disabled={section.modelOptions.length === 0}
+            onChange={(event) => onDefaultResourceChange(event.target.value)}
+          >
+            <option value="">{t("platformControl.forms.selectPlaceholder")}</option>
+            {section.availableDefaultResources.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
     </>
   );
 }
@@ -281,11 +285,12 @@ export default function PlatformDeploymentCapabilitySection({
         </select>
       </label>
 
-      {section.capabilityMode === "model" ? (
+      {section.capabilityMode === "model" || section.capabilityMode === "task_model" ? (
         <ModelCapabilityFields
           section={section}
           onResourceChange={onResourceChange}
           onDefaultResourceChange={onDefaultResourceChange}
+          showDefaultResource={section.capabilityMode === "model"}
         />
       ) : section.capabilityMode === "vector" ? (
         <VectorCapabilityFields

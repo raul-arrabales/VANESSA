@@ -321,4 +321,125 @@ describe("usePlatformDeploymentEditor", () => {
     expect(sandboxBinding).not.toHaveProperty("default_resource_id");
     expect(sandboxBinding).not.toHaveProperty("resource_policy");
   });
+
+  it("serializes image-analysis resources with task defaults and no global default", () => {
+    const imageModels: ManagedModel[] = [
+      {
+        ...llmModelsFixture[0],
+        id: "plate-detector",
+        name: "Plate detector",
+        backend: "local",
+        hosting: "local",
+        task_key: "image_plate_detection",
+      },
+      {
+        ...llmModelsFixture[0],
+        id: "plate-ocr",
+        name: "Plate OCR",
+        backend: "local",
+        hosting: "local",
+        task_key: "image_plate_ocr",
+      },
+      {
+        ...llmModelsFixture[0],
+        id: "object-detector",
+        name: "Object detector",
+        backend: "local",
+        hosting: "local",
+        task_key: "object_detection",
+      },
+      {
+        ...llmModelsFixture[0],
+        id: "captioner",
+        name: "Captioner",
+        backend: "local",
+        hosting: "local",
+        task_key: "image_captioning",
+      },
+    ];
+    const capabilitiesWithImage = [
+      ...capabilitiesFixture,
+      {
+        capability: "image_analysis",
+        display_name: "Image analysis",
+        description: "Image capability",
+        required: false,
+        active_provider: null,
+      },
+    ];
+    const providersWithImage = [
+      ...cloudModelProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-image",
+        slug: "image-analysis-local",
+        provider_key: "image_analysis_local",
+        capability: "image_analysis",
+        adapter_kind: "image_analysis_http",
+        provider_origin: "local" as const,
+        display_name: "Image analysis local",
+      },
+    ];
+    const formToValidate: DeploymentFormState = {
+      slug: "vision-profile",
+      displayName: "Vision Profile",
+      description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store", "image_analysis"],
+      providerIdsByCapability: {
+        llm_inference: "provider-1",
+        embeddings: "provider-embeddings",
+        vector_store: "provider-2",
+        image_analysis: "provider-image",
+      },
+      resourceIdsByCapability: {
+        llm_inference: ["gpt-5"],
+        embeddings: ["text-embedding-3-small"],
+        vector_store: ["kb_primary"],
+        image_analysis: ["plate-detector", "plate-ocr", "object-detector", "captioner"],
+      },
+      defaultResourceIdsByCapability: {
+        llm_inference: "gpt-5",
+        embeddings: "text-embedding-3-small",
+        image_analysis: "ignored",
+      },
+      resourcePolicyByCapability: {
+        vector_store: { selection_mode: "explicit" },
+      },
+    };
+
+    render(
+      <HookHarness
+        mode="create"
+        capabilities={capabilitiesWithImage}
+        providers={providersWithImage}
+        formToValidate={formToValidate}
+        eligibleModelsByCapability={{
+          llm_inference: llmModelsFixture,
+          embeddings: embeddingsModelsFixture,
+          image_analysis: imageModels,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent("");
+    const mutationInput = JSON.parse(screen.getByTestId("mutation-input").textContent ?? "null") as {
+      bindings: Array<Record<string, unknown>>;
+    };
+    const imageBinding = mutationInput.bindings.find((binding) => binding.capability === "image_analysis");
+    expect(imageBinding).toEqual(
+      expect.objectContaining({
+        provider_id: "provider-image",
+        default_resource_id: null,
+        resource_policy: {
+          selection_mode: "task_defaults",
+          task_defaults: {
+            plate_detector: "plate-detector",
+            plate_ocr: "plate-ocr",
+            object_detector: "object-detector",
+            captioner: "captioner",
+          },
+        },
+      }),
+    );
+  });
 });

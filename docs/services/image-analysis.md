@@ -1,0 +1,59 @@
+# Image Analysis Service
+
+`image_analysis` is an optional local provider for VANESSA image understanding. It is selected through the platform control plane as capability `image_analysis` with provider family `image_analysis_local` and adapter `image_analysis_http`.
+
+## Runtime
+
+- Compose service: `image_analysis`
+- Optional profile: `image_analysis`
+- Default port: `8090`
+- Model mount: `models/image_analysis:/models/image_analysis`
+- Backend seed env: `IMAGE_ANALYSIS_URL=http://image_analysis:8090`
+
+The service exposes:
+
+- `GET /health`
+- `GET /v1/resources`
+- `POST /v1/analyze`
+
+`POST /v1/analyze` accepts JSON only. Callers provide `image.data_base64`, `image.mime_type`, and one or more tasks: `license_plate_recognition`, `object_detection`, or `captioning`.
+
+Image bytes are transient request data. The service does not log image payloads by default, and backend/agent call records redact base64 image data.
+
+## Models
+
+V1 defaults are local open-source models:
+
+- Plate detection: `open-image-models` through `fast-alpr`
+- Plate OCR: `fast-plate-ocr` through `fast-alpr`
+- Object detection: RF-DETR
+- Captioning: Florence-2
+
+CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. In normal mode, model libraries are imported lazily when their task is requested.
+
+## Control Plane Binding
+
+`image_analysis` is ModelOps-governed and resource-bearing. Eligible ModelOps task keys are:
+
+- `image_plate_detection`
+- `image_plate_ocr`
+- `object_detection`
+- `image_captioning`
+
+Bindings use:
+
+```json
+{
+  "resource_policy": {
+    "selection_mode": "task_defaults",
+    "task_defaults": {
+      "plate_detector": "plate-detector-model-id",
+      "plate_ocr": "plate-ocr-model-id",
+      "object_detector": "object-detector-model-id",
+      "captioner": "caption-model-id"
+    }
+  }
+}
+```
+
+There is no global `default_resource_id` for this capability.

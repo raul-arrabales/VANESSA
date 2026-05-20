@@ -8,6 +8,7 @@ from ..repositories import platform_control_plane as platform_repo
 from .context_management import build_knowledge_base_binding_resource
 from .platform_adapters import (
     HttpMcpRuntimeAdapter,
+    HttpImageAnalysisAdapter,
     HttpSandboxExecutionAdapter,
     OpenAICompatibleEmbeddingsAdapter,
     OpenAICompatibleLlmAdapter,
@@ -25,13 +26,16 @@ from .platform_resources import _runtime_identifier_for_resource, _runtime_model
 from .platform_service_types import (
     BindingResourcePayload,
     ProviderStoragePayload,
+    _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    _IMAGE_SELECTION_TASK_DEFAULTS,
     _MODEL_BEARING_CAPABILITIES,
     _VECTOR_SELECTION_DYNAMIC_NAMESPACE,
     _VECTOR_SELECTION_EXPLICIT,
 )
-from .platform_shared import _expected_task_key, _runtime_model_entries_for_capability
+from .platform_shared import _expected_task_keys, _runtime_model_entries_for_capability
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
+    CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -289,6 +293,8 @@ def _adapter_from_binding(binding: ProviderBinding) -> Any:
         return HttpSandboxExecutionAdapter(binding)
     if binding.adapter_kind == "mcp_http":
         return HttpMcpRuntimeAdapter(binding)
+    if binding.adapter_kind == "image_analysis_http":
+        return HttpImageAnalysisAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported adapter kind", status_code=500)
 
 
@@ -388,6 +394,24 @@ def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
             "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
             "invoke_status_code": invoke_status,
         })
+    if binding.capability_key == CAPABILITY_IMAGE_ANALYSIS:
+        health = adapter.health()
+        resources, resources_status = _list_adapter_resources(adapter)
+        resource_errors = _validate_bound_resources_against_provider_inventory(
+            binding,
+            resources if 200 <= resources_status < 300 else None,
+        )
+        binding_error = _image_analysis_binding_error(binding)
+        payload = {
+            "health": health,
+            "resources_reachable": 200 <= resources_status < 300,
+            "resources_status_code": resources_status,
+            "resources": [_serialize_binding_resource(resource) for resource in resources],
+            "resource_errors": resource_errors,
+        }
+        if binding_error:
+            payload["binding_error"] = binding_error
+        return _annotate_provider_validation(binding.capability_key, payload)
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
 
 
@@ -447,6 +471,15 @@ def _validate_binding_resources(
             default_resource_id=normalized_default,
             resource_policy=resource_policy,
         )
+    if normalized_capability == CAPABILITY_IMAGE_ANALYSIS:
+        return _validate_image_analysis_resources(
+            database_url=database_url,
+            provider_row=provider_row,
+            resources=normalized_resources,
+            default_resource_id=normalized_default,
+            resource_policy=resource_policy,
+        )
+
     if normalized_default and normalized_default not in {str(resource.get("id") or "").strip() for resource in normalized_resources}:
         raise PlatformControlPlaneError(
             "default_resource_not_bound",
@@ -530,6 +563,87 @@ def _validate_non_model_resources(
         status_code=400,
         details={"selection_mode": selection_mode},
     )
+
+
+def _validate_image_analysis_resources(
+    *,
+    database_url: str,
+    provider_row: dict[str, Any],
+    resources: list[dict[str, Any]],
+    default_resource_id: str | None,
+    resource_policy: dict[str, Any],
+) -> dict[str, Any]:
+    if default_resource_id:
+        raise PlatformControlPlaneError(
+            "default_resource_not_supported",
+            "image_analysis bindings use resource_policy.task_defaults instead of default_resource_id",
+            status_code=400,
+        )
+    if not resources:
+        return {"resources": [], "default_resource_id": None}
+
+    selection_mode = str(resource_policy.get("selection_mode") or _IMAGE_SELECTION_TASK_DEFAULTS).strip().lower()
+    if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
+        raise PlatformControlPlaneError(
+            "invalid_resource_policy",
+            "image_analysis bindings require resource_policy.selection_mode=task_defaults",
+            status_code=400,
+            details={"selection_mode": selection_mode},
+        )
+
+    validated_resources = [
+        _validate_model_binding_resource(
+            database_url,
+            provider_row=provider_row,
+            capability_key=CAPABILITY_IMAGE_ANALYSIS,
+            resource=resource,
+        )
+        for resource in resources
+    ]
+    resources_by_id = {str(resource.get("id") or "").strip(): resource for resource in validated_resources}
+    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+    missing_defaults: list[str] = []
+    invalid_defaults: list[str] = []
+    for default_key, expected_task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items():
+        resource_id = str(task_defaults.get(default_key) or "").strip()
+        if not resource_id:
+            missing_defaults.append(default_key)
+            continue
+        resource = resources_by_id.get(resource_id)
+        if resource is None:
+            invalid_defaults.append(default_key)
+            continue
+        task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        if task_key != expected_task_key:
+            invalid_defaults.append(default_key)
+    if missing_defaults or invalid_defaults:
+        raise PlatformControlPlaneError(
+            "invalid_task_defaults",
+            "image_analysis bindings require task_defaults for plate_detector, plate_ocr, object_detector, and captioner",
+            status_code=400,
+            details={"missing_task_defaults": missing_defaults, "invalid_task_defaults": invalid_defaults},
+        )
+    return {"resources": validated_resources, "default_resource_id": None}
+
+
+def _image_analysis_binding_error(binding: ProviderBinding) -> str | None:
+    resources_by_id = {str(resource.get("id") or "").strip(): resource for resource in binding.resources}
+    if not resources_by_id:
+        return "task_defaults_required"
+    resource_policy = dict(binding.resource_policy or {})
+    selection_mode = str(resource_policy.get("selection_mode") or "").strip().lower()
+    if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
+        return "task_defaults_required"
+    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+    for default_key, expected_task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items():
+        resource_id = str(task_defaults.get(default_key) or "").strip()
+        resource = resources_by_id.get(resource_id)
+        if resource is None:
+            return "task_defaults_required"
+        task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        if task_key != expected_task_key:
+            return "task_defaults_required"
+    return None
 
 
 def _validate_vector_binding_resource(
@@ -626,12 +740,12 @@ def _validate_model_binding_resource(
             details={"resource_id": resource.get("id"), "managed_model_id": managed_model_id},
         )
 
-    expected_task_key = _expected_task_key(capability_key)
+    expected_task_keys = _expected_task_keys(capability_key)
     task_key = str(model_row.get("task_key", "")).strip().lower()
-    if task_key != expected_task_key:
+    if task_key not in expected_task_keys:
         raise PlatformControlPlaneError(
             "resource_task_mismatch",
-            f"{capability_key} bindings require a model with task_key={expected_task_key}",
+            f"{capability_key} bindings require a model with task_key in {sorted(expected_task_keys)}",
             status_code=400,
             details={"resource_id": resource.get("id"), "managed_model_id": managed_model_id, "task_key": model_row.get("task_key")},
         )

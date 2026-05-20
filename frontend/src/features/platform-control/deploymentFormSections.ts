@@ -7,7 +7,7 @@ import { filterModelsForProviderOrigin } from "./deploymentModelCompatibility";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-export type DeploymentCapabilitySectionMode = "model" | "vector" | "none";
+export type DeploymentCapabilitySectionMode = "model" | "task_model" | "vector" | "none";
 
 export type DeploymentModelCheckboxOption = {
   id: string;
@@ -108,7 +108,8 @@ export function buildDeploymentCapabilitySectionState({
   const capabilityProviders = providersByCapability[capabilityKey] ?? [];
   const selectedProviderId = value.providerIdsByCapability[capabilityKey] ?? "";
   const selectedProvider = capabilityProviders.find((provider) => provider.id === selectedProviderId) ?? null;
-  const allModelOptions = capabilityMode === "model" ? (modelResourcesByCapability[capabilityKey] ?? []) : [];
+  const isModelResourceMode = capabilityMode === "model" || capabilityMode === "task_model";
+  const allModelOptions = isModelResourceMode ? (modelResourcesByCapability[capabilityKey] ?? []) : [];
   const modelOptions = filterModelsForProviderOrigin(allModelOptions, selectedProvider);
   const selectedResourceIds = value.resourceIdsByCapability[capabilityKey] ?? [];
   const modelCheckboxOptions = modelOptions.map((model) => ({
@@ -124,7 +125,7 @@ export function buildDeploymentCapabilitySectionState({
   const loadedModelIsEligible = loadedManagedModelId
     ? modelOptions.some((model) => model.id === loadedManagedModelId)
     : false;
-  const loadedModelEligibilityHint = capabilityMode === "model"
+  const loadedModelEligibilityHint = isModelResourceMode
     && modelOptions.length === 0
     && Boolean(loadedManagedModelId)
     && !loadedModelIsEligible
@@ -134,7 +135,7 @@ export function buildDeploymentCapabilitySectionState({
         model: loadedManagedModelName,
       })
     : null;
-  const noEligibleResourcesHint = capabilityMode === "model"
+  const noEligibleResourcesHint = isModelResourceMode
     && modelOptions.length === 0
     && !loadedModelEligibilityHint
     ? t("platformControl.forms.deployment.noEligibleResourcesHint", {

@@ -119,6 +119,11 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
         headers=_auth(token),
         json={"index": "kb", "ids": ["doc-1"]},
     )
+    image_analysis = test_client.post(
+        "/v1/platform/image-analysis/analyze",
+        headers=_auth(token),
+        json={"image": {"data_base64": "ignored", "mime_type": "image/png"}, "tasks": ["captioning"]},
+    )
 
     assert providers.status_code == 403
     assert provider_families.status_code == 403
@@ -140,6 +145,7 @@ def test_platform_provider_and_deployment_routes_require_superadmin(client):
     assert upsert_documents.status_code == 403
     assert query_documents.status_code == 403
     assert delete_documents.status_code == 403
+    assert image_analysis.status_code == 403
 
 
 def test_superadmin_platform_management_routes_work(client, monkeypatch: pytest.MonkeyPatch):

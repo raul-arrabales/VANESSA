@@ -5,6 +5,7 @@ from flask import Blueprint, g, jsonify, request
 from ...application.platform_control_service import (
     PlatformControlRequestError,
     activate_platform_deployment,
+    analyze_platform_image_request,
     assign_platform_provider_loaded_model,
     clear_platform_provider_loaded_model,
     clone_platform_deployment,
@@ -55,6 +56,7 @@ delete_deployment_profile = delete_platform_deployment
 upsert_deployment_binding = upsert_platform_deployment_binding
 ensure_vector_index = ensure_platform_vector_index
 embed_platform_inputs = embed_platform_inputs_request
+analyze_platform_image = analyze_platform_image_request
 upsert_vector_documents = upsert_platform_vector_documents
 query_vector_documents = query_platform_vector_documents
 delete_vector_documents = delete_platform_vector_documents
@@ -374,6 +376,18 @@ def platform_embeddings_route():
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(result), 200
+
+
+@bp.post("/v1/platform/image-analysis/analyze")
+@require_role("superadmin")
+def platform_image_analysis_route():
+    try:
+        payload, status_code = analyze_platform_image(_database_url(), _config(), request.get_json(silent=True))
+    except PlatformControlRequestError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify(payload if isinstance(payload, dict) else {}), status_code
 
 
 @bp.post("/v1/platform/vector/documents/upsert")

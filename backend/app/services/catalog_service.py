@@ -1232,7 +1232,7 @@ def _coerce_tool_spec(database_url: str, payload: dict[str, Any], *, config: Any
     if execution_backend not in _VALID_TOOL_BACKENDS:
         raise CatalogError(
             "invalid_execution_backend",
-            "execution_backend must be sandbox_python, mcp_gateway_web_search, internal_http, or knowledge_base_retrieval",
+            "execution_backend must be sandbox_python, mcp_gateway_web_search, internal_http, knowledge_base_retrieval, or image_analysis",
         )
     input_schema = payload.get("input_schema")
     output_schema = payload.get("output_schema")
