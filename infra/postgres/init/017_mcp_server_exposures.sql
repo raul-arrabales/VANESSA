@@ -65,7 +65,7 @@ DECLARE
     new_mcp_refs JSONB;
 BEGIN
     FOR tool_row IN
-        SELECT e.entity_id, e.owner_user_id, v.version, v.spec_json
+        SELECT e.entity_id, e.owner_user_id, v.version, v.spec_json, v.published_at
         FROM registry_entities e
         JOIN registry_versions v
           ON v.entity_id = e.entity_id AND v.is_current = TRUE
@@ -158,7 +158,7 @@ BEGIN
                     'permissions', '{}'::jsonb
                 ),
             TRUE,
-            tool_row.version IS NOT NULL
+            tool_row.published_at
         );
 
         INSERT INTO catalog_tool_runtime_status (
