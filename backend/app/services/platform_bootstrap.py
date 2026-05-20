@@ -3,12 +3,17 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
+from ..repositories import modelops as modelops_repo
 from ..repositories import platform_control_plane as platform_repo
+from .platform_adapters import http_json_request
+from .platform_serialization import _build_model_binding_resource
 from .platform_service_types import (
     _BOOTSTRAP_DEPLOYMENT_DESCRIPTION,
     _BOOTSTRAP_DEPLOYMENT_NAME,
     _BOOTSTRAP_DEPLOYMENT_SLUG,
     _CLOUD_PROVIDER_KEYS,
+    _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    _IMAGE_SELECTION_TASK_DEFAULTS,
     _LLAMA_CPP_DEPLOYMENT_DESCRIPTION,
     _LLAMA_CPP_DEPLOYMENT_NAME,
     _LLAMA_CPP_DEPLOYMENT_SLUG,
@@ -28,6 +33,147 @@ from .platform_types import (
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
 )
+
+
+_IMAGE_ANALYSIS_MANAGED_MODEL_IDS = {
+    "plate_detector": "image-analysis-plate-detector",
+    "plate_ocr": "image-analysis-plate-ocr",
+    "object_detector": "image-analysis-object-detector",
+    "captioner": "image-analysis-captioner",
+}
+
+
+def _image_analysis_resource_url(provider_row: dict[str, Any]) -> str:
+    endpoint_url = str(provider_row.get("endpoint_url") or "").strip()
+    config_json = provider_row.get("config_json") if isinstance(provider_row.get("config_json"), dict) else {}
+    path = str(config_json.get("resources_path") or "/v1/resources").strip() or "/v1/resources"
+    return endpoint_url.rstrip("/") + path
+
+
+def _provider_image_analysis_resources(provider_row: dict[str, Any]) -> list[dict[str, Any]]:
+    payload, status_code = http_json_request(_image_analysis_resource_url(provider_row), method="GET")
+    if payload is None or status_code < 200 or status_code >= 300:
+        return []
+    raw_resources = payload.get("resources") if isinstance(payload, dict) else []
+    if not isinstance(raw_resources, list):
+        return []
+    return [dict(item) for item in raw_resources if isinstance(item, dict)]
+
+
+def _image_analysis_model_fingerprint(*, resource: dict[str, Any], model_id: str, provider_resource_id: str, task_key: str, metadata: dict[str, Any]) -> str:
+    return modelops_repo.compute_config_fingerprint(
+        {
+            "provider": "image_analysis_local",
+            "provider_model_id": provider_resource_id,
+            "source_id": str(resource.get("source_id") or provider_resource_id).strip() or provider_resource_id,
+            "local_path": None,
+            "backend_kind": "local",
+            "availability": "offline_ready",
+            "credential_id": None,
+            "task_key": task_key,
+            "hosting_kind": "local",
+            "checksum": None,
+            "revision": None,
+            "metadata": metadata,
+        }
+    )
+
+
+def _ensure_image_analysis_modelops_resources(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_row: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    resources_by_task = {
+        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower(): resource
+        for resource in _provider_image_analysis_resources(provider_row)
+        if isinstance(resource.get("metadata"), dict)
+    }
+    if not resources_by_task:
+        return [], {}
+
+    bound_resources: list[dict[str, Any]] = []
+    task_defaults: dict[str, str] = {}
+    task_default_key_by_task = {task_key: default_key for default_key, task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items()}
+    node_id = str(getattr(config, "modelops_node_id", "") or "local-node").strip() or "local-node"
+
+    for default_key, task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items():
+        runtime_resource = resources_by_task.get(task_key)
+        if not runtime_resource:
+            continue
+        model_id = _IMAGE_ANALYSIS_MANAGED_MODEL_IDS[default_key]
+        provider_resource_id = str(runtime_resource.get("provider_resource_id") or runtime_resource.get("id") or model_id).strip()
+        if not provider_resource_id:
+            continue
+        runtime_metadata = runtime_resource.get("metadata") if isinstance(runtime_resource.get("metadata"), dict) else {}
+        metadata = {
+            **runtime_metadata,
+            "capability": "image_analysis",
+            "managed_by": "platform_bootstrap",
+            "task_default_key": task_default_key_by_task[task_key],
+            "provider_resource_id": provider_resource_id,
+        }
+        fingerprint = _image_analysis_model_fingerprint(
+            resource=runtime_resource,
+            model_id=model_id,
+            provider_resource_id=provider_resource_id,
+            task_key=task_key,
+            metadata=metadata,
+        )
+        model_row = modelops_repo.get_model(database_url, model_id)
+        if model_row is None or str(model_row.get("current_config_fingerprint") or "").strip() != fingerprint:
+            model_row = modelops_repo.upsert_model_record(
+                database_url,
+                model_id=model_id,
+                node_id=node_id,
+                name=str(runtime_resource.get("display_name") or model_id).strip(),
+                provider="image_analysis_local",
+                task_key=task_key,
+                category=modelops_repo.infer_category(task_key),
+                backend_kind="local",
+                source_kind="local_folder",
+                availability="offline_ready",
+                visibility_scope="platform",
+                owner_type=modelops_repo.OWNER_PLATFORM,
+                owner_user_id=None,
+                provider_model_id=provider_resource_id,
+                credential_id=None,
+                source_id=str(runtime_resource.get("source_id") or provider_resource_id).strip() or provider_resource_id,
+                local_path=None,
+                status="available",
+                lifecycle_state=modelops_repo.LIFECYCLE_REGISTERED,
+                metadata=metadata,
+                comment="Bootstrapped from the local image-analysis provider inventory.",
+                model_size_billion=None,
+                created_by_user_id=None,
+                registered_by_user_id=None,
+            )
+
+        validation_current = bool(model_row.get("is_validation_current"))
+        validation_success = str(model_row.get("last_validation_status") or "").strip().lower() == modelops_repo.VALIDATION_SUCCESS
+        if not validation_current or not validation_success:
+            modelops_repo.append_validation(
+                database_url,
+                model_id=model_id,
+                validator_kind="image_analysis_provider_inventory",
+                trigger_reason="platform_bootstrap",
+                result=modelops_repo.VALIDATION_SUCCESS,
+                summary="Local image-analysis provider advertises this resource.",
+                error_details={"provider_instance_id": str(provider_row.get("id") or ""), "provider_resource_id": provider_resource_id},
+                config_fingerprint=str(model_row.get("current_config_fingerprint") or fingerprint),
+                validated_by_user_id=None,
+            )
+        if str(model_row.get("lifecycle_state") or "").strip().lower() != modelops_repo.LIFECYCLE_ACTIVE:
+            modelops_repo.activate_model(database_url, model_id=model_id)
+
+        active_row = modelops_repo.get_model(database_url, model_id) or model_row
+        bound_resources.append(_build_model_binding_resource(active_row, provider_resource_id=provider_resource_id))
+        task_defaults[default_key] = model_id
+
+    if set(task_defaults) != set(_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS):
+        return [], {}
+    return bound_resources, task_defaults
 
 
 def _upsert_bootstrap_binding(
@@ -393,6 +539,19 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 "request_timeout_seconds": llm_request_timeout_seconds,
             },
         )
+    image_analysis_resources: list[dict[str, Any]] = []
+    image_analysis_task_defaults: dict[str, str] = {}
+    if image_analysis_provider is not None:
+        image_analysis_resources, image_analysis_task_defaults = _ensure_image_analysis_modelops_resources(
+            database_url,
+            config=config,
+            provider_row=image_analysis_provider,
+        )
+    image_analysis_resource_policy = (
+        {"selection_mode": _IMAGE_SELECTION_TASK_DEFAULTS, "task_defaults": image_analysis_task_defaults}
+        if image_analysis_resources and image_analysis_task_defaults
+        else {}
+    )
 
     reconciled_providers = {
         str(item.get("slug") or "").strip(): item
@@ -425,10 +584,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             deployment_profile_id=str(profile["id"]),
             capability_key=CAPABILITY_IMAGE_ANALYSIS,
             provider_instance_id=str(image_analysis_provider["id"]),
-            resources=[],
+            resources=image_analysis_resources,
             default_resource_id=None,
             binding_config={},
-            resource_policy={},
+            resource_policy=image_analysis_resource_policy,
             existing_binding=default_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS),
         )
 
@@ -443,7 +602,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if image_analysis_provider is not None:
-            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if qdrant_provider is not None:
         qdrant_profile = platform_repo.ensure_deployment_profile(database_url, slug=_QDRANT_DEPLOYMENT_SLUG, display_name=_QDRANT_DEPLOYMENT_NAME, description=_QDRANT_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
@@ -456,7 +615,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if image_analysis_provider is not None:
-            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if platform_repo.get_active_deployment(database_url) is None:
         platform_repo.activate_deployment_profile(database_url, deployment_profile_id=str(profile["id"]), activated_by_user_id=None)

@@ -254,7 +254,8 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 20. Optional image-analysis proof:
    - set `IMAGE_ANALYSIS_URL=http://image_analysis:8090`
    - start the stack, then validate `Image analysis local` from Platform control
-   - register and validate the four image ModelOps resources, bind them as task defaults, and run `tool.image_captioning` or `tool.image_license_plate_recognition` through an agent/tool test
+   - confirm the four bootstrapped image ModelOps resources are active and bound as task defaults
+   - run `tool.image_captioning` or `tool.image_license_plate_recognition` through an agent/tool test
 21. Stop while keeping state: `./ops/local-staging/stop.sh`
 
 Local ModelOps note:

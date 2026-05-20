@@ -59,3 +59,10 @@ Bindings use:
 ```
 
 There is no global `default_resource_id` for this capability.
+
+When `IMAGE_ANALYSIS_URL` is configured and the provider advertises all four v1
+resources from `/v1/resources`, backend bootstrap registers platform-owned
+ModelOps records for those resources, validates them from provider inventory,
+activates them, and binds them into local deployment profiles as task defaults.
+Superadmins may still register image-analysis resources manually through
+ModelOps using the task keys above.

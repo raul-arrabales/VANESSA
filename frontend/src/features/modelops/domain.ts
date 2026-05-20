@@ -4,6 +4,10 @@ import type { AuthUser } from "../../auth/types";
 export const TASK_OPTIONS = [
   { value: "llm", label: "LLM / Text generation", category: "generative" as const },
   { value: "embeddings", label: "Embeddings", category: "predictive" as const },
+  { value: "image_plate_detection", label: "Image plate detection", category: "predictive" as const },
+  { value: "image_plate_ocr", label: "Image plate OCR", category: "predictive" as const },
+  { value: "object_detection", label: "Object detection", category: "predictive" as const },
+  { value: "image_captioning", label: "Image captioning", category: "predictive" as const },
   { value: "translation", label: "Translation", category: "generative" as const },
   { value: "classification", label: "Classification", category: "predictive" as const },
 ] as const;

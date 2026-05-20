@@ -2760,6 +2760,122 @@ def test_ensure_platform_bootstrap_state_seeds_provider_family_origins(monkeypat
     }
 
 
+def test_image_analysis_bootstrap_registers_provider_resources(monkeypatch: pytest.MonkeyPatch):
+    requests: list[str] = []
+    upserted_model_ids: list[str] = []
+    validated_model_ids: list[str] = []
+    activated_model_ids: list[str] = []
+    models: dict[str, dict[str, object]] = {}
+
+    provider_row = {
+        "id": "provider-image",
+        "endpoint_url": "http://image_analysis:8090",
+        "config_json": {"resources_path": "/v1/resources"},
+    }
+
+    def _http_json_request(url: str, **kwargs):
+        del kwargs
+        requests.append(url)
+        return {
+            "resources": [
+                {
+                    "id": "yolo-v9-t-384-license-plate-end2end",
+                    "display_name": "License plate detector",
+                    "provider_resource_id": "yolo-v9-t-384-license-plate-end2end",
+                    "metadata": {"task_key": "image_plate_detection", "engine": "open-image-models"},
+                },
+                {
+                    "id": "cct-xs-v2-global-model",
+                    "display_name": "License plate OCR",
+                    "provider_resource_id": "cct-xs-v2-global-model",
+                    "metadata": {"task_key": "image_plate_ocr", "engine": "fast-plate-ocr"},
+                },
+                {
+                    "id": "rfdetr-nano",
+                    "display_name": "Object detector",
+                    "provider_resource_id": "rfdetr-nano",
+                    "metadata": {"task_key": "object_detection", "engine": "rf-detr"},
+                },
+                {
+                    "id": "microsoft/Florence-2-large-ft",
+                    "display_name": "Image captioner",
+                    "provider_resource_id": "microsoft/Florence-2-large-ft",
+                    "metadata": {"task_key": "image_captioning", "engine": "florence-2"},
+                },
+            ]
+        }, 200
+
+    def _get_model(_database_url: str, model_id: str):
+        return models.get(model_id)
+
+    def _upsert_model_record(_database_url: str, **kwargs):
+        row = {
+            "model_id": kwargs["model_id"],
+            "name": kwargs["name"],
+            "provider": kwargs["provider"],
+            "task_key": kwargs["task_key"],
+            "backend_kind": kwargs["backend_kind"],
+            "provider_model_id": kwargs["provider_model_id"],
+            "local_path": kwargs["local_path"],
+            "source_id": kwargs["source_id"],
+            "availability": kwargs["availability"],
+            "lifecycle_state": kwargs["lifecycle_state"],
+            "is_validation_current": False,
+            "last_validation_status": None,
+            "current_config_fingerprint": "fingerprint",
+        }
+        models[str(kwargs["model_id"])] = row
+        upserted_model_ids.append(str(kwargs["model_id"]))
+        return row
+
+    def _append_validation(_database_url: str, **kwargs):
+        model_id = str(kwargs["model_id"])
+        models[model_id]["is_validation_current"] = True
+        models[model_id]["last_validation_status"] = "success"
+        validated_model_ids.append(model_id)
+        return {"result": "success"}
+
+    def _activate_model(_database_url: str, *, model_id: str):
+        models[model_id]["lifecycle_state"] = "active"
+        activated_model_ids.append(model_id)
+        return models[model_id]
+
+    monkeypatch.setattr(platform_bootstrap, "http_json_request", _http_json_request)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "get_model", _get_model)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "upsert_model_record", _upsert_model_record)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "append_validation", _append_validation)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "activate_model", _activate_model)
+
+    resources, task_defaults = platform_bootstrap._ensure_image_analysis_modelops_resources(  # type: ignore[attr-defined]
+        "ignored",
+        config=SimpleNamespace(modelops_node_id="local-node"),
+        provider_row=provider_row,
+    )
+
+    assert requests == ["http://image_analysis:8090/v1/resources"]
+    assert upserted_model_ids == [
+        "image-analysis-plate-detector",
+        "image-analysis-plate-ocr",
+        "image-analysis-object-detector",
+        "image-analysis-captioner",
+    ]
+    assert validated_model_ids == upserted_model_ids
+    assert activated_model_ids == upserted_model_ids
+    assert task_defaults == {
+        "plate_detector": "image-analysis-plate-detector",
+        "plate_ocr": "image-analysis-plate-ocr",
+        "object_detector": "image-analysis-object-detector",
+        "captioner": "image-analysis-captioner",
+    }
+    assert [resource["provider_resource_id"] for resource in resources] == [
+        "yolo-v9-t-384-license-plate-end2end",
+        "cct-xs-v2-global-model",
+        "rfdetr-nano",
+        "microsoft/Florence-2-large-ft",
+    ]
+    assert {resource["ref_type"] for resource in resources} == {"managed_model"}
+
+
 def test_ensure_platform_bootstrap_state_reconciles_local_provider_slots(monkeypatch: pytest.MonkeyPatch):
     reconciled_provider_ids: list[str] = []
 
