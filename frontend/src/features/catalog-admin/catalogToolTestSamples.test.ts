@@ -69,6 +69,20 @@ describe("buildSampleToolInput", () => {
     });
   });
 
+  it("returns an upload-ready image analysis sample", () => {
+    expect(buildSampleToolInput(buildTool({
+      spec: {
+        ...buildTool().spec,
+        execution_backend: "image_analysis",
+      },
+    }))).toEqual({
+      image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+    });
+  });
+
   it("builds a generic schema-based sample for other tools", () => {
     expect(buildSampleToolInput(buildTool({
       spec: {

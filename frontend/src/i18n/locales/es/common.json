@@ -1992,6 +1992,7 @@
       "sandboxPython": "Sandbox Python",
       "webSearch": "Busqueda web del gateway",
       "knowledgeBaseRetrieval": "Recuperacion de conocimiento",
+      "imageAnalysis": "Analisis de imagenes",
       "internalHttp": "HTTP interno"
     },
     "agents": {
@@ -2112,6 +2113,7 @@
       "testTitle": "Probar herramienta",
       "testDescription": "Ejecuta una prueba en vivo contra {{name}} usando su backend de ejecucion interno y esquema de entrada.",
       "testHelper": "Envía un objeto JSON que coincida con el esquema de entrada de la herramienta para inspeccionar la respuesta real del runtime.",
+      "imageUploadHelper": "Sube una imagen para completar image.data_base64 e image.mime_type antes de ejecutar la prueba.",
       "testMissing": "Selecciona una herramienta de plataforma antes de abrir su vista de prueba.",
       "testResultTitle": "Resultado de la prueba",
       "testStatus": "Estado del runtime: {{statusCode}}",
@@ -2419,7 +2421,8 @@
         "userGroupIds": "IDs de grupos de usuario permitidos"
       },
       "toolTest": {
-        "input": "Entrada de prueba"
+        "input": "Entrada de prueba",
+        "imageUpload": "Subir imagen"
       }
     },
     "validation": {

@@ -10,5 +10,8 @@ export function catalogToolBackendLabelKey(executionBackend: CatalogToolExecutio
   if (executionBackend === "knowledge_base_retrieval") {
     return "knowledgeBaseRetrieval";
   }
+  if (executionBackend === "image_analysis") {
+    return "imageAnalysis";
+  }
   return "internalHttp";
 }

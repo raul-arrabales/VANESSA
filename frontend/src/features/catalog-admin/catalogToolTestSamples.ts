@@ -94,5 +94,14 @@ export function buildSampleToolInput(tool: CatalogTool): Record<string, unknown>
     };
   }
 
+  if (tool.spec.execution_backend === "image_analysis") {
+    return {
+      image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+    };
+  }
+
   return buildSampleValueFromSchema(tool.spec.input_schema) as Record<string, unknown>;
 }

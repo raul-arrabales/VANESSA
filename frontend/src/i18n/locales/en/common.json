@@ -2010,6 +2010,7 @@
       "sandboxPython": "Python sandbox",
       "webSearch": "Gateway web search",
       "knowledgeBaseRetrieval": "Knowledge base retrieval",
+      "imageAnalysis": "Image analysis",
       "internalHttp": "Internal HTTP"
     },
     "agents": {
@@ -2130,6 +2131,7 @@
       "testTitle": "Test tool",
       "testDescription": "Run a live test against {{name}} using its internal execution backend and input schema.",
       "testHelper": "Submit a JSON object matching the tool input schema to inspect the live runtime response.",
+      "imageUploadHelper": "Upload an image to populate image.data_base64 and image.mime_type before running the test.",
       "testMissing": "Select a platform tool before opening its test view.",
       "testResultTitle": "Test result",
       "testStatus": "Runtime status: {{statusCode}}",
@@ -2437,7 +2439,8 @@
         "userGroupIds": "Allowed user group IDs"
       },
       "toolTest": {
-        "input": "Test input"
+        "input": "Test input",
+        "imageUpload": "Image upload"
       }
     },
     "validation": {

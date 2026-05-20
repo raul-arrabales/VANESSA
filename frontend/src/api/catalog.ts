@@ -32,7 +32,7 @@ export type CatalogToolSpec = {
   output_schema: Record<string, unknown>;
   safety_policy: Record<string, unknown>;
   offline_compatible: boolean;
-  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http" | "knowledge_base_retrieval";
+  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http" | "knowledge_base_retrieval" | "image_analysis";
   execution_config?: Record<string, unknown>;
   permissions?: Record<string, unknown>;
 };

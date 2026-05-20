@@ -7,6 +7,7 @@ import { t } from "../test/translation";
 import { expectNamedIconAction } from "../test/compactRegistryAssertions";
 import { ApiError } from "../auth/authApi";
 import type { AuthUser } from "../auth/types";
+import type { ManagedModel } from "../api/modelops";
 import PlatformDeploymentDetailPage from "./PlatformDeploymentDetailPage";
 import * as platformApi from "../api/platform";
 import * as modelopsApi from "../api/modelops";
@@ -392,7 +393,7 @@ describe("PlatformDeploymentDetailPage", () => {
   });
 
   it("saves image analysis binding with task defaults from the detail page", async () => {
-    const imageModels = [
+    const imageModels: ManagedModel[] = [
       {
         id: "image-analysis-plate-detector",
         name: "License plate detector",

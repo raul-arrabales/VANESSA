@@ -17,6 +17,28 @@ function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
+function parseCurrentInput(text: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function readImageFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Unable to read image file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function CatalogToolTestPanel({
   tool,
   form,
@@ -27,6 +49,23 @@ export default function CatalogToolTestPanel({
   onSubmit,
 }: CatalogToolTestPanelProps): JSX.Element {
   const { t } = useTranslation("common");
+  const supportsImageUpload = tool?.spec.execution_backend === "image_analysis";
+
+  const handleImageUpload = async (file: File | undefined): Promise<void> => {
+    if (!file) {
+      return;
+    }
+    const dataBase64 = await readImageFileAsBase64(file);
+    const input = parseCurrentInput(form.inputText);
+    const nextInput = {
+      ...input,
+      image: {
+        data_base64: dataBase64,
+        mime_type: file.type || "application/octet-stream",
+      },
+    };
+    onChange({ ...form, inputText: stringifyJson(nextInput) });
+  };
 
   if (!tool) {
     return (
@@ -65,6 +104,20 @@ export default function CatalogToolTestPanel({
           onChange={(event) => onChange({ ...form, inputText: event.target.value })}
         />
       </label>
+
+      {supportsImageUpload ? (
+        <label className="card-stack">
+          <span className="field-label">{t("catalogControl.forms.toolTest.imageUpload")}</span>
+          <input
+            className="field-input"
+            type="file"
+            accept="image/*"
+            aria-label={t("catalogControl.forms.toolTest.imageUpload")}
+            onChange={(event) => void handleImageUpload(event.currentTarget.files?.[0])}
+          />
+          <span className="status-text">{t("catalogControl.tools.imageUploadHelper")}</span>
+        </label>
+      ) : null}
 
       <div className="platform-action-row">
         <span className="status-text">

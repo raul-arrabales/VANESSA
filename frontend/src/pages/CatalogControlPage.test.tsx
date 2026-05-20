@@ -246,6 +246,39 @@ const kbRetrievalToolFixture = {
   },
 };
 
+const imageCaptioningToolFixture = {
+  ...toolFixture,
+  id: "tool.image_captioning",
+  entity: { id: "tool.image_captioning", type: "tool" as const, owner_user_id: 1, visibility: "private" as const },
+  spec: {
+    name: "Image Captioning",
+    description: "Produces a text caption for an image.",
+    execution_backend: "image_analysis" as const,
+    execution_config: { tasks: ["captioning"] },
+    permissions: {},
+    input_schema: {
+      type: "object",
+      properties: {
+        image: {
+          type: "object",
+          properties: {
+            data_base64: { type: "string" },
+            mime_type: { type: "string" },
+          },
+          required: ["data_base64", "mime_type"],
+          additionalProperties: false,
+        },
+        options: { type: "object", additionalProperties: true },
+      },
+      required: ["image"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object", additionalProperties: true },
+    safety_policy: { timeout_seconds: 30, network_access: false },
+    offline_compatible: true,
+  },
+};
+
 const mcpCreationOptionsFixture = {
   tools: [
     {
@@ -654,6 +687,55 @@ describe("CatalogControlPage", () => {
     const resultPanel = await screen.findByTestId("catalog-tool-test-result");
     expect(resultPanel).toBeVisible();
     expect(resultPanel).toHaveTextContent("Example result");
+  });
+
+  it("uploads an image into image analysis tool test input", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture, imageCaptioningToolFixture]);
+    vi.mocked(catalogApi.testCatalogTool).mockResolvedValue({
+      tool: imageCaptioningToolFixture,
+      execution: {
+        input: {
+          image: {
+            data_base64: "ZmFrZSBpbWFnZQ==",
+            mime_type: "image/png",
+          },
+        },
+        request_metadata: {},
+        status_code: 200,
+        ok: true,
+        result: { caption: { text: "A test image." } },
+      },
+    });
+
+    await renderWithAppProviders(<CatalogControlPage />, {
+      route: "/control/catalog?section=tools&view=test&toolId=tool.image_captioning",
+    });
+
+    expect(await screen.findByRole("heading", { name: "Test tool" })).toBeVisible();
+    expect(screen.getByText("Backend: Image analysis")).toBeVisible();
+
+    const imageFile = new File(["fake image"], "sample.png", { type: "image/png" });
+    await user.upload(screen.getByLabelText("Image upload"), imageFile);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Test input")).toHaveValue('{\n  "image": {\n    "data_base64": "ZmFrZSBpbWFnZQ==",\n    "mime_type": "image/png"\n  }\n}');
+    });
+
+    await user.click(screen.getByRole("button", { name: "Test" }));
+
+    await waitFor(() => {
+      expect(catalogApi.testCatalogTool).toHaveBeenCalledWith(
+        "tool.image_captioning",
+        {
+          image: {
+            data_base64: "ZmFrZSBpbWFnZQ==",
+            mime_type: "image/png",
+          },
+        },
+        "token",
+      );
+    });
   });
 
   it("starts MCP server creation from the backing tool and fills defaults", async () => {
