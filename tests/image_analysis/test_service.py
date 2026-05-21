@@ -77,6 +77,19 @@ def test_florence2_transformers_patch_adds_missing_forced_bos_token_id() -> None
     assert DummyPretrainedConfig.forced_bos_token_id is None
 
 
+def test_florence2_model_patch_adds_missing_attention_flags() -> None:
+    class DummyLanguageModel:
+        pass
+
+    class DummyModel:
+        language_model = DummyLanguageModel()
+
+    service._patch_florence2_model_compat(DummyModel())
+
+    assert DummyModel.language_model._supports_sdpa is False
+    assert DummyModel.language_model._supports_flash_attn_2 is False
+
+
 def test_malformed_image_is_rejected_when_decoder_is_available(monkeypatch) -> None:
     class BrokenImage:
         @staticmethod

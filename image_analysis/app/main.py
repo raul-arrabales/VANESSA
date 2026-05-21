@@ -162,6 +162,17 @@ def _patch_florence2_transformers_config(pretrained_config_cls: Any) -> None:
         setattr(pretrained_config_cls, "forced_bos_token_id", None)
 
 
+def _patch_florence2_model_compat(model: Any) -> None:
+    language_model = getattr(model, "language_model", None)
+    if language_model is None:
+        return
+    for attribute in ("_supports_sdpa", "_supports_flash_attn_2"):
+        try:
+            getattr(language_model, attribute)
+        except AttributeError:
+            setattr(language_model, attribute, False)
+
+
 def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -288,6 +299,7 @@ def _load_captioner() -> tuple[Any, Any]:
 
         model_id = _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft")
         model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True)
+        _patch_florence2_model_compat(model)
         processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         _CAPTIONER = (model, processor)
     return _CAPTIONER
