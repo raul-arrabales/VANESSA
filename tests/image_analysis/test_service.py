@@ -78,16 +78,46 @@ def test_florence2_transformers_patch_adds_missing_forced_bos_token_id() -> None
 
 
 def test_florence2_model_patch_adds_missing_attention_flags() -> None:
-    class DummyLanguageModel:
+    class NestedModel:
         pass
+
+    class DummyLanguageModel:
+        model = NestedModel()
 
     class DummyModel:
         language_model = DummyLanguageModel()
 
-    service._patch_florence2_model_compat(DummyModel())
+    model = DummyModel()
+    service._patch_florence2_model_compat(model)
 
+    assert model._supports_sdpa is False
+    assert model._supports_flash_attn_2 is False
     assert DummyModel.language_model._supports_sdpa is False
     assert DummyModel.language_model._supports_flash_attn_2 is False
+    assert DummyModel.language_model.model._supports_sdpa is False
+    assert DummyModel.language_model.model._supports_flash_attn_2 is False
+
+
+def test_florence2_model_class_patch_adds_missing_attention_flags() -> None:
+    class DummyPretrainedModel:
+        pass
+
+    service._patch_florence2_transformers_model(DummyPretrainedModel)
+
+    assert DummyPretrainedModel._supports_sdpa is False
+    assert DummyPretrainedModel._supports_flash_attn_2 is False
+
+
+def test_florence2_tokenizer_patch_adds_missing_special_tokens_property() -> None:
+    class DummyTokenizerBase:
+        pass
+
+    class DummyTokenizer(DummyTokenizerBase):
+        special_tokens_map = {"additional_special_tokens": ["<extra>"]}
+
+    service._patch_florence2_transformers_tokenizer(DummyTokenizerBase)
+
+    assert DummyTokenizer().additional_special_tokens == ["<extra>"]
 
 
 def test_malformed_image_is_rejected_when_decoder_is_available(monkeypatch) -> None:

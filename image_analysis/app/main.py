@@ -162,15 +162,43 @@ def _patch_florence2_transformers_config(pretrained_config_cls: Any) -> None:
         setattr(pretrained_config_cls, "forced_bos_token_id", None)
 
 
-def _patch_florence2_model_compat(model: Any) -> None:
-    language_model = getattr(model, "language_model", None)
-    if language_model is None:
-        return
+def _patch_florence2_transformers_model(pretrained_model_cls: Any) -> None:
     for attribute in ("_supports_sdpa", "_supports_flash_attn_2"):
         try:
-            getattr(language_model, attribute)
+            getattr(pretrained_model_cls, attribute)
         except AttributeError:
-            setattr(language_model, attribute, False)
+            setattr(pretrained_model_cls, attribute, False)
+
+
+def _patch_florence2_transformers_tokenizer(tokenizer_base_cls: Any) -> None:
+    try:
+        getattr(tokenizer_base_cls, "additional_special_tokens")
+        return
+    except AttributeError:
+        pass
+
+    def additional_special_tokens(self: Any) -> list[str]:
+        special_tokens_map = getattr(self, "special_tokens_map", {})
+        tokens = special_tokens_map.get("additional_special_tokens", [])
+        return list(tokens) if isinstance(tokens, list) else []
+
+    setattr(tokenizer_base_cls, "additional_special_tokens", property(additional_special_tokens))
+
+
+def _patch_florence2_model_compat(model: Any) -> None:
+    language_model = getattr(model, "language_model", None)
+    nested_model = getattr(language_model, "model", None) if language_model is not None else None
+    for target in (model, language_model, nested_model):
+        if target is None:
+            continue
+        for attribute in ("_supports_sdpa", "_supports_flash_attn_2"):
+            try:
+                getattr(target, attribute)
+            except AttributeError:
+                try:
+                    setattr(target, attribute, False)
+                except Exception:
+                    pass
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
@@ -293,16 +321,35 @@ def _object_results(image: Any, width: int, height: int, payload: dict[str, Any]
 def _load_captioner() -> tuple[Any, Any]:
     global _CAPTIONER
     if _CAPTIONER is None:
-        from transformers import AutoModelForCausalLM, AutoProcessor, PretrainedConfig
+        import torch
+        from transformers import AutoModelForCausalLM, AutoProcessor, PreTrainedModel, PreTrainedTokenizerBase, PretrainedConfig
 
         _patch_florence2_transformers_config(PretrainedConfig)
+        _patch_florence2_transformers_model(PreTrainedModel)
+        _patch_florence2_transformers_tokenizer(PreTrainedTokenizerBase)
 
         model_id = _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft")
-        model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            attn_implementation="eager",
+            torch_dtype=torch.float32,
+        )
         _patch_florence2_model_compat(model)
+        if hasattr(model, "config"):
+            setattr(model.config, "use_cache", False)
+        model.eval()
         processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         _CAPTIONER = (model, processor)
     return _CAPTIONER
+
+
+def _model_tensor_context(model: Any) -> tuple[Any, Any]:
+    try:
+        parameter = next(model.parameters())
+    except Exception:
+        return None, None
+    return getattr(parameter, "device", None), getattr(parameter, "dtype", None)
 
 
 def _caption_result(image: Any, width: int, height: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -311,12 +358,18 @@ def _caption_result(image: Any, width: int, height: int, payload: dict[str, Any]
     model, processor = _load_captioner()
     task_prompt = os.getenv("IMAGE_ANALYSIS_FLORENCE_CAPTION_PROMPT", "<CAPTION>")
     inputs = processor(text=task_prompt, images=image, return_tensors="pt")
+    device, dtype = _model_tensor_context(model)
+    if device is not None:
+        inputs = {key: value.to(device) if hasattr(value, "to") else value for key, value in inputs.items()}
+    if dtype is not None and "pixel_values" in inputs and hasattr(inputs["pixel_values"], "to"):
+        inputs["pixel_values"] = inputs["pixel_values"].to(dtype=dtype)
     with torch.no_grad():
         generated_ids = model.generate(
             input_ids=inputs["input_ids"],
             pixel_values=inputs["pixel_values"],
             max_new_tokens=_int_option(payload, "max_caption_tokens", 128),
             num_beams=3,
+            use_cache=False,
         )
     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
     parsed = processor.post_process_generation(generated_text, task=task_prompt, image_size=(width, height))
