@@ -2819,9 +2819,9 @@ def test_image_analysis_bootstrap_registers_provider_resources(monkeypatch: pyte
                     "metadata": {"task_key": "object_detection", "engine": "rf-detr"},
                 },
                 {
-                    "id": "microsoft/Florence-2-large-ft",
+                    "id": "florence-community/Florence-2-base-ft",
                     "display_name": "Image captioner",
-                    "provider_resource_id": "microsoft/Florence-2-large-ft",
+                    "provider_resource_id": "florence-community/Florence-2-base-ft",
                     "metadata": {"task_key": "image_captioning", "engine": "florence-2"},
                 },
             ]
@@ -2893,7 +2893,7 @@ def test_image_analysis_bootstrap_registers_provider_resources(monkeypatch: pyte
         "yolo-v9-t-384-license-plate-end2end",
         "cct-xs-v2-global-model",
         "rfdetr-nano",
-        "microsoft/Florence-2-large-ft",
+        "florence-community/Florence-2-base-ft",
     ]
     assert {resource["ref_type"] for resource in resources} == {"managed_model"}
 

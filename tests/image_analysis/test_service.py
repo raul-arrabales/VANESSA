@@ -120,6 +120,45 @@ def test_florence2_tokenizer_patch_adds_missing_special_tokens_property() -> Non
     assert DummyTokenizer().additional_special_tokens == ["<extra>"]
 
 
+def test_caption_image_is_square_padded_and_resized_when_needed(monkeypatch) -> None:
+    if service.Image is None:
+        return
+
+    monkeypatch.setenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", "8")
+    image = service.Image.new("RGB", (4, 2), (255, 255, 255))
+
+    result = service._square_caption_image(image)
+
+    assert result.size == (8, 8)
+
+
+def test_caption_token_embeddings_are_resized_for_processor_tokens() -> None:
+    class DummyTokenizer:
+        def __len__(self) -> int:
+            return 7
+
+    class DummyProcessor:
+        tokenizer = DummyTokenizer()
+
+    class DummyEmbeddings:
+        num_embeddings = 5
+
+    class DummyModel:
+        resized_to: int | None = None
+
+        def get_input_embeddings(self):
+            return DummyEmbeddings()
+
+        def resize_token_embeddings(self, token_count: int) -> None:
+            self.resized_to = token_count
+
+    model = DummyModel()
+
+    service._resize_caption_token_embeddings(model, DummyProcessor())
+
+    assert model.resized_to == 7
+
+
 def test_malformed_image_is_rejected_when_decoder_is_available(monkeypatch) -> None:
     class BrokenImage:
         @staticmethod

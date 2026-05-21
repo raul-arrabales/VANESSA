@@ -18,6 +18,7 @@ DEFAULT_PORT = 8090
 _ALPR_PIPELINE: Any | None = None
 _OBJECT_DETECTOR: Any | None = None
 _CAPTIONER: tuple[Any, Any] | None = None
+DEFAULT_CAPTION_MODEL_ID = "florence-community/Florence-2-base-ft"
 
 COCO_LABELS = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
@@ -61,9 +62,9 @@ def _resources() -> list[dict[str, Any]]:
             "metadata": {"task_key": "object_detection", "engine": "rf-detr"},
         },
         {
-            "id": _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft"),
+            "id": _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", DEFAULT_CAPTION_MODEL_ID),
             "display_name": "Image captioner",
-            "provider_resource_id": _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft"),
+            "provider_resource_id": _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", DEFAULT_CAPTION_MODEL_ID),
             "metadata": {"task_key": "image_captioning", "engine": "florence-2"},
         },
     ]
@@ -201,6 +202,26 @@ def _patch_florence2_model_compat(model: Any) -> None:
                     pass
 
 
+def _resize_caption_token_embeddings(model: Any, processor: Any) -> None:
+    tokenizer = getattr(processor, "tokenizer", None)
+    if tokenizer is None:
+        return
+    try:
+        token_count = len(tokenizer)
+    except Exception:
+        return
+    if token_count <= 0 or not hasattr(model, "resize_token_embeddings"):
+        return
+    try:
+        input_embeddings = model.get_input_embeddings() if hasattr(model, "get_input_embeddings") else None
+        current_count = getattr(input_embeddings, "num_embeddings", None)
+    except Exception:
+        current_count = None
+    if current_count == token_count:
+        return
+    model.resize_token_embeddings(token_count)
+
+
 def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -322,24 +343,24 @@ def _load_captioner() -> tuple[Any, Any]:
     global _CAPTIONER
     if _CAPTIONER is None:
         import torch
-        from transformers import AutoModelForCausalLM, AutoProcessor, PreTrainedModel, PreTrainedTokenizerBase, PretrainedConfig
+        from transformers import AutoProcessor, Florence2ForConditionalGeneration, PreTrainedModel, PreTrainedTokenizerBase, PretrainedConfig
 
         _patch_florence2_transformers_config(PretrainedConfig)
         _patch_florence2_transformers_model(PreTrainedModel)
         _patch_florence2_transformers_tokenizer(PreTrainedTokenizerBase)
 
-        model_id = _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft")
-        model = AutoModelForCausalLM.from_pretrained(
+        model_id = _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", DEFAULT_CAPTION_MODEL_ID)
+        model = Florence2ForConditionalGeneration.from_pretrained(
             model_id,
-            trust_remote_code=True,
             attn_implementation="eager",
-            torch_dtype=torch.float32,
+            dtype=torch.float32,
         )
         _patch_florence2_model_compat(model)
         if hasattr(model, "config"):
             setattr(model.config, "use_cache", False)
+        processor = AutoProcessor.from_pretrained(model_id)
+        _resize_caption_token_embeddings(model, processor)
         model.eval()
-        processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         _CAPTIONER = (model, processor)
     return _CAPTIONER
 
@@ -352,12 +373,37 @@ def _model_tensor_context(model: Any) -> tuple[Any, Any]:
     return getattr(parameter, "device", None), getattr(parameter, "dtype", None)
 
 
+def _caption_image_size() -> int:
+    try:
+        return max(1, int(os.getenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", "768")))
+    except ValueError:
+        return 768
+
+
+def _square_caption_image(image: Any) -> Any:
+    size = getattr(image, "size", None)
+    if not isinstance(size, tuple) or len(size) < 2 or Image is None:
+        return image
+    width, height = int(size[0]), int(size[1])
+    if width <= 0 or height <= 0:
+        return image
+    side = max(width, height)
+    canvas = image if width == height else Image.new("RGB", (side, side), (0, 0, 0))
+    if canvas is not image:
+        canvas.paste(image, ((side - width) // 2, (side - height) // 2))
+    target_size = _caption_image_size()
+    if side == target_size:
+        return canvas
+    resampling = getattr(getattr(Image, "Resampling", Image), "BICUBIC", 3)
+    return canvas.resize((target_size, target_size), resample=resampling)
+
+
 def _caption_result(image: Any, width: int, height: int, payload: dict[str, Any]) -> dict[str, Any]:
     import torch
 
     model, processor = _load_captioner()
     task_prompt = os.getenv("IMAGE_ANALYSIS_FLORENCE_CAPTION_PROMPT", "<CAPTION>")
-    inputs = processor(text=task_prompt, images=image, return_tensors="pt")
+    inputs = processor(text=task_prompt, images=_square_caption_image(image), return_tensors="pt")
     device, dtype = _model_tensor_context(model)
     if device is not None:
         inputs = {key: value.to(device) if hasattr(value, "to") else value for key, value in inputs.items()}

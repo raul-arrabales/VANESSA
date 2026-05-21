@@ -27,12 +27,12 @@ V1 defaults are local open-source models:
 - Plate detection: `open-image-models` through `fast-alpr`
 - Plate OCR: `fast-plate-ocr` through `fast-alpr`
 - Object detection: RF-DETR
-- Captioning: Florence-2
+- Captioning: Florence-2, defaulting to `florence-community/Florence-2-base-ft`
 
 CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want to install the real ANPR, RF-DETR, Florence, and Torch runtime dependencies.
 
 The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
-Florence-2 also requires `einops` and `timm` at runtime through its remote modeling code.
+Florence-2 also requires `einops` and `timm` at runtime.
 The backend provider timeout defaults to `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS=300` because first-run real model loading can exceed normal LLM request timeouts.
 
 ## Control Plane Binding
