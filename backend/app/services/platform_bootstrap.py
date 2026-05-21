@@ -291,6 +291,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
     image_analysis_url = str(getattr(config, "image_analysis_url", "") or "").strip()
     llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
+    image_analysis_request_timeout_seconds = int(
+        getattr(config, "image_analysis_request_timeout_seconds", 300) or 300
+    )
     llm_local_upstream_model = str(
         getattr(config, "llm_local_upstream_model", "") or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
     ).strip() or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
@@ -536,7 +539,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             config_json={
                 "resources_path": "/v1/resources",
                 "analyze_path": "/v1/analyze",
-                "request_timeout_seconds": llm_request_timeout_seconds,
+                "request_timeout_seconds": image_analysis_request_timeout_seconds,
             },
         )
     image_analysis_resources: list[dict[str, Any]] = []

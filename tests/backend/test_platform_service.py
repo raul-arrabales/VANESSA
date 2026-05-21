@@ -2898,6 +2898,48 @@ def test_image_analysis_bootstrap_registers_provider_resources(monkeypatch: pyte
     assert {resource["ref_type"] for resource in resources} == {"managed_model"}
 
 
+def test_ensure_platform_bootstrap_state_uses_image_analysis_timeout(monkeypatch: pytest.MonkeyPatch):
+    image_provider_configs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_capability", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_family", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "list_provider_instances", lambda _db: [])
+    monkeypatch.setattr(platform_service.platform_repo, "list_deployment_bindings", lambda _db, *, deployment_profile_id: [])
+    monkeypatch.setattr(platform_service.platform_repo, "get_provider_instance", lambda _db, provider_instance_id: None)
+
+    def _ensure_provider_instance(_db, **kwargs):
+        if kwargs["slug"] == "image-analysis-local":
+            image_provider_configs.append(dict(kwargs["config_json"]))
+        return {"id": f"{kwargs['slug']}-id", "slug": kwargs["slug"]}
+
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_provider_instance", _ensure_provider_instance)
+    monkeypatch.setattr(platform_service.platform_repo, "ensure_deployment_profile", lambda _db, *, slug, **kwargs: {"id": f"{slug}-id"})
+    monkeypatch.setattr(platform_service.platform_repo, "upsert_deployment_binding", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_service.platform_repo, "get_active_deployment", lambda _db: {"deployment_profile_id": "active"})
+    monkeypatch.setattr(platform_service.platform_repo, "activate_deployment_profile", lambda *args, **kwargs: {})
+    monkeypatch.setattr(platform_bootstrap, "_ensure_image_analysis_modelops_resources", lambda *_args, **_kwargs: ([], {}))
+
+    config = SimpleNamespace(
+        llm_url="http://llm:8000",
+        llm_runtime_url="http://llm_runtime:8000",
+        weaviate_url="http://weaviate:8080",
+        llama_cpp_url="",
+        qdrant_url="",
+        image_analysis_url="http://image_analysis:8090",
+        image_analysis_request_timeout_seconds=420,
+    )
+
+    platform_service.ensure_platform_bootstrap_state("ignored", config)  # type: ignore[arg-type]
+
+    assert image_provider_configs == [
+        {
+            "resources_path": "/v1/resources",
+            "analyze_path": "/v1/analyze",
+            "request_timeout_seconds": 420,
+        }
+    ]
+
+
 def test_ensure_platform_bootstrap_state_reconciles_local_provider_slots(monkeypatch: pytest.MonkeyPatch):
     reconciled_provider_ids: list[str] = []
 

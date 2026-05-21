@@ -14,6 +14,7 @@ DEFAULT_LLM_INFERENCE_RUNTIME_URL = "http://llm_runtime_inference:8000"
 DEFAULT_LLM_RUNTIME_URL = DEFAULT_LLM_INFERENCE_RUNTIME_URL
 DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL = "http://llm_runtime_embeddings:8000"
 DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 60
+DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS = 300
 DEFAULT_LLM_LOCAL_MODEL_PATH = "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
 DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
@@ -92,6 +93,7 @@ class AuthConfig:
     llm_inference_runtime_url: str = DEFAULT_LLM_INFERENCE_RUNTIME_URL
     llm_embeddings_runtime_url: str = DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
     llm_request_timeout_seconds: int = DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
+    image_analysis_request_timeout_seconds: int = DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS
     llm_local_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     llm_local_embeddings_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     sandbox_url: str = DEFAULT_SANDBOX_URL
@@ -238,6 +240,10 @@ def get_auth_config() -> AuthConfig:
             or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
         ),
         llm_request_timeout_seconds=_get_int_env("LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS),
+        image_analysis_request_timeout_seconds=_get_int_env(
+            "IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS",
+            DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS,
+        ),
         llm_local_upstream_model=(
             os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
             or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()

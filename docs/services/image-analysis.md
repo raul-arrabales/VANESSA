@@ -33,6 +33,7 @@ CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for determini
 
 The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
 Florence-2 also requires `einops` and `timm` at runtime through its remote modeling code.
+The backend provider timeout defaults to `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS=300` because first-run real model loading can exceed normal LLM request timeouts.
 
 ## Control Plane Binding
 

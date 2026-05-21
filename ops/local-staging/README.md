@@ -111,6 +111,7 @@ Supported launcher variables:
 - `IMAGE_ANALYSIS_URL` (blank by default; set to `http://image_analysis:8090` to enable the optional `image_analysis` compose profile and backend bootstrap binding)
 - `IMAGE_ANALYSIS_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
 - `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real vision model dependencies)
+- `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS` (default: `300`; increase for first-run Florence/RF-DETR model downloads on slow machines)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
 - `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
