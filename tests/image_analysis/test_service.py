@@ -68,6 +68,15 @@ def test_empty_detection_runtime_still_returns_requested_sections(monkeypatch) -
     assert result["warnings"][0]["code"] == "image_runtime_unavailable"
 
 
+def test_florence2_transformers_patch_adds_missing_forced_bos_token_id() -> None:
+    class DummyPretrainedConfig:
+        pass
+
+    service._patch_florence2_transformers_config(DummyPretrainedConfig)
+
+    assert DummyPretrainedConfig.forced_bos_token_id is None
+
+
 def test_malformed_image_is_rejected_when_decoder_is_available(monkeypatch) -> None:
     class BrokenImage:
         @staticmethod

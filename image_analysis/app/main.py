@@ -157,6 +157,11 @@ def _runtime_defaults(payload: dict[str, Any]) -> dict[str, str]:
     return {str(key): str(value) for key, value in task_defaults.items() if str(value).strip()}
 
 
+def _patch_florence2_transformers_config(pretrained_config_cls: Any) -> None:
+    if not hasattr(pretrained_config_cls, "forced_bos_token_id"):
+        setattr(pretrained_config_cls, "forced_bos_token_id", None)
+
+
 def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -277,7 +282,9 @@ def _object_results(image: Any, width: int, height: int, payload: dict[str, Any]
 def _load_captioner() -> tuple[Any, Any]:
     global _CAPTIONER
     if _CAPTIONER is None:
-        from transformers import AutoModelForCausalLM, AutoProcessor
+        from transformers import AutoModelForCausalLM, AutoProcessor, PretrainedConfig
+
+        _patch_florence2_transformers_config(PretrainedConfig)
 
         model_id = _resource_id("IMAGE_ANALYSIS_CAPTION_MODEL_ID", "microsoft/Florence-2-large-ft")
         model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=True)
