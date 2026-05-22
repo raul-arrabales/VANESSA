@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import gc
 import json
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from typing import Any
@@ -18,6 +20,7 @@ DEFAULT_PORT = 8090
 _ALPR_PIPELINE: Any | None = None
 _OBJECT_DETECTOR: Any | None = None
 _CAPTIONER: tuple[Any, Any] | None = None
+_MODEL_LOCK = threading.RLock()
 DEFAULT_CAPTION_MODEL_ID = "florence-community/Florence-2-base-ft"
 
 COCO_LABELS = [
@@ -39,6 +42,44 @@ def _fake_mode() -> bool:
 
 def _resource_id(env_name: str, default: str) -> str:
     return os.getenv(env_name, default).strip() or default
+
+
+def _keep_heavy_models_loaded() -> bool:
+    return os.getenv("IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _release_torch_memory() -> None:
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
+def _release_object_detector() -> None:
+    global _OBJECT_DETECTOR
+    if _OBJECT_DETECTOR is not None:
+        _OBJECT_DETECTOR = None
+        _release_torch_memory()
+
+
+def _release_captioner() -> None:
+    global _CAPTIONER
+    if _CAPTIONER is not None:
+        _CAPTIONER = None
+        _release_torch_memory()
+
+
+def _prepare_heavy_model(task: str) -> None:
+    if _keep_heavy_models_loaded():
+        return
+    if task == "object_detection":
+        _release_captioner()
+    elif task == "captioning":
+        _release_object_detector()
 
 
 def _resources() -> list[dict[str, Any]]:
@@ -293,6 +334,7 @@ def _plate_results(image: Any, width: int, height: int, payload: dict[str, Any])
 def _load_object_detector() -> Any:
     global _OBJECT_DETECTOR
     if _OBJECT_DETECTOR is None:
+        _prepare_heavy_model("object_detection")
         import torch
         from rfdetr import RFDETRBase, RFDETRLarge, RFDETRNano, RFDETRSmall
 
@@ -310,11 +352,12 @@ def _load_object_detector() -> Any:
 
 
 def _object_results(image: Any, width: int, height: int, payload: dict[str, Any]) -> list[dict[str, Any]]:
-    detector = _load_object_detector()
-    threshold = _float_option(payload, "object_detection", 0.25)
-    max_results = _int_option(payload, "max_objects", 50)
-    model_defaults = _runtime_defaults(payload)
-    raw = detector.predict(image, threshold=threshold)
+    with _MODEL_LOCK:
+        detector = _load_object_detector()
+        threshold = _float_option(payload, "object_detection", 0.25)
+        max_results = _int_option(payload, "max_objects", 50)
+        model_defaults = _runtime_defaults(payload)
+        raw = detector.predict(image, threshold=threshold)
     xyxy = getattr(raw, "xyxy", [])
     confidences = getattr(raw, "confidence", getattr(raw, "confidences", []))
     class_ids = getattr(raw, "class_id", getattr(raw, "class_ids", []))
@@ -345,6 +388,7 @@ def _object_results(image: Any, width: int, height: int, payload: dict[str, Any]
 def _load_captioner() -> tuple[Any, Any]:
     global _CAPTIONER
     if _CAPTIONER is None:
+        _prepare_heavy_model("captioning")
         import torch
         from transformers import AutoProcessor, Florence2ForConditionalGeneration, PreTrainedModel, PreTrainedTokenizerBase, PretrainedConfig
 
@@ -378,9 +422,24 @@ def _model_tensor_context(model: Any) -> tuple[Any, Any]:
 
 def _caption_image_size() -> int:
     try:
-        return max(1, int(os.getenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", "768")))
+        return max(1, int(os.getenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", "512")))
     except ValueError:
-        return 768
+        return 512
+
+
+def _caption_max_tokens(payload: dict[str, Any]) -> int:
+    try:
+        default_tokens = int(os.getenv("IMAGE_ANALYSIS_FLORENCE_MAX_NEW_TOKENS", "48"))
+    except ValueError:
+        default_tokens = 48
+    return _int_option(payload, "max_caption_tokens", max(1, default_tokens))
+
+
+def _caption_num_beams() -> int:
+    try:
+        return max(1, int(os.getenv("IMAGE_ANALYSIS_FLORENCE_NUM_BEAMS", "1")))
+    except ValueError:
+        return 1
 
 
 def _square_caption_image(image: Any) -> Any:
@@ -404,22 +463,23 @@ def _square_caption_image(image: Any) -> Any:
 def _caption_result(image: Any, width: int, height: int, payload: dict[str, Any]) -> dict[str, Any]:
     import torch
 
-    model, processor = _load_captioner()
-    task_prompt = os.getenv("IMAGE_ANALYSIS_FLORENCE_CAPTION_PROMPT", "<CAPTION>")
-    inputs = processor(text=task_prompt, images=_square_caption_image(image), return_tensors="pt")
-    device, dtype = _model_tensor_context(model)
-    if device is not None:
-        inputs = {key: value.to(device) if hasattr(value, "to") else value for key, value in inputs.items()}
-    if dtype is not None and "pixel_values" in inputs and hasattr(inputs["pixel_values"], "to"):
-        inputs["pixel_values"] = inputs["pixel_values"].to(dtype=dtype)
-    with torch.no_grad():
-        generated_ids = model.generate(
-            input_ids=inputs["input_ids"],
-            pixel_values=inputs["pixel_values"],
-            max_new_tokens=_int_option(payload, "max_caption_tokens", 128),
-            num_beams=3,
-            use_cache=False,
-        )
+    with _MODEL_LOCK:
+        model, processor = _load_captioner()
+        task_prompt = os.getenv("IMAGE_ANALYSIS_FLORENCE_CAPTION_PROMPT", "<CAPTION>")
+        inputs = processor(text=task_prompt, images=_square_caption_image(image), return_tensors="pt")
+        device, dtype = _model_tensor_context(model)
+        if device is not None:
+            inputs = {key: value.to(device) if hasattr(value, "to") else value for key, value in inputs.items()}
+        if dtype is not None and "pixel_values" in inputs and hasattr(inputs["pixel_values"], "to"):
+            inputs["pixel_values"] = inputs["pixel_values"].to(dtype=dtype)
+        with torch.no_grad():
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=_caption_max_tokens(payload),
+                num_beams=_caption_num_beams(),
+                use_cache=False,
+            )
     generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
     parsed = processor.post_process_generation(generated_text, task=task_prompt, image_size=(width, height))
     text = parsed.get(task_prompt, generated_text) if isinstance(parsed, dict) else generated_text

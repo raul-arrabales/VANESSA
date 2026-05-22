@@ -35,7 +35,11 @@ When real runtime dependencies are enabled, the Docker image also installs the s
 
 The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
 RF-DETR runs on `cuda` when CUDA is available and otherwise falls back to `cpu`; override with `IMAGE_ANALYSIS_RFDETR_DEVICE` when you need to pin a device explicitly.
-Florence-2 also requires `einops` and `timm` at runtime.
+Florence-2 also requires `einops` and `timm` at runtime. Captioning is CPU-expensive, so the default local-staging settings use a 512px caption image, greedy decoding, and 48 generated tokens. Override `IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE`, `IMAGE_ANALYSIS_FLORENCE_NUM_BEAMS`, and `IMAGE_ANALYSIS_FLORENCE_MAX_NEW_TOKENS` when you want to trade latency for richer captions.
+
+By default the service keeps only one heavy model family resident at a time: RF-DETR is released before loading Florence-2, and Florence-2 is released before loading RF-DETR. Set `IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED=1` only when the host has enough memory and you prefer repeated-call latency over lower memory pressure.
+
+Model caches are rooted under the mounted model directory: `HF_HOME=/models/image_analysis/huggingface`, `TORCH_HOME=/models/image_analysis/torch`, and `XDG_CACHE_HOME=/models/image_analysis/cache`. This lets rebuilt or restarted containers reuse downloaded model artifacts.
 The backend provider timeout defaults to `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS=300` because first-run real model loading can exceed normal LLM request timeouts.
 
 ## Control Plane Binding

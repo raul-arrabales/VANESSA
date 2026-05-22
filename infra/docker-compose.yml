@@ -193,6 +193,11 @@ services:
       IMAGE_ANALYSIS_PORT: 8090
       IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis
       IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+      IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED: ${IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED:-0}
+      HF_HOME: /models/image_analysis/huggingface
+      TORCH_HOME: /models/image_analysis/torch
+      XDG_CACHE_HOME: /models/image_analysis/cache
+      MPLCONFIGDIR: /tmp/matplotlib
     volumes:
       - ../models/image_analysis:/models/image_analysis
 

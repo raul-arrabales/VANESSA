@@ -132,6 +132,42 @@ def test_caption_image_is_square_padded_and_resized_when_needed(monkeypatch) -> 
     assert result.size == (8, 8)
 
 
+def test_caption_generation_defaults_are_cpu_friendly(monkeypatch) -> None:
+    monkeypatch.delenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", raising=False)
+    monkeypatch.delenv("IMAGE_ANALYSIS_FLORENCE_MAX_NEW_TOKENS", raising=False)
+    monkeypatch.delenv("IMAGE_ANALYSIS_FLORENCE_NUM_BEAMS", raising=False)
+
+    assert service._caption_image_size() == 512
+    assert service._caption_max_tokens({"options": {}}) == 48
+    assert service._caption_num_beams() == 1
+
+
+def test_heavy_model_prepare_releases_alternate_model_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED", raising=False)
+    monkeypatch.setattr(service, "_release_torch_memory", lambda: None)
+    monkeypatch.setattr(service, "_OBJECT_DETECTOR", object())
+    monkeypatch.setattr(service, "_CAPTIONER", (object(), object()))
+
+    service._prepare_heavy_model("captioning")
+
+    assert service._OBJECT_DETECTOR is None
+    assert service._CAPTIONER is not None
+
+
+def test_heavy_model_prepare_can_keep_models_loaded(monkeypatch) -> None:
+    monkeypatch.setenv("IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED", "1")
+    monkeypatch.setattr(service, "_release_torch_memory", lambda: None)
+    object_detector = object()
+    captioner = (object(), object())
+    monkeypatch.setattr(service, "_OBJECT_DETECTOR", object_detector)
+    monkeypatch.setattr(service, "_CAPTIONER", captioner)
+
+    service._prepare_heavy_model("captioning")
+
+    assert service._OBJECT_DETECTOR is object_detector
+    assert service._CAPTIONER is captioner
+
+
 def test_caption_token_embeddings_are_resized_for_processor_tokens() -> None:
     class DummyTokenizer:
         def __len__(self) -> int:

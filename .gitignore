@@ -9,6 +9,8 @@ __pycache__/
 
 # Models
 models/llm/
+models/image_analysis/*
+!models/image_analysis/.gitkeep
 *.safetensors
 *.bin
 *.pt

@@ -25,6 +25,11 @@ RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
         pip install --no-cache-dir -r /tmp/image-analysis-runtime-requirements.txt; \
     fi
 
+ENV HF_HOME=/models/image_analysis/huggingface \
+    TORCH_HOME=/models/image_analysis/torch \
+    XDG_CACHE_HOME=/models/image_analysis/cache \
+    MPLCONFIGDIR=/tmp/matplotlib
+
 COPY image_analysis /app/image_analysis
 
 EXPOSE 8090
