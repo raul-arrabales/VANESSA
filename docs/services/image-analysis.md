@@ -31,7 +31,10 @@ V1 defaults are local open-source models:
 
 CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want to install the real ANPR, RF-DETR, Florence, and Torch runtime dependencies.
 
+When real runtime dependencies are enabled, the Docker image also installs the small set of Debian shared libraries required by RF-DETR/OpenCV-style imports on `python:3.11-slim`.
+
 The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
+RF-DETR runs on `cuda` when CUDA is available and otherwise falls back to `cpu`; override with `IMAGE_ANALYSIS_RFDETR_DEVICE` when you need to pin a device explicitly.
 Florence-2 also requires `einops` and `timm` at runtime.
 The backend provider timeout defaults to `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS=300` because first-run real model loading can exceed normal LLM request timeouts.
 

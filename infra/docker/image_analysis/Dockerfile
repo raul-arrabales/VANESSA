@@ -9,7 +9,18 @@ COPY image_analysis/requirements.txt /tmp/image-analysis-requirements.txt
 COPY image_analysis/requirements-runtime.txt /tmp/image-analysis-runtime-requirements.txt
 
 ARG IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0
-RUN pip install --no-cache-dir -r /tmp/image-analysis-requirements.txt \
+RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            libgl1 \
+            libglib2.0-0 \
+            libsm6 \
+            libxext6 \
+            libxrender1 \
+            libxcb1 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi \
+    && pip install --no-cache-dir -r /tmp/image-analysis-requirements.txt \
     && if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
         pip install --no-cache-dir -r /tmp/image-analysis-runtime-requirements.txt; \
     fi

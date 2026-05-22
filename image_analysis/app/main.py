@@ -293,6 +293,7 @@ def _plate_results(image: Any, width: int, height: int, payload: dict[str, Any])
 def _load_object_detector() -> Any:
     global _OBJECT_DETECTOR
     if _OBJECT_DETECTOR is None:
+        import torch
         from rfdetr import RFDETRBase, RFDETRLarge, RFDETRNano, RFDETRSmall
 
         variant = os.getenv("IMAGE_ANALYSIS_RFDETR_VARIANT", "nano").strip().lower()
@@ -302,7 +303,9 @@ def _load_object_detector() -> Any:
             "large": RFDETRLarge,
             "nano": RFDETRNano,
         }.get(variant, RFDETRNano)
-        _OBJECT_DETECTOR = model_cls()
+        requested_device = os.getenv("IMAGE_ANALYSIS_RFDETR_DEVICE", "").strip().lower()
+        device = requested_device or ("cuda" if torch.cuda.is_available() else "cpu")
+        _OBJECT_DETECTOR = model_cls(device=device)
     return _OBJECT_DETECTOR
 
 
