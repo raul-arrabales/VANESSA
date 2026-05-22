@@ -64,6 +64,12 @@ image_analysis_ready_ok() {
   image_analysis_internal_http_ok "/health"
 }
 
+image_analysis_worker_ready_ok() {
+  local service_name="$1"
+  local port="$2"
+  image_analysis_worker_internal_http_ok "${service_name}" "${port}" "/health"
+}
+
 searxng_ready_ok() {
   searxng_internal_http_ok "/"
 }
@@ -310,6 +316,24 @@ run_checks() {
       printf 'image_analysis: OK (/health)\n'
     else
       printf 'image_analysis: FAIL\n'
+      failures=$((failures + 1))
+    fi
+    if image_analysis_worker_ready_ok "image_analysis_anpr" "8091"; then
+      printf 'image_analysis_anpr: OK (/health)\n'
+    else
+      printf 'image_analysis_anpr: FAIL\n'
+      failures=$((failures + 1))
+    fi
+    if image_analysis_worker_ready_ok "image_analysis_objects" "8092"; then
+      printf 'image_analysis_objects: OK (/health)\n'
+    else
+      printf 'image_analysis_objects: FAIL\n'
+      failures=$((failures + 1))
+    fi
+    if image_analysis_worker_ready_ok "image_analysis_captioning" "8093"; then
+      printf 'image_analysis_captioning: OK (/health)\n'
+    else
+      printf 'image_analysis_captioning: FAIL\n'
       failures=$((failures + 1))
     fi
   else

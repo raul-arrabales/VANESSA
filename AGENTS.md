@@ -165,8 +165,9 @@ Respect these runtime boundaries when generating code or configuration.
     - Must stay behind MCP gateway and not become a platform capability by itself.
 
 11. **Image Analysis (`image_analysis`)**
-   - Optional local HTTP provider for image understanding.
+   - Optional local HTTP provider gateway for image understanding.
    - Supports license plate recognition, generic object detection, and image captioning.
+   - In Docker, delegates model execution to private task workers: `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
    - Must be accessed through backend/agent runtime adapters and active `image_analysis` bindings; frontend must not call it directly.
    - Image payload bytes must not be logged, stored, or included in telemetry.
 

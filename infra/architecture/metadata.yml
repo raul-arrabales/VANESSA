@@ -18,6 +18,9 @@ rendering:
     - searxng
     - mcp_gateway
     - image_analysis
+    - image_analysis_anpr
+    - image_analysis_objects
+    - image_analysis_captioning
     - sandbox
     - weaviate
     - qdrant
@@ -86,8 +89,26 @@ services:
   image_analysis:
     label: Image Analysis
     group: runtime
-    description: Optional local image understanding service for plate recognition, object detection, and captioning.
+    description: Optional local image understanding gateway for plate recognition, object detection, and captioning.
     public_exposed: true
+    criticality: medium
+  image_analysis_anpr:
+    label: Image Analysis ANPR
+    group: runtime
+    description: Private image-analysis worker for license plate detection and OCR.
+    public_exposed: false
+    criticality: medium
+  image_analysis_objects:
+    label: Image Analysis Objects
+    group: runtime
+    description: Private image-analysis worker for generic object detection.
+    public_exposed: false
+    criticality: medium
+  image_analysis_captioning:
+    label: Image Analysis Captioning
+    group: runtime
+    description: Private image-analysis worker for image captioning.
+    public_exposed: false
     criticality: medium
   searxng:
     label: SearXNG
@@ -197,6 +218,24 @@ edges:
     protocol: HTTP
     purpose: Agent image-analysis tool invocation through resolved platform runtime bindings
     kind: http
+    direction: outbound
+  - from: image_analysis
+    to: image_analysis_anpr
+    protocol: Internal HTTP
+    purpose: License plate detection and OCR worker calls
+    kind: internal
+    direction: outbound
+  - from: image_analysis
+    to: image_analysis_objects
+    protocol: Internal HTTP
+    purpose: Object detection worker calls
+    kind: internal
+    direction: outbound
+  - from: image_analysis
+    to: image_analysis_captioning
+    protocol: Internal HTTP
+    purpose: Image captioning worker calls
+    kind: internal
     direction: outbound
   - from: mcp_gateway
     to: searxng

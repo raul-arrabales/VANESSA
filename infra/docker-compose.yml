@@ -178,25 +178,115 @@ services:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
       args:
-        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: "0"
+        IMAGE_ANALYSIS_RUNTIME_KIND: gateway
     container_name: vanessa-image-analysis
     profiles:
       - image_analysis
     ports:
       - "8090:8090"
+    depends_on:
+      - image_analysis_anpr
+      - image_analysis_objects
+      - image_analysis_captioning
     env_file:
       - path: .env.example
         required: true
       - path: .env.local
         required: false
     environment:
+      IMAGE_ANALYSIS_ROLE: gateway
       IMAGE_ANALYSIS_PORT: 8090
       IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis
       IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
-      IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED: ${IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED:-0}
-      HF_HOME: /models/image_analysis/huggingface
-      TORCH_HOME: /models/image_analysis/torch
-      XDG_CACHE_HOME: /models/image_analysis/cache
+      IMAGE_ANALYSIS_ANPR_URL: ${IMAGE_ANALYSIS_ANPR_URL:-http://image_analysis_anpr:8091}
+      IMAGE_ANALYSIS_OBJECTS_URL: ${IMAGE_ANALYSIS_OBJECTS_URL:-http://image_analysis_objects:8092}
+      IMAGE_ANALYSIS_CAPTIONING_URL: ${IMAGE_ANALYSIS_CAPTIONING_URL:-http://image_analysis_captioning:8093}
+      HF_HOME: /models/image_analysis/gateway/huggingface
+      TORCH_HOME: /models/image_analysis/gateway/torch
+      XDG_CACHE_HOME: /models/image_analysis/gateway/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_analysis:/models/image_analysis
+
+  image_analysis_anpr:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_analysis/Dockerfile
+      args:
+        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+        IMAGE_ANALYSIS_RUNTIME_KIND: anpr
+    container_name: vanessa-image-analysis-anpr
+    profiles:
+      - image_analysis
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_ANALYSIS_ROLE: anpr
+      IMAGE_ANALYSIS_PORT: 8091
+      IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis/anpr
+      IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+      HF_HOME: /models/image_analysis/anpr/huggingface
+      TORCH_HOME: /models/image_analysis/anpr/torch
+      XDG_CACHE_HOME: /models/image_analysis/anpr/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_analysis:/models/image_analysis
+
+  image_analysis_objects:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_analysis/Dockerfile
+      args:
+        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+        IMAGE_ANALYSIS_RUNTIME_KIND: objects
+    container_name: vanessa-image-analysis-objects
+    profiles:
+      - image_analysis
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_ANALYSIS_ROLE: objects
+      IMAGE_ANALYSIS_PORT: 8092
+      IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis/objects
+      IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+      IMAGE_ANALYSIS_RFDETR_DEVICE: ${IMAGE_ANALYSIS_RFDETR_DEVICE:-}
+      HF_HOME: /models/image_analysis/objects/huggingface
+      TORCH_HOME: /models/image_analysis/objects/torch
+      XDG_CACHE_HOME: /models/image_analysis/objects/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_analysis:/models/image_analysis
+
+  image_analysis_captioning:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_analysis/Dockerfile
+      args:
+        IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+        IMAGE_ANALYSIS_RUNTIME_KIND: captioning
+    container_name: vanessa-image-analysis-captioning
+    profiles:
+      - image_analysis
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_ANALYSIS_ROLE: captioning
+      IMAGE_ANALYSIS_PORT: 8093
+      IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis/captioning
+      IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+      HF_HOME: /models/image_analysis/captioning/huggingface
+      TORCH_HOME: /models/image_analysis/captioning/torch
+      XDG_CACHE_HOME: /models/image_analysis/captioning/cache
       MPLCONFIGDIR: /tmp/matplotlib
     volumes:
       - ../models/image_analysis:/models/image_analysis

@@ -2,9 +2,12 @@
 
 `image_analysis` is an optional local provider for VANESSA image understanding. It is selected through the platform control plane as capability `image_analysis` with provider family `image_analysis_local` and adapter `image_analysis_http`.
 
+The public provider remains a single gateway service. In local Docker deployments, the gateway delegates model execution to private task workers so ANPR, object detection, and captioning can isolate dependencies, model memory, startup cost, and runtime failures.
+
 ## Runtime
 
-- Compose service: `image_analysis`
+- Compose gateway service: `image_analysis`
+- Private worker services: `image_analysis_anpr`, `image_analysis_objects`, `image_analysis_captioning`
 - Optional profile: `image_analysis`
 - Default port: `8090`
 - Model mount: `models/image_analysis:/models/image_analysis`
@@ -16,9 +19,17 @@ The service exposes:
 - `GET /v1/resources`
 - `POST /v1/analyze`
 
-`POST /v1/analyze` accepts JSON only. Callers provide `image.data_base64`, `image.mime_type`, and one or more tasks: `license_plate_recognition`, `object_detection`, or `captioning`.
+`POST /v1/analyze` accepts JSON only. Callers provide `image.data_base64`, `image.mime_type`, and one or more tasks: `license_plate_recognition`, `object_detection`, or `captioning`. Backend, agent engine, and frontend-facing tools continue to call only the gateway URL; workers are private Compose services with no host-published ports.
 
 Image bytes are transient request data. The service does not log image payloads by default, and backend/agent call records redact base64 image data.
+
+Gateway worker URLs default to the Compose service names:
+
+- `IMAGE_ANALYSIS_ANPR_URL=http://image_analysis_anpr:8091`
+- `IMAGE_ANALYSIS_OBJECTS_URL=http://image_analysis_objects:8092`
+- `IMAGE_ANALYSIS_CAPTIONING_URL=http://image_analysis_captioning:8093`
+
+The gateway returns partial results with task-specific warnings if one requested worker is unavailable.
 
 ## Models
 
@@ -29,7 +40,7 @@ V1 defaults are local open-source models:
 - Object detection: RF-DETR
 - Captioning: Florence-2, defaulting to `florence-community/Florence-2-base-ft`
 
-CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want to install the real ANPR, RF-DETR, Florence, and Torch runtime dependencies.
+CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output at the gateway. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want worker images to install their real task-specific runtime dependencies.
 
 When real runtime dependencies are enabled, the Docker image also installs the small set of Debian shared libraries required by RF-DETR/OpenCV-style imports on `python:3.11-slim`.
 
@@ -37,10 +48,10 @@ The RF-DETR dependency currently requires Transformers 5.x, so the runtime requi
 RF-DETR runs on `cuda` when CUDA is available and otherwise falls back to `cpu`; override with `IMAGE_ANALYSIS_RFDETR_DEVICE` when you need to pin a device explicitly.
 Florence-2 also requires `einops` and `timm` at runtime. Captioning is CPU-expensive, so the default local-staging settings use a 512px caption image, greedy decoding, and 48 generated tokens. Override `IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE`, `IMAGE_ANALYSIS_FLORENCE_NUM_BEAMS`, and `IMAGE_ANALYSIS_FLORENCE_MAX_NEW_TOKENS` when you want to trade latency for richer captions.
 
-By default the service keeps only one heavy model family resident at a time: RF-DETR is released before loading Florence-2, and Florence-2 is released before loading RF-DETR. Set `IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED=1` only when the host has enough memory and you prefer repeated-call latency over lower memory pressure.
-
-Model caches are rooted under the mounted model directory: `HF_HOME=/models/image_analysis/huggingface`, `TORCH_HOME=/models/image_analysis/torch`, and `XDG_CACHE_HOME=/models/image_analysis/cache`. This lets rebuilt or restarted containers reuse downloaded model artifacts.
+Each worker keeps only its own model family resident. Model caches are rooted under worker-specific subdirectories of the mounted model directory, such as `/models/image_analysis/objects` and `/models/image_analysis/captioning`. This lets rebuilt or restarted containers reuse downloaded model artifacts without mixing worker caches.
 The backend provider timeout defaults to `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS=300` because first-run real model loading can exceed normal LLM request timeouts.
+
+The container split improves reliability and operability, but object detection accuracy still depends on the selected ModelOps resource and its task/model fit. Replacing or validating the detector model is a separate ModelOps concern.
 
 ## Control Plane Binding
 

@@ -1,0 +1,4 @@
+numpy==2.2.6
+fast-alpr[onnx]==0.4.0
+fast-plate-ocr==1.1.0
+open-image-models==0.5.1

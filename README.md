@@ -116,7 +116,7 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables
+- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables. The `image_analysis` profile runs one gateway plus private task workers.
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -145,7 +145,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `agent_engine/`: execution pipeline, retrieval, and tool runtime orchestration
 - `sandbox/`: isolated Python execution runtime
 - `mcp_gateway/`: gateway-hosted MCP server exposure provider
-- `image_analysis/`: optional local image understanding provider for plate recognition, object detection, and captioning
+- `image_analysis/`: optional local image understanding gateway/workers for plate recognition, object detection, and captioning
 - `infra/searxng/`: local SearXNG configuration used by MCP web search
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance

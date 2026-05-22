@@ -187,7 +187,7 @@ Bootstrap defaults:
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - `sandbox_local` is seeded from `SANDBOX_URL` and bound as optional `sandbox_execution` into local deployment profiles when available.
 - `mcp_gateway_local` is seeded from `MCP_GATEWAY_URL` and, in default local staging, is bound into local deployment profiles as `mcp_runtime`.
-- `image_analysis_local` is seeded only when `IMAGE_ANALYSIS_URL` is configured. It is a local-only provider for license plate recognition, object detection, and captioning.
+- `image_analysis_local` is seeded only when `IMAGE_ANALYSIS_URL` is configured. It is a local-only provider gateway for license plate recognition, object detection, and captioning; Docker deployments route the gateway to private task workers.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code. Built-in families seed explicit `provider_origin`; only the OpenAI-compatible cloud LLM and embeddings families are `cloud`.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Model-bearing deployment bindings now require a selected provider, but may be saved temporarily with zero resources and no default until the capability is fully configured.

@@ -60,12 +60,81 @@ def test_empty_detection_runtime_still_returns_requested_sections(monkeypatch) -
     monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
     monkeypatch.setattr(service, "Image", None)
 
-    result, status = service._analyze(_payload(tasks=["license_plate_recognition", "object_detection"]))
+    result, status = service._analyze_local(_payload(tasks=["license_plate_recognition", "object_detection"]))
 
     assert status == 200
     assert result["license_plates"] == []
     assert result["objects"] == []
     assert result["warnings"][0]["code"] == "image_runtime_unavailable"
+
+
+def test_gateway_routes_requested_tasks_and_aggregates_worker_results(monkeypatch) -> None:
+    calls: list[tuple[str, list[str]]] = []
+
+    def worker(role: str, payload: dict[str, object], tasks: list[str]):
+        calls.append((role, tasks))
+        if role == service.ROLE_ANPR:
+            return {"image": {"width": 1, "height": 1}, "license_plates": [{"text": "ABC123"}]}, 200, None
+        if role == service.ROLE_OBJECTS:
+            return {"image": {"width": 1, "height": 1}, "objects": [{"label": "car"}]}, 200, None
+        return {"image": {"width": 1, "height": 1}, "caption": {"text": "A car."}}, 200, None
+
+    monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
+    monkeypatch.setattr(service, "_decode_image", lambda _payload: (b"", 1, 1, object(), None))
+    monkeypatch.setattr(service, "_gateway_worker_analyze", worker)
+
+    result, status = service._analyze(_payload(tasks=["license_plate_recognition", "object_detection", "captioning"]))
+
+    assert status == 200
+    assert calls == [
+        (service.ROLE_ANPR, ["license_plate_recognition"]),
+        (service.ROLE_OBJECTS, ["object_detection"]),
+        (service.ROLE_CAPTIONING, ["captioning"]),
+    ]
+    assert result["license_plates"] == [{"text": "ABC123"}]
+    assert result["objects"] == [{"label": "car"}]
+    assert result["caption"] == {"text": "A car."}
+    assert "warnings" not in result
+
+
+def test_gateway_worker_failure_preserves_other_task_results(monkeypatch) -> None:
+    def worker(role: str, payload: dict[str, object], tasks: list[str]):
+        if role == service.ROLE_OBJECTS:
+            return None, 0, "connection refused"
+        return {"image": {"width": 1, "height": 1}, "caption": {"text": "A test image."}}, 200, None
+
+    monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
+    monkeypatch.setattr(service, "_decode_image", lambda _payload: (b"", 1, 1, object(), None))
+    monkeypatch.setattr(service, "_gateway_worker_analyze", worker)
+
+    result, status = service._analyze(_payload(tasks=["object_detection", "captioning"]))
+
+    assert status == 200
+    assert result["objects"] == []
+    assert result["caption"] == {"text": "A test image."}
+    assert result["warnings"][0]["code"] == "object_worker_unavailable"
+    assert ONE_PIXEL_PNG not in str(result["warnings"])
+
+
+def test_gateway_resources_aggregate_workers(monkeypatch) -> None:
+    def resources(role: str):
+        return service._resources_for_role(role), None
+
+    monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
+    monkeypatch.setattr(service, "_resources_from_worker", resources)
+
+    payload = service._resources_payload_for_role(service.ROLE_GATEWAY)
+
+    task_keys = {resource["metadata"]["task_key"] for resource in payload["resources"]}
+    assert task_keys == {"image_plate_detection", "image_plate_ocr", "object_detection", "image_captioning"}
+    assert "warnings" not in payload
+
+
+def test_worker_rejects_unsupported_task() -> None:
+    result, status = service._analyze_for_role(_payload(tasks=["captioning"]), service.ROLE_OBJECTS)
+
+    assert status == 400
+    assert result["error"] == "invalid_tasks"
 
 
 def test_florence2_transformers_patch_adds_missing_forced_bos_token_id() -> None:

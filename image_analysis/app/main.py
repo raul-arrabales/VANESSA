@@ -8,6 +8,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 try:  # pragma: no cover - optional dependency in lightweight test environments
     from PIL import Image
@@ -17,6 +19,21 @@ except Exception:  # pragma: no cover
 SERVICE_VERSION = "0.1.0"
 VALID_TASKS = {"license_plate_recognition", "object_detection", "captioning"}
 DEFAULT_PORT = 8090
+ROLE_GATEWAY = "gateway"
+ROLE_ANPR = "anpr"
+ROLE_OBJECTS = "objects"
+ROLE_CAPTIONING = "captioning"
+VALID_ROLES = {ROLE_GATEWAY, ROLE_ANPR, ROLE_OBJECTS, ROLE_CAPTIONING}
+ROLE_TASKS = {
+    ROLE_ANPR: {"license_plate_recognition"},
+    ROLE_OBJECTS: {"object_detection"},
+    ROLE_CAPTIONING: {"captioning"},
+}
+TASK_ROLE = {
+    "license_plate_recognition": ROLE_ANPR,
+    "object_detection": ROLE_OBJECTS,
+    "captioning": ROLE_CAPTIONING,
+}
 _ALPR_PIPELINE: Any | None = None
 _OBJECT_DETECTOR: Any | None = None
 _CAPTIONER: tuple[Any, Any] | None = None
@@ -42,6 +59,11 @@ def _fake_mode() -> bool:
 
 def _resource_id(env_name: str, default: str) -> str:
     return os.getenv(env_name, default).strip() or default
+
+
+def _service_role() -> str:
+    role = os.getenv("IMAGE_ANALYSIS_ROLE", ROLE_GATEWAY).strip().lower() or ROLE_GATEWAY
+    return role if role in VALID_ROLES else ROLE_GATEWAY
 
 
 def _keep_heavy_models_loaded() -> bool:
@@ -109,6 +131,94 @@ def _resources() -> list[dict[str, Any]]:
             "metadata": {"task_key": "image_captioning", "engine": "florence-2"},
         },
     ]
+
+
+def _resources_for_role(role: str) -> list[dict[str, Any]]:
+    resources = _resources()
+    if role == ROLE_GATEWAY:
+        return resources
+    task_keys_by_role = {
+        ROLE_ANPR: {"image_plate_detection", "image_plate_ocr"},
+        ROLE_OBJECTS: {"object_detection"},
+        ROLE_CAPTIONING: {"image_captioning"},
+    }
+    task_keys = task_keys_by_role.get(role, set())
+    return [resource for resource in resources if dict(resource.get("metadata") or {}).get("task_key") in task_keys]
+
+
+def _worker_url(role: str) -> str:
+    env_names = {
+        ROLE_ANPR: "IMAGE_ANALYSIS_ANPR_URL",
+        ROLE_OBJECTS: "IMAGE_ANALYSIS_OBJECTS_URL",
+        ROLE_CAPTIONING: "IMAGE_ANALYSIS_CAPTIONING_URL",
+    }
+    defaults = {
+        ROLE_ANPR: "http://image_analysis_anpr:8091",
+        ROLE_OBJECTS: "http://image_analysis_objects:8092",
+        ROLE_CAPTIONING: "http://image_analysis_captioning:8093",
+    }
+    env_name = env_names.get(role, "")
+    default = defaults.get(role, "")
+    return os.getenv(env_name, default).strip().rstrip("/") or default
+
+
+def _worker_timeout(role: str) -> float:
+    env_names = {
+        ROLE_ANPR: "IMAGE_ANALYSIS_ANPR_TIMEOUT_SECONDS",
+        ROLE_OBJECTS: "IMAGE_ANALYSIS_OBJECTS_TIMEOUT_SECONDS",
+        ROLE_CAPTIONING: "IMAGE_ANALYSIS_CAPTIONING_TIMEOUT_SECONDS",
+    }
+    defaults = {
+        ROLE_ANPR: 120.0,
+        ROLE_OBJECTS: 180.0,
+        ROLE_CAPTIONING: 300.0,
+    }
+    try:
+        timeout = float(os.getenv(env_names.get(role, ""), str(defaults.get(role, 120.0))))
+    except ValueError:
+        timeout = defaults.get(role, 120.0)
+    return timeout if timeout > 0 else defaults.get(role, 120.0)
+
+
+def _gateway_health_worker_timeout() -> float:
+    try:
+        timeout = float(os.getenv("IMAGE_ANALYSIS_WORKER_HEALTH_TIMEOUT_SECONDS", "0.35"))
+    except ValueError:
+        timeout = 0.35
+    return timeout if timeout > 0 else 0.35
+
+
+def _http_json(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    timeout_seconds: float = 5.0,
+) -> tuple[dict[str, Any] | None, int, str | None]:
+    body = None
+    headers: dict[str, str] = {}
+    if payload is not None:
+        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(req, timeout=timeout_seconds) as response:  # noqa: S310 - private compose URLs
+            raw = response.read()
+            if not raw:
+                return {}, int(response.status), None
+            parsed = json.loads(raw.decode("utf-8"))
+            return parsed if isinstance(parsed, dict) else {}, int(response.status), None
+    except HTTPError as exc:
+        raw_error = exc.read()
+        try:
+            parsed_error = json.loads(raw_error.decode("utf-8")) if raw_error else {}
+        except Exception:
+            parsed_error = {}
+        return parsed_error if isinstance(parsed_error, dict) else {}, int(exc.code), str(exc)
+    except (OSError, TimeoutError, URLError) as exc:
+        return None, 0, str(exc)
+    except json.JSONDecodeError as exc:
+        return None, 502, str(exc)
 
 
 def _read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any] | None:
@@ -486,15 +596,8 @@ def _caption_result(image: Any, width: int, height: int, payload: dict[str, Any]
     return {"text": str(text).strip(), "captioner_model_id": _runtime_defaults(payload).get("captioner")}
 
 
-def _analyze(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
-    _raw, width, height, image, error = _decode_image(payload)
-    if error:
-        return error, 400
-    tasks, error = _normalize_tasks(payload)
-    if error:
-        return error, 400
-
-    response: dict[str, Any] = {
+def _empty_response(width: int, height: int, payload: dict[str, Any]) -> dict[str, Any]:
+    return {
         "image": {"width": width, "height": height},
         "license_plates": [],
         "objects": [],
@@ -503,36 +606,56 @@ def _analyze(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
         "warnings": [],
     }
 
-    if _fake_mode():
-        box = _box(width, height)
-        if "license_plate_recognition" in tasks:
-            response["license_plates"] = [
-                {
-                    "text": os.getenv("IMAGE_ANALYSIS_FAKE_PLATE_TEXT", "LOCAL123"),
-                    "text_confidence": 0.99,
-                    "box_xyxy": box,
-                    "box_normalized_xyxy": _normalized_box(box, width, height),
-                    "plate_detector_model_id": response["model_resources"].get("plate_detector"),
-                    "plate_ocr_model_id": response["model_resources"].get("plate_ocr"),
-                }
-            ]
-        if "object_detection" in tasks:
-            response["objects"] = [
-                {
-                    "label": "vehicle",
-                    "confidence": 0.95,
-                    "box_xyxy": box,
-                    "box_normalized_xyxy": _normalized_box(box, width, height),
-                    "object_detector_model_id": response["model_resources"].get("object_detector"),
-                }
-            ]
-        if "captioning" in tasks:
-            response["caption"] = {
-                "text": "A vehicle is visible in the image.",
-                "captioner_model_id": response["model_resources"].get("captioner"),
+
+def _fake_analyze(payload: dict[str, Any], tasks: list[str], width: int, height: int) -> tuple[dict[str, Any], int]:
+    response = _empty_response(width, height, payload)
+    box = _box(width, height)
+    if "license_plate_recognition" in tasks:
+        response["license_plates"] = [
+            {
+                "text": os.getenv("IMAGE_ANALYSIS_FAKE_PLATE_TEXT", "LOCAL123"),
+                "text_confidence": 0.99,
+                "box_xyxy": box,
+                "box_normalized_xyxy": _normalized_box(box, width, height),
+                "plate_detector_model_id": response["model_resources"].get("plate_detector"),
+                "plate_ocr_model_id": response["model_resources"].get("plate_ocr"),
             }
-        response.pop("warnings", None)
-        return response, 200
+        ]
+    if "object_detection" in tasks:
+        response["objects"] = [
+            {
+                "label": "vehicle",
+                "confidence": 0.95,
+                "box_xyxy": box,
+                "box_normalized_xyxy": _normalized_box(box, width, height),
+                "object_detector_model_id": response["model_resources"].get("object_detector"),
+            }
+        ]
+    if "captioning" in tasks:
+        response["caption"] = {
+            "text": "A vehicle is visible in the image.",
+            "captioner_model_id": response["model_resources"].get("captioner"),
+        }
+    response.pop("warnings", None)
+    return response, 200
+
+
+def _analyze_local(payload: dict[str, Any], *, allowed_tasks: set[str] | None = None) -> tuple[dict[str, Any], int]:
+    _raw, width, height, image, error = _decode_image(payload)
+    if error:
+        return error, 400
+    tasks, error = _normalize_tasks(payload)
+    if error:
+        return error, 400
+    if allowed_tasks is not None:
+        invalid_tasks = sorted(set(tasks) - allowed_tasks)
+        if invalid_tasks:
+            return {"error": "invalid_tasks", "message": "task is not supported by this worker", "tasks": invalid_tasks}, 400
+
+    response = _empty_response(width, height, payload)
+
+    if _fake_mode():
+        return _fake_analyze(payload, tasks, width, height)
 
     if image is None:
         response["warnings"].append({"code": "image_runtime_unavailable", "message": "Pillow is unavailable"})
@@ -565,6 +688,158 @@ def _analyze(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
     return response, 200
 
 
+def _worker_warning(role: str, *, status_code: int, message: str | None) -> dict[str, Any]:
+    codes = {
+        ROLE_ANPR: "plate_worker_unavailable",
+        ROLE_OBJECTS: "object_worker_unavailable",
+        ROLE_CAPTIONING: "caption_worker_unavailable",
+    }
+    default_messages = {
+        ROLE_ANPR: "License plate worker is unavailable",
+        ROLE_OBJECTS: "Object detection worker is unavailable",
+        ROLE_CAPTIONING: "Image captioning worker is unavailable",
+    }
+    return {
+        "code": codes.get(role, "image_worker_unavailable"),
+        "message": message or default_messages.get(role, "Image analysis worker is unavailable"),
+        "status_code": status_code,
+    }
+
+
+def _merge_worker_response(response: dict[str, Any], role: str, payload: dict[str, Any]) -> None:
+    worker_image = payload.get("image") if isinstance(payload.get("image"), dict) else {}
+    if response["image"].get("width", 0) <= 0 and isinstance(worker_image.get("width"), int):
+        response["image"]["width"] = worker_image["width"]
+    if response["image"].get("height", 0) <= 0 and isinstance(worker_image.get("height"), int):
+        response["image"]["height"] = worker_image["height"]
+
+    worker_warnings = payload.get("warnings")
+    if isinstance(worker_warnings, list):
+        response["warnings"].extend([item for item in worker_warnings if isinstance(item, dict)])
+
+    if role == ROLE_ANPR:
+        license_plates = payload.get("license_plates")
+        response["license_plates"] = license_plates if isinstance(license_plates, list) else []
+    elif role == ROLE_OBJECTS:
+        objects = payload.get("objects")
+        response["objects"] = objects if isinstance(objects, list) else []
+    elif role == ROLE_CAPTIONING:
+        caption = payload.get("caption")
+        response["caption"] = caption if isinstance(caption, dict) else None
+
+
+def _gateway_worker_analyze(role: str, payload: dict[str, Any], tasks: list[str]) -> tuple[dict[str, Any] | None, int, str | None]:
+    worker_payload = {**payload, "tasks": tasks}
+    return _http_json(
+        _worker_url(role) + "/v1/analyze",
+        method="POST",
+        payload=worker_payload,
+        timeout_seconds=_worker_timeout(role),
+    )
+
+
+def _analyze(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
+    _raw, width, height, image, error = _decode_image(payload)
+    if error:
+        return error, 400
+    tasks, error = _normalize_tasks(payload)
+    if error:
+        return error, 400
+
+    if _fake_mode():
+        return _fake_analyze(payload, tasks, width, height)
+
+    response = _empty_response(width, height, payload)
+    if image is None:
+        response["warnings"].append({"code": "image_runtime_unavailable", "message": "Pillow is unavailable in image_analysis gateway"})
+
+    tasks_by_role: dict[str, list[str]] = {}
+    for task in tasks:
+        role = TASK_ROLE.get(task)
+        if role:
+            tasks_by_role.setdefault(role, []).append(task)
+
+    for role, role_tasks in tasks_by_role.items():
+        worker_payload, status_code, error_message = _gateway_worker_analyze(role, payload, role_tasks)
+        if worker_payload is None or status_code < 200 or status_code >= 300:
+            message = None
+            if isinstance(worker_payload, dict):
+                message = str(worker_payload.get("message") or worker_payload.get("error") or "").strip() or None
+            response["warnings"].append(_worker_warning(role, status_code=status_code, message=message or error_message))
+            continue
+        _merge_worker_response(response, role, worker_payload)
+
+    if not response["warnings"]:
+        response.pop("warnings", None)
+    return response, 200
+
+
+def _analyze_for_role(payload: dict[str, Any], role: str) -> tuple[dict[str, Any], int]:
+    if role == ROLE_GATEWAY:
+        return _analyze(payload)
+    return _analyze_local(payload, allowed_tasks=ROLE_TASKS.get(role, set()))
+
+
+def _worker_health(role: str) -> dict[str, Any]:
+    payload, status_code, error_message = _http_json(
+        _worker_url(role) + "/health",
+        timeout_seconds=_gateway_health_worker_timeout(),
+    )
+    return {
+        "reachable": payload is not None and 200 <= status_code < 300,
+        "status_code": status_code,
+        "url": _worker_url(role),
+        "message": error_message,
+    }
+
+
+def _health_for_role(role: str) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "status": "ok",
+        "service": "image_analysis" if role == ROLE_GATEWAY else f"image_analysis_{role}",
+        "role": role,
+        "version": SERVICE_VERSION,
+        "fake_mode": _fake_mode(),
+    }
+    if role == ROLE_GATEWAY and not _fake_mode():
+        payload["workers"] = {
+            worker_role: _worker_health(worker_role)
+            for worker_role in (ROLE_ANPR, ROLE_OBJECTS, ROLE_CAPTIONING)
+        }
+    if role != ROLE_GATEWAY:
+        payload["tasks"] = sorted(ROLE_TASKS.get(role, set()))
+    return payload
+
+
+def _resources_from_worker(role: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    payload, status_code, error_message = _http_json(
+        _worker_url(role) + "/v1/resources",
+        timeout_seconds=_gateway_health_worker_timeout(),
+    )
+    if payload is None or status_code < 200 or status_code >= 300:
+        return [], _worker_warning(role, status_code=status_code, message=error_message)
+    raw_resources = payload.get("resources")
+    if not isinstance(raw_resources, list):
+        return [], _worker_warning(role, status_code=502, message="Worker resources payload is malformed")
+    return [resource for resource in raw_resources if isinstance(resource, dict)], None
+
+
+def _resources_payload_for_role(role: str) -> dict[str, Any]:
+    if role != ROLE_GATEWAY or _fake_mode():
+        return {"resources": _resources_for_role(role)}
+    resources: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+    for worker_role in (ROLE_ANPR, ROLE_OBJECTS, ROLE_CAPTIONING):
+        worker_resources, warning = _resources_from_worker(worker_role)
+        resources.extend(worker_resources)
+        if warning:
+            warnings.append(warning)
+    payload: dict[str, Any] = {"resources": resources}
+    if warnings:
+        payload["warnings"] = warnings
+    return payload
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "VANESSAImageAnalysis/0.1"
 
@@ -577,15 +852,17 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
+        role = _service_role()
         if self.path == "/health":
-            self._send_json(200, {"status": "ok", "service": "image_analysis", "version": SERVICE_VERSION, "fake_mode": _fake_mode()})
+            self._send_json(200, _health_for_role(role))
             return
         if self.path == "/v1/resources":
-            self._send_json(200, {"resources": _resources()})
+            self._send_json(200, _resources_payload_for_role(role))
             return
         self._send_json(404, {"error": "not_found", "message": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802
+        role = _service_role()
         if self.path != "/v1/analyze":
             self._send_json(404, {"error": "not_found", "message": "Not found"})
             return
@@ -593,7 +870,7 @@ class Handler(BaseHTTPRequestHandler):
         if payload is None:
             self._send_json(400, {"error": "invalid_payload", "message": "Expected JSON object"})
             return
-        result, status = _analyze(payload)
+        result, status = _analyze_for_role(payload, role)
         self._send_json(status, result)
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
@@ -604,7 +881,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     port = int(os.getenv("IMAGE_ANALYSIS_PORT", str(DEFAULT_PORT)))
     server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print(f"image_analysis listening on :{port}", flush=True)
+    print(f"image_analysis role={_service_role()} listening on :{port}", flush=True)
     server.serve_forever()
 
 

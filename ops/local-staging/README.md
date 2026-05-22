@@ -110,8 +110,9 @@ Supported launcher variables:
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
 - `IMAGE_ANALYSIS_URL` (blank by default; set to `http://image_analysis:8090` to enable the optional `image_analysis` compose profile and backend bootstrap binding)
 - `IMAGE_ANALYSIS_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
-- `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real vision model dependencies)
+- `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real task-specific vision model dependencies in the private workers)
 - `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS` (default: `300`; increase for first-run Florence/RF-DETR model downloads on slow machines)
+- `IMAGE_ANALYSIS_ANPR_URL`, `IMAGE_ANALYSIS_OBJECTS_URL`, `IMAGE_ANALYSIS_CAPTIONING_URL` (default to the private Compose worker service URLs)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
 - `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
@@ -165,10 +166,10 @@ Split local runtime selection:
 
 `image_analysis` selection:
 
-- The optional `image_analysis` service is enabled only when `IMAGE_ANALYSIS_URL` is non-empty.
+- The optional `image_analysis` gateway and private worker services are enabled only when `IMAGE_ANALYSIS_URL` is non-empty.
 - Local-staging scripts automatically add the `image_analysis` compose profile when enabled.
-- The service mounts `models/image_analysis` and exposes local plate recognition, object detection, and captioning through the `image_analysis` platform capability.
-- `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
+- The gateway mounts `models/image_analysis`, exposes local plate recognition, object detection, and captioning through the `image_analysis` platform capability, and delegates to `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the gateway and worker containers.
 - Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 
 `mcp_gateway` behavior:
@@ -404,8 +405,9 @@ Use the targeted restart script when only one service changed:
 - `image_analysis` fails to start:
   - Confirm `IMAGE_ANALYSIS_URL=http://image_analysis:8090` is set.
   - Run `./ops/local-staging/restart-service.sh --service image_analysis`.
+  - If a worker fails, restart it directly with `--service image_analysis_anpr`, `--service image_analysis_objects`, or `--service image_analysis_captioning`.
   - Use `IMAGE_ANALYSIS_FAKE_MODE=1` for a lightweight smoke path before downloading full vision model assets.
-  - If installing real runtime dependencies, RF-DETR requires Transformers 5.x; rebuild after setting `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1`.
+  - If installing real runtime dependencies, the workers install task-specific dependency sets; RF-DETR requires Transformers 5.x, so rebuild after setting `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1`.
 - `health.sh` reports `llm_runtime_embeddings_slot: FAIL` even though `llm_runtime_embeddings: OK`:
   - This means the split embeddings runtime is healthy but is not advertising the embeddings model that the backend provider slot expects.
   - Retrieval and knowledge-base query flows will fail with embeddings errors until the slot is reapplied.

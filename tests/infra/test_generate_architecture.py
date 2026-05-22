@@ -28,6 +28,21 @@ def test_build_graph_uses_all_compose_services():
     assert len(graph["edges"]) > 0
 
 
+def test_image_analysis_profile_includes_gateway_and_private_workers():
+    compose = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))
+    services = compose["services"]
+
+    assert {"image_analysis", "image_analysis_anpr", "image_analysis_objects", "image_analysis_captioning"} <= set(services)
+    assert services["image_analysis"]["profiles"] == ["image_analysis"]
+    assert services["image_analysis_anpr"]["profiles"] == ["image_analysis"]
+    assert services["image_analysis_objects"]["profiles"] == ["image_analysis"]
+    assert services["image_analysis_captioning"]["profiles"] == ["image_analysis"]
+    assert services["image_analysis"].get("ports") == ["8090:8090"]
+    assert "ports" not in services["image_analysis_anpr"]
+    assert "ports" not in services["image_analysis_objects"]
+    assert "ports" not in services["image_analysis_captioning"]
+
+
 def test_build_graph_rejects_unknown_metadata_service():
     compose = {"services": {"backend": {}, "frontend": {"depends_on": ["backend"]}}}
     metadata = {

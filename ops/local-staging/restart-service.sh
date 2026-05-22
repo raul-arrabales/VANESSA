@@ -51,6 +51,9 @@ check_service_ready() {
     llama_cpp) llama_cpp_internal_http_ok "/v1/models" ;;
     qdrant) qdrant_internal_http_ok "/healthz" ;;
     image_analysis) image_analysis_internal_http_ok "/health" ;;
+    image_analysis_anpr) image_analysis_worker_internal_http_ok "image_analysis_anpr" "8091" "/health" ;;
+    image_analysis_objects) image_analysis_worker_internal_http_ok "image_analysis_objects" "8092" "/health" ;;
+    image_analysis_captioning) image_analysis_worker_internal_http_ok "image_analysis_captioning" "8093" "/health" ;;
     searxng) searxng_internal_http_ok "/" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
@@ -158,6 +161,10 @@ if [[ "${target_service}" == "qdrant" ]]; then
 fi
 if [[ "${target_service}" == "image_analysis" ]]; then
   image_analysis_enabled_requested || die "image_analysis is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
+  with_deps=true
+fi
+if [[ "${target_service}" == image_analysis_* ]]; then
+  image_analysis_enabled_requested || die "${target_service} is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
 fi
 validate_llm_cpu_thread_binding
 

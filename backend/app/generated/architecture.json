@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-22T14:14:18+00:00",
+  "generated_at": "2026-05-22T15:17:31+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -97,8 +97,35 @@
       "container": "image_analysis",
       "label": "Image Analysis",
       "group": "runtime",
-      "description": "Optional local image understanding service for plate recognition, object detection, and captioning.",
+      "description": "Optional local image understanding gateway for plate recognition, object detection, and captioning.",
       "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
+      "id": "image_analysis_anpr",
+      "container": "image_analysis_anpr",
+      "label": "Image Analysis ANPR",
+      "group": "runtime",
+      "description": "Private image-analysis worker for license plate detection and OCR.",
+      "public_exposed": false,
+      "criticality": "medium"
+    },
+    {
+      "id": "image_analysis_objects",
+      "container": "image_analysis_objects",
+      "label": "Image Analysis Objects",
+      "group": "runtime",
+      "description": "Private image-analysis worker for generic object detection.",
+      "public_exposed": false,
+      "criticality": "medium"
+    },
+    {
+      "id": "image_analysis_captioning",
+      "container": "image_analysis_captioning",
+      "label": "Image Analysis Captioning",
+      "group": "runtime",
+      "description": "Private image-analysis worker for image captioning.",
+      "public_exposed": false,
       "criticality": "medium"
     },
     {
@@ -293,6 +320,33 @@
       "direction": "outbound"
     },
     {
+      "id": "image_analysis-image_analysis_anpr",
+      "from": "image_analysis",
+      "to": "image_analysis_anpr",
+      "protocol": "Internal HTTP",
+      "purpose": "License plate detection and OCR worker calls",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "image_analysis-image_analysis_captioning",
+      "from": "image_analysis",
+      "to": "image_analysis_captioning",
+      "protocol": "Internal HTTP",
+      "purpose": "Image captioning worker calls",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "image_analysis-image_analysis_objects",
+      "from": "image_analysis",
+      "to": "image_analysis_objects",
+      "protocol": "Internal HTTP",
+      "purpose": "Object detection worker calls",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
       "id": "kws-backend",
       "from": "kws",
       "to": "backend",
@@ -413,9 +467,27 @@
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "image_analysis_anpr": {
         "x": 846,
         "y": 942,
+        "width": 220,
+        "height": 84
+      },
+      "image_analysis_objects": {
+        "x": 846,
+        "y": 1066,
+        "width": 220,
+        "height": 84
+      },
+      "image_analysis_captioning": {
+        "x": 846,
+        "y": 1190,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 1314,
         "width": 220,
         "height": 84
       },
@@ -439,5 +511,5 @@
       }
     }
   },
-  "source_hash": "1be5feeda24a2cc13549f89cbae0e1a17c520953bd98ddcd6862ab6800acd066"
+  "source_hash": "47e95e2209e06bb595e733d67d198c0bf32c7113e768752619426d02112f7f94"
 }
