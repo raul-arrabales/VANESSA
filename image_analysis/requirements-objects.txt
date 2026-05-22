@@ -1,1 +1,4 @@
 rfdetr==1.6.5.post0
+torch==2.9.1
+torchvision==0.24.1
+transformers>=5.1.0,<6.0.0

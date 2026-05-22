@@ -44,7 +44,7 @@ CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for determini
 
 When real runtime dependencies are enabled, the Docker image also installs the small set of Debian shared libraries required by RF-DETR/OpenCV-style imports on `python:3.11-slim`.
 
-The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin.
+The RF-DETR dependency currently requires Transformers 5.x, so the runtime requirements intentionally use `transformers>=5.1.0,<6.0.0` rather than the older Florence-2-era 4.x pin. The object worker also pins `torch==2.9.1` and `torchvision==0.24.1` so Docker builds do not drift into a different Torch/CUDA family from resolver churn.
 RF-DETR runs on `cuda` when CUDA is available and otherwise falls back to `cpu`; override with `IMAGE_ANALYSIS_RFDETR_DEVICE` when you need to pin a device explicitly.
 Florence-2 also requires `einops` and `timm` at runtime. Captioning is CPU-expensive, so the default local-staging settings use a 512px caption image, greedy decoding, and 48 generated tokens. Override `IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE`, `IMAGE_ANALYSIS_FLORENCE_NUM_BEAMS`, and `IMAGE_ANALYSIS_FLORENCE_MAX_NEW_TOKENS` when you want to trade latency for richer captions.
 

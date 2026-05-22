@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import base64
 
+from image_analysis.app import gateway
 from image_analysis.app import main as service
+from image_analysis.app import payloads
+from image_analysis.app.workers import captioning
 
 
 ONE_PIXEL_PNG = (
@@ -44,7 +47,7 @@ def test_analyze_rejects_unknown_task() -> None:
 
 def test_fake_mode_returns_plate_objects_and_caption(monkeypatch) -> None:
     monkeypatch.setenv("IMAGE_ANALYSIS_FAKE_MODE", "1")
-    monkeypatch.setattr(service, "Image", None)
+    monkeypatch.setattr(payloads, "Image", None)
 
     result, status = service._analyze(_payload(tasks=["license_plate_recognition", "object_detection", "captioning"]))
 
@@ -58,7 +61,7 @@ def test_fake_mode_returns_plate_objects_and_caption(monkeypatch) -> None:
 
 def test_empty_detection_runtime_still_returns_requested_sections(monkeypatch) -> None:
     monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
-    monkeypatch.setattr(service, "Image", None)
+    monkeypatch.setattr(payloads, "Image", None)
 
     result, status = service._analyze_local(_payload(tasks=["license_plate_recognition", "object_detection"]))
 
@@ -80,8 +83,8 @@ def test_gateway_routes_requested_tasks_and_aggregates_worker_results(monkeypatc
         return {"image": {"width": 1, "height": 1}, "caption": {"text": "A car."}}, 200, None
 
     monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
-    monkeypatch.setattr(service, "_decode_image", lambda _payload: (b"", 1, 1, object(), None))
-    monkeypatch.setattr(service, "_gateway_worker_analyze", worker)
+    monkeypatch.setattr(gateway, "decode_image", lambda _payload: (b"", 1, 1, object(), None))
+    monkeypatch.setattr(gateway, "gateway_worker_analyze", worker)
 
     result, status = service._analyze(_payload(tasks=["license_plate_recognition", "object_detection", "captioning"]))
 
@@ -104,8 +107,8 @@ def test_gateway_worker_failure_preserves_other_task_results(monkeypatch) -> Non
         return {"image": {"width": 1, "height": 1}, "caption": {"text": "A test image."}}, 200, None
 
     monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
-    monkeypatch.setattr(service, "_decode_image", lambda _payload: (b"", 1, 1, object(), None))
-    monkeypatch.setattr(service, "_gateway_worker_analyze", worker)
+    monkeypatch.setattr(gateway, "decode_image", lambda _payload: (b"", 1, 1, object(), None))
+    monkeypatch.setattr(gateway, "gateway_worker_analyze", worker)
 
     result, status = service._analyze(_payload(tasks=["object_detection", "captioning"]))
 
@@ -121,7 +124,7 @@ def test_gateway_resources_aggregate_workers(monkeypatch) -> None:
         return service._resources_for_role(role), None
 
     monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
-    monkeypatch.setattr(service, "_resources_from_worker", resources)
+    monkeypatch.setattr(gateway, "resources_from_worker", resources)
 
     payload = service._resources_payload_for_role(service.ROLE_GATEWAY)
 
@@ -190,11 +193,11 @@ def test_florence2_tokenizer_patch_adds_missing_special_tokens_property() -> Non
 
 
 def test_caption_image_is_square_padded_and_resized_when_needed(monkeypatch) -> None:
-    if service.Image is None:
+    if captioning.Image is None:
         return
 
     monkeypatch.setenv("IMAGE_ANALYSIS_FLORENCE_IMAGE_SIZE", "8")
-    image = service.Image.new("RGB", (4, 2), (255, 255, 255))
+    image = captioning.Image.new("RGB", (4, 2), (255, 255, 255))
 
     result = service._square_caption_image(image)
 
@@ -209,32 +212,6 @@ def test_caption_generation_defaults_are_cpu_friendly(monkeypatch) -> None:
     assert service._caption_image_size() == 512
     assert service._caption_max_tokens({"options": {}}) == 48
     assert service._caption_num_beams() == 1
-
-
-def test_heavy_model_prepare_releases_alternate_model_by_default(monkeypatch) -> None:
-    monkeypatch.delenv("IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED", raising=False)
-    monkeypatch.setattr(service, "_release_torch_memory", lambda: None)
-    monkeypatch.setattr(service, "_OBJECT_DETECTOR", object())
-    monkeypatch.setattr(service, "_CAPTIONER", (object(), object()))
-
-    service._prepare_heavy_model("captioning")
-
-    assert service._OBJECT_DETECTOR is None
-    assert service._CAPTIONER is not None
-
-
-def test_heavy_model_prepare_can_keep_models_loaded(monkeypatch) -> None:
-    monkeypatch.setenv("IMAGE_ANALYSIS_KEEP_HEAVY_MODELS_LOADED", "1")
-    monkeypatch.setattr(service, "_release_torch_memory", lambda: None)
-    object_detector = object()
-    captioner = (object(), object())
-    monkeypatch.setattr(service, "_OBJECT_DETECTOR", object_detector)
-    monkeypatch.setattr(service, "_CAPTIONER", captioner)
-
-    service._prepare_heavy_model("captioning")
-
-    assert service._OBJECT_DETECTOR is object_detector
-    assert service._CAPTIONER is captioner
 
 
 def test_caption_token_embeddings_are_resized_for_processor_tokens() -> None:
@@ -275,7 +252,7 @@ def test_malformed_image_is_rejected_when_decoder_is_available(monkeypatch) -> N
         "data_base64": base64.b64encode(b"not an image").decode("ascii"),
         "mime_type": "image/png",
     }
-    monkeypatch.setattr(service, "Image", BrokenImage)
+    monkeypatch.setattr(payloads, "Image", BrokenImage)
 
     result, status = service._analyze(payload)
 
