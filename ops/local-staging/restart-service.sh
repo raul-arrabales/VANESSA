@@ -6,17 +6,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
 target_service=""
-build_mode=true
+build_mode=auto
 wait_mode=true
 with_deps=false
 timeout_seconds=90
 
 usage() {
   cat <<USAGE
-Usage: $(basename "$0") --service <name> [--no-build] [--with-deps] [--no-wait] [--timeout <seconds>] [--env-file <path>]
+Usage: $(basename "$0") --service <name> [--build|--no-build] [--with-deps] [--no-wait] [--timeout <seconds>] [--env-file <path>]
 
 Rebuilds/restarts a single VANESSA service for faster local iteration.
-Defaults to --build, --no-deps, and waiting for the target service readiness check.
+Defaults to --build for normal services, --no-build for image-analysis services, --no-deps, and waiting for the target service readiness check.
 USAGE
 }
 
@@ -83,6 +83,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--service requires a value"
       target_service="$2"
       shift 2
+      ;;
+    --build)
+      build_mode=true
+      shift
       ;;
     --no-build)
       build_mode=false
@@ -167,6 +171,15 @@ if [[ "${target_service}" == image_analysis_* ]]; then
   image_analysis_enabled_requested || die "${target_service} is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
 fi
 validate_llm_cpu_thread_binding
+
+if [[ "${build_mode}" == "auto" ]]; then
+  if [[ "${target_service}" == image_analysis* ]]; then
+    build_mode=false
+    log_info "Image-analysis restart defaults to --no-build because worker images carry heavy ML dependencies. Pass --build when you need to rebuild them."
+  else
+    build_mode=true
+  fi
+fi
 
 log_info "Validating compose configuration"
 compose config >/dev/null || die "Compose configuration is invalid"

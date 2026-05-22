@@ -57,8 +57,9 @@ Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose op
   - Delegates to Docker Compose with the same CPU/GPU override resolution used by the local-staging scripts.
   - Use for ad hoc commands such as `./ops/local-staging/compose.sh ps` or `./ops/local-staging/compose.sh up -d backend`.
 - `restart-service.sh`
-  - Rebuilds/restarts one service for fast iteration; defaults to `--build --no-deps --wait`.
-  - Flags: `--service <name>`, `--no-build`, `--with-deps`, `--no-wait`, `--timeout <seconds>`, `--env-file <path>`
+  - Rebuilds/restarts one service for fast iteration; defaults to `--build --no-deps --wait` for normal services.
+  - Image-analysis services default to `--no-build` because their worker images carry heavy ML dependencies; pass `--build` when you intentionally need to rebuild them.
+  - Flags: `--service <name>`, `--build`, `--no-build`, `--with-deps`, `--no-wait`, `--timeout <seconds>`, `--env-file <path>`
   - Exit codes: `0` success, `2` readiness timeout
 - `reconcile-local-model-slot.sh`
   - Reads the backend-owned local model slot assignment for local vLLM providers, syncs split-runtime startup defaults into `infra/.env.local`, and optionally restarts `llm_runtime_inference`, `llm_runtime_embeddings`, and `llm`.
@@ -171,6 +172,7 @@ Split local runtime selection:
 - The gateway mounts `models/image_analysis`, exposes local plate recognition, object detection, and captioning through the `image_analysis` platform capability, and delegates to `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the gateway and worker containers.
 - Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
+- Once real worker images are built, restart image analysis with `./ops/local-staging/restart-service.sh --service image_analysis` to avoid reinstalling Torch/RF-DETR/Florence dependencies. Use `--build` only after changing Dockerfiles or image-analysis requirements.
 
 `mcp_gateway` behavior:
 
@@ -405,6 +407,7 @@ Use the targeted restart script when only one service changed:
 - `image_analysis` fails to start:
   - Confirm `IMAGE_ANALYSIS_URL=http://image_analysis:8090` is set.
   - Run `./ops/local-staging/restart-service.sh --service image_analysis`.
+  - If Dockerfile or requirement files changed, run `./ops/local-staging/restart-service.sh --service image_analysis --build --timeout 300`.
   - If a worker fails, restart it directly with `--service image_analysis_anpr`, `--service image_analysis_objects`, or `--service image_analysis_captioning`.
   - Use `IMAGE_ANALYSIS_FAKE_MODE=1` for a lightweight smoke path before downloading full vision model assets.
   - If installing real runtime dependencies, the workers install task-specific dependency sets; RF-DETR requires Transformers 5.x, so rebuild after setting `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1`.
