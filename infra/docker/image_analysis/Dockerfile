@@ -1,12 +1,16 @@
+# syntax=docker/dockerfile:1.7
+
 FROM python:3.11-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
 COPY image_analysis/requirements.txt /tmp/image-analysis-requirements.txt
-RUN pip install --no-cache-dir -r /tmp/image-analysis-requirements.txt
+RUN --mount=type=cache,id=vanessa-image-analysis-pip,target=/root/.cache/pip \
+    pip install -r /tmp/image-analysis-requirements.txt
 
 ENV HF_HOME=/models/image_analysis/huggingface \
     TORCH_HOME=/models/image_analysis/torch \
@@ -43,8 +47,9 @@ FROM runtime-base AS anpr
 
 ARG IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0
 COPY image_analysis/requirements-anpr.txt /tmp/image-analysis-anpr-requirements.txt
-RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
-        pip install --no-cache-dir -r /tmp/image-analysis-anpr-requirements.txt; \
+RUN --mount=type=cache,id=vanessa-image-analysis-pip,target=/root/.cache/pip \
+    if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
+        pip install -r /tmp/image-analysis-anpr-requirements.txt; \
     fi
 
 COPY image_analysis /app/image_analysis
@@ -58,8 +63,9 @@ FROM runtime-base AS objects
 
 ARG IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0
 COPY image_analysis/requirements-objects.txt /tmp/image-analysis-objects-requirements.txt
-RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
-        pip install --no-cache-dir -r /tmp/image-analysis-objects-requirements.txt; \
+RUN --mount=type=cache,id=vanessa-image-analysis-pip,target=/root/.cache/pip \
+    if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
+        pip install -r /tmp/image-analysis-objects-requirements.txt; \
     fi
 
 COPY image_analysis /app/image_analysis
@@ -73,8 +79,9 @@ FROM runtime-base AS captioning
 
 ARG IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0
 COPY image_analysis/requirements-captioning.txt /tmp/image-analysis-captioning-requirements.txt
-RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
-        pip install --no-cache-dir -r /tmp/image-analysis-captioning-requirements.txt; \
+RUN --mount=type=cache,id=vanessa-image-analysis-pip,target=/root/.cache/pip \
+    if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
+        pip install -r /tmp/image-analysis-captioning-requirements.txt; \
     fi
 
 COPY image_analysis /app/image_analysis
@@ -88,8 +95,9 @@ FROM runtime-base AS all
 
 ARG IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0
 COPY image_analysis/requirements-runtime.txt /tmp/image-analysis-runtime-requirements.txt
-RUN if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
-        pip install --no-cache-dir -r /tmp/image-analysis-runtime-requirements.txt; \
+RUN --mount=type=cache,id=vanessa-image-analysis-pip,target=/root/.cache/pip \
+    if [ "${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS}" = "1" ]; then \
+        pip install -r /tmp/image-analysis-runtime-requirements.txt; \
     fi
 
 COPY image_analysis /app/image_analysis

@@ -42,7 +42,7 @@ V1 defaults are local open-source models:
 
 CI and first-boot smoke tests can use `IMAGE_ANALYSIS_FAKE_MODE=1` for deterministic non-model output at the gateway. The image builds with only lightweight dependencies by default. Set `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` and rebuild when you want worker images to install their real task-specific runtime dependencies.
 
-The Dockerfile uses separate build targets for the gateway and each task worker. Worker targets copy only their own requirements file before installing task dependencies, so changing object-detection dependencies does not invalidate the captioning or ANPR dependency cache on later rebuilds.
+The Dockerfile uses separate build targets for the gateway and each task worker. Worker targets copy only their own requirements file before installing task dependencies, so changing object-detection dependencies does not invalidate the captioning or ANPR dependency cache on later rebuilds. Dependency install steps also use a shared BuildKit pip cache mount so large wheels such as Torch can be reused even when a dependency layer has to run again.
 
 When real runtime dependencies are enabled, the Docker image also installs the small set of Debian shared libraries required by RF-DETR/OpenCV-style imports on `python:3.11-slim`.
 

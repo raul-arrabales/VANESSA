@@ -180,6 +180,7 @@ services:
       target: gateway
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: "0"
+    image: vanessa-image-analysis-gateway:local
     container_name: vanessa-image-analysis
     profiles:
       - image_analysis
@@ -216,6 +217,7 @@ services:
       target: anpr
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+    image: vanessa-image-analysis-anpr:local
     container_name: vanessa-image-analysis-anpr
     profiles:
       - image_analysis
@@ -243,6 +245,7 @@ services:
       target: objects
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+    image: vanessa-image-analysis-objects:local
     container_name: vanessa-image-analysis-objects
     profiles:
       - image_analysis
@@ -271,6 +274,7 @@ services:
       target: captioning
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
+    image: vanessa-image-analysis-captioning:local
     container_name: vanessa-image-analysis-captioning
     profiles:
       - image_analysis
