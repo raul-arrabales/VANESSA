@@ -177,9 +177,9 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
+      target: gateway
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: "0"
-        IMAGE_ANALYSIS_RUNTIME_KIND: gateway
     container_name: vanessa-image-analysis
     profiles:
       - image_analysis
@@ -213,9 +213,9 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
+      target: anpr
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
-        IMAGE_ANALYSIS_RUNTIME_KIND: anpr
     container_name: vanessa-image-analysis-anpr
     profiles:
       - image_analysis
@@ -240,9 +240,9 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
+      target: objects
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
-        IMAGE_ANALYSIS_RUNTIME_KIND: objects
     container_name: vanessa-image-analysis-objects
     profiles:
       - image_analysis
@@ -268,9 +268,9 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/image_analysis/Dockerfile
+      target: captioning
       args:
         IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS: ${IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS:-0}
-        IMAGE_ANALYSIS_RUNTIME_KIND: captioning
     container_name: vanessa-image-analysis-captioning
     profiles:
       - image_analysis

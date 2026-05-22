@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-22T15:17:31+00:00",
+  "generated_at": "2026-05-22T17:28:25+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -511,5 +511,5 @@
       }
     }
   },
-  "source_hash": "47e95e2209e06bb595e733d67d198c0bf32c7113e768752619426d02112f7f94"
+  "source_hash": "44fe9aa7187a4d3be9e48c0c25c694043808cf2f547f1d9b12172c3007b34a07"
 }
