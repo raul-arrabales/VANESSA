@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-22T18:12:28+00:00",
+  "generated_at": "2026-05-23T10:56:49+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -97,7 +97,7 @@
       "container": "image_analysis",
       "label": "Image Analysis",
       "group": "runtime",
-      "description": "Optional local image understanding gateway for plate recognition, object detection, and captioning.",
+      "description": "Optional local image understanding gateway for selected plate recognition, object detection, and captioning workers.",
       "public_exposed": true,
       "criticality": "medium"
     },
@@ -511,5 +511,5 @@
       }
     }
   },
-  "source_hash": "27151c99608f0d1c3b2fa63d28dd7e646d0662250a43e1fd3f02447bac51659a"
+  "source_hash": "1f682ce99d9e7c13e36fa1a4b8b63be9ed6470436d9fd0046638e1319908ec28"
 }

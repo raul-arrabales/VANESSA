@@ -111,6 +111,7 @@ Supported launcher variables:
 - `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
 - `IMAGE_ANALYSIS_URL` (blank by default; set to `http://image_analysis:8090` to enable the optional `image_analysis` compose profile and backend bootstrap binding)
 - `IMAGE_ANALYSIS_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
+- `IMAGE_ANALYSIS_WORKERS` (default: `anpr,objects,captioning`; set comma-separated worker roles or `none` to start only the gateway)
 - `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real task-specific vision model dependencies in the private workers)
 - `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS` (default: `300`; increase for first-run Florence/RF-DETR model downloads on slow machines)
 - `IMAGE_ANALYSIS_ANPR_URL`, `IMAGE_ANALYSIS_OBJECTS_URL`, `IMAGE_ANALYSIS_CAPTIONING_URL` (default to the private Compose worker service URLs)
@@ -169,8 +170,10 @@ Split local runtime selection:
 
 - The optional `image_analysis` gateway and private worker services are enabled only when `IMAGE_ANALYSIS_URL` is non-empty.
 - Local-staging scripts automatically add the `image_analysis` compose profile when enabled.
-- The gateway mounts `models/image_analysis`, exposes local plate recognition, object detection, and captioning through the `image_analysis` platform capability, and delegates to `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
-- `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the gateway and worker containers.
+- `IMAGE_ANALYSIS_WORKERS` chooses which private workers are launched. Valid values are comma-separated `anpr`, `objects`, and `captioning`, or `none` to start only the gateway.
+- The gateway mounts `models/image_analysis`, exposes the selected local plate recognition, object detection, and captioning resources through the `image_analysis` platform capability, and delegates to the enabled worker containers.
+- `health.sh` validates readiness using `GET /health` inside the gateway and enabled worker containers, and reports unselected workers as skipped.
+- `restart-service.sh --service image_analysis` restarts the gateway plus the selected workers. Restarting a disabled worker directly fails with a message telling you which `IMAGE_ANALYSIS_WORKERS` role to add.
 - Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 - Once real worker images are built, restart image analysis with `./ops/local-staging/restart-service.sh --service image_analysis` to avoid reinstalling Torch/RF-DETR/Florence dependencies. Use `--build` only after changing Dockerfiles or image-analysis requirements.
 

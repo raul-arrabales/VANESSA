@@ -954,7 +954,55 @@ def test_image_analysis_runtime_client_requires_task_defaults() -> None:
     assert isinstance(image_binding, dict)
     image_binding["resource_policy"] = {"selection_mode": "task_defaults", "task_defaults": {}}
 
+    client = runtime_client.build_image_analysis_runtime_client(runtime)
+
     with pytest.raises(runtime_client.ImageAnalysisRuntimeClientError) as exc_info:
-        runtime_client.build_image_analysis_runtime_client(runtime)
+        client.analyze(
+            payload={
+                "image": {"data_base64": "abc", "mime_type": "image/png"},
+                "tasks": ["object_detection"],
+            }
+        )
 
     assert exc_info.value.code == "missing_image_analysis_task_defaults"
+    assert exc_info.value.details == {
+        "missing_task_defaults": ["object_detector"],
+        "tasks": ["object_detection"],
+    }
+
+
+def test_image_analysis_runtime_client_allows_caption_only_task_defaults(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del method, headers, timeout_seconds
+        assert url == "http://image_analysis:8090/v1/analyze"
+        seen_payloads.append(dict(payload or {}))
+        return {"image": {"width": 1, "height": 1}, "caption": {"text": "A tiny image."}}, 200
+
+    runtime = _platform_runtime(include_image_analysis_runtime=True)
+    image_binding = runtime["capabilities"]["image_analysis"]
+    assert isinstance(image_binding, dict)
+    image_binding["resources"] = [
+        {"id": "captioner", "metadata": {"task_key": "image_captioning"}},
+    ]
+    image_binding["resource_policy"] = {
+        "selection_mode": "task_defaults",
+        "task_defaults": {"captioner": "captioner"},
+    }
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_image_analysis_runtime_client(runtime)
+
+    payload = client.analyze(
+        payload={
+            "image": {"data_base64": "abc", "mime_type": "image/png"},
+            "tasks": ["captioning"],
+        }
+    )
+
+    assert payload["status_code"] == 200
+    assert seen_payloads[0]["runtime"] == {
+        "resources": [{"id": "captioner", "metadata": {"task_key": "image_captioning"}}],
+        "task_defaults": {"captioner": "captioner"},
+    }

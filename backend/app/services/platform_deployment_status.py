@@ -13,6 +13,7 @@ from .platform_types import (
     CAPABILITY_VECTOR_STORE,
     REQUIRED_CAPABILITIES,
 )
+from .platform_service_types import _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS, _IMAGE_ANALYSIS_TASK_GROUPS
 
 
 def _describe_capability(capability_key: str) -> str:
@@ -72,26 +73,35 @@ def _binding_configuration_status(
                 )
     elif capability_key == CAPABILITY_IMAGE_ANALYSIS:
         if not resources:
-            issues.append(_issue("resources_missing", "Image analysis requires detector, OCR, object detection, and captioning model resources."))
+            issues.append(_issue("resources_missing", "Image analysis requires at least one complete task resource group."))
         resource_policy = dict(binding.get("resource_policy") or {})
         task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
         task_key_by_resource_id = {
             str(resource.get("id") or "").strip(): str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
             for resource in resources
         }
-        required_defaults = {
-            "plate_detector": "image_plate_detection",
-            "plate_ocr": "image_plate_ocr",
-            "object_detector": "object_detection",
-            "captioner": "image_captioning",
-        }
-        for default_key, expected_task_key in required_defaults.items():
-            resource_id = str(task_defaults.get(default_key) or "").strip()
-            if not resource_id:
-                issues.append(_issue("task_default_missing", f"Select an image analysis default for {default_key}."))
+        selected_task_keys = set(task_key_by_resource_id.values())
+        complete_groups: list[str] = []
+        for group_name, default_keys in _IMAGE_ANALYSIS_TASK_GROUPS.items():
+            group_task_keys = {_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS[default_key] for default_key in default_keys}
+            group_requested = bool(group_task_keys & selected_task_keys) or any(str(task_defaults.get(default_key) or "").strip() for default_key in default_keys)
+            if not group_requested:
                 continue
-            if task_key_by_resource_id.get(resource_id) != expected_task_key:
-                issues.append(_issue("task_default_invalid", f"Image analysis default {default_key} must reference a {expected_task_key} model."))
+            group_valid = True
+            for default_key in default_keys:
+                expected_task_key = _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS[default_key]
+                resource_id = str(task_defaults.get(default_key) or "").strip()
+                if not resource_id:
+                    issues.append(_issue("task_default_missing", f"Select an image analysis default for {default_key}."))
+                    group_valid = False
+                    continue
+                if task_key_by_resource_id.get(resource_id) != expected_task_key:
+                    issues.append(_issue("task_default_invalid", f"Image analysis default {default_key} must reference a {expected_task_key} model."))
+                    group_valid = False
+            if group_valid:
+                complete_groups.append(group_name)
+        if resources and not complete_groups:
+            issues.append(_issue("task_default_missing", "Select at least one complete image analysis task resource group."))
         provider_origin = str(binding.get("provider_origin") or "local").strip().lower()
         for resource in resources:
             metadata = dict(resource.get("metadata") or {})

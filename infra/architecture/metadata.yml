@@ -89,7 +89,7 @@ services:
   image_analysis:
     label: Image Analysis
     group: runtime
-    description: Optional local image understanding gateway for plate recognition, object detection, and captioning.
+    description: Optional local image understanding gateway for selected plate recognition, object detection, and captioning workers.
     public_exposed: true
     criticality: medium
   image_analysis_anpr:

@@ -71,7 +71,7 @@ ModelOps is the managed-model domain layered on top of the GenAI control plane.
 - It owns model catalog records, lifecycle, validation, sharing, and usage.
 - It does not replace capability/provider/deployment selection in `/control/platform`.
 - A model must be active, validation-current, visible to the caller, and runtime-compatible before it is invokable or eligible for deployment binding as a managed-model resource.
-- `image_analysis` uses ModelOps task keys `image_plate_detection`, `image_plate_ocr`, `object_detection`, and `image_captioning`; deployment bindings select per-task defaults instead of one global default model.
+- `image_analysis` uses ModelOps task keys `image_plate_detection`, `image_plate_ocr`, `object_detection`, and `image_captioning`; deployment bindings select task-group defaults instead of one global default model. ANPR requires both plate detection and OCR defaults, while object detection and captioning can be bound independently.
 
 See [ModelOps service documentation](services/modelops.md) for the domain model, lifecycle rules, and canonical APIs.
 
@@ -92,7 +92,7 @@ Current provider proof state:
 - When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
 - `local-default` also binds `sandbox_execution -> sandbox_local` and `mcp_runtime -> mcp_gateway_local`.
-- When `IMAGE_ANALYSIS_URL` is configured, backend seeds `image_analysis -> image_analysis_local` and binds it into local deployment profiles. The optional Compose profile runs an `image_analysis` gateway plus private ANPR, object-detection, and captioning workers, all sharing `models/image_analysis` for local vision assets.
+- When `IMAGE_ANALYSIS_URL` is configured, backend seeds `image_analysis -> image_analysis_local` and binds provider-advertised image-analysis resources into local deployment profiles. The optional Compose profile runs an `image_analysis` gateway plus the private workers selected by `IMAGE_ANALYSIS_WORKERS`, all sharing `models/image_analysis` for local vision assets.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; OpenAI-compatible cloud provider instances hold endpoint/auth config, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings choose explicit managed-model resources.
 - Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - Online runtime cloud/external calls publish sanitized cloud-traffic events through backend. The app shell uses the authenticated SSE stream to light upload/download indicators, and backend can persist the same metadata to a local JSONL log without recording prompts, payloads, headers, credentials, response bodies, or full URLs.

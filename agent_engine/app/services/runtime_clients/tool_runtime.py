@@ -8,6 +8,12 @@ from .resolution import binding_timeout_seconds
 from .transport import JsonRequestFn, request_json_or_raise
 from ..cloud_traffic import report_cloud_traffic_for_binding
 
+_IMAGE_ANALYSIS_DEFAULTS_BY_TASK = {
+    "license_plate_recognition": ("plate_detector", "plate_ocr"),
+    "object_detection": ("object_detector",),
+    "captioning": ("captioner",),
+}
+
 
 def tool_unavailable_code(status_code: int) -> str:
     return "tool_runtime_timeout" if status_code == 504 else "tool_runtime_unreachable"
@@ -190,18 +196,27 @@ class HttpImageAnalysisRuntimeClient(ImageAnalysisRuntimeClient):
         self.request_json = request_json
 
     def analyze(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+        resource_policy = self.image_binding.get("resource_policy") if isinstance(self.image_binding.get("resource_policy"), dict) else {}
+        task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+        tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+        missing_defaults = [
+            default_key
+            for task in [str(item).strip().lower() for item in tasks if str(item).strip()]
+            for default_key in _IMAGE_ANALYSIS_DEFAULTS_BY_TASK.get(task, ())
+            if not str(task_defaults.get(default_key) or "").strip()
+        ]
+        if missing_defaults:
+            raise ImageAnalysisRuntimeClientError(
+                code="missing_image_analysis_task_defaults",
+                message="platform_runtime image_analysis binding is missing task defaults for requested tasks",
+                status_code=409,
+                details={"missing_task_defaults": sorted(set(missing_defaults)), "tasks": tasks},
+            )
         analysis_payload = {
             **payload,
             "runtime": {
                 "resources": list(self.image_binding.get("resources") or []),
-                "task_defaults": dict(
-                    (
-                        self.image_binding.get("resource_policy")
-                        if isinstance(self.image_binding.get("resource_policy"), dict)
-                        else {}
-                    ).get("task_defaults")
-                    or {}
-                ),
+                "task_defaults": dict(task_defaults),
             },
         }
         response_payload, status_code = request_json_or_raise(

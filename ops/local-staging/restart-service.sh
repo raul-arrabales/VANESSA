@@ -169,6 +169,14 @@ if [[ "${target_service}" == "image_analysis" ]]; then
 fi
 if [[ "${target_service}" == image_analysis_* ]]; then
   image_analysis_enabled_requested || die "${target_service} is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
+  validate_image_analysis_worker_selection
+  worker_role="$(image_analysis_worker_role_for_service "${target_service}")"
+  if ! image_analysis_worker_enabled "${worker_role}"; then
+    die "${target_service} is disabled by IMAGE_ANALYSIS_WORKERS=${IMAGE_ANALYSIS_WORKERS:-anpr,objects,captioning}. Add '${worker_role}' to IMAGE_ANALYSIS_WORKERS to start it."
+  fi
+fi
+if image_analysis_enabled_requested; then
+  validate_image_analysis_worker_selection
 fi
 validate_llm_cpu_thread_binding
 
@@ -192,8 +200,13 @@ if [[ "${with_deps}" == false ]]; then
   compose_args+=(--no-deps)
 fi
 
+compose_targets=("${target_service}")
+if [[ "${target_service}" == "image_analysis" ]]; then
+  mapfile -t compose_targets < <(image_analysis_selected_services)
+fi
+
 log_info "Restarting service '${target_service}'"
-if ! compose up "${compose_args[@]}" "${target_service}"; then
+if ! compose up "${compose_args[@]}" "${compose_targets[@]}"; then
   if [[ ( "${target_service}" == "llm_runtime_inference" || "${target_service}" == "llm_runtime_embeddings" ) && "${resolved_accelerator}" == "cpu" ]]; then
     log_warn "CPU vLLM builds require the PyTorch CPU wheel index. Current LLM_RUNTIME_CPU_TORCH_INDEX_URL=${LLM_RUNTIME_CPU_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
     log_warn "CPU ${target_service} failed with accelerator=${resolved_accelerator}, variant=${resolved_cpu_variant}, bind=${VLLM_CPU_OMP_THREADS_BIND_DEFAULT}. Try bind fallback order: 0-7, auto, nobind."

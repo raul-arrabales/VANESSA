@@ -83,6 +83,11 @@ _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS = {
     "object_detector": _TASK_KEY_OBJECT_DETECTION,
     "captioner": _TASK_KEY_IMAGE_CAPTIONING,
 }
+_IMAGE_ANALYSIS_TASK_GROUPS = {
+    "license_plate_recognition": ("plate_detector", "plate_ocr"),
+    "object_detection": ("object_detector",),
+    "captioning": ("captioner",),
+}
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
 _MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS}
 _VECTOR_SELECTION_EXPLICIT = "explicit"

@@ -1274,6 +1274,51 @@ def test_image_analysis_binding_resources_use_task_defaults(monkeypatch: pytest.
     }
 
 
+def test_image_analysis_binding_accepts_partial_task_groups(monkeypatch: pytest.MonkeyPatch):
+    bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
+    model_rows = {
+        "captioner": {"model_id": "captioner", "name": "Captioner", "provider_model_id": "captioner", "backend_kind": "local", "task_key": "image_captioning", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+    }
+    monkeypatch.setattr(bindings_module, "get_model_by_id", lambda _db, model_id: model_rows.get(model_id))
+
+    result = bindings_module._validate_binding_resources(
+        "ignored",
+        provider_row={"provider_origin": "local", "capability_key": "image_analysis"},
+        capability_key="image_analysis",
+        resources=[
+            {"id": "captioner", "resource_kind": "model", "ref_type": "managed_model", "managed_model_id": "captioner"},
+        ],
+        default_resource_id=None,
+        resource_policy={"selection_mode": "task_defaults", "task_defaults": {"captioner": "captioner"}},
+    )
+
+    assert result["default_resource_id"] is None
+    assert result["resources"][0]["metadata"]["task_key"] == "image_captioning"
+
+
+def test_image_analysis_binding_rejects_incomplete_anpr_task_group(monkeypatch: pytest.MonkeyPatch):
+    bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
+    model_rows = {
+        "plate-detector": {"model_id": "plate-detector", "name": "Plate detector", "provider_model_id": "plate-detector", "backend_kind": "local", "task_key": "image_plate_detection", "lifecycle_state": "active", "is_validation_current": True, "last_validation_status": "success"},
+    }
+    monkeypatch.setattr(bindings_module, "get_model_by_id", lambda _db, model_id: model_rows.get(model_id))
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        bindings_module._validate_binding_resources(
+            "ignored",
+            provider_row={"provider_origin": "local", "capability_key": "image_analysis"},
+            capability_key="image_analysis",
+            resources=[
+                {"id": "plate-detector", "resource_kind": "model", "ref_type": "managed_model", "managed_model_id": "plate-detector"},
+            ],
+            default_resource_id=None,
+            resource_policy={"selection_mode": "task_defaults", "task_defaults": {"plate_detector": "plate-detector"}},
+        )
+
+    assert exc_info.value.code == "invalid_task_defaults"
+    assert exc_info.value.details["missing_task_defaults"] == ["plate_ocr"]
+
+
 def test_image_analysis_binding_rejects_global_default(monkeypatch: pytest.MonkeyPatch):
     bindings_module = platform_service._platform_bindings_module  # type: ignore[attr-defined]
     monkeypatch.setattr(bindings_module, "get_model_by_id", lambda *_args, **_kwargs: None)
@@ -2896,6 +2941,75 @@ def test_image_analysis_bootstrap_registers_provider_resources(monkeypatch: pyte
         "florence-community/Florence-2-base-ft",
     ]
     assert {resource["ref_type"] for resource in resources} == {"managed_model"}
+
+
+def test_image_analysis_bootstrap_registers_partial_provider_resources(monkeypatch: pytest.MonkeyPatch):
+    requests: list[str] = []
+    models: dict[str, dict[str, object]] = {}
+
+    provider_row = {
+        "id": "provider-image",
+        "endpoint_url": "http://image_analysis:8090",
+        "config_json": {"resources_path": "/v1/resources"},
+    }
+
+    def _http_json_request(url: str, **kwargs):
+        del kwargs
+        requests.append(url)
+        return {
+            "resources": [
+                {
+                    "id": "florence-community/Florence-2-base-ft",
+                    "display_name": "Image captioner",
+                    "provider_resource_id": "florence-community/Florence-2-base-ft",
+                    "metadata": {"task_key": "image_captioning", "engine": "florence-2"},
+                },
+            ]
+        }, 200
+
+    def _get_model(_database_url: str, model_id: str):
+        return models.get(model_id)
+
+    def _upsert_model_record(_database_url: str, **kwargs):
+        row = {
+            "model_id": kwargs["model_id"],
+            "name": kwargs["name"],
+            "provider_model_id": kwargs["provider_model_id"],
+            "backend_kind": kwargs["backend_kind"],
+            "task_key": kwargs["task_key"],
+            "lifecycle_state": "draft",
+            "is_validation_current": False,
+            "last_validation_status": None,
+            "current_config_fingerprint": kwargs["config_fingerprint"],
+        }
+        models[str(kwargs["model_id"])] = row
+        return row
+
+    def _append_validation(_database_url: str, **kwargs):
+        model_id = str(kwargs["model_id"])
+        models[model_id]["is_validation_current"] = True
+        models[model_id]["last_validation_status"] = "success"
+        return {"result": "success"}
+
+    def _activate_model(_database_url: str, *, model_id: str):
+        models[model_id]["lifecycle_state"] = "active"
+        return models[model_id]
+
+    monkeypatch.setattr(platform_bootstrap, "http_json_request", _http_json_request)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "get_model", _get_model)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "upsert_model_record", _upsert_model_record)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "append_validation", _append_validation)
+    monkeypatch.setattr(platform_bootstrap.modelops_repo, "activate_model", _activate_model)
+
+    resources, task_defaults = platform_bootstrap._ensure_image_analysis_modelops_resources(  # type: ignore[attr-defined]
+        "ignored",
+        config=SimpleNamespace(modelops_node_id="local-node"),
+        provider_row=provider_row,
+    )
+
+    assert requests == ["http://image_analysis:8090/v1/resources"]
+    assert task_defaults == {"captioner": "image-analysis-captioner"}
+    assert [resource["provider_resource_id"] for resource in resources] == ["florence-community/Florence-2-base-ft"]
 
 
 def test_ensure_platform_bootstrap_state_uses_image_analysis_timeout(monkeypatch: pytest.MonkeyPatch):

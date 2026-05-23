@@ -171,7 +171,17 @@ def _ensure_image_analysis_modelops_resources(
         bound_resources.append(_build_model_binding_resource(active_row, provider_resource_id=provider_resource_id))
         task_defaults[default_key] = model_id
 
-    if set(task_defaults) != set(_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS):
+    plate_defaults = {"plate_detector", "plate_ocr"}
+    if bool(plate_defaults & set(task_defaults)) and not plate_defaults <= set(task_defaults):
+        bound_resources = [
+            resource
+            for resource in bound_resources
+            if str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+            not in {_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS["plate_detector"], _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS["plate_ocr"]}
+        ]
+        for default_key in plate_defaults:
+            task_defaults.pop(default_key, None)
+    if not task_defaults:
         return [], {}
     return bound_resources, task_defaults
 
@@ -604,7 +614,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
-        if image_analysis_provider is not None:
+        if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if qdrant_provider is not None:
@@ -617,7 +627,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
         if mcp_gateway_provider is not None:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
-        if image_analysis_provider is not None:
+        if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
     if platform_repo.get_active_deployment(database_url) is None:

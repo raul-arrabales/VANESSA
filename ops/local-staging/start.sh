@@ -68,6 +68,9 @@ validate_all_llm_local_model_paths
 if llama_cpp_enabled_requested; then
   validate_llama_cpp_model_path
 fi
+if image_analysis_enabled_requested; then
+  validate_image_analysis_worker_selection
+fi
 validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"

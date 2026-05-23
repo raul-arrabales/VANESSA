@@ -103,6 +103,17 @@ def test_gateway_routes_requested_tasks_and_aggregates_worker_results(monkeypatc
     assert "warnings" not in result
 
 
+def test_gateway_rejects_disabled_worker_task(monkeypatch) -> None:
+    monkeypatch.setenv("IMAGE_ANALYSIS_WORKERS", "captioning")
+    monkeypatch.setenv("IMAGE_ANALYSIS_FAKE_MODE", "1")
+
+    result, status = gateway.analyze(_payload(tasks=["object_detection"]))
+
+    assert status == 409
+    assert result["error"] == "image_analysis_task_disabled"
+    assert result["tasks"] == ["object_detection"]
+
+
 def test_gateway_worker_failure_preserves_other_task_results(monkeypatch) -> None:
     def worker(role: str, payload: dict[str, object], tasks: list[str]):
         if role == ROLE_OBJECTS:
@@ -134,6 +145,35 @@ def test_gateway_resources_aggregate_workers(monkeypatch) -> None:
     task_keys = {resource["metadata"]["task_key"] for resource in payload["resources"]}
     assert task_keys == {"image_plate_detection", "image_plate_ocr", "object_detection", "image_captioning"}
     assert "warnings" not in payload
+
+
+def test_gateway_resources_only_include_enabled_workers(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def resources(role: str):
+        calls.append(role)
+        return image_resources.resources_for_role(role), None
+
+    monkeypatch.setenv("IMAGE_ANALYSIS_WORKERS", "captioning")
+    monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
+    monkeypatch.setattr(gateway, "resources_from_worker", resources)
+
+    payload = gateway.resources_payload_for_role(ROLE_GATEWAY)
+
+    assert calls == [ROLE_CAPTIONING]
+    assert {resource["metadata"]["task_key"] for resource in payload["resources"]} == {"image_captioning"}
+
+
+def test_gateway_health_only_reports_enabled_workers(monkeypatch) -> None:
+    monkeypatch.setenv("IMAGE_ANALYSIS_WORKERS", "anpr")
+    monkeypatch.delenv("IMAGE_ANALYSIS_FAKE_MODE", raising=False)
+    monkeypatch.setattr(gateway, "worker_health", lambda role: {"reachable": True, "role": role})
+
+    payload = gateway.health_for_role(ROLE_GATEWAY)
+
+    assert payload["enabled_workers"] == [ROLE_ANPR]
+    assert payload["enabled_tasks"] == ["license_plate_recognition"]
+    assert set(payload["workers"]) == {ROLE_ANPR}
 
 
 def test_worker_rejects_unsupported_task() -> None:

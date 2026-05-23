@@ -6,9 +6,53 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from .constants import ROLE_ANPR, ROLE_CAPTIONING, ROLE_GATEWAY, ROLE_OBJECTS, ROLE_TASKS, SERVICE_VERSION, TASK_ROLE
+from .constants import (
+    DEFAULT_IMAGE_ANALYSIS_WORKERS,
+    ROLE_ANPR,
+    ROLE_CAPTIONING,
+    ROLE_GATEWAY,
+    ROLE_OBJECTS,
+    ROLE_TASKS,
+    SERVICE_VERSION,
+    TASK_ROLE,
+    WORKER_ROLES,
+)
 from .payloads import decode_image, empty_response, fake_analyze, fake_mode, normalize_tasks
-from .resources import resources_for_role
+from .resources import resources_for_role, resources_for_roles
+
+
+def enabled_worker_roles() -> tuple[str, ...]:
+    raw = os.getenv("IMAGE_ANALYSIS_WORKERS", DEFAULT_IMAGE_ANALYSIS_WORKERS).strip().lower()
+    if not raw:
+        raw = DEFAULT_IMAGE_ANALYSIS_WORKERS
+    if raw == "none":
+        return ()
+    roles: list[str] = []
+    for item in raw.split(","):
+        role = item.strip().lower()
+        if role and role in WORKER_ROLES and role not in roles:
+            roles.append(role)
+    return tuple(roles)
+
+
+def enabled_tasks() -> set[str]:
+    tasks: set[str] = set()
+    for role in enabled_worker_roles():
+        tasks.update(ROLE_TASKS.get(role, set()))
+    return tasks
+
+
+def disabled_task_error(tasks: list[str]) -> dict[str, Any] | None:
+    disabled_tasks = sorted(set(tasks) - enabled_tasks())
+    if not disabled_tasks:
+        return None
+    disabled_roles = sorted({TASK_ROLE.get(task, "") for task in disabled_tasks if TASK_ROLE.get(task)})
+    return {
+        "error": "image_analysis_task_disabled",
+        "message": "Requested image-analysis task is not enabled for this provider",
+        "tasks": disabled_tasks,
+        "workers": disabled_roles,
+    }
 
 
 def worker_url(role: str) -> str:
@@ -143,6 +187,9 @@ def analyze(payload: dict[str, Any]) -> tuple[dict[str, Any], int]:
     tasks, error = normalize_tasks(payload)
     if error:
         return error, 400
+    disabled_error = disabled_task_error(tasks)
+    if disabled_error:
+        return disabled_error, 409
 
     if fake_mode():
         return fake_analyze(payload, tasks, width, height)
@@ -193,11 +240,13 @@ def health_for_role(role: str) -> dict[str, Any]:
         "version": SERVICE_VERSION,
         "fake_mode": fake_mode(),
     }
+    if role == ROLE_GATEWAY:
+        payload["enabled_workers"] = list(enabled_worker_roles())
+        payload["enabled_tasks"] = sorted(enabled_tasks())
     if role == ROLE_GATEWAY and not fake_mode():
         payload["workers"] = {
-            ROLE_ANPR: worker_health(ROLE_ANPR),
-            ROLE_OBJECTS: worker_health(ROLE_OBJECTS),
-            ROLE_CAPTIONING: worker_health(ROLE_CAPTIONING),
+            worker_role: worker_health(worker_role)
+            for worker_role in enabled_worker_roles()
         }
     if role != ROLE_GATEWAY:
         payload["tasks"] = sorted(ROLE_TASKS.get(role, set()))
@@ -218,11 +267,13 @@ def resources_from_worker(role: str) -> tuple[list[dict[str, Any]], dict[str, An
 
 
 def resources_payload_for_role(role: str) -> dict[str, Any]:
-    if role != ROLE_GATEWAY or fake_mode():
+    if role != ROLE_GATEWAY:
         return {"resources": resources_for_role(role)}
+    if fake_mode():
+        return {"resources": resources_for_roles(enabled_worker_roles())}
     resources: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
-    for worker_role in (ROLE_ANPR, ROLE_OBJECTS, ROLE_CAPTIONING):
+    for worker_role in enabled_worker_roles():
         worker_resources, warning = resources_from_worker(worker_role)
         resources.extend(worker_resources)
         if warning:

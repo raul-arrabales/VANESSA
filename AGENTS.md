@@ -108,7 +108,7 @@ Current runtime ownership:
 For model-bearing capabilities:
 
 - `llm_inference` and `embeddings` bindings use managed-model `resources` plus `default_resource_id`.
-- `image_analysis` bindings use managed-model `resources` plus `resource_policy.selection_mode="task_defaults"` and task defaults for `plate_detector`, `plate_ocr`, `object_detector`, and `captioner`; they do not use a global `default_resource_id`.
+- `image_analysis` bindings use managed-model `resources` plus `resource_policy.selection_mode="task_defaults"`; they do not use a global `default_resource_id`. Bindings may include any complete task group: ANPR requires `plate_detector` and `plate_ocr`, object detection requires `object_detector`, and captioning requires `captioner`.
 - Requested models must belong to the active binding.
 - If no model is requested, the binding default is used.
 - In `offline` runtime profile, any provider with `provider_origin="cloud"` must be blocked before validation, activation, runtime resolution, adapter creation, or provider invocation.
@@ -167,7 +167,7 @@ Respect these runtime boundaries when generating code or configuration.
 11. **Image Analysis (`image_analysis`)**
    - Optional local HTTP provider gateway for image understanding.
    - Supports license plate recognition, generic object detection, and image captioning.
-   - In Docker, delegates model execution to private task workers: `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
+   - In Docker, delegates model execution to private task workers selected at launch with `IMAGE_ANALYSIS_WORKERS`: `image_analysis_anpr`, `image_analysis_objects`, and `image_analysis_captioning`.
    - Must be accessed through backend/agent runtime adapters and active `image_analysis` bindings; frontend must not call it directly.
    - Image payload bytes must not be logged, stored, or included in telemetry.
 

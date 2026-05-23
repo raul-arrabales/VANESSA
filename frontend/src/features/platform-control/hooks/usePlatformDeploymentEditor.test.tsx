@@ -442,4 +442,175 @@ describe("usePlatformDeploymentEditor", () => {
       }),
     );
   });
+
+  it("allows image-analysis bindings with only a complete captioning task group", () => {
+    const imageModels: ManagedModel[] = [
+      {
+        ...llmModelsFixture[0],
+        id: "captioner",
+        name: "Captioner",
+        backend: "local",
+        hosting: "local",
+        task_key: "image_captioning",
+      },
+    ];
+    const capabilitiesWithImage = [
+      ...capabilitiesFixture,
+      {
+        capability: "image_analysis",
+        display_name: "Image analysis",
+        description: "Image capability",
+        required: false,
+        active_provider: null,
+      },
+    ];
+    const providersWithImage = [
+      ...cloudModelProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-image",
+        slug: "image-analysis-local",
+        provider_key: "image_analysis_local",
+        capability: "image_analysis",
+        adapter_kind: "image_analysis_http",
+        provider_origin: "local" as const,
+        display_name: "Image analysis local",
+      },
+    ];
+    const formToValidate: DeploymentFormState = {
+      slug: "vision-profile",
+      displayName: "Vision Profile",
+      description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store", "image_analysis"],
+      providerIdsByCapability: {
+        llm_inference: "provider-1",
+        embeddings: "provider-embeddings",
+        vector_store: "provider-2",
+        image_analysis: "provider-image",
+      },
+      resourceIdsByCapability: {
+        llm_inference: ["gpt-5"],
+        embeddings: ["text-embedding-3-small"],
+        vector_store: ["kb_primary"],
+        image_analysis: ["captioner"],
+      },
+      defaultResourceIdsByCapability: {
+        llm_inference: "gpt-5",
+        embeddings: "text-embedding-3-small",
+      },
+      resourcePolicyByCapability: {
+        vector_store: { selection_mode: "explicit" },
+      },
+    };
+
+    render(
+      <HookHarness
+        mode="create"
+        capabilities={capabilitiesWithImage}
+        providers={providersWithImage}
+        formToValidate={formToValidate}
+        eligibleModelsByCapability={{
+          llm_inference: llmModelsFixture,
+          embeddings: embeddingsModelsFixture,
+          image_analysis: imageModels,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent("");
+    const mutationInput = JSON.parse(screen.getByTestId("mutation-input").textContent ?? "null") as {
+      bindings: Array<Record<string, unknown>>;
+    };
+    const imageBinding = mutationInput.bindings.find((binding) => binding.capability === "image_analysis");
+    expect(imageBinding).toEqual(
+      expect.objectContaining({
+        default_resource_id: null,
+        resource_policy: {
+          selection_mode: "task_defaults",
+          task_defaults: {
+            captioner: "captioner",
+          },
+        },
+      }),
+    );
+  });
+
+  it("rejects incomplete image-analysis ANPR task groups", () => {
+    const imageModels: ManagedModel[] = [
+      {
+        ...llmModelsFixture[0],
+        id: "plate-detector",
+        name: "Plate detector",
+        backend: "local",
+        hosting: "local",
+        task_key: "image_plate_detection",
+      },
+    ];
+    const capabilitiesWithImage = [
+      ...capabilitiesFixture,
+      {
+        capability: "image_analysis",
+        display_name: "Image analysis",
+        description: "Image capability",
+        required: false,
+        active_provider: null,
+      },
+    ];
+    const providersWithImage = [
+      ...cloudModelProviders(),
+      {
+        ...providersFixture[0],
+        id: "provider-image",
+        slug: "image-analysis-local",
+        provider_key: "image_analysis_local",
+        capability: "image_analysis",
+        adapter_kind: "image_analysis_http",
+        provider_origin: "local" as const,
+        display_name: "Image analysis local",
+      },
+    ];
+    const formToValidate: DeploymentFormState = {
+      slug: "vision-profile",
+      displayName: "Vision Profile",
+      description: "",
+      capabilityKeys: ["llm_inference", "embeddings", "vector_store", "image_analysis"],
+      providerIdsByCapability: {
+        llm_inference: "provider-1",
+        embeddings: "provider-embeddings",
+        vector_store: "provider-2",
+        image_analysis: "provider-image",
+      },
+      resourceIdsByCapability: {
+        llm_inference: ["gpt-5"],
+        embeddings: ["text-embedding-3-small"],
+        vector_store: ["kb_primary"],
+        image_analysis: ["plate-detector"],
+      },
+      defaultResourceIdsByCapability: {
+        llm_inference: "gpt-5",
+        embeddings: "text-embedding-3-small",
+      },
+      resourcePolicyByCapability: {
+        vector_store: { selection_mode: "explicit" },
+      },
+    };
+
+    render(
+      <HookHarness
+        mode="create"
+        capabilities={capabilitiesWithImage}
+        providers={providersWithImage}
+        formToValidate={formToValidate}
+        eligibleModelsByCapability={{
+          llm_inference: llmModelsFixture,
+          embeddings: embeddingsModelsFixture,
+          image_analysis: imageModels,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent(
+      "Image analysis requires at least one complete task resource group.",
+    );
+  });
 });

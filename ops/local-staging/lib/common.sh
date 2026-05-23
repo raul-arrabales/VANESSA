@@ -286,6 +286,101 @@ image_analysis_enabled_requested() {
   [[ -n "${IMAGE_ANALYSIS_URL:-}" ]]
 }
 
+image_analysis_workers_raw() {
+  local raw="${IMAGE_ANALYSIS_WORKERS:-anpr,objects,captioning}"
+  raw="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  printf '%s\n' "${raw:-anpr,objects,captioning}"
+}
+
+image_analysis_worker_role_for_service() {
+  case "$1" in
+    image_analysis_anpr) printf 'anpr\n' ;;
+    image_analysis_objects) printf 'objects\n' ;;
+    image_analysis_captioning) printf 'captioning\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+image_analysis_worker_service_for_role() {
+  case "$1" in
+    anpr) printf 'image_analysis_anpr\n' ;;
+    objects) printf 'image_analysis_objects\n' ;;
+    captioning) printf 'image_analysis_captioning\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+image_analysis_worker_roles() {
+  local raw
+  raw="$(image_analysis_workers_raw)"
+  [[ "${raw}" == "none" ]] && return 0
+
+  local old_ifs="${IFS}"
+  local item
+  local emitted=" "
+  IFS=','
+  for item in ${raw}; do
+    [[ -n "${item}" ]] || continue
+    case "${item}" in
+      anpr|objects|captioning)
+        if [[ "${emitted}" != *" ${item} "* ]]; then
+          printf '%s\n' "${item}"
+          emitted="${emitted}${item} "
+        fi
+        ;;
+    esac
+  done
+  IFS="${old_ifs}"
+}
+
+image_analysis_worker_enabled() {
+  local role="$1"
+  local enabled_role
+  while IFS= read -r enabled_role; do
+    [[ "${enabled_role}" == "${role}" ]] && return 0
+  done < <(image_analysis_worker_roles)
+  return 1
+}
+
+image_analysis_selected_services() {
+  printf 'image_analysis\n'
+  local role
+  while IFS= read -r role; do
+    image_analysis_worker_service_for_role "${role}"
+  done < <(image_analysis_worker_roles)
+}
+
+validate_image_analysis_worker_selection() {
+  local raw
+  raw="$(image_analysis_workers_raw)"
+  [[ "${raw}" == "none" ]] && return 0
+
+  local old_ifs="${IFS}"
+  local item
+  local invalid=()
+  local valid_count=0
+  IFS=','
+  for item in ${raw}; do
+    [[ -n "${item}" ]] || continue
+    case "${item}" in
+      anpr|objects|captioning)
+        valid_count=$((valid_count + 1))
+        ;;
+      *)
+        invalid+=("${item}")
+        ;;
+    esac
+  done
+  IFS="${old_ifs}"
+
+  if (( ${#invalid[@]} > 0 )); then
+    die "Invalid IMAGE_ANALYSIS_WORKERS=${IMAGE_ANALYSIS_WORKERS:-}. Valid values are comma-separated anpr,objects,captioning or none."
+  fi
+  if (( valid_count == 0 )); then
+    die "IMAGE_ANALYSIS_WORKERS must include at least one worker or be set to none."
+  fi
+}
+
 qdrant_internal_http_ok() {
   local path="$1"
   compose exec -T qdrant python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:6333${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
@@ -458,6 +553,13 @@ stack_services_for_start() {
     fi
     if [[ "${service}" == image_analysis_* ]] && ! image_analysis_enabled_requested; then
       continue
+    fi
+    if [[ "${service}" == image_analysis_* ]]; then
+      local role
+      role="$(image_analysis_worker_role_for_service "${service}")"
+      if ! image_analysis_worker_enabled "${role}"; then
+        continue
+      fi
     fi
     services_to_start+=("${service}")
   done

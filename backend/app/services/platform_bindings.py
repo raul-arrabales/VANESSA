@@ -26,6 +26,7 @@ from .platform_resources import _runtime_identifier_for_resource, _runtime_model
 from .platform_service_types import (
     BindingResourcePayload,
     ProviderStoragePayload,
+    _IMAGE_ANALYSIS_TASK_GROUPS,
     _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
     _IMAGE_SELECTION_TASK_DEFAULTS,
     _MODEL_BEARING_CAPABILITIES,
@@ -580,7 +581,11 @@ def _validate_image_analysis_resources(
             status_code=400,
         )
     if not resources:
-        return {"resources": [], "default_resource_id": None}
+        raise PlatformControlPlaneError(
+            "resources_required",
+            "image_analysis bindings require at least one complete task resource group",
+            status_code=400,
+        )
 
     selection_mode = str(resource_policy.get("selection_mode") or _IMAGE_SELECTION_TASK_DEFAULTS).strip().lower()
     if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
@@ -601,29 +606,63 @@ def _validate_image_analysis_resources(
         for resource in resources
     ]
     resources_by_id = {str(resource.get("id") or "").strip(): resource for resource in validated_resources}
-    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
-    missing_defaults: list[str] = []
-    invalid_defaults: list[str] = []
-    for default_key, expected_task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items():
-        resource_id = str(task_defaults.get(default_key) or "").strip()
-        if not resource_id:
-            missing_defaults.append(default_key)
-            continue
-        resource = resources_by_id.get(resource_id)
-        if resource is None:
-            invalid_defaults.append(default_key)
-            continue
-        task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
-        if task_key != expected_task_key:
-            invalid_defaults.append(default_key)
-    if missing_defaults or invalid_defaults:
+    missing_defaults, invalid_defaults, complete_groups = _validate_image_analysis_task_defaults(
+        resources_by_id=resources_by_id,
+        resource_policy=resource_policy,
+    )
+    if missing_defaults or invalid_defaults or not complete_groups:
         raise PlatformControlPlaneError(
             "invalid_task_defaults",
-            "image_analysis bindings require task_defaults for plate_detector, plate_ocr, object_detector, and captioner",
+            "image_analysis bindings require at least one complete task_defaults group",
             status_code=400,
-            details={"missing_task_defaults": missing_defaults, "invalid_task_defaults": invalid_defaults},
+            details={
+                "missing_task_defaults": missing_defaults,
+                "invalid_task_defaults": invalid_defaults,
+                "complete_task_groups": complete_groups,
+            },
         )
     return {"resources": validated_resources, "default_resource_id": None}
+
+
+def _validate_image_analysis_task_defaults(
+    *,
+    resources_by_id: dict[str, dict[str, Any]],
+    resource_policy: dict[str, Any],
+) -> tuple[list[str], list[str], list[str]]:
+    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+    selected_task_keys = {
+        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        for resource in resources_by_id.values()
+    }
+    missing_defaults: list[str] = []
+    invalid_defaults: list[str] = []
+    complete_groups: list[str] = []
+
+    for group_name, default_keys in _IMAGE_ANALYSIS_TASK_GROUPS.items():
+        group_task_keys = {_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS[default_key] for default_key in default_keys}
+        group_requested = bool(group_task_keys & selected_task_keys) or any(str(task_defaults.get(default_key) or "").strip() for default_key in default_keys)
+        if not group_requested:
+            continue
+        group_valid = True
+        for default_key in default_keys:
+            expected_task_key = _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS[default_key]
+            resource_id = str(task_defaults.get(default_key) or "").strip()
+            if not resource_id:
+                missing_defaults.append(default_key)
+                group_valid = False
+                continue
+            resource = resources_by_id.get(resource_id)
+            if resource is None:
+                invalid_defaults.append(default_key)
+                group_valid = False
+                continue
+            task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+            if task_key != expected_task_key:
+                invalid_defaults.append(default_key)
+                group_valid = False
+        if group_valid:
+            complete_groups.append(group_name)
+    return missing_defaults, invalid_defaults, complete_groups
 
 
 def _image_analysis_binding_error(binding: ProviderBinding) -> str | None:
@@ -634,15 +673,12 @@ def _image_analysis_binding_error(binding: ProviderBinding) -> str | None:
     selection_mode = str(resource_policy.get("selection_mode") or "").strip().lower()
     if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
         return "task_defaults_required"
-    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
-    for default_key, expected_task_key in _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.items():
-        resource_id = str(task_defaults.get(default_key) or "").strip()
-        resource = resources_by_id.get(resource_id)
-        if resource is None:
-            return "task_defaults_required"
-        task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
-        if task_key != expected_task_key:
-            return "task_defaults_required"
+    missing_defaults, invalid_defaults, complete_groups = _validate_image_analysis_task_defaults(
+        resources_by_id=resources_by_id,
+        resource_policy=resource_policy,
+    )
+    if missing_defaults or invalid_defaults or not complete_groups:
+        return "task_defaults_required"
     return None
 
 

@@ -23,6 +23,12 @@ const IMAGE_ANALYSIS_TASK_DEFAULTS: Record<string, string> = {
   captioner: "image_captioning",
 };
 
+const IMAGE_ANALYSIS_TASK_GROUPS: Record<string, string[]> = {
+  license_plate_recognition: ["plate_detector", "plate_ocr"],
+  object_detection: ["object_detector"],
+  captioning: ["captioner"],
+};
+
 export type DeploymentFormState = {
   slug: string;
   displayName: string;
@@ -83,6 +89,36 @@ function buildImageAnalysisTaskDefaults(
       .map(([defaultKey, taskKey]) => [defaultKey, selectedModelsByTask.get(taskKey) ?? ""])
       .filter(([, resourceId]) => resourceId),
   );
+}
+
+function hasIncompleteImageAnalysisTaskGroups(
+  resourceIds: string[],
+  modelResources: ManagedModel[],
+): boolean {
+  if (resourceIds.length === 0) {
+    return true;
+  }
+  const taskDefaults = buildImageAnalysisTaskDefaults(resourceIds, modelResources);
+  const selectedResourceIds = new Set(resourceIds);
+  const selectedTaskKeys = new Set(
+    modelResources
+      .filter((model) => selectedResourceIds.has(model.id))
+      .map((model) => String(model.task_key ?? "")),
+  );
+  return !Object.values(IMAGE_ANALYSIS_TASK_GROUPS).some((defaultKeys) => {
+    const groupTaskKeys = defaultKeys.map((defaultKey) => IMAGE_ANALYSIS_TASK_DEFAULTS[defaultKey]);
+    const groupRequested = groupTaskKeys.some((taskKey) => selectedTaskKeys.has(taskKey))
+      || defaultKeys.some((defaultKey) => Boolean(taskDefaults[defaultKey]));
+    if (!groupRequested) {
+      return false;
+    }
+    return defaultKeys.every((defaultKey) => Boolean(taskDefaults[defaultKey]));
+  }) || Object.values(IMAGE_ANALYSIS_TASK_GROUPS).some((defaultKeys) => {
+    const groupTaskKeys = defaultKeys.map((defaultKey) => IMAGE_ANALYSIS_TASK_DEFAULTS[defaultKey]);
+    const groupRequested = groupTaskKeys.some((taskKey) => selectedTaskKeys.has(taskKey))
+      || defaultKeys.some((defaultKey) => Boolean(taskDefaults[defaultKey]));
+    return groupRequested && defaultKeys.some((defaultKey) => !taskDefaults[defaultKey]);
+  });
 }
 
 export function createDefaultDeploymentForm(requiredCapabilities: PlatformCapability[]): DeploymentFormState {
@@ -191,14 +227,13 @@ export function validateDeploymentForm(
       return false;
     }
     const resourceIds = form.resourceIdsByCapability[capability.capability] ?? [];
-    const taskDefaults = buildImageAnalysisTaskDefaults(
+    return hasIncompleteImageAnalysisTaskGroups(
       resourceIds,
       options.modelResourcesByCapability[capability.capability] ?? [],
     );
-    return Object.keys(IMAGE_ANALYSIS_TASK_DEFAULTS).some((taskDefaultKey) => !taskDefaults[taskDefaultKey]);
   });
   if (missingImageTaskDefault) {
-    return `${missingImageTaskDefault.display_name} requires bound resources for plate detection, plate OCR, object detection, and captioning.`;
+    return `${missingImageTaskDefault.display_name} requires at least one complete task resource group.`;
   }
 
   if (options.providersByCapability && options.modelResourcesByCapability) {

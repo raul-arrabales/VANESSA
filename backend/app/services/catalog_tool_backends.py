@@ -11,6 +11,7 @@ from .context_management_retrieval_schema import (
 )
 from .context_management_runtime import list_active_runtime_knowledge_bases, query_knowledge_base
 from .platform_adapters import http_json_request
+from .image_analysis_service import require_image_analysis_task_defaults
 from .platform_service import get_active_platform_runtime, resolve_image_analysis_adapter, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
 
@@ -576,14 +577,17 @@ def _execute_image_analysis_backend(
     try:
         adapter = resolve_image_analysis_adapter(database_url, config)
         resource_policy = dict(adapter.binding.resource_policy or {})
+        task_defaults = dict(resource_policy.get("task_defaults") or {})
+        normalized_tasks = [str(item).strip().lower() for item in tasks if str(item).strip()]
+        require_image_analysis_task_defaults(normalized_tasks, task_defaults)
         return adapter.analyze(
             payload={
                 "image": image,
-                "tasks": tasks,
+                "tasks": normalized_tasks,
                 "options": dict(tool_input.get("options") or {}) if isinstance(tool_input.get("options"), dict) else {},
                 "runtime": {
                     "resources": [dict(resource) for resource in adapter.binding.resources],
-                    "task_defaults": dict(resource_policy.get("task_defaults") or {}),
+                    "task_defaults": task_defaults,
                 },
             }
         )

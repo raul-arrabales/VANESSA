@@ -4,6 +4,7 @@ from typing import Any
 
 from ..config import AuthConfig
 from .platform_runtime import resolve_image_analysis_adapter
+from .platform_service_types import _IMAGE_ANALYSIS_TASK_GROUPS
 from .platform_types import PlatformControlPlaneError
 
 _VALID_IMAGE_TASKS = {"license_plate_recognition", "object_detection", "captioning"}
@@ -25,6 +26,28 @@ def _normalize_tasks(raw_tasks: Any) -> list[str]:
     return tasks
 
 
+def missing_image_analysis_task_defaults(tasks: list[str], task_defaults: dict[str, Any]) -> list[str]:
+    return sorted(
+        {
+            default_key
+            for task in tasks
+            for default_key in _IMAGE_ANALYSIS_TASK_GROUPS.get(task, ())
+            if not str(task_defaults.get(default_key) or "").strip()
+        }
+    )
+
+
+def require_image_analysis_task_defaults(tasks: list[str], task_defaults: dict[str, Any]) -> None:
+    missing_defaults = missing_image_analysis_task_defaults(tasks, task_defaults)
+    if missing_defaults:
+        raise PlatformControlPlaneError(
+            "missing_image_analysis_task_defaults",
+            "Active image_analysis binding is missing task defaults for requested tasks",
+            status_code=409,
+            details={"missing_task_defaults": missing_defaults, "tasks": tasks},
+        )
+
+
 def analyze_platform_image(database_url: str, config: AuthConfig, payload: Any) -> tuple[dict[str, Any] | None, int]:
     body = _require_json_object(payload)
     image = body.get("image")
@@ -37,13 +60,15 @@ def analyze_platform_image(database_url: str, config: AuthConfig, payload: Any) 
     tasks = _normalize_tasks(body.get("tasks"))
     adapter = resolve_image_analysis_adapter(database_url, config)
     resource_policy = dict(adapter.binding.resource_policy or {})
+    task_defaults = dict(resource_policy.get("task_defaults") or {})
+    require_image_analysis_task_defaults(tasks, task_defaults)
     analysis_payload = {
         "image": {"data_base64": data_base64, "mime_type": mime_type},
         "tasks": tasks,
         "options": dict(body.get("options") or {}) if isinstance(body.get("options"), dict) else {},
         "runtime": {
             "resources": [dict(resource) for resource in adapter.binding.resources],
-            "task_defaults": dict(resource_policy.get("task_defaults") or {}),
+            "task_defaults": task_defaults,
         },
     }
     return adapter.analyze(payload=analysis_payload)

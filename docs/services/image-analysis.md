@@ -31,6 +31,15 @@ Gateway worker URLs default to the Compose service names:
 
 The gateway returns partial results with task-specific warnings if one requested worker is unavailable.
 
+Worker startup is launch-time configurable with `IMAGE_ANALYSIS_WORKERS`, defaulting to `anpr,objects,captioning`. Valid comma-separated values are:
+
+- `anpr`
+- `objects`
+- `captioning`
+- `none`
+
+`none` starts only the gateway and advertises no image-analysis resources. The gateway health payload reports only enabled workers, `/v1/resources` aggregates only enabled workers, and `/v1/analyze` returns `409 image_analysis_task_disabled` if a caller requests a task whose worker role was not enabled. If a worker is enabled but temporarily unreachable, the gateway keeps returning partial results with the existing task-specific warning behavior.
+
 ## Models
 
 V1 defaults are local open-source models:
@@ -64,6 +73,12 @@ The container split improves reliability and operability, but object detection a
 - `object_detection`
 - `image_captioning`
 
+Bindings use task-specific defaults. A deployment may bind any complete subset advertised by the running provider:
+
+- ANPR requires both `plate_detector` and `plate_ocr`.
+- Object detection requires `object_detector`.
+- Captioning requires `captioner`.
+
 Bindings use:
 
 ```json
@@ -82,9 +97,4 @@ Bindings use:
 
 There is no global `default_resource_id` for this capability.
 
-When `IMAGE_ANALYSIS_URL` is configured and the provider advertises all four v1
-resources from `/v1/resources`, backend bootstrap registers platform-owned
-ModelOps records for those resources, validates them from provider inventory,
-activates them, and binds them into local deployment profiles as task defaults.
-Superadmins may still register image-analysis resources manually through
-ModelOps using the task keys above.
+When `IMAGE_ANALYSIS_URL` is configured and the provider advertises one or more complete task groups from `/v1/resources`, backend bootstrap registers platform-owned ModelOps records for those resources, validates them from provider inventory, activates them, and binds that complete subset into local deployment profiles as task defaults. Superadmins may still register image-analysis resources manually through ModelOps using the task keys above.

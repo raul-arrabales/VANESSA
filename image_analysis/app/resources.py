@@ -46,3 +46,12 @@ def resources_for_role(role: str) -> list[dict[str, Any]]:
     }
     task_keys = task_keys_by_role.get(role, set())
     return [resource for resource in all_resources if dict(resource.get("metadata") or {}).get("task_key") in task_keys]
+
+
+def resources_for_roles(roles: list[str] | tuple[str, ...] | set[str]) -> list[dict[str, Any]]:
+    resources: list[dict[str, Any]] = []
+    for role in roles:
+        if role == ROLE_GATEWAY:
+            continue
+        resources.extend(resources_for_role(role))
+    return resources

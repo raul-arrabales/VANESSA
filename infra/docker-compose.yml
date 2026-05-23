@@ -186,10 +186,6 @@ services:
       - image_analysis
     ports:
       - "8090:8090"
-    depends_on:
-      - image_analysis_anpr
-      - image_analysis_objects
-      - image_analysis_captioning
     env_file:
       - path: .env.example
         required: true
@@ -200,6 +196,7 @@ services:
       IMAGE_ANALYSIS_PORT: 8090
       IMAGE_ANALYSIS_MODEL_ROOT: /models/image_analysis
       IMAGE_ANALYSIS_FAKE_MODE: ${IMAGE_ANALYSIS_FAKE_MODE:-0}
+      IMAGE_ANALYSIS_WORKERS: ${IMAGE_ANALYSIS_WORKERS:-anpr,objects,captioning}
       IMAGE_ANALYSIS_ANPR_URL: ${IMAGE_ANALYSIS_ANPR_URL:-http://image_analysis_anpr:8091}
       IMAGE_ANALYSIS_OBJECTS_URL: ${IMAGE_ANALYSIS_OBJECTS_URL:-http://image_analysis_objects:8092}
       IMAGE_ANALYSIS_CAPTIONING_URL: ${IMAGE_ANALYSIS_CAPTIONING_URL:-http://image_analysis_captioning:8093}

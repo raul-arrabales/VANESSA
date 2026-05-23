@@ -182,20 +182,6 @@ def build_image_analysis_runtime_client(platform_runtime: dict[str, Any]) -> Ima
         unsupported_message="Unsupported image analysis runtime adapter",
         error_cls=ImageAnalysisRuntimeClientError,
     )
-    resource_policy = image_binding.get("resource_policy") if isinstance(image_binding.get("resource_policy"), dict) else {}
-    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
-    missing_defaults = [
-        key
-        for key in ["plate_detector", "plate_ocr", "object_detector", "captioner"]
-        if not str(task_defaults.get(key) or "").strip()
-    ]
-    if missing_defaults:
-        raise ImageAnalysisRuntimeClientError(
-            code="missing_image_analysis_task_defaults",
-            message="platform_runtime image_analysis binding is missing task defaults",
-            status_code=409,
-            details={"missing_task_defaults": missing_defaults},
-        )
     return HttpImageAnalysisRuntimeClient(
         deployment_profile=deployment_profile,
         image_binding=image_binding,

@@ -312,29 +312,42 @@ run_checks() {
   fi
 
   if image_analysis_enabled_requested; then
+    validate_image_analysis_worker_selection
     if image_analysis_ready_ok; then
       printf 'image_analysis: OK (/health)\n'
     else
       printf 'image_analysis: FAIL\n'
       failures=$((failures + 1))
     fi
-    if image_analysis_worker_ready_ok "image_analysis_anpr" "8091"; then
-      printf 'image_analysis_anpr: OK (/health)\n'
+    if image_analysis_worker_enabled "anpr"; then
+      if image_analysis_worker_ready_ok "image_analysis_anpr" "8091"; then
+        printf 'image_analysis_anpr: OK (/health)\n'
+      else
+        printf 'image_analysis_anpr: FAIL\n'
+        failures=$((failures + 1))
+      fi
     else
-      printf 'image_analysis_anpr: FAIL\n'
-      failures=$((failures + 1))
+      printf 'image_analysis_anpr: SKIP (IMAGE_ANALYSIS_WORKERS)\n'
     fi
-    if image_analysis_worker_ready_ok "image_analysis_objects" "8092"; then
-      printf 'image_analysis_objects: OK (/health)\n'
+    if image_analysis_worker_enabled "objects"; then
+      if image_analysis_worker_ready_ok "image_analysis_objects" "8092"; then
+        printf 'image_analysis_objects: OK (/health)\n'
+      else
+        printf 'image_analysis_objects: FAIL\n'
+        failures=$((failures + 1))
+      fi
     else
-      printf 'image_analysis_objects: FAIL\n'
-      failures=$((failures + 1))
+      printf 'image_analysis_objects: SKIP (IMAGE_ANALYSIS_WORKERS)\n'
     fi
-    if image_analysis_worker_ready_ok "image_analysis_captioning" "8093"; then
-      printf 'image_analysis_captioning: OK (/health)\n'
+    if image_analysis_worker_enabled "captioning"; then
+      if image_analysis_worker_ready_ok "image_analysis_captioning" "8093"; then
+        printf 'image_analysis_captioning: OK (/health)\n'
+      else
+        printf 'image_analysis_captioning: FAIL\n'
+        failures=$((failures + 1))
+      fi
     else
-      printf 'image_analysis_captioning: FAIL\n'
-      failures=$((failures + 1))
+      printf 'image_analysis_captioning: SKIP (IMAGE_ANALYSIS_WORKERS)\n'
     fi
   else
     printf 'image_analysis: SKIP (IMAGE_ANALYSIS_URL not set)\n'
