@@ -2974,13 +2974,17 @@ def test_image_analysis_bootstrap_registers_partial_provider_resources(monkeypat
         row = {
             "model_id": kwargs["model_id"],
             "name": kwargs["name"],
-            "provider_model_id": kwargs["provider_model_id"],
-            "backend_kind": kwargs["backend_kind"],
+            "provider": kwargs["provider"],
             "task_key": kwargs["task_key"],
-            "lifecycle_state": "draft",
+            "backend_kind": kwargs["backend_kind"],
+            "provider_model_id": kwargs["provider_model_id"],
+            "local_path": kwargs["local_path"],
+            "source_id": kwargs["source_id"],
+            "availability": kwargs["availability"],
+            "lifecycle_state": kwargs["lifecycle_state"],
             "is_validation_current": False,
             "last_validation_status": None,
-            "current_config_fingerprint": kwargs["config_fingerprint"],
+            "current_config_fingerprint": "fingerprint",
         }
         models[str(kwargs["model_id"])] = row
         return row
