@@ -353,11 +353,15 @@ run_checks() {
     printf 'image_analysis: SKIP (IMAGE_ANALYSIS_URL not set)\n'
   fi
 
-  if searxng_ready_ok; then
-    printf 'searxng: OK (/)\n'
+  if web_search_enabled_requested; then
+    if searxng_ready_ok; then
+      printf 'searxng: OK (/)\n'
+    else
+      printf 'searxng: FAIL\n'
+      failures=$((failures + 1))
+    fi
   else
-    printf 'searxng: FAIL\n'
-    failures=$((failures + 1))
+    printf 'searxng: SKIP (WEB_SEARCH_ENABLED=false)\n'
   fi
 
   if mcp_gateway_ready_ok; then

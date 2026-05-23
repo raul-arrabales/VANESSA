@@ -13,7 +13,8 @@ System diagnostics endpoints:
   - Includes active capability/provider health from the platform control plane when available.
   - Includes optional `llama_cpp` reachability when `LLAMA_CPP_URL` is configured.
   - Includes optional `qdrant` reachability when `QDRANT_URL` is configured.
-  - Includes `mcp_gateway` reachability by default in local staging and whenever `MCP_GATEWAY_URL` is non-empty.
+  - Includes required `mcp_gateway` reachability by default in local staging.
+  - Includes SearXNG web-search reachability when `WEB_SEARCH_ENABLED=true`.
   - Includes optional `image_analysis` reachability when `IMAGE_ANALYSIS_URL` is configured.
 - `GET /system/architecture` returns generated architecture graph JSON.
 - `GET /system/architecture.svg` returns generated architecture diagram SVG.
@@ -91,8 +92,8 @@ Platform control plane endpoints:
 
 Platform control plane semantics:
 
-- `capabilities` represent platform functions such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
-- `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, and `sandbox_local`.
+- `capabilities` represent platform functions such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, and `sandbox_execution`.
+- `providers` represent implementation families such as `vllm_local`, `llama_cpp_local`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, and `sandbox_local`.
 - `deployment profiles` define the active capability-to-provider bindings.
 - Deployment identity can now be updated independently from binding configuration, and each capability binding can be saved independently from the deployment detail page.
 - Existing `LLM_URL`, `LLM_INFERENCE_RUNTIME_URL`, `LLM_EMBEDDINGS_RUNTIME_URL`, and `WEAVIATE_URL` values remain the bootstrap source for the default local deployment profile.
@@ -100,7 +101,8 @@ Platform control plane semantics:
 - `LLAMA_CPP_URL` enables the optional local llama.cpp provider instance and seeds an inactive `local-llama-cpp` deployment profile bound to `llama_cpp_local + weaviate_local`.
 - `QDRANT_URL` enables the optional local Qdrant provider instance and seeds an inactive `local-qdrant` deployment profile bound to `vllm_local + qdrant_local`.
 - `SANDBOX_URL` seeds the optional `sandbox_local` provider instance and binds it as `sandbox_execution`.
-- `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080` in local staging, seeds `mcp_gateway_local`, and binds it as `mcp_runtime`. The built-in web search tool remains online-only and is served by MCP Gateway through local SearXNG.
+- `MCP_GATEWAY_URL` defaults to `http://mcp_gateway:8080` in local staging, seeds `mcp_gateway_local`, and binds it as required `mcp_runtime`.
+- `WEB_SEARCH_ENABLED=true` seeds `searxng_local` from `WEB_SEARCH_URL` and binds it as optional `web_search`. The built-in web search tool remains online-only.
 - The embeddings and vector-store data planes now resolve through the active `embeddings` and `vector_store` bindings for normalized embeddings, ensure, upsert, query, and delete operations.
 - Managed knowledge bases are now a backend-owned context-management domain. They live in Postgres, each target one configured `vector_store` provider instance, and are bound into deployments as explicit `vector_store` resources.
 - Schema creation can now start from reusable provider-specific schema profiles. Built-in Weaviate profiles seed plain document RAG, agent semantic memory, and agent episodic memory templates, and superadmins may save custom profiles for reuse.
@@ -115,7 +117,7 @@ Platform control plane semantics:
 - Source-managed documents now carry provenance (`source_id`, `source_path`, `source_document_key`) and are treated as read-only from the manual document editor.
 - Backend now also resolves an execution-scoped `platform_runtime` snapshot from the active deployment profile and forwards it to `agent_engine`, which performs real prompt/message LLM calls through the active `llm_inference` binding.
 - Agent executions may now optionally include `input.retrieval`, which backend forwards unchanged to `agent_engine`; retrieval executes through the active `platform_runtime.capabilities.embeddings` and `platform_runtime.capabilities.vector_store` snapshots.
-- Agent executions may also use optional `platform_runtime.capabilities.mcp_runtime` and `platform_runtime.capabilities.sandbox_execution` bindings for LLM-driven tool execution.
+- Agent executions use required `platform_runtime.capabilities.mcp_runtime` plus optional `web_search` and `sandbox_execution` bindings for LLM-driven tool execution.
 - Cloud/external runtime traffic now publishes sanitized operational events through `GET /v1/runtime/cloud-traffic/events` and trusted `POST /v1/internal/cloud-traffic/events`; backend can also append those events to local JSONL logs without payloads, prompts, headers, credentials, or response bodies.
 - Product-facing chat and knowledge experiences now live under `/v1/playgrounds/*`; backend persists canonical playground sessions, resolves deployment-bound model and knowledge selections through governance, and routes knowledge requests through the fixed `agent.knowledge_chat` agent before returning normalized citations and retrieval metadata.
 - Operator-managed provider instances now support top-level `secret_refs` metadata so endpoint config can reference external secrets without mixing those references into the visible config payload.
@@ -123,7 +125,7 @@ Platform control plane semantics:
 - Deployment list/detail payloads now include `configuration_status` for both the deployment and each binding so the UI can show partially configured or mismatched capability state directly from backend-owned readiness rules.
 - Deployment activation now performs provider preflight validation before switching, and activation history is exposed via `/v1/platform/activation-audit`. Partially configured deployments may now be activated; missing resources/defaults are surfaced as readiness warnings and still enforced at runtime when a capability is used.
 - Registry bootstrap also seeds canonical built-in tools:
-  - `tool.web_search` -> MCP-backed `web_search`, backed by local SearXNG
+  - `tool.web_search` -> backend-owned `web_search`, backed by active provider bindings such as local SearXNG
   - `tool.python_exec` -> sandbox-backed Python execution
 - The typed catalog surface is now canonical for superadmin agent/tool lifecycle management.
   Generic `/v1/registry/*` routes remain available for compatibility, but catalog create/update

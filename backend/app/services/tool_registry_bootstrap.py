@@ -7,7 +7,7 @@ from ..repositories.users import list_users
 _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
     "tool.web_search": {
         "name": "Web Search",
-        "description": "Searches the web through the MCP gateway's SearXNG-backed runner.",
+        "description": "Searches the web through the active web-search provider.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -49,10 +49,9 @@ _BUILTIN_TOOLS: dict[str, dict[str, object]] = {
             "network_access": True,
         },
         "offline_compatible": False,
-        "execution_backend": "mcp_gateway_web_search",
+        "execution_backend": "web_search",
         "execution_config": {
-            "internal_tool_name": "web_search",
-            "gateway_internal_path": "/v1/internal/tools/web-search",
+            "provider_tool_name": "web_search",
         },
         "permissions": {},
     },

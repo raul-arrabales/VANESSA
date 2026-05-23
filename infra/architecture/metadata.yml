@@ -83,9 +83,9 @@ services:
   mcp_gateway:
     label: MCP Gateway
     group: runtime
-    description: HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.
+    description: Required HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.
     public_exposed: true
-    criticality: medium
+    criticality: high
   image_analysis:
     label: Image Analysis
     group: runtime
@@ -113,7 +113,7 @@ services:
   searxng:
     label: SearXNG
     group: runtime
-    description: Local token-free metasearch backend used by the MCP gateway web search tool.
+    description: Optional local token-free metasearch provider for backend-owned web search.
     public_exposed: false
     criticality: medium
   weaviate:
@@ -168,7 +168,13 @@ edges:
   - from: backend
     to: mcp_gateway
     protocol: HTTP
-    purpose: MCP provider checks and private gateway-backed tool adapters
+    purpose: Required MCP provider checks and gateway-hosted tool exposure transport
+    kind: http
+    direction: outbound
+  - from: backend
+    to: searxng
+    protocol: HTTP
+    purpose: Optional web search through the active searxng_local provider binding
     kind: http
     direction: outbound
   - from: backend
@@ -236,12 +242,6 @@ edges:
     protocol: Internal HTTP
     purpose: Image captioning worker calls
     kind: internal
-    direction: outbound
-  - from: mcp_gateway
-    to: searxng
-    protocol: HTTP
-    purpose: Web search queries through the local SearXNG JSON API
-    kind: http
     direction: outbound
   - from: agent_engine
     to: weaviate

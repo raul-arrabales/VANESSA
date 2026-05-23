@@ -147,12 +147,12 @@ BEGIN
                     'execution_backend',
                     CASE current_spec->>'transport'
                         WHEN 'sandbox_http' THEN 'sandbox_python'
-                        WHEN 'mcp' THEN 'mcp_gateway_web_search'
+                        WHEN 'mcp' THEN 'web_search'
                         ELSE 'internal_http'
                     END,
                     'execution_config',
                     CASE current_spec->>'transport'
-                        WHEN 'mcp' THEN jsonb_build_object('internal_tool_name', coalesce(current_spec->>'tool_name', 'web_search'))
+                        WHEN 'mcp' THEN jsonb_build_object('provider_tool_name', coalesce(current_spec->>'tool_name', 'web_search'))
                         ELSE '{}'::jsonb
                     END,
                     'permissions', '{}'::jsonb

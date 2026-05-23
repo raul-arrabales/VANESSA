@@ -81,6 +81,7 @@ from .platform_runtime import (
     resolve_mcp_runtime_adapter,
     resolve_sandbox_execution_adapter,
     resolve_vector_store_adapter,
+    resolve_web_search_adapter,
 )
 from .platform_serialization import (
     _build_model_binding_resource,
@@ -103,6 +104,7 @@ from .platform_types import (
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    CAPABILITY_WEB_SEARCH,
     OPTIONAL_CAPABILITIES,
     REQUIRED_CAPABILITIES,
     DeploymentBindingInput,
@@ -376,6 +378,15 @@ def resolve_mcp_runtime_adapter(database_url: str, config, *, provider_instance_
     )
 
 
+def resolve_web_search_adapter(database_url: str, config, *, provider_instance_id: str | None = None):
+    _sync_platform_helpers()
+    return _platform_runtime_module.resolve_web_search_adapter(
+        database_url,
+        config,
+        provider_instance_id=provider_instance_id,
+    )
+
+
 def get_active_platform_runtime(database_url: str, config, *, include_runtime_secrets: bool = False):
     _sync_platform_helpers()
     return _platform_runtime_module.get_active_platform_runtime(
@@ -406,6 +417,7 @@ __all__ = [
     "CAPABILITY_MCP_RUNTIME",
     "CAPABILITY_SANDBOX_EXECUTION",
     "CAPABILITY_VECTOR_STORE",
+    "CAPABILITY_WEB_SEARCH",
     "DeploymentBindingInput",
     "DeploymentProfileCreateInput",
     "OPTIONAL_CAPABILITIES",
@@ -485,6 +497,7 @@ __all__ = [
     "resolve_mcp_runtime_adapter",
     "resolve_sandbox_execution_adapter",
     "resolve_vector_store_adapter",
+    "resolve_web_search_adapter",
     "update_deployment_profile",
     "update_provider",
     "validate_provider",

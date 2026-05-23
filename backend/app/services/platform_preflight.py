@@ -9,6 +9,7 @@ from .platform_types import (
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    CAPABILITY_WEB_SEARCH,
 )
 
 
@@ -31,7 +32,9 @@ def _operation_reachable(capability_key: str, validation: dict[str, Any]) -> boo
     if capability_key == CAPABILITY_SANDBOX_EXECUTION:
         return _bool_or_none(validation.get("execute_reachable"))
     if capability_key == CAPABILITY_MCP_RUNTIME:
-        return _bool_or_none(validation.get("invoke_reachable"))
+        return _bool_or_none(validation.get("gateway_reachable"))
+    if capability_key == CAPABILITY_WEB_SEARCH:
+        return _bool_or_none(validation.get("search_reachable"))
     if capability_key == CAPABILITY_IMAGE_ANALYSIS:
         return _bool_or_none(validation.get("resources_reachable"))
     return _health_reachable(validation)
@@ -43,7 +46,9 @@ def _operation_failure_code(capability_key: str) -> str:
     if capability_key == CAPABILITY_SANDBOX_EXECUTION:
         return "execute_unreachable"
     if capability_key == CAPABILITY_MCP_RUNTIME:
-        return "invoke_unreachable"
+        return "mcp_gateway_unreachable"
+    if capability_key == CAPABILITY_WEB_SEARCH:
+        return "web_search_unreachable"
     if capability_key == CAPABILITY_IMAGE_ANALYSIS:
         return "image_analysis_unreachable"
     return "resources_unreachable"
@@ -57,8 +62,11 @@ def _operation_failure_message(capability_key: str, validation: dict[str, Any]) 
         status = validation.get("execute_status_code")
         return f"Sandbox dry run failed with HTTP {status}" if status else "Sandbox dry run failed"
     if capability_key == CAPABILITY_MCP_RUNTIME:
-        status = validation.get("invoke_status_code")
-        return f"MCP health tool invocation failed with HTTP {status}" if status else "MCP health tool invocation failed"
+        status = validation.get("gateway_status_code")
+        return f"MCP gateway health failed with HTTP {status}" if status else "MCP gateway health failed"
+    if capability_key == CAPABILITY_WEB_SEARCH:
+        status = validation.get("search_status_code")
+        return f"Web search request failed with HTTP {status}" if status else "Web search request failed"
     if capability_key == CAPABILITY_IMAGE_ANALYSIS:
         status = validation.get("resources_status_code")
         return f"Image analysis resources could not be listed with HTTP {status}" if status else "Image analysis resources could not be listed"

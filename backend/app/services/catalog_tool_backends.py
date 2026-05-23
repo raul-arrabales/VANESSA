@@ -15,12 +15,17 @@ from .image_analysis_tasks import (
     available_tasks_from_resources,
 )
 from .image_analysis_service import require_image_analysis_task_defaults
-from .platform_adapters import http_json_request
-from .platform_service import get_active_platform_runtime, resolve_image_analysis_adapter, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
+from .platform_service import (
+    get_active_platform_runtime,
+    resolve_image_analysis_adapter,
+    resolve_mcp_runtime_adapter,
+    resolve_sandbox_execution_adapter,
+    resolve_web_search_adapter,
+)
 from .platform_types import PlatformControlPlaneError
 
 TOOL_BACKEND_SANDBOX = "sandbox_python"
-TOOL_BACKEND_WEB_SEARCH = "mcp_gateway_web_search"
+TOOL_BACKEND_WEB_SEARCH = "web_search"
 TOOL_BACKEND_INTERNAL_HTTP = "internal_http"
 TOOL_BACKEND_KB_RETRIEVAL = "knowledge_base_retrieval"
 TOOL_BACKEND_IMAGE_ANALYSIS = "image_analysis"
@@ -150,7 +155,7 @@ def _build_web_search_tool_template() -> dict[str, Any]:
         "visibility": "private",
         "publish": False,
         "name": "Web Search",
-        "description": "Searches the web through the MCP gateway's SearXNG-backed runner.",
+        "description": "Searches the web through the active web-search provider.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -177,8 +182,7 @@ def _build_web_search_tool_template() -> dict[str, Any]:
         "offline_compatible": False,
         "execution_backend": TOOL_BACKEND_WEB_SEARCH,
         "execution_config": {
-            "internal_tool_name": "web_search",
-            "gateway_internal_path": "/v1/internal/tools/web-search",
+            "provider_tool_name": "web_search",
         },
         "permissions": {},
     }
@@ -344,7 +348,7 @@ def validate_backend(
     if execution_backend == TOOL_BACKEND_SANDBOX:
         _validate_sandbox_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
     elif execution_backend == TOOL_BACKEND_WEB_SEARCH:
-        _validate_mcp_gateway_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
+        _validate_web_search_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
     elif execution_backend == TOOL_BACKEND_KB_RETRIEVAL:
         _validate_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, runtime_checks=runtime_checks, errors=errors)
     elif execution_backend == TOOL_BACKEND_INTERNAL_HTTP:
@@ -389,7 +393,7 @@ def _validate_sandbox_backend(
         runtime_checks["sandbox_dry_run_ok"] = False
 
 
-def _validate_mcp_gateway_backend(
+def _validate_web_search_backend(
     *,
     database_url: str,
     config: Any,
@@ -397,23 +401,12 @@ def _validate_mcp_gateway_backend(
     errors: list[str],
 ) -> None:
     try:
-        adapter = resolve_mcp_runtime_adapter(database_url, config)
+        adapter = resolve_web_search_adapter(database_url, config)
         health = adapter.health()
         runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
         runtime_checks["provider_status_code"] = health.get("status_code")
-        if hasattr(adapter, "list_tools"):
-            tools_payload, tools_status = adapter.list_tools()
-            runtime_checks["tools_status_code"] = tools_status
-            tools = tools_payload.get("tools") if isinstance(tools_payload, dict) else []
-            available_names = {
-                str(item.get("tool_name", "")).strip()
-                for item in tools
-                if isinstance(item, dict) and str(item.get("tool_name", "")).strip()
-            }
-            runtime_checks["available_tool_names"] = sorted(available_names)
-            runtime_checks["tool_discovered"] = "web_search" in available_names if available_names else runtime_checks["provider_reachable"]
         if not runtime_checks["provider_reachable"]:
-            errors.append("MCP gateway provider is not reachable.")
+            errors.append("Web search provider is not reachable.")
     except PlatformControlPlaneError as exc:
         errors.append(exc.message)
         runtime_checks["provider_status_code"] = exc.status_code
@@ -457,12 +450,11 @@ def execute_backend(
     if execution_backend == TOOL_BACKEND_SANDBOX:
         return _execute_sandbox_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
     if execution_backend == TOOL_BACKEND_WEB_SEARCH:
-        return _execute_mcp_gateway_web_search_backend(
+        return _execute_web_search_backend(
             database_url=database_url,
             config=config,
             spec=spec,
             tool_input=tool_input,
-            request_metadata=request_metadata,
         )
     if execution_backend == TOOL_BACKEND_KB_RETRIEVAL:
         return _execute_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
@@ -543,37 +535,19 @@ def _execute_knowledge_base_retrieval_backend(
         raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
 
 
-def _execute_mcp_gateway_web_search_backend(
+def _execute_web_search_backend(
     *,
     database_url: str,
     config: Any,
     spec: dict[str, Any],
     tool_input: dict[str, Any],
-    request_metadata: dict[str, Any],
 ) -> tuple[dict[str, Any] | None, int]:
+    del spec
     try:
-        adapter = resolve_mcp_runtime_adapter(database_url, config)
+        adapter = resolve_web_search_adapter(database_url, config)
     except PlatformControlPlaneError as exc:
         raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
-
-    if str(spec.get("transport", "")).strip().lower() == "mcp" and hasattr(adapter, "invoke"):
-        return adapter.invoke(
-            tool_name=str(spec.get("tool_name") or "web_search").strip() or "web_search",
-            arguments=tool_input,
-            request_metadata=request_metadata,
-        )
-    endpoint_url = str(adapter.binding.endpoint_url).rstrip("/")
-    path = str((spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}).get("gateway_internal_path", "/v1/internal/tools/web-search"))
-    payload, status_code = http_json_request(
-        endpoint_url + path,
-        method="POST",
-        payload={
-            "arguments": tool_input,
-            "request_metadata": request_metadata,
-        },
-        headers={"X-Service-Token": str(config.mcp_gateway_service_token)},
-    )
-    return payload if isinstance(payload, dict) else None, status_code
+    return adapter.search(tool_input)
 
 
 def _execute_image_analysis_backend(

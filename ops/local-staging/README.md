@@ -184,14 +184,15 @@ Split local runtime selection:
 - The gateway listens on container port `8080`; local staging publishes it on host port `6100` so it does not conflict with Weaviate on `8080`.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /health` inside the container.
 - The built-in MCP exposures are `mcp.web_search` and `mcp.python_exec`; discovery includes metadata for category, capabilities, locality, sandboxing, risk, data access, freshness, and audit level.
-- The built-in `web_search` tool calls SearXNG at `SEARXNG_URL`, defaulting to `http://searxng:8080`.
-- This is token-free but still online-only because SearXNG queries upstream internet search engines.
+- `mcp.web_search` is exposed only when the optional backend-owned `web_search` capability is bound.
 
 `searxng` behavior:
 
-- `searxng` is part of the default local-staging stack and stays internal to Docker.
-- Local config lives in `infra/searxng/settings.yml`; JSON output must remain enabled for MCP web search.
-- `health.sh` and `restart-service.sh` validate readiness using `GET /` inside the container.
+- `WEB_SEARCH_ENABLED` defaults to `true`; set it to `false` to skip the optional web-search provider while keeping MCP Gateway available.
+- `WEB_SEARCH_URL` defaults to `http://searxng:8080`.
+- `searxng` stays internal to Docker and is called only by the backend `web_search` adapter.
+- Local config lives in `infra/searxng/settings.yml`; JSON output must remain enabled for web search.
+- `health.sh` and `restart-service.sh` validate readiness using `GET /` inside the container when web search is enabled.
 
 ## Sample Auth Seeding
 

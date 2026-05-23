@@ -65,7 +65,7 @@ VANESSA is organized around a few clear domains:
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`
-- Tool surfaces: backend-owned internal tools, gateway-hosted MCP server exposures, deployment-bound KB retrieval, SearXNG-backed web search, sandboxed Python execution, and optional local image analysis
+- Tool surfaces: backend-owned internal tools, required gateway-hosted MCP server transport, deployment-bound KB retrieval, optional SearXNG-backed web search, sandboxed Python execution, and optional local image analysis
 - Storage: PostgreSQL for relational state plus Weaviate and optional Qdrant for vector retrieval
 
 For the full architecture narrative and generated diagram source of truth, see [docs/architecture.md](docs/architecture.md).
@@ -74,8 +74,8 @@ For the full architecture narrative and generated diagram source of truth, see [
 
 The runtime architecture is intentionally explicit:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`
-- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `sandbox_local`, `image_analysis_local`, or OpenAI-compatible cloud families
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
+- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, or OpenAI-compatible cloud families
 - `deployment profile`: the named set of active capability bindings used to resolve a runtime snapshot
 - `provider_origin`: backend-owned `local` or `cloud` classification inherited by provider instances and runtime payloads
 - `platform_runtime`: the resolved runtime snapshot passed from backend to `agent_engine`
@@ -89,7 +89,7 @@ VANESSA currently uses global runtime profile semantics for safety gates and pro
 - `online` allows cloud-capable runtime behavior where configured
 - `offline` blocks cloud provider validation, deployment activation, runtime resolution, and invocation before any provider client is created
 - In online mode, cloud/external call metadata is published through backend cloud-traffic events so the topbar can indicate upload/download activity; optional local JSONL logging records only sanitized metadata.
-- MCP-exposed web search is governed by the same runtime contract, while sandbox-backed Python execution and local image analysis can remain available offline when their optional capabilities are bound
+- MCP transport is required for agents; optional web search is governed by the same runtime contract and is online-only when bound, while sandbox-backed Python execution and local image analysis can remain available offline when their optional capabilities are bound
 
 ## Product Areas
 
@@ -116,7 +116,7 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- `mcp_gateway` and local SearXNG web search are enabled by default; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables. The `image_analysis` profile runs one gateway plus the private task workers selected by `IMAGE_ANALYSIS_WORKERS`.
+- `mcp_gateway` is required and local SearXNG web search is enabled by default via `WEB_SEARCH_ENABLED=true`; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables. The `image_analysis` profile runs one gateway plus the private task workers selected by `IMAGE_ANALYSIS_WORKERS`.
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -146,7 +146,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `sandbox/`: isolated Python execution runtime
 - `mcp_gateway/`: gateway-hosted MCP server exposure provider
 - `image_analysis/`: optional local image understanding gateway/workers for selected plate recognition, object detection, and captioning tasks
-- `infra/searxng/`: local SearXNG configuration used by MCP web search
+- `infra/searxng/`: local SearXNG configuration used by the optional backend-owned web-search capability
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance
 - `ops/local-staging/`: staging-like launcher and health workflows

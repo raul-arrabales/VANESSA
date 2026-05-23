@@ -39,6 +39,7 @@
 <line id="edge-backend-postgres" class="architecture-edge architecture-edge-db" x1="526" y1="116" x2="1116" y2="364" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-qdrant" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="240" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-sandbox" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="1356" marker-end="url(#architecture-arrow)" />
+<line id="edge-backend-searxng" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="846" y2="612" marker-end="url(#architecture-arrow)" />
 <line id="edge-backend-weaviate" class="architecture-edge architecture-edge-http" x1="526" y1="116" x2="1116" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-frontend-backend" class="architecture-edge architecture-edge-http" x1="256" y1="116" x2="306" y2="116" marker-end="url(#architecture-arrow)" />
 <line id="edge-image_analysis-image_analysis_anpr" class="architecture-edge architecture-edge-internal" x1="956" y1="902" x2="956" y2="942" marker-end="url(#architecture-arrow)" />
@@ -48,7 +49,6 @@
 <line id="edge-llm-llm_runtime_embeddings" class="architecture-edge architecture-edge-internal" x1="956" y1="158" x2="956" y2="322" marker-end="url(#architecture-arrow)" />
 <line id="edge-llm-llm_runtime_inference" class="architecture-edge architecture-edge-internal" x1="956" y1="158" x2="956" y2="198" marker-end="url(#architecture-arrow)" />
 <line id="edge-mcp_gateway-backend" class="architecture-edge architecture-edge-internal" x1="846" y1="736" x2="526" y2="116" marker-end="url(#architecture-arrow)" />
-<line id="edge-mcp_gateway-searxng" class="architecture-edge architecture-edge-http" x1="956" y1="778" x2="956" y2="570" marker-end="url(#architecture-arrow)" />
 </g>
 <g id="architecture-edge-labels">
 <text class="edge-label" x="821" y="482">HTTP - Agent image-analysis tool invocation through resolved platform runtime bindings</text>
@@ -62,10 +62,11 @@
 <text class="edge-label" x="686" y="482">HTTP - Optional image-analysis provider validation and superadmin smoke tests</text>
 <text class="edge-label" x="686" y="296">HTTP - Optional direct llama.cpp inference via platform provider binding</text>
 <text class="edge-label" x="686" y="110">HTTP - Model inference and discovery</text>
-<text class="edge-label" x="686" y="420">HTTP - MCP provider checks and private gateway-backed tool adapters</text>
+<text class="edge-label" x="686" y="420">HTTP - Required MCP provider checks and gateway-hosted tool exposure transport</text>
 <text class="edge-label" x="821" y="234">SQL - Structured data access</text>
 <text class="edge-label" x="821" y="172">HTTP - Optional semantic retrieval operations via alternate provider binding</text>
 <text class="edge-label" x="686" y="730">HTTP - Controlled code execution</text>
+<text class="edge-label" x="686" y="358">HTTP - Optional web search through the active searxng_local provider binding</text>
 <text class="edge-label" x="821" y="110">HTTP - Semantic retrieval operations</text>
 <text class="edge-label" x="281" y="110">HTTP - UI API requests</text>
 <text class="edge-label" x="956" y="916">Internal HTTP - License plate detection and OCR worker calls</text>
@@ -75,7 +76,6 @@
 <text class="edge-label" x="956" y="234">Internal HTTP - Runtime embeddings execution path</text>
 <text class="edge-label" x="956" y="172">Internal HTTP - Runtime text generation path</text>
 <text class="edge-label" x="686" y="420">compose - Startup dependency</text>
-<text class="edge-label" x="956" y="668">HTTP - Web search queries through the local SearXNG JSON API</text>
 </g>
 <g id="architecture-nodes">
 <g id="node-frontend" class="architecture-node architecture-node-frontend architecture-group-client" data-container="frontend">

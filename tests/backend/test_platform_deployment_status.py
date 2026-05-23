@@ -88,7 +88,7 @@ def test_compute_status_marks_model_binding_incomplete_without_resources():
 
     assert binding_statuses["embeddings"]["is_ready"] is False
     assert binding_statuses["embeddings"]["issues"][0]["code"] == "resources_missing"
-    assert deployment_status["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+    assert deployment_status["incomplete_capabilities"] == ["embeddings", "llm_inference", "mcp_runtime", "vector_store"]
 
 
 def test_compute_status_marks_model_binding_incomplete_without_default():
@@ -124,7 +124,7 @@ def test_compute_status_marks_local_provider_with_cloud_model_incomplete():
     issue_codes = {issue["code"] for issue in binding_statuses["llm_inference"]["issues"]}
     assert "resource_provider_origin_mismatch" in issue_codes
     assert binding_statuses["llm_inference"]["is_ready"] is False
-    assert deployment_status["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+    assert deployment_status["incomplete_capabilities"] == ["embeddings", "llm_inference", "mcp_runtime", "vector_store"]
 
 
 def test_compute_status_marks_cloud_provider_with_local_model_incomplete():
@@ -198,6 +198,7 @@ def test_compute_status_marks_self_provided_kb_unsupported(monkeypatch: pytest.M
                 default_resource_id="kb-primary",
                 resource_policy={"selection_mode": "explicit"},
             ),
+            _binding("mcp_runtime"),
         ],
     )
 
@@ -233,6 +234,7 @@ def test_compute_status_marks_kb_embeddings_provider_mismatch(monkeypatch: pytes
                 default_resource_id="kb-primary",
                 resource_policy={"selection_mode": "explicit"},
             ),
+            _binding("mcp_runtime"),
         ],
     )
 
@@ -268,6 +270,7 @@ def test_compute_status_marks_kb_embeddings_resource_mismatch(monkeypatch: pytes
                 default_resource_id="kb-primary",
                 resource_policy={"selection_mode": "explicit"},
             ),
+            _binding("mcp_runtime"),
         ],
     )
 
@@ -318,6 +321,7 @@ def test_compute_status_returns_ready_for_fully_configured_deployment(monkeypatc
                 default_resource_id="kb-primary",
                 resource_policy={"selection_mode": "explicit"},
             ),
+            _binding("mcp_runtime"),
         ],
     )
 
@@ -358,6 +362,6 @@ def test_serialize_deployment_profile_with_status_attaches_binding_and_deploymen
     }
     assert deployment["configuration_status"] == {
         "is_ready": False,
-        "incomplete_capabilities": ["llm_inference", "vector_store"],
-        "summary": "2 required capabilities are not fully configured.",
+        "incomplete_capabilities": ["llm_inference", "mcp_runtime", "vector_store"],
+        "summary": "3 required capabilities are not fully configured.",
     }

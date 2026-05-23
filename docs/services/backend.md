@@ -170,8 +170,8 @@ Context-management semantics:
 
 Key terms:
 
-- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`
-- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, or `image_analysis_local`
+- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
+- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`
 - `provider_origin`: family-owned origin classification, `local` or `cloud`, inherited by provider instances and serialized in provider, deployment-binding, runtime, and active-provider payloads
 - `deployment profile`: named set of active capability bindings
 - `binding resource`: capability-scoped resource explicitly bound at the deployment-binding layer, such as a ModelOps-managed model or a vector-store index
@@ -186,7 +186,8 @@ Bootstrap defaults:
 - `local-llama-cpp` is seeded only when `LLAMA_CPP_URL` is configured.
 - `local-qdrant` is seeded only when `QDRANT_URL` is configured.
 - `sandbox_local` is seeded from `SANDBOX_URL` and bound as optional `sandbox_execution` into local deployment profiles when available.
-- `mcp_gateway_local` is seeded from `MCP_GATEWAY_URL` and, in default local staging, is bound into local deployment profiles as `mcp_runtime`.
+- `mcp_gateway_local` is seeded from `MCP_GATEWAY_URL` and bound into local deployment profiles as required `mcp_runtime`.
+- `searxng_local` is seeded from `WEB_SEARCH_URL` and bound as optional `web_search` when `WEB_SEARCH_ENABLED=true`.
 - `image_analysis_local` is seeded only when `IMAGE_ANALYSIS_URL` is configured. It is a local-only provider gateway for license plate recognition, object detection, and captioning; Docker deployments route the gateway to the private task workers selected by `IMAGE_ANALYSIS_WORKERS`.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code. Built-in families seed explicit `provider_origin`; only the OpenAI-compatible cloud LLM and embeddings families are `cloud`.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
@@ -206,13 +207,13 @@ Bootstrap defaults:
 - Local cloud-traffic JSONL logging is controlled by `CLOUD_TRAFFIC_LOG_ENABLED`, `CLOUD_TRAFFIC_LOG_PATH`, and `CLOUD_TRAFFIC_LOG_MAX_BYTES`. The compose backend mounts `../logs` to `/var/log/vanessa` and rotates `cloud-traffic.jsonl` to `.1` when the configured size is exceeded.
 - Backend owns product/public retrieval request shaping, active KB selection, deployment-runtime resolution, and knowledge-chat/source projection. It forwards canonical `input.retrieval` payloads to `agent_engine`, which executes semantic / keyword / hybrid retrieval against the active runtime bindings.
 - Canonical backend ↔ agent-engine retrieval semantics are documented in [Retrieval Contract](retrieval_contract.md).
-- Backend also forwards optional `platform_runtime.capabilities.mcp_runtime`, `platform_runtime.capabilities.sandbox_execution`, and `platform_runtime.capabilities.image_analysis` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
+- Backend also forwards required `platform_runtime.capabilities.mcp_runtime` plus optional `sandbox_execution`, `web_search`, and `image_analysis` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
 - `GET /v1/playgrounds/options` exposes runtime-allowed models, assistants, and deployment-bound knowledge bases for user-facing playground selection.
 - `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
 - Deployment bindings now serialize the full bound-resource list plus the default resource for UI rendering.
 - Deployment activation now performs provider preflight validation before switching and returns a conflict if any bound provider is unreachable or incompatible, but incomplete resource/default configuration is reported through readiness metadata instead of blocking activation.
-- Provider validation now includes dry-run execution checks for sandbox providers and invoke-readiness checks for MCP gateway providers.
+- Provider validation now includes dry-run execution checks for sandbox providers, health checks for MCP gateway providers, and search checks for web-search providers.
 - Tool definitions remain registry entities, but MCP is modeled as a separate catalog exposure instead of a tool transport. Backend bootstraps `tool.web_search` and `tool.python_exec` as internal tools with explicit schemas, execution backend, permissions, safety policy, offline compatibility, and persisted validation state. Superadmin tool creation starts from backend-owned execution backend templates, including `knowledge_base_retrieval` templates generated from active deployment-bound knowledge bases.
 - `knowledge_base_retrieval` tools bind exactly one active, ready knowledge base from the active deployment `vector_store` resources. Validation and execution fail if the active deployment changes and the configured KB is no longer bound. Invocation merges tool `retrieval_defaults` with call input and uses the same backend KB query path as the context-management retrieval QA surface.
 - Backend also bootstraps `mcp.web_search` and `mcp.python_exec` as gateway-hosted MCP server definitions backed by those tools. MCP creation defaults are backend-owned through `/v1/catalog/mcp-creation-options`; retrieval-backed tools classify as `knowledge_retrieval` with workspace data access and static freshness.

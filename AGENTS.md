@@ -32,8 +32,8 @@ Current architectural pillars:
   - `llm` is the normalized private LLM gateway.
   - `llm_runtime_inference`, `llm_runtime_embeddings`, and optional `llama_cpp` are local runtime/provider options behind the control plane.
   - Weaviate and optional Qdrant are alternate `vector_store` providers.
-  - Sandbox, MCP gateway, and image analysis are runtime capabilities selected by the control plane, not generic sidecars.
-  - SearXNG is the local token-free metasearch backend consumed only by MCP gateway web search tools.
+  - MCP gateway is required agent transport selected by the control plane; sandbox, image analysis, and web search are runtime capabilities selected by the control plane when bound.
+  - SearXNG is the local token-free metasearch backend for the optional backend-owned `web_search` capability.
 
 Design goals:
 
@@ -57,10 +57,10 @@ Important current product-stage guidance:
 Use these terms consistently:
 
 - `capability`
-  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`.
+  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`.
 
 - `provider`
-  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, or `image_analysis_local`.
+  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`.
   - Provider families own `provider_origin` (`local` or `cloud`); provider instances inherit that value and must not override it.
 
 - `adapter`
@@ -157,12 +157,12 @@ Respect these runtime boundaries when generating code or configuration.
 9. **MCP Gateway (`mcp_gateway`)**
    - Normalized HTTP provider for gateway-hosted MCP server exposures.
    - Delegates registry lookup, authorization, schema validation, execution dispatch, and audit logging to backend.
-   - Calls SearXNG for the gateway-private web-search runner; backend, frontend, and agent_engine must not call SearXNG directly.
+   - Required agent tool transport. It does not execute provider-specific tool backends directly.
 
 10. **SearXNG (`searxng`)**
-    - Local token-free metasearch service for real web search.
+    - Optional local token-free metasearch provider for the `web_search` capability.
     - Requires internet access even though it runs as a local container.
-    - Must stay behind MCP gateway and not become a platform capability by itself.
+    - Must be called only through the backend web-search adapter; frontend, agent_engine, and MCP gateway must not call it directly.
 
 11. **Image Analysis (`image_analysis`)**
    - Optional local HTTP provider gateway for image understanding.
@@ -209,7 +209,7 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `mcp_gateway/`
   - Gateway-hosted MCP server exposure provider.
-  - Owns the SearXNG-backed private web-search runner exposed through catalog-managed MCP server definitions.
+  - Owns MCP discovery and invocation proxying while backend owns concrete tool execution.
 
 - `image_analysis/`
   - Optional local image-analysis provider service.
@@ -227,7 +227,7 @@ Respect these runtime boundaries when generating code or configuration.
 
 - `infra/`
   - Compose files, Dockerfiles, architecture metadata, infrastructure wiring.
-  - Includes SearXNG config for local MCP web search under `infra/searxng/`.
+  - Includes SearXNG config for optional local web search under `infra/searxng/`.
 
 - `ops/local-staging/`
   - Human-facing staging-like local runtime workflow and scripts.

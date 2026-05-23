@@ -17,12 +17,12 @@ Notes:
 - Public `/v1/agent-executions*` remains as compatibility alias.
 - Configure service token with `AGENT_ENGINE_SERVICE_TOKEN`.
 - Streaming execution emits `status` progress events and may emit `delta` token events before `complete` with the normal execution payload or `error` with the public error shape.
-- Backend now sends an execution-scoped `platform_runtime` snapshot that may include active bindings for `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, and `sandbox_execution`.
+- Backend now sends an execution-scoped `platform_runtime` snapshot with required bindings for `llm_inference`, `embeddings`, `vector_store`, and `mcp_runtime`, plus optional bindings such as `web_search` and `sandbox_execution`.
 - Cloud LLM/embedding runtime calls and online web search dispatch report sanitized cloud-traffic events back to backend through `BACKEND_URL` plus `AGENT_ENGINE_SERVICE_TOKEN`.
 - Explicit retrieval requests use the canonical retrieval contract documented in [`docs/services/retrieval_contract.md`](../docs/services/retrieval_contract.md).
 - Agent engine owns execution-time semantic / keyword / hybrid retrieval branching and emits canonical `relevance_*` fields while preserving provider `score` / `score_kind` fields on result items.
 - LLM-driven tool execution is now supported through registry-managed `tool_refs`.
-  - `tool.web_search` dispatches through the active `mcp_runtime` provider.
+  - `tool.web_search` dispatches through backend-resolved MCP exposure and the active `web_search` provider.
   - `tool.python_exec` dispatches through the active `sandbox_execution` provider.
 - Tool loops are bounded to three rounds and execution results now populate real `tool_calls` metadata.
 

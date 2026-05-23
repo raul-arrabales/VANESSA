@@ -171,7 +171,6 @@ services:
       MCP_GATEWAY_SERVICE_TOKEN: ${MCP_GATEWAY_SERVICE_TOKEN:-dev-mcp-gateway-token}
     depends_on:
       - backend
-      - searxng
 
   image_analysis:
     build:

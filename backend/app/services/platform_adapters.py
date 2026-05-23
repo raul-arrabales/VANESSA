@@ -13,7 +13,7 @@ from threading import Lock
 from time import monotonic
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from urllib.error import URLError
 
 from .cloud_traffic import endpoint_host_from_url, publish_cloud_traffic_event, request_id_from_headers
@@ -701,6 +701,19 @@ class McpRuntimeAdapter(ABC):
 
     @abstractmethod
     def list_tools(self) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
+class WebSearchAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def search(self, arguments: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
         raise NotImplementedError
 
 
@@ -1682,6 +1695,139 @@ class HttpMcpRuntimeAdapter(McpRuntimeAdapter):
 
     def list_tools(self) -> tuple[dict[str, Any] | None, int]:
         return http_json_request(self._tools_url(), method="GET")
+
+
+class SearxngWebSearchAdapter(WebSearchAdapter):
+    _VALID_TIME_RANGES = {"day", "month", "year"}
+    _VALID_SAFESEARCH_VALUES = {"0", "1", "2"}
+
+    def _search_url(self, arguments: dict[str, Any], *, query: str) -> tuple[str | None, dict[str, str] | None]:
+        safesearch, error = self._coerce_safesearch(arguments.get("safesearch"))
+        if error:
+            return None, error
+        time_range, error = self._coerce_time_range(arguments.get("time_range"))
+        if error:
+            return None, error
+
+        language = self._optional_string(arguments.get("language")) or self._optional_string(
+            self.binding.config.get("default_language", "")
+        )
+        categories = self._optional_string(arguments.get("categories")) or self._optional_string(
+            self.binding.config.get("default_categories", "")
+        )
+        engines = self._optional_string(self.binding.config.get("default_engines", ""))
+        params: dict[str, str] = {
+            "q": query,
+            "format": "json",
+            "safesearch": safesearch or "1",
+        }
+        if language:
+            params["language"] = language
+        if categories:
+            params["categories"] = categories
+        if engines:
+            params["engines"] = engines
+        if time_range:
+            params["time_range"] = time_range
+        return f"{self.binding.endpoint_url.rstrip().rstrip('/')}/search?{urlencode(params)}", None
+
+    def _request_timeout_seconds(self) -> float:
+        return _binding_timeout_seconds(self.binding.config)
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = self.search({"query": str(self.binding.config.get("healthcheck_query", "healthcheck")), "top_k": 1})
+        reachable = payload is not None and 200 <= status_code < 300
+        return {
+            "reachable": reachable,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def search(self, arguments: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+        query = str(arguments.get("query", "")).strip()
+        if not query:
+            return {"error": "invalid_arguments", "message": "query is required"}, 400
+        top_k, error = self._coerce_top_k(arguments.get("top_k", 3))
+        if error:
+            return error, 400
+        assert top_k is not None
+        search_url, error = self._search_url(arguments, query=query)
+        if error:
+            return error, 400
+        assert search_url is not None
+        payload, status_code = http_json_request(search_url, method="GET", timeout_seconds=self._request_timeout_seconds())
+        if payload is None:
+            error_code = "search_timeout" if status_code == 504 else "search_backend_unavailable"
+            return {"error": error_code, "message": "Search backend is unavailable"}, status_code
+        if not 200 <= status_code < 300:
+            return {
+                "error": "search_backend_error",
+                "message": "Search backend returned an error",
+                "upstream_status_code": status_code,
+                "upstream": payload,
+            }, status_code
+        return {"query": query, "results": self._normalize_results(payload, top_k=top_k)}, 200
+
+    def _coerce_top_k(self, value: Any) -> tuple[int | None, dict[str, str] | None]:
+        try:
+            top_k = int(value)
+        except (TypeError, ValueError):
+            return None, {"error": "invalid_arguments", "message": "top_k must be an integer"}
+        return max(1, min(top_k, 10)), None
+
+    def _coerce_safesearch(self, value: Any) -> tuple[str | None, dict[str, str] | None]:
+        raw = self._optional_string(value)
+        if not raw:
+            raw = self._optional_string(self.binding.config.get("default_safesearch", "1"))
+        if raw not in self._VALID_SAFESEARCH_VALUES:
+            return None, {"error": "invalid_arguments", "message": "safesearch must be one of 0, 1, or 2"}
+        return raw, None
+
+    def _coerce_time_range(self, value: Any) -> tuple[str | None, dict[str, str] | None]:
+        raw = self._optional_string(value)
+        if not raw:
+            return None, None
+        if raw not in self._VALID_TIME_RANGES:
+            return None, {"error": "invalid_arguments", "message": "time_range must be one of day, month, or year"}
+        return raw, None
+
+    def _normalize_engine(self, value: Any, result: dict[str, Any]) -> str:
+        if isinstance(value, str):
+            return value
+        engines = result.get("engines")
+        if isinstance(engines, list):
+            return ", ".join(str(item).strip() for item in engines if str(item).strip())
+        return ""
+
+    def _normalize_results(self, payload: dict[str, Any], *, top_k: int) -> list[dict[str, Any]]:
+        raw_results = payload.get("results")
+        if not isinstance(raw_results, list):
+            return []
+        normalized: list[dict[str, Any]] = []
+        seen_urls: set[str] = set()
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            url = self._optional_string(item.get("url"))
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            normalized.append(
+                {
+                    "title": self._optional_string(item.get("title")),
+                    "url": url,
+                    "snippet": self._optional_string(item.get("content") or item.get("snippet")),
+                    "engine": self._normalize_engine(item.get("engine"), item),
+                    "rank": len(normalized) + 1,
+                }
+            )
+            if len(normalized) >= top_k:
+                break
+        return normalized
+
+    def _optional_string(self, value: Any) -> str:
+        return str(value).strip() if value is not None else ""
 
 
 class HttpImageAnalysisAdapter(ImageAnalysisAdapter):

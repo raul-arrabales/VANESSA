@@ -34,9 +34,9 @@ Legend:
 6. llama.cpp: optional OpenAI-compatible local inference runtime used as an alternate `llm_inference` provider.
 7. Agent Engine: multi-step agent logic and tool workflows.
 8. Sandbox: isolated Python code execution environment and native runtime provider for Python execution tools.
-9. MCP Gateway: normalized HTTP provider that exposes authorized MCP server wrappers backed by catalog tools.
+9. MCP Gateway: required normalized HTTP provider that exposes authorized MCP server wrappers backed by catalog tools.
 10. Image Analysis: optional local image understanding service for plate recognition, object detection, and captioning.
-11. SearXNG: local token-free metasearch backend used only by MCP Gateway for web search.
+11. SearXNG: optional local token-free metasearch provider for backend-owned web search.
 12. KWS: offline wake-word detection and wake-event emission.
 13. Weaviate: persistent semantic index for RAG context retrieval.
 14. Qdrant: optional vector database for alternate retrieval provider binding.
@@ -45,9 +45,8 @@ Legend:
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API
-- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, MCP Gateway, optional Image Analysis, Weaviate, optional Qdrant, PostgreSQL
+- Backend API -> Agent Engine, LLM API, optional llama.cpp, Sandbox, MCP Gateway, optional Web Search/SearXNG, optional Image Analysis, Weaviate, optional Qdrant, PostgreSQL
 - Agent Engine -> LLM API, Sandbox, MCP Gateway, optional Image Analysis, Weaviate, optional Qdrant, PostgreSQL
-- MCP Gateway -> SearXNG
 - LLM API -> LLM Runtime Inference, LLM Runtime Embeddings
 - KWS -> Backend API
 
@@ -55,8 +54,8 @@ Interaction semantics in the generated graph represent directional runtime commu
 
 The runtime architecture now distinguishes container topology from capability binding:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `sandbox_execution`, or `image_analysis`
-- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `sandbox_local`, or `image_analysis_local`
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
+- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`
 - `provider_origin`: a backend-owned family classification, either `local` or `cloud`, inherited by provider instances and serialized into provider, deployment, and runtime payloads
 - `deployment profile`: the named set of active capability-to-provider bindings, plus any binding-level resource selection required by that capability
 - `adapter`: the capability-specific backend client that talks to a provider
@@ -91,14 +90,14 @@ Current provider proof state:
 - `local-default` keeps `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `LLAMA_CPP_URL` is configured, backend also seeds `local-llama-cpp` with `llm_inference -> llama_cpp_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> weaviate_local`.
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
-- `local-default` also binds `sandbox_execution -> sandbox_local` and `mcp_runtime -> mcp_gateway_local`.
+- `local-default` also binds required `mcp_runtime -> mcp_gateway_local`, optional `sandbox_execution -> sandbox_local`, and optional `web_search -> searxng_local` when `WEB_SEARCH_ENABLED=true`.
 - When `IMAGE_ANALYSIS_URL` is configured, backend seeds `image_analysis -> image_analysis_local` and binds provider-advertised image-analysis resources into local deployment profiles. The optional Compose profile runs an `image_analysis` gateway plus the private workers selected by `IMAGE_ANALYSIS_WORKERS`, all sharing `models/image_analysis` for local vision assets.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; OpenAI-compatible cloud provider instances hold endpoint/auth config, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings choose explicit managed-model resources.
 - Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - Online runtime cloud/external calls publish sanitized cloud-traffic events through backend. The app shell uses the authenticated SSE stream to light upload/download indicators, and backend can persist the same metadata to a local JSONL log without recording prompts, payloads, headers, credentials, response bodies, or full URLs.
 - `embeddings` bindings now require a managed model with `task_key=embeddings`; bootstrap profiles intentionally leave that resource slot empty until an operator selects one.
 - `vector_store` bindings in explicit mode may now reference managed knowledge bases as binding resources; the runtime-facing provider resource remains the provider index name resolved from that knowledge base.
-- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. Tool runtime capabilities remain modeled as optional platform capabilities, but local staging now seeds and binds both sandbox and MCP runtime by default and still enforces them per execution only when an agent references internal tools or MCP server exposures that need them.
+- Switching deployment profiles changes the active inference and retrieval targets without changing frontend or ModelOps APIs. MCP runtime is required for agent tool transport; sandbox, image analysis, and web search remain optional capabilities enforced when an agent references tools that need them.
 
 ## Tools And MCP Exposures
 
@@ -114,7 +113,7 @@ Agent tools now use a catalog-backed split:
 
 Current canonical tools and exposures:
 
-- `tool.web_search` -> `execution_backend: mcp_gateway_web_search`; the default `mcp.web_search` exposure is served by MCP Gateway through local SearXNG and is token-free but internet-required.
+- `tool.web_search` -> `execution_backend: web_search`; the default `mcp.web_search` exposure is available when the optional `web_search` capability is bound to a provider such as local SearXNG.
 - `tool.python_exec` -> `execution_backend: sandbox_python`; the default `mcp.python_exec` exposure is local, sandboxed, and elevated-risk.
 - `tool.image_license_plate_recognition`, `tool.image_object_detection`, and `tool.image_captioning` -> `execution_backend: image_analysis`; the default MCP exposures invoke the active `image_analysis` runtime when that optional capability is bound.
 - KB retrieval tools are not globally seeded because their valid configuration depends on the currently active deployment-bound knowledge bases. When exposed through MCP, their default discovery metadata is `category=knowledge_retrieval`, workspace data access, static freshness, and low risk.

@@ -293,10 +293,10 @@ Detailed retrieval semantics, normalized result fields, and ownership boundaries
 
 `input.model` is optional and execution-scoped. When present, agent engine treats it as a managed model id and requires that it be present in `platform_runtime.capabilities.llm_inference.resources`. When omitted, the active binding default resource is used. Backend uses this for product-facing knowledge chat after resolving the user-selected model through model governance.
 
-Tool execution is also execution-scoped. Backend may include optional `mcp_runtime` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent catalog requires them. In the current MCP exposure model:
+Tool execution is also execution-scoped. Backend includes required `mcp_runtime` and may include optional `web_search` and `sandbox_execution` capability bindings in `platform_runtime`. Agent engine uses those bindings only when the resolved agent catalog requires them. In the current MCP exposure model:
 
 - agents reference authorized `mcp_server_refs`; MCP calls require `platform_runtime.capabilities.mcp_runtime`
-- `mcp.web_search` is backed by internal `tool.web_search` and requires online runtime
+- `mcp.web_search` is backed by internal `tool.web_search` and requires online runtime plus an active `web_search` binding
 - `mcp.python_exec` is backed by internal `tool.python_exec` and requires sandbox runtime
 
 Tool loops are LLM-driven and bounded to three rounds.

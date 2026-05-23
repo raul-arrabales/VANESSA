@@ -24,9 +24,10 @@ Backend resolves the active platform bindings and passes them to agent engine as
 
 Canonical retrieval semantics, normalized result fields, and backend/engine ownership boundaries are documented in [Retrieval Contract](retrieval_contract.md).
 
-Tool execution now adds two optional runtime capabilities to that same snapshot:
+Tool execution uses required MCP transport plus optional runtime capabilities in that same snapshot:
 
 - `mcp_runtime` for gateway-hosted MCP server exposures
+- `web_search` for online search tools exposed through MCP or internal catalog execution
 - `sandbox_execution` for native Python execution tools
 
 Execution flow summary:
@@ -36,7 +37,7 @@ Execution flow summary:
 3. Validate runtime dependencies and resolve allowed tools.
 4. Execute semantic / keyword / hybrid retrieval against the active `embeddings` and `vector_store` bindings when requested.
 5. Call the active `llm_inference` provider with normalized messages and tool definitions.
-6. Dispatch tool calls through the active `mcp_runtime` or `sandbox_execution` provider.
+6. Dispatch tool calls through the active `mcp_runtime`, `web_search`, or `sandbox_execution` provider as required by the backend-resolved catalog tool.
 7. Assemble `ExecutionResult` and persist execution state transitions.
 
 The code is now split into explicit seams:
@@ -52,7 +53,7 @@ These seams are intended to support future Vanessa-specific planner, memory/retr
 
 Current canonical built-in tool surfaces:
 
-- `mcp.web_search` backed by `tool.web_search`; the gateway resolves it through local SearXNG, so it requires online runtime
+- `mcp.web_search` backed by `tool.web_search`; backend resolves it through the optional `web_search` capability, so it requires online runtime and an active web-search provider
 - `mcp.python_exec` backed by `tool.python_exec`; the gateway resolves it through the sandbox runtime, so it requires sandbox execution
 
 Successful execution results now populate normalized `tool_calls` metadata alongside `model_calls`, `embedding_calls`, and canonical `retrieval_calls`.

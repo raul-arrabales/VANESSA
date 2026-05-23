@@ -174,14 +174,14 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
         },
     )
 
-    monkeypatch.setattr(catalog_routes, "list_catalog_tools", lambda _db: [tool_row])
+    monkeypatch.setattr(catalog_routes, "list_catalog_tools", lambda _db, config=None: [tool_row])
     monkeypatch.setattr(
         catalog_routes,
         "get_catalog_tool_creation_options",
         lambda _db, *, config: {
             "execution_backends": [
                 {
-                    "execution_backend": "mcp_gateway_web_search",
+                    "execution_backend": "web_search",
                     "requires_knowledge_base": False,
                     "template": {**tool_row["spec"], "id": "tool.web_search", "publish": True, "visibility": "private"},
                 }
@@ -195,7 +195,7 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         catalog_routes,
         "get_catalog_mcp_creation_options",
-        lambda _db: {
+        lambda _db, config=None: {
             "tools": [
                 {
                     "tool_id": "tool.web_search",
@@ -349,7 +349,7 @@ def test_superadmin_catalog_routes_work(client, monkeypatch: pytest.MonkeyPatch)
     assert tools.status_code == 200
     assert tools.get_json()["tools"][0]["id"] == "tool.web_search"
     assert tool_creation_options.status_code == 200
-    assert tool_creation_options.get_json()["execution_backends"][0]["execution_backend"] == "mcp_gateway_web_search"
+    assert tool_creation_options.get_json()["execution_backends"][0]["execution_backend"] == "web_search"
     assert mcp_creation_options.status_code == 200
     assert mcp_creation_options.get_json()["tools"][0]["metadata_defaults"]["category"] == "web_search"
     assert create_tool.status_code == 201
@@ -413,7 +413,7 @@ def test_superadmin_mcp_routes_round_trip_metadata(client, monkeypatch: pytest.M
     }
     seen_payloads: list[dict[str, object]] = []
 
-    monkeypatch.setattr(catalog_routes, "list_catalog_mcp_servers", lambda _db: [mcp_row])
+    monkeypatch.setattr(catalog_routes, "list_catalog_mcp_servers", lambda _db, config=None: [mcp_row])
     monkeypatch.setattr(catalog_routes, "get_catalog_mcp_server", lambda _db, *, mcp_server_id: dict(mcp_row, id=mcp_server_id))
     monkeypatch.setattr(
         catalog_routes,

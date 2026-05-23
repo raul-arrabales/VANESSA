@@ -163,6 +163,9 @@ fi
 if [[ "${target_service}" == "qdrant" ]]; then
   qdrant_enabled_requested || die "qdrant is disabled. Set QDRANT_URL to enable the optional Qdrant runtime."
 fi
+if [[ "${target_service}" == "searxng" ]]; then
+  web_search_enabled_requested || die "searxng is disabled. Set WEB_SEARCH_ENABLED=true to enable the optional web-search runtime."
+fi
 if [[ "${target_service}" == "image_analysis" ]]; then
   image_analysis_enabled_requested || die "image_analysis is disabled. Set IMAGE_ANALYSIS_URL to enable the optional image-analysis runtime."
   with_deps=true

@@ -286,6 +286,12 @@ image_analysis_enabled_requested() {
   [[ -n "${IMAGE_ANALYSIS_URL:-}" ]]
 }
 
+web_search_enabled_requested() {
+  local raw="${WEB_SEARCH_ENABLED:-true}"
+  raw="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | xargs)"
+  [[ "${raw}" != "0" && "${raw}" != "false" && "${raw}" != "no" && "${raw}" != "off" ]]
+}
+
 image_analysis_workers_raw() {
   local raw="${IMAGE_ANALYSIS_WORKERS:-anpr,objects,captioning}"
   raw="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
@@ -546,6 +552,9 @@ stack_services_for_start() {
       continue
     fi
     if [[ "${service}" == "qdrant" ]] && ! qdrant_enabled_requested; then
+      continue
+    fi
+    if [[ "${service}" == "searxng" ]] && ! web_search_enabled_requested; then
       continue
     fi
     if [[ "${service}" == "image_analysis" ]] && ! image_analysis_enabled_requested; then

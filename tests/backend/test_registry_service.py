@@ -77,7 +77,7 @@ def test_tool_spec_accepts_web_search_execution_backend(monkeypatch: pytest.Monk
             "output_schema": {},
             "safety_policy": {},
             "offline_compatible": False,
-            "execution_backend": "mcp_gateway_web_search",
+            "execution_backend": "web_search",
             "execution_config": {},
             "permissions": {},
         },

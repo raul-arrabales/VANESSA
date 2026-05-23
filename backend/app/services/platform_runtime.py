@@ -17,7 +17,9 @@ from .platform_adapters import (
     OpenAICompatibleLlmAdapter,
     QdrantVectorStoreAdapter,
     SandboxExecutionAdapter,
+    SearxngWebSearchAdapter,
     VectorStoreAdapter,
+    WebSearchAdapter,
     WeaviateVectorStoreAdapter,
 )
 from .platform_bootstrap import ensure_platform_bootstrap_state
@@ -30,6 +32,7 @@ from .platform_types import (
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    CAPABILITY_WEB_SEARCH,
     OPTIONAL_CAPABILITIES,
     PlatformControlPlaneError,
     ProviderBinding,
@@ -172,6 +175,24 @@ def resolve_mcp_runtime_adapter(
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported MCP adapter kind", status_code=500)
 
 
+def resolve_web_search_adapter(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    provider_instance_id: str | None = None,
+) -> WebSearchAdapter:
+    binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_WEB_SEARCH,
+        provider_instance_id=provider_instance_id,
+    )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
+    if binding.adapter_kind == "searxng_http":
+        return SearxngWebSearchAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported web search adapter kind", status_code=500)
+
+
 def resolve_image_analysis_adapter(
     database_url: str,
     config: AuthConfig,
@@ -216,6 +237,13 @@ def get_active_platform_runtime(
             database_url,
             config,
             capability_key=CAPABILITY_VECTOR_STORE,
+            provider_instance_id=None,
+            ensure_bootstrap=False,
+        ),
+        CAPABILITY_MCP_RUNTIME: _resolve_provider_binding(
+            database_url,
+            config,
+            capability_key=CAPABILITY_MCP_RUNTIME,
             provider_instance_id=None,
             ensure_bootstrap=False,
         ),
@@ -382,24 +410,44 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
         if exc.code != "active_binding_not_found":
             raise
 
+    mcp_adapter = resolve_mcp_runtime_adapter(database_url, config)
+    statuses.append(
+        {
+            "capability": CAPABILITY_MCP_RUNTIME,
+            "provider": {
+                "id": mcp_adapter.binding.provider_instance_id,
+                "slug": mcp_adapter.binding.provider_slug,
+                "provider_key": mcp_adapter.binding.provider_key,
+                "provider_origin": mcp_adapter.binding.provider_origin,
+                "display_name": mcp_adapter.binding.provider_display_name,
+            },
+            "deployment_profile": {
+                "id": mcp_adapter.binding.deployment_profile_id,
+                "slug": mcp_adapter.binding.deployment_profile_slug,
+                "display_name": mcp_adapter.binding.deployment_profile_display_name,
+            },
+            "health": mcp_adapter.health(),
+        }
+    )
+
     try:
-        mcp_adapter = resolve_mcp_runtime_adapter(database_url, config)
+        web_search_adapter = resolve_web_search_adapter(database_url, config)
         statuses.append(
             {
-                "capability": CAPABILITY_MCP_RUNTIME,
+                "capability": CAPABILITY_WEB_SEARCH,
                 "provider": {
-                    "id": mcp_adapter.binding.provider_instance_id,
-                    "slug": mcp_adapter.binding.provider_slug,
-                    "provider_key": mcp_adapter.binding.provider_key,
-                    "provider_origin": mcp_adapter.binding.provider_origin,
-                    "display_name": mcp_adapter.binding.provider_display_name,
+                    "id": web_search_adapter.binding.provider_instance_id,
+                    "slug": web_search_adapter.binding.provider_slug,
+                    "provider_key": web_search_adapter.binding.provider_key,
+                    "provider_origin": web_search_adapter.binding.provider_origin,
+                    "display_name": web_search_adapter.binding.provider_display_name,
                 },
                 "deployment_profile": {
-                    "id": mcp_adapter.binding.deployment_profile_id,
-                    "slug": mcp_adapter.binding.deployment_profile_slug,
-                    "display_name": mcp_adapter.binding.deployment_profile_display_name,
+                    "id": web_search_adapter.binding.deployment_profile_id,
+                    "slug": web_search_adapter.binding.deployment_profile_slug,
+                    "display_name": web_search_adapter.binding.deployment_profile_display_name,
                 },
-                "health": mcp_adapter.health(),
+                "health": web_search_adapter.health(),
             }
         )
     except PlatformControlPlaneError as exc:

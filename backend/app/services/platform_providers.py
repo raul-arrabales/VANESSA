@@ -24,6 +24,7 @@ from .platform_runtime import (
     resolve_mcp_runtime_adapter,
     resolve_sandbox_execution_adapter,
     resolve_vector_store_adapter,
+    resolve_web_search_adapter,
 )
 from .platform_serialization import _serialize_binding_resource, _serialize_provider_family_row, _serialize_provider_row
 from .platform_types import (
@@ -33,6 +34,7 @@ from .platform_types import (
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    CAPABILITY_WEB_SEARCH,
     PlatformControlPlaneError,
     ProviderBinding,
 )
@@ -318,17 +320,25 @@ def validate_provider(
 
     if binding.capability_key == CAPABILITY_MCP_RUNTIME:
         adapter = resolve_mcp_runtime_adapter(database_url, config, provider_instance_id=provider_instance_id)
-        invoke_payload, invoke_status = adapter.invoke(
-            tool_name=str(binding.config.get("healthcheck_tool_name", "web_search")),
-            arguments={"query": "healthcheck", "top_k": 1},
-            request_metadata={"validation": True},
-        )
+        health = adapter.health()
+        return {
+            "provider": _serialize_provider_row(provider_row),
+            "validation": _annotate_provider_validation(binding.capability_key, {
+                "health": health,
+                "gateway_reachable": bool(health.get("reachable", False)),
+                "gateway_status_code": health.get("status_code"),
+            }),
+        }
+
+    if binding.capability_key == CAPABILITY_WEB_SEARCH:
+        adapter = resolve_web_search_adapter(database_url, config, provider_instance_id=provider_instance_id)
+        search_payload, search_status = adapter.search({"query": str(binding.config.get("healthcheck_query", "healthcheck")), "top_k": 1})
         return {
             "provider": _serialize_provider_row(provider_row),
             "validation": _annotate_provider_validation(binding.capability_key, {
                 "health": adapter.health(),
-                "invoke_reachable": invoke_payload is not None and 200 <= invoke_status < 300,
-                "invoke_status_code": invoke_status,
+                "search_reachable": search_payload is not None and 200 <= search_status < 300,
+                "search_status_code": search_status,
             }),
         }
 

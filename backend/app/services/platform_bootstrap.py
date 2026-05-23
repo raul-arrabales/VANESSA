@@ -32,6 +32,7 @@ from .platform_types import (
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
     CAPABILITY_VECTOR_STORE,
+    CAPABILITY_WEB_SEARCH,
 )
 
 
@@ -298,7 +299,10 @@ def _existing_bindings_by_capability(
 
 def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> None:
     sandbox_url = str(getattr(config, "sandbox_url", "") or "").strip()
-    mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "").strip()
+    mcp_gateway_url = str(getattr(config, "mcp_gateway_url", "") or "http://mcp_gateway:8080").strip() or "http://mcp_gateway:8080"
+    web_search_enabled = bool(getattr(config, "web_search_enabled", True))
+    web_search_url = str(getattr(config, "web_search_url", "") or "http://searxng:8080").strip() or "http://searxng:8080"
+    web_search_timeout_seconds = int(getattr(config, "web_search_timeout_seconds", 8) or 8)
     image_analysis_url = str(getattr(config, "image_analysis_url", "") or "").strip()
     llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
     image_analysis_request_timeout_seconds = int(
@@ -315,9 +319,10 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_LLM_INFERENCE, display_name="LLM inference", description="Normalized chat and generation capability for model inference.", is_required=True)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_EMBEDDINGS, display_name="Embeddings", description="Normalized text embeddings capability for retrieval and vector ingestion.", is_required=True)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_VECTOR_STORE, display_name="Vector store", description="Semantic retrieval capability for embeddings and document search.", is_required=True)
-    platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_MCP_RUNTIME, display_name="MCP runtime", description="Gateway capability for MCP-hosted tool execution.", is_required=False)
+    platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_MCP_RUNTIME, display_name="MCP runtime", description="Gateway capability for MCP-hosted tool execution.", is_required=True)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_SANDBOX_EXECUTION, display_name="Sandbox execution", description="Isolated code-execution capability for agent tools.", is_required=False)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_IMAGE_ANALYSIS, display_name="Image analysis", description="Local image understanding capability for license plates, object detection, and captioning.", is_required=False)
+    platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_WEB_SEARCH, display_name="Web search", description="Online web search capability for agent research tools.", is_required=False)
 
     platform_repo.ensure_provider_family(
         database_url,
@@ -389,7 +394,16 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         adapter_kind="mcp_http",
         provider_origin="local",
         display_name="MCP gateway local",
-        description="Optional local MCP runtime gateway for remote and general-purpose tools.",
+        description="Required local MCP runtime gateway for agent tool transport.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="searxng_local",
+        capability_key=CAPABILITY_WEB_SEARCH,
+        adapter_kind="searxng_http",
+        provider_origin="local",
+        display_name="SearXNG local",
+        description="Optional local token-free web search provider.",
     )
     platform_repo.ensure_provider_family(
         database_url,
@@ -522,18 +536,36 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             enabled=True,
             config_json={"collections_path": "/collections", "health_path": "/healthz", "default_vector_size": 1, "distance": "Cosine"},
         )
-    mcp_gateway_provider = None
-    if mcp_gateway_url:
-        mcp_gateway_provider = platform_repo.ensure_provider_instance(
+    mcp_gateway_provider = platform_repo.ensure_provider_instance(
+        database_url,
+        slug="mcp-gateway-local",
+        provider_key="mcp_gateway_local",
+        display_name="MCP gateway local",
+        description="Required local MCP gateway for hosted tool runtimes.",
+        endpoint_url=mcp_gateway_url,
+        healthcheck_url=mcp_gateway_url.rstrip("/") + "/health",
+        enabled=True,
+        config_json={"invoke_path": "/v1/tools/invoke", "list_tools_path": "/v1/tools"},
+    )
+    web_search_provider = None
+    if web_search_enabled and web_search_url:
+        web_search_provider = platform_repo.ensure_provider_instance(
             database_url,
-            slug="mcp-gateway-local",
-            provider_key="mcp_gateway_local",
-            display_name="MCP gateway local",
-            description="Optional local MCP gateway for hosted tool runtimes.",
-            endpoint_url=mcp_gateway_url,
-            healthcheck_url=mcp_gateway_url.rstrip("/") + "/health",
+            slug="searxng-local",
+            provider_key="searxng_local",
+            display_name="SearXNG local",
+            description="Optional local token-free web search provider.",
+            endpoint_url=web_search_url,
+            healthcheck_url=None,
             enabled=True,
-            config_json={"invoke_path": "/v1/tools/invoke", "list_tools_path": "/v1/tools", "healthcheck_tool_name": "web_search"},
+            config_json={
+                "request_timeout_seconds": web_search_timeout_seconds,
+                "default_language": "",
+                "default_safesearch": "1",
+                "default_categories": "general",
+                "default_engines": "",
+                "healthcheck_query": "healthcheck",
+            },
         )
     image_analysis_provider = None
     if image_analysis_url:
@@ -589,8 +621,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=default_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
     if sandbox_provider is not None and sandbox_provider.get("id"):
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
-    if mcp_gateway_provider is not None:
-        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+    _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=default_bindings_by_capability.get(CAPABILITY_MCP_RUNTIME))
+    if web_search_provider is not None:
+        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(profile["id"]), capability_key=CAPABILITY_WEB_SEARCH, provider_instance_id=str(web_search_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=default_bindings_by_capability.get(CAPABILITY_WEB_SEARCH))
     if image_analysis_provider is not None:
         _upsert_bootstrap_binding(
             database_url,
@@ -612,8 +645,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(weaviate_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
         if sandbox_provider is not None and sandbox_provider.get("id"):
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
-        if mcp_gateway_provider is not None:
-            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_MCP_RUNTIME))
+        if web_search_provider is not None:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_WEB_SEARCH, provider_instance_id=str(web_search_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_WEB_SEARCH))
         if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 
@@ -625,8 +659,9 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_VECTOR_STORE, provider_instance_id=str(qdrant_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={"selection_mode": _VECTOR_SELECTION_DYNAMIC_NAMESPACE}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_VECTOR_STORE))
         if sandbox_provider is not None and sandbox_provider.get("id"):
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_SANDBOX_EXECUTION, provider_instance_id=str(sandbox_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
-        if mcp_gateway_provider is not None:
-            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={})
+        _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_MCP_RUNTIME, provider_instance_id=str(mcp_gateway_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_MCP_RUNTIME))
+        if web_search_provider is not None:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_WEB_SEARCH, provider_instance_id=str(web_search_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_WEB_SEARCH))
         if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
 

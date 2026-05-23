@@ -67,6 +67,7 @@ def register_system_routes(app: Flask) -> None:
         agent_engine_url = config.agent_engine_url.rstrip("/")
         sandbox_url = config.sandbox_url.rstrip("/")
         mcp_gateway_url = config.mcp_gateway_url.rstrip("/")
+        web_search_url = config.web_search_url.rstrip("/")
         image_analysis_url = config.image_analysis_url.rstrip("/")
         kws_url = config.kws_url.rstrip("/")
         weaviate_url = config.weaviate_url.rstrip("/")
@@ -89,10 +90,11 @@ def register_system_routes(app: Flask) -> None:
             services.insert(4, {"service": "llama.cpp", "container": "llama_cpp", "target": config.llama_cpp_url, "reachable": app_module._http_json_ok(llama_cpp_url + "/v1/models")})
         if config.qdrant_url.strip():
             services.insert(len(services) - 1, {"service": "Qdrant", "container": "qdrant", "target": config.qdrant_url, "reachable": app_module._http_json_ok(qdrant_url + "/healthz")})
-        if config.mcp_gateway_url.strip():
-            services.insert(6, {"service": "MCP Gateway", "container": "mcp_gateway", "target": config.mcp_gateway_url, "reachable": app_module._http_json_ok(mcp_gateway_url + "/health")})
+        services.insert(6, {"service": "MCP Gateway", "container": "mcp_gateway", "target": config.mcp_gateway_url, "reachable": app_module._http_json_ok(mcp_gateway_url + "/health")})
+        if config.web_search_enabled:
+            services.insert(7, {"service": "SearXNG Web Search", "container": "searxng", "target": config.web_search_url, "reachable": app_module._http_json_ok(web_search_url + "/")})
         if config.image_analysis_url.strip():
-            services.insert(7, {"service": "Image Analysis", "container": "image_analysis", "target": config.image_analysis_url, "reachable": app_module._http_json_ok(image_analysis_url + "/health")})
+            services.insert(8, {"service": "Image Analysis", "container": "image_analysis", "target": config.image_analysis_url, "reachable": app_module._http_json_ok(image_analysis_url + "/health")})
 
         response_payload: dict[str, Any] = {
             "status": "ok" if all(service["reachable"] for service in services) else "degraded",

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-23T10:56:49+00:00",
+  "generated_at": "2026-05-23T16:42:42+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -79,7 +79,7 @@
       "container": "searxng",
       "label": "SearXNG",
       "group": "runtime",
-      "description": "Local token-free metasearch backend used by the MCP gateway web search tool.",
+      "description": "Optional local token-free metasearch provider for backend-owned web search.",
       "public_exposed": false,
       "criticality": "medium"
     },
@@ -88,9 +88,9 @@
       "container": "mcp_gateway",
       "label": "MCP Gateway",
       "group": "runtime",
-      "description": "HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.",
+      "description": "Required HTTP gateway that exposes authorized MCP server wrappers backed by catalog tools.",
       "public_exposed": true,
-      "criticality": "medium"
+      "criticality": "high"
     },
     {
       "id": "image_analysis",
@@ -270,7 +270,7 @@
       "from": "backend",
       "to": "mcp_gateway",
       "protocol": "HTTP",
-      "purpose": "MCP provider checks and private gateway-backed tool adapters",
+      "purpose": "Required MCP provider checks and gateway-hosted tool exposure transport",
       "kind": "http",
       "direction": "outbound"
     },
@@ -298,6 +298,15 @@
       "to": "sandbox",
       "protocol": "HTTP",
       "purpose": "Controlled code execution",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-searxng",
+      "from": "backend",
+      "to": "searxng",
+      "protocol": "HTTP",
+      "purpose": "Optional web search through the active searxng_local provider binding",
       "kind": "http",
       "direction": "outbound"
     },
@@ -380,15 +389,6 @@
       "protocol": "compose",
       "purpose": "Startup dependency",
       "kind": "internal",
-      "direction": "outbound"
-    },
-    {
-      "id": "mcp_gateway-searxng",
-      "from": "mcp_gateway",
-      "to": "searxng",
-      "protocol": "HTTP",
-      "purpose": "Web search queries through the local SearXNG JSON API",
-      "kind": "http",
       "direction": "outbound"
     }
   ],
@@ -511,5 +511,5 @@
       }
     }
   },
-  "source_hash": "1f682ce99d9e7c13e36fa1a4b8b63be9ed6470436d9fd0046638e1319908ec28"
+  "source_hash": "13d4bf0e5e8ed85fc342d31620859cf550450e1d1bc6272b1aca2391bad4fb58"
 }

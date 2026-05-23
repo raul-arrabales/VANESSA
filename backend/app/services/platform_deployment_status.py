@@ -10,6 +10,7 @@ from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
     CAPABILITY_LLM_INFERENCE,
+    CAPABILITY_MCP_RUNTIME,
     CAPABILITY_VECTOR_STORE,
     REQUIRED_CAPABILITIES,
 )
@@ -21,6 +22,7 @@ def _describe_capability(capability_key: str) -> str:
         CAPABILITY_LLM_INFERENCE: "LLM inference",
         CAPABILITY_EMBEDDINGS: "Embeddings",
         CAPABILITY_VECTOR_STORE: "Vector store",
+        CAPABILITY_MCP_RUNTIME: "MCP runtime",
         CAPABILITY_IMAGE_ANALYSIS: "Image analysis",
     }
     return labels.get(capability_key, capability_key)
@@ -69,6 +71,13 @@ def _binding_configuration_status(
                     _issue(
                         "resource_provider_origin_mismatch",
                         f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is local and cannot be served by a cloud provider.",
+                    )
+                )
+            elif provider_origin != "cloud" and backend and backend != "local":
+                issues.append(
+                    _issue(
+                        "resource_provider_origin_mismatch",
+                        f"{resource.get('display_name') or resource.get('id') or 'Selected model'} is cloud-hosted and cannot be served by a local provider.",
                     )
                 )
     elif capability_key == CAPABILITY_IMAGE_ANALYSIS:

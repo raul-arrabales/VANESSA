@@ -202,6 +202,7 @@ def test_list_catalog_tools_hides_image_tools_without_enabled_worker(monkeypatch
     ]
     monkeypatch.setattr(catalog_service, "list_registry_entities", lambda _db, *, entity_type: rows if entity_type == "tool" else [])
     monkeypatch.setattr(catalog_service, "image_analysis_available_tasks", lambda _db, _config: {"license_plate_recognition"})
+    monkeypatch.setattr(catalog_service, "_web_search_available", lambda _db, _config: True)
 
     tools = catalog_service.list_catalog_tools("ignored", config=SimpleNamespace())
 
@@ -234,6 +235,7 @@ def test_list_catalog_mcp_servers_hides_image_servers_without_enabled_worker(mon
     monkeypatch.setattr(catalog_service, "list_registry_entities", lambda _db, *, entity_type: mcp_rows if entity_type == "mcp_server" else [])
     monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_rows.get(entity_id))
     monkeypatch.setattr(catalog_service, "image_analysis_available_tasks", lambda _db, _config: {"license_plate_recognition"})
+    monkeypatch.setattr(catalog_service, "_web_search_available", lambda _db, _config: True)
 
     servers = catalog_service.list_catalog_mcp_servers("ignored", config=SimpleNamespace())
 
@@ -802,9 +804,8 @@ def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(m
         "current_spec": {
             "name": "Web search",
             "description": "desc",
-            "transport": "mcp",
-            "connection_profile_ref": "default",
-            "tool_name": "web_search",
+            "execution_backend": "web_search",
+            "execution_config": {"provider_tool_name": "web_search"},
             "input_schema": {},
             "output_schema": {},
             "safety_policy": {},
@@ -813,34 +814,34 @@ def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(m
     }
     monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_row)
 
-    class HealthyMcpAdapter:
+    class HealthyWebSearchAdapter:
         def health(self):
             return {"reachable": True, "status_code": 200}
 
-        def list_tools(self):
-            return {"tools": [{"tool_name": "web_search"}]}, 200
+        def search(self, arguments):
+            return {"query": arguments.get("query"), "results": []}, 200
 
     result_ok = None
-    monkeypatch.setattr(catalog_tool_backends, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
+    monkeypatch.setattr(catalog_tool_backends, "resolve_web_search_adapter", lambda _db, config: HealthyWebSearchAdapter())
     result_ok = catalog_service.validate_catalog_tool("ignored", config=SimpleNamespace(), tool_id="tool.web_search")
 
     assert result_ok["validation"]["valid"] is True
-    assert result_ok["validation"]["runtime_checks"]["tool_discovered"] is True
+    assert result_ok["validation"]["runtime_checks"]["provider_reachable"] is True
 
     monkeypatch.setattr(
         catalog_tool_backends,
-        "resolve_mcp_runtime_adapter",
+        "resolve_web_search_adapter",
         lambda _db, config: (_ for _ in ()).throw(
-            PlatformControlPlaneError("missing_active_binding", "Active platform runtime is missing capability 'mcp_runtime'", status_code=404)
+            PlatformControlPlaneError("missing_active_binding", "Active platform runtime is missing capability 'web_search'", status_code=404)
         ),
     )
     result_missing = catalog_service.validate_catalog_tool("ignored", config=SimpleNamespace(), tool_id="tool.web_search")
 
     assert result_missing["validation"]["valid"] is False
-    assert "Active platform runtime is missing capability 'mcp_runtime'" in result_missing["validation"]["errors"]
+    assert "Active platform runtime is missing capability 'web_search'" in result_missing["validation"]["errors"]
 
 
-def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatch):
+def test_execute_catalog_tool_invokes_web_search_runtime(monkeypatch: pytest.MonkeyPatch):
     tool_row = {
         "entity_id": "tool.web_search",
         "entity_type": "tool",
@@ -852,9 +853,8 @@ def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatc
         "current_spec": {
             "name": "Web search",
             "description": "desc",
-            "transport": "mcp",
-            "connection_profile_ref": "default",
-            "tool_name": "web_search",
+            "execution_backend": "web_search",
+            "execution_config": {"provider_tool_name": "web_search"},
             "input_schema": {},
             "output_schema": {},
             "safety_policy": {},
@@ -865,14 +865,12 @@ def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatc
 
     captured: dict[str, object] = {}
 
-    class HealthyMcpAdapter:
-        def invoke(self, *, tool_name: str, arguments: dict[str, object], request_metadata: dict[str, object]):
-            captured["tool_name"] = tool_name
+    class HealthyWebSearchAdapter:
+        def search(self, arguments: dict[str, object]):
             captured["arguments"] = arguments
-            captured["request_metadata"] = request_metadata
-            return {"results": [{"title": "Example"}]}, 200
+            return {"query": arguments.get("query"), "results": [{"title": "Example"}]}, 200
 
-    monkeypatch.setattr(catalog_tool_backends, "resolve_mcp_runtime_adapter", lambda _db, config: HealthyMcpAdapter())
+    monkeypatch.setattr(catalog_tool_backends, "resolve_web_search_adapter", lambda _db, config: HealthyWebSearchAdapter())
 
     result = catalog_service.execute_catalog_tool(
         "ignored",
@@ -883,9 +881,7 @@ def test_execute_catalog_tool_invokes_mcp_runtime(monkeypatch: pytest.MonkeyPatc
     )
 
     assert captured == {
-        "tool_name": "web_search",
         "arguments": {"query": "OpenAI", "top_k": 3},
-        "request_metadata": {"actor_user_id": 7},
     }
     assert result["execution"]["ok"] is True
     assert result["execution"]["result"]["results"][0]["title"] == "Example"

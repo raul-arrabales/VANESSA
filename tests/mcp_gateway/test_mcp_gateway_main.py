@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.error import URLError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -11,131 +12,72 @@ if str(PROJECT_ROOT) not in sys.path:
 from mcp_gateway.app import main as mcp_main  # noqa: E402
 
 
-def test_web_search_returns_normalized_searxng_results(monkeypatch):
+class _FakeResponse:
+    def __init__(self, payload: dict[str, object], status: int = 200):
+        self.payload = payload
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+
+def test_request_backend_json_adds_service_token_and_payload(monkeypatch):
     seen: dict[str, object] = {}
 
-    def fake_fetch_json(url: str, *, timeout_seconds: float):
-        seen["url"] = url
-        seen["timeout_seconds"] = timeout_seconds
-        return {
-            "results": [
-                {
-                    "title": "Example One",
-                    "url": "https://example.com/one",
-                    "content": "First result",
-                    "engine": "duckduckgo",
-                },
-                {
-                    "title": "Duplicate",
-                    "url": "https://example.com/one",
-                    "content": "Duplicate result",
-                    "engine": "bing",
-                },
-                {
-                    "title": "Example Two",
-                    "url": "https://example.com/two",
-                    "content": "Second result",
-                    "engines": ["brave", "google"],
-                },
-            ]
-        }, 200
+    def fake_urlopen(request, timeout: float):
+        seen["url"] = request.full_url
+        seen["method"] = request.get_method()
+        seen["headers"] = dict(request.header_items())
+        seen["body"] = json.loads(request.data.decode("utf-8"))
+        seen["timeout"] = timeout
+        return _FakeResponse({"ok": True}, status=201)
 
-    monkeypatch.setenv("SEARXNG_URL", "http://searxng.local")
-    monkeypatch.setenv("SEARXNG_TIMEOUT_SECONDS", "4")
-    monkeypatch.setattr(mcp_main, "_fetch_json", fake_fetch_json)
+    monkeypatch.setenv("BACKEND_URL", "http://backend.local")
+    monkeypatch.setenv("MCP_GATEWAY_SERVICE_TOKEN", "test-token")
+    monkeypatch.setattr(mcp_main, "urlopen", fake_urlopen)
 
-    payload, status_code = mcp_main._web_search(
+    payload, status_code = mcp_main._request_backend_json(
+        "/v1/internal/mcp-servers/web_search/invoke",
+        method="POST",
+        payload={"arguments": {"query": "hello"}},
+    )
+
+    assert status_code == 201
+    assert payload == {"ok": True}
+    assert seen["url"] == "http://backend.local/v1/internal/mcp-servers/web_search/invoke"
+    assert seen["method"] == "POST"
+    assert seen["headers"]["X-service-token"] == "test-token"
+    assert seen["body"] == {"arguments": {"query": "hello"}}
+    assert seen["timeout"] == 8.0
+
+
+def test_request_backend_json_maps_backend_unavailable(monkeypatch):
+    def fake_urlopen(_request, timeout: float):
+        raise URLError("offline")
+
+    monkeypatch.setattr(mcp_main, "urlopen", fake_urlopen)
+
+    payload, status_code = mcp_main._request_backend_json("/v1/internal/mcp-servers/discover")
+
+    assert payload is None
+    assert status_code == 502
+
+
+def test_query_from_metadata_encodes_identity_scope():
+    query = mcp_main._query_from_metadata(
         {
-            "query": "hello world",
-            "top_k": 3,
-            "language": "en",
-            "time_range": "day",
-            "safesearch": 2,
-            "categories": "general,news",
+            "agent_id": "agent.local",
+            "agent_domain": "research",
+            "delegated_user_id": 42,
+            "delegated_user_role": "user",
+            "ignored": "value",
         }
     )
 
-    assert status_code == 200
-    assert payload["query"] == "hello world"
-    assert len(payload["results"]) == 2
-    assert payload["results"][0] == {
-        "title": "Example One",
-        "url": "https://example.com/one",
-        "snippet": "First result",
-        "engine": "duckduckgo",
-        "rank": 1,
-    }
-    assert payload["results"][1]["engine"] == "brave, google"
-    assert seen["timeout_seconds"] == 4.0
-
-    parsed = urlparse(str(seen["url"]))
-    query = parse_qs(parsed.query)
-    assert parsed.geturl().startswith("http://searxng.local/search?")
-    assert query["q"] == ["hello world"]
-    assert query["format"] == ["json"]
-    assert query["language"] == ["en"]
-    assert query["time_range"] == ["day"]
-    assert query["safesearch"] == ["2"]
-    assert query["categories"] == ["general,news"]
-
-
-def test_web_search_returns_empty_results(monkeypatch):
-    monkeypatch.setattr(mcp_main, "_fetch_json", lambda _url, *, timeout_seconds: ({"results": []}, 200))
-
-    payload, status_code = mcp_main._web_search({"query": "hello", "top_k": 2})
-
-    assert status_code == 200
-    assert payload == {"query": "hello", "results": []}
-
-
-def test_web_search_caps_top_k(monkeypatch):
-    def fake_fetch_json(_url: str, *, timeout_seconds: float):
-        return {
-            "results": [
-                {"title": f"Result {index}", "url": f"https://example.com/{index}", "content": "", "engine": "test"}
-                for index in range(20)
-            ]
-        }, 200
-
-    monkeypatch.setattr(mcp_main, "_fetch_json", fake_fetch_json)
-
-    payload, status_code = mcp_main._web_search({"query": "hello", "top_k": 999})
-
-    assert status_code == 200
-    assert len(payload["results"]) == 10
-    assert payload["results"][-1]["rank"] == 10
-
-
-def test_web_search_rejects_invalid_arguments():
-    payload, status_code = mcp_main._web_search({"query": "", "top_k": 2})
-
-    assert status_code == 400
-    assert payload["error"] == "invalid_arguments"
-
-    payload, status_code = mcp_main._web_search({"query": "hello", "top_k": "many"})
-
-    assert status_code == 400
-    assert payload["message"] == "top_k must be an integer"
-
-    payload, status_code = mcp_main._web_search({"query": "hello", "time_range": "week"})
-
-    assert status_code == 400
-    assert payload["message"] == "time_range must be one of day, month, or year"
-
-
-def test_web_search_maps_backend_timeout(monkeypatch):
-    monkeypatch.setattr(mcp_main, "_fetch_json", lambda _url, *, timeout_seconds: (None, 504))
-
-    payload, status_code = mcp_main._web_search({"query": "hello"})
-
-    assert status_code == 504
-    assert payload["error"] == "search_timeout"
-
-
-def test_web_search_maps_backend_unavailable(monkeypatch):
-    monkeypatch.setattr(mcp_main, "_fetch_json", lambda _url, *, timeout_seconds: (None, 502))
-
-    payload, status_code = mcp_main._web_search({"query": "hello"})
-
-    assert status_code == 502
-    assert payload["error"] == "search_backend_unavailable"
+    assert query == "?agent_id=agent.local&agent_domain=research&delegated_user_id=42&delegated_user_role=user"

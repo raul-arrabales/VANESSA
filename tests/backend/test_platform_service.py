@@ -76,6 +76,19 @@ def _provider_rows_by_id() -> dict[str, dict[str, object]]:
             "enabled": True,
             "adapter_kind": "weaviate_http",
         },
+        "provider-mcp": {
+            "id": "provider-mcp",
+            "slug": "mcp-gateway-local",
+            "provider_key": "mcp_gateway_local",
+            "provider_origin": "local",
+            "capability_key": "mcp_runtime",
+            "display_name": "MCP gateway local",
+            "description": "desc",
+            "endpoint_url": "http://mcp_gateway:8080",
+            "healthcheck_url": "http://mcp_gateway:8080/health",
+            "enabled": True,
+            "adapter_kind": "mcp_http",
+        },
     }
 
 
@@ -137,6 +150,7 @@ def _deployment_payload_with_embeddings_resource(model_id: str) -> dict[str, obj
                 "provider_id": "provider-vector",
                 "resource_policy": {"selection_mode": "explicit"},
             },
+            {"capability": "mcp_runtime", "provider_id": "provider-mcp"},
         ],
     }
 
@@ -820,7 +834,7 @@ def test_platform_service_runtime_wrapper_forwards_dispatch_secret_flag(monkeypa
 
 def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
-    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store"})
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store", "mcp_runtime"})
     monkeypatch.setattr(
         platform_service.platform_repo,
         "get_provider_instance",
@@ -849,14 +863,14 @@ def test_create_deployment_profile_rejects_provider_capability_mismatch(monkeypa
 
 def test_create_deployment_profile_allows_empty_resources_for_required_bindings(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(platform_service, "ensure_platform_bootstrap_state", lambda _db, _config: None)
-    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store"})
+    monkeypatch.setattr(platform_service, "_known_capability_keys", lambda _db: {"llm_inference", "embeddings", "vector_store", "mcp_runtime"})
     monkeypatch.setattr(
         platform_service.platform_repo,
         "get_provider_instance",
         lambda _db, provider_id: {
             "id": provider_id,
-            "provider_key": "weaviate_local" if provider_id == "provider-vector" else "vllm_embeddings_local",
-            "capability_key": "vector_store" if provider_id == "provider-vector" else ("llm_inference" if provider_id == "provider-llm" else "embeddings"),
+            "provider_key": "mcp_gateway_local" if provider_id == "provider-mcp" else ("weaviate_local" if provider_id == "provider-vector" else "vllm_embeddings_local"),
+            "capability_key": "mcp_runtime" if provider_id == "provider-mcp" else ("vector_store" if provider_id == "provider-vector" else ("llm_inference" if provider_id == "provider-llm" else "embeddings")),
         },
     )
     monkeypatch.setattr(
@@ -913,6 +927,20 @@ def test_create_deployment_profile_allows_empty_resources_for_required_bindings(
                 "default_resource_id": None,
                 "resource_policy": {"selection_mode": "explicit"},
             },
+            {
+                "capability_key": "mcp_runtime",
+                "provider_instance_id": "provider-mcp",
+                "provider_slug": "mcp-gateway-local",
+                "provider_key": "mcp_gateway_local",
+                "provider_display_name": "MCP gateway local",
+                "endpoint_url": "http://mcp_gateway:8080",
+                "healthcheck_url": "http://mcp_gateway:8080/health",
+                "enabled": True,
+                "adapter_kind": "mcp_http",
+                "resources": [],
+                "default_resource_id": None,
+                "resource_policy": {},
+            },
         ],
     )
 
@@ -926,6 +954,7 @@ def test_create_deployment_profile_allows_empty_resources_for_required_bindings(
                 {"capability": "llm_inference", "provider_id": "provider-llm"},
                 {"capability": "embeddings", "provider_id": "provider-embeddings"},
                 {"capability": "vector_store", "provider_id": "provider-vector", "resource_policy": {"selection_mode": "explicit"}},
+                {"capability": "mcp_runtime", "provider_id": "provider-mcp"},
             ],
         },
         created_by_user_id=1,
@@ -966,6 +995,17 @@ def test_model_bearing_deployment_save_paths_use_public_model_id(
                 "resource_policy": {"selection_mode": "explicit"},
             },
         ),
+        _resolved_binding_row(
+            providers_by_id,
+            {
+                "capability_key": "mcp_runtime",
+                "provider_instance_id": "provider-mcp",
+                "resources": [],
+                "default_resource_id": None,
+                "binding_config": {},
+                "resource_policy": {},
+            },
+        ),
     ]
     captured: dict[str, object] = {}
 
@@ -973,7 +1013,7 @@ def test_model_bearing_deployment_save_paths_use_public_model_id(
     monkeypatch.setattr(
         platform_service,
         "_known_capability_keys",
-        lambda _db: {"llm_inference", "embeddings", "vector_store"},
+        lambda _db: {"llm_inference", "embeddings", "vector_store", "mcp_runtime"},
     )
     monkeypatch.setattr(
         platform_service._platform_bindings_module,  # type: ignore[attr-defined]
@@ -1469,7 +1509,7 @@ def test_activate_deployment_profile_allows_incomplete_required_capabilities(mon
     )
 
     assert deployment["configuration_status"]["is_ready"] is False
-    assert deployment["configuration_status"]["incomplete_capabilities"] == ["embeddings", "llm_inference", "vector_store"]
+    assert deployment["configuration_status"]["incomplete_capabilities"] == ["embeddings", "llm_inference", "mcp_runtime", "vector_store"]
 
 
 def test_activate_deployment_profile_rejects_cloud_provider_when_offline(monkeypatch: pytest.MonkeyPatch):
@@ -2822,6 +2862,7 @@ def test_ensure_platform_bootstrap_state_seeds_provider_family_origins(monkeypat
         "weaviate_local": "local",
         "qdrant_local": "local",
         "mcp_gateway_local": "local",
+        "searxng_local": "local",
         "sandbox_local": "local",
         "image_analysis_local": "local",
     }
@@ -3783,11 +3824,29 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                     },
                 },
             }
+        if capability_key == "mcp_runtime":
+            return {
+                "capability_key": "mcp_runtime",
+                "provider_instance_id": "provider-mcp",
+                "provider_slug": "mcp-gateway-local",
+                "provider_key": "mcp_gateway_local",
+                "provider_display_name": "MCP gateway local",
+                "provider_description": "desc",
+                "endpoint_url": "http://mcp_gateway:8080",
+                "healthcheck_url": "http://mcp_gateway:8080/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "mcp_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": deployment_slug,
+                "deployment_profile_display_name": "Runtime Deployment",
+            }
         if capability_key == "sandbox_execution":
             return None
-        if capability_key == "mcp_runtime":
-            return None
         if capability_key == "image_analysis":
+            return None
+        if capability_key == "web_search":
             return None
         return {
             "capability_key": "vector_store",
@@ -3934,6 +3993,24 @@ def test_get_active_platform_runtime_uses_current_active_bindings(
                 "resource_policy": {},
                 "binding_config": {},
             },
+            "mcp_runtime": {
+                "id": "provider-mcp",
+                "slug": "mcp-gateway-local",
+                "provider_key": "mcp_gateway_local",
+                "provider_origin": "local",
+                "display_name": "MCP gateway local",
+                "description": "desc",
+                "adapter_kind": "mcp_http",
+                "endpoint_url": "http://mcp_gateway:8080",
+                "healthcheck_url": "http://mcp_gateway:8080/health",
+                "enabled": True,
+                "config": {},
+                "resources": [],
+                "default_resource_id": None,
+                "default_resource": None,
+                "resource_policy": {},
+                "binding_config": {},
+            },
         },
     }
 
@@ -4033,6 +4110,23 @@ def test_get_active_platform_runtime_includes_optional_tool_runtime_bindings(mon
                 "deployment_profile_slug": "local-default",
                 "deployment_profile_display_name": "Local Default",
             },
+            "mcp_runtime": {
+                "capability_key": "mcp_runtime",
+                "provider_instance_id": "provider-mcp",
+                "provider_slug": "mcp-gateway-local",
+                "provider_key": "mcp_gateway_local",
+                "provider_display_name": "MCP gateway local",
+                "provider_description": "desc",
+                "endpoint_url": "http://mcp_gateway:8080",
+                "healthcheck_url": "http://mcp_gateway:8080/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "mcp_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
             "sandbox_execution": {
                 "capability_key": "sandbox_execution",
                 "provider_instance_id": "provider-4",
@@ -4120,8 +4214,24 @@ def test_get_active_platform_runtime_bootstraps_once_for_runtime_snapshot(monkey
                 "deployment_profile_slug": "local-default",
                 "deployment_profile_display_name": "Local Default",
             },
+            "mcp_runtime": {
+                "capability_key": "mcp_runtime",
+                "provider_instance_id": "provider-mcp",
+                "provider_slug": "mcp-gateway-local",
+                "provider_key": "mcp_gateway_local",
+                "provider_display_name": "MCP gateway local",
+                "provider_description": "desc",
+                "endpoint_url": "http://mcp_gateway:8080",
+                "healthcheck_url": "http://mcp_gateway:8080/health",
+                "enabled": True,
+                "config_json": {},
+                "binding_config": {},
+                "adapter_kind": "mcp_http",
+                "deployment_profile_id": "deployment-1",
+                "deployment_profile_slug": "local-default",
+                "deployment_profile_display_name": "Local Default",
+            },
             "sandbox_execution": None,
-            "mcp_runtime": None,
         }
         return rows.get(capability_key)
 

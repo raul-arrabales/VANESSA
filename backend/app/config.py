@@ -21,6 +21,9 @@ DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
 DEFAULT_MCP_GATEWAY_SERVICE_TOKEN = "dev-mcp-gateway-token"
 DEFAULT_SANDBOX_URL = "http://sandbox:6000"
 DEFAULT_MCP_GATEWAY_URL = "http://mcp_gateway:8080"
+DEFAULT_WEB_SEARCH_ENABLED = True
+DEFAULT_WEB_SEARCH_URL = "http://searxng:8080"
+DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS = 8
 DEFAULT_IMAGE_ANALYSIS_URL = ""
 DEFAULT_KWS_URL = "http://kws:10400"
 DEFAULT_WEAVIATE_URL = "http://weaviate:8080"
@@ -46,6 +49,9 @@ class BackendRuntimeConfig:
     mcp_gateway_service_token: str = DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
     sandbox_url: str = DEFAULT_SANDBOX_URL
     mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
+    web_search_enabled: bool = DEFAULT_WEB_SEARCH_ENABLED
+    web_search_url: str = DEFAULT_WEB_SEARCH_URL
+    web_search_timeout_seconds: int = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
@@ -98,6 +104,9 @@ class AuthConfig:
     llm_local_embeddings_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     sandbox_url: str = DEFAULT_SANDBOX_URL
     mcp_gateway_url: str = DEFAULT_MCP_GATEWAY_URL
+    web_search_enabled: bool = DEFAULT_WEB_SEARCH_ENABLED
+    web_search_url: str = DEFAULT_WEB_SEARCH_URL
+    web_search_timeout_seconds: int = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
@@ -257,6 +266,9 @@ def get_auth_config() -> AuthConfig:
         ),
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
         mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip() or DEFAULT_MCP_GATEWAY_URL,
+        web_search_enabled=_get_bool_env("WEB_SEARCH_ENABLED", DEFAULT_WEB_SEARCH_ENABLED),
+        web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
+        web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
@@ -300,6 +312,9 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
         sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
         mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip() or DEFAULT_MCP_GATEWAY_URL,
+        web_search_enabled=_get_bool_env("WEB_SEARCH_ENABLED", DEFAULT_WEB_SEARCH_ENABLED),
+        web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
+        web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
