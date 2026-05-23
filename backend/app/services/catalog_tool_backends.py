@@ -14,10 +14,16 @@ from .image_analysis_tasks import (
     IMAGE_ANALYSIS_TASKS,
     available_tasks_from_resources,
 )
+from .image_generation_tasks import (
+    IMAGE_GENERATION_TASKS,
+    available_tasks_from_resources as image_generation_tasks_from_resources,
+)
 from .image_analysis_service import require_image_analysis_task_defaults
+from .image_generation_service import require_image_generation_task_defaults
 from .platform_service import (
     get_active_platform_runtime,
     resolve_image_analysis_adapter,
+    resolve_image_generation_adapter,
     resolve_mcp_runtime_adapter,
     resolve_sandbox_execution_adapter,
     resolve_web_search_adapter,
@@ -29,12 +35,14 @@ TOOL_BACKEND_WEB_SEARCH = "web_search"
 TOOL_BACKEND_INTERNAL_HTTP = "internal_http"
 TOOL_BACKEND_KB_RETRIEVAL = "knowledge_base_retrieval"
 TOOL_BACKEND_IMAGE_ANALYSIS = "image_analysis"
+TOOL_BACKEND_IMAGE_GENERATION = "image_generation"
 VALID_TOOL_BACKENDS = {
     TOOL_BACKEND_SANDBOX,
     TOOL_BACKEND_WEB_SEARCH,
     TOOL_BACKEND_INTERNAL_HTTP,
     TOOL_BACKEND_KB_RETRIEVAL,
     TOOL_BACKEND_IMAGE_ANALYSIS,
+    TOOL_BACKEND_IMAGE_GENERATION,
 }
 
 
@@ -245,6 +253,48 @@ def _build_image_analysis_tool_template(tasks: list[str] | None = None) -> dict[
     }
 
 
+def _build_image_generation_tool_template(tasks: list[str] | None = None) -> dict[str, Any]:
+    task_values = tasks or list(IMAGE_GENERATION_TASKS)
+    return {
+        "id": "tool.custom_image_generation",
+        "visibility": "private",
+        "publish": False,
+        "name": "Image Generation",
+        "description": "Generates or edits local image payloads.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tasks": {"type": "array", "items": {"type": "string", "enum": task_values}, "minItems": 1},
+                "prompt": {"type": "string"},
+                "negative_prompt": {"type": "string"},
+                "car_image": {
+                    "type": "object",
+                    "properties": {"data_base64": {"type": "string"}, "mime_type": {"type": "string"}},
+                    "required": ["data_base64", "mime_type"],
+                    "additionalProperties": False,
+                },
+                "logo_image": {
+                    "type": "object",
+                    "properties": {"data_base64": {"type": "string"}, "mime_type": {"type": "string"}},
+                    "required": ["data_base64", "mime_type"],
+                    "additionalProperties": False,
+                },
+                "plate_boxes": {"type": "array", "items": {"type": "object", "additionalProperties": True}},
+                "options": {"type": "object", "additionalProperties": True},
+            },
+            "required": ["tasks"],
+            "additionalProperties": False,
+        },
+        "output_schema": {"type": "object", "additionalProperties": True},
+        "safety_policy": {"timeout_seconds": 60, "network_access": False},
+        "offline_compatible": True,
+        "execution_backend": TOOL_BACKEND_IMAGE_GENERATION,
+        "transport": "image_generation_http",
+        "execution_config": {},
+        "permissions": {},
+    }
+
+
 def _tool_identifier_part(value: Any) -> str:
     normalized = str(value or "").strip().lower().replace("_", "-")
     normalized = re.sub(r"[^a-z0-9.-]+", "-", normalized)
@@ -280,6 +330,7 @@ def build_tool_creation_options(database_url: str, *, config: Any) -> dict[str, 
     knowledge_bases = list(runtime_payload.get("knowledge_bases") or [])
     offline_compatible = knowledge_retrieval_runtime_is_local(platform_runtime)
     image_tasks = sorted(image_analysis_available_tasks(database_url, config))
+    image_generation_tasks = sorted(image_generation_available_tasks(database_url, config))
     execution_backends: list[dict[str, Any]] = [
         _tool_creation_backend_option(TOOL_BACKEND_SANDBOX, _build_sandbox_tool_template()),
         _tool_creation_backend_option(TOOL_BACKEND_WEB_SEARCH, _build_web_search_tool_template()),
@@ -287,6 +338,8 @@ def build_tool_creation_options(database_url: str, *, config: Any) -> dict[str, 
     ]
     if image_tasks:
         execution_backends.append(_tool_creation_backend_option(TOOL_BACKEND_IMAGE_ANALYSIS, _build_image_analysis_tool_template(image_tasks)))
+    if image_generation_tasks:
+        execution_backends.append(_tool_creation_backend_option(TOOL_BACKEND_IMAGE_GENERATION, _build_image_generation_tool_template(image_generation_tasks)))
     if knowledge_bases:
         execution_backends.append(
             {
@@ -323,6 +376,17 @@ def image_analysis_available_tasks(database_url: str, config: Any) -> set[str]:
     return available_tasks_from_resources(resources)
 
 
+def image_generation_available_tasks(database_url: str, config: Any) -> set[str]:
+    try:
+        adapter = resolve_image_generation_adapter(database_url, config)
+        resources, status_code = adapter.list_resources()
+    except Exception:
+        return set()
+    if status_code < 200 or status_code >= 300:
+        return set()
+    return image_generation_tasks_from_resources(resources)
+
+
 def ensure_execution_config(database_url: str, *, config: Any | None, execution_backend: str, execution_config: dict[str, Any]) -> None:
     if execution_backend != TOOL_BACKEND_KB_RETRIEVAL:
         return
@@ -355,6 +419,8 @@ def validate_backend(
         runtime_checks["provider_reachable"] = True
     elif execution_backend == TOOL_BACKEND_IMAGE_ANALYSIS:
         _validate_image_analysis_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
+    elif execution_backend == TOOL_BACKEND_IMAGE_GENERATION:
+        _validate_image_generation_backend(database_url=database_url, config=config, runtime_checks=runtime_checks, errors=errors)
     else:
         errors.append(f"Unsupported execution backend '{execution_backend}'.")
 
@@ -460,6 +526,8 @@ def execute_backend(
         return _execute_knowledge_base_retrieval_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
     if execution_backend == TOOL_BACKEND_IMAGE_ANALYSIS:
         return _execute_image_analysis_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
+    if execution_backend == TOOL_BACKEND_IMAGE_GENERATION:
+        return _execute_image_generation_backend(database_url=database_url, config=config, spec=spec, tool_input=tool_input)
     raise CatalogError("invalid_execution_backend", f"Unsupported execution backend '{execution_backend}'.")
 
 
@@ -480,6 +548,28 @@ def _validate_image_analysis_backend(
         runtime_checks["resource_count"] = len(resources)
         if not runtime_checks["provider_reachable"]:
             errors.append("Image analysis runtime provider is not reachable.")
+    except PlatformControlPlaneError as exc:
+        errors.append(exc.message)
+        runtime_checks["provider_status_code"] = exc.status_code
+
+
+def _validate_image_generation_backend(
+    *,
+    database_url: str,
+    config: Any,
+    runtime_checks: dict[str, Any],
+    errors: list[str],
+) -> None:
+    try:
+        adapter = resolve_image_generation_adapter(database_url, config)
+        health = adapter.health()
+        resources, resources_status = adapter.list_resources()
+        runtime_checks["provider_reachable"] = bool(health.get("reachable", False))
+        runtime_checks["provider_status_code"] = health.get("status_code")
+        runtime_checks["resources_status_code"] = resources_status
+        runtime_checks["resource_count"] = len(resources)
+        if not runtime_checks["provider_reachable"]:
+            errors.append("Image generation runtime provider is not reachable.")
     except PlatformControlPlaneError as exc:
         errors.append(exc.message)
         runtime_checks["provider_status_code"] = exc.status_code
@@ -587,6 +677,44 @@ def _execute_image_analysis_backend(
         raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
 
 
+def _execute_image_generation_backend(
+    *,
+    database_url: str,
+    config: Any,
+    spec: dict[str, Any],
+    tool_input: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int]:
+    tasks = tool_input.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        execution_config = spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}
+        tasks = execution_config.get("tasks")
+    if not isinstance(tasks, list) or not tasks:
+        raise CatalogError("invalid_tool_input", "Image generation tools require input.tasks")
+    try:
+        adapter = resolve_image_generation_adapter(database_url, config)
+        resource_policy = dict(adapter.binding.resource_policy or {})
+        task_defaults = dict(resource_policy.get("task_defaults") or {})
+        normalized_tasks = [str(item).strip().lower() for item in tasks if str(item).strip()]
+        require_image_generation_task_defaults(normalized_tasks, task_defaults)
+        return adapter.generate(
+            payload={
+                "tasks": normalized_tasks,
+                "prompt": str(tool_input.get("prompt") or "").strip(),
+                "negative_prompt": str(tool_input.get("negative_prompt") or "").strip(),
+                "car_image": tool_input.get("car_image"),
+                "logo_image": tool_input.get("logo_image"),
+                "plate_boxes": tool_input.get("plate_boxes") if isinstance(tool_input.get("plate_boxes"), list) else [],
+                "options": dict(tool_input.get("options") or {}) if isinstance(tool_input.get("options"), dict) else {},
+                "runtime": {
+                    "resources": [dict(resource) for resource in adapter.binding.resources],
+                    "task_defaults": task_defaults,
+                },
+            }
+        )
+    except PlatformControlPlaneError as exc:
+        raise CatalogError(exc.code, exc.message, status_code=exc.status_code, details=exc.details or None) from exc
+
+
 def mcp_metadata_defaults_for_tool_spec(tool_spec: dict[str, Any]) -> dict[str, Any]:
     execution_backend = tool_execution_backend(tool_spec) or TOOL_BACKEND_INTERNAL_HTTP
     if execution_backend == TOOL_BACKEND_SANDBOX:
@@ -629,6 +757,18 @@ def mcp_metadata_defaults_for_tool_spec(tool_spec: dict[str, Any]) -> dict[str, 
         return {
             "category": "data_analysis",
             "capabilities": ["image-analysis", "license-plate-recognition", "object-detection", "image-captioning"],
+            "local": True,
+            "stateless": True,
+            "sandboxed": False,
+            "risk_level": "medium",
+            "data_access": "user_data",
+            "output_freshness": "runtime_generated",
+            "audit_level": "standard",
+        }
+    if execution_backend == TOOL_BACKEND_IMAGE_GENERATION:
+        return {
+            "category": "creative_media",
+            "capabilities": ["image-generation", "text-to-image", "image-editing", "license-plate-logo-replacement"],
             "local": True,
             "stateless": True,
             "sandboxed": False,

@@ -15,6 +15,7 @@ DEFAULT_LLM_RUNTIME_URL = DEFAULT_LLM_INFERENCE_RUNTIME_URL
 DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL = "http://llm_runtime_embeddings:8000"
 DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 60
 DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS = 300
+DEFAULT_IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS = 600
 DEFAULT_LLM_LOCAL_MODEL_PATH = "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
 DEFAULT_AGENT_ENGINE_URL = "http://agent_engine:7000"
 DEFAULT_AGENT_ENGINE_SERVICE_TOKEN = "dev-agent-engine-token"
@@ -25,6 +26,7 @@ DEFAULT_WEB_SEARCH_ENABLED = True
 DEFAULT_WEB_SEARCH_URL = "http://searxng:8080"
 DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS = 8
 DEFAULT_IMAGE_ANALYSIS_URL = ""
+DEFAULT_IMAGE_GENERATION_URL = ""
 DEFAULT_KWS_URL = "http://kws:10400"
 DEFAULT_WEAVIATE_URL = "http://weaviate:8080"
 DEFAULT_LLAMA_CPP_URL = ""
@@ -53,6 +55,7 @@ class BackendRuntimeConfig:
     web_search_url: str = DEFAULT_WEB_SEARCH_URL
     web_search_timeout_seconds: int = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
+    image_generation_url: str = DEFAULT_IMAGE_GENERATION_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
@@ -100,6 +103,7 @@ class AuthConfig:
     llm_embeddings_runtime_url: str = DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
     llm_request_timeout_seconds: int = DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS
     image_analysis_request_timeout_seconds: int = DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS
+    image_generation_request_timeout_seconds: int = DEFAULT_IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS
     llm_local_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     llm_local_embeddings_upstream_model: str = DEFAULT_LLM_LOCAL_MODEL_PATH
     sandbox_url: str = DEFAULT_SANDBOX_URL
@@ -108,6 +112,7 @@ class AuthConfig:
     web_search_url: str = DEFAULT_WEB_SEARCH_URL
     web_search_timeout_seconds: int = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
+    image_generation_url: str = DEFAULT_IMAGE_GENERATION_URL
     kws_url: str = DEFAULT_KWS_URL
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
@@ -253,6 +258,10 @@ def get_auth_config() -> AuthConfig:
             "IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS",
             DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS,
         ),
+        image_generation_request_timeout_seconds=_get_int_env(
+            "IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS",
+            DEFAULT_IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS,
+        ),
         llm_local_upstream_model=(
             os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
             or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
@@ -270,6 +279,7 @@ def get_auth_config() -> AuthConfig:
         web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
         web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
+        image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
@@ -316,6 +326,7 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
         web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
+        image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),

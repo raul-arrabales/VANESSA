@@ -31,6 +31,7 @@ def _platform_runtime(
     include_mcp_runtime: bool = False,
     include_sandbox_runtime: bool = False,
     include_image_analysis_runtime: bool = False,
+    include_image_generation_runtime: bool = False,
 ) -> dict[str, object]:
     capabilities: dict[str, object] = {
         "llm_inference": {
@@ -183,6 +184,32 @@ def _platform_runtime(
                     "plate_ocr": "plate-ocr",
                     "object_detector": "object-detector",
                     "captioner": "captioner",
+                },
+            },
+            "binding_config": {},
+        }
+    if include_image_generation_runtime:
+        capabilities["image_generation"] = {
+            "id": "provider-image-generation",
+            "slug": "image-generation-local",
+            "provider_key": "image_generation_local",
+            "display_name": "Image generation",
+            "description": "desc",
+            "adapter_kind": "image_generation_http",
+            "endpoint_url": "http://image_generation:8094",
+            "healthcheck_url": "http://image_generation:8094/health",
+            "enabled": True,
+            "config": {"generate_path": "/v1/generate", "request_timeout_seconds": 45},
+            "resources": [
+                {"id": "generator", "metadata": {"task_key": "image_text_to_image"}},
+                {"id": "plate-logo-processor", "metadata": {"task_key": "image_plate_logo_replacement"}},
+            ],
+            "default_resource_id": None,
+            "resource_policy": {
+                "selection_mode": "task_defaults",
+                "task_defaults": {
+                    "generator": "generator",
+                    "plate_logo_processor": "plate-logo-processor",
                 },
             },
             "binding_config": {},
@@ -1005,4 +1032,67 @@ def test_image_analysis_runtime_client_allows_caption_only_task_defaults(monkeyp
     assert seen_payloads[0]["runtime"] == {
         "resources": [{"id": "captioner", "metadata": {"task_key": "image_captioning"}}],
         "task_defaults": {"captioner": "captioner"},
+    }
+
+
+def test_image_generation_runtime_client_sends_bound_task_defaults(monkeypatch: pytest.MonkeyPatch):
+    seen_payloads: list[dict[str, object]] = []
+
+    def _request(url: str, *, method: str, payload=None, headers=None, timeout_seconds=5.0):
+        del method, headers
+        assert url == "http://image_generation:8094/v1/generate"
+        assert timeout_seconds == 45.0
+        seen_payloads.append(dict(payload or {}))
+        return {"image": {"width": 1, "height": 1, "mime_type": "image/png", "data_base64": "abc"}}, 200
+
+    monkeypatch.setattr(runtime_client, "http_json_request", _request)
+    client = runtime_client.build_image_generation_runtime_client(_platform_runtime(include_image_generation_runtime=True))
+
+    payload = client.generate(
+        payload={
+            "prompt": "a test image",
+            "tasks": ["text_to_image"],
+        }
+    )
+
+    assert payload["status_code"] == 200
+    assert seen_payloads[0]["runtime"] == {
+        "resources": [
+            {"id": "generator", "metadata": {"task_key": "image_text_to_image"}},
+            {"id": "plate-logo-processor", "metadata": {"task_key": "image_plate_logo_replacement"}},
+        ],
+        "task_defaults": {
+            "generator": "generator",
+            "plate_logo_processor": "plate-logo-processor",
+        },
+    }
+
+
+def test_image_generation_runtime_client_requires_binding() -> None:
+    with pytest.raises(runtime_client.ImageGenerationRuntimeClientError) as exc_info:
+        runtime_client.build_image_generation_runtime_client(_platform_runtime())
+
+    assert exc_info.value.code == "missing_image_generation_runtime"
+
+
+def test_image_generation_runtime_client_requires_task_defaults() -> None:
+    runtime = _platform_runtime(include_image_generation_runtime=True)
+    image_binding = runtime["capabilities"]["image_generation"]
+    assert isinstance(image_binding, dict)
+    image_binding["resource_policy"] = {"selection_mode": "task_defaults", "task_defaults": {}}
+
+    client = runtime_client.build_image_generation_runtime_client(runtime)
+
+    with pytest.raises(runtime_client.ImageGenerationRuntimeClientError) as exc_info:
+        client.generate(
+            payload={
+                "prompt": "a test image",
+                "tasks": ["text_to_image"],
+            }
+        )
+
+    assert exc_info.value.code == "missing_image_generation_task_defaults"
+    assert exc_info.value.details == {
+        "missing_task_defaults": ["generator"],
+        "tasks": ["text_to_image"],
     }

@@ -13,6 +13,8 @@ from .platform_service_types import (
     _BOOTSTRAP_DEPLOYMENT_SLUG,
     _CLOUD_PROVIDER_KEYS,
     _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    _IMAGE_GENERATION_TASK_DEFAULT_KEYS,
+    _IMAGE_GENERATION_TASK_GROUPS,
     _IMAGE_SELECTION_TASK_DEFAULTS,
     _LLAMA_CPP_DEPLOYMENT_DESCRIPTION,
     _LLAMA_CPP_DEPLOYMENT_NAME,
@@ -28,6 +30,7 @@ from .platform_local_slots import reconcile_local_provider_slots
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
+    CAPABILITY_IMAGE_GENERATION,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -41,6 +44,10 @@ _IMAGE_ANALYSIS_MANAGED_MODEL_IDS = {
     "plate_ocr": "image-analysis-plate-ocr",
     "object_detector": "image-analysis-object-detector",
     "captioner": "image-analysis-captioner",
+}
+
+_IMAGE_GENERATION_MANAGED_MODEL_IDS = {
+    "generator": "image-generation-text-to-image-generator",
 }
 
 
@@ -61,10 +68,46 @@ def _provider_image_analysis_resources(provider_row: dict[str, Any]) -> list[dic
     return [dict(item) for item in raw_resources if isinstance(item, dict)]
 
 
+def _provider_resource_url(provider_row: dict[str, Any]) -> str:
+    endpoint_url = str(provider_row.get("endpoint_url") or "").strip()
+    config_json = provider_row.get("config_json") if isinstance(provider_row.get("config_json"), dict) else {}
+    path = str(config_json.get("resources_path") or "/v1/resources").strip() or "/v1/resources"
+    return endpoint_url.rstrip("/") + path
+
+
+def _provider_resources(provider_row: dict[str, Any]) -> list[dict[str, Any]]:
+    payload, status_code = http_json_request(_provider_resource_url(provider_row), method="GET")
+    if payload is None or status_code < 200 or status_code >= 300:
+        return []
+    raw_resources = payload.get("resources") if isinstance(payload, dict) else []
+    if not isinstance(raw_resources, list):
+        return []
+    return [dict(item) for item in raw_resources if isinstance(item, dict)]
+
+
 def _image_analysis_model_fingerprint(*, resource: dict[str, Any], model_id: str, provider_resource_id: str, task_key: str, metadata: dict[str, Any]) -> str:
     return modelops_repo.compute_config_fingerprint(
         {
             "provider": "image_analysis_local",
+            "provider_model_id": provider_resource_id,
+            "source_id": str(resource.get("source_id") or provider_resource_id).strip() or provider_resource_id,
+            "local_path": None,
+            "backend_kind": "local",
+            "availability": "offline_ready",
+            "credential_id": None,
+            "task_key": task_key,
+            "hosting_kind": "local",
+            "checksum": None,
+            "revision": None,
+            "metadata": metadata,
+        }
+    )
+
+
+def _image_generation_model_fingerprint(*, resource: dict[str, Any], model_id: str, provider_resource_id: str, task_key: str, metadata: dict[str, Any]) -> str:
+    return modelops_repo.compute_config_fingerprint(
+        {
+            "provider": "image_generation_local",
             "provider_model_id": provider_resource_id,
             "source_id": str(resource.get("source_id") or provider_resource_id).strip() or provider_resource_id,
             "local_path": None,
@@ -187,6 +230,124 @@ def _ensure_image_analysis_modelops_resources(
     return bound_resources, task_defaults
 
 
+def _ensure_image_generation_resources(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    provider_row: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    resources_by_task = {
+        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower(): resource
+        for resource in _provider_resources(provider_row)
+        if isinstance(resource.get("metadata"), dict)
+    }
+    if not resources_by_task:
+        return [], {}
+
+    bound_resources: list[dict[str, Any]] = []
+    task_defaults: dict[str, str] = {}
+    node_id = str(getattr(config, "modelops_node_id", "") or "local-node").strip() or "local-node"
+
+    generator_task_key = _IMAGE_GENERATION_TASK_DEFAULT_KEYS["generator"]
+    generator_resource = resources_by_task.get(generator_task_key)
+    if generator_resource is not None:
+        model_id = _IMAGE_GENERATION_MANAGED_MODEL_IDS["generator"]
+        provider_resource_id = str(generator_resource.get("provider_resource_id") or generator_resource.get("id") or model_id).strip()
+        runtime_metadata = generator_resource.get("metadata") if isinstance(generator_resource.get("metadata"), dict) else {}
+        metadata = {
+            **runtime_metadata,
+            "capability": "image_generation",
+            "managed_by": "platform_bootstrap",
+            "task_default_key": "generator",
+            "provider_resource_id": provider_resource_id,
+        }
+        fingerprint = _image_generation_model_fingerprint(
+            resource=generator_resource,
+            model_id=model_id,
+            provider_resource_id=provider_resource_id,
+            task_key=generator_task_key,
+            metadata=metadata,
+        )
+        model_row = modelops_repo.get_model(database_url, model_id)
+        if model_row is None or str(model_row.get("current_config_fingerprint") or "").strip() != fingerprint:
+            model_row = modelops_repo.upsert_model_record(
+                database_url,
+                model_id=model_id,
+                node_id=node_id,
+                name=str(generator_resource.get("display_name") or model_id).strip(),
+                provider="image_generation_local",
+                task_key=generator_task_key,
+                category=modelops_repo.infer_category(generator_task_key),
+                backend_kind="local",
+                source_kind="local_folder",
+                availability="offline_ready",
+                visibility_scope="platform",
+                owner_type=modelops_repo.OWNER_PLATFORM,
+                owner_user_id=None,
+                provider_model_id=provider_resource_id,
+                credential_id=None,
+                source_id=str(generator_resource.get("source_id") or provider_resource_id).strip() or provider_resource_id,
+                local_path=None,
+                status="available",
+                lifecycle_state=modelops_repo.LIFECYCLE_REGISTERED,
+                metadata=metadata,
+                comment="Bootstrapped from the local image-generation provider inventory.",
+                model_size_billion=None,
+                created_by_user_id=None,
+                registered_by_user_id=None,
+            )
+        validation_current = bool(model_row.get("is_validation_current"))
+        validation_success = str(model_row.get("last_validation_status") or "").strip().lower() == modelops_repo.VALIDATION_SUCCESS
+        if not validation_current or not validation_success:
+            modelops_repo.append_validation(
+                database_url,
+                model_id=model_id,
+                validator_kind="image_generation_provider_inventory",
+                trigger_reason="platform_bootstrap",
+                result=modelops_repo.VALIDATION_SUCCESS,
+                summary="Local image-generation provider advertises this resource.",
+                error_details={"provider_instance_id": str(provider_row.get("id") or ""), "provider_resource_id": provider_resource_id},
+                config_fingerprint=str(model_row.get("current_config_fingerprint") or fingerprint),
+                validated_by_user_id=None,
+            )
+        if str(model_row.get("lifecycle_state") or "").strip().lower() != modelops_repo.LIFECYCLE_ACTIVE:
+            modelops_repo.activate_model(database_url, model_id=model_id)
+        active_row = modelops_repo.get_model(database_url, model_id) or model_row
+        bound_resources.append(_build_model_binding_resource(active_row, provider_resource_id=provider_resource_id))
+        task_defaults["generator"] = model_id
+
+    processor_task_key = _IMAGE_GENERATION_TASK_DEFAULT_KEYS["plate_logo_processor"]
+    processor_resource = resources_by_task.get(processor_task_key)
+    if processor_resource is not None:
+        processor_id = str(processor_resource.get("id") or processor_resource.get("provider_resource_id") or "plate-logo-processor-opencv").strip()
+        provider_resource_id = str(processor_resource.get("provider_resource_id") or processor_id).strip()
+        bound_resources.append(
+            {
+                "id": processor_id,
+                "resource_kind": "processor",
+                "ref_type": "provider_resource",
+                "managed_model_id": None,
+                "provider_resource_id": provider_resource_id,
+                "display_name": str(processor_resource.get("display_name") or processor_id).strip(),
+                "metadata": dict(processor_resource.get("metadata") or {}),
+            }
+        )
+        task_defaults["plate_logo_processor"] = processor_id
+
+    complete_defaults: dict[str, str] = {}
+    required_defaults = set()
+    for group_defaults in _IMAGE_GENERATION_TASK_GROUPS.values():
+        requested = any(default_key in task_defaults for default_key in group_defaults)
+        if requested and set(group_defaults) <= set(task_defaults):
+            required_defaults.update(group_defaults)
+    complete_defaults = {key: value for key, value in task_defaults.items() if key in required_defaults}
+    complete_resource_ids = set(complete_defaults.values())
+    bound_resources = [resource for resource in bound_resources if str(resource.get("id") or "").strip() in complete_resource_ids]
+    if not complete_defaults:
+        return [], {}
+    return bound_resources, complete_defaults
+
+
 def _upsert_bootstrap_binding(
     database_url: str,
     *,
@@ -304,9 +465,13 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     web_search_url = str(getattr(config, "web_search_url", "") or "http://searxng:8080").strip() or "http://searxng:8080"
     web_search_timeout_seconds = int(getattr(config, "web_search_timeout_seconds", 8) or 8)
     image_analysis_url = str(getattr(config, "image_analysis_url", "") or "").strip()
+    image_generation_url = str(getattr(config, "image_generation_url", "") or "").strip()
     llm_request_timeout_seconds = int(getattr(config, "llm_request_timeout_seconds", 60) or 60)
     image_analysis_request_timeout_seconds = int(
         getattr(config, "image_analysis_request_timeout_seconds", 300) or 300
+    )
+    image_generation_request_timeout_seconds = int(
+        getattr(config, "image_generation_request_timeout_seconds", 600) or 600
     )
     llm_local_upstream_model = str(
         getattr(config, "llm_local_upstream_model", "") or "/models/llm/Qwen--Qwen2.5-0.5B-Instruct"
@@ -322,6 +487,7 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_MCP_RUNTIME, display_name="MCP runtime", description="Gateway capability for MCP-hosted tool execution.", is_required=True)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_SANDBOX_EXECUTION, display_name="Sandbox execution", description="Isolated code-execution capability for agent tools.", is_required=False)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_IMAGE_ANALYSIS, display_name="Image analysis", description="Local image understanding capability for license plates, object detection, and captioning.", is_required=False)
+    platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_IMAGE_GENERATION, display_name="Image generation", description="Local image generation and image-editing capability for text-to-image and plate-logo replacement.", is_required=False)
     platform_repo.ensure_capability(database_url, capability_key=CAPABILITY_WEB_SEARCH, display_name="Web search", description="Online web search capability for agent research tools.", is_required=False)
 
     platform_repo.ensure_provider_family(
@@ -422,6 +588,15 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
         provider_origin="local",
         display_name="Image analysis local",
         description="Optional local image-analysis runtime for ANPR, object detection, and captioning.",
+    )
+    platform_repo.ensure_provider_family(
+        database_url,
+        provider_key="image_generation_local",
+        capability_key=CAPABILITY_IMAGE_GENERATION,
+        adapter_kind="image_generation_http",
+        provider_origin="local",
+        display_name="Image generation local",
+        description="Optional local image-generation runtime for text-to-image and plate-logo replacement.",
     )
 
     vllm_provider = platform_repo.ensure_provider_instance(
@@ -584,6 +759,23 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
                 "request_timeout_seconds": image_analysis_request_timeout_seconds,
             },
         )
+    image_generation_provider = None
+    if image_generation_url:
+        image_generation_provider = platform_repo.ensure_provider_instance(
+            database_url,
+            slug="image-generation-local",
+            provider_key="image_generation_local",
+            display_name="Image generation local",
+            description="Optional local image-generation runtime.",
+            endpoint_url=image_generation_url,
+            healthcheck_url=image_generation_url.rstrip("/") + "/health",
+            enabled=True,
+            config_json={
+                "resources_path": "/v1/resources",
+                "generate_path": "/v1/generate",
+                "request_timeout_seconds": image_generation_request_timeout_seconds,
+            },
+        )
     image_analysis_resources: list[dict[str, Any]] = []
     image_analysis_task_defaults: dict[str, str] = {}
     if image_analysis_provider is not None:
@@ -595,6 +787,19 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
     image_analysis_resource_policy = (
         {"selection_mode": _IMAGE_SELECTION_TASK_DEFAULTS, "task_defaults": image_analysis_task_defaults}
         if image_analysis_resources and image_analysis_task_defaults
+        else {}
+    )
+    image_generation_resources: list[dict[str, Any]] = []
+    image_generation_task_defaults: dict[str, str] = {}
+    if image_generation_provider is not None:
+        image_generation_resources, image_generation_task_defaults = _ensure_image_generation_resources(
+            database_url,
+            config=config,
+            provider_row=image_generation_provider,
+        )
+    image_generation_resource_policy = (
+        {"selection_mode": _IMAGE_SELECTION_TASK_DEFAULTS, "task_defaults": image_generation_task_defaults}
+        if image_generation_resources and image_generation_task_defaults
         else {}
     )
 
@@ -636,6 +841,18 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             resource_policy=image_analysis_resource_policy,
             existing_binding=default_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS),
         )
+    if image_generation_provider is not None:
+        _upsert_bootstrap_binding(
+            database_url,
+            deployment_profile_id=str(profile["id"]),
+            capability_key=CAPABILITY_IMAGE_GENERATION,
+            provider_instance_id=str(image_generation_provider["id"]),
+            resources=image_generation_resources,
+            default_resource_id=None,
+            binding_config={},
+            resource_policy=image_generation_resource_policy,
+            existing_binding=default_bindings_by_capability.get(CAPABILITY_IMAGE_GENERATION),
+        )
 
     if getattr(config, "llama_cpp_url", "").strip():
         llama_profile = platform_repo.ensure_deployment_profile(database_url, slug=_LLAMA_CPP_DEPLOYMENT_SLUG, display_name=_LLAMA_CPP_DEPLOYMENT_NAME, description=_LLAMA_CPP_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
@@ -650,6 +867,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_WEB_SEARCH, provider_instance_id=str(web_search_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=llama_bindings_by_capability.get(CAPABILITY_WEB_SEARCH))
         if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
+        if image_generation_provider is not None and image_generation_resource_policy:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(llama_profile["id"]), capability_key=CAPABILITY_IMAGE_GENERATION, provider_instance_id=str(image_generation_provider["id"]), resources=image_generation_resources, default_resource_id=None, binding_config={}, resource_policy=image_generation_resource_policy, existing_binding=llama_bindings_by_capability.get(CAPABILITY_IMAGE_GENERATION))
 
     if qdrant_provider is not None:
         qdrant_profile = platform_repo.ensure_deployment_profile(database_url, slug=_QDRANT_DEPLOYMENT_SLUG, display_name=_QDRANT_DEPLOYMENT_NAME, description=_QDRANT_DEPLOYMENT_DESCRIPTION, created_by_user_id=None, updated_by_user_id=None)
@@ -664,6 +883,8 @@ def ensure_platform_bootstrap_state(database_url: str, config: AuthConfig) -> No
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_WEB_SEARCH, provider_instance_id=str(web_search_provider["id"]), resources=[], default_resource_id=None, binding_config={}, resource_policy={}, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_WEB_SEARCH))
         if image_analysis_provider is not None and image_analysis_resource_policy:
             _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_ANALYSIS, provider_instance_id=str(image_analysis_provider["id"]), resources=image_analysis_resources, default_resource_id=None, binding_config={}, resource_policy=image_analysis_resource_policy, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_ANALYSIS))
+        if image_generation_provider is not None and image_generation_resource_policy:
+            _upsert_bootstrap_binding(database_url, deployment_profile_id=str(qdrant_profile["id"]), capability_key=CAPABILITY_IMAGE_GENERATION, provider_instance_id=str(image_generation_provider["id"]), resources=image_generation_resources, default_resource_id=None, binding_config={}, resource_policy=image_generation_resource_policy, existing_binding=qdrant_bindings_by_capability.get(CAPABILITY_IMAGE_GENERATION))
 
     if platform_repo.get_active_deployment(database_url) is None:
         platform_repo.activate_deployment_profile(database_url, deployment_profile_id=str(profile["id"]), activated_by_user_id=None)

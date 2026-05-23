@@ -5,6 +5,7 @@ from typing import Any
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
+    CAPABILITY_IMAGE_GENERATION,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -35,7 +36,7 @@ def _operation_reachable(capability_key: str, validation: dict[str, Any]) -> boo
         return _bool_or_none(validation.get("gateway_reachable"))
     if capability_key == CAPABILITY_WEB_SEARCH:
         return _bool_or_none(validation.get("search_reachable"))
-    if capability_key == CAPABILITY_IMAGE_ANALYSIS:
+    if capability_key in {CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_IMAGE_GENERATION}:
         return _bool_or_none(validation.get("resources_reachable"))
     return _health_reachable(validation)
 
@@ -51,6 +52,8 @@ def _operation_failure_code(capability_key: str) -> str:
         return "web_search_unreachable"
     if capability_key == CAPABILITY_IMAGE_ANALYSIS:
         return "image_analysis_unreachable"
+    if capability_key == CAPABILITY_IMAGE_GENERATION:
+        return "image_generation_unreachable"
     return "resources_unreachable"
 
 
@@ -70,6 +73,9 @@ def _operation_failure_message(capability_key: str, validation: dict[str, Any]) 
     if capability_key == CAPABILITY_IMAGE_ANALYSIS:
         status = validation.get("resources_status_code")
         return f"Image analysis resources could not be listed with HTTP {status}" if status else "Image analysis resources could not be listed"
+    if capability_key == CAPABILITY_IMAGE_GENERATION:
+        status = validation.get("resources_status_code")
+        return f"Image generation resources could not be listed with HTTP {status}" if status else "Image generation resources could not be listed"
     status = validation.get("resources_status_code")
     return f"Provider resources could not be listed with HTTP {status}" if status else "Provider resources could not be listed"
 

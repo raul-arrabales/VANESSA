@@ -15,6 +15,7 @@ TASK_IMAGE_PLATE_DETECTION = "image_plate_detection"
 TASK_IMAGE_PLATE_OCR = "image_plate_ocr"
 TASK_OBJECT_DETECTION = "object_detection"
 TASK_IMAGE_CAPTIONING = "image_captioning"
+TASK_IMAGE_TEXT_TO_IMAGE = "image_text_to_image"
 OWNER_PLATFORM = "platform"
 OWNER_USER = "user"
 LIFECYCLE_CREATED = "created"
@@ -451,6 +452,8 @@ def _eligible_clause(*, require_active: bool, capability_key: str | None) -> str
         conditions.append("m.task_key = 'llm'")
     elif capability_key == "image_analysis":
         conditions.append("m.task_key IN ('image_plate_detection', 'image_plate_ocr', 'object_detection', 'image_captioning')")
+    elif capability_key == "image_generation":
+        conditions.append("m.task_key = 'image_text_to_image'")
     return " AND ".join(conditions)
 
 

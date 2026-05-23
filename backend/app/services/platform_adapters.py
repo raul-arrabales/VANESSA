@@ -734,6 +734,23 @@ class ImageAnalysisAdapter(ABC):
         raise NotImplementedError
 
 
+class ImageGenerationAdapter(ABC):
+    def __init__(self, binding: ProviderBinding):
+        self.binding = binding
+
+    @abstractmethod
+    def health(self) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def generate(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+        raise NotImplementedError
+
+
 class OpenAICompatibleLlmAdapter(LlmInferenceAdapter):
     def _request_headers(self) -> dict[str, str]:
         return _openai_compatible_headers(self.binding)
@@ -1896,6 +1913,78 @@ class HttpImageAnalysisAdapter(ImageAnalysisAdapter):
     def analyze(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
         return http_json_request(
             self._analyze_url(),
+            method="POST",
+            payload=payload,
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+
+
+class HttpImageGenerationAdapter(ImageGenerationAdapter):
+    def _health_url(self) -> str:
+        if self.binding.healthcheck_url:
+            return self.binding.healthcheck_url
+        return self.binding.endpoint_url.rstrip("/") + "/health"
+
+    def _resources_url(self) -> str:
+        path = str(self.binding.config.get("resources_path", "/v1/resources")).strip() or "/v1/resources"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def _generate_url(self) -> str:
+        path = str(self.binding.config.get("generate_path", "/v1/generate")).strip() or "/v1/generate"
+        return self.binding.endpoint_url.rstrip("/") + path
+
+    def _request_timeout_seconds(self) -> float:
+        return _binding_timeout_seconds(self.binding.config)
+
+    def health(self) -> dict[str, Any]:
+        payload, status_code = http_json_request(
+            self._health_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+        return {
+            "reachable": payload is not None and 200 <= status_code < 300,
+            "status_code": status_code,
+            "provider_key": self.binding.provider_key,
+            "provider_slug": self.binding.provider_slug,
+        }
+
+    def list_resources(self) -> tuple[list[dict[str, Any]], int]:
+        payload, status_code = http_json_request(
+            self._resources_url(),
+            method="GET",
+            timeout_seconds=self._request_timeout_seconds(),
+        )
+        raw_resources = payload.get("resources") if isinstance(payload, dict) else []
+        resources: list[dict[str, Any]] = []
+        if isinstance(raw_resources, list):
+            for item in raw_resources:
+                if not isinstance(item, dict):
+                    continue
+                resource_id = str(item.get("id") or item.get("provider_resource_id") or "").strip()
+                if not resource_id:
+                    continue
+                resource_kind = str(item.get("resource_kind") or "model").strip().lower() or "model"
+                resources.append(
+                    {
+                        "id": resource_id,
+                        "resource_kind": resource_kind,
+                        "ref_type": "provider_resource",
+                        "managed_model_id": None,
+                        "provider_resource_id": str(item.get("provider_resource_id") or resource_id).strip(),
+                        "display_name": item.get("display_name") or resource_id,
+                        "metadata": {
+                            key: value
+                            for key, value in dict(item.get("metadata") or {}).items()
+                            if value not in {None, ""}
+                        },
+                    }
+                )
+        return resources, status_code
+
+    def generate(self, *, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, int]:
+        return http_json_request(
+            self._generate_url(),
             method="POST",
             payload=payload,
             timeout_seconds=self._request_timeout_seconds(),

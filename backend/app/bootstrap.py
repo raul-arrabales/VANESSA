@@ -69,6 +69,7 @@ def register_system_routes(app: Flask) -> None:
         mcp_gateway_url = config.mcp_gateway_url.rstrip("/")
         web_search_url = config.web_search_url.rstrip("/")
         image_analysis_url = config.image_analysis_url.rstrip("/")
+        image_generation_url = config.image_generation_url.rstrip("/")
         kws_url = config.kws_url.rstrip("/")
         weaviate_url = config.weaviate_url.rstrip("/")
         llama_cpp_url = config.llama_cpp_url.rstrip("/")
@@ -95,6 +96,8 @@ def register_system_routes(app: Flask) -> None:
             services.insert(7, {"service": "SearXNG Web Search", "container": "searxng", "target": config.web_search_url, "reachable": app_module._http_json_ok(web_search_url + "/")})
         if config.image_analysis_url.strip():
             services.insert(8, {"service": "Image Analysis", "container": "image_analysis", "target": config.image_analysis_url, "reachable": app_module._http_json_ok(image_analysis_url + "/health")})
+        if config.image_generation_url.strip():
+            services.insert(9, {"service": "Image Generation", "container": "image_generation", "target": config.image_generation_url, "reachable": app_module._http_json_ok(image_generation_url + "/health")})
 
         response_payload: dict[str, Any] = {
             "status": "ok" if all(service["reachable"] for service in services) else "degraded",

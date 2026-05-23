@@ -54,8 +54,8 @@ Interaction semantics in the generated graph represent directional runtime commu
 
 The runtime architecture now distinguishes container topology from capability binding:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
-- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, `image_analysis`, or `image_generation`
+- `provider`: an implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, or `image_generation_local`
 - `provider_origin`: a backend-owned family classification, either `local` or `cloud`, inherited by provider instances and serialized into provider, deployment, and runtime payloads
 - `deployment profile`: the named set of active capability-to-provider bindings, plus any binding-level resource selection required by that capability
 - `adapter`: the capability-specific backend client that talks to a provider
@@ -71,6 +71,7 @@ ModelOps is the managed-model domain layered on top of the GenAI control plane.
 - It does not replace capability/provider/deployment selection in `/control/platform`.
 - A model must be active, validation-current, visible to the caller, and runtime-compatible before it is invokable or eligible for deployment binding as a managed-model resource.
 - `image_analysis` uses ModelOps task keys `image_plate_detection`, `image_plate_ocr`, `object_detection`, and `image_captioning`; deployment bindings select task-group defaults instead of one global default model. ANPR requires both plate detection and OCR defaults, while object detection and captioning can be bound independently.
+- `image_generation` uses ModelOps task key `image_text_to_image` for the text-to-image generator plus provider-native processor resource `image_plate_logo_replacement`; deployment bindings select task-group defaults instead of one global default model.
 
 See [ModelOps service documentation](services/modelops.md) for the domain model, lifecycle rules, and canonical APIs.
 
@@ -92,6 +93,7 @@ Current provider proof state:
 - When `QDRANT_URL` is configured, backend also seeds `local-qdrant` with `llm_inference -> vllm_local`, `embeddings -> vllm_embeddings_local`, and `vector_store -> qdrant_local`.
 - `local-default` also binds required `mcp_runtime -> mcp_gateway_local`, optional `sandbox_execution -> sandbox_local`, and optional `web_search -> searxng_local` when `WEB_SEARCH_ENABLED=true`.
 - When `IMAGE_ANALYSIS_URL` is configured, backend seeds `image_analysis -> image_analysis_local` and binds provider-advertised image-analysis resources into local deployment profiles. The optional Compose profile runs an `image_analysis` gateway plus the private workers selected by `IMAGE_ANALYSIS_WORKERS`, all sharing `models/image_analysis` for local vision assets.
+- When `IMAGE_GENERATION_URL` is configured, backend seeds `image_generation -> image_generation_local` and binds provider-advertised image-generation resources into local deployment profiles. The optional Compose profile runs an `image_generation` gateway plus private workers selected by `IMAGE_GENERATION_WORKERS`, all sharing `models/image_generation` for local generation assets.
 - Shared cloud provider families are also available for OpenAI-compatible LLM and embeddings endpoints; OpenAI-compatible cloud provider instances hold endpoint/auth config, including optional `modelops://credential/<credential-id>` refs to saved ModelOps credentials, while deployment bindings choose explicit managed-model resources.
 - Offline runtime profile enforcement uses persisted `provider_origin`, not provider-key naming. Cloud providers can be created and listed while offline, but validation, deployment activation, runtime snapshot resolution, and provider dispatch fail closed with `offline_provider_blocked` before any cloud provider client is created.
 - Online runtime cloud/external calls publish sanitized cloud-traffic events through backend. The app shell uses the authenticated SSE stream to light upload/download indicators, and backend can persist the same metadata to a local JSONL log without recording prompts, payloads, headers, credentials, response bodies, or full URLs.
@@ -116,6 +118,7 @@ Current canonical tools and exposures:
 - `tool.web_search` -> `execution_backend: web_search`; the default `mcp.web_search` exposure is available when the optional `web_search` capability is bound to a provider such as local SearXNG.
 - `tool.python_exec` -> `execution_backend: sandbox_python`; the default `mcp.python_exec` exposure is local, sandboxed, and elevated-risk.
 - `tool.image_license_plate_recognition`, `tool.image_object_detection`, and `tool.image_captioning` -> `execution_backend: image_analysis`; the default MCP exposures invoke the active `image_analysis` runtime when that optional capability is bound.
+- `tool.image_text_to_image` and `tool.image_plate_logo_replacement` -> `execution_backend: image_generation`; the default MCP exposures invoke the active `image_generation` runtime when that optional capability is bound.
 - KB retrieval tools are not globally seeded because their valid configuration depends on the currently active deployment-bound knowledge bases. When exposed through MCP, their default discovery metadata is `category=knowledge_retrieval`, workspace data access, static freshness, and low risk.
 
 Tool execution is LLM-driven. Agent engine passes authorized MCP exposure definitions to the active OpenAI-compatible `llm_inference` provider, dispatches returned tool calls through the active MCP gateway provider with agent/user/domain identity metadata, appends tool results back into the conversation, and loops for up to three rounds before returning the final answer plus normalized `tool_calls` metadata.

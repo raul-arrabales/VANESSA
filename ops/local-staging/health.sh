@@ -70,6 +70,16 @@ image_analysis_worker_ready_ok() {
   image_analysis_worker_internal_http_ok "${service_name}" "${port}" "/health"
 }
 
+image_generation_ready_ok() {
+  image_generation_internal_http_ok "/health"
+}
+
+image_generation_worker_ready_ok() {
+  local service_name="$1"
+  local port="$2"
+  image_generation_worker_internal_http_ok "${service_name}" "${port}" "/health"
+}
+
 searxng_ready_ok() {
   searxng_internal_http_ok "/"
 }
@@ -351,6 +361,38 @@ run_checks() {
     fi
   else
     printf 'image_analysis: SKIP (IMAGE_ANALYSIS_URL not set)\n'
+  fi
+
+  if image_generation_enabled_requested; then
+    validate_image_generation_worker_selection
+    if image_generation_ready_ok; then
+      printf 'image_generation: OK (/health)\n'
+    else
+      printf 'image_generation: FAIL\n'
+      failures=$((failures + 1))
+    fi
+    if image_generation_worker_enabled "text_to_image"; then
+      if image_generation_worker_ready_ok "image_generation_text_to_image" "8095"; then
+        printf 'image_generation_text_to_image: OK (/health)\n'
+      else
+        printf 'image_generation_text_to_image: FAIL\n'
+        failures=$((failures + 1))
+      fi
+    else
+      printf 'image_generation_text_to_image: SKIP (IMAGE_GENERATION_WORKERS)\n'
+    fi
+    if image_generation_worker_enabled "plate_logo"; then
+      if image_generation_worker_ready_ok "image_generation_plate_logo" "8096"; then
+        printf 'image_generation_plate_logo: OK (/health)\n'
+      else
+        printf 'image_generation_plate_logo: FAIL\n'
+        failures=$((failures + 1))
+      fi
+    else
+      printf 'image_generation_plate_logo: SKIP (IMAGE_GENERATION_WORKERS)\n'
+    fi
+  else
+    printf 'image_generation: SKIP (IMAGE_GENERATION_URL not set)\n'
   fi
 
   if web_search_enabled_requested; then

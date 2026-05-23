@@ -74,8 +74,8 @@ For the full architecture narrative and generated diagram source of truth, see [
 
 The runtime architecture is intentionally explicit:
 
-- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
-- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, or OpenAI-compatible cloud families
+- `capability`: a platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, `image_analysis`, or `image_generation`
+- `provider`: a concrete implementation family for a capability, such as `vllm_local`, `weaviate_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, `image_generation_local`, or OpenAI-compatible cloud families
 - `deployment profile`: the named set of active capability bindings used to resolve a runtime snapshot
 - `provider_origin`: backend-owned `local` or `cloud` classification inherited by provider instances and runtime payloads
 - `platform_runtime`: the resolved runtime snapshot passed from backend to `agent_engine`
@@ -116,7 +116,7 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- `mcp_gateway` is required and local SearXNG web search is enabled by default via `WEB_SEARCH_ENABLED=true`; optional `llama_cpp`, `qdrant`, and `image_analysis` profiles can be enabled through environment variables. The `image_analysis` profile runs one gateway plus the private task workers selected by `IMAGE_ANALYSIS_WORKERS`.
+- `mcp_gateway` is required and local SearXNG web search is enabled by default via `WEB_SEARCH_ENABLED=true`; optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` profiles can be enabled through environment variables. The image capability profiles run one gateway plus the private task workers selected by their worker env vars.
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -146,6 +146,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `sandbox/`: isolated Python execution runtime
 - `mcp_gateway/`: gateway-hosted MCP server exposure provider
 - `image_analysis/`: optional local image understanding gateway/workers for selected plate recognition, object detection, and captioning tasks
+- `image_generation/`: optional local image generation gateway/workers for text-to-image and license plate logo replacement tasks
 - `infra/searxng/`: local SearXNG configuration used by the optional backend-owned web-search capability
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
 - `docs/`: architecture, setup, service docs, and contributor guidance

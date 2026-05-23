@@ -7,6 +7,7 @@ from ..services.policy_runtime_gate import ExecutionBlockedError
 from ..services.runtime_client import (
     ToolRuntimeClientError,
     build_image_analysis_runtime_client,
+    build_image_generation_runtime_client,
     build_mcp_tool_runtime_client,
     build_sandbox_tool_runtime_client,
 )
@@ -30,6 +31,8 @@ def runtime_capability_for_tool_spec(tool_spec: dict[str, Any]) -> str:
         return "sandbox_execution"
     if transport == "image_analysis_http" or execution_backend == "image_analysis":
         return "image_analysis"
+    if transport == "image_generation_http" or execution_backend == "image_generation":
+        return "image_generation"
     return runtime_capability_for_mcp_server()
 
 
@@ -52,9 +55,10 @@ def tool_message_content(payload: Any) -> list[dict[str, str]]:
 
 def _redact_image_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
     redacted = dict(arguments)
-    image = redacted.get("image") if isinstance(redacted.get("image"), dict) else None
-    if image is not None and "data_base64" in image:
-        redacted["image"] = {**image, "data_base64": "<redacted>"}
+    for key in ["image", "car_image", "logo_image"]:
+        image = redacted.get(key) if isinstance(redacted.get(key), dict) else None
+        if image is not None and "data_base64" in image:
+            redacted[key] = {**image, "data_base64": "<redacted>"}
     if "data_base64" in redacted:
         redacted["data_base64"] = "<redacted>"
     return redacted
@@ -172,6 +176,9 @@ def invoke_tool_call(
         elif runtime_capability == "image_analysis":
             runtime_client = build_image_analysis_runtime_client(platform_runtime)
             runtime_payload = runtime_client.analyze(payload=_image_analysis_payload(tool_spec, arguments))
+        elif runtime_capability == "image_generation":
+            runtime_client = build_image_generation_runtime_client(platform_runtime)
+            runtime_payload = runtime_client.generate(payload=_image_generation_payload(tool_spec, arguments))
         else:
             runtime_client = build_mcp_tool_runtime_client(platform_runtime)
             runtime_payload = runtime_client.invoke(
@@ -202,7 +209,7 @@ def invoke_tool_call(
         "provider_key": binding.get("provider_key"),
         "deployment_profile_slug": deployment_profile.get("slug"),
         "status_code": status_code,
-        "arguments": _redact_image_arguments(arguments) if runtime_capability == "image_analysis" else arguments,
+        "arguments": _redact_image_arguments(arguments) if runtime_capability in {"image_analysis", "image_generation"} else arguments,
     }
     if str(tool_spec.get("transport", "")).strip():
         call_record["transport"] = str(tool_spec.get("transport", "")).strip()
@@ -237,5 +244,29 @@ def _image_analysis_payload(tool_spec: dict[str, Any], arguments: dict[str, Any]
     return {
         "image": image,
         "tasks": normalized_tasks,
+        "options": options,
+    }
+
+
+def _image_generation_payload(tool_spec: dict[str, Any], arguments: dict[str, Any]) -> dict[str, Any]:
+    task = str(arguments.get("task") or "").strip().lower()
+    tasks = arguments.get("tasks") if isinstance(arguments.get("tasks"), list) else []
+    normalized_tasks = [str(item).strip().lower() for item in tasks if str(item).strip()]
+    execution_config = tool_spec.get("execution_config") if isinstance(tool_spec.get("execution_config"), dict) else {}
+    configured_tasks = execution_config.get("tasks") if isinstance(execution_config.get("tasks"), list) else []
+    for configured_task in configured_tasks:
+        normalized = str(configured_task).strip().lower()
+        if normalized and normalized not in normalized_tasks:
+            normalized_tasks.append(normalized)
+    if task and task not in normalized_tasks:
+        normalized_tasks.append(task)
+    options = arguments.get("options") if isinstance(arguments.get("options"), dict) else {}
+    return {
+        "tasks": normalized_tasks or ["text_to_image"],
+        "prompt": str(arguments.get("prompt") or "").strip(),
+        "negative_prompt": str(arguments.get("negative_prompt") or "").strip(),
+        "car_image": arguments.get("car_image") if isinstance(arguments.get("car_image"), dict) else None,
+        "logo_image": arguments.get("logo_image") if isinstance(arguments.get("logo_image"), dict) else None,
+        "plate_boxes": arguments.get("plate_boxes") if isinstance(arguments.get("plate_boxes"), list) else [],
         "options": options,
     }

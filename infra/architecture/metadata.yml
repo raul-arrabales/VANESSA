@@ -21,6 +21,9 @@ rendering:
     - image_analysis_anpr
     - image_analysis_objects
     - image_analysis_captioning
+    - image_generation
+    - image_generation_text_to_image
+    - image_generation_plate_logo
     - sandbox
     - weaviate
     - qdrant
@@ -110,6 +113,24 @@ services:
     description: Private image-analysis worker for image captioning.
     public_exposed: false
     criticality: medium
+  image_generation:
+    label: Image Generation
+    group: runtime
+    description: Optional local image generation gateway for text-to-image and plate-logo replacement workers.
+    public_exposed: true
+    criticality: medium
+  image_generation_text_to_image:
+    label: Image Generation Text-to-Image
+    group: runtime
+    description: Private image-generation worker for CPU-friendly text-to-image generation.
+    public_exposed: false
+    criticality: medium
+  image_generation_plate_logo:
+    label: Image Generation Plate Logo
+    group: runtime
+    description: Private image-generation worker for license plate logo replacement.
+    public_exposed: false
+    criticality: medium
   searxng:
     label: SearXNG
     group: runtime
@@ -184,6 +205,12 @@ edges:
     kind: http
     direction: outbound
   - from: backend
+    to: image_generation
+    protocol: HTTP
+    purpose: Optional image-generation provider validation and superadmin smoke tests
+    kind: http
+    direction: outbound
+  - from: backend
     to: weaviate
     protocol: HTTP
     purpose: Semantic retrieval operations
@@ -225,6 +252,12 @@ edges:
     purpose: Agent image-analysis tool invocation through resolved platform runtime bindings
     kind: http
     direction: outbound
+  - from: agent_engine
+    to: image_generation
+    protocol: HTTP
+    purpose: Agent image-generation tool invocation through resolved platform runtime bindings
+    kind: http
+    direction: outbound
   - from: image_analysis
     to: image_analysis_anpr
     protocol: Internal HTTP
@@ -241,6 +274,18 @@ edges:
     to: image_analysis_captioning
     protocol: Internal HTTP
     purpose: Image captioning worker calls
+    kind: internal
+    direction: outbound
+  - from: image_generation
+    to: image_generation_text_to_image
+    protocol: Internal HTTP
+    purpose: Text-to-image worker calls
+    kind: internal
+    direction: outbound
+  - from: image_generation
+    to: image_generation_plate_logo
+    protocol: Internal HTTP
+    purpose: Plate logo replacement worker calls
     kind: internal
     direction: outbound
   - from: agent_engine

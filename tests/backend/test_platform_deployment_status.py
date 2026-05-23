@@ -64,6 +64,21 @@ def _model_resource(
     }
 
 
+def _image_generation_resource(resource_id: str, task_key: str) -> dict[str, object]:
+    return {
+        "id": resource_id,
+        "resource_kind": "model" if task_key == "image_text_to_image" else "processor",
+        "ref_type": "managed_model" if task_key == "image_text_to_image" else "provider_resource",
+        "managed_model_id": resource_id if task_key == "image_text_to_image" else None,
+        "provider_resource_id": resource_id,
+        "display_name": resource_id,
+        "metadata": {
+            "backend": "local",
+            "task_key": task_key,
+        },
+    }
+
+
 def _knowledge_base_resource(knowledge_base_id: str) -> dict[str, object]:
     return {
         "id": knowledge_base_id,
@@ -157,6 +172,26 @@ def test_compute_status_marks_vector_binding_incomplete_without_kbs():
 
     assert binding_statuses["vector_store"]["is_ready"] is False
     assert binding_statuses["vector_store"]["issues"][0]["code"] == "resources_missing"
+
+
+def test_compute_status_accepts_image_generation_plate_logo_processor_group():
+    binding_statuses, _deployment_status = platform_deployment_status.compute_deployment_configuration_status(
+        "ignored",
+        bindings=[
+            _binding(
+                "image_generation",
+                resources=[
+                    _image_generation_resource("plate-logo-processor", "image_plate_logo_replacement"),
+                ],
+                resource_policy={
+                    "selection_mode": "task_defaults",
+                    "task_defaults": {"plate_logo_processor": "plate-logo-processor"},
+                },
+            )
+        ],
+    )
+
+    assert binding_statuses["image_generation"]["is_ready"] is True
 
 
 def test_compute_status_marks_dynamic_namespace_without_prefix():

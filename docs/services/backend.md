@@ -109,6 +109,7 @@ Agent-project semantics:
 - `POST /v1/platform/vector/query` (superadmin)
 - `POST /v1/platform/vector/documents/delete` (superadmin)
 - `POST /v1/platform/image-analysis/analyze` (superadmin smoke-test proxy; JSON base64 images only)
+- `POST /v1/platform/image-generation/generate` (superadmin smoke-test proxy; JSON base64 images only)
 
 Platform-control request parsing and response shaping are now owned by the application-layer platform-control service behind the canonical `api/http` module.
 
@@ -170,8 +171,8 @@ Context-management semantics:
 
 Key terms:
 
-- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`
-- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`
+- `capability`: platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, `image_analysis`, or `image_generation`
+- `provider`: implementation family such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, or `image_generation_local`
 - `provider_origin`: family-owned origin classification, `local` or `cloud`, inherited by provider instances and serialized in provider, deployment-binding, runtime, and active-provider payloads
 - `deployment profile`: named set of active capability bindings
 - `binding resource`: capability-scoped resource explicitly bound at the deployment-binding layer, such as a ModelOps-managed model or a vector-store index
@@ -189,11 +190,13 @@ Bootstrap defaults:
 - `mcp_gateway_local` is seeded from `MCP_GATEWAY_URL` and bound into local deployment profiles as required `mcp_runtime`.
 - `searxng_local` is seeded from `WEB_SEARCH_URL` and bound as optional `web_search` when `WEB_SEARCH_ENABLED=true`.
 - `image_analysis_local` is seeded only when `IMAGE_ANALYSIS_URL` is configured. It is a local-only provider gateway for license plate recognition, object detection, and captioning; Docker deployments route the gateway to the private task workers selected by `IMAGE_ANALYSIS_WORKERS`.
+- `image_generation_local` is seeded only when `IMAGE_GENERATION_URL` is configured. It is a local-only provider gateway for text-to-image generation and plate-logo replacement; Docker deployments route the gateway to the private task workers selected by `IMAGE_GENERATION_WORKERS`.
 - OpenAI-compatible cloud provider families are also seeded so superadmins can create shared cloud-backed LLM or embeddings providers without changing backend code. Built-in families seed explicit `provider_origin`; only the OpenAI-compatible cloud LLM and embeddings families are `cloud`.
 - The shared OpenAI-compatible LLM adapter now supports both the in-stack normalized LLM gateway and direct llama.cpp OpenAI chat-completions endpoints.
 - Model-bearing deployment bindings now require a selected provider, but may be saved temporarily with zero resources and no default until the capability is fully configured.
 - Deployment bindings may reference only ModelOps models that are already `active`, `is_validation_current=true`, and `last_validation_status=success`.
 - `image_analysis` is model-bearing but uses `resource_policy.selection_mode="task_defaults"` instead of `default_resource_id`. Deployments may bind any complete provider-advertised task group: ANPR requires `plate_detector` and `plate_ocr`, object detection requires `object_detector`, and captioning requires `captioner`.
+- `image_generation` uses `resource_policy.selection_mode="task_defaults"` instead of `default_resource_id`. `text_to_image` requires the ModelOps-managed `generator`; `license_plate_logo_replacement` requires the provider-native `plate_logo_processor`.
 - The runtime snapshot now serializes generic binding `resources`, `default_resource_id`, `default_resource`, and `resource_policy` for every capability binding.
 - Deployment list/detail responses now include `configuration_status` for both the deployment and each binding so the UI can show partial or mismatched configuration without inventing its own readiness rules.
 - Direct backend inference and agent-engine runtime selection both enforce active-binding membership: requested LLM model ids must be present in the active `llm_inference` binding and omitted requests fall back to the binding default.
@@ -207,7 +210,7 @@ Bootstrap defaults:
 - Local cloud-traffic JSONL logging is controlled by `CLOUD_TRAFFIC_LOG_ENABLED`, `CLOUD_TRAFFIC_LOG_PATH`, and `CLOUD_TRAFFIC_LOG_MAX_BYTES`. The compose backend mounts `../logs` to `/var/log/vanessa` and rotates `cloud-traffic.jsonl` to `.1` when the configured size is exceeded.
 - Backend owns product/public retrieval request shaping, active KB selection, deployment-runtime resolution, and knowledge-chat/source projection. It forwards canonical `input.retrieval` payloads to `agent_engine`, which executes semantic / keyword / hybrid retrieval against the active runtime bindings.
 - Canonical backend ↔ agent-engine retrieval semantics are documented in [Retrieval Contract](retrieval_contract.md).
-- Backend also forwards required `platform_runtime.capabilities.mcp_runtime` plus optional `sandbox_execution`, `web_search`, and `image_analysis` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
+- Backend also forwards required `platform_runtime.capabilities.mcp_runtime` plus optional `sandbox_execution`, `web_search`, `image_analysis`, and `image_generation` snapshots to support agent tool dispatch without giving `agent_engine` direct platform-table ownership.
 - `GET /v1/playgrounds/options` exposes runtime-allowed models, assistants, and deployment-bound knowledge bases for user-facing playground selection.
 - `POST /v1/playgrounds/sessions/{id}/messages` resolves the session kind and routes chat or knowledge execution through the same backend-owned playground orchestration layer.
 - Superadmins can now manage provider instances and deployment profiles directly from the control-plane API/UI, including clone/delete flows and activation history reads.
@@ -218,6 +221,7 @@ Bootstrap defaults:
 - `knowledge_base_retrieval` tools bind exactly one active, ready knowledge base from the active deployment `vector_store` resources. Validation and execution fail if the active deployment changes and the configured KB is no longer bound. Invocation merges tool `retrieval_defaults` with call input and uses the same backend KB query path as the context-management retrieval QA surface.
 - Backend also bootstraps `mcp.web_search` and `mcp.python_exec` as gateway-hosted MCP server definitions backed by those tools. MCP creation defaults are backend-owned through `/v1/catalog/mcp-creation-options`; retrieval-backed tools classify as `knowledge_retrieval` with workspace data access and static freshness.
 - Backend also bootstraps image-analysis internal tools and MCP exposures for plate recognition, object detection, and captioning. These tools require the active `image_analysis` binding and never log or persist image payload bytes.
+- Backend also bootstraps image-generation internal tools and MCP exposures for text-to-image and plate-logo replacement. These tools require the active `image_generation` binding and never log or persist image payload bytes.
 - Superadmins manage MCP server definitions from `/v1/catalog/mcp-servers`. Backend validates MCP schemas and discovery metadata before save, filters discovery by agent/user/domain policy, validates inbound and outbound invocation payloads, dispatches to the backing internal tool, and records every MCP invocation in the audit log.
 - The typed catalog API is now the canonical superadmin management surface for agents and tools.
   Each catalog create/update writes a new registry version under the hood, so runtime consumers

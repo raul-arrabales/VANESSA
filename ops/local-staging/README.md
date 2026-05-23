@@ -42,7 +42,7 @@ Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose op
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
   - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
   - Checks optional `qdrant` when `QDRANT_URL` is configured.
-  - Checks optional `image_analysis` when `IMAGE_ANALYSIS_URL` is configured.
+  - Checks optional `image_analysis` and `image_generation` when their provider URLs are configured.
   - Checks `searxng` and `mcp_gateway` by default.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
 - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
@@ -115,6 +115,12 @@ Supported launcher variables:
 - `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real task-specific vision model dependencies in the private workers)
 - `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS` (default: `300`; increase for first-run Florence/RF-DETR model downloads on slow machines)
 - `IMAGE_ANALYSIS_ANPR_URL`, `IMAGE_ANALYSIS_OBJECTS_URL`, `IMAGE_ANALYSIS_CAPTIONING_URL` (default to the private Compose worker service URLs)
+- `IMAGE_GENERATION_URL` (blank by default; set to `http://image_generation:8094` to enable the optional `image_generation` compose profile and backend bootstrap binding)
+- `IMAGE_GENERATION_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
+- `IMAGE_GENERATION_WORKERS` (default: `text_to_image,plate_logo`; set comma-separated worker roles or `none` to start only the gateway)
+- `IMAGE_GENERATION_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real Diffusers/OpenCV dependencies in the private workers)
+- `IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS` (default: `600`; increase for first-run Diffusers model downloads on slow machines)
+- `IMAGE_GENERATION_TEXT_TO_IMAGE_URL`, `IMAGE_GENERATION_PLATE_LOGO_URL` (default to the private Compose worker service URLs)
 - `VANESSA_RUNTIME_PROFILE` (default: `offline`; values: `online|offline`; seeds the initial DB-backed runtime profile; legacy `air_gapped` is normalized to `offline`)
 - `VANESSA_RUNTIME_PROFILE_FORCE` (blank by default; values: `online|offline`; hard-locks the runtime profile and disables the UI toggle; legacy `air_gapped` is normalized to `offline`)
 - `AGENT_ENGINE_SERVICE_TOKEN` (shared backend<->agent_engine token for `/v1/internal/agent-executions*`)
@@ -177,6 +183,14 @@ Split local runtime selection:
 - After changing `IMAGE_ANALYSIS_WORKERS`, restart `image_analysis` and then `backend` if you want Platform Catalog tool and MCP visibility to update immediately.
 - Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 - Once real worker images are built, restart image analysis with `./ops/local-staging/restart-service.sh --service image_analysis` to avoid reinstalling Torch/RF-DETR/Florence dependencies. Use `--build` only after changing Dockerfiles or image-analysis requirements.
+
+`image_generation` selection:
+
+- The optional `image_generation` gateway and private worker services are enabled only when `IMAGE_GENERATION_URL` is non-empty.
+- Local-staging scripts automatically add the `image_generation` compose profile when enabled.
+- `IMAGE_GENERATION_WORKERS` chooses which private workers are launched. Valid values are comma-separated `text_to_image` and `plate_logo`, or `none` to start only the gateway.
+- The gateway mounts `models/image_generation`, exposes text-to-image and plate-logo replacement resources through the `image_generation` platform capability, and delegates to the enabled worker containers.
+- Local smoke tests should keep `IMAGE_GENERATION_FAKE_MODE=1` and `IMAGE_GENERATION_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_GENERATION_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 
 `mcp_gateway` behavior:
 

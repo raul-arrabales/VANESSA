@@ -291,6 +291,98 @@ services:
     volumes:
       - ../models/image_analysis:/models/image_analysis
 
+  image_generation:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_generation/Dockerfile
+      target: gateway
+      args:
+        IMAGE_GENERATION_INSTALL_RUNTIME_DEPS: "0"
+    image: vanessa-image-generation-gateway:local
+    container_name: vanessa-image-generation
+    profiles:
+      - image_generation
+    ports:
+      - "8094:8094"
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_GENERATION_ROLE: gateway
+      IMAGE_GENERATION_PORT: 8094
+      IMAGE_GENERATION_MODEL_ROOT: /models/image_generation
+      IMAGE_GENERATION_FAKE_MODE: ${IMAGE_GENERATION_FAKE_MODE:-0}
+      IMAGE_GENERATION_WORKERS: ${IMAGE_GENERATION_WORKERS:-text_to_image,plate_logo}
+      IMAGE_GENERATION_TEXT_TO_IMAGE_URL: ${IMAGE_GENERATION_TEXT_TO_IMAGE_URL:-http://image_generation_text_to_image:8095}
+      IMAGE_GENERATION_PLATE_LOGO_URL: ${IMAGE_GENERATION_PLATE_LOGO_URL:-http://image_generation_plate_logo:8096}
+      HF_HOME: /models/image_generation/gateway/huggingface
+      TORCH_HOME: /models/image_generation/gateway/torch
+      XDG_CACHE_HOME: /models/image_generation/gateway/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_generation:/models/image_generation
+
+  image_generation_text_to_image:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_generation/Dockerfile
+      target: text-to-image
+      args:
+        IMAGE_GENERATION_INSTALL_RUNTIME_DEPS: ${IMAGE_GENERATION_INSTALL_RUNTIME_DEPS:-0}
+    image: vanessa-image-generation-text-to-image:local
+    container_name: vanessa-image-generation-text-to-image
+    profiles:
+      - image_generation
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_GENERATION_ROLE: text_to_image
+      IMAGE_GENERATION_PORT: 8095
+      IMAGE_GENERATION_MODEL_ROOT: /models/image_generation/text_to_image
+      IMAGE_GENERATION_FAKE_MODE: ${IMAGE_GENERATION_FAKE_MODE:-0}
+      IMAGE_GENERATION_TEXT_TO_IMAGE_MODEL_ID: ${IMAGE_GENERATION_TEXT_TO_IMAGE_MODEL_ID:-segmind/tiny-sd}
+      IMAGE_GENERATION_TEXT_TO_IMAGE_DEVICE: ${IMAGE_GENERATION_TEXT_TO_IMAGE_DEVICE:-cpu}
+      IMAGE_GENERATION_TEXT_TO_IMAGE_DTYPE: ${IMAGE_GENERATION_TEXT_TO_IMAGE_DTYPE:-float32}
+      HF_HOME: /models/image_generation/text_to_image/huggingface
+      TORCH_HOME: /models/image_generation/text_to_image/torch
+      XDG_CACHE_HOME: /models/image_generation/text_to_image/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_generation:/models/image_generation
+
+  image_generation_plate_logo:
+    build:
+      context: ..
+      dockerfile: infra/docker/image_generation/Dockerfile
+      target: plate-logo
+      args:
+        IMAGE_GENERATION_INSTALL_RUNTIME_DEPS: ${IMAGE_GENERATION_INSTALL_RUNTIME_DEPS:-0}
+    image: vanessa-image-generation-plate-logo:local
+    container_name: vanessa-image-generation-plate-logo
+    profiles:
+      - image_generation
+    env_file:
+      - path: .env.example
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      IMAGE_GENERATION_ROLE: plate_logo
+      IMAGE_GENERATION_PORT: 8096
+      IMAGE_GENERATION_MODEL_ROOT: /models/image_generation/plate_logo
+      IMAGE_GENERATION_FAKE_MODE: ${IMAGE_GENERATION_FAKE_MODE:-0}
+      HF_HOME: /models/image_generation/plate_logo/huggingface
+      TORCH_HOME: /models/image_generation/plate_logo/torch
+      XDG_CACHE_HOME: /models/image_generation/plate_logo/cache
+      MPLCONFIGDIR: /tmp/matplotlib
+    volumes:
+      - ../models/image_generation:/models/image_generation
+
   agent_engine:
     build:
       context: ..

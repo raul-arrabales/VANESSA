@@ -14,6 +14,7 @@ _CAPABILITIES = {
     "mcp_runtime",
     "sandbox_execution",
     "image_analysis",
+    "image_generation",
     "web_search",
 }
 

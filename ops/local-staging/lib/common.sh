@@ -25,7 +25,7 @@ LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MO
 LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant image_analysis image_analysis_anpr image_analysis_objects image_analysis_captioning searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
+readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant image_analysis image_analysis_anpr image_analysis_objects image_analysis_captioning image_generation image_generation_text_to_image image_generation_plate_logo searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"
@@ -286,6 +286,10 @@ image_analysis_enabled_requested() {
   [[ -n "${IMAGE_ANALYSIS_URL:-}" ]]
 }
 
+image_generation_enabled_requested() {
+  [[ -n "${IMAGE_GENERATION_URL:-}" ]]
+}
+
 web_search_enabled_requested() {
   local raw="${WEB_SEARCH_ENABLED:-true}"
   raw="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | xargs)"
@@ -398,6 +402,111 @@ image_analysis_internal_http_ok() {
 }
 
 image_analysis_worker_internal_http_ok() {
+  local service_name="$1"
+  local port="$2"
+  local path="$3"
+  compose exec -T "${service_name}" python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:${port}${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
+image_generation_workers_raw() {
+  local raw="${IMAGE_GENERATION_WORKERS:-text_to_image,plate_logo}"
+  raw="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  printf '%s\n' "${raw:-text_to_image,plate_logo}"
+}
+
+image_generation_worker_role_for_service() {
+  case "$1" in
+    image_generation_text_to_image) printf 'text_to_image\n' ;;
+    image_generation_plate_logo) printf 'plate_logo\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+image_generation_worker_service_for_role() {
+  case "$1" in
+    text_to_image) printf 'image_generation_text_to_image\n' ;;
+    plate_logo) printf 'image_generation_plate_logo\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+image_generation_worker_roles() {
+  local raw
+  raw="$(image_generation_workers_raw)"
+  [[ "${raw}" == "none" ]] && return 0
+
+  local old_ifs="${IFS}"
+  local item
+  local emitted=" "
+  IFS=','
+  for item in ${raw}; do
+    [[ -n "${item}" ]] || continue
+    case "${item}" in
+      text_to_image|plate_logo)
+        if [[ "${emitted}" != *" ${item} "* ]]; then
+          printf '%s\n' "${item}"
+          emitted="${emitted}${item} "
+        fi
+        ;;
+    esac
+  done
+  IFS="${old_ifs}"
+}
+
+image_generation_worker_enabled() {
+  local role="$1"
+  local enabled_role
+  while IFS= read -r enabled_role; do
+    [[ "${enabled_role}" == "${role}" ]] && return 0
+  done < <(image_generation_worker_roles)
+  return 1
+}
+
+image_generation_selected_services() {
+  printf 'image_generation\n'
+  local role
+  while IFS= read -r role; do
+    image_generation_worker_service_for_role "${role}"
+  done < <(image_generation_worker_roles)
+}
+
+validate_image_generation_worker_selection() {
+  local raw
+  raw="$(image_generation_workers_raw)"
+  [[ "${raw}" == "none" ]] && return 0
+
+  local old_ifs="${IFS}"
+  local item
+  local invalid=()
+  local valid_count=0
+  IFS=','
+  for item in ${raw}; do
+    [[ -n "${item}" ]] || continue
+    case "${item}" in
+      text_to_image|plate_logo)
+        valid_count=$((valid_count + 1))
+        ;;
+      *)
+        invalid+=("${item}")
+        ;;
+    esac
+  done
+  IFS="${old_ifs}"
+
+  if (( ${#invalid[@]} > 0 )); then
+    die "Invalid IMAGE_GENERATION_WORKERS=${IMAGE_GENERATION_WORKERS:-}. Valid values are comma-separated text_to_image,plate_logo or none."
+  fi
+  if (( valid_count == 0 )); then
+    die "IMAGE_GENERATION_WORKERS must include at least one worker or be set to none."
+  fi
+}
+
+image_generation_internal_http_ok() {
+  local path="$1"
+  compose exec -T image_generation python -c "import sys, urllib.request; sys.exit(0 if 200 <= getattr(urllib.request.urlopen('http://127.0.0.1:8094${path}', timeout=3), 'status', 500) < 400 else 1)" >/dev/null 2>&1
+}
+
+image_generation_worker_internal_http_ok() {
   local service_name="$1"
   local port="$2"
   local path="$3"
@@ -533,6 +642,9 @@ compose() {
   if image_analysis_enabled_requested; then
     cmd+=(--profile image_analysis)
   fi
+  if image_generation_enabled_requested; then
+    cmd+=(--profile image_generation)
+  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -567,6 +679,19 @@ stack_services_for_start() {
       local role
       role="$(image_analysis_worker_role_for_service "${service}")"
       if ! image_analysis_worker_enabled "${role}"; then
+        continue
+      fi
+    fi
+    if [[ "${service}" == "image_generation" ]] && ! image_generation_enabled_requested; then
+      continue
+    fi
+    if [[ "${service}" == image_generation_* ]] && ! image_generation_enabled_requested; then
+      continue
+    fi
+    if [[ "${service}" == image_generation_* ]]; then
+      local generation_role
+      generation_role="$(image_generation_worker_role_for_service "${service}")"
+      if ! image_generation_worker_enabled "${generation_role}"; then
         continue
       fi
     fi

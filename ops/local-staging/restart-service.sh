@@ -54,6 +54,9 @@ check_service_ready() {
     image_analysis_anpr) image_analysis_worker_internal_http_ok "image_analysis_anpr" "8091" "/health" ;;
     image_analysis_objects) image_analysis_worker_internal_http_ok "image_analysis_objects" "8092" "/health" ;;
     image_analysis_captioning) image_analysis_worker_internal_http_ok "image_analysis_captioning" "8093" "/health" ;;
+    image_generation) image_generation_internal_http_ok "/health" ;;
+    image_generation_text_to_image) image_generation_worker_internal_http_ok "image_generation_text_to_image" "8095" "/health" ;;
+    image_generation_plate_logo) image_generation_worker_internal_http_ok "image_generation_plate_logo" "8096" "/health" ;;
     searxng) searxng_internal_http_ok "/" ;;
     weaviate) http_ok "http://localhost:8080/v1/.well-known/live" ;;
     postgres) tcp_ok "localhost" "5432" ;;
@@ -178,8 +181,23 @@ if [[ "${target_service}" == image_analysis_* ]]; then
     die "${target_service} is disabled by IMAGE_ANALYSIS_WORKERS=${IMAGE_ANALYSIS_WORKERS:-anpr,objects,captioning}. Add '${worker_role}' to IMAGE_ANALYSIS_WORKERS to start it."
   fi
 fi
+if [[ "${target_service}" == "image_generation" ]]; then
+  image_generation_enabled_requested || die "image_generation is disabled. Set IMAGE_GENERATION_URL to enable the optional image-generation runtime."
+  with_deps=true
+fi
+if [[ "${target_service}" == image_generation_* ]]; then
+  image_generation_enabled_requested || die "${target_service} is disabled. Set IMAGE_GENERATION_URL to enable the optional image-generation runtime."
+  validate_image_generation_worker_selection
+  generation_worker_role="$(image_generation_worker_role_for_service "${target_service}")"
+  if ! image_generation_worker_enabled "${generation_worker_role}"; then
+    die "${target_service} is disabled by IMAGE_GENERATION_WORKERS=${IMAGE_GENERATION_WORKERS:-text_to_image,plate_logo}. Add '${generation_worker_role}' to IMAGE_GENERATION_WORKERS to start it."
+  fi
+fi
 if image_analysis_enabled_requested; then
   validate_image_analysis_worker_selection
+fi
+if image_generation_enabled_requested; then
+  validate_image_generation_worker_selection
 fi
 validate_llm_cpu_thread_binding
 
@@ -187,6 +205,9 @@ if [[ "${build_mode}" == "auto" ]]; then
   if [[ "${target_service}" == image_analysis* ]]; then
     build_mode=false
     log_info "Image-analysis restart defaults to --no-build because worker images carry heavy ML dependencies. Pass --build when you need to rebuild them."
+  elif [[ "${target_service}" == image_generation* ]]; then
+    build_mode=false
+    log_info "Image-generation restart defaults to --no-build because worker images can carry heavy ML dependencies. Pass --build when you need to rebuild them."
   else
     build_mode=true
   fi
@@ -206,6 +227,9 @@ fi
 compose_targets=("${target_service}")
 if [[ "${target_service}" == "image_analysis" ]]; then
   mapfile -t compose_targets < <(image_analysis_selected_services)
+fi
+if [[ "${target_service}" == "image_generation" ]]; then
+  mapfile -t compose_targets < <(image_generation_selected_services)
 fi
 
 log_info "Restarting service '${target_service}'"

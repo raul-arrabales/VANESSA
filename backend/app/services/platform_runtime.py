@@ -9,6 +9,7 @@ from ..repositories import platform_control_plane as platform_repo
 from .platform_adapters import (
     EmbeddingsAdapter,
     HttpImageAnalysisAdapter,
+    HttpImageGenerationAdapter,
     HttpMcpRuntimeAdapter,
     HttpSandboxExecutionAdapter,
     LlmInferenceAdapter,
@@ -28,6 +29,7 @@ from .platform_serialization import _serialize_runtime_binding, _serialize_runti
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
+    CAPABILITY_IMAGE_GENERATION,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -209,6 +211,24 @@ def resolve_image_analysis_adapter(
     if binding.adapter_kind == "image_analysis_http":
         return HttpImageAnalysisAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported image analysis adapter kind", status_code=500)
+
+
+def resolve_image_generation_adapter(
+    database_url: str,
+    config: AuthConfig,
+    *,
+    provider_instance_id: str | None = None,
+) -> HttpImageGenerationAdapter:
+    binding = _resolve_provider_binding(
+        database_url,
+        config,
+        capability_key=CAPABILITY_IMAGE_GENERATION,
+        provider_instance_id=provider_instance_id,
+    )
+    binding, _credential_summary = resolve_binding_modelops_credential(database_url, config=config, binding=binding)
+    if binding.adapter_kind == "image_generation_http":
+        return HttpImageGenerationAdapter(binding)
+    raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported image generation adapter kind", status_code=500)
 
 
 def get_active_platform_runtime(
@@ -472,6 +492,30 @@ def get_active_capability_statuses(database_url: str, config: AuthConfig) -> lis
                     "display_name": image_adapter.binding.deployment_profile_display_name,
                 },
                 "health": image_adapter.health(),
+            }
+        )
+    except PlatformControlPlaneError as exc:
+        if exc.code != "active_binding_not_found":
+            raise
+
+    try:
+        image_generation_adapter = resolve_image_generation_adapter(database_url, config)
+        statuses.append(
+            {
+                "capability": CAPABILITY_IMAGE_GENERATION,
+                "provider": {
+                    "id": image_generation_adapter.binding.provider_instance_id,
+                    "slug": image_generation_adapter.binding.provider_slug,
+                    "provider_key": image_generation_adapter.binding.provider_key,
+                    "provider_origin": image_generation_adapter.binding.provider_origin,
+                    "display_name": image_generation_adapter.binding.provider_display_name,
+                },
+                "deployment_profile": {
+                    "id": image_generation_adapter.binding.deployment_profile_id,
+                    "slug": image_generation_adapter.binding.deployment_profile_slug,
+                    "display_name": image_generation_adapter.binding.deployment_profile_display_name,
+                },
+                "health": image_generation_adapter.health(),
             }
         )
     except PlatformControlPlaneError as exc:

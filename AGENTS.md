@@ -57,10 +57,10 @@ Important current product-stage guidance:
 Use these terms consistently:
 
 - `capability`
-  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, or `image_analysis`.
+  - Platform function such as `llm_inference`, `embeddings`, `vector_store`, `mcp_runtime`, `web_search`, `sandbox_execution`, `image_analysis`, or `image_generation`.
 
 - `provider`
-  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, or `image_analysis_local`.
+  - Concrete implementation family for a capability such as `vllm_local`, `llama_cpp_local`, `openai_compatible_cloud_llm`, `openai_compatible_cloud_embeddings`, `weaviate_local`, `qdrant_local`, `mcp_gateway_local`, `searxng_local`, `sandbox_local`, `image_analysis_local`, or `image_generation_local`.
   - Provider families own `provider_origin` (`local` or `cloud`); provider instances inherit that value and must not override it.
 
 - `adapter`
@@ -109,6 +109,7 @@ For model-bearing capabilities:
 
 - `llm_inference` and `embeddings` bindings use managed-model `resources` plus `default_resource_id`.
 - `image_analysis` bindings use managed-model `resources` plus `resource_policy.selection_mode="task_defaults"`; they do not use a global `default_resource_id`. Bindings may include any complete task group: ANPR requires `plate_detector` and `plate_ocr`, object detection requires `object_detector`, and captioning requires `captioner`.
+- `image_generation` bindings use `resources` plus `resource_policy.selection_mode="task_defaults"`; they do not use a global `default_resource_id`. `text_to_image` requires the ModelOps-managed `generator`; `license_plate_logo_replacement` requires the provider-native `plate_logo_processor`.
 - Requested models must belong to the active binding.
 - If no model is requested, the binding default is used.
 - In `offline` runtime profile, any provider with `provider_origin="cloud"` must be blocked before validation, activation, runtime resolution, adapter creation, or provider invocation.
@@ -171,19 +172,26 @@ Respect these runtime boundaries when generating code or configuration.
    - Must be accessed through backend/agent runtime adapters and active `image_analysis` bindings; frontend must not call it directly.
    - Image payload bytes must not be logged, stored, or included in telemetry.
 
-12. **Wake-word service (`kws`)**
+12. **Image Generation (`image_generation`)**
+   - Optional local HTTP provider gateway for image generation and image editing.
+   - Supports text-to-image generation and license plate logo replacement.
+   - In Docker, delegates task execution to private task workers selected at launch with `IMAGE_GENERATION_WORKERS`: `image_generation_text_to_image` and `image_generation_plate_logo`.
+   - Must be accessed through backend/agent runtime adapters and active `image_generation` bindings; frontend must not call it directly.
+   - Image payload bytes must not be logged, stored, or included in telemetry.
+
+13. **Wake-word service (`kws`)**
    - Offline wake-word detection and wake-event emission.
    - Integrates with backend via webhook/event flow.
 
-13. **Weaviate**
+14. **Weaviate**
     - Persistent vector index.
     - One possible `vector_store` provider.
 
-14. **Optional Qdrant (`qdrant`)**
+15. **Optional Qdrant (`qdrant`)**
     - Alternate vector database.
     - Alternate `vector_store` provider selected by deployment profile.
 
-15. **PostgreSQL**
+16. **PostgreSQL**
     - Persistent relational storage for auth, metadata, control-plane state, ModelOps state, and execution metadata.
 
 ---
@@ -215,6 +223,11 @@ Respect these runtime boundaries when generating code or configuration.
   - Optional local image-analysis provider service.
   - Exposes `/health`, `/v1/resources`, and `/v1/analyze`.
   - Uses local open-source model pipelines for plate recognition, object detection, and captioning.
+
+- `image_generation/`
+  - Optional local image-generation provider service.
+  - Exposes `/health`, `/v1/resources`, and `/v1/generate`.
+  - Uses a local Diffusers text-to-image worker and an OpenCV/Pillow plate-logo replacement worker.
 
 - `kws/`
   - Wake-word service.
@@ -327,6 +340,7 @@ Prefer current platform terms:
 - `platform_runtime`
 - `ModelOps`
 - `image_analysis`
+- `image_generation`
 
 Avoid reviving outdated singular terminology such as binding everything around one `served_model_id` when the current design is resource-oriented and multi-model.
 
@@ -399,6 +413,7 @@ When making changes:
 - Weaviate and Qdrant are alternate `vector_store` providers.
 - Sandbox and MCP gateway are runtime capabilities, not generic utilities to call directly from anywhere.
 - Image analysis is a runtime capability, not a generic utility to call directly from frontend or product code.
+- Image generation is a runtime capability, not a generic utility to call directly from frontend or product code.
 
 6. Be safe with the sandbox.
 - Any code-execution feature must integrate through approved backend/agent_engine abstractions and governance checks.
@@ -460,6 +475,7 @@ Keep these current repo truths in mind:
 - Active runtime selection happens through deployment profiles.
 - Model-bearing bindings are multi-model and require an explicit default.
 - `agent_engine` executes against backend-provided `platform_runtime`.
+- Optional image-generation execution happens through the active `image_generation` binding and backend/agent runtime adapters.
 - Internal tools are backend-owned catalog capabilities; KB retrieval tools bind exactly one active deployment-bound knowledge base; MCP server definitions are separate gateway-hosted exposures backed by validated tools.
 - Product-facing AI interaction is standardized on `/v1/playgrounds/*`, while end-user agent authoring now lives under `/v1/agent-projects/*`.
 

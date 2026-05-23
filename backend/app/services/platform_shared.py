@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from .image_analysis_tasks import IMAGE_ANALYSIS_TASK_DEFAULT_KEYS
+from .image_generation_tasks import TASK_KEY_TEXT_TO_IMAGE
 from .platform_service_types import (
     _TASK_KEY_EMBEDDINGS,
     _TASK_KEY_LLM,
 )
-from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_LLM_INFERENCE
+from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_IMAGE_GENERATION, CAPABILITY_LLM_INFERENCE
 
 
 def _runtime_model_entries_for_capability(
@@ -45,4 +46,6 @@ def _expected_task_keys(capability_key: str) -> set[str]:
     normalized = capability_key.strip().lower()
     if normalized == CAPABILITY_IMAGE_ANALYSIS:
         return set(IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.values())
+    if normalized == CAPABILITY_IMAGE_GENERATION:
+        return {TASK_KEY_TEXT_TO_IMAGE}
     return {_expected_task_key(normalized)}

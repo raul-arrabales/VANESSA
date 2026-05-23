@@ -3,8 +3,9 @@ from __future__ import annotations
 from time import monotonic
 from typing import Any
 
-from .base import ImageAnalysisRuntimeClient, ImageAnalysisRuntimeClientError, McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
+from .base import ImageAnalysisRuntimeClient, ImageAnalysisRuntimeClientError, ImageGenerationRuntimeClient, ImageGenerationRuntimeClientError, McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
 from .image_analysis_tasks import IMAGE_ANALYSIS_DEFAULTS_BY_TASK
+from .image_generation_tasks import IMAGE_GENERATION_DEFAULTS_BY_TASK
 from .resolution import binding_timeout_seconds
 from .transport import JsonRequestFn, request_json_or_raise
 from ..cloud_traffic import report_cloud_traffic_for_binding
@@ -234,3 +235,60 @@ class HttpImageAnalysisRuntimeClient(ImageAnalysisRuntimeClient):
         analyze_path = str(config.get("analyze_path", "/v1/analyze")).strip() or "/v1/analyze"
         endpoint_url = str(self.image_binding.get("endpoint_url", "")).rstrip("/")
         return endpoint_url + analyze_path
+
+
+class HttpImageGenerationRuntimeClient(ImageGenerationRuntimeClient):
+    def __init__(
+        self,
+        *,
+        deployment_profile: dict[str, Any],
+        image_binding: dict[str, Any],
+        request_json: JsonRequestFn,
+    ):
+        super().__init__(deployment_profile=deployment_profile, image_binding=image_binding)
+        self.request_json = request_json
+
+    def generate(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+        resource_policy = self.image_binding.get("resource_policy") if isinstance(self.image_binding.get("resource_policy"), dict) else {}
+        task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+        tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+        missing_defaults = [
+            default_key
+            for task in [str(item).strip().lower() for item in tasks if str(item).strip()]
+            for default_key in IMAGE_GENERATION_DEFAULTS_BY_TASK.get(task, ())
+            if not str(task_defaults.get(default_key) or "").strip()
+        ]
+        if missing_defaults:
+            raise ImageGenerationRuntimeClientError(
+                code="missing_image_generation_task_defaults",
+                message="platform_runtime image_generation binding is missing task defaults for requested tasks",
+                status_code=409,
+                details={"missing_task_defaults": sorted(set(missing_defaults)), "tasks": tasks},
+            )
+        generation_payload = {
+            **payload,
+            "runtime": {
+                "resources": list(self.image_binding.get("resources") or []),
+                "task_defaults": dict(task_defaults),
+            },
+        }
+        response_payload, status_code = request_json_or_raise(
+            request_json=self.request_json,
+            error_cls=ImageGenerationRuntimeClientError,
+            binding=self.image_binding,
+            url=self._generate_url(),
+            method="POST",
+            payload=generation_payload,
+            timeout_seconds=binding_timeout_seconds(self.image_binding),
+            unavailable_code=tool_unavailable_code,
+            unavailable_message="Image generation runtime unavailable",
+            request_failed_code=tool_request_failed_code,
+            request_failed_message="Image generation runtime request failed",
+        )
+        return {"status_code": status_code, "result": response_payload}
+
+    def _generate_url(self) -> str:
+        config = self.image_binding.get("config") if isinstance(self.image_binding.get("config"), dict) else {}
+        generate_path = str(config.get("generate_path", "/v1/generate")).strip() or "/v1/generate"
+        endpoint_url = str(self.image_binding.get("endpoint_url", "")).rstrip("/")
+        return endpoint_url + generate_path

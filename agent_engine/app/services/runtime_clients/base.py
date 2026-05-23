@@ -34,6 +34,10 @@ class ImageAnalysisRuntimeClientError(RuntimeClientError):
     pass
 
 
+class ImageGenerationRuntimeClientError(RuntimeClientError):
+    pass
+
+
 class LlmRuntimeClient(ABC):
     def __init__(self, *, deployment_profile: dict[str, Any], llm_binding: dict[str, Any]):
         self.deployment_profile = deployment_profile
@@ -133,4 +137,14 @@ class ImageAnalysisRuntimeClient(ABC):
 
     @abstractmethod
     def analyze(self, *, payload: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class ImageGenerationRuntimeClient(ABC):
+    def __init__(self, *, deployment_profile: dict[str, Any], image_binding: dict[str, Any]):
+        self.deployment_profile = deployment_profile
+        self.image_binding = image_binding
+
+    @abstractmethod
+    def generate(self, *, payload: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError

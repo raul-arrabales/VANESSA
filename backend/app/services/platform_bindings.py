@@ -9,6 +9,7 @@ from .context_management import build_knowledge_base_binding_resource
 from .platform_adapters import (
     HttpMcpRuntimeAdapter,
     HttpImageAnalysisAdapter,
+    HttpImageGenerationAdapter,
     HttpSandboxExecutionAdapter,
     OpenAICompatibleEmbeddingsAdapter,
     OpenAICompatibleLlmAdapter,
@@ -29,6 +30,9 @@ from .platform_service_types import (
     ProviderStoragePayload,
     _IMAGE_ANALYSIS_TASK_GROUPS,
     _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    _IMAGE_GENERATION_TASK_DEFAULT_KEYS,
+    _IMAGE_GENERATION_TASK_GROUPS,
+    _IMAGE_GENERATION_MODEL_DEFAULT_KEYS,
     _IMAGE_SELECTION_TASK_DEFAULTS,
     _MODEL_BEARING_CAPABILITIES,
     _VECTOR_SELECTION_DYNAMIC_NAMESPACE,
@@ -38,6 +42,7 @@ from .platform_shared import _expected_task_keys, _runtime_model_entries_for_cap
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
+    CAPABILITY_IMAGE_GENERATION,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -300,6 +305,8 @@ def _adapter_from_binding(binding: ProviderBinding) -> Any:
         return SearxngWebSearchAdapter(binding)
     if binding.adapter_kind == "image_analysis_http":
         return HttpImageAnalysisAdapter(binding)
+    if binding.adapter_kind == "image_generation_http":
+        return HttpImageGenerationAdapter(binding)
     raise PlatformControlPlaneError("unsupported_adapter_kind", "Unsupported adapter kind", status_code=500)
 
 
@@ -420,6 +427,24 @@ def _validate_provider_binding(binding: ProviderBinding) -> dict[str, Any]:
         if binding_error:
             payload["binding_error"] = binding_error
         return _annotate_provider_validation(binding.capability_key, payload)
+    if binding.capability_key == CAPABILITY_IMAGE_GENERATION:
+        health = adapter.health()
+        resources, resources_status = _list_adapter_resources(adapter)
+        resource_errors = _validate_bound_resources_against_provider_inventory(
+            binding,
+            resources if 200 <= resources_status < 300 else None,
+        )
+        binding_error = _image_generation_binding_error(binding)
+        payload = {
+            "health": health,
+            "resources_reachable": 200 <= resources_status < 300,
+            "resources_status_code": resources_status,
+            "resources": [_serialize_binding_resource(resource) for resource in resources],
+            "resource_errors": resource_errors,
+        }
+        if binding_error:
+            payload["binding_error"] = binding_error
+        return _annotate_provider_validation(binding.capability_key, payload)
     raise PlatformControlPlaneError("unsupported_capability", "Unsupported capability", status_code=400)
 
 
@@ -481,6 +506,14 @@ def _validate_binding_resources(
         )
     if normalized_capability == CAPABILITY_IMAGE_ANALYSIS:
         return _validate_image_analysis_resources(
+            database_url=database_url,
+            provider_row=provider_row,
+            resources=normalized_resources,
+            default_resource_id=normalized_default,
+            resource_policy=resource_policy,
+        )
+    if normalized_capability == CAPABILITY_IMAGE_GENERATION:
+        return _validate_image_generation_resources(
             database_url=database_url,
             provider_row=provider_row,
             resources=normalized_resources,
@@ -681,6 +714,142 @@ def _image_analysis_binding_error(binding: ProviderBinding) -> str | None:
     if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
         return "task_defaults_required"
     missing_defaults, invalid_defaults, complete_groups = _validate_image_analysis_task_defaults(
+        resources_by_id=resources_by_id,
+        resource_policy=resource_policy,
+    )
+    if missing_defaults or invalid_defaults or not complete_groups:
+        return "task_defaults_required"
+    return None
+
+
+def _validate_image_generation_resources(
+    *,
+    database_url: str,
+    provider_row: dict[str, Any],
+    resources: list[dict[str, Any]],
+    default_resource_id: str | None,
+    resource_policy: dict[str, Any],
+) -> dict[str, Any]:
+    if default_resource_id:
+        raise PlatformControlPlaneError(
+            "default_resource_not_supported",
+            "image_generation bindings use resource_policy.task_defaults instead of default_resource_id",
+            status_code=400,
+        )
+    if not resources:
+        raise PlatformControlPlaneError(
+            "resources_required",
+            "image_generation bindings require at least one complete task resource group",
+            status_code=400,
+        )
+    selection_mode = str(resource_policy.get("selection_mode") or _IMAGE_SELECTION_TASK_DEFAULTS).strip().lower()
+    if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
+        raise PlatformControlPlaneError(
+            "invalid_resource_policy",
+            "image_generation bindings require resource_policy.selection_mode=task_defaults",
+            status_code=400,
+            details={"selection_mode": selection_mode},
+        )
+
+    validated_resources: list[dict[str, Any]] = []
+    for resource in resources:
+        task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        default_key = next(
+            (key for key, expected_task_key in _IMAGE_GENERATION_TASK_DEFAULT_KEYS.items() if expected_task_key == task_key),
+            "",
+        )
+        if default_key in _IMAGE_GENERATION_MODEL_DEFAULT_KEYS:
+            validated_resources.append(
+                _validate_model_binding_resource(
+                    database_url,
+                    provider_row=provider_row,
+                    capability_key=CAPABILITY_IMAGE_GENERATION,
+                    resource=resource,
+                )
+            )
+            continue
+        validated_resources.append(
+            {
+                "id": str(resource.get("id") or "").strip(),
+                "resource_kind": str(resource.get("resource_kind") or "processor").strip().lower() or "processor",
+                "ref_type": "provider_resource",
+                "managed_model_id": None,
+                "knowledge_base_id": None,
+                "provider_resource_id": str(resource.get("provider_resource_id") or resource.get("id") or "").strip(),
+                "display_name": str(resource.get("display_name") or resource.get("id") or "").strip(),
+                "metadata": dict(resource.get("metadata") or {}),
+            }
+        )
+
+    resources_by_id = {str(resource.get("id") or "").strip(): resource for resource in validated_resources}
+    missing_defaults, invalid_defaults, complete_groups = _validate_image_generation_task_defaults(
+        resources_by_id=resources_by_id,
+        resource_policy=resource_policy,
+    )
+    if missing_defaults or invalid_defaults or not complete_groups:
+        raise PlatformControlPlaneError(
+            "invalid_task_defaults",
+            "image_generation bindings require at least one complete task_defaults group",
+            status_code=400,
+            details={
+                "missing_task_defaults": missing_defaults,
+                "invalid_task_defaults": invalid_defaults,
+                "complete_task_groups": complete_groups,
+            },
+        )
+    return {"resources": validated_resources, "default_resource_id": None}
+
+
+def _validate_image_generation_task_defaults(
+    *,
+    resources_by_id: dict[str, dict[str, Any]],
+    resource_policy: dict[str, Any],
+) -> tuple[list[str], list[str], list[str]]:
+    task_defaults = resource_policy.get("task_defaults") if isinstance(resource_policy.get("task_defaults"), dict) else {}
+    selected_task_keys = {
+        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        for resource in resources_by_id.values()
+    }
+    missing_defaults: list[str] = []
+    invalid_defaults: list[str] = []
+    complete_groups: list[str] = []
+
+    for group_name, default_keys in _IMAGE_GENERATION_TASK_GROUPS.items():
+        group_task_keys = {_IMAGE_GENERATION_TASK_DEFAULT_KEYS[default_key] for default_key in default_keys}
+        group_requested = bool(group_task_keys & selected_task_keys) or any(str(task_defaults.get(default_key) or "").strip() for default_key in default_keys)
+        if not group_requested:
+            continue
+        group_valid = True
+        for default_key in default_keys:
+            expected_task_key = _IMAGE_GENERATION_TASK_DEFAULT_KEYS[default_key]
+            resource_id = str(task_defaults.get(default_key) or "").strip()
+            if not resource_id:
+                missing_defaults.append(default_key)
+                group_valid = False
+                continue
+            resource = resources_by_id.get(resource_id)
+            if resource is None:
+                invalid_defaults.append(default_key)
+                group_valid = False
+                continue
+            task_key = str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+            if task_key != expected_task_key:
+                invalid_defaults.append(default_key)
+                group_valid = False
+        if group_valid:
+            complete_groups.append(group_name)
+    return missing_defaults, invalid_defaults, complete_groups
+
+
+def _image_generation_binding_error(binding: ProviderBinding) -> str | None:
+    resources_by_id = {str(resource.get("id") or "").strip(): resource for resource in binding.resources}
+    if not resources_by_id:
+        return "task_defaults_required"
+    resource_policy = dict(binding.resource_policy or {})
+    selection_mode = str(resource_policy.get("selection_mode") or "").strip().lower()
+    if selection_mode != _IMAGE_SELECTION_TASK_DEFAULTS:
+        return "task_defaults_required"
+    missing_defaults, invalid_defaults, complete_groups = _validate_image_generation_task_defaults(
         resources_by_id=resources_by_id,
         resource_policy=resource_policy,
     )

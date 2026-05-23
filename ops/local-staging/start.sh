@@ -71,6 +71,9 @@ fi
 if image_analysis_enabled_requested; then
   validate_image_analysis_worker_selection
 fi
+if image_generation_enabled_requested; then
+  validate_image_generation_worker_selection
+fi
 validate_llm_cpu_thread_binding
 
 log_info "Validating compose configuration"

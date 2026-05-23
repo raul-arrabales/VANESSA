@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_at": "2026-05-23T16:42:42+00:00",
+  "generated_at": "2026-05-23T18:39:12+00:00",
   "nodes": [
     {
       "id": "frontend",
@@ -129,6 +129,33 @@
       "criticality": "medium"
     },
     {
+      "id": "image_generation",
+      "container": "image_generation",
+      "label": "Image Generation",
+      "group": "runtime",
+      "description": "Optional local image generation gateway for text-to-image and plate-logo replacement workers.",
+      "public_exposed": true,
+      "criticality": "medium"
+    },
+    {
+      "id": "image_generation_text_to_image",
+      "container": "image_generation_text_to_image",
+      "label": "Image Generation Text-to-Image",
+      "group": "runtime",
+      "description": "Private image-generation worker for CPU-friendly text-to-image generation.",
+      "public_exposed": false,
+      "criticality": "medium"
+    },
+    {
+      "id": "image_generation_plate_logo",
+      "container": "image_generation_plate_logo",
+      "label": "Image Generation Plate Logo",
+      "group": "runtime",
+      "description": "Private image-generation worker for license plate logo replacement.",
+      "public_exposed": false,
+      "criticality": "medium"
+    },
+    {
       "id": "sandbox",
       "container": "sandbox",
       "label": "Sandbox",
@@ -172,6 +199,15 @@
       "to": "image_analysis",
       "protocol": "HTTP",
       "purpose": "Agent image-analysis tool invocation through resolved platform runtime bindings",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "agent_engine-image_generation",
+      "from": "agent_engine",
+      "to": "image_generation",
+      "protocol": "HTTP",
+      "purpose": "Agent image-generation tool invocation through resolved platform runtime bindings",
       "kind": "http",
       "direction": "outbound"
     },
@@ -244,6 +280,15 @@
       "to": "image_analysis",
       "protocol": "HTTP",
       "purpose": "Optional image-analysis provider validation and superadmin smoke tests",
+      "kind": "http",
+      "direction": "outbound"
+    },
+    {
+      "id": "backend-image_generation",
+      "from": "backend",
+      "to": "image_generation",
+      "protocol": "HTTP",
+      "purpose": "Optional image-generation provider validation and superadmin smoke tests",
       "kind": "http",
       "direction": "outbound"
     },
@@ -352,6 +397,24 @@
       "to": "image_analysis_objects",
       "protocol": "Internal HTTP",
       "purpose": "Object detection worker calls",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "image_generation-image_generation_plate_logo",
+      "from": "image_generation",
+      "to": "image_generation_plate_logo",
+      "protocol": "Internal HTTP",
+      "purpose": "Plate logo replacement worker calls",
+      "kind": "internal",
+      "direction": "outbound"
+    },
+    {
+      "id": "image_generation-image_generation_text_to_image",
+      "from": "image_generation",
+      "to": "image_generation_text_to_image",
+      "protocol": "Internal HTTP",
+      "purpose": "Text-to-image worker calls",
       "kind": "internal",
       "direction": "outbound"
     },
@@ -485,9 +548,27 @@
         "width": 220,
         "height": 84
       },
-      "sandbox": {
+      "image_generation": {
         "x": 846,
         "y": 1314,
+        "width": 220,
+        "height": 84
+      },
+      "image_generation_text_to_image": {
+        "x": 846,
+        "y": 1438,
+        "width": 220,
+        "height": 84
+      },
+      "image_generation_plate_logo": {
+        "x": 846,
+        "y": 1562,
+        "width": 220,
+        "height": 84
+      },
+      "sandbox": {
+        "x": 846,
+        "y": 1686,
         "width": 220,
         "height": 84
       },
@@ -511,5 +592,5 @@
       }
     }
   },
-  "source_hash": "13d4bf0e5e8ed85fc342d31620859cf550450e1d1bc6272b1aca2391bad4fb58"
+  "source_hash": "99b91d8f10033e4bba7446fa50b8af07296d66c9c652f01c307450f3293b5a78"
 }

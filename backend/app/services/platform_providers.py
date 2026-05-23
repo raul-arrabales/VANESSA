@@ -30,6 +30,7 @@ from .platform_serialization import _serialize_binding_resource, _serialize_prov
 from .platform_types import (
     CAPABILITY_EMBEDDINGS,
     CAPABILITY_IMAGE_ANALYSIS,
+    CAPABILITY_IMAGE_GENERATION,
     CAPABILITY_LLM_INFERENCE,
     CAPABILITY_MCP_RUNTIME,
     CAPABILITY_SANDBOX_EXECUTION,
@@ -342,7 +343,7 @@ def validate_provider(
             }),
         }
 
-    if binding.capability_key == CAPABILITY_IMAGE_ANALYSIS:
+    if binding.capability_key in {CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_IMAGE_GENERATION}:
         adapter = _adapter_from_binding(binding)
         resources, resources_status = _list_adapter_resources(adapter)
         validation_payload = {

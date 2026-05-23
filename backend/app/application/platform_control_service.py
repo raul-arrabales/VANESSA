@@ -4,6 +4,7 @@ from typing import Any
 
 from ..services.embeddings_service import embed_platform_inputs as _embed_platform_inputs
 from ..services.image_analysis_service import analyze_platform_image as _analyze_platform_image
+from ..services.image_generation_service import generate_platform_image as _generate_platform_image
 from ..services.platform_service import (
     activate_deployment_profile as _activate_deployment_profile,
     assign_provider_loaded_model as _assign_provider_loaded_model,
@@ -238,6 +239,10 @@ def embed_platform_inputs_request(database_url: str, config, payload: Any):
 
 def analyze_platform_image_request(database_url: str, config, payload: Any):
     return _analyze_platform_image(database_url, config, _require_json_object(payload))
+
+
+def generate_platform_image_request(database_url: str, config, payload: Any):
+    return _generate_platform_image(database_url, config, _require_json_object(payload))
 
 
 def upsert_platform_vector_documents(database_url: str, config, payload: Any):

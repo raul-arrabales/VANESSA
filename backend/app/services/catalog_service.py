@@ -42,6 +42,7 @@ from .catalog_errors import CatalogError
 from .catalog_tool_backends import (
     TOOL_BACKEND_INTERNAL_HTTP as _TOOL_BACKEND_INTERNAL_HTTP,
     TOOL_BACKEND_IMAGE_ANALYSIS as _TOOL_BACKEND_IMAGE_ANALYSIS,
+    TOOL_BACKEND_IMAGE_GENERATION as _TOOL_BACKEND_IMAGE_GENERATION,
     TOOL_BACKEND_KB_RETRIEVAL as _TOOL_BACKEND_KB_RETRIEVAL,
     TOOL_BACKEND_SANDBOX as _TOOL_BACKEND_SANDBOX,
     TOOL_BACKEND_WEB_SEARCH as _TOOL_BACKEND_WEB_SEARCH,
@@ -50,6 +51,7 @@ from .catalog_tool_backends import (
     ensure_execution_config,
     execute_backend,
     image_analysis_available_tasks,
+    image_generation_available_tasks,
     mcp_metadata_defaults_for_tool_spec,
     tool_execution_backend,
     validate_backend,
@@ -66,6 +68,7 @@ _VALID_MCP_METADATA_CATEGORIES = {
     "knowledge_retrieval",
     "code_execution",
     "data_analysis",
+    "creative_media",
     "automation",
     "communication",
     "custom",
@@ -89,21 +92,23 @@ def list_catalog_agents(database_url: str) -> list[dict[str, Any]]:
 
 def list_catalog_tools(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
     available_image_tasks = _available_image_analysis_tasks(database_url, config)
+    available_image_generation_tasks = _available_image_generation_tasks(database_url, config)
     web_search_available = _web_search_available(database_url, config)
     return [
         _serialize_catalog_row(row, entity_type=_ENTITY_TYPE_TOOL, database_url=database_url)
         for row in list_registry_entities(database_url, entity_type=_ENTITY_TYPE_TOOL)
-        if _tool_visible_for_runtime(row, available_image_tasks, web_search_available)
+        if _tool_visible_for_runtime(row, available_image_tasks, available_image_generation_tasks, web_search_available)
     ]
 
 
 def list_catalog_mcp_servers(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
     available_image_tasks = _available_image_analysis_tasks(database_url, config)
+    available_image_generation_tasks = _available_image_generation_tasks(database_url, config)
     web_search_available = _web_search_available(database_url, config)
     return [
         _serialize_catalog_row(row, entity_type=_ENTITY_TYPE_MCP_SERVER, database_url=database_url)
         for row in list_registry_entities(database_url, entity_type=_ENTITY_TYPE_MCP_SERVER)
-        if _mcp_server_visible_for_runtime(database_url, row, available_image_tasks, web_search_available)
+        if _mcp_server_visible_for_runtime(database_url, row, available_image_tasks, available_image_generation_tasks, web_search_available)
     ]
 
 
@@ -119,6 +124,12 @@ def _available_image_analysis_tasks(database_url: str, config: Any | None) -> se
     if config is None:
         return None
     return image_analysis_available_tasks(database_url, config)
+
+
+def _available_image_generation_tasks(database_url: str, config: Any | None) -> set[str] | None:
+    if config is None:
+        return None
+    return image_generation_available_tasks(database_url, config)
 
 
 def _web_search_available(database_url: str, config: Any | None) -> bool | None:
@@ -143,31 +154,40 @@ def _configured_image_analysis_tasks(spec: dict[str, Any]) -> set[str]:
 def _tool_visible_for_runtime(
     row: dict[str, Any],
     available_image_tasks: set[str] | None,
+    available_image_generation_tasks: set[str] | None,
     web_search_available: bool | None,
 ) -> bool:
-    if available_image_tasks is None and web_search_available is None:
+    if available_image_tasks is None and available_image_generation_tasks is None and web_search_available is None:
         return True
     spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
     execution_backend = tool_execution_backend(spec)
     if execution_backend == _TOOL_BACKEND_WEB_SEARCH:
         return web_search_available is not False
-    if execution_backend != _TOOL_BACKEND_IMAGE_ANALYSIS:
-        return True
-    if available_image_tasks is None:
-        return True
-    configured_tasks = _configured_image_analysis_tasks(spec)
-    if not configured_tasks:
-        return bool(available_image_tasks)
-    return configured_tasks <= available_image_tasks
+    if execution_backend == _TOOL_BACKEND_IMAGE_ANALYSIS:
+        if available_image_tasks is None:
+            return True
+        configured_tasks = _configured_image_analysis_tasks(spec)
+        if not configured_tasks:
+            return bool(available_image_tasks)
+        return configured_tasks <= available_image_tasks
+    if execution_backend == _TOOL_BACKEND_IMAGE_GENERATION:
+        if available_image_generation_tasks is None:
+            return True
+        configured_tasks = _configured_image_analysis_tasks(spec)
+        if not configured_tasks:
+            return bool(available_image_generation_tasks)
+        return configured_tasks <= available_image_generation_tasks
+    return True
 
 
 def _mcp_server_visible_for_runtime(
     database_url: str,
     row: dict[str, Any],
     available_image_tasks: set[str] | None,
+    available_image_generation_tasks: set[str] | None,
     web_search_available: bool | None,
 ) -> bool:
-    if available_image_tasks is None and web_search_available is None:
+    if available_image_tasks is None and available_image_generation_tasks is None and web_search_available is None:
         return True
     spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
     backing_tool_id = str(spec.get("backing_tool_id") or "").strip()
@@ -176,7 +196,7 @@ def _mcp_server_visible_for_runtime(
     tool_row = find_registry_entity(database_url, entity_type=_ENTITY_TYPE_TOOL, entity_id=backing_tool_id)
     if tool_row is None:
         return True
-    return _tool_visible_for_runtime(tool_row, available_image_tasks, web_search_available)
+    return _tool_visible_for_runtime(tool_row, available_image_tasks, available_image_generation_tasks, web_search_available)
 
 
 def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict[str, Any]:
@@ -691,12 +711,14 @@ def invoke_catalog_mcp_server(
             raise CatalogError("invalid_mcp_arguments", "MCP arguments do not match schema", details={"errors": input_errors})
         tool = get_catalog_tool(database_url, tool_id=backing_tool_id)
         available_image_tasks = _available_image_analysis_tasks(database_url, config)
+        available_image_generation_tasks = _available_image_generation_tasks(database_url, config)
         web_search_available = _web_search_available(database_url, config)
         if not _tool_visible_for_runtime(
             {
                 "current_spec": tool.get("spec") if isinstance(tool.get("spec"), dict) else {},
             },
             available_image_tasks,
+            available_image_generation_tasks,
             web_search_available,
         ):
             raise CatalogError("mcp_server_unavailable", "MCP server backing tool is unavailable for the active runtime providers", status_code=409)
@@ -1317,7 +1339,7 @@ def _coerce_tool_spec(database_url: str, payload: dict[str, Any], *, config: Any
     if execution_backend not in _VALID_TOOL_BACKENDS:
         raise CatalogError(
             "invalid_execution_backend",
-            "execution_backend must be sandbox_python, web_search, internal_http, knowledge_base_retrieval, or image_analysis",
+            "execution_backend must be sandbox_python, web_search, internal_http, knowledge_base_retrieval, image_analysis, or image_generation",
         )
     input_schema = payload.get("input_schema")
     output_schema = payload.get("output_schema")
