@@ -6,6 +6,9 @@ infra/.env.local
 # python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+env/
 
 # Models
 models/llm/
