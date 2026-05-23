@@ -41,6 +41,7 @@ from .knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID
 from .catalog_errors import CatalogError
 from .catalog_tool_backends import (
     TOOL_BACKEND_INTERNAL_HTTP as _TOOL_BACKEND_INTERNAL_HTTP,
+    TOOL_BACKEND_IMAGE_ANALYSIS as _TOOL_BACKEND_IMAGE_ANALYSIS,
     TOOL_BACKEND_KB_RETRIEVAL as _TOOL_BACKEND_KB_RETRIEVAL,
     TOOL_BACKEND_SANDBOX as _TOOL_BACKEND_SANDBOX,
     TOOL_BACKEND_WEB_SEARCH as _TOOL_BACKEND_WEB_SEARCH,
@@ -48,6 +49,7 @@ from .catalog_tool_backends import (
     build_tool_creation_options,
     ensure_execution_config,
     execute_backend,
+    image_analysis_available_tasks,
     mcp_metadata_defaults_for_tool_spec,
     tool_execution_backend,
     validate_backend,
@@ -85,17 +87,21 @@ def list_catalog_agents(database_url: str) -> list[dict[str, Any]]:
     ]
 
 
-def list_catalog_tools(database_url: str) -> list[dict[str, Any]]:
+def list_catalog_tools(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
+    available_image_tasks = _available_image_analysis_tasks(database_url, config)
     return [
         _serialize_catalog_row(row, entity_type=_ENTITY_TYPE_TOOL, database_url=database_url)
         for row in list_registry_entities(database_url, entity_type=_ENTITY_TYPE_TOOL)
+        if _tool_visible_for_runtime(row, available_image_tasks)
     ]
 
 
-def list_catalog_mcp_servers(database_url: str) -> list[dict[str, Any]]:
+def list_catalog_mcp_servers(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
+    available_image_tasks = _available_image_analysis_tasks(database_url, config)
     return [
         _serialize_catalog_row(row, entity_type=_ENTITY_TYPE_MCP_SERVER, database_url=database_url)
         for row in list_registry_entities(database_url, entity_type=_ENTITY_TYPE_MCP_SERVER)
+        if _mcp_server_visible_for_runtime(database_url, row, available_image_tasks)
     ]
 
 
@@ -107,18 +113,60 @@ def get_catalog_defaults() -> dict[str, Any]:
     }
 
 
+def _available_image_analysis_tasks(database_url: str, config: Any | None) -> set[str] | None:
+    if config is None:
+        return None
+    return image_analysis_available_tasks(database_url, config)
+
+
+def _configured_image_analysis_tasks(spec: dict[str, Any]) -> set[str]:
+    execution_config = spec.get("execution_config") if isinstance(spec.get("execution_config"), dict) else {}
+    tasks = execution_config.get("tasks") if isinstance(execution_config.get("tasks"), list) else []
+    return {str(task).strip().lower() for task in tasks if str(task).strip()}
+
+
+def _tool_visible_for_runtime(row: dict[str, Any], available_image_tasks: set[str] | None) -> bool:
+    if available_image_tasks is None:
+        return True
+    spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
+    if tool_execution_backend(spec) != _TOOL_BACKEND_IMAGE_ANALYSIS:
+        return True
+    configured_tasks = _configured_image_analysis_tasks(spec)
+    if not configured_tasks:
+        return bool(available_image_tasks)
+    return configured_tasks <= available_image_tasks
+
+
+def _mcp_server_visible_for_runtime(
+    database_url: str,
+    row: dict[str, Any],
+    available_image_tasks: set[str] | None,
+) -> bool:
+    if available_image_tasks is None:
+        return True
+    spec = row.get("current_spec") if isinstance(row.get("current_spec"), dict) else {}
+    backing_tool_id = str(spec.get("backing_tool_id") or "").strip()
+    if not backing_tool_id:
+        return True
+    tool_row = find_registry_entity(database_url, entity_type=_ENTITY_TYPE_TOOL, entity_id=backing_tool_id)
+    if tool_row is None:
+        return True
+    return _tool_visible_for_runtime(tool_row, available_image_tasks)
+
+
 def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict[str, Any]:
     return build_tool_creation_options(database_url, config=config)
 
 
-def get_catalog_mcp_creation_options(database_url: str) -> dict[str, Any]:
+def get_catalog_mcp_creation_options(database_url: str, *, config: Any | None = None) -> dict[str, Any]:
+    tools = list_catalog_tools(database_url, config=config) if config is not None else list_catalog_tools(database_url)
     return {
         "tools": [
             {
                 "tool_id": tool["id"],
                 "metadata_defaults": mcp_metadata_defaults_for_tool_spec(tool.get("spec") if isinstance(tool.get("spec"), dict) else {}),
             }
-            for tool in list_catalog_tools(database_url)
+            for tool in tools
         ],
     }
 
@@ -538,6 +586,7 @@ def test_catalog_mcp_server(
 def discover_authorized_mcp_servers(
     database_url: str,
     *,
+    config: Any | None = None,
     agent_id: str | None,
     agent_domain: str | None,
     delegated_user_id: int | None,
@@ -545,7 +594,8 @@ def discover_authorized_mcp_servers(
 ) -> list[dict[str, Any]]:
     user_group_ids = list_user_group_ids(database_url, user_id=delegated_user_id) if delegated_user_id else set()
     discovered: list[dict[str, Any]] = []
-    for server in list_catalog_mcp_servers(database_url):
+    servers = list_catalog_mcp_servers(database_url, config=config) if config is not None else list_catalog_mcp_servers(database_url)
+    for server in servers:
         spec = server.get("spec") if isinstance(server.get("spec"), dict) else {}
         if not bool(spec.get("enabled", False)):
             continue
@@ -615,6 +665,14 @@ def invoke_catalog_mcp_server(
         if input_errors:
             raise CatalogError("invalid_mcp_arguments", "MCP arguments do not match schema", details={"errors": input_errors})
         tool = get_catalog_tool(database_url, tool_id=backing_tool_id)
+        available_image_tasks = _available_image_analysis_tasks(database_url, config)
+        if not _tool_visible_for_runtime(
+            {
+                "current_spec": tool.get("spec") if isinstance(tool.get("spec"), dict) else {},
+            },
+            available_image_tasks,
+        ):
+            raise CatalogError("mcp_server_unavailable", "MCP server backing tool is unavailable for the active image-analysis provider", status_code=409)
         result_payload, status_code = _execute_internal_tool(
             database_url=database_url,
             config=config,

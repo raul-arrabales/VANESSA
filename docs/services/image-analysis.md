@@ -40,6 +40,8 @@ Worker startup is launch-time configurable with `IMAGE_ANALYSIS_WORKERS`, defaul
 
 `none` starts only the gateway and advertises no image-analysis resources. The gateway health payload reports only enabled workers, `/v1/resources` aggregates only enabled workers, and `/v1/analyze` returns `409 image_analysis_task_disabled` if a caller requests a task whose worker role was not enabled. If a worker is enabled but temporarily unreachable, the gateway keeps returning partial results with the existing task-specific warning behavior.
 
+Backend catalog listings and MCP discovery also use the gateway resource inventory. If only `anpr` is enabled, only the license-plate tool and MCP exposure are listed; object detection and captioning definitions remain in the registry but are hidden until their workers are selected and the gateway advertises their resources.
+
 ## Models
 
 V1 defaults are local open-source models:

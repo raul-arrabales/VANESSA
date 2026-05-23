@@ -180,6 +180,66 @@ def test_builtin_mcp_servers_include_metadata_and_python_execution():
     assert python_exec["metadata"]["risk_level"] == "high"
 
 
+def _catalog_row(entity_id: str, entity_type: str, spec: dict[str, object]) -> dict[str, object]:
+    return {
+        "entity_id": entity_id,
+        "entity_type": entity_type,
+        "owner_user_id": 1,
+        "visibility": "private",
+        "status": "published",
+        "current_version": "v1",
+        "current_spec": spec,
+        "published_at": "2026-01-01T00:00:00+00:00",
+    }
+
+
+def test_list_catalog_tools_hides_image_tools_without_enabled_worker(monkeypatch: pytest.MonkeyPatch):
+    rows = [
+        _catalog_row("tool.web_search", "tool", tool_registry_bootstrap._BUILTIN_TOOLS["tool.web_search"]),
+        _catalog_row("tool.image_license_plate_recognition", "tool", tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_license_plate_recognition"]),
+        _catalog_row("tool.image_object_detection", "tool", tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_object_detection"]),
+        _catalog_row("tool.image_captioning", "tool", tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_captioning"]),
+    ]
+    monkeypatch.setattr(catalog_service, "list_registry_entities", lambda _db, *, entity_type: rows if entity_type == "tool" else [])
+    monkeypatch.setattr(catalog_service, "image_analysis_available_tasks", lambda _db, _config: {"license_plate_recognition"})
+
+    tools = catalog_service.list_catalog_tools("ignored", config=SimpleNamespace())
+
+    assert [tool["id"] for tool in tools] == ["tool.web_search", "tool.image_license_plate_recognition"]
+
+
+def test_list_catalog_mcp_servers_hides_image_servers_without_enabled_worker(monkeypatch: pytest.MonkeyPatch):
+    tool_rows = {
+        "tool.image_license_plate_recognition": _catalog_row(
+            "tool.image_license_plate_recognition",
+            "tool",
+            tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_license_plate_recognition"],
+        ),
+        "tool.image_object_detection": _catalog_row(
+            "tool.image_object_detection",
+            "tool",
+            tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_object_detection"],
+        ),
+        "tool.image_captioning": _catalog_row(
+            "tool.image_captioning",
+            "tool",
+            tool_registry_bootstrap._BUILTIN_TOOLS["tool.image_captioning"],
+        ),
+    }
+    mcp_rows = [
+        _catalog_row("mcp.image_license_plate_recognition", "mcp_server", tool_registry_bootstrap._BUILTIN_MCP_SERVERS["mcp.image_license_plate_recognition"]),
+        _catalog_row("mcp.image_object_detection", "mcp_server", tool_registry_bootstrap._BUILTIN_MCP_SERVERS["mcp.image_object_detection"]),
+        _catalog_row("mcp.image_captioning", "mcp_server", tool_registry_bootstrap._BUILTIN_MCP_SERVERS["mcp.image_captioning"]),
+    ]
+    monkeypatch.setattr(catalog_service, "list_registry_entities", lambda _db, *, entity_type: mcp_rows if entity_type == "mcp_server" else [])
+    monkeypatch.setattr(catalog_service, "find_registry_entity", lambda _db, *, entity_type, entity_id: tool_rows.get(entity_id))
+    monkeypatch.setattr(catalog_service, "image_analysis_available_tasks", lambda _db, _config: {"license_plate_recognition"})
+
+    servers = catalog_service.list_catalog_mcp_servers("ignored", config=SimpleNamespace())
+
+    assert [server["id"] for server in servers] == ["mcp.image_license_plate_recognition"]
+
+
 def test_builtin_mcp_seed_reconciles_changed_specs(monkeypatch: pytest.MonkeyPatch):
     entities = {
         "mcp_server:mcp.web_search": {

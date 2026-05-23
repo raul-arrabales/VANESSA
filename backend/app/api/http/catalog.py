@@ -168,7 +168,7 @@ def validate_catalog_agent_route(agent_id: str):
 @require_role("superadmin")
 def list_catalog_tools_route():
     try:
-        tools = list_catalog_tools(_database_url())
+        tools = list_catalog_tools(_database_url(), config=_config())
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"tools": tools}), 200
@@ -249,7 +249,7 @@ def execute_catalog_tool_route(tool_id: str):
 @require_role("superadmin")
 def list_catalog_mcp_servers_route():
     try:
-        servers = list_catalog_mcp_servers(_database_url())
+        servers = list_catalog_mcp_servers(_database_url(), config=_config())
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"mcp_servers": servers}), 200
@@ -259,7 +259,7 @@ def list_catalog_mcp_servers_route():
 @require_role("superadmin")
 def get_catalog_mcp_creation_options_route():
     try:
-        payload = get_catalog_mcp_creation_options(_database_url())
+        payload = get_catalog_mcp_creation_options(_database_url(), config=_config())
     except CatalogError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify(payload), 200
@@ -366,6 +366,7 @@ def discover_mcp_servers_internal_route():
         return _json_error(401, "invalid_service_token", "Missing or invalid service token")
     servers = discover_authorized_mcp_servers(
         _database_url(),
+        config=_config(),
         agent_id=request.args.get("agent_id"),
         agent_domain=request.args.get("agent_domain"),
         delegated_user_id=_int_arg("delegated_user_id"),

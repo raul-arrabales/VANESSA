@@ -101,12 +101,12 @@ def preview_catalog_agent_prompt_payload(payload: Any) -> dict[str, Any]:
     return _preview_catalog_agent_prompt_payload(_require_json_object(payload))
 
 
-def list_catalog_tools(database_url: str) -> list[dict[str, Any]]:
-    return _list_catalog_tools(database_url)
+def list_catalog_tools(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
+    return _list_catalog_tools(database_url, config=config)
 
 
-def list_catalog_mcp_servers(database_url: str) -> list[dict[str, Any]]:
-    return _list_catalog_mcp_servers(database_url)
+def list_catalog_mcp_servers(database_url: str, *, config: Any | None = None) -> list[dict[str, Any]]:
+    return _list_catalog_mcp_servers(database_url, config=config)
 
 
 def get_catalog_defaults() -> dict[str, Any]:
@@ -117,8 +117,8 @@ def get_catalog_tool_creation_options(database_url: str, *, config: Any) -> dict
     return _get_catalog_tool_creation_options(database_url, config=config)
 
 
-def get_catalog_mcp_creation_options(database_url: str) -> dict[str, Any]:
-    return _get_catalog_mcp_creation_options(database_url)
+def get_catalog_mcp_creation_options(database_url: str, *, config: Any | None = None) -> dict[str, Any]:
+    return _get_catalog_mcp_creation_options(database_url, config=config)
 
 
 def get_catalog_tool(database_url: str, *, tool_id: str) -> dict[str, Any]:
@@ -250,6 +250,7 @@ def test_catalog_mcp_server(
 def discover_authorized_mcp_servers(
     database_url: str,
     *,
+    config: Any | None = None,
     agent_id: str | None,
     agent_domain: str | None,
     delegated_user_id: int | None,
@@ -257,6 +258,7 @@ def discover_authorized_mcp_servers(
 ) -> list[dict[str, Any]]:
     return _discover_authorized_mcp_servers(
         database_url,
+        config=config,
         agent_id=agent_id,
         agent_domain=agent_domain,
         delegated_user_id=delegated_user_id,

@@ -197,7 +197,15 @@ def _build_internal_http_tool_template() -> dict[str, Any]:
     }
 
 
-def _build_image_analysis_tool_template() -> dict[str, Any]:
+_IMAGE_ANALYSIS_TASK_RESOURCE_KEYS = {
+    "license_plate_recognition": {"image_plate_detection", "image_plate_ocr"},
+    "object_detection": {"object_detection"},
+    "captioning": {"image_captioning"},
+}
+
+
+def _build_image_analysis_tool_template(tasks: list[str] | None = None) -> dict[str, Any]:
+    task_values = tasks or ["license_plate_recognition", "object_detection", "captioning"]
     return {
         "id": "tool.custom_image_analysis",
         "visibility": "private",
@@ -218,7 +226,7 @@ def _build_image_analysis_tool_template() -> dict[str, Any]:
                 },
                 "tasks": {
                     "type": "array",
-                    "items": {"type": "string", "enum": ["license_plate_recognition", "object_detection", "captioning"]},
+                    "items": {"type": "string", "enum": task_values},
                     "minItems": 1,
                 },
                 "options": {"type": "object", "additionalProperties": True},
@@ -270,12 +278,14 @@ def build_tool_creation_options(database_url: str, *, config: Any) -> dict[str, 
     runtime_payload, platform_runtime = active_runtime_knowledge_base_payload(database_url, config)
     knowledge_bases = list(runtime_payload.get("knowledge_bases") or [])
     offline_compatible = knowledge_retrieval_runtime_is_local(platform_runtime)
+    image_tasks = sorted(image_analysis_available_tasks(database_url, config))
     execution_backends: list[dict[str, Any]] = [
         _tool_creation_backend_option(TOOL_BACKEND_SANDBOX, _build_sandbox_tool_template()),
         _tool_creation_backend_option(TOOL_BACKEND_WEB_SEARCH, _build_web_search_tool_template()),
         _tool_creation_backend_option(TOOL_BACKEND_INTERNAL_HTTP, _build_internal_http_tool_template()),
-        _tool_creation_backend_option(TOOL_BACKEND_IMAGE_ANALYSIS, _build_image_analysis_tool_template()),
     ]
+    if image_tasks:
+        execution_backends.append(_tool_creation_backend_option(TOOL_BACKEND_IMAGE_ANALYSIS, _build_image_analysis_tool_template(image_tasks)))
     if knowledge_bases:
         execution_backends.append(
             {
@@ -298,6 +308,26 @@ def build_tool_creation_options(database_url: str, *, config: Any) -> dict[str, 
         "default_knowledge_base_id": runtime_payload.get("default_knowledge_base_id"),
         "selection_required": bool(runtime_payload.get("selection_required", False)),
         "configuration_message": runtime_payload.get("configuration_message"),
+    }
+
+
+def image_analysis_available_tasks(database_url: str, config: Any) -> set[str]:
+    try:
+        adapter = resolve_image_analysis_adapter(database_url, config)
+        resources, status_code = adapter.list_resources()
+    except Exception:
+        return set()
+    if status_code < 200 or status_code >= 300:
+        return set()
+    available_task_keys = {
+        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
+        for resource in resources
+        if isinstance(resource, dict)
+    }
+    return {
+        task
+        for task, required_task_keys in _IMAGE_ANALYSIS_TASK_RESOURCE_KEYS.items()
+        if required_task_keys <= available_task_keys
     }
 
 
