@@ -174,6 +174,7 @@ Split local runtime selection:
 - The gateway mounts `models/image_analysis`, exposes the selected local plate recognition, object detection, and captioning resources through the `image_analysis` platform capability, and delegates to the enabled worker containers.
 - `health.sh` validates readiness using `GET /health` inside the gateway and enabled worker containers, and reports unselected workers as skipped.
 - `restart-service.sh --service image_analysis` restarts the gateway plus the selected workers. Restarting a disabled worker directly fails with a message telling you which `IMAGE_ANALYSIS_WORKERS` role to add.
+- After changing `IMAGE_ANALYSIS_WORKERS`, restart `image_analysis` and then `backend` if you want Platform Catalog tool and MCP visibility to update immediately.
 - Local smoke tests should keep `IMAGE_ANALYSIS_FAKE_MODE=1` and `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=0`; real model testing requires `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS=1` plus a rebuild.
 - Once real worker images are built, restart image analysis with `./ops/local-staging/restart-service.sh --service image_analysis` to avoid reinstalling Torch/RF-DETR/Florence dependencies. Use `--build` only after changing Dockerfiles or image-analysis requirements.
 

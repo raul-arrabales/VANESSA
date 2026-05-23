@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .image_analysis_tasks import IMAGE_ANALYSIS_TASK_DEFAULT_KEYS
 from .platform_service_types import (
-    _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
     _TASK_KEY_EMBEDDINGS,
     _TASK_KEY_LLM,
 )
@@ -44,5 +44,5 @@ def _expected_task_key(capability_key: str) -> str:
 def _expected_task_keys(capability_key: str) -> set[str]:
     normalized = capability_key.strip().lower()
     if normalized == CAPABILITY_IMAGE_ANALYSIS:
-        return set(_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.values())
+        return set(IMAGE_ANALYSIS_TASK_DEFAULT_KEYS.values())
     return {_expected_task_key(normalized)}

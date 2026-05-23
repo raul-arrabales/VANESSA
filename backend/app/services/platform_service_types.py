@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from typing import Any, TypeAlias, TypedDict
 
+from .image_analysis_tasks import (
+    IMAGE_ANALYSIS_TASK_DEFAULT_KEYS as _IMAGE_ANALYSIS_TASK_DEFAULT_KEYS,
+    IMAGE_ANALYSIS_TASK_GROUPS as _IMAGE_ANALYSIS_TASK_GROUPS,
+    TASK_KEY_IMAGE_CAPTIONING as _TASK_KEY_IMAGE_CAPTIONING,
+    TASK_KEY_IMAGE_PLATE_DETECTION as _TASK_KEY_IMAGE_PLATE_DETECTION,
+    TASK_KEY_IMAGE_PLATE_OCR as _TASK_KEY_IMAGE_PLATE_OCR,
+    TASK_KEY_OBJECT_DETECTION as _TASK_KEY_OBJECT_DETECTION,
+)
 from .platform_types import CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS, CAPABILITY_LLM_INFERENCE
 
 ProviderRow: TypeAlias = dict[str, Any]
@@ -73,21 +81,6 @@ _QDRANT_DEPLOYMENT_NAME = "Local Qdrant"
 _QDRANT_DEPLOYMENT_DESCRIPTION = "Optional local profile using vLLM for LLM inference and Qdrant for vector storage."
 _TASK_KEY_EMBEDDINGS = "embeddings"
 _TASK_KEY_LLM = "llm"
-_TASK_KEY_IMAGE_PLATE_DETECTION = "image_plate_detection"
-_TASK_KEY_IMAGE_PLATE_OCR = "image_plate_ocr"
-_TASK_KEY_OBJECT_DETECTION = "object_detection"
-_TASK_KEY_IMAGE_CAPTIONING = "image_captioning"
-_IMAGE_ANALYSIS_TASK_DEFAULT_KEYS = {
-    "plate_detector": _TASK_KEY_IMAGE_PLATE_DETECTION,
-    "plate_ocr": _TASK_KEY_IMAGE_PLATE_OCR,
-    "object_detector": _TASK_KEY_OBJECT_DETECTION,
-    "captioner": _TASK_KEY_IMAGE_CAPTIONING,
-}
-_IMAGE_ANALYSIS_TASK_GROUPS = {
-    "license_plate_recognition": ("plate_detector", "plate_ocr"),
-    "object_detection": ("object_detector",),
-    "captioning": ("captioner",),
-}
 _CLOUD_PROVIDER_KEYS = {"openai_compatible_cloud_llm", "openai_compatible_cloud_embeddings"}
 _MODEL_BEARING_CAPABILITIES = {CAPABILITY_LLM_INFERENCE, CAPABILITY_EMBEDDINGS, CAPABILITY_IMAGE_ANALYSIS}
 _VECTOR_SELECTION_EXPLICIT = "explicit"

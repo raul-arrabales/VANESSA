@@ -10,8 +10,12 @@ from .context_management_retrieval_schema import (
     build_knowledge_base_retrieval_output_schema,
 )
 from .context_management_runtime import list_active_runtime_knowledge_bases, query_knowledge_base
-from .platform_adapters import http_json_request
+from .image_analysis_tasks import (
+    IMAGE_ANALYSIS_TASKS,
+    available_tasks_from_resources,
+)
 from .image_analysis_service import require_image_analysis_task_defaults
+from .platform_adapters import http_json_request
 from .platform_service import get_active_platform_runtime, resolve_image_analysis_adapter, resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter
 from .platform_types import PlatformControlPlaneError
 
@@ -197,15 +201,8 @@ def _build_internal_http_tool_template() -> dict[str, Any]:
     }
 
 
-_IMAGE_ANALYSIS_TASK_RESOURCE_KEYS = {
-    "license_plate_recognition": {"image_plate_detection", "image_plate_ocr"},
-    "object_detection": {"object_detection"},
-    "captioning": {"image_captioning"},
-}
-
-
 def _build_image_analysis_tool_template(tasks: list[str] | None = None) -> dict[str, Any]:
-    task_values = tasks or ["license_plate_recognition", "object_detection", "captioning"]
+    task_values = tasks or list(IMAGE_ANALYSIS_TASKS)
     return {
         "id": "tool.custom_image_analysis",
         "visibility": "private",
@@ -319,16 +316,7 @@ def image_analysis_available_tasks(database_url: str, config: Any) -> set[str]:
         return set()
     if status_code < 200 or status_code >= 300:
         return set()
-    available_task_keys = {
-        str((resource.get("metadata") or {}).get("task_key") or "").strip().lower()
-        for resource in resources
-        if isinstance(resource, dict)
-    }
-    return {
-        task
-        for task, required_task_keys in _IMAGE_ANALYSIS_TASK_RESOURCE_KEYS.items()
-        if required_task_keys <= available_task_keys
-    }
+    return available_tasks_from_resources(resources)
 
 
 def ensure_execution_config(database_url: str, *, config: Any | None, execution_backend: str, execution_config: dict[str, Any]) -> None:

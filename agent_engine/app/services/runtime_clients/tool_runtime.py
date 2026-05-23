@@ -4,15 +4,10 @@ from time import monotonic
 from typing import Any
 
 from .base import ImageAnalysisRuntimeClient, ImageAnalysisRuntimeClientError, McpToolRuntimeClient, SandboxToolRuntimeClient, ToolRuntimeClientError
+from .image_analysis_tasks import IMAGE_ANALYSIS_DEFAULTS_BY_TASK
 from .resolution import binding_timeout_seconds
 from .transport import JsonRequestFn, request_json_or_raise
 from ..cloud_traffic import report_cloud_traffic_for_binding
-
-_IMAGE_ANALYSIS_DEFAULTS_BY_TASK = {
-    "license_plate_recognition": ("plate_detector", "plate_ocr"),
-    "object_detection": ("object_detector",),
-    "captioning": ("captioner",),
-}
 
 
 def tool_unavailable_code(status_code: int) -> str:
@@ -202,7 +197,7 @@ class HttpImageAnalysisRuntimeClient(ImageAnalysisRuntimeClient):
         missing_defaults = [
             default_key
             for task in [str(item).strip().lower() for item in tasks if str(item).strip()]
-            for default_key in _IMAGE_ANALYSIS_DEFAULTS_BY_TASK.get(task, ())
+            for default_key in IMAGE_ANALYSIS_DEFAULTS_BY_TASK.get(task, ())
             if not str(task_defaults.get(default_key) or "").strip()
         ]
         if missing_defaults:

@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import AuthConfig
+from .image_analysis_tasks import (
+    invalid_image_analysis_tasks,
+    missing_task_defaults_for_tasks,
+    normalize_image_analysis_task_values,
+)
 from .platform_runtime import resolve_image_analysis_adapter
-from .platform_service_types import _IMAGE_ANALYSIS_TASK_GROUPS
 from .platform_types import PlatformControlPlaneError
-
-_VALID_IMAGE_TASKS = {"license_plate_recognition", "object_detection", "captioning"}
 
 
 def _require_json_object(payload: Any) -> dict[str, Any]:
@@ -17,24 +19,17 @@ def _require_json_object(payload: Any) -> dict[str, Any]:
 
 
 def _normalize_tasks(raw_tasks: Any) -> list[str]:
-    if not isinstance(raw_tasks, list) or not raw_tasks:
+    tasks = normalize_image_analysis_task_values(raw_tasks)
+    if not tasks:
         raise PlatformControlPlaneError("invalid_tasks", "tasks must be a non-empty array", status_code=400)
-    tasks = [str(item).strip().lower() for item in raw_tasks if str(item).strip()]
-    invalid = sorted({task for task in tasks if task not in _VALID_IMAGE_TASKS})
+    invalid = invalid_image_analysis_tasks(tasks)
     if invalid:
         raise PlatformControlPlaneError("invalid_tasks", "Unsupported image analysis task", status_code=400, details={"tasks": invalid})
     return tasks
 
 
 def missing_image_analysis_task_defaults(tasks: list[str], task_defaults: dict[str, Any]) -> list[str]:
-    return sorted(
-        {
-            default_key
-            for task in tasks
-            for default_key in _IMAGE_ANALYSIS_TASK_GROUPS.get(task, ())
-            if not str(task_defaults.get(default_key) or "").strip()
-        }
-    )
+    return missing_task_defaults_for_tasks(tasks, task_defaults)
 
 
 def require_image_analysis_task_defaults(tasks: list[str], task_defaults: dict[str, Any]) -> None:
