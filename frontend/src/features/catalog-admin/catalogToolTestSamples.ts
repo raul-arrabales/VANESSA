@@ -103,5 +103,23 @@ export function buildSampleToolInput(tool: CatalogTool): Record<string, unknown>
     };
   }
 
+  if (tool.id === "tool.image_plate_logo_replacement") {
+    return {
+      car_image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+      logo_image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+      plate_boxes: [
+        {
+          box_xyxy: [120, 260, 420, 340],
+        },
+      ],
+    };
+  }
+
   return buildSampleValueFromSchema(tool.spec.input_schema) as Record<string, unknown>;
 }

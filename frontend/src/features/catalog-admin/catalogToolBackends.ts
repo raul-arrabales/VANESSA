@@ -13,5 +13,8 @@ export function catalogToolBackendLabelKey(executionBackend: CatalogToolExecutio
   if (executionBackend === "image_analysis") {
     return "imageAnalysis";
   }
+  if (executionBackend === "image_generation") {
+    return "imageGeneration";
+  }
   return "internalHttp";
 }

@@ -2011,6 +2011,7 @@
       "webSearch": "Gateway web search",
       "knowledgeBaseRetrieval": "Knowledge base retrieval",
       "imageAnalysis": "Image analysis",
+      "imageGeneration": "Image generation",
       "internalHttp": "Internal HTTP"
     },
     "agents": {
@@ -2132,9 +2133,12 @@
       "testDescription": "Run a live test against {{name}} using its internal execution backend and input schema.",
       "testHelper": "Submit a JSON object matching the tool input schema to inspect the live runtime response.",
       "imageUploadHelper": "Upload an image to populate image.data_base64 and image.mime_type before running the test.",
+      "plateLogoUploadHelper": "Upload the car image and logo image, then edit plate_boxes in the JSON input before running the test.",
       "testMissing": "Select a platform tool before opening its test view.",
       "testResultTitle": "Test result",
       "testStatus": "Runtime status: {{statusCode}}",
+      "resultImageTitle": "Result image",
+      "resultImageAlt": "Generated tool result",
       "inputSchemaTitle": "Input schema",
       "requestTitle": "Submitted input",
       "responseTitle": "Runtime result",
@@ -2345,6 +2349,7 @@
           "knowledge_retrieval": "Knowledge retrieval",
           "code_execution": "Code execution",
           "data_analysis": "Data analysis",
+          "creative_media": "Creative media",
           "automation": "Automation",
           "communication": "Communication",
           "custom": "Custom"
@@ -2440,7 +2445,10 @@
       },
       "toolTest": {
         "input": "Test input",
-        "imageUpload": "Image upload"
+        "imageUpload": "Image upload",
+        "plateLogoUploads": "Image files",
+        "carImageUpload": "Car image upload",
+        "logoImageUpload": "Logo image upload"
       }
     },
     "validation": {

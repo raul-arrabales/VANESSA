@@ -15,3 +15,24 @@
   margin: 0;
   white-space: pre-wrap;
 }
+
+.catalog-tool-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+}
+
+.catalog-tool-result-image-frame {
+  width: min(100%, 44rem);
+  max-height: 32rem;
+  overflow: auto;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.catalog-tool-result-image-frame img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}

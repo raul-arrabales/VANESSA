@@ -279,6 +279,52 @@ const imageCaptioningToolFixture = {
   },
 };
 
+const imagePlateLogoToolFixture = {
+  ...toolFixture,
+  id: "tool.image_plate_logo_replacement",
+  entity: { id: "tool.image_plate_logo_replacement", type: "tool" as const, owner_user_id: 1, visibility: "private" as const },
+  spec: {
+    name: "Plate Logo Replacement",
+    description: "Replaces detected license plates in an image with a supplied logo.",
+    execution_backend: "image_generation" as const,
+    execution_config: { tasks: ["license_plate_logo_replacement"] },
+    permissions: {},
+    input_schema: {
+      type: "object",
+      properties: {
+        car_image: {
+          type: "object",
+          properties: {
+            data_base64: { type: "string" },
+            mime_type: { type: "string" },
+          },
+          required: ["data_base64", "mime_type"],
+          additionalProperties: false,
+        },
+        logo_image: {
+          type: "object",
+          properties: {
+            data_base64: { type: "string" },
+            mime_type: { type: "string" },
+          },
+          required: ["data_base64", "mime_type"],
+          additionalProperties: false,
+        },
+        plate_boxes: {
+          type: "array",
+          items: { type: "object", additionalProperties: true },
+        },
+        options: { type: "object", additionalProperties: true },
+      },
+      required: ["car_image", "logo_image", "plate_boxes"],
+      additionalProperties: false,
+    },
+    output_schema: { type: "object", additionalProperties: true },
+    safety_policy: { timeout_seconds: 30, network_access: false },
+    offline_compatible: true,
+  },
+};
+
 const mcpCreationOptionsFixture = {
   tools: [
     {
@@ -736,6 +782,87 @@ describe("CatalogControlPage", () => {
         "token",
       );
     });
+  });
+
+  it("uploads car and logo images into plate logo replacement input and previews the result image", async () => {
+    const user = userEvent.setup();
+    vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture, imagePlateLogoToolFixture]);
+    vi.mocked(catalogApi.testCatalogTool).mockResolvedValue({
+      tool: imagePlateLogoToolFixture,
+      execution: {
+        input: {
+          car_image: {
+            data_base64: "Y2FyIGltYWdl",
+            mime_type: "image/png",
+          },
+          logo_image: {
+            data_base64: "bG9nbyBpbWFnZQ==",
+            mime_type: "image/png",
+          },
+          plate_boxes: [{ box_xyxy: [120, 260, 420, 340] }],
+        },
+        request_metadata: {},
+        status_code: 200,
+        ok: true,
+        result: {
+          image: {
+            data_base64: "cmVzdWx0IGltYWdl",
+            mime_type: "image/png",
+            width: 2,
+            height: 2,
+          },
+          placements: [{ index: 0 }],
+        },
+      },
+    });
+
+    await renderWithAppProviders(<CatalogControlPage />, {
+      route: "/control/catalog?section=tools&view=test&toolId=tool.image_plate_logo_replacement",
+    });
+
+    expect(await screen.findByRole("heading", { name: "Test tool" })).toBeVisible();
+    expect(screen.getByText("Backend: Image generation")).toBeVisible();
+
+    await user.upload(screen.getByLabelText("Car image upload"), new File(["car image"], "car.png", { type: "image/png" }));
+    await user.upload(screen.getByLabelText("Logo image upload"), new File(["logo image"], "logo.png", { type: "image/png" }));
+
+    await waitFor(() => {
+      const input = JSON.parse((screen.getByLabelText("Test input") as HTMLTextAreaElement).value);
+      expect(input).toEqual({
+        car_image: {
+          data_base64: "Y2FyIGltYWdl",
+          mime_type: "image/png",
+        },
+        logo_image: {
+          data_base64: "bG9nbyBpbWFnZQ==",
+          mime_type: "image/png",
+        },
+        plate_boxes: [{ box_xyxy: [120, 260, 420, 340] }],
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: "Test" }));
+
+    await waitFor(() => {
+      expect(catalogApi.testCatalogTool).toHaveBeenCalledWith(
+        "tool.image_plate_logo_replacement",
+        {
+          car_image: {
+            data_base64: "Y2FyIGltYWdl",
+            mime_type: "image/png",
+          },
+          logo_image: {
+            data_base64: "bG9nbyBpbWFnZQ==",
+            mime_type: "image/png",
+          },
+          plate_boxes: [{ box_xyxy: [120, 260, 420, 340] }],
+        },
+        "token",
+      );
+    });
+
+    const resultImage = await screen.findByRole("img", { name: "Generated tool result" });
+    expect(resultImage).toHaveAttribute("src", "data:image/png;base64,cmVzdWx0IGltYWdl");
   });
 
   it("starts MCP server creation from the backing tool and fills defaults", async () => {

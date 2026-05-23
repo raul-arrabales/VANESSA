@@ -32,7 +32,7 @@ export type CatalogToolSpec = {
   output_schema: Record<string, unknown>;
   safety_policy: Record<string, unknown>;
   offline_compatible: boolean;
-  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http" | "knowledge_base_retrieval" | "image_analysis";
+  execution_backend?: "sandbox_python" | "mcp_gateway_web_search" | "internal_http" | "knowledge_base_retrieval" | "image_analysis" | "image_generation";
   execution_config?: Record<string, unknown>;
   permissions?: Record<string, unknown>;
 };
@@ -85,7 +85,7 @@ export type CatalogMcpServerSpec = {
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   metadata: {
-    category: "web_search" | "knowledge_retrieval" | "code_execution" | "data_analysis" | "automation" | "communication" | "custom";
+    category: "web_search" | "knowledge_retrieval" | "code_execution" | "data_analysis" | "creative_media" | "automation" | "communication" | "custom";
     capabilities: string[];
     local: boolean;
     stateless: boolean;

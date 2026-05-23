@@ -1993,6 +1993,7 @@
       "webSearch": "Busqueda web del gateway",
       "knowledgeBaseRetrieval": "Recuperacion de conocimiento",
       "imageAnalysis": "Analisis de imagenes",
+      "imageGeneration": "Generacion de imagenes",
       "internalHttp": "HTTP interno"
     },
     "agents": {
@@ -2114,9 +2115,12 @@
       "testDescription": "Ejecuta una prueba en vivo contra {{name}} usando su backend de ejecucion interno y esquema de entrada.",
       "testHelper": "Envía un objeto JSON que coincida con el esquema de entrada de la herramienta para inspeccionar la respuesta real del runtime.",
       "imageUploadHelper": "Sube una imagen para completar image.data_base64 e image.mime_type antes de ejecutar la prueba.",
+      "plateLogoUploadHelper": "Sube la imagen del coche y la imagen del logo, luego edita plate_boxes en la entrada JSON antes de ejecutar la prueba.",
       "testMissing": "Selecciona una herramienta de plataforma antes de abrir su vista de prueba.",
       "testResultTitle": "Resultado de la prueba",
       "testStatus": "Estado del runtime: {{statusCode}}",
+      "resultImageTitle": "Imagen resultante",
+      "resultImageAlt": "Resultado visual generado por la herramienta",
       "inputSchemaTitle": "Esquema de entrada",
       "requestTitle": "Entrada enviada",
       "responseTitle": "Resultado del runtime",
@@ -2327,6 +2331,7 @@
           "knowledge_retrieval": "Recuperacion de conocimiento",
           "code_execution": "Ejecucion de codigo",
           "data_analysis": "Analisis de datos",
+          "creative_media": "Medios creativos",
           "automation": "Automatizacion",
           "communication": "Comunicacion",
           "custom": "Personalizado"
@@ -2422,7 +2427,10 @@
       },
       "toolTest": {
         "input": "Entrada de prueba",
-        "imageUpload": "Subir imagen"
+        "imageUpload": "Subir imagen",
+        "plateLogoUploads": "Archivos de imagen",
+        "carImageUpload": "Subir imagen del coche",
+        "logoImageUpload": "Subir imagen del logo"
       }
     },
     "validation": {

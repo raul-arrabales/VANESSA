@@ -83,6 +83,30 @@ describe("buildSampleToolInput", () => {
     });
   });
 
+  it("returns an upload-ready plate logo replacement sample", () => {
+    expect(buildSampleToolInput(buildTool({
+      id: "tool.image_plate_logo_replacement",
+      spec: {
+        ...buildTool().spec,
+        execution_backend: "image_generation",
+      },
+    }))).toEqual({
+      car_image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+      logo_image: {
+        data_base64: "",
+        mime_type: "image/png",
+      },
+      plate_boxes: [
+        {
+          box_xyxy: [120, 260, 420, 340],
+        },
+      ],
+    });
+  });
+
   it("builds a generic schema-based sample for other tools", () => {
     expect(buildSampleToolInput(buildTool({
       spec: {

@@ -39,6 +39,29 @@ function readImageFileAsBase64(file: File): Promise<string> {
   });
 }
 
+type ImagePayload = {
+  data_base64: string;
+  mime_type: string;
+};
+
+function imagePayloadFromResult(value: unknown): ImagePayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const resultObject = value as Record<string, unknown>;
+  const image = resultObject.image;
+  if (!image || typeof image !== "object" || Array.isArray(image)) {
+    return null;
+  }
+  const imageObject = image as Record<string, unknown>;
+  const dataBase64 = typeof imageObject.data_base64 === "string" ? imageObject.data_base64.trim() : "";
+  const mimeType = typeof imageObject.mime_type === "string" ? imageObject.mime_type.trim() : "";
+  if (!dataBase64 || !mimeType) {
+    return null;
+  }
+  return { data_base64: dataBase64, mime_type: mimeType };
+}
+
 export default function CatalogToolTestPanel({
   tool,
   form,
@@ -50,6 +73,9 @@ export default function CatalogToolTestPanel({
 }: CatalogToolTestPanelProps): JSX.Element {
   const { t } = useTranslation("common");
   const supportsImageUpload = tool?.spec.execution_backend === "image_analysis";
+  const supportsPlateLogoUploads = tool?.id === "tool.image_plate_logo_replacement";
+  const resultImage = imagePayloadFromResult(result?.execution.result);
+  const resultImageSrc = resultImage ? `data:${resultImage.mime_type};base64,${resultImage.data_base64}` : "";
 
   const handleImageUpload = async (file: File | undefined): Promise<void> => {
     if (!file) {
@@ -60,6 +86,22 @@ export default function CatalogToolTestPanel({
     const nextInput = {
       ...input,
       image: {
+        data_base64: dataBase64,
+        mime_type: file.type || "application/octet-stream",
+      },
+    };
+    onChange({ ...form, inputText: stringifyJson(nextInput) });
+  };
+
+  const handleNamedImageUpload = async (fieldName: "car_image" | "logo_image", file: File | undefined): Promise<void> => {
+    if (!file) {
+      return;
+    }
+    const dataBase64 = await readImageFileAsBase64(file);
+    const input = parseCurrentInput(form.inputText);
+    const nextInput = {
+      ...input,
+      [fieldName]: {
         data_base64: dataBase64,
         mime_type: file.type || "application/octet-stream",
       },
@@ -119,6 +161,35 @@ export default function CatalogToolTestPanel({
         </label>
       ) : null}
 
+      {supportsPlateLogoUploads ? (
+        <div className="panel panel-nested card-stack">
+          <span className="field-label">{t("catalogControl.forms.toolTest.plateLogoUploads")}</span>
+          <div className="catalog-tool-upload-grid">
+            <label className="card-stack">
+              <span className="field-label">{t("catalogControl.forms.toolTest.carImageUpload")}</span>
+              <input
+                className="field-input"
+                type="file"
+                accept="image/*"
+                aria-label={t("catalogControl.forms.toolTest.carImageUpload")}
+                onChange={(event) => void handleNamedImageUpload("car_image", event.currentTarget.files?.[0])}
+              />
+            </label>
+            <label className="card-stack">
+              <span className="field-label">{t("catalogControl.forms.toolTest.logoImageUpload")}</span>
+              <input
+                className="field-input"
+                type="file"
+                accept="image/*"
+                aria-label={t("catalogControl.forms.toolTest.logoImageUpload")}
+                onChange={(event) => void handleNamedImageUpload("logo_image", event.currentTarget.files?.[0])}
+              />
+            </label>
+          </div>
+          <span className="status-text">{t("catalogControl.tools.plateLogoUploadHelper")}</span>
+        </div>
+      ) : null}
+
       <div className="platform-action-row">
         <span className="status-text">
           {errorMessage || t("catalogControl.tools.testHelper")}
@@ -144,6 +215,14 @@ export default function CatalogToolTestPanel({
             </span>
           </div>
           <p className="status-text">{t("catalogControl.tools.testStatus", { statusCode: result.execution.status_code })}</p>
+          {resultImageSrc ? (
+            <div className="card-stack">
+              <span className="field-label">{t("catalogControl.tools.resultImageTitle")}</span>
+              <div className="catalog-tool-result-image-frame">
+                <img src={resultImageSrc} alt={t("catalogControl.tools.resultImageAlt")} />
+              </div>
+            </div>
+          ) : null}
           <div className="card-stack">
             <span className="field-label">{t("catalogControl.tools.requestTitle")}</span>
             <pre className="code-block">{stringifyJson(result.execution.input)}</pre>
