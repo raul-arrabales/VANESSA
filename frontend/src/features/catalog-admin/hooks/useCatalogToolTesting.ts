@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { testCatalogTool, type CatalogTool, type CatalogToolTestResult } from "../../../api/catalog";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
@@ -52,18 +52,35 @@ export function useCatalogToolTesting(token: string) {
   const [toolTestResult, setToolTestResult] = useState<CatalogToolTestResult | null>(null);
   const [toolTestError, setToolTestError] = useState("");
   const [testingToolId, setTestingToolId] = useState("");
+  const [toolTestStartedAt, setToolTestStartedAt] = useState<number | null>(null);
+  const [toolTestElapsedMs, setToolTestElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!testingToolId || toolTestStartedAt === null) {
+      setToolTestElapsedMs(0);
+      return;
+    }
+    setToolTestElapsedMs(Math.max(0, Date.now() - toolTestStartedAt));
+    const intervalId = window.setInterval(() => {
+      setToolTestElapsedMs(Math.max(0, Date.now() - toolTestStartedAt));
+    }, 150);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [testingToolId, toolTestStartedAt]);
 
   const handleToolTest = useCallback(async (): Promise<CatalogToolTestResult | null> => {
     if (!token || !toolTestForm.toolId) {
       return null;
     }
-    setTestingToolId(toolTestForm.toolId);
     setToolTestError("");
     try {
       const input = parseJsonObject(
         toolTestForm.inputText,
         t("catalogControl.feedback.invalidJson", { field: t("catalogControl.forms.toolTest.input") }),
       );
+      setTestingToolId(toolTestForm.toolId);
+      setToolTestStartedAt(Date.now());
       const result = await testCatalogTool(toolTestForm.toolId, input, token);
       setToolTestResult(result);
       return result;
@@ -75,6 +92,8 @@ export function useCatalogToolTesting(token: string) {
       return null;
     } finally {
       setTestingToolId("");
+      setToolTestStartedAt(null);
+      setToolTestElapsedMs(0);
     }
   }, [showErrorFeedback, t, token, toolTestForm.inputText, toolTestForm.toolId]);
 
@@ -96,6 +115,7 @@ export function useCatalogToolTesting(token: string) {
     toolTestResult,
     toolTestError,
     testingToolId,
+    toolTestElapsedMs,
     handleToolTest,
     openToolTester,
     resetToolTester,

@@ -68,6 +68,7 @@ export default function CatalogControlPage(): JSX.Element {
     agentPromptPreview,
     agentPromptPreviewLoading,
     testingToolId,
+    toolTestElapsedMs,
     savingAgent,
     savingTool,
     savingMcpServer,
@@ -269,6 +270,7 @@ export default function CatalogControlPage(): JSX.Element {
           tool={selectedTestTool}
           form={toolTestForm}
           testing={testingToolId === toolTestForm.toolId}
+          elapsedMs={toolTestElapsedMs}
           errorMessage={toolTestError}
           result={toolTestResult}
           onChange={setToolTestForm}

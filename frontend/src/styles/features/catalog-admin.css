@@ -36,3 +36,146 @@
   max-width: 100%;
   height: auto;
 }
+
+.catalog-tool-test-progress-modal {
+  width: min(42rem, 100%);
+}
+
+.catalog-tool-test-progress {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.catalog-tool-test-progress-hero {
+  position: relative;
+  width: 4.75rem;
+  height: 4.75rem;
+  margin: 0 auto;
+}
+
+.catalog-tool-test-progress-core,
+.catalog-tool-test-progress-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+
+.catalog-tool-test-progress-core {
+  inset: 1rem;
+  background:
+    radial-gradient(circle at 30% 30%, color-mix(in oklab, var(--accent-primary) 88%, white) 0%, var(--accent-primary) 55%, color-mix(in oklab, var(--accent-primary) 56%, black) 100%);
+  box-shadow: 0 0 0 0.45rem color-mix(in oklab, var(--accent-primary) 18%, transparent);
+  animation: catalog-tool-test-pulse 1.4s ease-in-out infinite;
+}
+
+.catalog-tool-test-progress-orbit {
+  border: 3px solid color-mix(in oklab, var(--accent-primary) 18%, transparent);
+  border-top-color: var(--accent-primary);
+  animation: catalog-tool-test-spin 1s linear infinite;
+}
+
+.catalog-tool-test-progress-meter {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.catalog-tool-test-progress-meter-track {
+  height: 0.7rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg-subtle) 75%, var(--border-muted));
+}
+
+.catalog-tool-test-progress-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--accent-primary) 58%, white), var(--accent-primary));
+  transition: width 220ms ease;
+}
+
+.catalog-tool-test-progress-meter-text {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.catalog-tool-test-progress-stage-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalog-tool-test-progress-stage {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 72%, transparent);
+}
+
+.catalog-tool-test-progress-stage-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-top: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--border-muted) 75%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border-muted) 55%, transparent);
+}
+
+.catalog-tool-test-progress-stage[data-state="active"] {
+  border-color: color-mix(in oklab, var(--accent-primary) 42%, var(--border-muted));
+  background: color-mix(in oklab, var(--accent-primary) 10%, var(--bg-subtle));
+}
+
+.catalog-tool-test-progress-stage[data-state="active"] .catalog-tool-test-progress-stage-icon {
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 0.3rem color-mix(in oklab, var(--accent-primary) 20%, transparent);
+}
+
+.catalog-tool-test-progress-stage[data-state="done"] .catalog-tool-test-progress-stage-icon {
+  background: var(--color-success-500, #2e8b57);
+  box-shadow: none;
+}
+
+.catalog-tool-runtime-log {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.catalog-tool-runtime-log-entry {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 72%, transparent);
+}
+
+.catalog-tool-runtime-log-entry[data-level="warning"] {
+  border-color: color-mix(in oklab, var(--color-warning-500, #c58a00) 50%, var(--border-muted));
+}
+
+.catalog-tool-runtime-log-entry[data-level="error"] {
+  border-color: color-mix(in oklab, var(--color-danger-500, #b42318) 50%, var(--border-muted));
+}
+
+@keyframes catalog-tool-test-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes catalog-tool-test-pulse {
+  0%,
+  100% {
+    transform: scale(0.96);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+}

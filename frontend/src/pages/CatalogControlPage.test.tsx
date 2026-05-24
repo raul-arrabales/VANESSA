@@ -711,6 +711,13 @@ describe("CatalogControlPage", () => {
 
   it("opens the test flow from the tools directory and runs the tool with sample input", async () => {
     const user = userEvent.setup();
+    let resolveTest: ((value: catalogApi.CatalogToolTestResult) => void) | null = null;
+    vi.mocked(catalogApi.testCatalogTool).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTest = resolve;
+        }),
+    );
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=tools&view=tools" });
 
@@ -723,6 +730,9 @@ describe("CatalogControlPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Test" }));
 
+    expect(await screen.findByRole("dialog", { name: "Testing Web search" })).toBeVisible();
+    expect(screen.getByText("Schema check")).toBeVisible();
+
     await waitFor(() => {
       expect(catalogApi.testCatalogTool).toHaveBeenCalledWith(
         "tool.web_search",
@@ -730,9 +740,36 @@ describe("CatalogControlPage", () => {
         "token",
       );
     });
+    resolveTest?.({
+      tool: toolFixture,
+      execution: {
+        input: { query: "OpenAI platform runtime", top_k: 3 },
+        request_metadata: {},
+        started_at: "2026-05-24T10:00:00+00:00",
+        completed_at: "2026-05-24T10:00:01+00:00",
+        duration_ms: 1042,
+        status_code: 200,
+        ok: true,
+        runtime_log: [
+          {
+            stage: "request_received",
+            level: "info",
+            message: "Backend accepted the catalog tool test request.",
+            details: { backend: "mcp_gateway_web_search" },
+          },
+        ],
+        result: { results: [{ title: "Example result" }] },
+      },
+    });
+
     const resultPanel = await screen.findByTestId("catalog-tool-test-result");
     expect(resultPanel).toBeVisible();
     expect(resultPanel).toHaveTextContent("Example result");
+    expect(resultPanel).toHaveTextContent("Backend runtime log");
+    expect(resultPanel).toHaveTextContent("Backend accepted the catalog tool test request.");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Testing Web search" })).not.toBeInTheDocument();
+    });
   });
 
   it("uploads an image into image analysis tool test input", async () => {

@@ -884,6 +884,10 @@ def test_execute_catalog_tool_invokes_web_search_runtime(monkeypatch: pytest.Mon
         "arguments": {"query": "OpenAI", "top_k": 3},
     }
     assert result["execution"]["ok"] is True
+    assert result["execution"]["duration_ms"] >= 0
+    assert result["execution"]["runtime_log"][0]["stage"] == "request_received"
+    assert result["execution"]["runtime_log"][1]["details"]["query_length"] == 6
+    assert result["execution"]["runtime_log"][-1]["stage"] == "completed"
     assert result["execution"]["result"]["results"][0]["title"] == "Example"
 
 
@@ -939,4 +943,5 @@ def test_execute_catalog_tool_invokes_sandbox_runtime(monkeypatch: pytest.Monkey
         "policy": {"timeout_seconds": 5, "network_access": False},
     }
     assert result["execution"]["ok"] is True
+    assert result["execution"]["runtime_log"][1]["details"]["code_length"] == len("print(1 + 2)")
     assert result["execution"]["result"]["result"] == 3

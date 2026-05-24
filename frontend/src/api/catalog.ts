@@ -242,9 +242,18 @@ export type CatalogToolTestResult = {
   execution: {
     input: Record<string, unknown>;
     request_metadata: Record<string, unknown>;
+    started_at?: string;
+    completed_at?: string;
+    duration_ms?: number;
     status_code: number;
     ok: boolean;
     result: Record<string, unknown> | null;
+    runtime_log?: Array<{
+      stage: string;
+      level: "info" | "warning" | "error" | string;
+      message: string;
+      details?: Record<string, unknown>;
+    }>;
   };
 };
 
