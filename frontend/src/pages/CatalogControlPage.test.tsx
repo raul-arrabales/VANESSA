@@ -732,6 +732,13 @@ describe("CatalogControlPage", () => {
 
     expect(await screen.findByRole("dialog", { name: "Testing Web search" })).toBeVisible();
     expect(screen.getByText("Schema check")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Back to test page" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Testing Web search" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Reopen status" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Reopen status" }));
+    expect(await screen.findByRole("dialog", { name: "Testing Web search" })).toBeVisible();
 
     await waitFor(() => {
       expect(catalogApi.testCatalogTool).toHaveBeenCalledWith(

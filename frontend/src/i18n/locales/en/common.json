@@ -2157,7 +2157,9 @@
         "runtimeDetail": "Sending the request through {{runtime}}.",
         "waitingLabel": "Awaiting result",
         "waitingDetail": "Waiting for the active runtime provider to finish execution.",
-        "runtimeFallback": "the active runtime"
+        "runtimeFallback": "the active runtime",
+        "exit": "Back to test page",
+        "reopen": "Reopen status"
       },
       "noKnowledgeBases": "The active deployment has no bound knowledge bases available for retrieval tools.",
       "actionsFor": "Tool actions for {{name}}",

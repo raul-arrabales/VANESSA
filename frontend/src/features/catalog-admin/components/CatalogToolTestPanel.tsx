@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ModalDialog from "../../../components/ModalDialog";
 import type { CatalogTool, CatalogToolTestResult } from "../../../api/catalog";
@@ -136,6 +136,7 @@ export default function CatalogToolTestPanel({
   const supportsPlateLogoUploads = tool?.id === "tool.image_plate_logo_replacement";
   const resultImage = imagePayloadFromResult(result?.execution.result);
   const resultImageSrc = resultImage ? `data:${resultImage.mime_type};base64,${resultImage.data_base64}` : "";
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const stages = useMemo(() => toolTestStages(tool, t), [tool, t]);
   const activeStageIndex = activeToolTestStageIndex(elapsedMs, stages.length);
   const progressPercent = stages.length > 1
@@ -151,6 +152,14 @@ export default function CatalogToolTestPanel({
       resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [result, testing]);
+
+  useEffect(() => {
+    if (testing) {
+      setIsProgressModalOpen(true);
+      return;
+    }
+    setIsProgressModalOpen(false);
+  }, [testing]);
 
   const handleImageUpload = async (file: File | undefined): Promise<void> => {
     if (!file) {
@@ -195,13 +204,21 @@ export default function CatalogToolTestPanel({
 
   return (
     <article className="panel card-stack">
-      {testing ? (
+      {testing && isProgressModalOpen ? (
         <ModalDialog
           className="catalog-tool-test-progress-modal"
           title={t("catalogControl.tools.progress.title", { name: tool?.spec.name ?? t("catalogControl.tools.testTitle") })}
           description={t("catalogControl.tools.progress.description")}
-          onClose={() => undefined}
-          closeDisabled
+          onClose={() => setIsProgressModalOpen(false)}
+          actions={(
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsProgressModalOpen(false)}
+            >
+              {t("catalogControl.tools.progress.exit")}
+            </button>
+          )}
         >
           <div className="catalog-tool-test-progress">
             <div className="catalog-tool-test-progress-hero" aria-hidden="true">
@@ -311,6 +328,15 @@ export default function CatalogToolTestPanel({
           {errorMessage || t("catalogControl.tools.testHelper")}
         </span>
         <div className="form-actions">
+          {testing && !isProgressModalOpen ? (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setIsProgressModalOpen(true)}
+            >
+              {t("catalogControl.tools.progress.reopen")}
+            </button>
+          ) : null}
           <button type="button" className="btn btn-primary" onClick={onSubmit} disabled={testing}>
             {testing ? t("catalogControl.actions.testingTool") : t("catalogControl.actions.testTool")}
           </button>

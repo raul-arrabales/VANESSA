@@ -2139,7 +2139,9 @@
         "runtimeDetail": "Enviando la solicitud mediante {{runtime}}.",
         "waitingLabel": "Esperando resultado",
         "waitingDetail": "Esperando a que el proveedor activo termine la ejecucion.",
-        "runtimeFallback": "el runtime activo"
+        "runtimeFallback": "el runtime activo",
+        "exit": "Volver a la prueba",
+        "reopen": "Reabrir estado"
       },
       "noKnowledgeBases": "El despliegue activo no tiene bases de conocimiento enlazadas disponibles para herramientas de recuperacion.",
       "actionsFor": "Acciones de herramienta para {{name}}",
