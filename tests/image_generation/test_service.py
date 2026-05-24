@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import base64
 from io import BytesIO
+import sys
+import types
+
+import pytest
 
 from image_generation.app import gateway
 from image_generation.app import resources as image_resources
 from image_generation.app import runtime
 from image_generation.app.constants import ROLE_PLATE_LOGO, ROLE_TEXT_TO_IMAGE
+from image_generation.app.workers import text_to_image
 
 try:
     from PIL import Image
@@ -115,6 +120,56 @@ def test_worker_rejects_unsupported_task() -> None:
 
     assert status == 400
     assert result["error"] == "invalid_tasks"
+
+
+def test_text_to_image_pipeline_falls_back_when_repo_has_only_bin_weights(monkeypatch) -> None:
+    calls: list[bool] = []
+
+    class FakePipeline:
+        def to(self, device: str):
+            assert device == "cpu"
+            return self
+
+    class FakeAutoPipeline:
+        @staticmethod
+        def from_pretrained(model_id: str, *, torch_dtype, use_safetensors: bool):
+            assert model_id == "segmind/tiny-sd"
+            calls.append(use_safetensors)
+            if use_safetensors:
+                raise OSError("Could not find the necessary `safetensors` weights")
+            assert torch_dtype == "float32-dtype"
+            return FakePipeline()
+
+    fake_torch = types.SimpleNamespace(float16="float16-dtype", float32="float32-dtype")
+    fake_diffusers = types.SimpleNamespace(AutoPipelineForText2Image=FakeAutoPipeline)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "diffusers", fake_diffusers)
+    monkeypatch.setenv("IMAGE_GENERATION_TEXT_TO_IMAGE_MODEL_ID", "segmind/tiny-sd")
+    monkeypatch.setenv("IMAGE_GENERATION_TEXT_TO_IMAGE_DEVICE", "cpu")
+    monkeypatch.setenv("IMAGE_GENERATION_TEXT_TO_IMAGE_DTYPE", "float32")
+    monkeypatch.setattr(text_to_image, "_PIPELINE", None)
+
+    pipeline = text_to_image.load_pipeline()
+
+    assert isinstance(pipeline, FakePipeline)
+    assert calls == [True, False]
+
+
+def test_text_to_image_pipeline_reraises_other_os_errors(monkeypatch) -> None:
+    class FakeAutoPipeline:
+        @staticmethod
+        def from_pretrained(model_id: str, *, torch_dtype, use_safetensors: bool):
+            raise OSError("network unavailable")
+
+    fake_torch = types.SimpleNamespace(float16="float16-dtype", float32="float32-dtype")
+    fake_diffusers = types.SimpleNamespace(AutoPipelineForText2Image=FakeAutoPipeline)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "diffusers", fake_diffusers)
+    monkeypatch.setenv("IMAGE_GENERATION_TEXT_TO_IMAGE_MODEL_ID", "segmind/tiny-sd")
+    monkeypatch.setattr(text_to_image, "_PIPELINE", None)
+
+    with pytest.raises(OSError, match="network unavailable"):
+        text_to_image.load_pipeline()
 
 
 def test_plate_logo_replacement_rect_preserves_dimensions(monkeypatch) -> None:

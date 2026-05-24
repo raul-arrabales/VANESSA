@@ -28,7 +28,20 @@ def load_pipeline() -> Any:
 
             dtype = torch.float16 if _dtype_name() in {"float16", "fp16", "half"} else torch.float32
             model_id = resource_id("IMAGE_GENERATION_TEXT_TO_IMAGE_MODEL_ID", DEFAULT_TEXT_TO_IMAGE_MODEL_ID)
-            _PIPELINE = AutoPipelineForText2Image.from_pretrained(model_id, torch_dtype=dtype, use_safetensors=True)
+            try:
+                _PIPELINE = AutoPipelineForText2Image.from_pretrained(
+                    model_id,
+                    torch_dtype=dtype,
+                    use_safetensors=True,
+                )
+            except OSError as exc:
+                if "necessary `safetensors` weights" not in str(exc):
+                    raise
+                _PIPELINE = AutoPipelineForText2Image.from_pretrained(
+                    model_id,
+                    torch_dtype=dtype,
+                    use_safetensors=False,
+                )
             _PIPELINE = _PIPELINE.to(_device())
         return _PIPELINE
 
