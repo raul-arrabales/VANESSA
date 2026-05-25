@@ -94,3 +94,72 @@
 .auth-panel {
   width: min(620px, 100%);
 }
+
+.system-log-summary {
+  align-items: flex-end;
+}
+
+.system-log-summary-grid {
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.system-log-follow-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.system-log-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.system-log-search-field {
+  grid-column: 1 / -1;
+}
+
+.system-log-table {
+  min-width: 62rem;
+}
+
+.system-log-message-cell code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.system-log-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+  color: var(--text-primary);
+}
+
+.system-log-badge[data-kind="level"][data-level="error"] {
+  background: color-mix(in oklab, var(--status-danger) 18%, var(--bg-subtle));
+  color: var(--status-danger);
+}
+
+.system-log-badge[data-kind="level"][data-level="warning"] {
+  background: color-mix(in oklab, #f79009 18%, var(--bg-subtle));
+  color: #b54708;
+}
+
+.system-log-badge[data-kind="level"][data-level="info"] {
+  background: color-mix(in oklab, var(--status-success) 18%, var(--bg-subtle));
+  color: color-mix(in oklab, var(--status-success) 78%, black);
+}
+
+.system-log-badge[data-kind="level"][data-level="debug"] {
+  background: color-mix(in oklab, var(--accent-primary) 16%, var(--bg-subtle));
+  color: var(--accent-primary);
+}

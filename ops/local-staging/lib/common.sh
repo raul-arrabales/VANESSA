@@ -25,7 +25,13 @@ LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MO
 LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
 
-readonly SERVICES=(frontend backend llm llm_runtime_inference llm_runtime_embeddings llama_cpp qdrant image_analysis image_analysis_anpr image_analysis_objects image_analysis_captioning image_generation image_generation_text_to_image image_generation_plate_logo searxng mcp_gateway agent_engine sandbox kws weaviate postgres)
+SERVICE_REGISTRY_FILE="${LOCAL_STAGING_DIR}/services.txt"
+if [[ ! -f "${SERVICE_REGISTRY_FILE}" ]]; then
+  die "Missing local-staging service registry: ${SERVICE_REGISTRY_FILE}"
+fi
+mapfile -t SERVICES < <(grep -v '^[[:space:]]*#' "${SERVICE_REGISTRY_FILE}" | sed '/^[[:space:]]*$/d')
+readonly SERVICE_REGISTRY_FILE
+readonly SERVICES
 
 now_ts() {
   date +"%Y-%m-%dT%H:%M:%S%z"

@@ -146,12 +146,74 @@
       "service": "Service",
       "container": "Container",
       "target": "Health target",
-      "status": "Status"
+      "status": "Status",
+      "actions": "Actions"
     },
     "serviceStatus": {
       "up": "Up",
       "down": "Down",
       "unknown": "Unknown"
+    },
+    "logs": {
+      "openAction": "Open logs",
+      "title": "Service Logs",
+      "description": "Inspect recent and live log output for {{service}}.",
+      "descriptionGeneric": "Inspect recent and live log output for a VANESSA service.",
+      "backToOverview": "Back to system health",
+      "serviceLabel": "Selected service",
+      "containerLabel": "Container",
+      "serviceStatusLabel": "Current status",
+      "liveFollow": "Follow live",
+      "missingServiceTitle": "Select a service",
+      "resultsTitle": "{{count}} log entries",
+      "tailHint": "Showing the current in-memory tail of {{count}} entries.",
+      "loading": "Loading service logs...",
+      "empty": "No log entries matched the current filters.",
+      "tableAria": "Service log entries",
+      "table": {
+        "timestamp": "Timestamp",
+        "level": "Level",
+        "eventType": "Event type",
+        "message": "Message"
+      },
+      "filters": {
+        "startTime": "Start time",
+        "endTime": "End time",
+        "level": "Level",
+        "eventType": "Event type",
+        "search": "Search",
+        "searchPlaceholder": "Filter log lines",
+        "allLevels": "All levels",
+        "allEventTypes": "All event types"
+      },
+      "level": {
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Info",
+        "debug": "Debug",
+        "unknown": "Unknown"
+      },
+      "eventType": {
+        "generic": "Generic",
+        "health": "Health",
+        "http": "HTTP",
+        "startup": "Startup",
+        "runtime": "Runtime",
+        "model": "Model"
+      },
+      "stream": {
+        "label": "Stream status",
+        "idle": "Idle",
+        "connecting": "Connecting",
+        "live": "Live",
+        "disconnected": "Disconnected",
+        "disconnectedMessage": "Live follow stopped. The current tail remains available."
+      },
+      "errors": {
+        "missingService": "Choose a service from System Health to inspect its logs.",
+        "unknownService": "The service \"{{service}}\" is not available in this local staging stack.",
+        "loadFailed": "Service logs could not be loaded."
+      }
     }
   },
   "auth": {

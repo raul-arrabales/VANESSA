@@ -36,6 +36,7 @@ services:
       - ../models/llm:/models/llm
       - ../context_sources:/context_sources
       - ../logs:/var/log/vanessa
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   llm:
     build:

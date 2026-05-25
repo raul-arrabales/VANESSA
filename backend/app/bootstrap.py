@@ -149,6 +149,7 @@ def register_http_blueprints(app: Flask) -> None:
     from .api.http.registry import bp as registry_bp
     from .api.http.registry_models import bp as registry_models_bp
     from .api.http.runtime import bp as runtime_bp
+    from .api.http.system_logs import bp as system_logs_bp
     from .routes import auth as auth_routes
     from .routes import auth_legacy_routes
     from .routes import model_inference_v1 as model_inference_v1_routes
@@ -164,6 +165,7 @@ def register_http_blueprints(app: Flask) -> None:
     app.register_blueprint(policy_bp)
     app.register_blueprint(quotes_bp)
     app.register_blueprint(runtime_bp)
+    app.register_blueprint(system_logs_bp)
     app.register_blueprint(executions_bp)
     app.register_blueprint(modelops_bp)
     app.register_blueprint(model_inference_v1_routes.bp)

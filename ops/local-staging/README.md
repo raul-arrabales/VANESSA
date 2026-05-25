@@ -247,6 +247,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
 7.1. To test managed knowledge-base directory sources, place sample `.txt`, `.md`, `.json`, or `.jsonl` files under host directory `context_sources/` before opening Context Management.
 7.2. In `/control/context`, create or open a knowledge base, add a managed source pointing at a relative path under `context_sources/`, or use the `Browse` button to pick that directory from the allowlisted source root, and use `Sync now` to import and reconcile those files.
 8. In the UI, open "System Health" and use "Check all services". The frontend calls `/api/system/health` and Vite proxies to backend.
+8.1. Use the new `Open logs` action in System Health to open a per-service tail view in a new tab. Local staging reads Docker service logs through the backend, so the backend container must keep its read-only Docker socket mount intact.
 9. Check API health directly (host-to-container): `http://localhost:5000/health`
 9.1. Check runtime profile directly: `http://localhost:5000/v1/runtime/profile`
 10. Check aggregate system health directly (host-to-container): `http://localhost:5000/system/health`

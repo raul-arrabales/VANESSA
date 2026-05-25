@@ -141,12 +141,74 @@
       "service": "Servicio",
       "container": "Contenedor",
       "target": "Objetivo de salud",
-      "status": "Estado"
+      "status": "Estado",
+      "actions": "Acciones"
     },
     "serviceStatus": {
       "up": "Activo",
       "down": "Fallando",
       "unknown": "Desconocido"
+    },
+    "logs": {
+      "openAction": "Abrir logs",
+      "title": "Logs del servicio",
+      "description": "Inspecciona la salida reciente y en vivo de {{service}}.",
+      "descriptionGeneric": "Inspecciona la salida reciente y en vivo de un servicio de VANESSA.",
+      "backToOverview": "Volver a estado del sistema",
+      "serviceLabel": "Servicio seleccionado",
+      "containerLabel": "Contenedor",
+      "serviceStatusLabel": "Estado actual",
+      "liveFollow": "Seguir en vivo",
+      "missingServiceTitle": "Selecciona un servicio",
+      "resultsTitle": "{{count}} entradas de log",
+      "tailHint": "Mostrando la cola actual en memoria de {{count}} entradas.",
+      "loading": "Cargando logs del servicio...",
+      "empty": "Ninguna entrada coincide con los filtros actuales.",
+      "tableAria": "Entradas de logs del servicio",
+      "table": {
+        "timestamp": "Marca de tiempo",
+        "level": "Nivel",
+        "eventType": "Tipo de evento",
+        "message": "Mensaje"
+      },
+      "filters": {
+        "startTime": "Hora inicial",
+        "endTime": "Hora final",
+        "level": "Nivel",
+        "eventType": "Tipo de evento",
+        "search": "Buscar",
+        "searchPlaceholder": "Filtrar lineas de log",
+        "allLevels": "Todos los niveles",
+        "allEventTypes": "Todos los tipos de evento"
+      },
+      "level": {
+        "error": "Error",
+        "warning": "Advertencia",
+        "info": "Info",
+        "debug": "Debug",
+        "unknown": "Desconocido"
+      },
+      "eventType": {
+        "generic": "Generico",
+        "health": "Salud",
+        "http": "HTTP",
+        "startup": "Arranque",
+        "runtime": "Runtime",
+        "model": "Modelo"
+      },
+      "stream": {
+        "label": "Estado del stream",
+        "idle": "Inactivo",
+        "connecting": "Conectando",
+        "live": "En vivo",
+        "disconnected": "Desconectado",
+        "disconnectedMessage": "El seguimiento en vivo se detuvo. La cola actual sigue disponible."
+      },
+      "errors": {
+        "missingService": "Elige un servicio desde Estado del sistema para inspeccionar sus logs.",
+        "unknownService": "El servicio \"{{service}}\" no esta disponible en este stack local.",
+        "loadFailed": "No se pudieron cargar los logs del servicio."
+      }
     }
   },
   "auth": {

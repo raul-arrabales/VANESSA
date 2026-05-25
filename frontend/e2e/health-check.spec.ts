@@ -172,6 +172,93 @@ test("shows clear error state when backend request fails", async ({ page }) => {
   await expect(page.getByText(/Request failed:/)).toBeVisible();
 });
 
+test("opens service logs in a new tab and shows tail plus streamed entries", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("vanessa.locale", "en");
+  });
+  await seedAuthenticatedSession(page, {
+    id: 1,
+    email: "superadmin@example.com",
+    username: "superadmin",
+    role: "superadmin",
+    is_active: true,
+  });
+
+  await page.context().route("**/system/health", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "ok",
+        services: [
+          { service: "Backend", container: "backend", target: "http://backend:5000", reachable: true },
+        ],
+      }),
+    });
+  });
+  await page.context().route("**/system/architecture", async (route) => {
+    await route.fulfill({ status: 503, body: "" });
+  });
+  await page.context().route("**/system/architecture.svg", async (route) => {
+    await route.fulfill({ status: 503, body: "" });
+  });
+  await page.context().route("**/v1/system/logs/services", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        services: [{ id: "backend", display_name: "Backend" }],
+      }),
+    });
+  });
+  await page.context().route("**/v1/system/logs/backend?tail=200", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        service: "backend",
+        display_name: "Backend",
+        tail: 200,
+        entries: [
+          {
+            id: "entry-1",
+            service: "backend",
+            timestamp: "2026-05-25T10:00:00Z",
+            level: "error",
+            event_type: "http",
+            raw: "2026-05-25T10:00:00Z [ERROR] GET /health failed",
+            message: "[ERROR] GET /health failed",
+          },
+        ],
+      }),
+    });
+  });
+  await page.context().route("**/v1/system/logs/backend/events?since=**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: [
+        "event: service_log",
+        "data: {\"id\":\"entry-2\",\"service\":\"backend\",\"timestamp\":\"2026-05-25T10:01:00Z\",\"level\":\"info\",\"event_type\":\"startup\",\"raw\":\"2026-05-25T10:01:00Z Started backend\",\"message\":\"Started backend\"}",
+        "",
+        "",
+      ].join("\n"),
+    });
+  });
+
+  await page.goto("/control/system-health");
+  await page.getByRole("button", { name: "Check all services" }).click();
+
+  const popupPromise = page.waitForEvent("popup");
+  await page.locator("table tbody tr").first().getByRole("button").click();
+  const popup = await popupPromise;
+
+  await expect(popup).toHaveURL(/\/control\/system-health\?view=logs&service=backend$/);
+  await expect(popup.getByRole("heading", { name: "Service Logs" })).toBeVisible();
+  await expect(popup.getByText("[ERROR] GET /health failed")).toBeVisible();
+  await expect(popup.getByText("Started backend")).toBeVisible();
+});
+
 test("switches language to Spanish and persists preference", async ({ page }) => {
   await seedAuthenticatedSession(page, {
     id: 9,
