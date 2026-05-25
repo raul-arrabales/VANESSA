@@ -2144,6 +2144,14 @@
       "requestTitle": "Submitted input",
       "responseTitle": "Runtime result",
       "runtimeLogTitle": "Backend runtime log",
+      "runtimeLogStages": {
+        "request_received": "Request received",
+        "input_validated": "Input validated",
+        "runtime_dispatched": "Runtime dispatched",
+        "runtime_warnings": "Warnings",
+        "completed": "Completed",
+        "failed": "Failed"
+      },
       "progress": {
         "title": "Testing {{name}}",
         "description": "The runtime is working through this tool test. The dialog will close and jump to the result when execution finishes.",

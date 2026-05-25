@@ -2,11 +2,11 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogTool, CatalogToolTestResult } from "../../../api/catalog";
 import { catalogToolBackendLabelKey } from "../catalogToolBackends";
-import { executionTraceEntries } from "../catalogExecutionTrace";
+import { applyImageFileToToolTestInput } from "../catalogToolTestInput";
 import { useCatalogToolTestProgress } from "../hooks/useCatalogToolTestProgress";
 import type { ToolTestFormState } from "../hooks/useCatalogToolTesting";
-import CatalogRuntimeLog from "./CatalogRuntimeLog";
 import CatalogToolTestProgressDialog, { catalogToolTestProgressStageCount } from "./CatalogToolTestProgressDialog";
+import CatalogToolTestResultPanel from "./CatalogToolTestResult";
 
 type CatalogToolTestPanelProps = {
   tool: CatalogTool | null;
@@ -22,51 +22,6 @@ function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-function parseCurrentInput(text: string): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(text);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-  } catch {
-    return {};
-  }
-}
-
-function readImageFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      const commaIndex = result.indexOf(",");
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Unable to read image file."));
-    reader.readAsDataURL(file);
-  });
-}
-
-type ImagePayload = {
-  data_base64: string;
-  mime_type: string;
-};
-
-function imagePayloadFromResult(value: unknown): ImagePayload | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  const resultObject = value as Record<string, unknown>;
-  const image = resultObject.image;
-  if (!image || typeof image !== "object" || Array.isArray(image)) {
-    return null;
-  }
-  const imageObject = image as Record<string, unknown>;
-  const dataBase64 = typeof imageObject.data_base64 === "string" ? imageObject.data_base64.trim() : "";
-  const mimeType = typeof imageObject.mime_type === "string" ? imageObject.mime_type.trim() : "";
-  if (!dataBase64 || !mimeType) {
-    return null;
-  }
-  return { data_base64: dataBase64, mime_type: mimeType };
-}
-
 export default function CatalogToolTestPanel({
   tool,
   form,
@@ -80,12 +35,9 @@ export default function CatalogToolTestPanel({
   const resultRef = useRef<HTMLDivElement>(null);
   const supportsImageUpload = tool?.spec.execution_backend === "image_analysis";
   const supportsPlateLogoUploads = tool?.id === "tool.image_plate_logo_replacement";
-  const resultImage = imagePayloadFromResult(result?.execution.result);
-  const resultImageSrc = resultImage ? `data:${resultImage.mime_type};base64,${resultImage.data_base64}` : "";
-  const runtimeLogs = executionTraceEntries(result?.execution.runtime_log);
   const progress = useCatalogToolTestProgress({
     testing,
-    traceEntries: runtimeLogs,
+    traceEntries: result?.execution.runtime_log ?? [],
     stageCount: catalogToolTestProgressStageCount(),
   });
 
@@ -98,36 +50,12 @@ export default function CatalogToolTestPanel({
     }
   }, [result, testing]);
 
-  const handleImageUpload = async (file: File | undefined): Promise<void> => {
+  const handleImageUpload = async (fieldName: "image" | "car_image" | "logo_image", file: File | undefined): Promise<void> => {
     if (!file) {
       return;
     }
-    const dataBase64 = await readImageFileAsBase64(file);
-    const input = parseCurrentInput(form.inputText);
-    const nextInput = {
-      ...input,
-      image: {
-        data_base64: dataBase64,
-        mime_type: file.type || "application/octet-stream",
-      },
-    };
-    onChange({ ...form, inputText: stringifyJson(nextInput) });
-  };
-
-  const handleNamedImageUpload = async (fieldName: "car_image" | "logo_image", file: File | undefined): Promise<void> => {
-    if (!file) {
-      return;
-    }
-    const dataBase64 = await readImageFileAsBase64(file);
-    const input = parseCurrentInput(form.inputText);
-    const nextInput = {
-      ...input,
-      [fieldName]: {
-        data_base64: dataBase64,
-        mime_type: file.type || "application/octet-stream",
-      },
-    };
-    onChange({ ...form, inputText: stringifyJson(nextInput) });
+    const inputText = await applyImageFileToToolTestInput(form.inputText, fieldName, file);
+    onChange({ ...form, inputText });
   };
 
   if (!tool) {
@@ -185,7 +113,7 @@ export default function CatalogToolTestPanel({
             type="file"
             accept="image/*"
             aria-label={t("catalogControl.forms.toolTest.imageUpload")}
-            onChange={(event) => void handleImageUpload(event.currentTarget.files?.[0])}
+            onChange={(event) => void handleImageUpload("image", event.currentTarget.files?.[0])}
           />
           <span className="status-text">{t("catalogControl.tools.imageUploadHelper")}</span>
         </label>
@@ -202,7 +130,7 @@ export default function CatalogToolTestPanel({
                 type="file"
                 accept="image/*"
                 aria-label={t("catalogControl.forms.toolTest.carImageUpload")}
-                onChange={(event) => void handleNamedImageUpload("car_image", event.currentTarget.files?.[0])}
+                onChange={(event) => void handleImageUpload("car_image", event.currentTarget.files?.[0])}
               />
             </label>
             <label className="card-stack">
@@ -212,7 +140,7 @@ export default function CatalogToolTestPanel({
                 type="file"
                 accept="image/*"
                 aria-label={t("catalogControl.forms.toolTest.logoImageUpload")}
-                onChange={(event) => void handleNamedImageUpload("logo_image", event.currentTarget.files?.[0])}
+                onChange={(event) => void handleImageUpload("logo_image", event.currentTarget.files?.[0])}
               />
             </label>
           </div>
@@ -245,37 +173,7 @@ export default function CatalogToolTestPanel({
         <pre className="code-block">{stringifyJson(tool.spec.input_schema)}</pre>
       </div>
 
-      {result ? (
-        <div ref={resultRef} className="panel panel-nested card-stack" data-testid="catalog-tool-test-result">
-          <div className="status-row">
-            <span className="field-label">{t("catalogControl.tools.testResultTitle")}</span>
-            <span className="platform-badge" data-tone={result.execution.ok ? "enabled" : "required"}>
-              {result.execution.ok ? t("catalogControl.validation.valid") : t("catalogControl.validation.invalid")}
-            </span>
-          </div>
-          <p className="status-text">{t("catalogControl.tools.testStatus", { statusCode: result.execution.status_code })}</p>
-          {typeof result.execution.duration_ms === "number" ? (
-            <p className="status-text">{t("catalogControl.tools.duration", { milliseconds: result.execution.duration_ms })}</p>
-          ) : null}
-          {resultImageSrc ? (
-            <div className="card-stack">
-              <span className="field-label">{t("catalogControl.tools.resultImageTitle")}</span>
-              <div className="catalog-tool-result-image-frame">
-                <img src={resultImageSrc} alt={t("catalogControl.tools.resultImageAlt")} />
-              </div>
-            </div>
-          ) : null}
-          <div className="card-stack">
-            <span className="field-label">{t("catalogControl.tools.requestTitle")}</span>
-            <pre className="code-block">{stringifyJson(result.execution.input)}</pre>
-          </div>
-          <div className="card-stack">
-            <span className="field-label">{t("catalogControl.tools.responseTitle")}</span>
-            <pre className="code-block">{stringifyJson(result.execution.result)}</pre>
-          </div>
-          <CatalogRuntimeLog entries={runtimeLogs} />
-        </div>
-      ) : null}
+      {result ? <CatalogToolTestResultPanel result={result} resultRef={resultRef} /> : null}
     </article>
   );
 }

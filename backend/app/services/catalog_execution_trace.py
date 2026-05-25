@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, NotRequired, TypedDict
 
 from .catalog_tool_backends import (
     TOOL_BACKEND_IMAGE_ANALYSIS,
@@ -12,15 +12,43 @@ from .catalog_tool_backends import (
     tool_execution_backend,
 )
 
+CatalogExecutionTraceStage = Literal[
+    "request_received",
+    "input_validated",
+    "runtime_dispatched",
+    "runtime_warnings",
+    "completed",
+    "failed",
+]
+CatalogExecutionTraceLevel = Literal["info", "warning", "error"]
+
+
+class CatalogExecutionTraceEntry(TypedDict):
+    stage: CatalogExecutionTraceStage
+    level: CatalogExecutionTraceLevel
+    message: str
+    details: NotRequired[dict[str, Any]]
+
+
+class CatalogExecutionWarningSummary(TypedDict):
+    warning_count: int
+    warning_codes: list[str]
+
+
+class CatalogExecutionCompletionDetails(TypedDict, total=False):
+    status_code: int
+    duration_ms: int
+    error: Any
+
 
 def catalog_runtime_log_entry(
-    stage: str,
+    stage: CatalogExecutionTraceStage,
     message: str,
     *,
-    level: str = "info",
+    level: CatalogExecutionTraceLevel = "info",
     details: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    entry: dict[str, Any] = {
+) -> CatalogExecutionTraceEntry:
+    entry: CatalogExecutionTraceEntry = {
         "stage": stage,
         "level": level,
         "message": message,
@@ -66,7 +94,7 @@ def tool_runtime_input_summary(tool: dict[str, Any], input_payload: dict[str, An
     return summary
 
 
-def result_warning_summary(result_payload: dict[str, Any] | None) -> dict[str, Any] | None:
+def result_warning_summary(result_payload: dict[str, Any] | None) -> CatalogExecutionWarningSummary | None:
     if not isinstance(result_payload, dict):
         return None
     warnings = result_payload.get("warnings")
@@ -91,7 +119,7 @@ def build_catalog_tool_runtime_log(
     result_payload: dict[str, Any] | None,
     status_code: int,
     duration_ms: int,
-) -> list[dict[str, Any]]:
+) -> list[CatalogExecutionTraceEntry]:
     spec = tool.get("spec") if isinstance(tool.get("spec"), dict) else {}
     backend = tool_execution_backend(spec) or TOOL_BACKEND_INTERNAL_HTTP
     summary = tool_runtime_input_summary(tool, input_payload)
@@ -124,7 +152,7 @@ def build_catalog_tool_runtime_log(
             )
         )
     ok = result_payload is not None and 200 <= status_code < 300 and not result_payload.get("error")
-    completion_details = {"status_code": status_code, "duration_ms": duration_ms}
+    completion_details: CatalogExecutionCompletionDetails = {"status_code": status_code, "duration_ms": duration_ms}
     if isinstance(result_payload, dict) and result_payload.get("error"):
         completion_details["error"] = result_payload.get("error")
     logs.append(

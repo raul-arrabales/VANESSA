@@ -20,6 +20,10 @@ function humanizeDetailKey(key: string): string {
   return key.replace(/_/g, " ");
 }
 
+function stageLabelKey(stage: string): string {
+  return `catalogControl.tools.runtimeLogStages.${stage}`;
+}
+
 export default function CatalogRuntimeLog({ entries }: CatalogRuntimeLogProps): JSX.Element | null {
   const { t } = useTranslation("common");
   if (!entries.length) {
@@ -37,7 +41,7 @@ export default function CatalogRuntimeLog({ entries }: CatalogRuntimeLogProps): 
               <div className="status-row">
                 <strong>{entry.message}</strong>
                 <span className="platform-badge" data-tone={badgeToneForLevel(entry.level)}>
-                  {entry.stage}
+                  {t(stageLabelKey(entry.stage), { defaultValue: entry.stage })}
                 </span>
               </div>
               {detailRows.length ? (

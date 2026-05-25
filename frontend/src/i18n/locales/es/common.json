@@ -2126,6 +2126,14 @@
       "requestTitle": "Entrada enviada",
       "responseTitle": "Resultado del runtime",
       "runtimeLogTitle": "Log del runtime backend",
+      "runtimeLogStages": {
+        "request_received": "Solicitud recibida",
+        "input_validated": "Entrada validada",
+        "runtime_dispatched": "Runtime enviado",
+        "runtime_warnings": "Advertencias",
+        "completed": "Completado",
+        "failed": "Fallido"
+      },
       "progress": {
         "title": "Probando {{name}}",
         "description": "El runtime esta procesando esta prueba. El dialogo se cerrara y saltara al resultado cuando termine la ejecucion.",
