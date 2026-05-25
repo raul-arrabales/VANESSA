@@ -15,6 +15,7 @@ type LoadState = "idle" | "loading" | "success" | "error";
 type ServiceStatus = "up" | "down" | "unknown";
 type BackendHealthView = "overview" | "logs";
 type StreamState = "idle" | "connecting" | "live" | "disconnected";
+type LogSortOrder = "desc" | "asc";
 
 type ServiceRow = {
   service: string;
@@ -141,6 +142,7 @@ export default function BackendHealthPage(): JSX.Element {
   const [levelFilter, setLevelFilter] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState<LogSortOrder>("desc");
   const architectureContainerRef = useRef<HTMLDivElement | null>(null);
 
   const activeView = resolveBackendHealthView(searchParams.get("view"));
@@ -157,7 +159,7 @@ export default function BackendHealthPage(): JSX.Element {
     const startTimeMs = normalizeFilterDateTime(startTimeFilter);
     const endTimeMs = normalizeFilterDateTime(endTimeFilter);
 
-    return logEntries.filter((entry) => {
+    const filteredEntries = logEntries.filter((entry) => {
       if (levelFilter && entry.level !== levelFilter) {
         return false;
       }
@@ -179,7 +181,24 @@ export default function BackendHealthPage(): JSX.Element {
       }
       return true;
     });
-  }, [endTimeFilter, eventTypeFilter, levelFilter, logEntries, searchFilter, startTimeFilter]);
+
+    return filteredEntries.slice().sort((left, right) => {
+      const leftTime = left.timestamp ? Date.parse(left.timestamp) : Number.NaN;
+      const rightTime = right.timestamp ? Date.parse(right.timestamp) : Number.NaN;
+      if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+        return sortOrder === "desc" ? rightTime - leftTime : leftTime - rightTime;
+      }
+      if (!Number.isNaN(leftTime) && Number.isNaN(rightTime)) {
+        return -1;
+      }
+      if (Number.isNaN(leftTime) && !Number.isNaN(rightTime)) {
+        return 1;
+      }
+      return sortOrder === "desc"
+        ? right.raw.localeCompare(left.raw)
+        : left.raw.localeCompare(right.raw);
+    });
+  }, [endTimeFilter, eventTypeFilter, levelFilter, logEntries, searchFilter, sortOrder, startTimeFilter]);
 
   useEffect(() => {
     if (!architectureContainerRef.current || !architectureSvg) {
@@ -509,6 +528,13 @@ export default function BackendHealthPage(): JSX.Element {
                   {t(`backend.logs.eventType.${eventType}`, { defaultValue: eventType })}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="card-stack">
+            <span className="field-label">{t("backend.logs.filters.sortOrder")}</span>
+            <select className="field-input" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as LogSortOrder)}>
+              <option value="desc">{t("backend.logs.filters.newestFirst")}</option>
+              <option value="asc">{t("backend.logs.filters.oldestFirst")}</option>
             </select>
           </label>
           <label className="card-stack system-log-search-field">

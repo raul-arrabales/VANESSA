@@ -78,6 +78,9 @@ const translate = (key: string, values?: Record<string, string | number>) => {
     "backend.logs.filters.endTime": "End time",
     "backend.logs.filters.level": "Level",
     "backend.logs.filters.eventType": "Event type",
+    "backend.logs.filters.sortOrder": "Order",
+    "backend.logs.filters.newestFirst": "Most recent first",
+    "backend.logs.filters.oldestFirst": "Oldest first",
     "backend.logs.filters.search": "Search",
     "backend.logs.filters.searchPlaceholder": "Filter log lines",
     "backend.logs.filters.allLevels": "All levels",
@@ -248,10 +251,63 @@ describe("BackendHealthPage", () => {
     await screen.findByText("Inspect recent and live log output for Backend.");
     await screen.findByText("Started backend");
     expect(screen.getByText("Disconnected")).toBeVisible();
+    const messageCells = screen.getAllByRole("cell").filter((cell) => cell.textContent?.includes("backend") || cell.textContent?.includes("[ERROR]"));
+    expect(messageCells[0]).toHaveTextContent("Started backend");
 
     await userEvent.selectOptions(screen.getByLabelText("Level"), "error");
     expect(screen.getByText("[ERROR] GET /health failed")).toBeVisible();
     expect(screen.queryByText("Started backend")).toBeNull();
+  });
+
+  it("orders log entries by most recent first by default and can switch to oldest first", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: "ok",
+        services: [{ service: "Backend", container: "backend", target: "http://backend:5000", reachable: true }],
+      }),
+    })));
+    fetchServiceLogServicesMock.mockResolvedValue([{ id: "backend", display_name: "Backend" }]);
+    fetchServiceLogSnapshotMock.mockResolvedValue({
+      service: "backend",
+      display_name: "Backend",
+      tail: 200,
+      entries: [
+        {
+          id: "older-entry",
+          service: "backend",
+          timestamp: "2026-05-25T10:00:00Z",
+          level: "info",
+          event_type: "startup",
+          raw: "2026-05-25T10:00:00Z Older event",
+          message: "Older event",
+        },
+        {
+          id: "newer-entry",
+          service: "backend",
+          timestamp: "2026-05-25T10:01:00Z",
+          level: "info",
+          event_type: "startup",
+          raw: "2026-05-25T10:01:00Z Newer event",
+          message: "Newer event",
+        },
+      ],
+    });
+    streamServiceLogsMock.mockResolvedValue(undefined);
+
+    renderPage("/control/system-health?view=logs&service=backend");
+
+    await screen.findByText("Newer event");
+    let messageCodes = screen.getAllByText(/event$/);
+    expect(messageCodes[0]).toHaveTextContent("Newer event");
+    expect(messageCodes[1]).toHaveTextContent("Older event");
+
+    await userEvent.selectOptions(screen.getByLabelText("Order"), "asc");
+
+    messageCodes = screen.getAllByText(/event$/);
+    expect(messageCodes[0]).toHaveTextContent("Older event");
+    expect(messageCodes[1]).toHaveTextContent("Newer event");
   });
 
   it("shows a clear error state for invalid log-view service ids", async () => {
