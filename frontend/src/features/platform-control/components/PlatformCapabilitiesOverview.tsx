@@ -93,7 +93,7 @@ export default function PlatformCapabilitiesOverview({
                           to={`/control/platform/deployments/${activeDeployment.id}`}
                           label={t("platformControl.actions.openDeploymentFor", { name: activeDeployment.display_name })}
                         >
-                          <ActionIcon name="open" />
+                          <ActionIcon name="deployment" />
                         </IconLink>
                       ) : null}
                     </div>

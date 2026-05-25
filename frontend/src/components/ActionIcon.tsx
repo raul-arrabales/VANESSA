@@ -1,5 +1,6 @@
 export type ActionIconName =
   | "delete"
+  | "deployment"
   | "description"
   | "details"
   | "disable"
@@ -55,6 +56,13 @@ export default function ActionIcon({ name }: { name: ActionIconName }): JSX.Elem
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="M8 4h8l1 2h4v2H3V6h4l1-2Zm1 6h2v8H9v-8Zm4 0h2v8h-2v-8ZM6 10h12l-1 10H7L6 10Z" />
+      </svg>
+    );
+  }
+  if (name === "deployment") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M4 6.5 12 3l8 3.5v4L12 14 4 10.5v-4Zm2 1.31v1.39l6 2.62 6-2.62V7.81L12 10.44 6 7.81ZM4 13.5 12 17l8-3.5v4L12 21l-8-3.5v-4Zm2 1.31v1.39l6 2.62 6-2.62v-1.39L12 17.44l-6-2.63Z" />
       </svg>
     );
   }
