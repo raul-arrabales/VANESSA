@@ -1,4 +1,5 @@
 import { requestJson } from "./modelops/request";
+import type { CatalogExecutionTraceEntry } from "./catalogExecutionTrace";
 
 export type CatalogAgentSpec = {
   name: string;
@@ -248,12 +249,7 @@ export type CatalogToolTestResult = {
     status_code: number;
     ok: boolean;
     result: Record<string, unknown> | null;
-    runtime_log?: Array<{
-      stage: string;
-      level: "info" | "warning" | "error" | string;
-      message: string;
-      details?: Record<string, unknown>;
-    }>;
+    runtime_log?: CatalogExecutionTraceEntry[];
   };
 };
 

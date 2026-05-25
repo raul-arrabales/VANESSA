@@ -711,7 +711,7 @@ describe("CatalogControlPage", () => {
 
   it("opens the test flow from the tools directory and runs the tool with sample input", async () => {
     const user = userEvent.setup();
-    let resolveTest: ((value: catalogApi.CatalogToolTestResult) => void) | null = null;
+    let resolveTest!: (value: catalogApi.CatalogToolTestResult) => void;
     vi.mocked(catalogApi.testCatalogTool).mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -747,7 +747,7 @@ describe("CatalogControlPage", () => {
         "token",
       );
     });
-    resolveTest?.({
+    resolveTest({
       tool: toolFixture,
       execution: {
         input: { query: "OpenAI platform runtime", top_k: 3 },

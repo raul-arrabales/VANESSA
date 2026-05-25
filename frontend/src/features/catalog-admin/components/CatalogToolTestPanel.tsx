@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import ModalDialog from "../../../components/ModalDialog";
 import type { CatalogTool, CatalogToolTestResult } from "../../../api/catalog";
 import { catalogToolBackendLabelKey } from "../catalogToolBackends";
+import { executionTraceEntries } from "../catalogExecutionTrace";
+import { useCatalogToolTestProgress } from "../hooks/useCatalogToolTestProgress";
 import type { ToolTestFormState } from "../hooks/useCatalogToolTesting";
+import CatalogRuntimeLog from "./CatalogRuntimeLog";
+import CatalogToolTestProgressDialog, { catalogToolTestProgressStageCount } from "./CatalogToolTestProgressDialog";
 
 type CatalogToolTestPanelProps = {
   tool: CatalogTool | null;
   form: ToolTestFormState;
   testing: boolean;
-  elapsedMs: number;
   errorMessage: string;
   result: CatalogToolTestResult | null;
   onChange: (value: ToolTestFormState) => void;
@@ -65,66 +67,10 @@ function imagePayloadFromResult(value: unknown): ImagePayload | null {
   return { data_base64: dataBase64, mime_type: mimeType };
 }
 
-type ToolTestStage = {
-  id: string;
-  label: string;
-  detail: string;
-};
-
-function toolTestStages(tool: CatalogTool | null, t: (key: string, options?: Record<string, unknown>) => string): ToolTestStage[] {
-  const backend = tool?.spec.execution_backend;
-  const runtimeLabel = backend
-    ? t(`catalogControl.executionBackend.${catalogToolBackendLabelKey(backend)}`)
-    : t("catalogControl.tools.progress.runtimeFallback");
-  return [
-    {
-      id: "queued",
-      label: t("catalogControl.tools.progress.queuedLabel"),
-      detail: t("catalogControl.tools.progress.queuedDetail", { name: tool?.spec.name ?? t("catalogControl.tools.testTitle") }),
-    },
-    {
-      id: "validated",
-      label: t("catalogControl.tools.progress.validatedLabel"),
-      detail: t("catalogControl.tools.progress.validatedDetail"),
-    },
-    {
-      id: "runtime",
-      label: t("catalogControl.tools.progress.runtimeLabel"),
-      detail: t("catalogControl.tools.progress.runtimeDetail", { runtime: runtimeLabel }),
-    },
-    {
-      id: "waiting",
-      label: t("catalogControl.tools.progress.waitingLabel"),
-      detail: t("catalogControl.tools.progress.waitingDetail"),
-    },
-  ];
-}
-
-function activeToolTestStageIndex(elapsedMs: number, stageCount: number): number {
-  if (stageCount <= 1) {
-    return 0;
-  }
-  if (elapsedMs < 800) {
-    return 0;
-  }
-  if (elapsedMs < 1800) {
-    return Math.min(1, stageCount - 1);
-  }
-  if (elapsedMs < 3600) {
-    return Math.min(2, stageCount - 1);
-  }
-  return stageCount - 1;
-}
-
-function runtimeLogLines(result: CatalogToolTestResult | null): Array<{ stage: string; level: string; message: string; details?: Record<string, unknown> }> {
-  return Array.isArray(result?.execution.runtime_log) ? result.execution.runtime_log : [];
-}
-
 export default function CatalogToolTestPanel({
   tool,
   form,
   testing,
-  elapsedMs,
   errorMessage,
   result,
   onChange,
@@ -136,13 +82,12 @@ export default function CatalogToolTestPanel({
   const supportsPlateLogoUploads = tool?.id === "tool.image_plate_logo_replacement";
   const resultImage = imagePayloadFromResult(result?.execution.result);
   const resultImageSrc = resultImage ? `data:${resultImage.mime_type};base64,${resultImage.data_base64}` : "";
-  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
-  const stages = useMemo(() => toolTestStages(tool, t), [tool, t]);
-  const activeStageIndex = activeToolTestStageIndex(elapsedMs, stages.length);
-  const progressPercent = stages.length > 1
-    ? Math.round((activeStageIndex / (stages.length - 1)) * 100)
-    : 100;
-  const runtimeLogs = runtimeLogLines(result);
+  const runtimeLogs = executionTraceEntries(result?.execution.runtime_log);
+  const progress = useCatalogToolTestProgress({
+    testing,
+    traceEntries: runtimeLogs,
+    stageCount: catalogToolTestProgressStageCount(),
+  });
 
   useEffect(() => {
     if (!result || testing) {
@@ -152,14 +97,6 @@ export default function CatalogToolTestPanel({
       resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [result, testing]);
-
-  useEffect(() => {
-    if (testing) {
-      setIsProgressModalOpen(true);
-      return;
-    }
-    setIsProgressModalOpen(false);
-  }, [testing]);
 
   const handleImageUpload = async (file: File | undefined): Promise<void> => {
     if (!file) {
@@ -204,54 +141,14 @@ export default function CatalogToolTestPanel({
 
   return (
     <article className="panel card-stack">
-      {testing && isProgressModalOpen ? (
-        <ModalDialog
-          className="catalog-tool-test-progress-modal"
-          title={t("catalogControl.tools.progress.title", { name: tool?.spec.name ?? t("catalogControl.tools.testTitle") })}
-          description={t("catalogControl.tools.progress.description")}
-          onClose={() => setIsProgressModalOpen(false)}
-          actions={(
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsProgressModalOpen(false)}
-            >
-              {t("catalogControl.tools.progress.exit")}
-            </button>
-          )}
-        >
-          <div className="catalog-tool-test-progress">
-            <div className="catalog-tool-test-progress-hero" aria-hidden="true">
-              <span className="catalog-tool-test-progress-orbit" />
-              <span className="catalog-tool-test-progress-core" />
-            </div>
-            <div className="catalog-tool-test-progress-meter" aria-label={t("catalogControl.tools.progress.barLabel")}>
-              <div className="catalog-tool-test-progress-meter-track">
-                <div
-                  className="catalog-tool-test-progress-meter-fill"
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
-              <span className="catalog-tool-test-progress-meter-text">
-                {t("catalogControl.tools.progress.elapsed", { seconds: (elapsedMs / 1000).toFixed(1) })}
-              </span>
-            </div>
-            <ol className="catalog-tool-test-progress-stage-list">
-              {stages.map((stage, index) => {
-                const state = index < activeStageIndex ? "done" : index === activeStageIndex ? "active" : "pending";
-                return (
-                  <li key={stage.id} className="catalog-tool-test-progress-stage" data-state={state}>
-                    <span className="catalog-tool-test-progress-stage-icon" aria-hidden="true" />
-                    <div className="card-stack">
-                      <strong>{stage.label}</strong>
-                      <span className="status-text">{stage.detail}</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        </ModalDialog>
+      {testing && progress.isProgressModalOpen ? (
+        <CatalogToolTestProgressDialog
+          tool={tool}
+          elapsedMs={progress.elapsedMs}
+          activeStageIndex={progress.activeStageIndex}
+          progressPercent={progress.progressPercent}
+          onDismiss={progress.dismissProgressModal}
+        />
       ) : null}
       <div className="status-row">
         <div className="card-stack">
@@ -328,11 +225,11 @@ export default function CatalogToolTestPanel({
           {errorMessage || t("catalogControl.tools.testHelper")}
         </span>
         <div className="form-actions">
-          {testing && !isProgressModalOpen ? (
+          {testing && !progress.isProgressModalOpen ? (
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setIsProgressModalOpen(true)}
+              onClick={progress.openProgressModal}
             >
               {t("catalogControl.tools.progress.reopen")}
             </button>
@@ -376,26 +273,7 @@ export default function CatalogToolTestPanel({
             <span className="field-label">{t("catalogControl.tools.responseTitle")}</span>
             <pre className="code-block">{stringifyJson(result.execution.result)}</pre>
           </div>
-          {runtimeLogs.length ? (
-            <div className="card-stack">
-              <span className="field-label">{t("catalogControl.tools.runtimeLogTitle")}</span>
-              <div className="catalog-tool-runtime-log" data-testid="catalog-tool-runtime-log">
-                {runtimeLogs.map((entry, index) => (
-                  <div key={`${entry.stage}-${index}`} className="catalog-tool-runtime-log-entry" data-level={entry.level}>
-                    <div className="status-row">
-                      <strong>{entry.message}</strong>
-                      <span className="platform-badge" data-tone={entry.level === "error" ? "required" : entry.level === "warning" ? "pending" : "enabled"}>
-                        {entry.stage}
-                      </span>
-                    </div>
-                    {entry.details ? (
-                      <pre className="code-block">{stringifyJson(entry.details)}</pre>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
+          <CatalogRuntimeLog entries={runtimeLogs} />
         </div>
       ) : null}
     </article>
