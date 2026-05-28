@@ -20,7 +20,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
   const { t } = useTranslation("common");
   const navigate = useNavigate();
   const location = useLocation();
-  const { token } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const { showErrorFeedback } = useActionFeedback();
   const [projects, setProjects] = useState<AgentProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
   useRouteActionFeedback(location.state);
 
   useEffect(() => {
-    if (!token) {
+    if (!isAuthenticated || !token) {
       setLoading(false);
       return;
     }
@@ -48,9 +48,10 @@ export function useAgentProjects(): UseAgentProjectsResult {
           if (current.retrievalContext.trim()) {
             return current;
           }
+          const retrievalContext = defaultsPayload.agent?.runtime_prompts?.retrieval_context ?? "";
           return {
             ...current,
-            retrievalContext: defaultsPayload.agent.runtime_prompts.retrieval_context,
+            retrievalContext,
           };
         });
       } catch (error) {
@@ -60,7 +61,7 @@ export function useAgentProjects(): UseAgentProjectsResult {
       }
     };
     void load();
-  }, [t, token]);
+  }, [isAuthenticated, t, token]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();

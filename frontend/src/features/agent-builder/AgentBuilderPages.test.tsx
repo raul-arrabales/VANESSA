@@ -7,7 +7,6 @@ import { renderWithAppProviders } from "../../test/renderWithAppProviders";
 import AgentBuilderProjectsPage from "./pages/AgentBuilderProjectsPage";
 import AgentProjectDetailPage from "./pages/AgentProjectDetailPage";
 import * as agentProjectsApi from "../../api/agentProjects";
-import * as catalogApi from "../../api/catalog";
 
 let mockUser: AuthUser | null = null;
 
@@ -16,20 +15,18 @@ vi.mock("../../auth/AuthProvider", () => ({
     user: mockUser,
     token: mockUser ? "token" : "",
     isAuthenticated: Boolean(mockUser),
+    isLoading: false,
   }),
 }));
 
 vi.mock("../../api/agentProjects", () => ({
   listAgentProjects: vi.fn(),
+  getAgentProjectDefaults: vi.fn(),
   createAgentProject: vi.fn(),
   getAgentProject: vi.fn(),
   updateAgentProject: vi.fn(),
   validateAgentProject: vi.fn(),
   publishAgentProject: vi.fn(),
-}));
-
-vi.mock("../../api/catalog", () => ({
-  getCatalogDefaults: vi.fn(),
 }));
 
 const apiRetrievalDefault = "Use API retrieval defaults for project agents.";
@@ -65,7 +62,7 @@ describe("Agent builder pages", () => {
       role: "user",
       is_active: true,
     };
-    vi.mocked(catalogApi.getCatalogDefaults).mockResolvedValue({
+    vi.mocked(agentProjectsApi.getAgentProjectDefaults).mockResolvedValue({
       agent: { runtime_prompts: { retrieval_context: apiRetrievalDefault } },
     });
     vi.mocked(agentProjectsApi.listAgentProjects).mockResolvedValue([projectFixture]);

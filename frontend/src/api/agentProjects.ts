@@ -86,7 +86,8 @@ export async function listAgentProjects(token: string): Promise<AgentProject[]> 
 }
 
 export async function getAgentProjectDefaults(token: string): Promise<AgentProjectDefaults> {
-  return requestJson<AgentProjectDefaults>("/v1/catalog/defaults", { token });
+  const result = await requestJson<{ defaults: AgentProjectDefaults }>("/v1/catalog/defaults", { token });
+  return result.defaults;
 }
 
 export async function createAgentProject(input: AgentProjectMutationInput, token: string): Promise<AgentProject> {
