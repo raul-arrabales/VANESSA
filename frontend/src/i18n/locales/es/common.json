@@ -2157,6 +2157,9 @@
         "userAgents": "Agentes de usuario",
         "create": "Crear agente"
       },
+      "userProjects": {
+        "workflowInstructionsDisabled": "Los agentes Workflow no usan instrucciones. Siempre ejecutan los pasos definidos del flujo en secuencia."
+      },
       "deleteDialog": {
         "title": "Eliminar agente de usuario",
         "message": "¿Eliminar {{name}}? Esto elimina el agente del catalogo y sus versiones.",

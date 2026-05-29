@@ -37,7 +37,7 @@ type UseUserAgentProjectsControlResult = {
   refresh: () => Promise<void>;
 };
 
-export function useUserAgentProjectsControl(token: string): UseUserAgentProjectsControlResult {
+export function useUserAgentProjectsControl(token: string, existingAgentNames: string[] = []): UseUserAgentProjectsControlResult {
   const { t } = useTranslation("common");
   const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
   const [projects, setProjects] = useState<AgentProject[]>([]);
@@ -46,9 +46,30 @@ export function useUserAgentProjectsControl(token: string): UseUserAgentProjects
   const [validatingProjectId, setValidatingProjectId] = useState("");
   const [publishingProjectId, setPublishingProjectId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [form, setForm] = useState<AgentProjectFormState>(() => buildDefaultAgentProjectForm(null));
+  const [form, setForm] = useState<AgentProjectFormState>(() => buildDefaultAgentProjectForm(null, { existingAgentNames }));
   const [validations, setValidations] = useState<Record<string, AgentProjectValidation>>({});
   const [publishResults, setPublishResults] = useState<Record<string, AgentProjectPublishResult>>({});
+
+  const buildCreateDefaults = (projectList: AgentProject[]): AgentProjectFormState => buildDefaultAgentProjectForm(null, {
+    existingProjectIds: projectList.map((project) => project.id),
+    existingAgentNames: [...existingAgentNames, ...projectList.map((project) => project.spec.name)],
+  });
+  const isUntouchedGeneratedDraft = (current: AgentProjectFormState): boolean => (
+    current.agentType === "workflow"
+    && current.visibility === "private"
+    && current.description === "Executes a deterministic MCP workflow in the Vanessa WebApp chat."
+    && current.instructions === ""
+    && current.defaultModelRef === ""
+    && current.selectedMcpServerSlug === ""
+    && current.selectedToolName === ""
+    && current.stepName === ""
+    && current.stepArgumentsText === "{}"
+    && current.toolPolicyText === "{\n  \"allow_user_tools\": false\n}"
+    && current.internetRequired === false
+    && current.sandboxRequired === false
+    && current.id.startsWith("workflow-agent")
+    && current.name.startsWith("Workflow Agent")
+  );
 
   const refresh = async (): Promise<void> => {
     if (!token) {
@@ -60,6 +81,15 @@ export function useUserAgentProjectsControl(token: string): UseUserAgentProjects
     try {
       const listed = await listAgentProjects(token);
       setProjects(listed);
+      setForm((current) => {
+        if (selectedProjectId) {
+          return current;
+        }
+        if (!isUntouchedGeneratedDraft(current)) {
+          return current;
+        }
+        return buildCreateDefaults(listed);
+      });
     } catch (error) {
       showErrorFeedback(error, t("catalogControl.agents.userProjects.loadFailed"));
     } finally {
@@ -74,7 +104,7 @@ export function useUserAgentProjectsControl(token: string): UseUserAgentProjects
   const selectProject = (project: AgentProject | null): void => {
     if (!project) {
       setSelectedProjectId(null);
-      setForm(buildDefaultAgentProjectForm(null));
+      setForm(buildCreateDefaults(projects));
       return;
     }
     setSelectedProjectId(project.id);
@@ -83,7 +113,7 @@ export function useUserAgentProjectsControl(token: string): UseUserAgentProjects
 
   const resetForm = (): void => {
     setSelectedProjectId(null);
-    setForm(buildDefaultAgentProjectForm(null));
+    setForm(buildCreateDefaults(projects));
   };
 
   const submitForm = async (): Promise<AgentProject | null> => {

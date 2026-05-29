@@ -2201,6 +2201,7 @@
         "workflowTool": "Exposed tool name",
         "workflowStepName": "Step name",
         "workflowArguments": "Step arguments JSON",
+        "workflowInstructionsDisabled": "Workflow agents do not use instructions. They always execute the defined workflow steps in sequence.",
         "selectMcp": "Select an MCP server",
         "save": "Save user agent",
         "publish": "Publish app",

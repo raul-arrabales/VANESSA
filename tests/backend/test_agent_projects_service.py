@@ -103,7 +103,7 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
             "visibility": "private",
             "name": "Support Agent",
             "description": "Handles support workflows.",
-            "instructions": "Be helpful.",
+            "instructions": "",
             "default_model_ref": None,
             "tool_refs": [],
             "mcp_server_refs": [],
@@ -117,6 +117,7 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
     )
 
     assert created_specs[0]["runtime_prompts"] == default_agent_runtime_prompts()
+    assert created_specs[0]["instructions"] == ""
     assert project["spec"]["runtime_prompts"] == default_agent_runtime_prompts()
 
 

@@ -612,18 +612,29 @@ describe("CatalogControlPage", () => {
     const subNav = await screen.findByRole("navigation", { name: "Agent catalog sections" });
     expect(within(subNav).getByRole("link", { name: "Create agent" })).toHaveAttribute("aria-current", "page");
 
-    await user.type(screen.getByLabelText("Agent ID"), "agent.beta");
-    await user.type(screen.getByLabelText("Name"), "Agent Beta");
+    expect(screen.getByLabelText("Agent ID")).toHaveValue("workflow-agent");
+    expect(screen.getByLabelText("Agent ID")).toBeDisabled();
+    expect(screen.getByLabelText("Name")).toHaveValue("Workflow Agent");
+    expect(screen.getByLabelText("Description")).toHaveValue("Executes a deterministic MCP workflow in the Vanessa WebApp chat.");
+    expect(screen.getByLabelText("Instructions")).toBeDisabled();
+    expect(screen.getByLabelText("Instructions")).toHaveValue(
+      "Workflow agents do not use instructions. They always execute the defined workflow steps in sequence.",
+    );
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Workflow Agent Support");
+    await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
-    await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
     await user.selectOptions(screen.getByLabelText("MCP server"), "web_search");
     await user.click(screen.getByRole("button", { name: "Save user agent" }));
 
     await waitFor(() => {
       expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: "agent.beta",
-          name: "Agent Beta",
+          id: "workflow-agent",
+          name: "Workflow Agent Support",
+          description: "Catalog agent",
+          instructions: "",
           agent_type: "workflow",
           channel_type: "vanessa_webapp",
           interface_type: "chat",

@@ -82,6 +82,10 @@ export default function CatalogControlPage(): JSX.Element {
     publishedTools,
     enabledMcpServers,
   } = useCatalogControl(token);
+  const allCatalogAgentNames = useMemo(
+    () => agents.map((agent) => agent.spec.name),
+    [agents],
+  );
   const {
     projects: userAgentProjects,
     loading: userAgentProjectsLoading,
@@ -96,7 +100,7 @@ export default function CatalogControlPage(): JSX.Element {
     submitForm,
     validateProject,
     publishProject,
-  } = useUserAgentProjectsControl(token);
+  } = useUserAgentProjectsControl(token, allCatalogAgentNames);
   const selectedTestTool = tools.find((tool) => tool.id === activeToolId) ?? null;
   const platformAgents = useMemo(
     () => agents.filter((agent) => agent.is_platform_agent || agent.agent_kind === "platform"),

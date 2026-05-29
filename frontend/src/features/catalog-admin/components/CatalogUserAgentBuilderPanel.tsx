@@ -25,6 +25,7 @@ export default function CatalogUserAgentBuilderPanel({
   onReset,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
+  const instructionsDisabled = form.agentType === "workflow";
   const selectedMcpServer = useMemo(
     () => mcpServers.find((server) => server.spec.slug === form.selectedMcpServerSlug) ?? null,
     [form.selectedMcpServerSlug, mcpServers],
@@ -70,7 +71,7 @@ export default function CatalogUserAgentBuilderPanel({
           <div className="form-grid">
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.forms.agent.id")}</span>
-              <input className="field-input" value={form.id} onChange={(event) => onChange({ ...form, id: event.currentTarget.value })} />
+              <input className="field-input" value={form.id} disabled />
             </label>
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.forms.agent.name")}</span>
@@ -91,7 +92,12 @@ export default function CatalogUserAgentBuilderPanel({
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.instructions")}</span>
-            <textarea className="field-input form-textarea" value={form.instructions} onChange={(event) => onChange({ ...form, instructions: event.currentTarget.value })} />
+            <textarea
+              className="field-input form-textarea"
+              value={instructionsDisabled ? t("catalogControl.agents.userProjects.workflowInstructionsDisabled") : form.instructions}
+              onChange={(event) => onChange({ ...form, instructions: event.currentTarget.value })}
+              disabled={instructionsDisabled}
+            />
           </label>
           <label className="card-stack">
             <span className="field-label">{t("catalogControl.forms.agent.defaultModel")}</span>

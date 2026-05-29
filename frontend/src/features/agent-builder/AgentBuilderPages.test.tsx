@@ -95,8 +95,11 @@ describe("Agent builder pages", () => {
 
     await renderWithAppProviders(<AgentBuilderProjectsPage />, { route: "/agent-builder" });
 
+    await user.clear(screen.getByLabelText("Project ID"));
     await user.type(screen.getByLabelText("Project ID"), "proj-1");
+    await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Support Agent");
+    await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Handles support workflows.");
     await user.type(screen.getByLabelText("Instructions"), "Be helpful.");
     expect(screen.getByLabelText("Retrieval instructions")).toHaveValue(apiRetrievalDefault);

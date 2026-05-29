@@ -322,8 +322,6 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_name", "name is required")
     if not description:
         raise AgentProjectError("invalid_description", "description is required")
-    if not instructions:
-        raise AgentProjectError("invalid_instructions", "instructions is required")
     try:
         coerced_runtime_prompts = coerce_agent_runtime_prompts(
             payload.get("runtime_prompts"),
@@ -350,6 +348,8 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_agent_type", str(exc)) from exc
     if agent_type not in CREATABLE_USER_AGENT_TYPES:
         raise AgentProjectError("unsupported_agent_type", f"agent_type '{agent_type}' is not supported yet")
+    if agent_type != "workflow" and not instructions:
+        raise AgentProjectError("invalid_instructions", "instructions is required")
     try:
         channel_type = coerce_channel_type(payload.get("channel_type"))
     except ValueError as exc:
