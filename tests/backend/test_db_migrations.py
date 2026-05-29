@@ -139,6 +139,40 @@ def test_run_context_management_schema_migration_executes_context_sql(monkeypatc
     assert executed_sql == ["-- migration 012", "-- migration 013", "-- migration 014", "-- migration 016"]
 
 
+def test_run_agent_projects_schema_migration_executes_base_and_additive_sql(monkeypatch):
+    executed_sql: list[str] = []
+
+    class _RecordingCursor(_FakeCursor):
+        def execute(self, query, _params=None):
+            executed_sql.append(str(query))
+            return None
+
+    class _RecordingConnection(_FakeConnection):
+        def cursor(self):
+            return _RecordingCursor()
+
+    @contextmanager
+    def _recording_get_connection(_database_url: str) -> Iterator[_RecordingConnection]:
+        yield _RecordingConnection()
+
+    original_read_text = Path.read_text
+
+    def _fake_read_text(self: Path, encoding: str = "utf-8") -> str:
+        del encoding
+        if self.name == "015_agent_projects.sql":
+            return "-- migration 015"
+        if self.name == "018_user_agent_apps.sql":
+            return "-- migration 018"
+        return original_read_text(self, encoding="utf-8")
+
+    monkeypatch.setattr(db, "get_connection", _recording_get_connection)
+    monkeypatch.setattr(Path, "read_text", _fake_read_text)
+
+    db.run_agent_projects_schema_migration("postgresql://ignored")
+
+    assert executed_sql == ["-- migration 015", "-- migration 018"]
+
+
 def test_platform_binding_resources_migration_guards_legacy_copy_when_table_absent():
     migration_file = (
         Path(__file__).resolve().parents[2]
