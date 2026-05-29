@@ -322,8 +322,12 @@ export function useCatalogControl(token: string) {
 
   const loadCatalogState = useCallback(async (): Promise<void> => {
     if (!token) {
-      setState("error");
-      setErrorMessage(t("catalogControl.feedback.authRequired"));
+      setState("idle");
+      setErrorMessage("");
+      setAgents([]);
+      setTools([]);
+      setMcpServers([]);
+      setModels([]);
       return;
     }
 

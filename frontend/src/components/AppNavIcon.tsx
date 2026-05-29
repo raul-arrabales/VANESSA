@@ -3,6 +3,7 @@ export type AppNavIconName =
   | "profile"
   | "register"
   | "vanessa"
+  | "apps"
   | "approvals"
   | "health"
   | "settings"
@@ -34,6 +35,11 @@ const iconByName: Record<AppNavIconName, JSX.Element> = {
   vanessa: (
     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
       <path d="M4 5h3.1L12 16.36 16.9 5H20l-6.62 14h-2.76L4 5Z" />
+    </svg>
+  ),
+  apps: (
+    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+      <path d="M5 4h6v6H5V4Zm8 0h6v6h-6V4ZM5 12h6v8H5v-8Zm8 3h6v5h-6v-5Zm1-2V9h4v4h-4Z" />
     </svg>
   ),
   approvals: (

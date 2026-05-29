@@ -193,7 +193,7 @@ export const appRoutes: AppRouteDefinition[] = [
     navGroup: "primary",
     navAudience: "authenticated",
     sidebar: {
-      icon: "ai",
+      icon: "apps",
       order: 40,
       labelKey: "nav.apps",
     },

@@ -1,3 +1,5 @@
+import { ApiError } from "../auth/authApi";
+import { readStoredToken } from "../auth/storage";
 import { requestJson } from "./modelops/request";
 
 export type AgentProjectVisibility = "private" | "unlisted" | "public";
@@ -91,49 +93,64 @@ export type AgentProjectDefaults = {
   };
 };
 
-export async function listAgentProjects(token: string): Promise<AgentProject[]> {
-  const result = await requestJson<{ agent_projects: AgentProject[] }>("/v1/agent-projects", { token });
+function requireToken(token?: string): string {
+  const activeToken = token || readStoredToken();
+  if (!activeToken) {
+    throw new ApiError("Authentication required", 401, "missing_auth");
+  }
+  return activeToken;
+}
+
+export async function listAgentProjects(token?: string): Promise<AgentProject[]> {
+  const result = await requestJson<{ agent_projects: AgentProject[] }>("/v1/agent-projects", {
+    token: requireToken(token),
+  });
   return result.agent_projects;
 }
 
-export async function getAgentProjectDefaults(token: string): Promise<AgentProjectDefaults> {
-  const result = await requestJson<{ defaults: AgentProjectDefaults }>("/v1/catalog/defaults", { token });
+export async function getAgentProjectDefaults(token?: string): Promise<AgentProjectDefaults> {
+  const result = await requestJson<{ defaults: AgentProjectDefaults }>("/v1/catalog/defaults", {
+    token: requireToken(token),
+  });
   return result.defaults;
 }
 
-export async function createAgentProject(input: AgentProjectMutationInput, token: string): Promise<AgentProject> {
+export async function createAgentProject(input: AgentProjectMutationInput, token?: string): Promise<AgentProject> {
   const result = await requestJson<{ agent_project: AgentProject }>("/v1/agent-projects", {
     method: "POST",
-    token,
+    token: requireToken(token),
     body: input,
   });
   return result.agent_project;
 }
 
-export async function getAgentProject(projectId: string, token: string): Promise<AgentProject> {
-  const result = await requestJson<{ agent_project: AgentProject }>(`/v1/agent-projects/${encodeURIComponent(projectId)}`, { token });
+export async function getAgentProject(projectId: string, token?: string): Promise<AgentProject> {
+  const result = await requestJson<{ agent_project: AgentProject }>(
+    `/v1/agent-projects/${encodeURIComponent(projectId)}`,
+    { token: requireToken(token) },
+  );
   return result.agent_project;
 }
 
-export async function updateAgentProject(projectId: string, input: AgentProjectMutationInput, token: string): Promise<AgentProject> {
+export async function updateAgentProject(projectId: string, input: AgentProjectMutationInput, token?: string): Promise<AgentProject> {
   const result = await requestJson<{ agent_project: AgentProject }>(`/v1/agent-projects/${encodeURIComponent(projectId)}`, {
     method: "PUT",
-    token,
+    token: requireToken(token),
     body: input,
   });
   return result.agent_project;
 }
 
-export async function validateAgentProject(projectId: string, token: string): Promise<AgentProjectValidation> {
+export async function validateAgentProject(projectId: string, token?: string): Promise<AgentProjectValidation> {
   return requestJson<AgentProjectValidation>(`/v1/agent-projects/${encodeURIComponent(projectId)}/validate`, {
     method: "POST",
-    token,
+    token: requireToken(token),
   });
 }
 
-export async function publishAgentProject(projectId: string, token: string): Promise<AgentProjectPublishResult> {
+export async function publishAgentProject(projectId: string, token?: string): Promise<AgentProjectPublishResult> {
   return requestJson<AgentProjectPublishResult>(`/v1/agent-projects/${encodeURIComponent(projectId)}/publish`, {
     method: "POST",
-    token,
+    token: requireToken(token),
   });
 }

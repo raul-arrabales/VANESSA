@@ -16,6 +16,7 @@ vi.mock("../auth/AuthProvider", () => ({
     user: mockUser,
     token: mockUser ? "token" : "",
     isAuthenticated: Boolean(mockUser),
+    isLoading: false,
   }),
 }));
 
@@ -561,6 +562,18 @@ describe("CatalogControlPage", () => {
         result: { results: [{ title: "Example result" }] },
       },
     });
+  });
+
+  it("stays idle while auth is unavailable instead of surfacing an auth load error", async () => {
+    mockUser = null;
+
+    await renderPage();
+
+    await waitFor(() => {
+      expect(catalogApi.listCatalogAgents).not.toHaveBeenCalled();
+      expect(agentProjectsApi.listAgentProjects).not.toHaveBeenCalled();
+    });
+    expect(screen.queryByText("Authentication required")).not.toBeInTheDocument();
   });
 
   it("loads the overview dashboard with first-level navigation", async () => {
