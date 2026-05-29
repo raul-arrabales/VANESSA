@@ -41,12 +41,17 @@ def list_conversation_summaries(
     *,
     owner_user_id: int,
     conversation_kind: str = PLAIN_CONVERSATION_KIND,
+    assistant_ref: str | None = None,
     title_query: str | None = None,
     updated_from: date | None = None,
     updated_to: date | None = None,
 ) -> list[dict[str, Any]]:
     clauses = ["c.owner_user_id = %s", "c.conversation_kind = %s"]
     params: list[object] = [owner_user_id, conversation_kind]
+
+    if assistant_ref:
+        clauses.append("c.assistant_ref = %s")
+        params.append(assistant_ref)
 
     if title_query:
         clauses.append("c.title ILIKE %s")

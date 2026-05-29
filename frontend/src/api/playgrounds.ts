@@ -146,6 +146,7 @@ export type PlaygroundSessionFilters = {
   titleQuery?: string;
   updatedFrom?: string;
   updatedTo?: string;
+  assistantRef?: string;
 };
 
 function stringOrNull(value: unknown): string | null | undefined {
@@ -307,6 +308,9 @@ export async function listPlaygroundSessions(
   }
   if (filters.updatedTo) {
     params.set("updated_to", filters.updatedTo);
+  }
+  if (filters.assistantRef?.trim()) {
+    params.set("assistant_ref", filters.assistantRef.trim());
   }
   const result = await requestJson<{ sessions: PlaygroundSessionSummary[] }>(
     `/v1/playgrounds/sessions?${params.toString()}`,

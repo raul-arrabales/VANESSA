@@ -81,7 +81,7 @@ Agent-project semantics:
 
 - This is the builder-facing authoring surface for `workflow_definition`, `tool_policy`, validation, and publish flows.
 - Runtime `catalog` entities remain the admin/runtime surface; publish compiles agent projects into catalog-managed artifacts.
-- The frontend builder workspace now lives under `/agent-builder`, while superadmin catalog administration remains at `/control/catalog`.
+- User-agent authoring now lives under `/control/catalog?section=agents`, while published Vanessa WebApp chat agents are exposed to signed-in users through `/apps`.
 
 ## Platform Control Plane
 

@@ -64,7 +64,10 @@ export function usePlaygroundSessions({
     const loadHistory = async (): Promise<void> => {
       setIsHistoryLoading(true);
       try {
-        const listed = await listPlaygroundSessions(config.playgroundKind, token, sessionFilters);
+        const listed = await listPlaygroundSessions(config.playgroundKind, token, {
+          ...sessionFilters,
+          assistantRef: config.fixedAssistantRef ?? sessionFilters.assistantRef,
+        });
         if (cancelled) {
           return;
         }

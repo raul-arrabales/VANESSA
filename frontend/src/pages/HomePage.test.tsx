@@ -286,6 +286,6 @@ describe("HomePage quote of the day", () => {
     expect(screen.queryByRole("link", { name: "View profile" })).toBeNull();
     expect(screen.getByRole("link", { name: "Control Panel" })).toHaveAttribute("href", "/control");
     expect(screen.getByRole("link", { name: "AI Playground" })).toHaveAttribute("href", "/playgrounds");
-    expect(screen.getByRole("link", { name: "Agent Builder" })).toHaveAttribute("href", "/agent-builder");
+    expect(screen.getByRole("link", { name: "Apps" })).toHaveAttribute("href", "/apps");
   });
 });

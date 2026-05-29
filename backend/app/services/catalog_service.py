@@ -58,6 +58,15 @@ from .catalog_tool_backends import (
 )
 from .platform_service import resolve_mcp_runtime_adapter, resolve_sandbox_execution_adapter, resolve_web_search_adapter
 from .platform_types import PlatformControlPlaneError
+from .user_agent_types import (
+    CHANNEL_TYPE_VANESSA_WEBAPP,
+    INTERFACE_TYPE_CHAT,
+    coerce_channel_type,
+    coerce_interface_type,
+    coerce_user_agent_type,
+    normalize_workflow_definition,
+    workflow_step_server_slugs,
+)
 
 _ENTITY_TYPE_AGENT = "agent"
 _ENTITY_TYPE_TOOL = "tool"
@@ -820,8 +829,9 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
         if not offline_compatible:
             derived_runtime_requirements["internet_required"] = True
 
-    for mcp_ref in spec.get("mcp_server_refs", []):
-        slug = str(mcp_ref).strip()
+    configured_mcp_refs = {str(value).strip() for value in spec.get("mcp_server_refs", []) if str(value).strip()}
+    workflow_mcp_refs = set(workflow_step_server_slugs(spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}))
+    for slug in sorted(configured_mcp_refs | workflow_mcp_refs):
         if not slug:
             continue
         mcp_server = _find_mcp_server_by_slug(database_url, slug)
@@ -845,8 +855,16 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
             derived_runtime_requirements["sandbox_required"] = True
         if not bool(tool_spec.get("offline_compatible", False)):
             derived_runtime_requirements["internet_required"] = True
+        if not bool(mcp_spec.get("enabled", False)):
+            errors.append(f"MCP server '{slug}' is disabled.")
 
     runtime_constraints = spec.get("runtime_constraints") if isinstance(spec.get("runtime_constraints"), dict) else {}
+    if spec.get("agent_type") == "workflow":
+        workflow_steps = spec.get("workflow_definition", {}).get("steps") if isinstance(spec.get("workflow_definition"), dict) else None
+        if not isinstance(workflow_steps, list) or not workflow_steps:
+            errors.append("Workflow agents require at least one workflow step.")
+    if spec.get("channel_type") == CHANNEL_TYPE_VANESSA_WEBAPP and spec.get("interface_type") != INTERFACE_TYPE_CHAT:
+        errors.append("channel_type vanessa_webapp currently requires interface_type chat.")
     if derived_runtime_requirements["sandbox_required"] and not bool(runtime_constraints.get("sandbox_required", False)):
         errors.append("Agent references sandbox tools but runtime_constraints.sandbox_required is false.")
     if derived_runtime_requirements["internet_required"] and not bool(runtime_constraints.get("internet_required", False)):
@@ -936,8 +954,12 @@ def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(spec)
     normalized["runtime_prompts"] = normalize_agent_runtime_prompts(normalized.get("runtime_prompts"))
     normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
+    normalized["agent_type"] = str(normalized.get("agent_type") or "workflow").strip() or "workflow"
+    normalized["channel_type"] = str(normalized.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP).strip() or CHANNEL_TYPE_VANESSA_WEBAPP
+    normalized["interface_type"] = str(normalized.get("interface_type") or INTERFACE_TYPE_CHAT).strip() or INTERFACE_TYPE_CHAT
     normalized["tool_refs"] = list(normalized.get("tool_refs") or [])
     normalized["mcp_server_refs"] = list(normalized.get("mcp_server_refs") or [])
+    normalized["workflow_definition"] = normalize_workflow_definition(normalized.get("workflow_definition"))
     return normalized
 
 
@@ -1317,6 +1339,18 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise CatalogError("invalid_mcp_server_refs", "mcp_server_refs must be an array")
     mcp_server_refs = [str(item).strip() for item in mcp_server_refs_raw if str(item).strip()]
     agent_domain = str(payload.get("agent_domain") or "default").strip() or "default"
+    try:
+        agent_type = coerce_user_agent_type(payload.get("agent_type"))
+    except ValueError as exc:
+        raise CatalogError("invalid_agent_type", str(exc)) from exc
+    try:
+        channel_type = coerce_channel_type(payload.get("channel_type"))
+    except ValueError as exc:
+        raise CatalogError("invalid_channel_type", str(exc)) from exc
+    try:
+        interface_type = coerce_interface_type(payload.get("interface_type"))
+    except ValueError as exc:
+        raise CatalogError("invalid_interface_type", str(exc)) from exc
     runtime_constraints = payload.get("runtime_constraints")
     if not isinstance(runtime_constraints, dict):
         raise CatalogError("invalid_runtime_constraints", "runtime_constraints must be an object")
@@ -1331,8 +1365,14 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         )
     except ValueError as exc:
         raise CatalogError("invalid_runtime_prompts", str(exc)) from exc
+    try:
+        workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
+    except ValueError as exc:
+        raise CatalogError("invalid_workflow_definition", str(exc)) from exc
     default_model_ref_raw = payload.get("default_model_ref")
     default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
+    if channel_type == CHANNEL_TYPE_VANESSA_WEBAPP and interface_type != INTERFACE_TYPE_CHAT:
+        raise CatalogError("invalid_interface_type", "channel_type vanessa_webapp currently requires interface_type chat")
     return {
         "name": name,
         "description": description,
@@ -1342,6 +1382,10 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "tool_refs": tool_refs,
         "mcp_server_refs": mcp_server_refs,
         "agent_domain": agent_domain,
+        "agent_type": agent_type,
+        "channel_type": channel_type,
+        "interface_type": interface_type,
+        "workflow_definition": workflow_definition,
         "runtime_constraints": {
             "internet_required": bool(runtime_constraints["internet_required"]),
             "sandbox_required": bool(runtime_constraints["sandbox_required"]),

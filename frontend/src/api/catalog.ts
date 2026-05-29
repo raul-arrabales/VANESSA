@@ -12,6 +12,18 @@ export type CatalogAgentSpec = {
   tool_refs: string[];
   mcp_server_refs?: string[];
   agent_domain?: string;
+  agent_type?: "workflow" | "planner" | "react";
+  channel_type?: "vanessa_webapp";
+  interface_type?: "chat";
+  workflow_definition?: {
+    steps: Array<{
+      id: string;
+      name: string;
+      mcp_server_slug: string;
+      exposed_tool_name: string;
+      arguments: Record<string, unknown>;
+    }>;
+  };
   runtime_constraints: {
     internet_required: boolean;
     sandbox_required: boolean;

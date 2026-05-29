@@ -91,6 +91,7 @@ export type PlaygroundWorkspaceConfig = {
     missingKnowledgeBase: string;
   };
   defaultAssistantRef?: string | null;
+  fixedAssistantRef?: string | null;
 };
 
 export type PlaygroundWorkspaceOptions = {

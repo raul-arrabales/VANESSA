@@ -12,8 +12,8 @@ const ControlShellPage = lazy(() => import("../features/control-shell/pages/Cont
 const AdminApprovalsPage = lazy(() => import("../features/admin-approvals/pages/AdminApprovalsPage"));
 const QuoteManagementPage = lazy(() => import("../features/quote-management/pages/QuoteManagementPage"));
 const CatalogControlPage = lazy(() => import("../features/catalog-admin/pages/CatalogControlPage"));
-const AgentBuilderProjectsPage = lazy(() => import("../features/agent-builder/pages/AgentBuilderProjectsPage"));
-const AgentProjectDetailPage = lazy(() => import("../features/agent-builder/pages/AgentProjectDetailPage"));
+const AppsHomePage = lazy(() => import("../features/apps/pages/AppsHomePage"));
+const AppDetailPage = lazy(() => import("../features/apps/pages/AppDetailPage"));
 const BackendHealthPage = lazy(() => import("../pages/BackendHealthPage"));
 const PlatformControlPage = lazy(() => import("../features/platform-control/pages/PlatformControlPage"));
 const PlatformProvidersPage = lazy(() => import("../features/platform-control/pages/PlatformProvidersPage"));
@@ -43,7 +43,7 @@ const ChatbotPage = lazy(() => import("../features/playgrounds/pages/ChatPlaygro
 const KnowledgeChatPage = lazy(() => import("../features/playgrounds/pages/KnowledgePlaygroundPage"));
 const VanessaCorePage = lazy(() => import("../features/vanessa-core/pages/VanessaCorePage"));
 
-export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds" | "agentBuilder";
+export type AppRouteSection = "public" | "settings" | "control" | "ai" | "playgrounds" | "apps";
 export type AppRouteNavGroup = "primary" | "userMenu";
 export type AppRouteAudience = "guest" | "authenticated" | "all";
 export type AppRouteMainContentLayout = "default" | "full-bleed";
@@ -182,31 +182,33 @@ export const appRoutes: AppRouteDefinition[] = [
     element: <QuoteManagementPage />,
   },
   {
-    id: "agent-builder",
-    path: "/agent-builder",
-    titleKey: "nav.agentBuilder",
-    section: "agentBuilder",
-    showInNav: false,
+    id: "apps",
+    path: "/apps",
+    titleKey: "nav.apps",
+    section: "apps",
+    showInNav: true,
     showInBreadcrumbs: true,
     requiresAuth: true,
     minimumRole: "user",
+    navGroup: "primary",
+    navAudience: "authenticated",
     sidebar: {
-      icon: "models",
+      icon: "ai",
       order: 40,
-      labelKey: "nav.agentBuilder",
+      labelKey: "nav.apps",
     },
-    element: <AgentBuilderProjectsPage />,
+    element: <AppsHomePage />,
   },
   {
-    id: "agent-builder-detail",
-    path: "/agent-builder/:projectId",
-    titleKey: "nav.agentProjectDetail",
-    section: "agentBuilder",
+    id: "app-detail",
+    path: "/apps/:appId",
+    titleKey: "nav.apps",
+    section: "apps",
     showInNav: false,
     showInBreadcrumbs: true,
     requiresAuth: true,
     minimumRole: "user",
-    element: <AgentProjectDetailPage />,
+    element: <AppDetailPage />,
   },
   {
     id: "control-catalog",

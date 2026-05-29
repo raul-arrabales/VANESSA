@@ -11,6 +11,7 @@
     "control": "Control",
     "controlPanel": "Panel de control",
     "ai": "Vanessa AI",
+    "apps": "Apps",
     "playgrounds": "AI Playground",
     "chat": "Espacio de chat",
     "vanessa": "Vanessa Core",
@@ -318,7 +319,7 @@
       "profile": "Ver perfil",
       "control": "Panel de control",
       "playgrounds": "AI Playground",
-      "agentBuilder": "Constructor de agentes"
+      "apps": "Apps"
     }
   },
   "control": {

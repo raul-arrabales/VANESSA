@@ -42,6 +42,7 @@ from .playground_execution import (
     auto_title_from_prompt,
     build_context_messages,
     complete_status,
+    execute_agent_chat_request,
     execute_knowledge_request,
     list_runtime_knowledge_base_options,
     normalize_prompt,
@@ -50,6 +51,7 @@ from .playground_execution import (
     serialize_datetime,
     start_status,
     string_or_none,
+    stream_agent_chat_request,
     stream_knowledge_request,
 )
 
@@ -91,6 +93,7 @@ def list_playground_sessions(
     *,
     owner_user_id: int,
     playground_kind: str | None = None,
+    assistant_ref: str | None = None,
     title_query: str | None = None,
     updated_from: str | None = None,
     updated_to: str | None = None,
@@ -106,6 +109,7 @@ def list_playground_sessions(
             database_url,
             owner_user_id=owner_user_id,
             conversation_kind=conversation_kind,
+            assistant_ref=string_or_none(assistant_ref),
             **filters,
         )
         return [_serialize_session_summary(row) for row in rows]
@@ -116,6 +120,7 @@ def list_playground_sessions(
             database_url,
             owner_user_id=owner_user_id,
             conversation_kind=conversation_kind,
+            assistant_ref=string_or_none(assistant_ref),
             **filters,
         )
         items.extend(_serialize_session_summary(row) for row in rows)
@@ -275,7 +280,10 @@ def stream_playground_message(
         )
     return _stream_chat_request(
         database_url,
+        config=config,
         owner_user_id=owner_user_id,
+        owner_role=owner_role,
+        request_id=request_id,
         request=request,
     )
 
@@ -320,7 +328,14 @@ def stream_temporary_playground_message(
             owner_role=owner_role,
             request=request,
         )
-    return _stream_temporary_chat_request(request)
+    return _stream_temporary_chat_request(
+        database_url,
+        config=config,
+        request_id=request_id,
+        owner_user_id=owner_user_id,
+        owner_role=owner_role,
+        request=request,
+    )
 
 
 def get_playground_options(
@@ -524,6 +539,18 @@ def _execute_request(
     request: PlaygroundExecutionRequest,
 ) -> PlaygroundExecutionResult:
     if request.playground_kind == CHAT_PLAYGROUND_KIND:
+        if str(request.assistant_ref or "").strip().startswith("agent."):
+            try:
+                return execute_agent_chat_request(
+                    database_url=database_url,
+                    config=config,
+                    request_id=request_id,
+                    request=request,
+                    actor_user_id=owner_user_id,
+                    actor_user_role=owner_role,
+                )
+            except PlatformControlPlaneError as exc:
+                raise PlaygroundSessionValidationError(exc.code, exc.message) from exc
         return _execute_chat_request(request)
     if not request.knowledge_base_id:
         raise PlaygroundSessionValidationError(
@@ -792,8 +819,11 @@ def _stream_llm_chat_execution(
 
 def _stream_chat_request(
     database_url: str,
+    config: AuthConfig,
     *,
     owner_user_id: int,
+    owner_role: str,
+    request_id: str,
     request: PlaygroundExecutionRequest,
 ) -> Iterator[dict[str, Any]]:
     if not request.model_id:
@@ -801,6 +831,50 @@ def _stream_chat_request(
 
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
+        if str(request.assistant_ref or "").strip().startswith("agent."):
+            for event in stream_agent_chat_request(
+                database_url=database_url,
+                config=config,
+                request_id=request_id,
+                request=request,
+                actor_user_id=owner_user_id,
+                actor_user_role=owner_role,
+            ):
+                event_name = str(event.get("event") or "").strip()
+                data = event.get("data")
+                if event_name == "status" and isinstance(data, dict):
+                    yield {"event": "status", "data": _record_status(statuses, data)}
+                    continue
+                if event_name == "delta" and isinstance(data, dict):
+                    text = str(data.get("text") or "")
+                    if text:
+                        yield {"event": "delta", "data": {"text": text}}
+                    continue
+                if event_name == "complete" and isinstance(data, PlaygroundExecutionResult):
+                    result = data
+                    result.statuses = _status_values(statuses)
+                    persisted = _persist_execution_result(
+                        database_url,
+                        owner_user_id=owner_user_id,
+                        request=request,
+                        result=result,
+                    )
+                    session = get_playground_session_detail(
+                        database_url,
+                        owner_user_id=owner_user_id,
+                        session_id=request.session_id,
+                        playground_kind=request.playground_kind,
+                    )
+                    yield {
+                        "event": "complete",
+                        "data": _serialize_execution_response(
+                            session=session,
+                            persisted=persisted,
+                            result=result,
+                        ),
+                    }
+                    return
+            return
         result = yield from _stream_llm_chat_execution(request, statuses)
         if result is None:
             return
@@ -830,12 +904,51 @@ def _stream_chat_request(
     return _stream()
 
 
-def _stream_temporary_chat_request(request: PlaygroundExecutionRequest) -> Iterator[dict[str, Any]]:
+def _stream_temporary_chat_request(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    request_id: str,
+    owner_user_id: int,
+    owner_role: str,
+    request: PlaygroundExecutionRequest,
+) -> Iterator[dict[str, Any]]:
     if not request.model_id:
         raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
 
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
+        if str(request.assistant_ref or "").strip().startswith("agent."):
+            for event in stream_agent_chat_request(
+                database_url=database_url,
+                config=config,
+                request_id=request_id,
+                request=request,
+                actor_user_id=owner_user_id,
+                actor_user_role=owner_role,
+            ):
+                event_name = str(event.get("event") or "").strip()
+                data = event.get("data")
+                if event_name == "status" and isinstance(data, dict):
+                    yield {"event": "status", "data": _record_status(statuses, data)}
+                    continue
+                if event_name == "delta" and isinstance(data, dict):
+                    text = str(data.get("text") or "")
+                    if text:
+                        yield {"event": "delta", "data": {"text": text}}
+                    continue
+                if event_name == "complete" and isinstance(data, PlaygroundExecutionResult):
+                    result = data
+                    result.statuses = _status_values(statuses)
+                    yield {
+                        "event": "complete",
+                        "data": _serialize_temporary_execution_response(
+                            request=request,
+                            result=result,
+                        ),
+                    }
+                    return
+            return
         result = yield from _stream_llm_chat_execution(request, statuses)
         if result is None:
             return

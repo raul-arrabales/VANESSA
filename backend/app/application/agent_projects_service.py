@@ -13,6 +13,16 @@ from ..repositories.agent_projects import (
 from ..repositories.model_access import find_model_definition
 from ..repositories.registry import find_registry_entity
 from ..services.agent_prompt_defaults import coerce_agent_runtime_prompts, normalize_agent_runtime_prompts
+from ..services.user_agent_types import (
+    CHANNEL_TYPE_VANESSA_WEBAPP,
+    CREATABLE_USER_AGENT_TYPES,
+    INTERFACE_TYPE_CHAT,
+    coerce_channel_type,
+    coerce_interface_type,
+    coerce_user_agent_type,
+    normalize_workflow_definition,
+    workflow_step_server_slugs,
+)
 from .catalog_management_service import create_catalog_agent, update_catalog_agent
 
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
@@ -130,7 +140,10 @@ def validate_agent_project(
         if not offline_compatible:
             derived_runtime_requirements["internet_required"] = True
     resolved_mcp_servers: list[dict[str, Any]] = []
-    for mcp_ref in spec.get("mcp_server_refs", []):
+    configured_mcp_refs = {str(value).strip() for value in spec.get("mcp_server_refs", []) if str(value).strip()}
+    workflow_mcp_refs = set(workflow_step_server_slugs(spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}))
+    all_mcp_refs = sorted(configured_mcp_refs | workflow_mcp_refs)
+    for mcp_ref in all_mcp_refs:
         mcp_server = _find_mcp_server_by_slug(database_url, slug=str(mcp_ref))
         if mcp_server is None:
             errors.append(f"MCP server '{mcp_ref}' does not exist.")
@@ -155,12 +168,20 @@ def validate_agent_project(
             derived_runtime_requirements["sandbox_required"] = True
         if not bool(tool_spec.get("offline_compatible", False)):
             derived_runtime_requirements["internet_required"] = True
+        if not bool(mcp_spec.get("enabled", False)):
+            errors.append(f"MCP server '{mcp_ref}' is disabled.")
 
     runtime_constraints = spec.get("runtime_constraints") if isinstance(spec.get("runtime_constraints"), dict) else {}
+    if spec.get("agent_type") == "workflow":
+        workflow_steps = spec.get("workflow_definition", {}).get("steps") if isinstance(spec.get("workflow_definition"), dict) else None
+        if not isinstance(workflow_steps, list) or not workflow_steps:
+            errors.append("Workflow agents require at least one workflow step.")
     if derived_runtime_requirements["sandbox_required"] and not bool(runtime_constraints.get("sandbox_required", False)):
         errors.append("Project references sandbox tools but runtime_constraints.sandbox_required is false.")
     if derived_runtime_requirements["internet_required"] and not bool(runtime_constraints.get("internet_required", False)):
         errors.append("Project references online-only tools but runtime_constraints.internet_required is false.")
+    if spec.get("channel_type") == CHANNEL_TYPE_VANESSA_WEBAPP and spec.get("interface_type") != INTERFACE_TYPE_CHAT:
+        errors.append("channel_type vanessa_webapp currently requires interface_type chat.")
 
     return {
         "agent_project": project,
@@ -242,6 +263,9 @@ def build_agent_project_preview(
         "tool_refs": list(spec.get("tool_refs", [])),
         "mcp_server_refs": list(spec.get("mcp_server_refs", [])),
         "agent_domain": str(spec.get("agent_domain") or "default"),
+        "agent_type": str(spec.get("agent_type") or "workflow"),
+        "channel_type": str(spec.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
+        "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),
     }
@@ -280,6 +304,9 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
             "tool_refs": list(row.get("tool_refs") or []),
             "mcp_server_refs": list(row.get("mcp_server_refs") or []),
             "agent_domain": str(row.get("agent_domain") or "default"),
+            "agent_type": str(row.get("agent_type") or "workflow"),
+            "channel_type": str(row.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
+            "interface_type": str(row.get("interface_type") or INTERFACE_TYPE_CHAT),
             "workflow_definition": dict(row.get("workflow_definition") or {}),
             "tool_policy": dict(row.get("tool_policy") or {}),
             "runtime_constraints": dict(row.get("runtime_constraints") or {}),
@@ -317,12 +344,29 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.internet_required must be a boolean")
     if not isinstance(runtime_constraints.get("sandbox_required"), bool):
         raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.sandbox_required must be a boolean")
-    workflow_definition = payload.get("workflow_definition", {})
+    try:
+        agent_type = coerce_user_agent_type(payload.get("agent_type"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_agent_type", str(exc)) from exc
+    if agent_type not in CREATABLE_USER_AGENT_TYPES:
+        raise AgentProjectError("unsupported_agent_type", f"agent_type '{agent_type}' is not supported yet")
+    try:
+        channel_type = coerce_channel_type(payload.get("channel_type"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_channel_type", str(exc)) from exc
+    try:
+        interface_type = coerce_interface_type(payload.get("interface_type"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_interface_type", str(exc)) from exc
+    try:
+        workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_workflow_definition", str(exc)) from exc
     tool_policy = payload.get("tool_policy", {})
-    if not isinstance(workflow_definition, dict):
-        raise AgentProjectError("invalid_workflow_definition", "workflow_definition must be an object")
     if not isinstance(tool_policy, dict):
         raise AgentProjectError("invalid_tool_policy", "tool_policy must be an object")
+    if channel_type == CHANNEL_TYPE_VANESSA_WEBAPP and interface_type != INTERFACE_TYPE_CHAT:
+        raise AgentProjectError("invalid_interface_type", "channel_type vanessa_webapp currently requires interface_type chat")
     default_model_ref_raw = payload.get("default_model_ref")
     default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
     return {
@@ -334,6 +378,9 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "tool_refs": [str(item).strip() for item in tool_refs_raw if str(item).strip()],
         "mcp_server_refs": [str(item).strip() for item in mcp_server_refs_raw if str(item).strip()],
         "agent_domain": str(payload.get("agent_domain") or "default").strip() or "default",
+        "agent_type": agent_type,
+        "channel_type": channel_type,
+        "interface_type": interface_type,
         "workflow_definition": workflow_definition,
         "tool_policy": tool_policy,
         "runtime_constraints": {
@@ -375,6 +422,12 @@ def _compile_catalog_payload(project: dict[str, Any]) -> dict[str, Any]:
         "runtime_prompts": normalize_agent_runtime_prompts(spec.get("runtime_prompts")),
         "default_model_ref": spec.get("default_model_ref"),
         "tool_refs": list(spec.get("tool_refs", [])),
+        "mcp_server_refs": list(spec.get("mcp_server_refs", [])),
+        "agent_domain": str(spec.get("agent_domain") or "default"),
+        "agent_type": str(spec.get("agent_type") or "workflow"),
+        "channel_type": str(spec.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
+        "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
+        "workflow_definition": dict(spec.get("workflow_definition") or {}),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "visibility": str(project.get("visibility", "private")),
         "publish": True,

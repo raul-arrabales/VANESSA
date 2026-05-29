@@ -10,10 +10,14 @@ export type AgentProjectFormState = {
   instructions: string;
   retrievalContext: string;
   defaultModelRef: string;
-  toolRefsText: string;
-  mcpServerRefsText: string;
+  agentType: "workflow" | "planner" | "react";
+  channelType: "vanessa_webapp";
+  interfaceType: "chat";
   agentDomain: string;
-  workflowDefinitionText: string;
+  selectedMcpServerSlug: string;
+  selectedToolName: string;
+  stepName: string;
+  stepArgumentsText: string;
   toolPolicyText: string;
   internetRequired: boolean;
   sandboxRequired: boolean;
@@ -30,10 +34,14 @@ export function buildDefaultAgentProjectForm(defaults: CatalogDefaults | null): 
     instructions: "",
     retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
     defaultModelRef: "",
-    toolRefsText: "",
-    mcpServerRefsText: "",
+    agentType: "workflow",
+    channelType: "vanessa_webapp",
+    interfaceType: "chat",
     agentDomain: "default",
-    workflowDefinitionText: "{\n  \"entrypoint\": \"assistant\"\n}",
+    selectedMcpServerSlug: "",
+    selectedToolName: "",
+    stepName: "",
+    stepArgumentsText: "{}",
     toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
     internetRequired: false,
     sandboxRequired: false,
@@ -71,10 +79,14 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     instructions: project.spec.instructions,
     retrievalContext: project.spec.runtime_prompts.retrieval_context,
     defaultModelRef: project.spec.default_model_ref ?? "",
-    toolRefsText: project.spec.tool_refs.join(", "),
-    mcpServerRefsText: (project.spec.mcp_server_refs ?? []).join(", "),
+    agentType: project.spec.agent_type,
+    channelType: project.spec.channel_type,
+    interfaceType: project.spec.interface_type,
     agentDomain: project.spec.agent_domain ?? "default",
-    workflowDefinitionText: JSON.stringify(project.spec.workflow_definition, null, 2),
+    selectedMcpServerSlug: project.spec.workflow_definition.steps[0]?.mcp_server_slug ?? "",
+    selectedToolName: project.spec.workflow_definition.steps[0]?.exposed_tool_name ?? "",
+    stepName: project.spec.workflow_definition.steps[0]?.name ?? "",
+    stepArgumentsText: JSON.stringify(project.spec.workflow_definition.steps[0]?.arguments ?? {}, null, 2),
     toolPolicyText: JSON.stringify(project.spec.tool_policy, null, 2),
     internetRequired: project.spec.runtime_constraints.internet_required,
     sandboxRequired: project.spec.runtime_constraints.sandbox_required,
@@ -101,16 +113,23 @@ export function toAgentProjectMutationInput(
       retrieval_context: form.retrievalContext.trim(),
     },
     default_model_ref: form.defaultModelRef.trim() || null,
-    tool_refs: form.toolRefsText
-      .split(/\r?\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    mcp_server_refs: form.mcpServerRefsText
-      .split(/\r?\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean),
+    tool_refs: [],
+    mcp_server_refs: form.selectedMcpServerSlug.trim() ? [form.selectedMcpServerSlug.trim()] : [],
     agent_domain: form.agentDomain.trim() || "default",
-    workflow_definition: parseJsonObject(form.workflowDefinitionText, invalidWorkflowMessage),
+    agent_type: form.agentType,
+    channel_type: form.channelType,
+    interface_type: form.interfaceType,
+    workflow_definition: {
+      steps: form.selectedMcpServerSlug.trim() && form.selectedToolName.trim()
+        ? [{
+          id: "step_1",
+          name: form.stepName.trim() || form.selectedToolName.trim(),
+          mcp_server_slug: form.selectedMcpServerSlug.trim(),
+          exposed_tool_name: form.selectedToolName.trim(),
+          arguments: parseJsonObject(form.stepArgumentsText, invalidWorkflowMessage),
+        }]
+        : [],
+    },
     tool_policy: parseJsonObject(form.toolPolicyText, invalidToolPolicyMessage),
     runtime_constraints: {
       internet_required: form.internetRequired,
@@ -120,30 +139,37 @@ export function toAgentProjectMutationInput(
 }
 
 export function buildAgentProjectPreview(projectId: string, form: AgentProjectFormState): AgentProjectPreview {
-  let workflowDefinition: Record<string, unknown> = {};
+  let stepArguments: Record<string, unknown> = {};
   try {
-    workflowDefinition = parseJsonObject(form.workflowDefinitionText, "Invalid workflow definition");
+    stepArguments = parseJsonObject(form.stepArgumentsText, "Invalid workflow definition");
   } catch {
-    workflowDefinition = {};
+    stepArguments = {};
   }
 
   return {
     assistant_ref: `agent.project.${projectId || "draft"}`,
     playground_kind: "chat",
     default_model_ref: form.defaultModelRef.trim() || null,
-    tool_refs: form.toolRefsText
-      .split(/\r?\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean),
-    mcp_server_refs: form.mcpServerRefsText
-      .split(/\r?\n|,/)
-      .map((item) => item.trim())
-      .filter(Boolean),
+    tool_refs: [],
+    mcp_server_refs: form.selectedMcpServerSlug.trim() ? [form.selectedMcpServerSlug.trim()] : [],
     agent_domain: form.agentDomain.trim() || "default",
+    agent_type: form.agentType,
+    channel_type: form.channelType,
+    interface_type: form.interfaceType,
     runtime_constraints: {
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,
     },
-    workflow_definition: workflowDefinition,
+    workflow_definition: {
+      steps: form.selectedMcpServerSlug.trim() && form.selectedToolName.trim()
+        ? [{
+          id: "step_1",
+          name: form.stepName.trim() || form.selectedToolName.trim(),
+          mcp_server_slug: form.selectedMcpServerSlug.trim(),
+          exposed_tool_name: form.selectedToolName.trim(),
+          arguments: stepArguments,
+        }]
+        : [],
+    },
   };
 }

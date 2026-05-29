@@ -7,6 +7,7 @@ import type { AuthUser } from "../auth/types";
 import type { CatalogToolCreationOptions } from "../api/catalog";
 import CatalogControlPage from "./CatalogControlPage";
 import * as catalogApi from "../api/catalog";
+import * as agentProjectsApi from "../api/agentProjects";
 
 let mockUser: AuthUser | null = null;
 
@@ -44,6 +45,13 @@ vi.mock("../api/catalog", () => ({
 vi.mock("../api/modelops", () => ({
   listEnabledModels: vi.fn(),
 }));
+vi.mock("../api/agentProjects", () => ({
+  listAgentProjects: vi.fn(),
+  createAgentProject: vi.fn(),
+  updateAgentProject: vi.fn(),
+  validateAgentProject: vi.fn(),
+  publishAgentProject: vi.fn(),
+}));
 
 const modelApi = await import("../api/modelops");
 const apiRetrievalDefault = "Use API-provided retrieval instructions.";
@@ -66,6 +74,31 @@ const agentFixture = {
     },
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
+    runtime_constraints: { internet_required: true, sandbox_required: false },
+  },
+};
+const agentProjectFixture = {
+  id: "proj-1",
+  owner_user_id: 1,
+  published_agent_id: null,
+  current_version: 1,
+  visibility: "private" as const,
+  created_at: "2026-03-18T11:00:00Z",
+  updated_at: "2026-03-18T11:00:00Z",
+  spec: {
+    name: "Agent Alpha",
+    description: "Agent description",
+    instructions: "Be concise.",
+    runtime_prompts: { retrieval_context: "Use retrieved context and cite references." },
+    default_model_ref: "safe-small",
+    tool_refs: [],
+    mcp_server_refs: [],
+    agent_domain: "default",
+    agent_type: "workflow" as const,
+    channel_type: "vanessa_webapp" as const,
+    interface_type: "chat" as const,
+    workflow_definition: { steps: [] },
+    tool_policy: { allow_user_tools: false },
     runtime_constraints: { internet_required: true, sandbox_required: false },
   },
 };
@@ -454,6 +487,24 @@ describe("CatalogControlPage", () => {
     vi.mocked(catalogApi.getCatalogToolCreationOptions).mockResolvedValue(toolCreationOptionsFixture);
     vi.mocked(catalogApi.getCatalogMcpCreationOptions).mockResolvedValue(mcpCreationOptionsFixture);
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([platformAgentFixture, agentFixture]);
+    vi.mocked(agentProjectsApi.listAgentProjects).mockResolvedValue([agentProjectFixture]);
+    vi.mocked(agentProjectsApi.createAgentProject).mockResolvedValue(agentProjectFixture);
+    vi.mocked(agentProjectsApi.updateAgentProject).mockResolvedValue(agentProjectFixture);
+    vi.mocked(agentProjectsApi.validateAgentProject).mockResolvedValue({
+      agent_project: agentProjectFixture,
+      validation: {
+        valid: true,
+        errors: [],
+        warnings: [],
+        resolved_tools: [],
+        resolved_mcp_servers: [],
+        derived_runtime_requirements: { internet_required: true, sandbox_required: false },
+      },
+    });
+    vi.mocked(agentProjectsApi.publishAgentProject).mockResolvedValue({
+      agent_project: { ...agentProjectFixture, published_agent_id: "agent.project.proj-1" },
+      publish_result: { agent_id: "agent.project.proj-1", catalog_agent: {}, published_at: "2026-03-18T11:00:00Z" },
+    });
     vi.mocked(catalogApi.listCatalogTools).mockResolvedValue([toolFixture]);
     vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([]);
     vi.mocked(catalogApi.createCatalogMcpServer).mockResolvedValue(mcpServerFixture);
@@ -541,6 +592,7 @@ describe("CatalogControlPage", () => {
   it("creates an agent from the create-agent view", async () => {
     const user = userEvent.setup();
     vi.mocked(catalogApi.listCatalogAgents).mockResolvedValue([]);
+    vi.mocked(catalogApi.listCatalogMcpServers).mockResolvedValue([mcpServerFixture]);
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=create" });
 
@@ -551,27 +603,17 @@ describe("CatalogControlPage", () => {
     await user.type(screen.getByLabelText("Name"), "Agent Beta");
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
     await user.type(screen.getByLabelText("Instructions"), "Use tools carefully.");
-    expect((screen.getByLabelText("Retrieval instructions") as HTMLTextAreaElement).value).toBe(apiRetrievalDefault);
-    await waitFor(() => {
-      expect(catalogApi.previewCatalogAgentPrompt).toHaveBeenCalledWith(
-        expect.objectContaining({
-          instructions: expect.stringContaining("Use tools carefully."),
-        }),
-        "token",
-      );
-    });
-    expect((screen.getByLabelText("Prompt review") as HTMLTextAreaElement).value).toBe("Backend prompt preview");
-    await user.click(screen.getByRole("button", { name: "Create agent" }));
+    await user.selectOptions(screen.getByLabelText("MCP server"), "web_search");
+    await user.click(screen.getByRole("button", { name: "Save user agent" }));
 
     await waitFor(() => {
-      expect(catalogApi.createCatalogAgent).toHaveBeenCalledWith(
+      expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "agent.beta",
           name: "Agent Beta",
-          publish: false,
-          runtime_prompts: expect.objectContaining({
-            retrieval_context: apiRetrievalDefault,
-          }),
+          agent_type: "workflow",
+          channel_type: "vanessa_webapp",
+          interface_type: "chat",
         }),
         "token",
       );
@@ -599,25 +641,21 @@ describe("CatalogControlPage", () => {
     await user.click(userAgentsLink);
 
     expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
-    expectCompactRegistryRowForHeading("Agent Alpha");
     expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
-    expectNamedIconAction("button", "View lifecycle for Agent Alpha");
-    expectNamedIconAction("button", "Delete Agent Alpha");
+    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Validate" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Publish app" })).toBeVisible();
   });
 
-  it("deletes a user agent after confirmation", async () => {
+  it("publishes a user agent project from the directory", async () => {
     const user = userEvent.setup();
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=user-agents" });
 
-    await user.click(await screen.findByRole("button", { name: "Delete Agent Alpha" }));
-    const dialog = await screen.findByRole("dialog", { name: "Delete user agent" });
-    expect(within(dialog).getByText("Delete Agent Alpha? This removes the catalog agent and its versions.")).toBeVisible();
-
-    await user.click(within(dialog).getByRole("button", { name: "Delete agent" }));
+    await user.click(await screen.findByRole("button", { name: "Publish app" }));
 
     await waitFor(() => {
-      expect(catalogApi.deleteCatalogAgent).toHaveBeenCalledWith("agent.alpha", "token");
+      expect(agentProjectsApi.publishAgentProject).toHaveBeenCalledWith("proj-1", "token");
     });
   });
 

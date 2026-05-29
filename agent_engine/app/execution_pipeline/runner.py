@@ -113,6 +113,128 @@ def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
     return retrieval_context or None
 
 
+def _agent_type(agent_spec: dict[str, Any]) -> str:
+    return str(agent_spec.get("agent_type") or "workflow").strip().lower() or "workflow"
+
+
+def _workflow_steps(agent_spec: dict[str, Any]) -> list[dict[str, Any]]:
+    workflow_definition = agent_spec.get("workflow_definition") if isinstance(agent_spec.get("workflow_definition"), dict) else {}
+    raw_steps = workflow_definition.get("steps") if isinstance(workflow_definition.get("steps"), list) else []
+    return [item for item in raw_steps if isinstance(item, dict)]
+
+
+def _tool_entity_lookup(agent_tools: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    lookup: dict[str, dict[str, Any]] = {}
+    for tool_entity in agent_tools:
+        tool_spec = effective_tool_spec(tool_entity)
+        slug = str(tool_spec.get("slug") or "").strip()
+        if slug:
+            lookup[slug] = tool_entity
+    return lookup
+
+
+def _workflow_step_result_text(result: dict[str, Any]) -> str:
+    for key in ("output_text", "answer", "summary", "message", "result"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return compact_payload(result)
+
+
+def _workflow_output_from_results(step_results: list[dict[str, Any]]) -> str:
+    if not step_results:
+        return "Workflow completed."
+    last_result = step_results[-1].get("result")
+    if isinstance(last_result, dict):
+        return _workflow_step_result_text(last_result)
+    lines = []
+    for index, step in enumerate(step_results, start=1):
+        lines.append(f"{index}. {step.get('name')}: {compact_payload(step.get('result'))}")
+    return "\n".join(lines)
+
+
+def _execute_workflow_agent(
+    *,
+    context: ExecutionContext,
+    agent_entity: dict[str, Any],
+    agent_tools: list[dict[str, Any]],
+    progress: ProgressRecorder | None = None,
+) -> tuple[ExecutionResult, str | None]:
+    progress = progress or ProgressRecorder()
+    agent_spec = _agent_current_spec(agent_entity)
+    steps = _workflow_steps(agent_spec)
+    if not steps:
+        raise ExecutionBlockedError(
+            code="EXEC_INVALID_AGENT",
+            message="Workflow agent is missing workflow steps",
+            status_code=422,
+        )
+    tool_lookup = _tool_entity_lookup(agent_tools)
+    runtime_snapshot = context.platform_runtime if isinstance(context.platform_runtime, dict) else {}
+    agent_domain = str(agent_spec.get("agent_domain") or "default").strip() or "default"
+    tool_calls: list[dict[str, Any]] = []
+    step_results: list[dict[str, Any]] = []
+    for index, step in enumerate(steps, start=1):
+        slug = str(step.get("mcp_server_slug") or "").strip()
+        tool_entity = tool_lookup.get(slug)
+        if tool_entity is None:
+            raise ExecutionBlockedError(
+                code="EXEC_TOOL_NOT_ALLOWED",
+                message=f"Workflow step references unavailable MCP server '{slug}'",
+                status_code=403,
+            )
+        tool_spec = effective_tool_spec(tool_entity)
+        tool_name = str(step.get("exposed_tool_name") or tool_spec.get("exposed_tool_name") or "").strip()
+        runtime_capability = runtime_capability_for_tool_spec(tool_spec)
+        resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
+        arguments = step.get("arguments") if isinstance(step.get("arguments"), dict) else {}
+        status_id = progress.start(
+            kind="running_tool",
+            label=f"Running workflow step {index}: {str(step.get('name') or tool_name or slug)}",
+            details={"step": index, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
+        )
+        tool_call = {
+            "id": f"workflow-step-{index}",
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "arguments": compact_payload(arguments),
+            },
+        }
+        call_record, tool_payload = invoke_tool_call(
+            tool_entity=tool_entity,
+            tool_call=tool_call,
+            platform_runtime=runtime_snapshot,
+            agent_id=context.agent_id,
+            agent_domain=agent_domain,
+            delegated_user_id=context.requested_by_user_id,
+            delegated_user_role=context.requested_by_role,
+        )
+        progress.complete(
+            status_id,
+            kind="running_tool",
+            label=f"Completed workflow step {index}",
+            summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
+            details={"step": index, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
+        )
+        tool_calls.append(call_record)
+        step_results.append(
+            {
+                "id": str(step.get("id") or f"step_{index}"),
+                "name": str(step.get("name") or tool_name or slug),
+                "mcp_server_slug": slug,
+                "result": tool_payload,
+            }
+        )
+    return (
+        ExecutionResult(
+            output_text=_workflow_output_from_results(step_results),
+            tool_calls=tool_calls,
+        ),
+        None,
+    )
+
+
 def _execute_model_call(
     *,
     context: ExecutionContext,
@@ -512,6 +634,11 @@ def create_execution(payload: dict[str, Any], progress_emit=None, delta_emit: De
             agent_tools=agent_tools,
             progress=progress,
             delta_emit=delta_emit,
+        ) if _agent_type(_agent_current_spec(agent_entity)) != "workflow" else _execute_workflow_agent(
+            context=context,
+            agent_entity=agent_entity,
+            agent_tools=agent_tools,
+            progress=progress,
         )
         finished = _build_execution(
             execution_id=execution_id,

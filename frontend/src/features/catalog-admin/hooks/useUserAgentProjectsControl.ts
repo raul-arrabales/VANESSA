@@ -1,0 +1,174 @@
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  createAgentProject,
+  listAgentProjects,
+  publishAgentProject,
+  updateAgentProject,
+  validateAgentProject,
+  type AgentProject,
+  type AgentProjectPublishResult,
+  type AgentProjectValidation,
+} from "../../../api/agentProjects";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import {
+  buildAgentProjectForm,
+  buildDefaultAgentProjectForm,
+  toAgentProjectMutationInput,
+  type AgentProjectFormState,
+} from "../../agent-builder/types";
+
+type UseUserAgentProjectsControlResult = {
+  projects: AgentProject[];
+  loading: boolean;
+  saving: boolean;
+  validatingProjectId: string;
+  publishingProjectId: string;
+  selectedProjectId: string | null;
+  form: AgentProjectFormState;
+  setForm: Dispatch<SetStateAction<AgentProjectFormState>>;
+  validations: Record<string, AgentProjectValidation>;
+  publishResults: Record<string, AgentProjectPublishResult>;
+  selectProject: (project: AgentProject | null) => void;
+  resetForm: () => void;
+  submitForm: () => Promise<AgentProject | null>;
+  validateProject: (projectId: string) => Promise<void>;
+  publishProject: (projectId: string) => Promise<void>;
+  refresh: () => Promise<void>;
+};
+
+export function useUserAgentProjectsControl(token: string): UseUserAgentProjectsControlResult {
+  const { t } = useTranslation("common");
+  const { showErrorFeedback, showSuccessFeedback } = useActionFeedback();
+  const [projects, setProjects] = useState<AgentProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [validatingProjectId, setValidatingProjectId] = useState("");
+  const [publishingProjectId, setPublishingProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [form, setForm] = useState<AgentProjectFormState>(() => buildDefaultAgentProjectForm(null));
+  const [validations, setValidations] = useState<Record<string, AgentProjectValidation>>({});
+  const [publishResults, setPublishResults] = useState<Record<string, AgentProjectPublishResult>>({});
+
+  const refresh = async (): Promise<void> => {
+    if (!token) {
+      setProjects([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const listed = await listAgentProjects(token);
+      setProjects(listed);
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.agents.userProjects.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, [token]);
+
+  const selectProject = (project: AgentProject | null): void => {
+    if (!project) {
+      setSelectedProjectId(null);
+      setForm(buildDefaultAgentProjectForm(null));
+      return;
+    }
+    setSelectedProjectId(project.id);
+    setForm(buildAgentProjectForm(project));
+  };
+
+  const resetForm = (): void => {
+    setSelectedProjectId(null);
+    setForm(buildDefaultAgentProjectForm(null));
+  };
+
+  const submitForm = async (): Promise<AgentProject | null> => {
+    if (!token) {
+      return null;
+    }
+    setSaving(true);
+    try {
+      const payload = toAgentProjectMutationInput(form, {
+        includeId: !selectedProjectId,
+        invalidWorkflowMessage: t("catalogControl.agents.userProjects.invalidWorkflowDefinition"),
+        invalidToolPolicyMessage: t("catalogControl.agents.userProjects.invalidToolPolicy"),
+      });
+      const saved = selectedProjectId
+        ? await updateAgentProject(selectedProjectId, payload, token)
+        : await createAgentProject(payload, token);
+      setProjects((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setSelectedProjectId(saved.id);
+      setForm(buildAgentProjectForm(saved));
+      showSuccessFeedback(
+        selectedProjectId
+          ? t("catalogControl.agents.userProjects.updated", { name: saved.spec.name })
+          : t("catalogControl.agents.userProjects.created", { name: saved.spec.name }),
+      );
+      return saved;
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.agents.userProjects.saveFailed"));
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const validateProject = async (projectId: string): Promise<void> => {
+    if (!token) {
+      return;
+    }
+    setValidatingProjectId(projectId);
+    try {
+      const payload = await validateAgentProject(projectId, token);
+      setValidations((current) => ({ ...current, [projectId]: payload }));
+      showSuccessFeedback(t("catalogControl.agents.userProjects.validated", { name: payload.agent_project.spec.name }));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.agents.userProjects.validateFailed"));
+    } finally {
+      setValidatingProjectId("");
+    }
+  };
+
+  const publishProject = async (projectId: string): Promise<void> => {
+    if (!token) {
+      return;
+    }
+    setPublishingProjectId(projectId);
+    try {
+      const payload = await publishAgentProject(projectId, token);
+      setPublishResults((current) => ({ ...current, [projectId]: payload }));
+      setProjects((current) => [payload.agent_project, ...current.filter((item) => item.id !== projectId)]);
+      if (selectedProjectId === projectId) {
+        setForm(buildAgentProjectForm(payload.agent_project));
+      }
+      showSuccessFeedback(t("catalogControl.agents.userProjects.published", { name: payload.agent_project.spec.name }));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.agents.userProjects.publishFailed"));
+    } finally {
+      setPublishingProjectId("");
+    }
+  };
+
+  return {
+    projects,
+    loading,
+    saving,
+    validatingProjectId,
+    publishingProjectId,
+    selectedProjectId,
+    form,
+    setForm,
+    validations,
+    publishResults,
+    selectProject,
+    resetForm,
+    submitForm,
+    validateProject,
+    publishProject,
+    refresh,
+  };
+}

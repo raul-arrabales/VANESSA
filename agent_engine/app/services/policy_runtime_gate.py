@@ -203,6 +203,10 @@ def resolve_agent_spec(*, agent_id: str) -> dict[str, Any]:
                 "tool_refs": [],
                 "mcp_server_refs": [],
                 "agent_domain": "default",
+                "agent_type": "workflow",
+                "channel_type": "vanessa_webapp",
+                "interface_type": "chat",
+                "workflow_definition": {"steps": []},
                 "runtime_constraints": {},
             },
         }
@@ -245,8 +249,20 @@ def validate_runtime_and_dependencies(*, agent_entity: dict[str, Any], runtime_p
 def resolve_agent_tools(*, agent_entity: dict[str, Any], runtime_profile: str) -> list[dict[str, Any]]:
     current_spec = agent_entity.get("current_spec") if isinstance(agent_entity.get("current_spec"), dict) else {}
     tool_refs = current_spec.get("mcp_server_refs") if isinstance(current_spec.get("mcp_server_refs"), list) else []
+    workflow_definition = current_spec.get("workflow_definition") if isinstance(current_spec.get("workflow_definition"), dict) else {}
+    workflow_steps = workflow_definition.get("steps") if isinstance(workflow_definition.get("steps"), list) else []
+    workflow_refs = [
+        str(item.get("mcp_server_slug") or "").strip()
+        for item in workflow_steps
+        if isinstance(item, dict) and str(item.get("mcp_server_slug") or "").strip()
+    ]
+    merged_refs: list[str] = []
+    for value in [*tool_refs, *workflow_refs]:
+        normalized = str(value).strip()
+        if normalized and normalized not in merged_refs:
+            merged_refs.append(normalized)
     resolved_tools: list[dict[str, Any]] = []
-    for server_ref in tool_refs:
+    for server_ref in merged_refs:
         server_slug = str(server_ref).strip()
         if not server_slug:
             continue

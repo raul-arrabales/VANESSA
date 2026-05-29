@@ -11,6 +11,7 @@
     "control": "Control",
     "controlPanel": "Control Panel",
     "ai": "Vanessa AI",
+    "apps": "Apps",
     "playgrounds": "AI Playground",
     "chat": "Chat Workspace",
     "vanessa": "Vanessa Core",
@@ -318,12 +319,12 @@
     },
     "authenticated": {
       "title": "Welcome back",
-      "description": "You are signed in as {{username}}. Open your control panel, AI Playground, or Vanessa AI workspace.",
+      "description": "You are signed in as {{username}}. Open your control panel, Apps, AI Playground, or Vanessa AI workspace.",
       "actions": "Signed-in quick actions",
       "profile": "View profile",
       "control": "Control Panel",
       "playgrounds": "AI Playground",
-      "agentBuilder": "Agent Builder"
+      "apps": "Apps"
     }
   },
   "control": {
@@ -2173,6 +2174,37 @@
         "agents": "Platform agents",
         "userAgents": "User agents",
         "create": "Create agent"
+      },
+      "userProjects": {
+        "loadFailed": "Unable to load user agents.",
+        "saveFailed": "Unable to save user agent.",
+        "validateFailed": "Unable to validate user agent.",
+        "publishFailed": "Unable to publish user agent.",
+        "invalidWorkflowDefinition": "Workflow step arguments must be valid JSON.",
+        "invalidToolPolicy": "Tool policy must be valid JSON.",
+        "created": "Created {{name}}.",
+        "updated": "Updated {{name}}.",
+        "validated": "Validated {{name}}.",
+        "published": "Published {{name}}.",
+        "loading": "Loading user agents...",
+        "directoryDescription": "User agents are drafted and published from the canonical user-agent project model.",
+        "createTitle": "Create user agent",
+        "createDescription": "Follow this guided flow to define a user agent, choose its app channel, and configure its first deterministic workflow step.",
+        "stepType": "1. Agent type",
+        "stepBasics": "2. Basics",
+        "stepWorkflow": "3. Workflow",
+        "agentType": "Agent type",
+        "channelType": "Channel",
+        "interfaceType": "Interface",
+        "workflowHelp": "Workflow Agent is the only supported type in this first pass. It runs a single-thread ordered MCP action sequence.",
+        "workflowMcp": "MCP server",
+        "workflowTool": "Exposed tool name",
+        "workflowStepName": "Step name",
+        "workflowArguments": "Step arguments JSON",
+        "selectMcp": "Select an MCP server",
+        "save": "Save user agent",
+        "publish": "Publish app",
+        "notPublished": "Not published"
       },
       "deleteDialog": {
         "title": "Delete user agent",

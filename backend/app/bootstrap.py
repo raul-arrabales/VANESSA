@@ -136,6 +136,7 @@ def register_system_routes(app: Flask) -> None:
 
 
 def register_http_blueprints(app: Flask) -> None:
+    from .api.http.apps import bp as apps_bp
     from .api.http.agent_projects import bp as agent_projects_bp
     from .api.http.catalog import bp as catalog_bp
     from .api.http.content import bp as content_bp
@@ -171,6 +172,7 @@ def register_http_blueprints(app: Flask) -> None:
     app.register_blueprint(model_inference_v1_routes.bp)
     app.register_blueprint(platform_bp)
     app.register_blueprint(catalog_bp)
+    app.register_blueprint(apps_bp)
     app.register_blueprint(context_bp)
     app.register_blueprint(agent_projects_bp)
     app.register_blueprint(playgrounds_bp)

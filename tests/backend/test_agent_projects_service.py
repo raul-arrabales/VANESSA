@@ -19,7 +19,22 @@ def _project_row() -> dict[str, object]:
         "runtime_prompts": {"retrieval_context": "Use retrieved context for support answers."},
         "default_model_ref": "safe-small",
         "tool_refs": ["tool.web_search"],
-        "workflow_definition": {"entrypoint": "assistant"},
+        "mcp_server_refs": ["support_search"],
+        "agent_domain": "default",
+        "agent_type": "workflow",
+        "channel_type": "vanessa_webapp",
+        "interface_type": "chat",
+        "workflow_definition": {
+            "steps": [
+                {
+                    "id": "step_1",
+                    "name": "Support search",
+                    "mcp_server_slug": "support_search",
+                    "exposed_tool_name": "support_search",
+                    "arguments": {},
+                }
+            ]
+        },
         "tool_policy": {"allow_user_tools": False},
         "runtime_constraints": {"internet_required": False, "sandbox_required": False},
     }
@@ -38,6 +53,19 @@ def test_validate_agent_project_reports_runtime_constraint_mismatches(monkeypatc
                 "tool_name": "web_search",
                 "transport": "mcp",
                 "offline_compatible": False,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        agent_projects_service,
+        "_find_mcp_server_by_slug",
+        lambda *_args, **_kwargs: {
+            "entity_id": "mcp.support_search",
+            "current_spec": {
+                "slug": "support_search",
+                "name": "Support Search",
+                "backing_tool_id": "tool.web_search",
+                "enabled": True,
             },
         },
     )
@@ -78,7 +106,11 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
             "instructions": "Be helpful.",
             "default_model_ref": None,
             "tool_refs": [],
-            "workflow_definition": {"entrypoint": "assistant"},
+            "mcp_server_refs": [],
+            "agent_type": "workflow",
+            "channel_type": "vanessa_webapp",
+            "interface_type": "chat",
+            "workflow_definition": {"steps": []},
             "tool_policy": {"allow_user_tools": False},
             "runtime_constraints": {"internet_required": False, "sandbox_required": False},
         },
@@ -114,6 +146,7 @@ def test_publish_agent_project_compiles_catalog_payload_and_persists_published_a
     assert create_calls[0]["owner_user_id"] == 10
     assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": "Use retrieved context for support answers."}
     assert create_calls[0]["payload"]["tool_refs"] == ["tool.web_search"]
+    assert create_calls[0]["payload"]["agent_type"] == "workflow"
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
 
 
@@ -133,8 +166,21 @@ def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypat
         "playground_kind": "chat",
         "default_model_ref": "safe-small",
         "tool_refs": ["tool.web_search"],
-        "mcp_server_refs": [],
+        "mcp_server_refs": ["support_search"],
         "agent_domain": "default",
+        "agent_type": "workflow",
+        "channel_type": "vanessa_webapp",
+        "interface_type": "chat",
         "runtime_constraints": {"internet_required": False, "sandbox_required": False},
-        "workflow_definition": {"entrypoint": "assistant"},
+        "workflow_definition": {
+            "steps": [
+                {
+                    "id": "step_1",
+                    "name": "Support search",
+                    "mcp_server_slug": "support_search",
+                    "exposed_tool_name": "support_search",
+                    "arguments": {},
+                }
+            ]
+        },
     }

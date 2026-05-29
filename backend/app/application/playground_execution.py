@@ -377,6 +377,61 @@ def execute_knowledge_request(
     )
 
 
+def execute_agent_chat_request(
+    *,
+    database_url: str,
+    config: AuthConfig,
+    request_id: str,
+    request: PlaygroundExecutionRequest,
+    actor_user_id: int,
+    actor_user_role: str,
+    create_execution_fn=None,
+    get_active_platform_runtime_fn=None,
+    resolve_runtime_profile_fn=None,
+) -> PlaygroundExecutionResult:
+    create_execution_impl = create_execution_fn or create_execution
+    get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
+    resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
+
+    prompt = normalize_prompt(request.prompt)
+    platform_runtime = get_active_platform_runtime_for_dispatch(
+        database_url,
+        config,
+        get_active_platform_runtime_fn=get_active_platform_runtime_impl,
+    )
+    if request.model_id:
+        ensure_model_bound_to_active_runtime(platform_runtime, request.model_id)
+    response_payload, execution_status = create_execution_impl(
+        base_url=config.agent_engine_url.rstrip("/"),
+        service_token=config.agent_engine_service_token,
+        request_id=request_id,
+        agent_id=str(request.assistant_ref or ""),
+        execution_input={
+            "prompt": prompt,
+            "model": request.model_id,
+            "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
+        },
+        requested_by_user_id=actor_user_id,
+        requested_by_role=actor_user_role,
+        runtime_profile=resolve_runtime_profile_impl(database_url),
+        platform_runtime=platform_runtime,
+        timeout_seconds=max(float(config.llm_request_timeout_seconds), 1.0) + _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS,
+    )
+    execution_payload = response_payload.get("execution") if isinstance(response_payload.get("execution"), dict) else {}
+    result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
+    if not 200 <= execution_status < 300:
+        raise AgentEngineClientError(
+            code="agent_chat_failed",
+            message="Agent chat request failed.",
+            status_code=execution_status,
+            details=response_payload,
+        )
+    return PlaygroundExecutionResult(
+        output=str(result_payload.get("output_text", "")).strip(),
+        response=execution_payload,
+    )
+
+
 def stream_knowledge_request(
     *,
     database_url: str,
@@ -482,6 +537,90 @@ def stream_knowledge_request(
                 references=references,
                 retrieval=retrieval,
                 knowledge_base_id=str(selected_knowledge_base["id"]),
+                statuses=statuses,
+            ),
+        }
+        return
+
+    raise AgentEngineClientError(
+        code="agent_engine_stream_incomplete",
+        message="Agent engine stream ended before completion",
+        status_code=502,
+    )
+
+
+def stream_agent_chat_request(
+    *,
+    database_url: str,
+    config: AuthConfig,
+    request_id: str,
+    request: PlaygroundExecutionRequest,
+    actor_user_id: int,
+    actor_user_role: str,
+    stream_execution_fn=None,
+    get_active_platform_runtime_fn=None,
+    resolve_runtime_profile_fn=None,
+) -> Iterator[dict[str, Any]]:
+    stream_execution_impl = stream_execution_fn or stream_execution
+    get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
+    resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
+
+    prompt = normalize_prompt(request.prompt)
+    platform_runtime = get_active_platform_runtime_for_dispatch(
+        database_url,
+        config,
+        get_active_platform_runtime_fn=get_active_platform_runtime_impl,
+    )
+    if request.model_id:
+        ensure_model_bound_to_active_runtime(platform_runtime, request.model_id)
+    statuses: list[dict[str, Any]] = []
+    output_parts: list[str] = []
+    for event in stream_execution_impl(
+        base_url=config.agent_engine_url.rstrip("/"),
+        service_token=config.agent_engine_service_token,
+        request_id=request_id,
+        agent_id=str(request.assistant_ref or ""),
+        execution_input={
+            "prompt": prompt,
+            "model": request.model_id,
+            "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
+        },
+        requested_by_user_id=actor_user_id,
+        requested_by_role=actor_user_role,
+        runtime_profile=resolve_runtime_profile_impl(database_url),
+        platform_runtime=platform_runtime,
+        timeout_seconds=max(float(config.llm_request_timeout_seconds), 1.0) + _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS,
+    ):
+        event_name = str(event.get("event") or "").strip()
+        data = event.get("data") if isinstance(event.get("data"), dict) else {}
+        if event_name == "status":
+            statuses.append(data)
+            yield {"event": "status", "data": data}
+            continue
+        if event_name == "delta":
+            text = str(data.get("text") or "")
+            if text:
+                output_parts.append(text)
+                yield {"event": "delta", "data": {"text": text}}
+            continue
+        if event_name == "error":
+            raise AgentEngineClientError(
+                code=str(data.get("error") or "agent_chat_failed"),
+                message=str(data.get("message") or "Agent chat request failed."),
+                status_code=int(data.get("status_code", 502) or 502),
+                details=data,
+            )
+        if event_name != "complete":
+            continue
+
+        execution_payload = data.get("execution") if isinstance(data.get("execution"), dict) else {}
+        result_payload = execution_payload.get("result") if isinstance(execution_payload.get("result"), dict) else {}
+        output = str(result_payload.get("output_text", "")).strip() or "".join(output_parts).strip()
+        yield {
+            "event": "complete",
+            "data": PlaygroundExecutionResult(
+                output=output,
+                response=execution_payload,
                 statuses=statuses,
             ),
         }

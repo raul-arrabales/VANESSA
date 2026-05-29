@@ -61,7 +61,7 @@ For a fuller setup guide, see [docs/setup.md](docs/setup.md) and [ops/local-stag
 
 VANESSA is organized around a few clear domains:
 
-- Product UI: React/Vite frontend for playgrounds, agent builder, catalog administration, platform control, and Vanessa AI
+- Product UI: React/Vite frontend for Apps, playgrounds, catalog administration, platform control, and Vanessa AI
 - Backend / control plane: Flask API that owns auth, orchestration, GenAI control plane, deployment resolution, and ModelOps-facing governance
 - Model serving: private `llm` gateway plus split local runtimes for inference and embeddings, with optional `llama_cpp`
 - Agent engine: multi-step execution, retrieval, and tool dispatch against backend-resolved `platform_runtime`

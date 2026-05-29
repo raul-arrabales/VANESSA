@@ -7,6 +7,9 @@ export type PreviewableAssistantExperience = {
   tool_refs: string[];
   mcp_server_refs?: string[];
   agent_domain?: string;
+  agent_type?: "workflow" | "planner" | "react";
+  channel_type?: "vanessa_webapp";
+  interface_type?: "chat";
   runtime_constraints: {
     internet_required: boolean;
     sandbox_required: boolean;

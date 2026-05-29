@@ -61,6 +61,7 @@ def list_playground_sessions_route():
             _database_url(),
             owner_user_id=int(g.current_user["id"]),
             playground_kind=playground_kind,
+            assistant_ref=request.args.get("assistant_ref"),
             title_query=request.args.get("title_query"),
             updated_from=request.args.get("updated_from"),
             updated_to=request.args.get("updated_to"),

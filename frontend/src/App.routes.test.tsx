@@ -189,8 +189,13 @@ vi.mock("./api/agentProjects", () => ({
       instructions: "Be helpful.",
       runtime_prompts: { retrieval_context: "Use retrieved context for support answers." },
       default_model_ref: "gpt-4",
-      tool_refs: ["tool.web_search"],
-      workflow_definition: { entrypoint: "assistant" },
+      tool_refs: [],
+      mcp_server_refs: [],
+      agent_domain: "default",
+      agent_type: "workflow",
+      channel_type: "vanessa_webapp",
+      interface_type: "chat",
+      workflow_definition: { steps: [] },
       tool_policy: { allow_user_tools: false },
       runtime_constraints: { internet_required: true, sandbox_required: false },
     },
@@ -210,8 +215,13 @@ vi.mock("./api/agentProjects", () => ({
       instructions: "Be helpful.",
       runtime_prompts: { retrieval_context: "Use retrieved context for support answers." },
       default_model_ref: "gpt-4",
-      tool_refs: ["tool.web_search"],
-      workflow_definition: { entrypoint: "assistant" },
+      tool_refs: [],
+      mcp_server_refs: [],
+      agent_domain: "default",
+      agent_type: "workflow",
+      channel_type: "vanessa_webapp",
+      interface_type: "chat",
+      workflow_definition: { steps: [] },
       tool_policy: { allow_user_tools: false },
       runtime_constraints: { internet_required: true, sandbox_required: false },
     },
@@ -219,6 +229,10 @@ vi.mock("./api/agentProjects", () => ({
   updateAgentProject: vi.fn(),
   validateAgentProject: vi.fn(),
   publishAgentProject: vi.fn(),
+}));
+vi.mock("./api/apps", () => ({
+  listApps: vi.fn(async () => [{ id: "agent.project.proj-1", agent_id: "agent.project.proj-1", name: "Support Agent", description: "Handles support workflows.", interface_type: "chat", channel_type: "vanessa_webapp", agent_type: "workflow", published_at: "2026-03-18T11:00:00Z", updated_at: "2026-03-18T11:00:00Z" }]),
+  getApp: vi.fn(async () => ({ id: "agent.project.proj-1", agent_id: "agent.project.proj-1", name: "Support Agent", description: "Handles support workflows.", interface_type: "chat", channel_type: "vanessa_webapp", agent_type: "workflow", published_at: "2026-03-18T11:00:00Z", updated_at: "2026-03-18T11:00:00Z" })),
 }));
 vi.mock("./api/platform", () => ({
   listPlatformCapabilities: vi.fn(async () => [
@@ -352,7 +366,7 @@ describe("App superadmin models route", () => {
     await userEvent.click(screen.getByRole("link", { name: "Model catalog" }));
     expect(await screen.findByRole("heading", { name: await t("modelOps.catalog.title") })).toBeVisible();
 
-    await userEvent.click(screen.getByRole("link", { name: "Open details" }));
+    await userEvent.click(screen.getByRole("link", { name: "Open details: GPT-4" }));
     expect(await screen.findByRole("heading", { name: "GPT-4" })).toBeVisible();
 
     await userEvent.click(screen.getByRole("link", { name: "Test model: GPT-4" }));
@@ -402,7 +416,7 @@ describe("App superadmin models route", () => {
     expect(await screen.findByRole("heading", { name: await t("catalogControl.title") })).toBeVisible();
   });
 
-  it("renders the agent builder page for users", async () => {
+  it("renders the apps page for users", async () => {
     mockUser = {
       id: 3,
       email: "user@example.com",
@@ -411,9 +425,9 @@ describe("App superadmin models route", () => {
       is_active: true,
     };
 
-    await renderWithAppProviders(<App />, { route: "/agent-builder" });
+    await renderWithAppProviders(<App />, { route: "/apps" });
 
-    expect(await screen.findByRole("heading", { name: await t("agentBuilder.title") })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Apps" })).toBeVisible();
   });
 
   it("blocks admin users from the platform control route", async () => {

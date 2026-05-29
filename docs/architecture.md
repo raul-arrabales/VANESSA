@@ -151,7 +151,7 @@ The product-facing AI surface now has its own domain split, separate from the co
   - Frontend entrypoints now live under the `Vanessa AI` section at `/ai`, with `Vanessa Core` remaining at `/ai/vanessa`.
 
 Frontend work now lands under `frontend/src/features/*`, backend product APIs under `backend/app/api/http`, and engine execution seams under `agent_engine/app/execution_pipeline`.
-Admin builder/catalog work follows the same rule, with builder-facing authoring under `frontend/src/features/agent-builder`, catalog administration under `frontend/src/features/catalog-admin`, and the canonical backend HTTP owners under `backend/app/api/http/catalog.py`, `backend/app/api/http/registry.py`, and `backend/app/api/http/registry_models.py`.
+Admin catalog work follows the same rule, with user-agent authoring under `frontend/src/features/catalog-admin`, published app interaction under `frontend/src/features/apps`, and the canonical backend HTTP owners under `backend/app/api/http/catalog.py`, `backend/app/api/http/agent_projects.py`, and `backend/app/api/http/apps.py`.
 
 ## Source of Truth
 

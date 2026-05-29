@@ -51,8 +51,10 @@ def test_frontend_routes_point_to_feature_domain_pages() -> None:
     assert '../features/context-management/pages/ContextKnowledgeBasesPage' in routes_source
     assert '../features/context-management/pages/ContextKnowledgeBaseCreatePage' in routes_source
     assert '../features/context-management/pages/ContextKnowledgeBaseDetailPage' in routes_source
-    assert '../features/agent-builder/pages/AgentBuilderProjectsPage' in routes_source
-    assert '../features/agent-builder/pages/AgentProjectDetailPage' in routes_source
+    assert '../features/apps/pages/AppsHomePage' in routes_source
+    assert '../features/apps/pages/AppDetailPage' in routes_source
+    assert '../features/agent-builder/pages/AgentBuilderProjectsPage' not in routes_source
+    assert '../features/agent-builder/pages/AgentProjectDetailPage' not in routes_source
     assert '../features/catalog-admin/pages/CatalogControlPage' in routes_source
     assert '../pages/PlatformControlPage' not in routes_source
     assert '../pages/ContextKnowledgeBasesPage' not in routes_source
