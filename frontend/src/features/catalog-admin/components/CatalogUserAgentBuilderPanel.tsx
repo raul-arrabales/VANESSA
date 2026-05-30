@@ -11,6 +11,7 @@ type Props = {
   mcpServers: CatalogMcpServer[];
   models: ModelCatalogItem[];
   onChange: (value: AgentProjectFormState) => void;
+  onAgentTypeChange: (agentType: AgentProjectFormState["agentType"]) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
 };
@@ -21,11 +22,15 @@ export default function CatalogUserAgentBuilderPanel({
   mcpServers,
   models,
   onChange,
+  onAgentTypeChange,
   onSubmit,
   onReset,
 }: Props): JSX.Element {
   const { t } = useTranslation("common");
   const instructionsDisabled = form.agentType === "workflow";
+  const isTypeStepComplete = form.agentType === "workflow" && form.channelType === "vanessa_webapp" && form.interfaceType === "chat";
+  const isBasicsStepComplete = isTypeStepComplete
+    && Boolean(form.id.trim() && form.name.trim() && form.description.trim());
   const selectedMcpServer = useMemo(
     () => mcpServers.find((server) => server.spec.slug === form.selectedMcpServerSlug) ?? null,
     [form.selectedMcpServerSlug, mcpServers],
@@ -49,7 +54,8 @@ export default function CatalogUserAgentBuilderPanel({
           <div className="form-grid">
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.agents.userProjects.agentType")}</span>
-              <select className="field-input" value={form.agentType} onChange={(event) => onChange({ ...form, agentType: event.currentTarget.value as AgentProjectFormState["agentType"] })}>
+              <select className="field-input" value={form.agentType} onChange={(event) => onAgentTypeChange(event.currentTarget.value as AgentProjectFormState["agentType"])}>
+                <option value="">{t("catalogControl.agents.userProjects.selectAgentType")}</option>
                 <option value="workflow">Workflow Agent</option>
                 <option value="planner" disabled>Planner Agent (Coming soon)</option>
                 <option value="react" disabled>ReAct Agent (Coming soon)</option>
@@ -66,6 +72,7 @@ export default function CatalogUserAgentBuilderPanel({
           </div>
         </section>
 
+        {isTypeStepComplete ? (
         <section className="panel panel-nested card-stack">
           <h4 className="section-title">{t("catalogControl.agents.userProjects.stepBasics")}</h4>
           <div className="form-grid">
@@ -109,7 +116,9 @@ export default function CatalogUserAgentBuilderPanel({
             </select>
           </label>
         </section>
+        ) : null}
 
+        {isBasicsStepComplete ? (
         <section className="panel panel-nested card-stack">
           <h4 className="section-title">{t("catalogControl.agents.userProjects.stepWorkflow")}</h4>
           <p className="status-text">{t("catalogControl.agents.userProjects.workflowHelp")}</p>
@@ -144,12 +153,15 @@ export default function CatalogUserAgentBuilderPanel({
             <textarea className="field-input form-textarea" value={form.stepArgumentsText} onChange={(event) => onChange({ ...form, stepArgumentsText: event.currentTarget.value })} />
           </label>
         </section>
+        ) : null}
 
+        {isBasicsStepComplete ? (
         <div className="status-row">
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? t("catalogControl.actions.saving") : t("catalogControl.agents.userProjects.save")}
           </button>
         </div>
+        ) : null}
       </form>
     </article>
   );

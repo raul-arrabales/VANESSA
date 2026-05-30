@@ -96,6 +96,7 @@ export default function CatalogControlPage(): JSX.Element {
     setForm: setUserAgentForm,
     validations: userAgentValidations,
     selectProject,
+    setCreateAgentType,
     resetForm: resetUserAgentForm,
     submitForm,
     validateProject,
@@ -313,6 +314,7 @@ export default function CatalogControlPage(): JSX.Element {
           models={models}
           saving={userAgentProjectSaving}
           onChange={setUserAgentForm}
+          onAgentTypeChange={setCreateAgentType}
           onSubmit={(event) => {
             event.preventDefault();
             void submitForm();

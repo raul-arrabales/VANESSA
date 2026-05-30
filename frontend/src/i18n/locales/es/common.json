@@ -2158,6 +2158,7 @@
         "create": "Crear agente"
       },
       "userProjects": {
+        "selectAgentType": "Selecciona un tipo de agente",
         "workflowInstructionsDisabled": "Los agentes Workflow no usan instrucciones. Siempre ejecutan los pasos definidos del flujo en secuencia."
       },
       "deleteDialog": {

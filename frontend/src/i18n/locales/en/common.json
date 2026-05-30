@@ -2194,6 +2194,7 @@
         "stepBasics": "2. Basics",
         "stepWorkflow": "3. Workflow",
         "agentType": "Agent type",
+        "selectAgentType": "Select an agent type",
         "channelType": "Channel",
         "interfaceType": "Interface",
         "workflowHelp": "Workflow Agent is the only supported type in this first pass. It runs a single-thread ordered MCP action sequence.",

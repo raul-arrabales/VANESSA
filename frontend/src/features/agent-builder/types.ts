@@ -10,9 +10,9 @@ export type AgentProjectFormState = {
   instructions: string;
   retrievalContext: string;
   defaultModelRef: string;
-  agentType: "workflow" | "planner" | "react";
-  channelType: "vanessa_webapp";
-  interfaceType: "chat";
+  agentType: "" | "workflow" | "planner" | "react";
+  channelType: "" | "vanessa_webapp";
+  interfaceType: "" | "chat";
   agentDomain: string;
   selectedMcpServerSlug: string;
   selectedToolName: string;
@@ -25,7 +25,8 @@ export type AgentProjectFormState = {
 
 export type AgentProjectPreview = PreviewableAssistantExperience;
 
-const DEFAULT_WORKFLOW_AGENT_DESCRIPTION = "Executes a deterministic MCP workflow in the Vanessa WebApp chat.";
+export const DEFAULT_WORKFLOW_AGENT_DESCRIPTION = "Executes a deterministic MCP workflow in the Vanessa WebApp chat.";
+export const DEFAULT_WORKFLOW_TOOL_POLICY_TEXT = "{\n  \"allow_user_tools\": false\n}";
 
 function normalizeId(value: string): string {
   return value.trim().toLowerCase();
@@ -35,24 +36,19 @@ function normalizeName(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function nextAvailableSuffixedValue(base: string, existingValues: string[], normalize: (value: string) => string): string {
+function nextAvailableNumberedValue(prefix: string, existingValues: string[], normalize: (value: string) => string, separator: "-" | " "): string {
+  const join = (counter: number) => `${prefix}${separator}${counter}`;
   const used = new Set(existingValues.map(normalize).filter(Boolean));
-  if (!used.has(normalize(base))) {
-    return base;
-  }
-  let counter = 2;
-  while (used.has(normalize(`${base}-${counter}`))) {
+  let counter = 1;
+  while (used.has(normalize(join(counter)))) {
     counter += 1;
   }
-  return `${base}-${counter}`;
+  return join(counter);
 }
 
-function nextAvailableSuffixedName(base: string, existingNames: string[]): string {
+function nextAvailableNumberedName(base: string, existingNames: string[]): string {
   const used = new Set(existingNames.map(normalizeName).filter(Boolean));
-  if (!used.has(normalizeName(base))) {
-    return base;
-  }
-  let counter = 2;
+  let counter = 1;
   while (used.has(normalizeName(`${base} ${counter}`))) {
     counter += 1;
   }
@@ -68,8 +64,8 @@ export function buildDefaultAgentProjectForm(
 ): AgentProjectFormState {
   const baseId = "workflow-agent";
   const baseName = "Workflow Agent";
-  const id = nextAvailableSuffixedValue(baseId, options.existingProjectIds ?? [], normalizeId);
-  const name = nextAvailableSuffixedName(baseName, options.existingAgentNames ?? []);
+  const id = nextAvailableNumberedValue(baseId, options.existingProjectIds ?? [], normalizeId, "-");
+  const name = nextAvailableNumberedName(baseName, options.existingAgentNames ?? []);
   return {
     id,
     visibility: "private",
@@ -86,13 +82,54 @@ export function buildDefaultAgentProjectForm(
     selectedToolName: "",
     stepName: "",
     stepArgumentsText: "{}",
-    toolPolicyText: "{\n  \"allow_user_tools\": false\n}",
+    toolPolicyText: DEFAULT_WORKFLOW_TOOL_POLICY_TEXT,
     internetRequired: false,
     sandboxRequired: false,
   };
 }
 
 export const DEFAULT_AGENT_PROJECT_FORM: AgentProjectFormState = buildDefaultAgentProjectForm(null);
+
+export function buildGuidedUserAgentCreateForm(
+  defaults: CatalogDefaults | null,
+  options: {
+    existingProjectIds?: string[];
+    existingAgentNames?: string[];
+    agentType?: AgentProjectFormState["agentType"];
+  } = {},
+): AgentProjectFormState {
+  const selectedAgentType = options.agentType ?? "";
+  if (selectedAgentType === "workflow") {
+    const workflowDefaults = buildDefaultAgentProjectForm(defaults, options);
+    return {
+      ...workflowDefaults,
+      agentType: "workflow",
+      channelType: "vanessa_webapp",
+      interfaceType: "chat",
+    };
+  }
+
+  return {
+    id: "",
+    visibility: "private",
+    name: "",
+    description: "",
+    instructions: "",
+    retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+    defaultModelRef: "",
+    agentType: "",
+    channelType: "",
+    interfaceType: "",
+    agentDomain: "default",
+    selectedMcpServerSlug: "",
+    selectedToolName: "",
+    stepName: "",
+    stepArgumentsText: "{}",
+    toolPolicyText: DEFAULT_WORKFLOW_TOOL_POLICY_TEXT,
+    internetRequired: false,
+    sandboxRequired: false,
+  };
+}
 
 export function parseJsonObject(text: string, errorMessage: string): Record<string, unknown> {
   const normalized = text.trim();
@@ -149,6 +186,9 @@ export function toAgentProjectMutationInput(
 ): AgentProjectMutationInput {
   const { includeId, invalidWorkflowMessage, invalidToolPolicyMessage } = options;
   const id = form.id.trim();
+  const agentType = (form.agentType || "workflow") as "workflow" | "planner" | "react";
+  const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
+  const interfaceType = (form.interfaceType || "chat") as "chat";
   const selectedMcpServerSlug = String(form.selectedMcpServerSlug ?? "").trim();
   const selectedToolName = String(form.selectedToolName ?? "").trim();
   const stepName = String(form.stepName ?? "").trim();
@@ -157,7 +197,7 @@ export function toAgentProjectMutationInput(
     visibility: form.visibility,
     name: form.name.trim(),
     description: form.description.trim(),
-    instructions: form.agentType === "workflow" ? "" : form.instructions.trim(),
+    instructions: agentType === "workflow" ? "" : form.instructions.trim(),
     runtime_prompts: {
       retrieval_context: form.retrievalContext.trim(),
     },
@@ -165,9 +205,9 @@ export function toAgentProjectMutationInput(
     tool_refs: [],
     mcp_server_refs: selectedMcpServerSlug ? [selectedMcpServerSlug] : [],
     agent_domain: form.agentDomain.trim() || "default",
-    agent_type: form.agentType,
-    channel_type: form.channelType,
-    interface_type: form.interfaceType,
+    agent_type: agentType,
+    channel_type: channelType,
+    interface_type: interfaceType,
     workflow_definition: {
       steps: selectedMcpServerSlug && selectedToolName
         ? [{
@@ -188,6 +228,9 @@ export function toAgentProjectMutationInput(
 }
 
 export function buildAgentProjectPreview(projectId: string, form: AgentProjectFormState): AgentProjectPreview {
+  const agentType = (form.agentType || "workflow") as "workflow" | "planner" | "react";
+  const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
+  const interfaceType = (form.interfaceType || "chat") as "chat";
   const defaultModelRef = String(form.defaultModelRef ?? "").trim();
   const selectedMcpServerSlug = String(form.selectedMcpServerSlug ?? "").trim();
   const selectedToolName = String(form.selectedToolName ?? "").trim();
@@ -207,9 +250,9 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
     tool_refs: [],
     mcp_server_refs: selectedMcpServerSlug ? [selectedMcpServerSlug] : [],
     agent_domain: agentDomain || "default",
-    agent_type: form.agentType,
-    channel_type: form.channelType,
-    interface_type: form.interfaceType,
+    agent_type: agentType,
+    channel_type: channelType,
+    interface_type: interfaceType,
     runtime_constraints: {
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,

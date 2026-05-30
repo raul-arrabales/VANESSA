@@ -13,7 +13,7 @@ import {
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import {
   buildAgentProjectForm,
-  buildDefaultAgentProjectForm,
+  buildGuidedUserAgentCreateForm,
   toAgentProjectMutationInput,
   type AgentProjectFormState,
 } from "../../agent-builder/types";
@@ -30,6 +30,7 @@ type UseUserAgentProjectsControlResult = {
   validations: Record<string, AgentProjectValidation>;
   publishResults: Record<string, AgentProjectPublishResult>;
   selectProject: (project: AgentProject | null) => void;
+  setCreateAgentType: (agentType: AgentProjectFormState["agentType"]) => void;
   resetForm: () => void;
   submitForm: () => Promise<AgentProject | null>;
   validateProject: (projectId: string) => Promise<void>;
@@ -46,30 +47,18 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   const [validatingProjectId, setValidatingProjectId] = useState("");
   const [publishingProjectId, setPublishingProjectId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [form, setForm] = useState<AgentProjectFormState>(() => buildDefaultAgentProjectForm(null, { existingAgentNames }));
+  const [form, setForm] = useState<AgentProjectFormState>(() => buildGuidedUserAgentCreateForm(null, { existingAgentNames }));
   const [validations, setValidations] = useState<Record<string, AgentProjectValidation>>({});
   const [publishResults, setPublishResults] = useState<Record<string, AgentProjectPublishResult>>({});
 
-  const buildCreateDefaults = (projectList: AgentProject[]): AgentProjectFormState => buildDefaultAgentProjectForm(null, {
+  const buildCreateDefaults = (
+    projectList: AgentProject[],
+    agentType: AgentProjectFormState["agentType"] = "",
+  ): AgentProjectFormState => buildGuidedUserAgentCreateForm(null, {
     existingProjectIds: projectList.map((project) => project.id),
     existingAgentNames: [...existingAgentNames, ...projectList.map((project) => project.spec.name)],
+    agentType,
   });
-  const isUntouchedGeneratedDraft = (current: AgentProjectFormState): boolean => (
-    current.agentType === "workflow"
-    && current.visibility === "private"
-    && current.description === "Executes a deterministic MCP workflow in the Vanessa WebApp chat."
-    && current.instructions === ""
-    && current.defaultModelRef === ""
-    && current.selectedMcpServerSlug === ""
-    && current.selectedToolName === ""
-    && current.stepName === ""
-    && current.stepArgumentsText === "{}"
-    && current.toolPolicyText === "{\n  \"allow_user_tools\": false\n}"
-    && current.internetRequired === false
-    && current.sandboxRequired === false
-    && current.id.startsWith("workflow-agent")
-    && current.name.startsWith("Workflow Agent")
-  );
 
   const refresh = async (): Promise<void> => {
     if (!token) {
@@ -85,7 +74,15 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
         if (selectedProjectId) {
           return current;
         }
-        if (!isUntouchedGeneratedDraft(current)) {
+        if (
+          current.agentType
+          || current.id.trim()
+          || current.name.trim()
+          || current.description.trim()
+          || current.selectedMcpServerSlug.trim()
+          || current.selectedToolName.trim()
+          || current.stepName.trim()
+        ) {
           return current;
         }
         return buildCreateDefaults(listed);
@@ -114,6 +111,19 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   const resetForm = (): void => {
     setSelectedProjectId(null);
     setForm(buildCreateDefaults(projects));
+  };
+
+  const setCreateAgentType = (agentType: AgentProjectFormState["agentType"]): void => {
+    if (selectedProjectId) {
+      setForm((current) => ({
+        ...current,
+        agentType,
+        channelType: agentType === "workflow" ? "vanessa_webapp" : "",
+        interfaceType: agentType === "workflow" ? "chat" : "",
+      }));
+      return;
+    }
+    setForm(buildCreateDefaults(projects, agentType));
   };
 
   const submitForm = async (): Promise<AgentProject | null> => {
@@ -195,6 +205,7 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
     validations,
     publishResults,
     selectProject,
+    setCreateAgentType,
     resetForm,
     submitForm,
     validateProject,

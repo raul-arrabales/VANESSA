@@ -612,9 +612,15 @@ describe("CatalogControlPage", () => {
     const subNav = await screen.findByRole("navigation", { name: "Agent catalog sections" });
     expect(within(subNav).getByRole("link", { name: "Create agent" })).toHaveAttribute("aria-current", "page");
 
-    expect(screen.getByLabelText("Agent ID")).toHaveValue("workflow-agent");
+    expect(screen.queryByLabelText("Agent ID")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("MCP server")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Agent type"), "workflow");
+
+    expect(screen.getByLabelText("Agent ID")).toHaveValue("workflow-agent-1");
     expect(screen.getByLabelText("Agent ID")).toBeDisabled();
-    expect(screen.getByLabelText("Name")).toHaveValue("Workflow Agent");
+    expect(screen.getByLabelText("Name")).toHaveValue("Workflow Agent 1");
     expect(screen.getByLabelText("Description")).toHaveValue("Executes a deterministic MCP workflow in the Vanessa WebApp chat.");
     expect(screen.getByLabelText("Instructions")).toBeDisabled();
     expect(screen.getByLabelText("Instructions")).toHaveValue(
@@ -631,7 +637,7 @@ describe("CatalogControlPage", () => {
     await waitFor(() => {
       expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: "workflow-agent",
+          id: "workflow-agent-1",
           name: "Workflow Agent Support",
           description: "Catalog agent",
           instructions: "",
