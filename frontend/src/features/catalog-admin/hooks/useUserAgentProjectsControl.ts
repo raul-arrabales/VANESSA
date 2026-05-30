@@ -79,9 +79,7 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
           || current.id.trim()
           || current.name.trim()
           || current.description.trim()
-          || current.selectedMcpServerSlug.trim()
-          || current.selectedToolName.trim()
-          || current.stepName.trim()
+          || current.workflowActions.length > 0
         ) {
           return current;
         }

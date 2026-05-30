@@ -3,6 +3,52 @@ import { readStoredToken } from "../auth/storage";
 import { requestJson } from "./modelops/request";
 
 export type AgentProjectVisibility = "private" | "unlisted" | "public";
+export type WorkflowVariableType = "text";
+
+export type WorkflowVariableDefinition = {
+  name: string;
+  label: string;
+  type: WorkflowVariableType;
+  required?: boolean;
+  guidance?: string;
+};
+
+export type WorkflowVariableReference = {
+  variable: string;
+};
+
+export type WorkflowGetUserInputAction = {
+  id: string;
+  type: "get_user_input";
+  name: string;
+  prompt: string;
+  variables: WorkflowVariableDefinition[];
+};
+
+export type WorkflowMcpToolAction = {
+  id: string;
+  type: "mcp_tool";
+  name: string;
+  mcp_server_slug: string;
+  exposed_tool_name: string;
+  input_bindings: Record<string, WorkflowVariableReference>;
+  output_variables: Array<WorkflowVariableDefinition & { path?: string }>;
+};
+
+export type WorkflowSendOutputAction = {
+  id: string;
+  type: "send_output";
+  name: string;
+  instruction: string;
+  variable_refs: string[];
+};
+
+export type WorkflowAction = WorkflowGetUserInputAction | WorkflowMcpToolAction | WorkflowSendOutputAction;
+
+export type WorkflowDefinition = {
+  version: number;
+  actions: WorkflowAction[];
+};
 
 export type AgentProjectSpec = {
   name: string;
@@ -18,15 +64,7 @@ export type AgentProjectSpec = {
   agent_type: "workflow" | "planner" | "react";
   channel_type: "vanessa_webapp";
   interface_type: "chat";
-  workflow_definition: {
-    steps: Array<{
-      id: string;
-      name: string;
-      mcp_server_slug: string;
-      exposed_tool_name: string;
-      arguments: Record<string, unknown>;
-    }>;
-  };
+  workflow_definition: WorkflowDefinition;
   tool_policy: Record<string, unknown>;
   runtime_constraints: {
     internet_required: boolean;

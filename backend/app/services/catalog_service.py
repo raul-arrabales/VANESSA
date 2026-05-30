@@ -65,7 +65,8 @@ from .user_agent_types import (
     coerce_interface_type,
     coerce_user_agent_type,
     normalize_workflow_definition,
-    workflow_step_server_slugs,
+    workflow_actions,
+    workflow_mcp_server_slugs,
 )
 
 _ENTITY_TYPE_AGENT = "agent"
@@ -830,7 +831,8 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
             derived_runtime_requirements["internet_required"] = True
 
     configured_mcp_refs = {str(value).strip() for value in spec.get("mcp_server_refs", []) if str(value).strip()}
-    workflow_mcp_refs = set(workflow_step_server_slugs(spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}))
+    workflow_definition = spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}
+    workflow_mcp_refs = set(workflow_mcp_server_slugs(workflow_definition))
     for slug in sorted(configured_mcp_refs | workflow_mcp_refs):
         if not slug:
             continue
@@ -860,9 +862,11 @@ def validate_catalog_agent(database_url: str, *, agent_id: str) -> dict[str, Any
 
     runtime_constraints = spec.get("runtime_constraints") if isinstance(spec.get("runtime_constraints"), dict) else {}
     if spec.get("agent_type") == "workflow":
-        workflow_steps = spec.get("workflow_definition", {}).get("steps") if isinstance(spec.get("workflow_definition"), dict) else None
-        if not isinstance(workflow_steps, list) or not workflow_steps:
-            errors.append("Workflow agents require at least one workflow step.")
+        actions = workflow_actions(workflow_definition)
+        if not actions:
+            errors.append("Workflow agents require at least one workflow action.")
+        elif str(actions[0].get("type") or "") != "get_user_input" or str(actions[-1].get("type") or "") != "send_output":
+            errors.append("Workflow agents must start with get_user_input and end with send_output.")
     if spec.get("channel_type") == CHANNEL_TYPE_VANESSA_WEBAPP and spec.get("interface_type") != INTERFACE_TYPE_CHAT:
         errors.append("channel_type vanessa_webapp currently requires interface_type chat.")
     if derived_runtime_requirements["sandbox_required"] and not bool(runtime_constraints.get("sandbox_required", False)):

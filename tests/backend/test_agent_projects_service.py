@@ -25,14 +25,31 @@ def _project_row() -> dict[str, object]:
         "channel_type": "vanessa_webapp",
         "interface_type": "chat",
         "workflow_definition": {
-            "steps": [
+            "version": 2,
+            "actions": [
                 {
-                    "id": "step_1",
+                    "id": "input_1",
+                    "type": "get_user_input",
+                    "name": "Collect query",
+                    "prompt": "Ask for the support query.",
+                    "variables": [{"name": "query", "label": "Support query", "type": "text", "required": True}],
+                },
+                {
+                    "id": "tool_1",
+                    "type": "mcp_tool",
                     "name": "Support search",
                     "mcp_server_slug": "support_search",
                     "exposed_tool_name": "support_search",
-                    "arguments": {},
-                }
+                    "input_bindings": {"query": {"variable": "query"}},
+                    "output_variables": [{"name": "search_results", "label": "Search results", "type": "text", "required": True}],
+                },
+                {
+                    "id": "output_1",
+                    "type": "send_output",
+                    "name": "Send response",
+                    "instruction": "Summarize the result.",
+                    "variable_refs": ["search_results"],
+                },
             ]
         },
         "tool_policy": {"allow_user_tools": False},
@@ -62,12 +79,14 @@ def test_validate_agent_project_reports_runtime_constraint_mismatches(monkeypatc
         lambda *_args, **_kwargs: {
             "entity_id": "mcp.support_search",
             "current_spec": {
-                "slug": "support_search",
-                "name": "Support Search",
-                "backing_tool_id": "tool.web_search",
-                "enabled": True,
+                    "slug": "support_search",
+                    "name": "Support Search",
+                    "backing_tool_id": "tool.web_search",
+                    "exposed_tool_name": "support_search",
+                    "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+                    "enabled": True,
+                },
             },
-        },
     )
 
     payload = agent_projects_service.validate_agent_project(
@@ -110,7 +129,7 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
             "agent_type": "workflow",
             "channel_type": "vanessa_webapp",
             "interface_type": "chat",
-            "workflow_definition": {"steps": []},
+            "workflow_definition": _project_row()["workflow_definition"],
             "tool_policy": {"allow_user_tools": False},
             "runtime_constraints": {"internet_required": False, "sandbox_required": False},
         },
@@ -173,15 +192,5 @@ def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypat
         "channel_type": "vanessa_webapp",
         "interface_type": "chat",
         "runtime_constraints": {"internet_required": False, "sandbox_required": False},
-        "workflow_definition": {
-            "steps": [
-                {
-                    "id": "step_1",
-                    "name": "Support search",
-                    "mcp_server_slug": "support_search",
-                    "exposed_tool_name": "support_search",
-                    "arguments": {},
-                }
-            ]
-        },
+        "workflow_definition": _project_row()["workflow_definition"],
     }

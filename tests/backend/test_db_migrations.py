@@ -163,6 +163,8 @@ def test_run_agent_projects_schema_migration_executes_base_and_additive_sql(monk
             return "-- migration 015"
         if self.name == "018_user_agent_apps.sql":
             return "-- migration 018"
+        if self.name == "019_agent_workflow_runs.sql":
+            return "-- migration 019"
         return original_read_text(self, encoding="utf-8")
 
     monkeypatch.setattr(db, "get_connection", _recording_get_connection)
@@ -170,7 +172,7 @@ def test_run_agent_projects_schema_migration_executes_base_and_additive_sql(monk
 
     db.run_agent_projects_schema_migration("postgresql://ignored")
 
-    assert executed_sql == ["-- migration 015", "-- migration 018"]
+    assert executed_sql == ["-- migration 015", "-- migration 018", "-- migration 019"]
 
 
 def test_platform_binding_resources_migration_guards_legacy_copy_when_table_absent():

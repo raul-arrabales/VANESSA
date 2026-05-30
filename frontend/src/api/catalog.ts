@@ -1,5 +1,6 @@
 import { requestJson } from "./modelops/request";
 import type { CatalogExecutionTraceEntry } from "./catalogExecutionTrace";
+import type { WorkflowDefinition } from "./agentProjects";
 
 export type CatalogAgentSpec = {
   name: string;
@@ -15,15 +16,7 @@ export type CatalogAgentSpec = {
   agent_type?: "workflow" | "planner" | "react";
   channel_type?: "vanessa_webapp";
   interface_type?: "chat";
-  workflow_definition?: {
-    steps: Array<{
-      id: string;
-      name: string;
-      mcp_server_slug: string;
-      exposed_tool_name: string;
-      arguments: Record<string, unknown>;
-    }>;
-  };
+  workflow_definition?: WorkflowDefinition;
   runtime_constraints: {
     internet_required: boolean;
     sandbox_required: boolean;

@@ -98,7 +98,7 @@ const agentProjectFixture = {
     agent_type: "workflow" as const,
     channel_type: "vanessa_webapp" as const,
     interface_type: "chat" as const,
-    workflow_definition: { steps: [] },
+    workflow_definition: { version: 2, actions: [] },
     tool_policy: { allow_user_tools: false },
     runtime_constraints: { internet_required: true, sandbox_required: false },
   },
@@ -631,7 +631,16 @@ describe("CatalogControlPage", () => {
     await user.type(screen.getByLabelText("Name"), "Workflow Agent Support");
     await user.clear(screen.getByLabelText("Description"));
     await user.type(screen.getByLabelText("Description"), "Catalog agent");
+    await user.selectOptions(screen.getByLabelText("Add workflow action"), "get_user_input");
+    await user.type(screen.getByLabelText("Variable name"), "search_query");
+    await user.type(screen.getByLabelText("Variable label"), "Search query");
+    await user.selectOptions(screen.getByLabelText("Add workflow action"), "mcp_tool");
     await user.selectOptions(screen.getByLabelText("MCP server"), "web_search");
+    await user.selectOptions(screen.getByLabelText("query"), "search_query");
+    await user.type(screen.getAllByLabelText("Variable name")[1], "search_results");
+    await user.type(screen.getAllByLabelText("Variable label")[1], "Search results");
+    await user.selectOptions(screen.getByLabelText("Add workflow action"), "send_output");
+    await user.click(screen.getByLabelText("Search results"));
     await user.click(screen.getByRole("button", { name: "Save user agent" }));
 
     await waitFor(() => {
@@ -644,6 +653,14 @@ describe("CatalogControlPage", () => {
           agent_type: "workflow",
           channel_type: "vanessa_webapp",
           interface_type: "chat",
+          workflow_definition: expect.objectContaining({
+            version: 2,
+            actions: expect.arrayContaining([
+              expect.objectContaining({ type: "get_user_input" }),
+              expect.objectContaining({ type: "mcp_tool", mcp_server_slug: "web_search" }),
+              expect.objectContaining({ type: "send_output" }),
+            ]),
+          }),
         }),
         "token",
       );

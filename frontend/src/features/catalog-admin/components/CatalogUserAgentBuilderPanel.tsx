@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer } from "../../../api/catalog";
+import type { WorkflowAction } from "../../../api/agentProjects";
 import type { ModelCatalogItem } from "../../../api/modelops";
 import type { AgentProjectFormState } from "../../agent-builder/types";
 
@@ -15,6 +16,13 @@ type Props = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReset: () => void;
 };
+
+type AvailableVariable = {
+  name: string;
+  label: string;
+};
+
+const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 export default function CatalogUserAgentBuilderPanel({
   form,
@@ -31,10 +39,29 @@ export default function CatalogUserAgentBuilderPanel({
   const isTypeStepComplete = form.agentType === "workflow" && form.channelType === "vanessa_webapp" && form.interfaceType === "chat";
   const isBasicsStepComplete = isTypeStepComplete
     && Boolean(form.id.trim() && form.name.trim() && form.description.trim());
-  const selectedMcpServer = useMemo(
-    () => mcpServers.find((server) => server.spec.slug === form.selectedMcpServerSlug) ?? null,
-    [form.selectedMcpServerSlug, mcpServers],
-  );
+  const enabledMcpServers = useMemo(() => mcpServers.filter((server) => server.spec.enabled), [mcpServers]);
+  const workflowComplete = isWorkflowComplete(form.workflowActions, enabledMcpServers);
+
+  const updateAction = (index: number, action: WorkflowAction): void => {
+    onChange({
+      ...form,
+      workflowActions: form.workflowActions.map((item, itemIndex) => (itemIndex === index ? action : item)),
+    });
+  };
+
+  const removeAction = (index: number): void => {
+    onChange({
+      ...form,
+      workflowActions: form.workflowActions.filter((_item, itemIndex) => itemIndex !== index),
+    });
+  };
+
+  const appendAction = (type: WorkflowAction["type"]): void => {
+    onChange({
+      ...form,
+      workflowActions: [...form.workflowActions, buildNewAction(type, form.workflowActions.length)],
+    });
+  };
 
   return (
     <article className="panel card-stack">
@@ -73,96 +100,374 @@ export default function CatalogUserAgentBuilderPanel({
         </section>
 
         {isTypeStepComplete ? (
-        <section className="panel panel-nested card-stack">
-          <h4 className="section-title">{t("catalogControl.agents.userProjects.stepBasics")}</h4>
-          <div className="form-grid">
+          <section className="panel panel-nested card-stack">
+            <h4 className="section-title">{t("catalogControl.agents.userProjects.stepBasics")}</h4>
+            <div className="form-grid">
+              <label className="card-stack">
+                <span className="field-label">{t("catalogControl.forms.agent.id")}</span>
+                <input className="field-input" value={form.id} disabled />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("catalogControl.forms.agent.name")}</span>
+                <input className="field-input" value={form.name} onChange={(event) => onChange({ ...form, name: event.currentTarget.value })} />
+              </label>
+              <label className="card-stack">
+                <span className="field-label">{t("catalogControl.forms.status")}</span>
+                <select className="field-input" value={form.visibility} onChange={(event) => onChange({ ...form, visibility: event.currentTarget.value as AgentProjectFormState["visibility"] })}>
+                  <option value="private">private</option>
+                  <option value="unlisted">unlisted</option>
+                  <option value="public">public</option>
+                </select>
+              </label>
+            </div>
             <label className="card-stack">
-              <span className="field-label">{t("catalogControl.forms.agent.id")}</span>
-              <input className="field-input" value={form.id} disabled />
+              <span className="field-label">{t("catalogControl.forms.agent.description")}</span>
+              <textarea className="field-input form-textarea" value={form.description} onChange={(event) => onChange({ ...form, description: event.currentTarget.value })} />
             </label>
             <label className="card-stack">
-              <span className="field-label">{t("catalogControl.forms.agent.name")}</span>
-              <input className="field-input" value={form.name} onChange={(event) => onChange({ ...form, name: event.currentTarget.value })} />
+              <span className="field-label">{t("catalogControl.forms.agent.instructions")}</span>
+              <textarea
+                className="field-input form-textarea"
+                value={instructionsDisabled ? t("catalogControl.agents.userProjects.workflowInstructionsDisabled") : form.instructions}
+                onChange={(event) => onChange({ ...form, instructions: event.currentTarget.value })}
+                disabled={instructionsDisabled}
+              />
             </label>
             <label className="card-stack">
-              <span className="field-label">{t("catalogControl.forms.status")}</span>
-              <select className="field-input" value={form.visibility} onChange={(event) => onChange({ ...form, visibility: event.currentTarget.value as AgentProjectFormState["visibility"] })}>
-                <option value="private">private</option>
-                <option value="unlisted">unlisted</option>
-                <option value="public">public</option>
+              <span className="field-label">{t("catalogControl.forms.agent.defaultModel")}</span>
+              <select className="field-input" value={form.defaultModelRef} onChange={(event) => onChange({ ...form, defaultModelRef: event.currentTarget.value })}>
+                <option value="">{t("catalogControl.forms.agent.noDefaultModel")}</option>
+                {models.map((model) => (
+                  <option key={model.id} value={model.id}>{model.name}</option>
+                ))}
               </select>
             </label>
-          </div>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.forms.agent.description")}</span>
-            <textarea className="field-input form-textarea" value={form.description} onChange={(event) => onChange({ ...form, description: event.currentTarget.value })} />
-          </label>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.forms.agent.instructions")}</span>
-            <textarea
-              className="field-input form-textarea"
-              value={instructionsDisabled ? t("catalogControl.agents.userProjects.workflowInstructionsDisabled") : form.instructions}
-              onChange={(event) => onChange({ ...form, instructions: event.currentTarget.value })}
-              disabled={instructionsDisabled}
-            />
-          </label>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.forms.agent.defaultModel")}</span>
-            <select className="field-input" value={form.defaultModelRef} onChange={(event) => onChange({ ...form, defaultModelRef: event.currentTarget.value })}>
-              <option value="">{t("catalogControl.forms.agent.noDefaultModel")}</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>{model.name}</option>
-              ))}
-            </select>
-          </label>
-        </section>
+          </section>
         ) : null}
 
         {isBasicsStepComplete ? (
-        <section className="panel panel-nested card-stack">
-          <h4 className="section-title">{t("catalogControl.agents.userProjects.stepWorkflow")}</h4>
-          <p className="status-text">{t("catalogControl.agents.userProjects.workflowHelp")}</p>
+          <section className="panel panel-nested card-stack">
+            <h4 className="section-title">{t("catalogControl.agents.userProjects.stepWorkflow")}</h4>
+            <p className="status-text">{t("catalogControl.agents.userProjects.workflowHelp")}</p>
+            <div className="card-stack">
+              {form.workflowActions.map((action, index) => (
+                <WorkflowActionEditor
+                  key={action.id}
+                  action={action}
+                  actionIndex={index}
+                  enabledMcpServers={enabledMcpServers}
+                  availableVariables={variablesBeforeAction(form.workflowActions, index)}
+                  onChange={(updated) => updateAction(index, updated)}
+                  onRemove={() => removeAction(index)}
+                />
+              ))}
+            </div>
+            {canAppendAction(form.workflowActions, enabledMcpServers) ? (
+              <div className="status-row">
+                <select
+                  aria-label={t("catalogControl.agents.userProjects.addAction")}
+                  className="field-input"
+                  value=""
+                  onChange={(event) => {
+                    const value = event.currentTarget.value as WorkflowAction["type"];
+                    if (value) appendAction(value);
+                  }}
+                >
+                  <option value="">{t("catalogControl.agents.userProjects.addAction")}</option>
+                  <option value="get_user_input">{t("catalogControl.agents.userProjects.actionGetInput")}</option>
+                  <option value="mcp_tool">{t("catalogControl.agents.userProjects.actionMcpTool")}</option>
+                  <option value="send_output">{t("catalogControl.agents.userProjects.actionSendOutput")}</option>
+                </select>
+              </div>
+            ) : (
+              <p className="status-text">{t("catalogControl.agents.userProjects.completeActionBeforeNext")}</p>
+            )}
+          </section>
+        ) : null}
+
+        {isBasicsStepComplete ? (
+          <div className="status-row">
+            <button type="submit" className="btn btn-primary" disabled={saving || !workflowComplete}>
+              {saving ? t("catalogControl.actions.saving") : t("catalogControl.agents.userProjects.save")}
+            </button>
+          </div>
+        ) : null}
+      </form>
+    </article>
+  );
+}
+
+function WorkflowActionEditor({
+  action,
+  actionIndex,
+  enabledMcpServers,
+  availableVariables,
+  onChange,
+  onRemove,
+}: {
+  action: WorkflowAction;
+  actionIndex: number;
+  enabledMcpServers: CatalogMcpServer[];
+  availableVariables: AvailableVariable[];
+  onChange: (action: WorkflowAction) => void;
+  onRemove: () => void;
+}): JSX.Element {
+  const { t } = useTranslation("common");
+  const selectedServer = action.type === "mcp_tool"
+    ? enabledMcpServers.find((server) => server.spec.slug === action.mcp_server_slug) ?? null
+    : null;
+  const requiredInputs = selectedServer ? requiredSchemaFields(selectedServer.spec.input_schema) : [];
+  const outputFields = selectedServer ? schemaPropertyNames(selectedServer.spec.output_schema) : [];
+
+  return (
+    <section className="panel panel-nested card-stack">
+      <div className="status-row">
+        <h5 className="section-title">{actionIndex + 1}. {actionLabel(action.type, t)}</h5>
+        <button type="button" className="btn btn-secondary" onClick={onRemove}>{t("catalogControl.actions.remove")}</button>
+      </div>
+      <label className="card-stack">
+        <span className="field-label">{t("catalogControl.agents.userProjects.actionName")}</span>
+        <input className="field-input" value={action.name} onChange={(event) => onChange({ ...action, name: event.currentTarget.value })} />
+      </label>
+      {action.type === "get_user_input" ? (
+        <>
+          <label className="card-stack">
+            <span className="field-label">{t("catalogControl.agents.userProjects.userInputPrompt")}</span>
+            <textarea className="field-input form-textarea" value={action.prompt} onChange={(event) => onChange({ ...action, prompt: event.currentTarget.value })} />
+          </label>
+          <div className="card-stack">
+            <span className="field-label">{t("catalogControl.agents.userProjects.outputVariables")}</span>
+            {action.variables.map((variable, variableIndex) => (
+              <div className="form-grid" key={`${action.id}-var-${variableIndex}`}>
+                <input aria-label={t("catalogControl.agents.userProjects.variableName")} className="field-input" placeholder="user_name" value={variable.name} onChange={(event) => onChange({
+                  ...action,
+                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, name: event.currentTarget.value } : item),
+                })} />
+                <input aria-label={t("catalogControl.agents.userProjects.variableLabel")} className="field-input" placeholder="User name" value={variable.label} onChange={(event) => onChange({
+                  ...action,
+                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, label: event.currentTarget.value } : item),
+                })} />
+                <input aria-label={t("catalogControl.agents.userProjects.variableGuidance")} className="field-input" placeholder="Ask for the user's name" value={variable.guidance ?? ""} onChange={(event) => onChange({
+                  ...action,
+                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, guidance: event.currentTarget.value } : item),
+                })} />
+              </div>
+            ))}
+            <button type="button" className="btn btn-secondary" onClick={() => onChange({
+              ...action,
+              variables: [...action.variables, { name: "", label: "", type: "text", required: true }],
+            })}>{t("catalogControl.agents.userProjects.addVariable")}</button>
+          </div>
+        </>
+      ) : null}
+      {action.type === "mcp_tool" ? (
+        <>
           <div className="form-grid">
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.agents.userProjects.workflowMcp")}</span>
-              <select className="field-input" value={form.selectedMcpServerSlug} onChange={(event) => onChange({ ...form, selectedMcpServerSlug: event.currentTarget.value, selectedToolName: event.currentTarget.selectedOptions[0]?.dataset.toolName ?? form.selectedToolName, stepName: event.currentTarget.selectedOptions[0]?.dataset.serverName ?? form.stepName })}>
+              <select className="field-input" value={action.mcp_server_slug} onChange={(event) => {
+                const server = enabledMcpServers.find((item) => item.spec.slug === event.currentTarget.value);
+                onChange({
+                  ...action,
+                  mcp_server_slug: event.currentTarget.value,
+                  exposed_tool_name: server?.spec.exposed_tool_name ?? "",
+                  name: action.name || server?.spec.name || "Invoke MCP tool",
+                  input_bindings: {},
+                  output_variables: action.output_variables.length
+                    ? action.output_variables
+                    : [{ name: "", label: "", type: "text", required: true }],
+                });
+              }}>
                 <option value="">{t("catalogControl.agents.userProjects.selectMcp")}</option>
-                {mcpServers.filter((server) => server.spec.enabled).map((server) => (
-                  <option
-                    key={server.id}
-                    value={server.spec.slug}
-                    data-tool-name={server.spec.exposed_tool_name}
-                    data-server-name={server.spec.name}
-                  >
-                    {server.spec.name}
-                  </option>
+                {enabledMcpServers.map((server) => (
+                  <option key={server.id} value={server.spec.slug}>{server.spec.name}</option>
                 ))}
               </select>
             </label>
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.agents.userProjects.workflowTool")}</span>
-              <input className="field-input" value={form.selectedToolName || selectedMcpServer?.spec.exposed_tool_name || ""} onChange={(event) => onChange({ ...form, selectedToolName: event.currentTarget.value })} />
-            </label>
-            <label className="card-stack">
-              <span className="field-label">{t("catalogControl.agents.userProjects.workflowStepName")}</span>
-              <input className="field-input" value={form.stepName} onChange={(event) => onChange({ ...form, stepName: event.currentTarget.value })} />
+              <input className="field-input" value={action.exposed_tool_name} onChange={(event) => onChange({ ...action, exposed_tool_name: event.currentTarget.value })} />
             </label>
           </div>
+          {requiredInputs.length ? (
+            <div className="card-stack">
+              <span className="field-label">{t("catalogControl.agents.userProjects.requiredInputs")}</span>
+              {requiredInputs.map((fieldName) => (
+                <label className="card-stack" key={fieldName}>
+                  <span className="status-text">{fieldName}</span>
+                  <VariableSelect
+                    label={fieldName}
+                    value={action.input_bindings[fieldName]?.variable ?? ""}
+                    variables={availableVariables}
+                    onChange={(variable) => onChange({
+                      ...action,
+                      input_bindings: { ...action.input_bindings, [fieldName]: { variable } },
+                    })}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+          <div className="card-stack">
+            <span className="field-label">{t("catalogControl.agents.userProjects.outputVariables")}</span>
+            {action.output_variables.map((variable, variableIndex) => (
+              <div className="form-grid" key={`${action.id}-out-${variableIndex}`}>
+                <input aria-label={t("catalogControl.agents.userProjects.variableName")} className="field-input" placeholder="tool_result" value={variable.name} onChange={(event) => onChange({
+                  ...action,
+                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, name: event.currentTarget.value } : item),
+                })} />
+                <input aria-label={t("catalogControl.agents.userProjects.variableLabel")} className="field-input" placeholder="Tool result" value={variable.label} onChange={(event) => onChange({
+                  ...action,
+                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, label: event.currentTarget.value } : item),
+                })} />
+                <select aria-label={t("catalogControl.agents.userProjects.outputPath")} className="field-input" value={variable.path ?? ""} onChange={(event) => onChange({
+                  ...action,
+                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, path: event.currentTarget.value } : item),
+                })}>
+                  <option value="">{t("catalogControl.agents.userProjects.outputWholeResult")}</option>
+                  {outputFields.map((fieldName) => <option key={fieldName} value={fieldName}>{fieldName}</option>)}
+                </select>
+              </div>
+            ))}
+            <button type="button" className="btn btn-secondary" onClick={() => onChange({
+              ...action,
+              output_variables: [...action.output_variables, { name: "", label: "", type: "text", required: true }],
+            })}>{t("catalogControl.agents.userProjects.addVariable")}</button>
+          </div>
+        </>
+      ) : null}
+      {action.type === "send_output" ? (
+        <>
           <label className="card-stack">
-            <span className="field-label">{t("catalogControl.agents.userProjects.workflowArguments")}</span>
-            <textarea className="field-input form-textarea" value={form.stepArgumentsText} onChange={(event) => onChange({ ...form, stepArgumentsText: event.currentTarget.value })} />
+            <span className="field-label">{t("catalogControl.agents.userProjects.deliveryInstruction")}</span>
+            <textarea className="field-input form-textarea" value={action.instruction} onChange={(event) => onChange({ ...action, instruction: event.currentTarget.value })} />
           </label>
-        </section>
-        ) : null}
-
-        {isBasicsStepComplete ? (
-        <div className="status-row">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? t("catalogControl.actions.saving") : t("catalogControl.agents.userProjects.save")}
-          </button>
-        </div>
-        ) : null}
-      </form>
-    </article>
+          <div className="card-stack">
+            <span className="field-label">{t("catalogControl.agents.userProjects.variablesToSend")}</span>
+            {availableVariables.map((variable) => (
+              <label className="status-row" key={variable.name}>
+                <input
+                  type="checkbox"
+                  checked={action.variable_refs.includes(variable.name)}
+                  onChange={(event) => onChange({
+                    ...action,
+                    variable_refs: event.currentTarget.checked
+                      ? [...action.variable_refs, variable.name]
+                      : action.variable_refs.filter((item) => item !== variable.name),
+                  })}
+                />
+                <span>{variable.label || variable.name}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
   );
+}
+
+function VariableSelect({ label, value, variables, onChange }: { label: string; value: string; variables: AvailableVariable[]; onChange: (value: string) => void }): JSX.Element {
+  const { t } = useTranslation("common");
+  return (
+    <select aria-label={label} className="field-input" value={value} onChange={(event) => onChange(event.currentTarget.value)}>
+      <option value="">{t("catalogControl.agents.userProjects.selectVariable")}</option>
+      {variables.map((variable) => <option key={variable.name} value={variable.name}>{variable.label || variable.name}</option>)}
+    </select>
+  );
+}
+
+function buildNewAction(type: WorkflowAction["type"], index: number): WorkflowAction {
+  if (type === "get_user_input") {
+    return {
+      id: `get_user_input_${index + 1}`,
+      type,
+      name: "Collect user input",
+      prompt: "Ask the user for the required information.",
+      variables: [{ name: "", label: "", type: "text", required: true }],
+    };
+  }
+  if (type === "mcp_tool") {
+    return {
+      id: `mcp_tool_${index + 1}`,
+      type,
+      name: "Invoke MCP tool",
+      mcp_server_slug: "",
+      exposed_tool_name: "",
+      input_bindings: {},
+      output_variables: [{ name: "", label: "", type: "text", required: true }],
+    };
+  }
+  return {
+    id: `send_output_${index + 1}`,
+    type,
+    name: "Send output",
+    instruction: "Compose a concise chat response for the user.",
+    variable_refs: [],
+  };
+}
+
+function variablesBeforeAction(actions: WorkflowAction[], actionIndex: number): AvailableVariable[] {
+  const variables: AvailableVariable[] = [];
+  for (const action of actions.slice(0, actionIndex)) {
+    if (action.type === "get_user_input") {
+      variables.push(...action.variables.map((variable) => ({ name: variable.name, label: variable.label })));
+    }
+    if (action.type === "mcp_tool") {
+      variables.push(...action.output_variables.map((variable) => ({ name: variable.name, label: variable.label })));
+    }
+  }
+  return variables.filter((variable) => VARIABLE_NAME_PATTERN.test(variable.name));
+}
+
+function actionProducesValidVariables(action: WorkflowAction): boolean {
+  const variables = action.type === "get_user_input" ? action.variables : action.type === "mcp_tool" ? action.output_variables : [];
+  return variables.length > 0 && variables.every((variable) => VARIABLE_NAME_PATTERN.test(variable.name) && variable.label.trim() && variable.type === "text");
+}
+
+function isActionComplete(action: WorkflowAction, actionIndex: number, actions: WorkflowAction[], enabledMcpServers: CatalogMcpServer[]): boolean {
+  if (!action.name.trim()) return false;
+  if (action.type === "get_user_input") {
+    return actionProducesValidVariables(action);
+  }
+  if (action.type === "mcp_tool") {
+    const server = enabledMcpServers.find((item) => item.spec.slug === action.mcp_server_slug);
+    if (!server || !action.exposed_tool_name.trim() || !actionProducesValidVariables(action)) return false;
+    const available = new Set(variablesBeforeAction(actions, actionIndex).map((variable) => variable.name));
+    return requiredSchemaFields(server.spec.input_schema).every((field) => available.has(action.input_bindings[field]?.variable ?? ""));
+  }
+  return action.instruction.trim().length > 0
+    && action.variable_refs.length > 0
+    && action.variable_refs.every((variable) => variablesBeforeAction(actions, actionIndex).some((item) => item.name === variable));
+}
+
+function canAppendAction(actions: WorkflowAction[], enabledMcpServers: CatalogMcpServer[]): boolean {
+  if (!actions.length) return true;
+  const lastIndex = actions.length - 1;
+  return isActionComplete(actions[lastIndex], lastIndex, actions, enabledMcpServers) && actions[lastIndex].type !== "send_output";
+}
+
+function isWorkflowComplete(actions: WorkflowAction[], enabledMcpServers: CatalogMcpServer[]): boolean {
+  return actions.length > 0
+    && actions[0].type === "get_user_input"
+    && actions[actions.length - 1].type === "send_output"
+    && actions.every((action, index) => isActionComplete(action, index, actions, enabledMcpServers));
+}
+
+function requiredSchemaFields(schema: unknown): string[] {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
+  const required = (schema as { required?: unknown }).required;
+  return Array.isArray(required) ? required.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function schemaPropertyNames(schema: unknown): string[] {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
+  const properties = (schema as { properties?: unknown }).properties;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) return [];
+  return Object.keys(properties);
+}
+
+function actionLabel(type: WorkflowAction["type"], t: (key: string) => string): string {
+  if (type === "get_user_input") return t("catalogControl.agents.userProjects.actionGetInput");
+  if (type === "mcp_tool") return t("catalogControl.agents.userProjects.actionMcpTool");
+  return t("catalogControl.agents.userProjects.actionSendOutput");
 }

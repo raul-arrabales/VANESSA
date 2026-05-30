@@ -27,15 +27,22 @@ class ExecutionResult:
     embedding_calls: list[dict[str, Any]] = field(default_factory=list)
     model_calls: list[dict[str, Any]] = field(default_factory=list)
     retrieval_calls: list[dict[str, Any]] = field(default_factory=list)
+    workflow_state: dict[str, Any] | None = None
+    workflow_status: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "output_text": self.output_text,
             "tool_calls": self.tool_calls,
             "embedding_calls": self.embedding_calls,
             "model_calls": self.model_calls,
             "retrieval_calls": self.retrieval_calls,
         }
+        if self.workflow_state is not None:
+            payload["workflow_state"] = self.workflow_state
+        if self.workflow_status is not None:
+            payload["workflow_status"] = self.workflow_status
+        return payload
 
 
 @dataclass(slots=True)

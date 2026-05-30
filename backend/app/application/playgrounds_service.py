@@ -14,6 +14,7 @@ from ..domain.playgrounds import (
     playground_kind_for_conversation_kind,
 )
 from ..infrastructure import playgrounds_repository
+from ..repositories.agent_workflow_runs import get_workflow_run, upsert_workflow_run
 from ..services.agent_engine_client import AgentEngineClientError
 from ..services.chat_inference import (
     chat_completion_stream_with_allowed_model,
@@ -540,6 +541,13 @@ def _execute_request(
 ) -> PlaygroundExecutionResult:
     if request.playground_kind == CHAT_PLAYGROUND_KIND:
         if str(request.assistant_ref or "").strip().startswith("agent."):
+            workflow_run = get_workflow_run(
+                database_url,
+                owner_user_id=owner_user_id,
+                conversation_id=request.session_id,
+                assistant_ref=str(request.assistant_ref or ""),
+            )
+            request.workflow_state = workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None
             try:
                 return execute_agent_chat_request(
                     database_url=database_url,
@@ -613,6 +621,9 @@ def _persist_execution_result(
     result: PlaygroundExecutionResult,
 ) -> dict[str, Any]:
     assistant_metadata = {"statuses": result.statuses} if result.statuses else None
+    if result.workflow_status:
+        assistant_metadata = dict(assistant_metadata or {})
+        assistant_metadata["workflow_status"] = result.workflow_status
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         assistant_metadata = {
             "response": result.response,
@@ -636,6 +647,15 @@ def _persist_execution_result(
     )
     if persisted is None:
         raise PlaygroundSessionNotFoundError
+    if request.assistant_ref and result.workflow_state is not None:
+        upsert_workflow_run(
+            database_url,
+            owner_user_id=owner_user_id,
+            conversation_id=request.session_id,
+            assistant_ref=request.assistant_ref,
+            status=result.workflow_status or "running",
+            workflow_state=result.workflow_state,
+        )
     return persisted
 
 
@@ -826,12 +846,16 @@ def _stream_chat_request(
     request_id: str,
     request: PlaygroundExecutionRequest,
 ) -> Iterator[dict[str, Any]]:
-    if not request.model_id:
-        raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
-
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
         if str(request.assistant_ref or "").strip().startswith("agent."):
+            workflow_run = get_workflow_run(
+                database_url,
+                owner_user_id=owner_user_id,
+                conversation_id=request.session_id,
+                assistant_ref=str(request.assistant_ref or ""),
+            )
+            request.workflow_state = workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None
             for event in stream_agent_chat_request(
                 database_url=database_url,
                 config=config,
@@ -875,6 +899,8 @@ def _stream_chat_request(
                     }
                     return
             return
+        if not request.model_id:
+            raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
         result = yield from _stream_llm_chat_execution(request, statuses)
         if result is None:
             return

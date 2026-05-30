@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 USER_AGENT_TYPE_WORKFLOW = "workflow"
@@ -18,9 +19,11 @@ SUPPORTED_CHANNEL_TYPES = {CHANNEL_TYPE_VANESSA_WEBAPP}
 INTERFACE_TYPE_CHAT = "chat"
 SUPPORTED_INTERFACE_TYPES = {INTERFACE_TYPE_CHAT}
 
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 
 def default_workflow_definition() -> dict[str, Any]:
-    return {"steps": []}
+    return {"version": 2, "actions": []}
 
 
 def coerce_user_agent_type(value: Any) -> str:
@@ -49,6 +52,75 @@ def normalize_workflow_definition(value: Any) -> dict[str, Any]:
         return default_workflow_definition()
     if not isinstance(value, dict):
         raise ValueError("workflow_definition must be an object")
+    if int(value.get("version", 1) or 1) == 2 or "actions" in value:
+        actions_raw = value.get("actions", [])
+        if not isinstance(actions_raw, list):
+            raise ValueError("workflow_definition.actions must be an array")
+        actions: list[dict[str, Any]] = []
+        produced_variables: set[str] = set()
+        for index, item in enumerate(actions_raw):
+            if not isinstance(item, dict):
+                raise ValueError(f"workflow_definition.actions[{index}] must be an object")
+            action_type = str(item.get("type") or "").strip()
+            if action_type not in {"get_user_input", "mcp_tool", "send_output"}:
+                raise ValueError(f"workflow_definition.actions[{index}].type is invalid")
+            action_id = str(item.get("id") or f"{action_type}_{index + 1}").strip() or f"{action_type}_{index + 1}"
+            name = str(item.get("name") or action_type.replace("_", " ")).strip() or action_type
+            if action_type == "get_user_input":
+                variables = _normalize_workflow_variables(item.get("variables"), f"workflow_definition.actions[{index}].variables", produced_variables)
+                actions.append({
+                    "id": action_id,
+                    "type": action_type,
+                    "name": name,
+                    "prompt": str(item.get("prompt") or "").strip(),
+                    "variables": variables,
+                })
+                continue
+            if action_type == "mcp_tool":
+                mcp_server_slug = str(item.get("mcp_server_slug") or "").strip()
+                exposed_tool_name = str(item.get("exposed_tool_name") or "").strip()
+                if not mcp_server_slug:
+                    raise ValueError(f"workflow_definition.actions[{index}].mcp_server_slug is required")
+                if not exposed_tool_name:
+                    raise ValueError(f"workflow_definition.actions[{index}].exposed_tool_name is required")
+                input_bindings = item.get("input_bindings")
+                if not isinstance(input_bindings, dict):
+                    raise ValueError(f"workflow_definition.actions[{index}].input_bindings must be an object")
+                normalized_bindings: dict[str, dict[str, str]] = {}
+                for field_name, binding in input_bindings.items():
+                    if not isinstance(binding, dict):
+                        raise ValueError(f"workflow_definition.actions[{index}].input_bindings.{field_name} must be an object")
+                    variable = str(binding.get("variable") or "").strip()
+                    if variable:
+                        normalized_bindings[str(field_name)] = {"variable": variable}
+                output_variables = _normalize_workflow_variables(
+                    item.get("output_variables"),
+                    f"workflow_definition.actions[{index}].output_variables",
+                    produced_variables,
+                    allow_path=True,
+                )
+                actions.append({
+                    "id": action_id,
+                    "type": action_type,
+                    "name": name,
+                    "mcp_server_slug": mcp_server_slug,
+                    "exposed_tool_name": exposed_tool_name,
+                    "input_bindings": normalized_bindings,
+                    "output_variables": output_variables,
+                })
+                continue
+            variable_refs_raw = item.get("variable_refs", [])
+            if not isinstance(variable_refs_raw, list):
+                raise ValueError(f"workflow_definition.actions[{index}].variable_refs must be an array")
+            actions.append({
+                "id": action_id,
+                "type": action_type,
+                "name": name,
+                "instruction": str(item.get("instruction") or "").strip(),
+                "variable_refs": [str(variable).strip() for variable in variable_refs_raw if str(variable).strip()],
+            })
+        return {"version": 2, "actions": actions}
+
     steps_raw = value.get("steps", [])
     if not isinstance(steps_raw, list):
         raise ValueError("workflow_definition.steps must be an array")
@@ -80,16 +152,72 @@ def normalize_workflow_definition(value: Any) -> dict[str, Any]:
                 "arguments": arguments,
             }
         )
-    return {"steps": steps}
+    actions = [
+        {
+            "id": str(step["id"]),
+            "type": "mcp_tool",
+            "name": str(step["name"]),
+            "mcp_server_slug": str(step["mcp_server_slug"]),
+            "exposed_tool_name": str(step["exposed_tool_name"]),
+            "input_bindings": {},
+            "output_variables": [{"name": f"step_{index + 1}_output", "label": "Step output", "type": "text", "required": True}],
+        }
+        for index, step in enumerate(steps)
+    ]
+    return {"version": 2, "actions": actions}
 
 
-def workflow_step_server_slugs(workflow_definition: dict[str, Any]) -> list[str]:
-    steps = workflow_definition.get("steps") if isinstance(workflow_definition.get("steps"), list) else []
-    slugs: list[str] = []
-    for item in steps:
+def _normalize_workflow_variables(value: Any, path: str, produced_variables: set[str], *, allow_path: bool = False) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{path} must be a non-empty array")
+    variables: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
         if not isinstance(item, dict):
+            raise ValueError(f"{path}[{index}] must be an object")
+        name = str(item.get("name") or "").strip()
+        if not _IDENTIFIER_RE.match(name):
+            raise ValueError(f"{path}[{index}].name must be a valid identifier")
+        if name in produced_variables:
+            raise ValueError(f"workflow variable '{name}' is defined more than once")
+        label = str(item.get("label") or "").strip()
+        if not label:
+            raise ValueError(f"{path}[{index}].label is required")
+        variable_type = str(item.get("type") or "text").strip().lower()
+        if variable_type != "text":
+            raise ValueError(f"{path}[{index}].type must be text")
+        produced_variables.add(name)
+        normalized = {
+            "name": name,
+            "label": label,
+            "type": "text",
+            "required": bool(item.get("required", True)),
+        }
+        guidance = str(item.get("guidance") or "").strip()
+        if guidance:
+            normalized["guidance"] = guidance
+        if allow_path:
+            output_path = str(item.get("path") or "").strip()
+            if output_path:
+                normalized["path"] = output_path
+        variables.append(normalized)
+    return variables
+
+
+def workflow_actions(workflow_definition: dict[str, Any]) -> list[dict[str, Any]]:
+    actions = workflow_definition.get("actions") if isinstance(workflow_definition.get("actions"), list) else []
+    return [action for action in actions if isinstance(action, dict)]
+
+
+def workflow_mcp_server_slugs(workflow_definition: dict[str, Any]) -> list[str]:
+    actions = workflow_actions(workflow_definition)
+    slugs: list[str] = []
+    for item in actions:
+        if str(item.get("type") or "") != "mcp_tool":
             continue
         slug = str(item.get("mcp_server_slug") or "").strip()
         if slug:
             slugs.append(slug)
     return slugs
+
+
+workflow_step_server_slugs = workflow_mcp_server_slugs

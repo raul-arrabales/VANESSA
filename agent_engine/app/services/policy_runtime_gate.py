@@ -206,7 +206,7 @@ def resolve_agent_spec(*, agent_id: str) -> dict[str, Any]:
                 "agent_type": "workflow",
                 "channel_type": "vanessa_webapp",
                 "interface_type": "chat",
-                "workflow_definition": {"steps": []},
+                "workflow_definition": {"version": 2, "actions": []},
                 "runtime_constraints": {},
             },
         }
@@ -250,11 +250,11 @@ def resolve_agent_tools(*, agent_entity: dict[str, Any], runtime_profile: str) -
     current_spec = agent_entity.get("current_spec") if isinstance(agent_entity.get("current_spec"), dict) else {}
     tool_refs = current_spec.get("mcp_server_refs") if isinstance(current_spec.get("mcp_server_refs"), list) else []
     workflow_definition = current_spec.get("workflow_definition") if isinstance(current_spec.get("workflow_definition"), dict) else {}
-    workflow_steps = workflow_definition.get("steps") if isinstance(workflow_definition.get("steps"), list) else []
+    workflow_steps = workflow_definition.get("actions") if isinstance(workflow_definition.get("actions"), list) else []
     workflow_refs = [
         str(item.get("mcp_server_slug") or "").strip()
         for item in workflow_steps
-        if isinstance(item, dict) and str(item.get("mcp_server_slug") or "").strip()
+        if isinstance(item, dict) and str(item.get("type") or "") == "mcp_tool" and str(item.get("mcp_server_slug") or "").strip()
     ]
     merged_refs: list[str] = []
     for value in [*tool_refs, *workflow_refs]:

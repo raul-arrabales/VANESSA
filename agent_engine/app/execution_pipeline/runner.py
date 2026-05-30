@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from json import loads
+from json import dumps, loads
 from queue import Queue
 from threading import Thread
 from typing import Any, Iterator
@@ -114,13 +114,30 @@ def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
 
 
 def _agent_type(agent_spec: dict[str, Any]) -> str:
-    return str(agent_spec.get("agent_type") or "workflow").strip().lower() or "workflow"
+    return str(agent_spec.get("agent_type") or "react").strip().lower() or "react"
 
 
-def _workflow_steps(agent_spec: dict[str, Any]) -> list[dict[str, Any]]:
+def _workflow_actions(agent_spec: dict[str, Any]) -> list[dict[str, Any]]:
     workflow_definition = agent_spec.get("workflow_definition") if isinstance(agent_spec.get("workflow_definition"), dict) else {}
+    raw_actions = workflow_definition.get("actions") if isinstance(workflow_definition.get("actions"), list) else []
+    if raw_actions:
+        return [item for item in raw_actions if isinstance(item, dict)]
     raw_steps = workflow_definition.get("steps") if isinstance(workflow_definition.get("steps"), list) else []
-    return [item for item in raw_steps if isinstance(item, dict)]
+    actions: list[dict[str, Any]] = []
+    for index, step in enumerate(raw_steps):
+        if not isinstance(step, dict):
+            continue
+        actions.append({
+            "id": str(step.get("id") or f"mcp_tool_{index + 1}"),
+            "type": "mcp_tool",
+            "name": str(step.get("name") or step.get("exposed_tool_name") or f"MCP tool {index + 1}"),
+            "mcp_server_slug": str(step.get("mcp_server_slug") or ""),
+            "exposed_tool_name": str(step.get("exposed_tool_name") or ""),
+            "input_bindings": {},
+            "static_arguments": step.get("arguments") if isinstance(step.get("arguments"), dict) else {},
+            "output_variables": [{"name": f"step_{index + 1}_output", "label": "Step output", "type": "text"}],
+        })
+    return actions
 
 
 def _tool_entity_lookup(agent_tools: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -141,16 +158,85 @@ def _workflow_step_result_text(result: dict[str, Any]) -> str:
     return compact_payload(result)
 
 
-def _workflow_output_from_results(step_results: list[dict[str, Any]]) -> str:
-    if not step_results:
-        return "Workflow completed."
-    last_result = step_results[-1].get("result")
-    if isinstance(last_result, dict):
-        return _workflow_step_result_text(last_result)
-    lines = []
-    for index, step in enumerate(step_results, start=1):
-        lines.append(f"{index}. {step.get('name')}: {compact_payload(step.get('result'))}")
+def _workflow_state_from_input(execution_input: dict[str, Any]) -> dict[str, Any]:
+    state = execution_input.get("workflow_state")
+    if not isinstance(state, dict) or str(state.get("status") or "") == "completed":
+        state = {}
+    return {
+        "version": 2,
+        "action_index": int(state.get("action_index", 0) or 0) if isinstance(state, dict) else 0,
+        "variables": dict(state.get("variables") or {}) if isinstance(state.get("variables"), dict) else {},
+        "action_outputs": dict(state.get("action_outputs") or {}) if isinstance(state.get("action_outputs"), dict) else {},
+        "status": str(state.get("status") or "running") if isinstance(state, dict) else "running",
+    }
+
+
+def _message_text(messages: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for message in messages:
+        role = str(message.get("role") or "message")
+        content = message.get("content")
+        if isinstance(content, list):
+            text = " ".join(str(part.get("text") or "") for part in content if isinstance(part, dict))
+        else:
+            text = str(content or "")
+        if text.strip():
+            lines.append(f"{role}: {text.strip()}")
     return "\n".join(lines)
+
+
+def _parse_json_object(text: Any) -> dict[str, Any]:
+    try:
+        parsed = loads(str(text or "").strip())
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _llm_json(
+    *,
+    context: ExecutionContext,
+    runtime_snapshot: dict[str, Any],
+    requested_model: str | None,
+    system_prompt: str,
+    user_prompt: str,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    client = build_llm_runtime_client(runtime_snapshot)
+    completion = client.chat_completion(
+        requested_model=requested_model,
+        messages=[
+            _system_text_message(system_prompt),
+            {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
+        ],
+    )
+    return _parse_json_object(completion.get("output_text")), {
+        "requested_model": str(completion.get("requested_model") or requested_model or ""),
+        "status_code": int(completion.get("status_code", 200) or 200),
+    }
+
+
+def _get_path(payload: Any, path: str) -> Any:
+    if not path:
+        return payload
+    current = payload
+    for part in path.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+            continue
+        return None
+    return current
+
+
+def _store_output_variables(state: dict[str, Any], action: dict[str, Any], tool_payload: Any) -> None:
+    variables = state.setdefault("variables", {})
+    for variable in action.get("output_variables", []):
+        if not isinstance(variable, dict):
+            continue
+        name = str(variable.get("name") or "").strip()
+        if not name:
+            continue
+        extracted = _get_path(tool_payload, str(variable.get("path") or "").strip())
+        variables[name] = extracted if isinstance(extracted, str) else compact_payload(extracted)
 
 
 def _execute_workflow_agent(
@@ -162,77 +248,183 @@ def _execute_workflow_agent(
 ) -> tuple[ExecutionResult, str | None]:
     progress = progress or ProgressRecorder()
     agent_spec = _agent_current_spec(agent_entity)
-    steps = _workflow_steps(agent_spec)
-    if not steps:
+    actions = _workflow_actions(agent_spec)
+    if not actions:
         raise ExecutionBlockedError(
             code="EXEC_INVALID_AGENT",
-            message="Workflow agent is missing workflow steps",
+            message="Workflow agent is missing workflow actions",
             status_code=422,
         )
     tool_lookup = _tool_entity_lookup(agent_tools)
     runtime_snapshot = context.platform_runtime if isinstance(context.platform_runtime, dict) else {}
     agent_domain = str(agent_spec.get("agent_domain") or "default").strip() or "default"
+    requested_model = str(context.execution_input.get("model") or agent_spec.get("default_model_ref") or "").strip() or None
+    state = _workflow_state_from_input(context.execution_input)
     tool_calls: list[dict[str, Any]] = []
-    step_results: list[dict[str, Any]] = []
-    for index, step in enumerate(steps, start=1):
-        slug = str(step.get("mcp_server_slug") or "").strip()
-        tool_entity = tool_lookup.get(slug)
-        if tool_entity is None:
-            raise ExecutionBlockedError(
-                code="EXEC_TOOL_NOT_ALLOWED",
-                message=f"Workflow step references unavailable MCP server '{slug}'",
-                status_code=403,
-            )
-        tool_spec = effective_tool_spec(tool_entity)
-        tool_name = str(step.get("exposed_tool_name") or tool_spec.get("exposed_tool_name") or "").strip()
-        runtime_capability = runtime_capability_for_tool_spec(tool_spec)
-        resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
-        arguments = step.get("arguments") if isinstance(step.get("arguments"), dict) else {}
-        status_id = progress.start(
-            kind="running_tool",
-            label=f"Running workflow step {index}: {str(step.get('name') or tool_name or slug)}",
-            details={"step": index, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
-        )
-        tool_call = {
-            "id": f"workflow-step-{index}",
-            "type": "function",
-            "function": {
-                "name": tool_name,
-                "arguments": compact_payload(arguments),
-            },
-        }
-        call_record, tool_payload = invoke_tool_call(
-            tool_entity=tool_entity,
-            tool_call=tool_call,
-            platform_runtime=runtime_snapshot,
-            agent_id=context.agent_id,
-            agent_domain=agent_domain,
-            delegated_user_id=context.requested_by_user_id,
-            delegated_user_role=context.requested_by_role,
-        )
-        progress.complete(
-            status_id,
-            kind="running_tool",
-            label=f"Completed workflow step {index}",
-            summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
-            details={"step": index, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
-        )
-        tool_calls.append(call_record)
-        step_results.append(
-            {
-                "id": str(step.get("id") or f"step_{index}"),
-                "name": str(step.get("name") or tool_name or slug),
-                "mcp_server_slug": slug,
-                "result": tool_payload,
+    model_calls: list[dict[str, Any]] = []
+    action_index = max(0, min(int(state.get("action_index", 0) or 0), len(actions)))
+    while action_index < len(actions):
+        action = actions[action_index]
+        action_type = str(action.get("type") or "")
+        if action_type == "get_user_input":
+            variables = [item for item in action.get("variables", []) if isinstance(item, dict)]
+            missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
+            status_id = progress.start(kind="thinking", label=f"Inspecting workflow input {action_index + 1}")
+            try:
+                parsed, model_call = _llm_json(
+                    context=context,
+                    runtime_snapshot=runtime_snapshot,
+                    requested_model=requested_model,
+                    system_prompt=(
+                        "You inspect a chat conversation for required workflow variables. "
+                        "Return only JSON with complete:boolean, variables:object, missing:array, question:string."
+                    ),
+                    user_prompt=(
+                        f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+                        f"Required variables:\n{dumps(variables)}\n\n"
+                        f"Existing variables:\n{dumps(state['variables'])}"
+                    ),
+                )
+                if model_call:
+                    model_calls.append(model_call)
+            except LlmRuntimeClientError:
+                parsed = {}
+            for name, value in (parsed.get("variables") if isinstance(parsed.get("variables"), dict) else {}).items():
+                if str(name) in missing and str(value).strip():
+                    state["variables"][str(name)] = str(value).strip()
+            missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
+            if missing:
+                question = str(parsed.get("question") or "").strip()
+                if not question:
+                    labels = [str(item.get("label") or item.get("name") or "").strip() for item in variables if str(item.get("name") or "") in missing]
+                    question = "Please provide: " + ", ".join(labels)
+                state.update({"action_index": action_index, "status": "awaiting_user_input"})
+                progress.complete(status_id, kind="thinking", label="Workflow is awaiting user input", details={"missing": missing})
+                return ExecutionResult(
+                    output_text=question,
+                    tool_calls=tool_calls,
+                    model_calls=model_calls,
+                    workflow_state=state,
+                    workflow_status="awaiting_user_input",
+                ), requested_model
+            progress.complete(status_id, kind="thinking", label=f"Collected workflow input {action_index + 1}")
+            action_index += 1
+            state["action_index"] = action_index
+            continue
+
+        if action_type == "mcp_tool":
+            slug = str(action.get("mcp_server_slug") or "").strip()
+            tool_entity = tool_lookup.get(slug)
+            if tool_entity is None:
+                raise ExecutionBlockedError(
+                    code="EXEC_TOOL_NOT_ALLOWED",
+                    message=f"Workflow action references unavailable MCP server '{slug}'",
+                    status_code=403,
+                )
+            tool_spec = effective_tool_spec(tool_entity)
+            tool_name = str(action.get("exposed_tool_name") or tool_spec.get("exposed_tool_name") or "").strip()
+            runtime_capability = runtime_capability_for_tool_spec(tool_spec)
+            resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
+            input_bindings = action.get("input_bindings") if isinstance(action.get("input_bindings"), dict) else {}
+            bound_values = {
+                field: state["variables"].get(str(binding.get("variable") or ""))
+                for field, binding in input_bindings.items()
+                if isinstance(binding, dict)
             }
-        )
-    return (
-        ExecutionResult(
-            output_text=_workflow_output_from_results(step_results),
-            tool_calls=tool_calls,
-        ),
-        None,
-    )
+            static_arguments = action.get("static_arguments") if isinstance(action.get("static_arguments"), dict) else {}
+            try:
+                parsed, model_call = _llm_json(
+                    context=context,
+                    runtime_snapshot=runtime_snapshot,
+                    requested_model=requested_model,
+                    system_prompt="Create schema-valid MCP tool arguments. Return only a JSON object.",
+                    user_prompt=(
+                        f"Tool name: {tool_name}\n"
+                        f"Input schema: {dumps(tool_spec.get('input_schema') or {})}\n"
+                        f"Selected variables: {dumps(bound_values)}"
+                    ),
+                )
+                if model_call:
+                    model_calls.append(model_call)
+                arguments = parsed or bound_values or static_arguments
+            except LlmRuntimeClientError:
+                arguments = bound_values or static_arguments
+            status_id = progress.start(
+                kind="running_tool",
+                label=f"Running workflow action {action_index + 1}: {str(action.get('name') or tool_name or slug)}",
+                details={"action": action_index + 1, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
+            )
+            tool_call = {
+                "id": f"workflow-action-{action_index + 1}",
+                "type": "function",
+                "function": {"name": tool_name, "arguments": compact_payload(arguments)},
+            }
+            call_record, tool_payload = invoke_tool_call(
+                tool_entity=tool_entity,
+                tool_call=tool_call,
+                platform_runtime=runtime_snapshot,
+                agent_id=context.agent_id,
+                agent_domain=agent_domain,
+                delegated_user_id=context.requested_by_user_id,
+                delegated_user_role=context.requested_by_role,
+            )
+            progress.complete(
+                status_id,
+                kind="running_tool",
+                label=f"Completed workflow action {action_index + 1}",
+                summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
+                details={"action": action_index + 1, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
+            )
+            tool_calls.append(call_record)
+            state.setdefault("action_outputs", {})[str(action.get("id") or f"action_{action_index + 1}")] = tool_payload
+            _store_output_variables(state, action, tool_payload)
+            action_index += 1
+            state["action_index"] = action_index
+            continue
+
+        if action_type == "send_output":
+            selected = {
+                variable: state["variables"].get(str(variable))
+                for variable in action.get("variable_refs", [])
+                if str(variable) in state["variables"]
+            }
+            try:
+                parsed, model_call = _llm_json(
+                    context=context,
+                    runtime_snapshot=runtime_snapshot,
+                    requested_model=requested_model,
+                    system_prompt="Compose the final workflow chat response. Return only JSON with response:string.",
+                    user_prompt=(
+                        f"Delivery instruction: {str(action.get('instruction') or '')}\n"
+                        f"Variables: {dumps(selected)}\n"
+                        f"Conversation:\n{_message_text(context.conversation.messages)}"
+                    ),
+                )
+                if model_call:
+                    model_calls.append(model_call)
+                output = str(parsed.get("response") or "").strip()
+            except LlmRuntimeClientError:
+                output = ""
+            if not output:
+                output = "\n".join(f"{key}: {compact_payload(value)}" for key, value in selected.items()) or "Workflow completed."
+            state.update({"action_index": len(actions), "status": "completed"})
+            return ExecutionResult(
+                output_text=output,
+                tool_calls=tool_calls,
+                model_calls=model_calls,
+                workflow_state=state,
+                workflow_status="completed",
+            ), requested_model
+
+        raise ExecutionBlockedError(code="EXEC_INVALID_AGENT", message=f"Unknown workflow action '{action_type}'", status_code=422)
+    state.update({"action_index": len(actions), "status": "completed"})
+    return ExecutionResult(
+        output_text="Workflow completed.",
+        tool_calls=tool_calls,
+        model_calls=model_calls,
+        workflow_state=state,
+        workflow_status="completed",
+    ), requested_model
 
 
 def _execute_model_call(

@@ -45,6 +45,7 @@ class PlaygroundExecutionRequest:
     history: list[dict[str, Any]] = field(default_factory=list)
     conversation_title: str | None = None
     title_source: str | None = None
+    workflow_state: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)
@@ -56,6 +57,8 @@ class PlaygroundExecutionResult:
     retrieval: dict[str, Any] | None = None
     knowledge_base_id: str | None = None
     statuses: list[dict[str, Any]] = field(default_factory=list)
+    workflow_state: dict[str, Any] | None = None
+    workflow_status: str | None = None
 
 
 def serialize_message(row: dict[str, Any]) -> dict[str, Any]:
@@ -410,6 +413,7 @@ def execute_agent_chat_request(
             "prompt": prompt,
             "model": request.model_id,
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
+            "workflow_state": request.workflow_state,
         },
         requested_by_user_id=actor_user_id,
         requested_by_role=actor_user_role,
@@ -429,6 +433,8 @@ def execute_agent_chat_request(
     return PlaygroundExecutionResult(
         output=str(result_payload.get("output_text", "")).strip(),
         response=execution_payload,
+        workflow_state=result_payload.get("workflow_state") if isinstance(result_payload.get("workflow_state"), dict) else None,
+        workflow_status=str(result_payload.get("workflow_status") or "").strip() or None,
     )
 
 
@@ -584,6 +590,7 @@ def stream_agent_chat_request(
             "prompt": prompt,
             "model": request.model_id,
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
+            "workflow_state": request.workflow_state,
         },
         requested_by_user_id=actor_user_id,
         requested_by_role=actor_user_role,
@@ -622,6 +629,8 @@ def stream_agent_chat_request(
                 output=output,
                 response=execution_payload,
                 statuses=statuses,
+                workflow_state=result_payload.get("workflow_state") if isinstance(result_payload.get("workflow_state"), dict) else None,
+                workflow_status=str(result_payload.get("workflow_status") or "").strip() or None,
             ),
         }
         return

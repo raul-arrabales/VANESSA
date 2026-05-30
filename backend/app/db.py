@@ -573,6 +573,7 @@ def run_agent_projects_schema_migration(database_url: str) -> None:
     migration_files = [
         migration_root / "015_agent_projects.sql",
         migration_root / "018_user_agent_apps.sql",
+        migration_root / "019_agent_workflow_runs.sql",
     ]
 
     with get_connection(database_url) as connection:

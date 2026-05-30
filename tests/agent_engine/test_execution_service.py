@@ -19,6 +19,118 @@ from agent_engine.app.services.policy_runtime_gate import ExecutionBlockedError
 from contract_fixtures import load_contract_fixture
 
 
+def _workflow_agent_spec() -> dict[str, Any]:
+    return {
+        "entity_id": "agent.workflow",
+        "current_version": "v1",
+        "current_spec": {
+            "agent_type": "workflow",
+            "default_model_ref": "model.alpha",
+            "mcp_server_refs": [],
+            "workflow_definition": {
+                "version": 2,
+                "actions": [
+                    {
+                        "id": "input_1",
+                        "type": "get_user_input",
+                        "name": "Collect name",
+                        "variables": [{"name": "user_name", "label": "User name", "type": "text", "required": True}],
+                    },
+                    {
+                        "id": "output_1",
+                        "type": "send_output",
+                        "name": "Send greeting",
+                        "instruction": "Greet the user.",
+                        "variable_refs": ["user_name"],
+                    },
+                ],
+            },
+            "runtime_constraints": {},
+        },
+    }
+
+
+def test_workflow_agent_pauses_when_user_input_is_missing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(execution_service, "resolve_agent_spec", lambda *, agent_id: _workflow_agent_spec())
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def chat_completion(self, **kwargs):
+            return {
+                "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "question": "What is your name?"}',
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "hello", "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}]},
+            "platform_runtime": {"capabilities": {"llm_inference": {"slug": "vllm", "provider_key": "vllm_local"}}},
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "What is your name?"
+    assert result["workflow_status"] == "awaiting_user_input"
+    assert result["workflow_state"]["action_index"] == 0
+
+
+def test_workflow_agent_resumes_and_completes_from_stored_state(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(execution_service, "resolve_agent_spec", lambda *, agent_id: _workflow_agent_spec())
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def chat_completion(self, **kwargs):
+            prompt = kwargs["messages"][-1]["content"][0]["text"]
+            if "Required variables" in prompt:
+                return {
+                    "output_text": '{"complete": true, "variables": {"user_name": "Ada"}, "missing": [], "question": ""}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            return {
+                "output_text": '{"response": "Hello Ada."}',
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "My name is Ada",
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "My name is Ada"}]}],
+                "workflow_state": {"version": 2, "action_index": 0, "variables": {}, "action_outputs": {}, "status": "awaiting_user_input"},
+            },
+            "platform_runtime": {"capabilities": {"llm_inference": {"slug": "vllm", "provider_key": "vllm_local"}}},
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "Hello Ada."
+    assert result["workflow_status"] == "completed"
+    assert result["workflow_state"]["variables"]["user_name"] == "Ada"
+
+
 def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):
     saved_statuses: list[str] = []
 

@@ -21,7 +21,8 @@ from ..services.user_agent_types import (
     coerce_interface_type,
     coerce_user_agent_type,
     normalize_workflow_definition,
-    workflow_step_server_slugs,
+    workflow_actions,
+    workflow_mcp_server_slugs,
 )
 from .catalog_management_service import create_catalog_agent, update_catalog_agent
 
@@ -141,14 +142,17 @@ def validate_agent_project(
             derived_runtime_requirements["internet_required"] = True
     resolved_mcp_servers: list[dict[str, Any]] = []
     configured_mcp_refs = {str(value).strip() for value in spec.get("mcp_server_refs", []) if str(value).strip()}
-    workflow_mcp_refs = set(workflow_step_server_slugs(spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}))
+    workflow_definition = spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}
+    workflow_mcp_refs = set(workflow_mcp_server_slugs(workflow_definition))
     all_mcp_refs = sorted(configured_mcp_refs | workflow_mcp_refs)
+    mcp_specs_by_slug: dict[str, dict[str, Any]] = {}
     for mcp_ref in all_mcp_refs:
         mcp_server = _find_mcp_server_by_slug(database_url, slug=str(mcp_ref))
         if mcp_server is None:
             errors.append(f"MCP server '{mcp_ref}' does not exist.")
             continue
         mcp_spec = mcp_server.get("current_spec") if isinstance(mcp_server.get("current_spec"), dict) else {}
+        mcp_specs_by_slug[str(mcp_spec.get("slug") or "").strip()] = mcp_spec
         backing_tool_id = str(mcp_spec.get("backing_tool_id", "")).strip()
         tool_row = find_registry_entity(database_url, entity_type="tool", entity_id=backing_tool_id)
         if tool_row is None:
@@ -173,9 +177,7 @@ def validate_agent_project(
 
     runtime_constraints = spec.get("runtime_constraints") if isinstance(spec.get("runtime_constraints"), dict) else {}
     if spec.get("agent_type") == "workflow":
-        workflow_steps = spec.get("workflow_definition", {}).get("steps") if isinstance(spec.get("workflow_definition"), dict) else None
-        if not isinstance(workflow_steps, list) or not workflow_steps:
-            errors.append("Workflow agents require at least one workflow step.")
+        errors.extend(_validate_workflow_actions(workflow_definition, mcp_specs_by_slug))
     if derived_runtime_requirements["sandbox_required"] and not bool(runtime_constraints.get("sandbox_required", False)):
         errors.append("Project references sandbox tools but runtime_constraints.sandbox_required is false.")
     if derived_runtime_requirements["internet_required"] and not bool(runtime_constraints.get("internet_required", False)):
@@ -194,6 +196,62 @@ def validate_agent_project(
             "derived_runtime_requirements": derived_runtime_requirements,
         },
     }
+
+
+def _validate_workflow_actions(workflow_definition: dict[str, Any], mcp_specs_by_slug: dict[str, dict[str, Any]]) -> list[str]:
+    errors: list[str] = []
+    actions = workflow_actions(workflow_definition)
+    if not actions:
+        return ["Workflow agents require at least one workflow action."]
+    if str(actions[0].get("type") or "") != "get_user_input":
+        errors.append("Workflow agents must start with a get_user_input action.")
+    if str(actions[-1].get("type") or "") != "send_output":
+        errors.append("Workflow agents must end with a send_output action.")
+    available_variables: set[str] = set()
+    for index, action in enumerate(actions):
+        action_type = str(action.get("type") or "")
+        if action_type == "get_user_input":
+            for variable in action.get("variables", []):
+                if isinstance(variable, dict):
+                    available_variables.add(str(variable.get("name") or ""))
+            continue
+        if action_type == "mcp_tool":
+            slug = str(action.get("mcp_server_slug") or "").strip()
+            mcp_spec = mcp_specs_by_slug.get(slug)
+            if not mcp_spec:
+                errors.append(f"Workflow action {index + 1} references unavailable MCP server '{slug}'.")
+            else:
+                exposed_tool_name = str(action.get("exposed_tool_name") or "").strip()
+                if exposed_tool_name != str(mcp_spec.get("exposed_tool_name") or "").strip():
+                    errors.append(f"Workflow action {index + 1} references invalid MCP tool '{exposed_tool_name}'.")
+                for field_name in _required_schema_fields(mcp_spec.get("input_schema")):
+                    binding = action.get("input_bindings", {}).get(field_name) if isinstance(action.get("input_bindings"), dict) else None
+                    variable = str(binding.get("variable") or "").strip() if isinstance(binding, dict) else ""
+                    if variable not in available_variables:
+                        errors.append(f"Workflow action {index + 1} requires input '{field_name}' mapped to a prior variable.")
+            for variable in action.get("output_variables", []):
+                if isinstance(variable, dict):
+                    available_variables.add(str(variable.get("name") or ""))
+            continue
+        if action_type == "send_output":
+            variable_refs = action.get("variable_refs") if isinstance(action.get("variable_refs"), list) else []
+            if not variable_refs:
+                errors.append(f"Workflow action {index + 1} must include at least one output variable.")
+            for variable in variable_refs:
+                if str(variable).strip() not in available_variables:
+                    errors.append(f"Workflow action {index + 1} references unknown variable '{variable}'.")
+            if not str(action.get("instruction") or "").strip():
+                errors.append(f"Workflow action {index + 1} requires a delivery instruction.")
+    return errors
+
+
+def _required_schema_fields(schema: Any) -> list[str]:
+    if not isinstance(schema, dict):
+        return []
+    required = schema.get("required")
+    if not isinstance(required, list):
+        return []
+    return [str(item).strip() for item in required if str(item).strip()]
 
 
 def publish_agent_project(
@@ -362,6 +420,9 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
     except ValueError as exc:
         raise AgentProjectError("invalid_workflow_definition", str(exc)) from exc
+    workflow_shape_errors = _validate_workflow_shape(workflow_definition) if agent_type == "workflow" else []
+    if workflow_shape_errors:
+        raise AgentProjectError("invalid_workflow_definition", workflow_shape_errors[0], details={"errors": workflow_shape_errors})
     tool_policy = payload.get("tool_policy", {})
     if not isinstance(tool_policy, dict):
         raise AgentProjectError("invalid_tool_policy", "tool_policy must be an object")
@@ -388,6 +449,40 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
             "sandbox_required": bool(runtime_constraints["sandbox_required"]),
         },
     }
+
+
+def _validate_workflow_shape(workflow_definition: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    actions = workflow_actions(workflow_definition)
+    if not actions:
+        return ["Workflow agents require at least one workflow action."]
+    if str(actions[0].get("type") or "") != "get_user_input":
+        errors.append("Workflow agents must start with a get_user_input action.")
+    if str(actions[-1].get("type") or "") != "send_output":
+        errors.append("Workflow agents must end with a send_output action.")
+    available_variables: set[str] = set()
+    for index, action in enumerate(actions):
+        action_type = str(action.get("type") or "")
+        if action_type == "get_user_input":
+            for variable in action.get("variables", []):
+                if isinstance(variable, dict):
+                    available_variables.add(str(variable.get("name") or ""))
+            continue
+        if action_type == "mcp_tool":
+            bindings = action.get("input_bindings") if isinstance(action.get("input_bindings"), dict) else {}
+            for field_name, binding in bindings.items():
+                variable = str(binding.get("variable") or "").strip() if isinstance(binding, dict) else ""
+                if variable and variable not in available_variables:
+                    errors.append(f"Workflow action {index + 1} input '{field_name}' references unknown variable '{variable}'.")
+            for variable in action.get("output_variables", []):
+                if isinstance(variable, dict):
+                    available_variables.add(str(variable.get("name") or ""))
+            continue
+        if action_type == "send_output":
+            for variable in action.get("variable_refs", []):
+                if str(variable).strip() not in available_variables:
+                    errors.append(f"Workflow action {index + 1} references unknown variable '{variable}'.")
+    return errors
 
 
 def _find_mcp_server_by_slug(database_url: str, *, slug: str) -> dict[str, Any] | None:

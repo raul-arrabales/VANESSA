@@ -1,4 +1,4 @@
-import type { AgentProject, AgentProjectMutationInput, AgentProjectVisibility } from "../../api/agentProjects";
+import type { AgentProject, AgentProjectMutationInput, AgentProjectVisibility, WorkflowAction, WorkflowDefinition } from "../../api/agentProjects";
 import type { CatalogDefaults } from "../../api/catalog";
 import type { PreviewableAssistantExperience } from "../ai-shared/assistantExperience";
 
@@ -14,10 +14,10 @@ export type AgentProjectFormState = {
   channelType: "" | "vanessa_webapp";
   interfaceType: "" | "chat";
   agentDomain: string;
-  selectedMcpServerSlug: string;
-  selectedToolName: string;
-  stepName: string;
-  stepArgumentsText: string;
+  workflowActions: WorkflowAction[];
+  toolRefsText: string;
+  mcpServerRefsText: string;
+  workflowDefinitionText: string;
   toolPolicyText: string;
   internetRequired: boolean;
   sandboxRequired: boolean;
@@ -27,6 +27,7 @@ export type AgentProjectPreview = PreviewableAssistantExperience;
 
 export const DEFAULT_WORKFLOW_AGENT_DESCRIPTION = "Executes a deterministic MCP workflow in the Vanessa WebApp chat.";
 export const DEFAULT_WORKFLOW_TOOL_POLICY_TEXT = "{\n  \"allow_user_tools\": false\n}";
+export const EMPTY_WORKFLOW_DEFINITION: WorkflowDefinition = { version: 2, actions: [] };
 
 function normalizeId(value: string): string {
   return value.trim().toLowerCase();
@@ -78,10 +79,10 @@ export function buildDefaultAgentProjectForm(
     channelType: "vanessa_webapp",
     interfaceType: "chat",
     agentDomain: "default",
-    selectedMcpServerSlug: "",
-    selectedToolName: "",
-    stepName: "",
-    stepArgumentsText: "{}",
+    workflowActions: [],
+    toolRefsText: "",
+    mcpServerRefsText: "",
+    workflowDefinitionText: JSON.stringify(EMPTY_WORKFLOW_DEFINITION, null, 2),
     toolPolicyText: DEFAULT_WORKFLOW_TOOL_POLICY_TEXT,
     internetRequired: false,
     sandboxRequired: false,
@@ -121,10 +122,10 @@ export function buildGuidedUserAgentCreateForm(
     channelType: "",
     interfaceType: "",
     agentDomain: "default",
-    selectedMcpServerSlug: "",
-    selectedToolName: "",
-    stepName: "",
-    stepArgumentsText: "{}",
+    workflowActions: [],
+    toolRefsText: "",
+    mcpServerRefsText: "",
+    workflowDefinitionText: JSON.stringify(EMPTY_WORKFLOW_DEFINITION, null, 2),
     toolPolicyText: DEFAULT_WORKFLOW_TOOL_POLICY_TEXT,
     internetRequired: false,
     sandboxRequired: false,
@@ -152,8 +153,6 @@ export function parseJsonObject(text: string, errorMessage: string): Record<stri
 }
 
 export function buildAgentProjectForm(project: AgentProject): AgentProjectFormState {
-  const workflowSteps = Array.isArray(project.spec.workflow_definition?.steps) ? project.spec.workflow_definition.steps : [];
-  const firstWorkflowStep = workflowSteps[0];
   return {
     id: project.id,
     visibility: project.visibility,
@@ -166,14 +165,59 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     channelType: project.spec.channel_type,
     interfaceType: project.spec.interface_type,
     agentDomain: project.spec.agent_domain ?? "default",
-    selectedMcpServerSlug: firstWorkflowStep?.mcp_server_slug ?? "",
-    selectedToolName: firstWorkflowStep?.exposed_tool_name ?? "",
-    stepName: firstWorkflowStep?.name ?? "",
-    stepArgumentsText: JSON.stringify(firstWorkflowStep?.arguments ?? {}, null, 2),
+    workflowActions: normalizeWorkflowActions(project.spec.workflow_definition),
+    toolRefsText: JSON.stringify(project.spec.tool_refs, null, 2),
+    mcpServerRefsText: JSON.stringify(project.spec.mcp_server_refs ?? [], null, 2),
+    workflowDefinitionText: JSON.stringify(project.spec.workflow_definition ?? EMPTY_WORKFLOW_DEFINITION, null, 2),
     toolPolicyText: JSON.stringify(project.spec.tool_policy, null, 2),
     internetRequired: project.spec.runtime_constraints.internet_required,
     sandboxRequired: project.spec.runtime_constraints.sandbox_required,
   };
+}
+
+function normalizeWorkflowActions(workflowDefinition: unknown): WorkflowAction[] {
+  if (!workflowDefinition || typeof workflowDefinition !== "object" || Array.isArray(workflowDefinition)) {
+    return [];
+  }
+  const definition = workflowDefinition as Record<string, unknown>;
+  if (definition.version === 2 && Array.isArray(definition.actions)) {
+    return definition.actions.filter((item): item is WorkflowAction => Boolean(item && typeof item === "object" && "type" in item));
+  }
+  const legacySteps = Array.isArray(definition.steps) ? definition.steps : [];
+  return legacySteps
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    .map((step, index): WorkflowAction => ({
+      id: String(step.id || `mcp_tool_${index + 1}`),
+      type: "mcp_tool",
+      name: String(step.name || step.exposed_tool_name || `MCP tool ${index + 1}`),
+      mcp_server_slug: String(step.mcp_server_slug || ""),
+      exposed_tool_name: String(step.exposed_tool_name || ""),
+      input_bindings: {},
+      output_variables: [{
+        name: `step_${index + 1}_output`,
+        label: "Step output",
+        type: "text",
+        required: true,
+      }],
+    }));
+}
+
+function workflowDefinitionFromForm(form: AgentProjectFormState): WorkflowDefinition {
+  return {
+    version: 2,
+    actions: form.workflowActions.map((action, index) => ({
+      ...action,
+      id: String(action.id || `${action.type}_${index + 1}`),
+      name: String(action.name || action.type.replace(/_/g, " ")).trim() || action.type,
+    })),
+  };
+}
+
+function mcpServerRefsFromWorkflow(actions: WorkflowAction[]): string[] {
+  return Array.from(new Set(actions
+    .filter((action): action is Extract<WorkflowAction, { type: "mcp_tool" }> => action.type === "mcp_tool")
+    .map((action) => action.mcp_server_slug.trim())
+    .filter(Boolean)));
 }
 
 export function toAgentProjectMutationInput(
@@ -184,14 +228,12 @@ export function toAgentProjectMutationInput(
     invalidToolPolicyMessage: string;
   },
 ): AgentProjectMutationInput {
-  const { includeId, invalidWorkflowMessage, invalidToolPolicyMessage } = options;
+  const { includeId, invalidToolPolicyMessage } = options;
   const id = form.id.trim();
   const agentType = (form.agentType || "workflow") as "workflow" | "planner" | "react";
   const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
   const interfaceType = (form.interfaceType || "chat") as "chat";
-  const selectedMcpServerSlug = String(form.selectedMcpServerSlug ?? "").trim();
-  const selectedToolName = String(form.selectedToolName ?? "").trim();
-  const stepName = String(form.stepName ?? "").trim();
+  const workflowDefinition = workflowDefinitionFromForm(form);
   return {
     ...(includeId && id ? { id } : {}),
     visibility: form.visibility,
@@ -203,22 +245,12 @@ export function toAgentProjectMutationInput(
     },
     default_model_ref: form.defaultModelRef.trim() || null,
     tool_refs: [],
-    mcp_server_refs: selectedMcpServerSlug ? [selectedMcpServerSlug] : [],
+    mcp_server_refs: mcpServerRefsFromWorkflow(workflowDefinition.actions),
     agent_domain: form.agentDomain.trim() || "default",
     agent_type: agentType,
     channel_type: channelType,
     interface_type: interfaceType,
-    workflow_definition: {
-      steps: selectedMcpServerSlug && selectedToolName
-        ? [{
-          id: "step_1",
-          name: stepName || selectedToolName,
-          mcp_server_slug: selectedMcpServerSlug,
-          exposed_tool_name: selectedToolName,
-          arguments: parseJsonObject(form.stepArgumentsText, invalidWorkflowMessage),
-        }]
-        : [],
-    },
+    workflow_definition: workflowDefinition,
     tool_policy: parseJsonObject(form.toolPolicyText, invalidToolPolicyMessage),
     runtime_constraints: {
       internet_required: form.internetRequired,
@@ -232,23 +264,15 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
   const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
   const interfaceType = (form.interfaceType || "chat") as "chat";
   const defaultModelRef = String(form.defaultModelRef ?? "").trim();
-  const selectedMcpServerSlug = String(form.selectedMcpServerSlug ?? "").trim();
-  const selectedToolName = String(form.selectedToolName ?? "").trim();
-  const stepName = String(form.stepName ?? "").trim();
   const agentDomain = String(form.agentDomain ?? "").trim();
-  let stepArguments: Record<string, unknown> = {};
-  try {
-    stepArguments = parseJsonObject(form.stepArgumentsText, "Invalid workflow definition");
-  } catch {
-    stepArguments = {};
-  }
+  const workflowDefinition = workflowDefinitionFromForm(form);
 
   return {
     assistant_ref: `agent.project.${projectId || "draft"}`,
     playground_kind: "chat",
     default_model_ref: defaultModelRef || null,
     tool_refs: [],
-    mcp_server_refs: selectedMcpServerSlug ? [selectedMcpServerSlug] : [],
+    mcp_server_refs: mcpServerRefsFromWorkflow(workflowDefinition.actions),
     agent_domain: agentDomain || "default",
     agent_type: agentType,
     channel_type: channelType,
@@ -257,16 +281,6 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,
     },
-    workflow_definition: {
-      steps: selectedMcpServerSlug && selectedToolName
-        ? [{
-          id: "step_1",
-          name: stepName || selectedToolName,
-          mcp_server_slug: selectedMcpServerSlug,
-          exposed_tool_name: selectedToolName,
-          arguments: stepArguments,
-        }]
-        : [],
-    },
+    workflow_definition: workflowDefinition,
   };
 }
