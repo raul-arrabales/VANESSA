@@ -51,12 +51,28 @@ export type PlaygroundMessageMetadata = Record<string, unknown> & {
   sources?: PlaygroundKnowledgeSource[];
   references?: PlaygroundKnowledgeReference[];
   statuses?: PlaygroundRunStatus[];
+  content_parts?: PlaygroundMessageContentPart[];
 };
+
+export type PlaygroundTextContentPart = {
+  type: "text";
+  text: string;
+};
+
+export type PlaygroundImageContentPart = {
+  type: "image";
+  image_ref?: string;
+  mime_type?: string;
+  alt_text?: string;
+};
+
+export type PlaygroundMessageContentPart = PlaygroundTextContentPart | PlaygroundImageContentPart;
 
 export type PlaygroundMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  content_parts?: PlaygroundMessageContentPart[];
   metadata: PlaygroundMessageMetadata;
   createdAt: string | null;
 };

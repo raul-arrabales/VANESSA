@@ -7,6 +7,7 @@ import type {
   PlaygroundRunStatus,
 } from "./types";
 import { hasSelector } from "./selectorConfig";
+import { textContentPart } from "./messageContent";
 
 export function sortSessions(sessions: PlaygroundSessionViewModel[]): PlaygroundSessionViewModel[] {
   return [...sessions].sort((left, right) => {
@@ -57,6 +58,7 @@ export function createOptimisticMessages(
       id: userMessageId,
       role: "user",
       content: prompt,
+      content_parts: [textContentPart(prompt)],
       metadata: {},
       createdAt: null,
     },
@@ -64,6 +66,7 @@ export function createOptimisticMessages(
       id: assistantMessageId,
       role: "assistant",
       content: "",
+      content_parts: [],
       metadata: { transient: true },
       createdAt: null,
       isTransient: true,
@@ -78,7 +81,7 @@ export function updateTransientAssistantMessage(
 ): PlaygroundMessageViewModel[] {
   return messages.map((message) => (
     message.id === assistantMessageId
-      ? { ...message, content: `${message.content}${text}` }
+      ? { ...message, content: `${message.content}${text}`, content_parts: [textContentPart(`${message.content}${text}`)] }
       : message
   ));
 }

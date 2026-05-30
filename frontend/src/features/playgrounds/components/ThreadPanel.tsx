@@ -6,6 +6,7 @@ import { getPlaygroundMessageReferences, getPlaygroundMessageSources } from "../
 import KnowledgeReferencesList from "../../ai-shared/KnowledgeReferencesList";
 import { buildPlaygroundKnowledgeReferencesFromSources } from "../../ai-shared/retrieval";
 import AssistantStatusTimeline from "./AssistantStatusTimeline";
+import { messageText } from "../messageContent";
 import type { PlaygroundRunStatus, PlaygroundSessionViewModel } from "../types";
 
 type ThreadPanelProps = {
@@ -135,6 +136,7 @@ export default function ThreadPanel({
       >
         {activeSession?.messages.length
           ? activeSession.messages.map((message) => {
+            const text = messageText(message);
             const storedReferences = getPlaygroundMessageReferences(message.metadata);
             const references = storedReferences.length > 0
               ? storedReferences
@@ -145,7 +147,7 @@ export default function ThreadPanel({
               <AssistantStatusTimeline
                 statuses={statuses}
                 messageId={message.id}
-                responseText={message.content}
+                responseText={text}
                 isLive={isLiveAssistantStatus}
               />
             ) : null;
@@ -156,9 +158,9 @@ export default function ThreadPanel({
               >
                 <div className="chatbot-message-surface">
                   {isLiveAssistantStatus ? statusTimeline : null}
-                  {message.content.trim() ? (
+                  {text.trim() ? (
                     <ChatMessageBody
-                      content={message.content}
+                      content={text}
                       renderMarkdown={message.role === "assistant"}
                     />
                   ) : null}
@@ -166,7 +168,7 @@ export default function ThreadPanel({
                   {message.role === "assistant" && references.length > 0 ? (
                     <KnowledgeReferencesList references={references} messageId={message.id} />
                   ) : null}
-                  {message.role === "assistant" && message.content.trim() ? (
+                  {message.role === "assistant" && text.trim() ? (
                     <div
                       className="chatbot-message-actions"
                       data-copied={copiedMessageId === message.id ? "true" : "false"}
@@ -176,7 +178,7 @@ export default function ThreadPanel({
                         className="chatbot-message-copy-button"
                         aria-label={copiedMessageId === message.id ? copiedLabel : copyLabel}
                         title={copiedMessageId === message.id ? copiedLabel : copyLabel}
-                        onClick={() => void handleCopyMessage(message.id, message.content)}
+                        onClick={() => void handleCopyMessage(message.id, text)}
                       >
                         <span className="chatbot-message-copy-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24" focusable="false">

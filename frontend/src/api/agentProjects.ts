@@ -4,6 +4,11 @@ import { requestJson } from "./modelops/request";
 
 export type AgentProjectVisibility = "private" | "unlisted" | "public";
 export type WorkflowVariableType = "text";
+export const SUPPORTED_WORKFLOW_VARIABLE_TYPES: WorkflowVariableType[] = ["text"];
+
+export function isSupportedWorkflowVariableType(value: unknown): value is WorkflowVariableType {
+  return SUPPORTED_WORKFLOW_VARIABLE_TYPES.includes(value as WorkflowVariableType);
+}
 
 export type WorkflowVariableDefinition = {
   name: string;

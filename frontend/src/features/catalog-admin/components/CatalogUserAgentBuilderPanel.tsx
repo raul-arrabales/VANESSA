@@ -23,6 +23,7 @@ type AvailableVariable = {
 };
 
 const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+const SUPPORTED_WORKFLOW_VARIABLE_TYPES = new Set(["text"]);
 
 export default function CatalogUserAgentBuilderPanel({
   form,
@@ -421,7 +422,7 @@ function variablesBeforeAction(actions: WorkflowAction[], actionIndex: number): 
 
 function actionProducesValidVariables(action: WorkflowAction): boolean {
   const variables = action.type === "get_user_input" ? action.variables : action.type === "mcp_tool" ? action.output_variables : [];
-  return variables.length > 0 && variables.every((variable) => VARIABLE_NAME_PATTERN.test(variable.name) && variable.label.trim() && variable.type === "text");
+  return variables.length > 0 && variables.every((variable) => VARIABLE_NAME_PATTERN.test(variable.name) && variable.label.trim() && SUPPORTED_WORKFLOW_VARIABLE_TYPES.has(variable.type));
 }
 
 function isActionComplete(action: WorkflowAction, actionIndex: number, actions: WorkflowAction[], enabledMcpServers: CatalogMcpServer[]): boolean {

@@ -8,6 +8,7 @@ import {
   updatePlaygroundSession,
 } from "../../../api/playgrounds";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import { messageContentParts } from "../messageContent";
 import { hasSelector } from "../selectorConfig";
 import type {
   PlaygroundMessageViewModel,
@@ -62,6 +63,7 @@ function buildTemporaryMessagePayload(
       .map((message) => ({
         role: message.role,
         content: message.content,
+        content_parts: messageContentParts(message),
         metadata: message.metadata,
       })),
     prompt,

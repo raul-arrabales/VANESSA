@@ -9,6 +9,7 @@ from .chat_inference import (
     chat_completion_with_allowed_model,
     extract_output_text,
 )
+from .message_content import content_text, message_content_parts
 from .stream_errors import public_stream_error_payload
 from ..repositories import chat_conversations as chat_repository
 
@@ -309,10 +310,12 @@ def serialize_message(row: dict[str, Any]) -> dict[str, Any]:
     metadata = row.get("metadata_json")
     if not isinstance(metadata, dict):
         metadata = {}
+    content_parts = message_content_parts({"content": row.get("content", ""), "metadata": metadata})
     return {
         "id": str(row.get("id", "")),
         "role": str(row.get("role", "")),
-        "content": str(row.get("content", "")),
+        "content": content_text(content_parts) or str(row.get("content", "")),
+        "content_parts": content_parts,
         "metadata": metadata,
         "createdAt": _serialize_datetime(row.get("created_at")),
     }
@@ -417,7 +420,7 @@ def _build_context_messages(messages: Sequence[dict[str, Any]]) -> list[dict[str
     stable_messages: list[dict[str, Any]] = []
     dynamic_messages: list[dict[str, Any]] = []
     for message in messages:
-        content = str(message.get("content") or "")
+        content = content_text(message)
         if not content:
             continue
         role = str(message.get("role") or "").strip().lower()
@@ -431,7 +434,7 @@ def _build_context_messages(messages: Sequence[dict[str, Any]]) -> list[dict[str
     running_chars = 0
 
     for message in reversed_messages:
-        content = str(message.get("content") or "")
+        content = content_text(message)
         if not content:
             continue
         if len(selected) >= MAX_CONTEXT_MESSAGES:
@@ -444,14 +447,14 @@ def _build_context_messages(messages: Sequence[dict[str, Any]]) -> list[dict[str
     normalized = [
         {
             "role": str(message.get("role") or ""),
-            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+            "content": message_content_parts(message),
         }
         for message in stable_messages
     ]
     normalized.extend([
         {
             "role": str(message.get("role") or ""),
-            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+            "content": message_content_parts(message),
         }
         for message in reversed(selected)
     ])

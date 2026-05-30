@@ -9,32 +9,14 @@ from ..config import get_auth_config
 from ..repositories import modelops as modelops_repo
 from .modelops_common import ModelOpsError
 from .modelops_runtime import ensure_model_invokable, measure_and_record_inference
+from .message_content import coerce_llm_messages
 from .platform_service import resolve_llm_inference_adapter
 from .platform_types import PlatformControlPlaneError
 from .stream_telemetry import llm_binding_telemetry
 
 
 def coerce_chat_messages(messages: Any) -> list[dict[str, Any]]:
-    if not isinstance(messages, list):
-        return []
-
-    normalized: list[dict[str, Any]] = []
-    for item in messages:
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role", "")).strip().lower()
-        content = str(item.get("content", "")).strip()
-        if role not in {"system", "user", "assistant", "tool"}:
-            continue
-        if not content:
-            continue
-        normalized.append(
-            {
-                "role": role,
-                "content": [{"type": "text", "text": content}],
-            }
-        )
-    return normalized
+    return coerce_llm_messages(messages, allowed_roles={"system", "user", "assistant", "tool"})
 
 
 def extract_output_text(llm_response: dict[str, Any]) -> str:

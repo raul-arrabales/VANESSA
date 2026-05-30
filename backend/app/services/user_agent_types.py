@@ -18,6 +18,8 @@ SUPPORTED_CHANNEL_TYPES = {CHANNEL_TYPE_VANESSA_WEBAPP}
 
 INTERFACE_TYPE_CHAT = "chat"
 SUPPORTED_INTERFACE_TYPES = {INTERFACE_TYPE_CHAT}
+WORKFLOW_VARIABLE_TYPE_TEXT = "text"
+SUPPORTED_WORKFLOW_VARIABLE_TYPES = {WORKFLOW_VARIABLE_TYPE_TEXT}
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -182,14 +184,12 @@ def _normalize_workflow_variables(value: Any, path: str, produced_variables: set
         label = str(item.get("label") or "").strip()
         if not label:
             raise ValueError(f"{path}[{index}].label is required")
-        variable_type = str(item.get("type") or "text").strip().lower()
-        if variable_type != "text":
-            raise ValueError(f"{path}[{index}].type must be text")
+        variable_type = coerce_workflow_variable_type(item.get("type"))
         produced_variables.add(name)
         normalized = {
             "name": name,
             "label": label,
-            "type": "text",
+            "type": variable_type,
             "required": bool(item.get("required", True)),
         }
         guidance = str(item.get("guidance") or "").strip()
@@ -221,3 +221,10 @@ def workflow_mcp_server_slugs(workflow_definition: dict[str, Any]) -> list[str]:
 
 
 workflow_step_server_slugs = workflow_mcp_server_slugs
+
+
+def coerce_workflow_variable_type(value: Any) -> str:
+    normalized = str(value or WORKFLOW_VARIABLE_TYPE_TEXT).strip().lower() or WORKFLOW_VARIABLE_TYPE_TEXT
+    if normalized not in SUPPORTED_WORKFLOW_VARIABLE_TYPES:
+        raise ValueError("workflow variable type must be text")
+    return normalized

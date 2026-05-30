@@ -10,6 +10,7 @@ from ..config import AuthConfig
 from ..services.agent_engine_client import AgentEngineClientError, create_execution, stream_execution
 from ..services.context_management import list_active_runtime_knowledge_bases, resolve_runtime_knowledge_base_selection
 from ..services.knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
+from ..services.message_content import coerce_llm_messages, content_text, message_content_parts, text_message
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_runtime import ensure_model_invokable
 from ..services.platform_service import get_active_platform_runtime
@@ -65,10 +66,12 @@ def serialize_message(row: dict[str, Any]) -> dict[str, Any]:
     metadata = row.get("metadata_json")
     if not isinstance(metadata, dict):
         metadata = {}
+    content_parts = message_content_parts({"content": row.get("content", ""), "metadata": metadata})
     return {
         "id": str(row.get("id", "")),
         "role": str(row.get("role", "")),
-        "content": str(row.get("content", "")),
+        "content": content_text(content_parts) or str(row.get("content", "")),
+        "content_parts": content_parts,
         "metadata": metadata,
         "createdAt": serialize_datetime(row.get("created_at")),
     }
@@ -144,7 +147,7 @@ def build_context_messages(messages: list[dict[str, Any]], *, prompt: str) -> li
     stable_messages: list[dict[str, Any]] = []
     dynamic_messages: list[dict[str, Any]] = []
     for message in messages:
-        content = str(message.get("content") or "")
+        content = content_text(message)
         if not content:
             continue
         role = str(message.get("role") or "").strip().lower()
@@ -158,7 +161,7 @@ def build_context_messages(messages: list[dict[str, Any]], *, prompt: str) -> li
     running_chars = 0
 
     for message in reversed_messages:
-        content = str(message.get("content") or "")
+        content = content_text(message)
         if not content:
             continue
         if len(selected) >= MAX_CONTEXT_MESSAGES:
@@ -171,18 +174,18 @@ def build_context_messages(messages: list[dict[str, Any]], *, prompt: str) -> li
     normalized = [
         {
             "role": str(message.get("role") or ""),
-            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+            "content": message_content_parts(message),
         }
         for message in stable_messages
     ]
     normalized.extend([
         {
             "role": str(message.get("role") or ""),
-            "content": [{"type": "text", "text": str(message.get("content") or "")}],
+            "content": message_content_parts(message),
         }
         for message in reversed(selected)
     ])
-    normalized.append({"role": "user", "content": [{"type": "text", "text": prompt}]})
+    normalized.append(text_message("user", prompt))
     return normalized
 
 
@@ -199,32 +202,13 @@ def order_messages_for_prompt_cache(messages: list[dict[str, Any]]) -> list[dict
 
 
 def coerce_engine_messages(messages: Any) -> list[dict[str, Any]]:
-    if not isinstance(messages, list):
-        return []
-
-    normalized: list[dict[str, Any]] = []
-    for item in messages:
-        if not isinstance(item, dict):
-            continue
-        role = str(item.get("role", "")).strip().lower()
-        content = str(item.get("content", "")).strip()
-        if role not in {"system", "developer", "user", "assistant", "tool"}:
-            continue
-        if not content:
-            continue
-        normalized.append(
-            {
-                "role": role,
-                "content": [{"type": "text", "text": content}],
-            }
-        )
-    return normalized
+    return coerce_llm_messages(messages, allowed_roles={"system", "developer", "user", "assistant", "tool"})
 
 
 def build_engine_messages(*, prompt: str, history_payload: Any) -> list[dict[str, Any]]:
     return [
         *order_messages_for_prompt_cache(coerce_engine_messages(history_payload)),
-        {"role": "user", "content": [{"type": "text", "text": prompt}]},
+        text_message("user", prompt),
     ]
 
 

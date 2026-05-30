@@ -23,6 +23,7 @@ from ..services.chat_inference import (
 )
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_queries import list_model_picker_options
+from ..services.message_content import content_text, message_content_parts
 from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
 from ..services.stream_errors import public_stream_error_payload
@@ -475,7 +476,15 @@ def _build_execution_request(
         model_id=string_or_none(row.get("model_id")),
         knowledge_base_id=string_or_none(row.get("knowledge_base_id")),
         prompt=prompt_text,
-        history=[{"role": str(item.get("role", "")), "content": str(item.get("content", ""))} for item in history_messages],
+        history=[
+            {
+                "role": str(item.get("role", "")),
+                "content": str(item.get("content", "")),
+                "content_parts": message_content_parts(item),
+                "metadata": item.get("metadata_json") if isinstance(item.get("metadata_json"), dict) else {},
+            }
+            for item in history_messages
+        ],
         conversation_title=conversation_title,
         title_source=title_source,
     )
@@ -509,13 +518,15 @@ def _normalize_temporary_history(raw_messages: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         role = str(item.get("role") or "").strip().lower()
-        content = str(item.get("content") or "").strip()
+        parts = message_content_parts(item)
+        content = content_text(parts)
         if role not in {"user", "assistant"} or not content:
             continue
         metadata = item.get("metadata")
         messages.append({
             "role": role,
             "content": content,
+            "content_parts": parts,
             "metadata": metadata if isinstance(metadata, dict) else {},
         })
     return messages
