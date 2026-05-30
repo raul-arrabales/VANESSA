@@ -59,14 +59,42 @@ export type PlaygroundTextContentPart = {
   text: string;
 };
 
-export type PlaygroundImageContentPart = {
-  type: "image";
-  image_ref?: string;
-  mime_type?: string;
+export type PlaygroundImageMimeType = "image/png" | "image/jpeg" | "image/webp" | "image/gif" | string;
+
+export type PlaygroundImageReference = {
+  image_ref: string;
+  mime_type: PlaygroundImageMimeType;
   alt_text?: string;
+  width?: number;
+  height?: number;
+  byte_size?: number;
+  sha256?: string;
 };
 
-export type PlaygroundMessageContentPart = PlaygroundTextContentPart | PlaygroundImageContentPart;
+export type PlaygroundImageUploadRequest = {
+  kind: "image";
+  file_name: string;
+  mime_type: PlaygroundImageMimeType;
+  byte_size: number;
+  alt_text?: string;
+  sha256?: string;
+};
+
+export type PlaygroundImageUploadResult = PlaygroundImageReference & {
+  attachment_id: string;
+};
+
+export type PlaygroundImageContentPart = {
+  type: "image";
+} & PlaygroundImageReference;
+
+export type PlaygroundUnsupportedContentPart = {
+  type: "unsupported";
+  original_type: string;
+  reason: string;
+};
+
+export type PlaygroundMessageContentPart = PlaygroundTextContentPart | PlaygroundImageContentPart | PlaygroundUnsupportedContentPart;
 
 export type PlaygroundMessage = {
   id: string;

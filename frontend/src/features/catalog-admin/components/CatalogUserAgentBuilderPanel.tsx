@@ -2,7 +2,7 @@ import type { FormEvent } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer } from "../../../api/catalog";
-import type { WorkflowAction } from "../../../api/agentProjects";
+import type { WorkflowAction, WorkflowVariableDefinition } from "../../../api/agentProjects";
 import type { ModelCatalogItem } from "../../../api/modelops";
 import type { AgentProjectFormState } from "../../agent-builder/types";
 
@@ -20,6 +20,10 @@ type Props = {
 type AvailableVariable = {
   name: string;
   label: string;
+};
+
+type EditableWorkflowVariable = WorkflowVariableDefinition & {
+  path?: string;
 };
 
 const VARIABLE_NAME_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -238,26 +242,11 @@ function WorkflowActionEditor({
           </label>
           <div className="card-stack">
             <span className="field-label">{t("catalogControl.agents.userProjects.outputVariables")}</span>
-            {action.variables.map((variable, variableIndex) => (
-              <div className="form-grid" key={`${action.id}-var-${variableIndex}`}>
-                <input aria-label={t("catalogControl.agents.userProjects.variableName")} className="field-input" placeholder="user_name" value={variable.name} onChange={(event) => onChange({
-                  ...action,
-                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, name: event.currentTarget.value } : item),
-                })} />
-                <input aria-label={t("catalogControl.agents.userProjects.variableLabel")} className="field-input" placeholder="User name" value={variable.label} onChange={(event) => onChange({
-                  ...action,
-                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, label: event.currentTarget.value } : item),
-                })} />
-                <input aria-label={t("catalogControl.agents.userProjects.variableGuidance")} className="field-input" placeholder="Ask for the user's name" value={variable.guidance ?? ""} onChange={(event) => onChange({
-                  ...action,
-                  variables: action.variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, guidance: event.currentTarget.value } : item),
-                })} />
-              </div>
-            ))}
-            <button type="button" className="btn btn-secondary" onClick={() => onChange({
-              ...action,
-              variables: [...action.variables, { name: "", label: "", type: "text", required: true }],
-            })}>{t("catalogControl.agents.userProjects.addVariable")}</button>
+            <WorkflowVariableListEditor
+              variables={action.variables}
+              mode="user-input"
+              onChange={(variables) => onChange({ ...action, variables })}
+            />
           </div>
         </>
       ) : null}
@@ -311,29 +300,12 @@ function WorkflowActionEditor({
           ) : null}
           <div className="card-stack">
             <span className="field-label">{t("catalogControl.agents.userProjects.outputVariables")}</span>
-            {action.output_variables.map((variable, variableIndex) => (
-              <div className="form-grid" key={`${action.id}-out-${variableIndex}`}>
-                <input aria-label={t("catalogControl.agents.userProjects.variableName")} className="field-input" placeholder="tool_result" value={variable.name} onChange={(event) => onChange({
-                  ...action,
-                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, name: event.currentTarget.value } : item),
-                })} />
-                <input aria-label={t("catalogControl.agents.userProjects.variableLabel")} className="field-input" placeholder="Tool result" value={variable.label} onChange={(event) => onChange({
-                  ...action,
-                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, label: event.currentTarget.value } : item),
-                })} />
-                <select aria-label={t("catalogControl.agents.userProjects.outputPath")} className="field-input" value={variable.path ?? ""} onChange={(event) => onChange({
-                  ...action,
-                  output_variables: action.output_variables.map((item, itemIndex) => itemIndex === variableIndex ? { ...item, path: event.currentTarget.value } : item),
-                })}>
-                  <option value="">{t("catalogControl.agents.userProjects.outputWholeResult")}</option>
-                  {outputFields.map((fieldName) => <option key={fieldName} value={fieldName}>{fieldName}</option>)}
-                </select>
-              </div>
-            ))}
-            <button type="button" className="btn btn-secondary" onClick={() => onChange({
-              ...action,
-              output_variables: [...action.output_variables, { name: "", label: "", type: "text", required: true }],
-            })}>{t("catalogControl.agents.userProjects.addVariable")}</button>
+            <WorkflowVariableListEditor
+              variables={action.output_variables}
+              mode="mcp-output"
+              outputFields={outputFields}
+              onChange={(output_variables) => onChange({ ...action, output_variables })}
+            />
           </div>
         </>
       ) : null}
@@ -364,6 +336,75 @@ function WorkflowActionEditor({
         </>
       ) : null}
     </section>
+  );
+}
+
+function WorkflowVariableListEditor({
+  variables,
+  mode,
+  outputFields = [],
+  onChange,
+}: {
+  variables: EditableWorkflowVariable[];
+  mode: "user-input" | "mcp-output";
+  outputFields?: string[];
+  onChange: (variables: EditableWorkflowVariable[]) => void;
+}): JSX.Element {
+  const { t } = useTranslation("common");
+  const includeGuidance = mode === "user-input";
+  const includePath = mode === "mcp-output";
+  const updateVariable = (index: number, patch: Partial<EditableWorkflowVariable>): void => {
+    onChange(variables.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
+  };
+
+  return (
+    <>
+      {variables.map((variable, variableIndex) => (
+        <div className="form-grid" key={`${mode}-variable-${variableIndex}`}>
+          <input
+            aria-label={t("catalogControl.agents.userProjects.variableName")}
+            className="field-input"
+            placeholder={mode === "user-input" ? "user_name" : "tool_result"}
+            value={variable.name}
+            onChange={(event) => updateVariable(variableIndex, { name: event.currentTarget.value })}
+          />
+          <input
+            aria-label={t("catalogControl.agents.userProjects.variableLabel")}
+            className="field-input"
+            placeholder={mode === "user-input" ? "User name" : "Tool result"}
+            value={variable.label}
+            onChange={(event) => updateVariable(variableIndex, { label: event.currentTarget.value })}
+          />
+          {includeGuidance ? (
+            <input
+              aria-label={t("catalogControl.agents.userProjects.variableGuidance")}
+              className="field-input"
+              placeholder="Ask for the user's name"
+              value={variable.guidance ?? ""}
+              onChange={(event) => updateVariable(variableIndex, { guidance: event.currentTarget.value })}
+            />
+          ) : null}
+          {includePath ? (
+            <select
+              aria-label={t("catalogControl.agents.userProjects.outputPath")}
+              className="field-input"
+              value={variable.path ?? ""}
+              onChange={(event) => updateVariable(variableIndex, { path: event.currentTarget.value })}
+            >
+              <option value="">{t("catalogControl.agents.userProjects.outputWholeResult")}</option>
+              {outputFields.map((fieldName) => <option key={fieldName} value={fieldName}>{fieldName}</option>)}
+            </select>
+          ) : null}
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={() => onChange([...variables, { name: "", label: "", type: "text", required: true }])}
+      >
+        {t("catalogControl.agents.userProjects.addVariable")}
+      </button>
+    </>
   );
 }
 
