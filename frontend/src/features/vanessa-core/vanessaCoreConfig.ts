@@ -1,8 +1,9 @@
 import type { PlaygroundWorkspaceConfig } from "../playgrounds/types";
-import { VANESSA_CORE_ASSISTANT_EXPERIENCE } from "./assistantExperience";
+
+export const VANESSA_CORE_ASSISTANT_REF = "assistant.vanessa.core";
 
 export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
-  playgroundKind: VANESSA_CORE_ASSISTANT_EXPERIENCE.playground_kind,
+  playgroundKind: "chat",
   title: "Vanessa Core",
   panelAriaLabel: "Vanessa Core workspace",
   introText: "Chat with Vanessa in the Vanessa AI workspace.",
@@ -49,5 +50,5 @@ export const vanessaCorePlaygroundConfig: PlaygroundWorkspaceConfig = {
     missingModel: "Model is required.",
     missingKnowledgeBase: "Knowledge base is required.",
   },
-  defaultAssistantRef: VANESSA_CORE_ASSISTANT_EXPERIENCE.assistant_ref,
+  defaultAssistantRef: VANESSA_CORE_ASSISTANT_REF,
 };

@@ -15,10 +15,12 @@ describe("vanessa-core boundaries", () => {
     expect(indexSource).not.toContain("vanessaCoreFeatureReady = false");
   });
 
-  it("Vanessa reuses the shared playground workspace and assistant experience contract", () => {
+  it("Vanessa reuses the shared playground workspace without private workflow metadata", () => {
     expect(pageSource).toContain("../../playgrounds/components/PlaygroundWorkspace");
     expect(configSource).toContain("../playgrounds/types");
-    expect(configSource).toContain("./assistantExperience");
-    expect(configSource).toContain('defaultAssistantRef: VANESSA_CORE_ASSISTANT_EXPERIENCE.assistant_ref');
+    expect(configSource).toContain('VANESSA_CORE_ASSISTANT_REF = "assistant.vanessa.core"');
+    expect(configSource).toContain("defaultAssistantRef: VANESSA_CORE_ASSISTANT_REF");
+    expect(configSource).not.toContain("workflow_definition");
+    expect(configSource).not.toContain("assistantExperience");
   });
 });

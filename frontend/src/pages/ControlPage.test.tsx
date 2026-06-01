@@ -41,7 +41,7 @@ describe("ControlPage", () => {
     expect(screen.getByRole("link", { name: await t("control.items.models.title") })).toHaveAttribute("href", "/control/models");
     expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
-    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
+    expect(controlCardDefinitions.some((item) => item.id === "agentBuilder")).toBe(false);
   });
 
   it("shows the quotes control for admin users", async () => {
@@ -60,7 +60,7 @@ describe("ControlPage", () => {
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
-    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
+    expect(controlCardDefinitions.some((item) => item.id === "agentBuilder")).toBe(false);
     expect(screen.getByRole("link", { name: await t("control.items.quotes.title") })).toHaveAttribute("href", "/control/quotes");
     expect(screen.getByRole("link", { name: await t("control.items.context.title") })).toHaveAttribute("href", "/control/context");
     expect(screen.queryByRole("link", { name: await t("control.items.platform.title") })).toBeNull();
@@ -82,7 +82,7 @@ describe("ControlPage", () => {
     expect(screen.queryByRole("link", { name: await t("control.items.profile.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.ai.title") })).toBeNull();
     expect(screen.queryByRole("link", { name: await t("control.items.playgrounds.title") })).toBeNull();
-    expect(screen.queryByRole("link", { name: await t("control.items.agentBuilder.title") })).toBeNull();
+    expect(controlCardDefinitions.some((item) => item.id === "agentBuilder")).toBe(false);
     expect(screen.getByRole("link", { name: await t("control.items.systemHealth.title") })).toHaveAttribute("href", "/control/system-health");
     expect(screen.getByRole("link", { name: await t("control.items.platform.title") })).toHaveAttribute("href", "/control/platform");
     expect(controlCardDefinitions.find((item) => item.id === "platform")?.icon).toBe("settings");

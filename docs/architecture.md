@@ -147,7 +147,7 @@ The product-facing AI surface now has its own domain split, separate from the co
   - Public API lives under `/v1/agent-projects/*`.
 
 - `vanessa-core`
-  - First-party Vanessa behavior is intended to plug into shared execution seams instead of branching generic execution code.
+  - First-party Vanessa behavior uses the shared playground shell today and should reuse tested user-agent workflow, channel, and runtime artifacts as they mature.
   - Frontend entrypoints now live under the `Vanessa AI` section at `/ai`, with `Vanessa Core` remaining at `/ai/vanessa`.
 
 Frontend work now lands under `frontend/src/features/*`, backend product APIs under `backend/app/api/http`, and engine execution seams under `agent_engine/app/execution_pipeline`.
