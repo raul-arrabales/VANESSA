@@ -21,6 +21,9 @@ from .attachment_policy import (
 )
 
 MAX_IMAGES_PER_MESSAGE = 5
+ATTACHMENT_KIND_IMAGE = "image"
+ATTACHMENT_KIND_FILE = "file"
+ENABLED_ATTACHMENT_KINDS = frozenset({ATTACHMENT_KIND_IMAGE})
 
 _MIME_EXTENSIONS = {
     "image/png": ".png",
@@ -53,15 +56,25 @@ def attachment_id_from_ref(value: Any) -> str | None:
     return attachment_id or None
 
 
-def image_attachment_ids_from_parts(parts: list[dict[str, Any]]) -> list[str]:
+def attachment_ids_from_parts(
+    parts: list[dict[str, Any]],
+    *,
+    enabled_kinds: frozenset[str] = ENABLED_ATTACHMENT_KINDS,
+) -> list[str]:
     attachment_ids: list[str] = []
     for part in parts:
-        if str(part.get("type") or "") != "image":
+        part_type = str(part.get("type") or "").strip().lower()
+        if part_type not in enabled_kinds:
             continue
-        attachment_id = str(part.get("attachment_id") or "").strip() or attachment_id_from_ref(part.get("image_ref")) or ""
+        ref_key = "image_ref" if part_type == ATTACHMENT_KIND_IMAGE else "attachment_ref"
+        attachment_id = str(part.get("attachment_id") or "").strip() or attachment_id_from_ref(part.get(ref_key)) or ""
         if attachment_id and attachment_id not in attachment_ids:
             attachment_ids.append(attachment_id)
     return attachment_ids
+
+
+def image_attachment_ids_from_parts(parts: list[dict[str, Any]]) -> list[str]:
+    return attachment_ids_from_parts(parts, enabled_kinds=frozenset({ATTACHMENT_KIND_IMAGE}))
 
 
 def save_chat_image_attachment(
@@ -99,6 +112,7 @@ def save_chat_image_attachment(
             database_url,
             attachment_id=attachment_id,
             owner_user_id=owner_user_id,
+            attachment_kind=ATTACHMENT_KIND_IMAGE,
             mime_type=metadata["mime_type"],
             byte_size=metadata["byte_size"],
             sha256=digest,
@@ -165,11 +179,30 @@ def validate_owned_image_references(
     owner_user_id: int,
     parts: list[dict[str, Any]],
 ) -> None:
-    attachment_ids = image_attachment_ids_from_parts(parts)
-    if len(attachment_ids) > MAX_IMAGES_PER_MESSAGE:
+    validate_owned_attachment_references(
+        database_url,
+        owner_user_id=owner_user_id,
+        parts=parts,
+        attachment_kind=ATTACHMENT_KIND_IMAGE,
+        max_count=MAX_IMAGES_PER_MESSAGE,
+    )
+
+
+def validate_owned_attachment_references(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    parts: list[dict[str, Any]],
+    attachment_kind: str,
+    max_count: int,
+) -> None:
+    if attachment_kind not in ENABLED_ATTACHMENT_KINDS:
+        raise ChatAttachmentError("attachment_kind_unavailable", "Attachment type is not available")
+    attachment_ids = attachment_ids_from_parts(parts, enabled_kinds=frozenset({attachment_kind}))
+    if len(attachment_ids) > max_count:
         raise ChatAttachmentError(
             "too_many_images",
-            f"Messages can include at most {MAX_IMAGES_PER_MESSAGE} images",
+            f"Messages can include at most {max_count} images",
         )
     for attachment_id in attachment_ids:
         try:
@@ -184,7 +217,13 @@ def validate_owned_image_references(
     found_ids = {str(row.get("id") or "") for row in rows}
     missing_ids = [attachment_id for attachment_id in attachment_ids if attachment_id not in found_ids]
     if missing_ids:
-        raise ChatAttachmentError("attachment_not_found", "One or more image attachments are unavailable", status_code=404)
+        raise ChatAttachmentError("attachment_not_found", "One or more attachments are unavailable", status_code=404)
+    mismatched_rows = [
+        row for row in rows
+        if str(row.get("attachment_kind") or "").strip().lower() != attachment_kind
+    ]
+    if mismatched_rows:
+        raise ChatAttachmentError("attachment_kind_mismatch", "One or more attachments have an invalid type")
 
 
 def bind_message_attachments(

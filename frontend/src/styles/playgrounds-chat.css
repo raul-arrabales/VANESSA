@@ -674,6 +674,22 @@
   gap: var(--space-2);
 }
 
+.chatbot-image-viewer-download {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.chatbot-image-viewer-download svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .chatbot-message-text {
   margin: 0;
   white-space: pre-wrap;

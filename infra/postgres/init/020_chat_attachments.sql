@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS chat_attachments (
     storage_path TEXT NOT NULL,
     original_filename TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chat_attachments_kind_check CHECK (attachment_kind IN ('image')),
+    CONSTRAINT chat_attachments_kind_check CHECK (attachment_kind IN ('image', 'file')),
     CONSTRAINT chat_attachments_byte_size_check CHECK (byte_size > 0),
     CONSTRAINT chat_attachments_width_check CHECK (width IS NULL OR width > 0),
     CONSTRAINT chat_attachments_height_check CHECK (height IS NULL OR height > 0)

@@ -18,6 +18,7 @@ def create_attachment(
     height: int | None,
     storage_path: str,
     original_filename: str | None = None,
+    attachment_kind: str = "image",
 ) -> dict[str, Any]:
     with get_connection(database_url) as connection:
         row = connection.execute(
@@ -35,7 +36,7 @@ def create_attachment(
                 original_filename,
                 created_at
             )
-            VALUES (%s, %s, 'image', %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING
                 id,
                 owner_user_id,
@@ -54,6 +55,7 @@ def create_attachment(
             (
                 attachment_id,
                 owner_user_id,
+                attachment_kind,
                 mime_type,
                 byte_size,
                 sha256,

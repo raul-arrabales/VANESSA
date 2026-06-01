@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { PlaygroundImageContentPart } from "../../../api/playgrounds";
 import { useAutoResizingComposer } from "../hooks/useAutoResizingComposer";
-import AttachmentImage from "./AttachmentImage";
+import ComposerAttachmentsTray from "./ComposerAttachmentsTray";
 
 type ComposerProps = {
   draft: string;
@@ -69,24 +69,11 @@ export default function Composer({
 
   return (
     <div ref={shellRef} className="chatbot-composer-shell">
-      {pendingImages.length > 0 ? (
-        <div className="chatbot-composer-attachments" aria-label="Images ready to send">
-          {pendingImages.map((image) => (
-            <figure key={image.image_ref} className="chatbot-composer-attachment">
-              <AttachmentImage image={image} className="chatbot-composer-attachment-preview" />
-              <button
-                type="button"
-                className="chatbot-composer-attachment-remove"
-                onClick={() => onRemoveImage?.(image.image_ref)}
-                aria-label="Remove image"
-                disabled={isSending}
-              >
-                x
-              </button>
-            </figure>
-          ))}
-        </div>
-      ) : null}
+      <ComposerAttachmentsTray
+        pendingImages={pendingImages}
+        isSending={isSending}
+        onRemoveImage={onRemoveImage}
+      />
       <label className="sr-only" htmlFor="prompt">Message</label>
       <div className="chatbot-composer-input-wrap">
         <button
