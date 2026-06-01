@@ -168,6 +168,30 @@ VANESSA_RUNTIME_ENV_MODE_FILE="${VANESSA_RUNTIME_ENV_MODE_FILE:-env/${DEPLOYMENT
 VANESSA_RUNTIME_ENV_LEGACY_OVERRIDE_FILE="${VANESSA_RUNTIME_ENV_LEGACY_OVERRIDE_FILE:-.env.local}"
 VANESSA_RUNTIME_ENV_ACTIVE_FILE="${VANESSA_RUNTIME_ENV_ACTIVE_FILE:-/tmp/vanessa-runtime-${DEPLOYMENT_MODE_FILE_STEM}.active.env}"
 
+declare -Ar OPTIONAL_SERVICE_PROFILES=(
+  [llama_cpp]="llama_cpp"
+  [qdrant]="qdrant"
+  [image_analysis]="image_analysis"
+  [image_generation]="image_generation"
+  [web_search]=""
+  [kws]="kws"
+)
+declare -Ar OPTIONAL_SERVICE_PRIMARY_SERVICES=(
+  [llama_cpp]="llama_cpp"
+  [qdrant]="qdrant"
+  [image_analysis]="image_analysis"
+  [image_generation]="image_generation"
+  [web_search]="searxng"
+  [kws]="kws"
+)
+declare -Ar OPTIONAL_SERVICE_DEFAULT_URLS=(
+  [llama_cpp]="http://llama_cpp:8080"
+  [qdrant]="http://qdrant:6333"
+  [image_analysis]="http://image_analysis:8090"
+  [image_generation]="http://image_generation:8094"
+  [web_search]="http://searxng:8080"
+)
+
 runtime_env_path() {
   local relative_or_absolute="$1"
   if [[ -z "${relative_or_absolute}" ]]; then
@@ -234,6 +258,46 @@ optional_service_enabled() {
   service_list_contains "${service_key}" "${VANESSA_ENABLED_OPTIONAL_SERVICES}"
 }
 
+optional_service_keys() {
+  local raw="${VANESSA_ALLOWED_OPTIONAL_SERVICES:-}"
+  local normalized old_ifs item
+  normalized="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  old_ifs="${IFS}"
+  IFS=','
+  for item in ${normalized}; do
+    [[ -n "${item}" ]] || continue
+    printf '%s\n' "${item}"
+  done
+  IFS="${old_ifs}"
+}
+
+enabled_optional_service_keys() {
+  local service_key
+  while IFS= read -r service_key; do
+    optional_service_enabled "${service_key}" && printf '%s\n' "${service_key}"
+  done < <(optional_service_keys)
+}
+
+optional_service_profile_for_key() {
+  printf '%s\n' "${OPTIONAL_SERVICE_PROFILES[$1]:-}"
+}
+
+optional_service_primary_service_for_key() {
+  printf '%s\n' "${OPTIONAL_SERVICE_PRIMARY_SERVICES[$1]:-}"
+}
+
+optional_service_key_for_service_name() {
+  local service_name="$1"
+  local service_key
+  while IFS= read -r service_key; do
+    if [[ "$(optional_service_primary_service_for_key "${service_key}")" == "${service_name}" ]]; then
+      printf '%s\n' "${service_key}"
+      return 0
+    fi
+  done < <(optional_service_keys)
+  return 1
+}
+
 validate_optional_services_config() {
   local allowed=" ${VANESSA_ALLOWED_OPTIONAL_SERVICES//,/ } "
   local raw normalized old_ifs item seen=" "
@@ -259,14 +323,7 @@ validate_optional_services_config() {
 }
 
 default_optional_service_url() {
-  case "$1" in
-    llama_cpp) printf '%s\n' "${LLAMA_CPP_URL_DEFAULT:-http://llama_cpp:8080}" ;;
-    qdrant) printf '%s\n' "${QDRANT_URL_DEFAULT:-http://qdrant:6333}" ;;
-    image_analysis) printf '%s\n' "${IMAGE_ANALYSIS_URL_DEFAULT:-http://image_analysis:8090}" ;;
-    image_generation) printf '%s\n' "${IMAGE_GENERATION_URL_DEFAULT:-http://image_generation:8094}" ;;
-    web_search) printf '%s\n' "${WEB_SEARCH_URL_DEFAULT:-http://searxng:8080}" ;;
-    *) printf '\n' ;;
-  esac
+  printf '%s\n' "${OPTIONAL_SERVICE_DEFAULT_URLS[$1]:-}"
 }
 
 write_runtime_activation_env() {
@@ -914,20 +971,17 @@ compose() {
   fi
 
   local -a cmd=(docker compose)
-  if llama_cpp_enabled_requested; then
-    cmd+=(--profile llama_cpp)
-  fi
-  if qdrant_enabled_requested; then
-    cmd+=(--profile qdrant)
-  fi
+  local optional_service_key optional_profile
+  while IFS= read -r optional_service_key; do
+    optional_profile="$(optional_service_profile_for_key "${optional_service_key}")"
+    [[ -n "${optional_profile}" ]] || continue
+    cmd+=(--profile "${optional_profile}")
+  done < <(enabled_optional_service_keys)
   if image_analysis_enabled_requested; then
-    cmd+=(--profile image_analysis)
+    :
   fi
   if image_generation_enabled_requested; then
-    cmd+=(--profile image_generation)
-  fi
-  if kws_enabled_requested; then
-    cmd+=(--profile kws)
+    :
   fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
@@ -942,18 +996,10 @@ compose() {
 
 stack_services_for_start() {
   local -a services_to_start=()
-  local service
+  local service optional_service_key
   for service in "${SERVICES[@]}"; do
-    if [[ "${service}" == "llama_cpp" ]] && ! llama_cpp_enabled_requested; then
-      continue
-    fi
-    if [[ "${service}" == "qdrant" ]] && ! qdrant_enabled_requested; then
-      continue
-    fi
-    if [[ "${service}" == "searxng" ]] && ! web_search_enabled_requested; then
-      continue
-    fi
-    if [[ "${service}" == "image_analysis" ]] && ! image_analysis_enabled_requested; then
+    optional_service_key="$(optional_service_key_for_service_name "${service}" || true)"
+    if [[ -n "${optional_service_key}" ]] && ! optional_service_enabled "${optional_service_key}"; then
       continue
     fi
     if [[ "${service}" == image_analysis_* ]] && ! image_analysis_enabled_requested; then
@@ -978,9 +1024,6 @@ stack_services_for_start() {
       if ! image_generation_worker_enabled "${generation_role}"; then
         continue
       fi
-    fi
-    if [[ "${service}" == "kws" ]] && ! kws_enabled_requested; then
-      continue
     fi
     services_to_start+=("${service}")
   done

@@ -153,3 +153,39 @@ def test_system_health_includes_image_generation_service_when_configured(client,
     payload = response.get_json()
     assert any(service["container"] == "image_generation" for service in payload["services"])
     assert "http://image_generation:8094/health" in seen_urls
+
+
+def test_system_health_excludes_kws_when_disabled(client, monkeypatch: pytest.MonkeyPatch):
+    config = build_test_auth_config(backend_app_module.AuthConfig, kws_enabled=False)
+
+    monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
+    monkeypatch.setattr(backend_app_module, "_http_json_ok", lambda _url: True)
+    monkeypatch.setattr(backend_app_module, "_postgres_ok", lambda _db: True)
+    monkeypatch.setattr(backend_app_module, "get_active_capability_statuses", lambda _db, _config: [])
+
+    response = client.get("/system/health")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert not any(service["container"] == "kws" for service in payload["services"])
+
+
+def test_system_health_includes_kws_when_enabled(client, monkeypatch: pytest.MonkeyPatch):
+    config = build_test_auth_config(backend_app_module.AuthConfig, kws_enabled=True)
+    seen_urls: list[str] = []
+
+    def _http_ok(url: str) -> bool:
+        seen_urls.append(url)
+        return True
+
+    monkeypatch.setattr(backend_app_module, "_get_config", lambda: config)
+    monkeypatch.setattr(backend_app_module, "_http_json_ok", _http_ok)
+    monkeypatch.setattr(backend_app_module, "_postgres_ok", lambda _db: True)
+    monkeypatch.setattr(backend_app_module, "get_active_capability_statuses", lambda _db, _config: [])
+
+    response = client.get("/system/health")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert any(service["container"] == "kws" for service in payload["services"])
+    assert "http://kws:10400/health" in seen_urls

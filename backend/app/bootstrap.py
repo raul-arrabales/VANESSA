@@ -18,6 +18,130 @@ _GENERATED_DIR = Path(__file__).resolve().parent / "generated"
 _ARCHITECTURE_JSON_PATH = _GENERATED_DIR / "architecture.json"
 _ARCHITECTURE_SVG_PATH = _GENERATED_DIR / "architecture.svg"
 
+_CORE_SYSTEM_SERVICE_SPECS: tuple[dict[str, str], ...] = (
+    {"service": "Frontend", "container": "frontend", "config_attr": "frontend_url", "health_path": "/"},
+    {"service": "Backend", "container": "backend", "config_attr": "backend_url", "health_path": "/health"},
+    {"service": "LLM API", "container": "llm", "config_attr": "llm_url", "health_path": "/health"},
+    {
+        "service": "LLM Runtime Inference",
+        "container": "llm_runtime_inference",
+        "config_attr": "llm_inference_runtime_url",
+        "health_path": "/health",
+    },
+    {
+        "service": "LLM Runtime Embeddings",
+        "container": "llm_runtime_embeddings",
+        "config_attr": "llm_embeddings_runtime_url",
+        "health_path": "/health",
+    },
+    {"service": "Agent Engine", "container": "agent_engine", "config_attr": "agent_engine_url", "health_path": "/health"},
+    {"service": "Sandbox", "container": "sandbox", "config_attr": "sandbox_url", "health_path": "/health"},
+    {"service": "Weaviate", "container": "weaviate", "config_attr": "weaviate_url", "health_path": "/v1/.well-known/ready"},
+)
+
+def _service_health_entry(config: AuthConfig, *, service: str, container: str, config_attr: str, health_path: str) -> dict[str, Any]:
+    from . import app as app_module
+
+    target = str(getattr(config, config_attr)).strip()
+    normalized_target = target.rstrip("/")
+    return {
+        "service": service,
+        "container": container,
+        "target": target,
+        "reachable": app_module._http_json_ok(normalized_target + health_path),
+    }
+
+
+def _build_system_health_services(config: AuthConfig) -> list[dict[str, Any]]:
+    services = [
+        _service_health_entry(
+            config,
+            service=spec["service"],
+            container=spec["container"],
+            config_attr=spec["config_attr"],
+            health_path=spec["health_path"],
+        )
+        for spec in _CORE_SYSTEM_SERVICE_SPECS
+    ]
+    services.insert(
+        6,
+        _service_health_entry(
+            config,
+            service="MCP Gateway",
+            container="mcp_gateway",
+            config_attr="mcp_gateway_url",
+            health_path="/health",
+        ),
+    )
+    if config.web_search_enabled:
+        services.insert(
+            7,
+            _service_health_entry(
+                config,
+                service="SearXNG Web Search",
+                container="searxng",
+                config_attr="web_search_url",
+                health_path="/",
+            ),
+        )
+    if config.image_analysis_url.strip():
+        services.insert(
+            8,
+            _service_health_entry(
+                config,
+                service="Image Analysis",
+                container="image_analysis",
+                config_attr="image_analysis_url",
+                health_path="/health",
+            ),
+        )
+    if config.image_generation_url.strip():
+        services.insert(
+            9,
+            _service_health_entry(
+                config,
+                service="Image Generation",
+                container="image_generation",
+                config_attr="image_generation_url",
+                health_path="/health",
+            ),
+        )
+    if config.kws_enabled:
+        services.insert(
+            len(services) - 2,
+            _service_health_entry(
+                config,
+                service="KWS",
+                container="kws",
+                config_attr="kws_url",
+                health_path="/health",
+            ),
+        )
+    if config.llama_cpp_url.strip():
+        services.insert(
+            4,
+            _service_health_entry(
+                config,
+                service="llama.cpp",
+                container="llama_cpp",
+                config_attr="llama_cpp_url",
+                health_path="/v1/models",
+            ),
+        )
+    if config.qdrant_url.strip():
+        services.insert(
+            len(services) - 1,
+            _service_health_entry(
+                config,
+                service="Qdrant",
+                container="qdrant",
+                config_attr="qdrant_url",
+                health_path="/healthz",
+            ),
+        )
+    services.append({"service": "PostgreSQL", "container": "postgres", "target": "postgresql", "reachable": False})
+    return services
+
 
 def configure_request_context(app: Flask) -> None:
     @app.before_request
@@ -59,46 +183,8 @@ def register_system_routes(app: Flask) -> None:
         from . import app as app_module
 
         config = app_module._get_config()
-        frontend_url = config.frontend_url.rstrip("/")
-        backend_url = config.backend_url.rstrip("/")
-        llm_url = config.llm_url.rstrip("/")
-        llm_inference_runtime_url = config.llm_inference_runtime_url.rstrip("/")
-        llm_embeddings_runtime_url = config.llm_embeddings_runtime_url.rstrip("/")
-        agent_engine_url = config.agent_engine_url.rstrip("/")
-        sandbox_url = config.sandbox_url.rstrip("/")
-        mcp_gateway_url = config.mcp_gateway_url.rstrip("/")
-        web_search_url = config.web_search_url.rstrip("/")
-        image_analysis_url = config.image_analysis_url.rstrip("/")
-        image_generation_url = config.image_generation_url.rstrip("/")
-        weaviate_url = config.weaviate_url.rstrip("/")
-        llama_cpp_url = config.llama_cpp_url.rstrip("/")
-        qdrant_url = config.qdrant_url.rstrip("/")
-
-        services = [
-            {"service": "Frontend", "container": "frontend", "target": config.frontend_url, "reachable": app_module._http_json_ok(frontend_url + "/")},
-            {"service": "Backend", "container": "backend", "target": config.backend_url, "reachable": app_module._http_json_ok(backend_url + "/health")},
-            {"service": "LLM API", "container": "llm", "target": config.llm_url, "reachable": app_module._http_json_ok(llm_url + "/health")},
-            {"service": "LLM Runtime Inference", "container": "llm_runtime_inference", "target": config.llm_inference_runtime_url, "reachable": app_module._http_json_ok(llm_inference_runtime_url + "/health")},
-            {"service": "LLM Runtime Embeddings", "container": "llm_runtime_embeddings", "target": config.llm_embeddings_runtime_url, "reachable": app_module._http_json_ok(llm_embeddings_runtime_url + "/health")},
-            {"service": "Agent Engine", "container": "agent_engine", "target": config.agent_engine_url, "reachable": app_module._http_json_ok(agent_engine_url + "/health")},
-            {"service": "Sandbox", "container": "sandbox", "target": config.sandbox_url, "reachable": app_module._http_json_ok(sandbox_url + "/health")},
-            {"service": "Weaviate", "container": "weaviate", "target": config.weaviate_url, "reachable": app_module._http_json_ok(weaviate_url + "/v1/.well-known/ready")},
-            {"service": "PostgreSQL", "container": "postgres", "target": "postgresql", "reachable": app_module._postgres_ok(config.database_url)},
-        ]
-        if config.kws_enabled:
-            kws_url = config.kws_url.rstrip("/")
-            services.insert(len(services) - 2, {"service": "KWS", "container": "kws", "target": config.kws_url, "reachable": app_module._http_json_ok(kws_url + "/health")})
-        if config.llama_cpp_url.strip():
-            services.insert(4, {"service": "llama.cpp", "container": "llama_cpp", "target": config.llama_cpp_url, "reachable": app_module._http_json_ok(llama_cpp_url + "/v1/models")})
-        if config.qdrant_url.strip():
-            services.insert(len(services) - 1, {"service": "Qdrant", "container": "qdrant", "target": config.qdrant_url, "reachable": app_module._http_json_ok(qdrant_url + "/healthz")})
-        services.insert(6, {"service": "MCP Gateway", "container": "mcp_gateway", "target": config.mcp_gateway_url, "reachable": app_module._http_json_ok(mcp_gateway_url + "/health")})
-        if config.web_search_enabled:
-            services.insert(7, {"service": "SearXNG Web Search", "container": "searxng", "target": config.web_search_url, "reachable": app_module._http_json_ok(web_search_url + "/")})
-        if config.image_analysis_url.strip():
-            services.insert(8, {"service": "Image Analysis", "container": "image_analysis", "target": config.image_analysis_url, "reachable": app_module._http_json_ok(image_analysis_url + "/health")})
-        if config.image_generation_url.strip():
-            services.insert(9, {"service": "Image Generation", "container": "image_generation", "target": config.image_generation_url, "reachable": app_module._http_json_ok(image_generation_url + "/health")})
+        services = _build_system_health_services(config)
+        services[-1]["reachable"] = app_module._postgres_ok(config.database_url)
 
         response_payload: dict[str, Any] = {
             "status": "ok" if all(service["reachable"] for service in services) else "degraded",

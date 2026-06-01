@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 RUNTIME_PROFILES = {"online", "offline"}
 DEFAULT_RUNTIME_PROFILE = "offline"
@@ -37,6 +37,89 @@ DEFAULT_CONTEXT_SOURCE_ROOTS = "/context_sources"
 DEFAULT_CLOUD_TRAFFIC_LOG_PATH = "/var/log/vanessa/cloud-traffic.jsonl"
 DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES = 10_485_760
 DEFAULT_CHAT_ATTACHMENTS_ROOT = "/var/lib/vanessa/chat-attachments"
+
+
+def _shared_runtime_config_kwargs() -> dict[str, object]:
+    return {
+        "frontend_url": os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,
+        "backend_url": os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
+        "llm_url": os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
+        "llm_runtime_url": os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
+        "llm_inference_runtime_url": (
+            os.getenv("LLM_INFERENCE_RUNTIME_URL", DEFAULT_LLM_INFERENCE_RUNTIME_URL).strip()
+            or DEFAULT_LLM_INFERENCE_RUNTIME_URL
+        ),
+        "llm_embeddings_runtime_url": (
+            os.getenv("LLM_EMBEDDINGS_RUNTIME_URL", DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL).strip()
+            or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
+        ),
+        "agent_engine_url": os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
+        "agent_engine_service_token": (
+            os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
+            or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN
+        ),
+        "mcp_gateway_service_token": (
+            os.getenv("MCP_GATEWAY_SERVICE_TOKEN", DEFAULT_MCP_GATEWAY_SERVICE_TOKEN).strip()
+            or DEFAULT_MCP_GATEWAY_SERVICE_TOKEN
+        ),
+        "sandbox_url": os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
+        "mcp_gateway_url": os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip() or DEFAULT_MCP_GATEWAY_URL,
+        "web_search_enabled": _get_bool_env("WEB_SEARCH_ENABLED", DEFAULT_WEB_SEARCH_ENABLED),
+        "web_search_url": os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
+        "web_search_timeout_seconds": _get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
+        "image_analysis_url": os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
+        "image_generation_url": os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
+        "kws_url": os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
+        "kws_enabled": _get_bool_env("KWS_ENABLED", False),
+        "weaviate_url": os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
+        "llama_cpp_url": os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
+        "qdrant_url": os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
+        "runtime_profile_seed": _get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
+        "runtime_profile_force": _get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
+        "kws_detection_threshold": _get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
+        "kws_cooldown_ms": _get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
+        "cloud_traffic_log_enabled": _get_bool_env("CLOUD_TRAFFIC_LOG_ENABLED", True),
+        "cloud_traffic_log_path": (
+            os.getenv("CLOUD_TRAFFIC_LOG_PATH", DEFAULT_CLOUD_TRAFFIC_LOG_PATH).strip()
+            or DEFAULT_CLOUD_TRAFFIC_LOG_PATH
+        ),
+        "cloud_traffic_log_max_bytes": _get_int_env(
+            "CLOUD_TRAFFIC_LOG_MAX_BYTES",
+            DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES,
+        ),
+        "chat_attachments_root": (
+            os.getenv("CHAT_ATTACHMENTS_ROOT", DEFAULT_CHAT_ATTACHMENTS_ROOT).strip()
+            or DEFAULT_CHAT_ATTACHMENTS_ROOT
+        ),
+    }
+
+
+def _auth_runtime_extension_kwargs() -> dict[str, object]:
+    return {
+        "llm_request_timeout_seconds": _get_int_env("LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS),
+        "image_analysis_request_timeout_seconds": _get_int_env(
+            "IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS",
+            DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS,
+        ),
+        "image_generation_request_timeout_seconds": _get_int_env(
+            "IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS",
+            DEFAULT_IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS,
+        ),
+        "llm_local_upstream_model": (
+            os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
+            or DEFAULT_LLM_LOCAL_MODEL_PATH
+        ),
+        "llm_local_embeddings_upstream_model": (
+            os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
+            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
+            or DEFAULT_LLM_LOCAL_MODEL_PATH
+        ),
+        "product_rag_index": os.getenv("PRODUCT_RAG_INDEX", DEFAULT_PRODUCT_RAG_INDEX).strip() or DEFAULT_PRODUCT_RAG_INDEX,
+        "product_rag_top_k": _get_int_env("PRODUCT_RAG_TOP_K", DEFAULT_PRODUCT_RAG_TOP_K),
+        "context_source_roots": _get_path_list_env("CONTEXT_SOURCE_ROOTS", DEFAULT_CONTEXT_SOURCE_ROOTS),
+    }
 
 
 @dataclass(frozen=True)
@@ -202,6 +285,57 @@ def _get_path_list_env(name: str, default: str) -> tuple[str, ...]:
     return normalized or tuple(item for item in default.split(":") if item)
 
 
+def _config_field_names(config_cls: type[object]) -> set[str]:
+    return {field.name for field in fields(config_cls)}
+
+
+SHARED_RUNTIME_CONFIG_FIELD_NAMES = frozenset(
+    {
+        "frontend_url",
+        "backend_url",
+        "llm_url",
+        "llm_runtime_url",
+        "llm_inference_runtime_url",
+        "llm_embeddings_runtime_url",
+        "agent_engine_url",
+        "agent_engine_service_token",
+        "mcp_gateway_service_token",
+        "sandbox_url",
+        "mcp_gateway_url",
+        "web_search_enabled",
+        "web_search_url",
+        "web_search_timeout_seconds",
+        "image_analysis_url",
+        "image_generation_url",
+        "kws_url",
+        "kws_enabled",
+        "weaviate_url",
+        "llama_cpp_url",
+        "qdrant_url",
+        "runtime_profile_seed",
+        "runtime_profile_force",
+        "kws_detection_threshold",
+        "kws_cooldown_ms",
+        "cloud_traffic_log_enabled",
+        "cloud_traffic_log_path",
+        "cloud_traffic_log_max_bytes",
+        "chat_attachments_root",
+    }
+)
+AUTH_RUNTIME_EXTENSION_FIELD_NAMES = frozenset(
+    {
+        "llm_request_timeout_seconds",
+        "image_analysis_request_timeout_seconds",
+        "image_generation_request_timeout_seconds",
+        "llm_local_upstream_model",
+        "llm_local_embeddings_upstream_model",
+        "product_rag_index",
+        "product_rag_top_k",
+        "context_source_roots",
+    }
+)
+
+
 def get_auth_config() -> AuthConfig:
     database_url = os.getenv("DATABASE_URL", "").strip()
     if not database_url:
@@ -239,111 +373,12 @@ def get_auth_config() -> AuthConfig:
         model_download_allow_patterns_default=os.getenv("MODEL_DOWNLOAD_ALLOW_PATTERNS_DEFAULT", "").strip(),
         model_download_ignore_patterns_default=os.getenv("MODEL_DOWNLOAD_IGNORE_PATTERNS_DEFAULT", "").strip(),
         hf_token=os.getenv("HF_TOKEN", "").strip(),
-        agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
-        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
-        or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
-        mcp_gateway_service_token=os.getenv("MCP_GATEWAY_SERVICE_TOKEN", DEFAULT_MCP_GATEWAY_SERVICE_TOKEN).strip()
-        or DEFAULT_MCP_GATEWAY_SERVICE_TOKEN,
         agent_execution_via_engine=_get_bool_env("AGENT_EXECUTION_VIA_ENGINE", True),
         agent_execution_fallback=_get_bool_env("AGENT_EXECUTION_FALLBACK", False),
-        frontend_url=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,
-        backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
-        llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
-        llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
-        llm_inference_runtime_url=(
-            os.getenv("LLM_INFERENCE_RUNTIME_URL", DEFAULT_LLM_INFERENCE_RUNTIME_URL).strip()
-            or DEFAULT_LLM_INFERENCE_RUNTIME_URL
-        ),
-        llm_embeddings_runtime_url=(
-            os.getenv("LLM_EMBEDDINGS_RUNTIME_URL", DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL).strip()
-            or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
-        ),
-        llm_request_timeout_seconds=_get_int_env("LLM_REQUEST_TIMEOUT_SECONDS", DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS),
-        image_analysis_request_timeout_seconds=_get_int_env(
-            "IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS",
-            DEFAULT_IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS,
-        ),
-        image_generation_request_timeout_seconds=_get_int_env(
-            "IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS",
-            DEFAULT_IMAGE_GENERATION_REQUEST_TIMEOUT_SECONDS,
-        ),
-        llm_local_upstream_model=(
-            os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
-            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
-            or DEFAULT_LLM_LOCAL_MODEL_PATH
-        ),
-        llm_local_embeddings_upstream_model=(
-            os.getenv("LLM_LOCAL_EMBEDDINGS_UPSTREAM_MODEL", "").strip()
-            or os.getenv("LLM_LOCAL_UPSTREAM_MODEL", "").strip()
-            or os.getenv("LLM_LOCAL_MODEL_PATH", DEFAULT_LLM_LOCAL_MODEL_PATH).strip()
-            or DEFAULT_LLM_LOCAL_MODEL_PATH
-        ),
-        sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
-        mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip() or DEFAULT_MCP_GATEWAY_URL,
-        web_search_enabled=_get_bool_env("WEB_SEARCH_ENABLED", DEFAULT_WEB_SEARCH_ENABLED),
-        web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
-        web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
-        image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
-        image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
-        kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
-        kws_enabled=_get_bool_env("KWS_ENABLED", False),
-        weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
-        llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
-        qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
-        product_rag_index=os.getenv("PRODUCT_RAG_INDEX", DEFAULT_PRODUCT_RAG_INDEX).strip() or DEFAULT_PRODUCT_RAG_INDEX,
-        product_rag_top_k=_get_int_env("PRODUCT_RAG_TOP_K", DEFAULT_PRODUCT_RAG_TOP_K),
-        context_source_roots=_get_path_list_env("CONTEXT_SOURCE_ROOTS", DEFAULT_CONTEXT_SOURCE_ROOTS),
-        runtime_profile_seed=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
-        runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
-        kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
-        kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
-        cloud_traffic_log_enabled=_get_bool_env("CLOUD_TRAFFIC_LOG_ENABLED", True),
-        cloud_traffic_log_path=(
-            os.getenv("CLOUD_TRAFFIC_LOG_PATH", DEFAULT_CLOUD_TRAFFIC_LOG_PATH).strip()
-            or DEFAULT_CLOUD_TRAFFIC_LOG_PATH
-        ),
-        cloud_traffic_log_max_bytes=_get_int_env(
-            "CLOUD_TRAFFIC_LOG_MAX_BYTES",
-            DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES,
-        ),
-        chat_attachments_root=(
-            os.getenv("CHAT_ATTACHMENTS_ROOT", DEFAULT_CHAT_ATTACHMENTS_ROOT).strip()
-            or DEFAULT_CHAT_ATTACHMENTS_ROOT
-        ),
+        **_shared_runtime_config_kwargs(),
+        **_auth_runtime_extension_kwargs(),
     )
 
 
 def get_backend_runtime_config() -> BackendRuntimeConfig:
-    return BackendRuntimeConfig(
-        frontend_url=os.getenv("FRONTEND_URL", DEFAULT_FRONTEND_URL).strip() or DEFAULT_FRONTEND_URL,
-        backend_url=os.getenv("BACKEND_URL", DEFAULT_BACKEND_URL).strip() or DEFAULT_BACKEND_URL,
-        llm_url=os.getenv("LLM_URL", DEFAULT_LLM_URL).strip() or DEFAULT_LLM_URL,
-        llm_runtime_url=os.getenv("LLM_RUNTIME_URL", DEFAULT_LLM_RUNTIME_URL).strip() or DEFAULT_LLM_RUNTIME_URL,
-        llm_inference_runtime_url=(
-            os.getenv("LLM_INFERENCE_RUNTIME_URL", DEFAULT_LLM_INFERENCE_RUNTIME_URL).strip()
-            or DEFAULT_LLM_INFERENCE_RUNTIME_URL
-        ),
-        llm_embeddings_runtime_url=(
-            os.getenv("LLM_EMBEDDINGS_RUNTIME_URL", DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL).strip()
-            or DEFAULT_LLM_EMBEDDINGS_RUNTIME_URL
-        ),
-        agent_engine_url=os.getenv("AGENT_ENGINE_URL", DEFAULT_AGENT_ENGINE_URL).strip() or DEFAULT_AGENT_ENGINE_URL,
-        agent_engine_service_token=os.getenv("AGENT_ENGINE_SERVICE_TOKEN", DEFAULT_AGENT_ENGINE_SERVICE_TOKEN).strip()
-        or DEFAULT_AGENT_ENGINE_SERVICE_TOKEN,
-        sandbox_url=os.getenv("SANDBOX_URL", DEFAULT_SANDBOX_URL).strip() or DEFAULT_SANDBOX_URL,
-        mcp_gateway_url=os.getenv("MCP_GATEWAY_URL", DEFAULT_MCP_GATEWAY_URL).strip() or DEFAULT_MCP_GATEWAY_URL,
-        web_search_enabled=_get_bool_env("WEB_SEARCH_ENABLED", DEFAULT_WEB_SEARCH_ENABLED),
-        web_search_url=os.getenv("WEB_SEARCH_URL", DEFAULT_WEB_SEARCH_URL).strip() or DEFAULT_WEB_SEARCH_URL,
-        web_search_timeout_seconds=_get_int_env("WEB_SEARCH_TIMEOUT_SECONDS", DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS),
-        image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
-        image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
-        kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
-        kws_enabled=_get_bool_env("KWS_ENABLED", False),
-        weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
-        llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
-        qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
-        runtime_profile_seed=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE"),
-        runtime_profile_force=_get_runtime_profile_env("VANESSA_RUNTIME_PROFILE_FORCE"),
-        kws_detection_threshold=_get_float_env("KWS_DETECTION_THRESHOLD", 0.5),
-        kws_cooldown_ms=_get_nonnegative_int_env("KWS_COOLDOWN_MS", 2_000),
-    )
+    return BackendRuntimeConfig(**_shared_runtime_config_kwargs())

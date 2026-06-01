@@ -115,3 +115,27 @@ def test_cloud_traffic_log_config_defaults_and_overrides(monkeypatch: pytest.Mon
     assert overridden.cloud_traffic_log_enabled is False
     assert overridden.cloud_traffic_log_path == "/tmp/cloud.jsonl"
     assert overridden.cloud_traffic_log_max_bytes == 1234
+
+
+def test_shared_runtime_config_fields_exist_on_both_configs():
+    auth_fields = backend_config._config_field_names(backend_config.AuthConfig)
+    runtime_fields = backend_config._config_field_names(backend_config.BackendRuntimeConfig)
+
+    assert backend_config.SHARED_RUNTIME_CONFIG_FIELD_NAMES <= auth_fields
+    assert backend_config.SHARED_RUNTIME_CONFIG_FIELD_NAMES <= runtime_fields
+
+
+def test_auth_runtime_extension_fields_exist_on_auth_config():
+    auth_fields = backend_config._config_field_names(backend_config.AuthConfig)
+
+    assert backend_config.AUTH_RUNTIME_EXTENSION_FIELD_NAMES <= auth_fields
+
+
+def test_auth_config_includes_chat_attachments_root(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://ignored")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "jwt-signing-secret")
+    monkeypatch.setenv("CHAT_ATTACHMENTS_ROOT", "/tmp/chat-attachments")
+
+    config = backend_config.get_auth_config()
+
+    assert config.chat_attachments_root == "/tmp/chat-attachments"
