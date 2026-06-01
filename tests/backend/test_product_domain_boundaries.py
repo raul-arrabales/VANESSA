@@ -61,6 +61,12 @@ def test_frontend_routes_point_to_feature_domain_pages() -> None:
     assert '../pages/CatalogControlPage' not in routes_source
 
 
+def test_legacy_agent_builder_frontend_artifacts_are_removed() -> None:
+    legacy_root = PROJECT_ROOT / "frontend" / "src" / "features" / "agent-builder"
+
+    assert not any(path.is_file() for path in legacy_root.glob("**/*"))
+
+
 def test_playgrounds_service_does_not_depend_on_legacy_chat_or_knowledge_orchestrators() -> None:
     service_source = (PROJECT_ROOT / "backend" / "app" / "application" / "playgrounds_service.py").read_text(encoding="utf-8")
 

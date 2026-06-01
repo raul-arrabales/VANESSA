@@ -2683,7 +2683,7 @@
       "none": "None"
     },
     "feedback": {
-      "loadFailed": "Unable to load agent builder data.",
+      "loadFailed": "Unable to load user-agent project data.",
       "createFailed": "Unable to create the agent project.",
       "updateFailed": "Unable to save the agent project.",
       "validateFailed": "Unable to validate the agent project.",

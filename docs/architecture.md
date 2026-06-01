@@ -142,7 +142,7 @@ The product-facing AI surface now has its own domain split, separate from the co
   - Public API lives under `/v1/playgrounds/*`.
 
 - `agent-projects`
-  - Builder-facing authoring domain for end-user agents and workflow definitions.
+  - Backend authoring domain for catalog-created user agents and workflow definitions.
   - Publish compiles project specs into catalog-managed runtime artifacts instead of exposing raw registry entities directly.
   - Public API lives under `/v1/agent-projects/*`.
 

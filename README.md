@@ -96,8 +96,8 @@ VANESSA currently uses global runtime profile semantics for safety gates and pro
 The product-facing AI surface is split into clear domains:
 
 - `AI Playground`: user-facing chat and knowledge workspaces
-- `Agent Builder`: builder-facing agent authoring and publish flows
-- `Catalog Control`: superadmin management for typed agent and tool definitions
+- `Apps`: published Vanessa WebApp agents available to signed-in users
+- `Catalog Control`: superadmin management for typed agent, user-agent authoring, and tool definitions
 - `Vanessa AI`: first-party Vanessa behavior on top of shared execution seams
 - `Platform Control`: provider, deployment, runtime, and capability governance
 
