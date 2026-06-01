@@ -23,7 +23,8 @@ from ..services.chat_inference import (
 )
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_queries import list_model_picker_options
-from ..services.message_content import content_text, message_content_parts
+from ..services.chat_attachments import ChatAttachmentError, bind_message_attachments, validate_owned_image_references
+from ..services.message_content import MESSAGE_CONTENT_METADATA_KEY, content_text, message_content_parts, normalize_content_parts, text_part
 from ..services.platform_service import get_active_platform_runtime
 from ..services.platform_types import PlatformControlPlaneError
 from ..services.stream_errors import public_stream_error_payload
@@ -61,6 +62,7 @@ DEFAULT_TITLE_SOURCE = "auto"
 DEFAULT_CHAT_TITLE = "New chat session"
 DEFAULT_KNOWLEDGE_TITLE = "New knowledge session"
 TEMPORARY_CHAT_TITLE = "Temporary chat"
+IMAGE_ONLY_EXECUTION_PROMPT = "User sent image attachment(s)."
 SESSION_UNSET = playgrounds_repository.UNSET
 
 PlaygroundSessionValidationError = PlaygroundExecutionValidationError
@@ -88,6 +90,10 @@ def _record_status(statuses: dict[str, dict[str, Any]], status: dict[str, Any]) 
 
 def _status_values(statuses: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     return list(statuses.values())
+
+
+def _has_image_parts(parts: list[dict[str, Any]]) -> bool:
+    return any(str(part.get("type") or "") == "image" for part in parts)
 
 
 def list_playground_sessions(
@@ -218,6 +224,7 @@ def send_playground_message(
     owner_role: str,
     session_id: str,
     prompt: Any,
+    content_parts: Any = None,
 ) -> dict[str, Any]:
     row, history_messages = _load_session_and_messages(
         database_url,
@@ -225,7 +232,14 @@ def send_playground_message(
         session_id=session_id,
         playground_kind=None,
     )
-    request = _build_execution_request(row=row, history_messages=history_messages, prompt=prompt)
+    request = _build_execution_request(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        row=row,
+        history_messages=history_messages,
+        prompt=prompt,
+        content_parts=content_parts,
+    )
     result = _execute_request(
         database_url,
         config=config,
@@ -262,6 +276,7 @@ def stream_playground_message(
     owner_role: str,
     session_id: str,
     prompt: Any,
+    content_parts: Any = None,
 ) -> Iterator[dict[str, Any]]:
     row, history_messages = _load_session_and_messages(
         database_url,
@@ -269,7 +284,14 @@ def stream_playground_message(
         session_id=session_id,
         playground_kind=None,
     )
-    request = _build_execution_request(row=row, history_messages=history_messages, prompt=prompt)
+    request = _build_execution_request(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        row=row,
+        history_messages=history_messages,
+        prompt=prompt,
+        content_parts=content_parts,
+    )
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         return _stream_knowledge_playground_message(
             database_url,
@@ -299,7 +321,11 @@ def send_temporary_playground_message(
     owner_role: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    request = _build_temporary_execution_request(payload=payload)
+    request = _build_temporary_execution_request(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        payload=payload,
+    )
     result = _execute_request(
         database_url,
         config=config,
@@ -320,7 +346,11 @@ def stream_temporary_playground_message(
     owner_role: str,
     payload: dict[str, Any],
 ) -> Iterator[dict[str, Any]]:
-    request = _build_temporary_execution_request(payload=payload)
+    request = _build_temporary_execution_request(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        payload=payload,
+    )
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         return _stream_temporary_knowledge_playground_message(
             database_url,
@@ -457,16 +487,26 @@ def get_playground_knowledge_base_options(
 
 def _build_execution_request(
     *,
+    database_url: str,
+    owner_user_id: int,
     row: dict[str, Any],
     history_messages: list[dict[str, Any]],
     prompt: Any,
+    content_parts: Any = None,
 ) -> PlaygroundExecutionRequest:
     playground_kind = playground_kind_for_conversation_kind(str(row.get("conversation_kind", "")))
-    prompt_text = normalize_prompt(prompt)
+    user_content_parts = _normalize_user_content_parts(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        prompt=prompt,
+        content_parts=content_parts,
+    )
+    prompt_text = _execution_prompt_for_parts(user_content_parts)
+    user_content_text = content_text(user_content_parts, allow_image_parts=True)
     conversation_title = None
     title_source = None
     if not history_messages and str(row.get("title_source") or DEFAULT_TITLE_SOURCE) == DEFAULT_TITLE_SOURCE:
-        conversation_title = auto_title_from_prompt(prompt_text)
+        conversation_title = auto_title_from_prompt(user_content_text or "Image message")
         title_source = DEFAULT_TITLE_SOURCE
     return PlaygroundExecutionRequest(
         playground_kind=playground_kind,
@@ -476,11 +516,12 @@ def _build_execution_request(
         model_id=string_or_none(row.get("model_id")),
         knowledge_base_id=string_or_none(row.get("knowledge_base_id")),
         prompt=prompt_text,
+        user_content_parts=user_content_parts,
         history=[
             {
                 "role": str(item.get("role", "")),
                 "content": str(item.get("content", "")),
-                "content_parts": message_content_parts(item),
+                "content_parts": message_content_parts(item, allow_image_parts=True),
                 "metadata": item.get("metadata_json") if isinstance(item.get("metadata_json"), dict) else {},
             }
             for item in history_messages
@@ -490,9 +531,21 @@ def _build_execution_request(
     )
 
 
-def _build_temporary_execution_request(*, payload: dict[str, Any]) -> PlaygroundExecutionRequest:
+def _build_temporary_execution_request(
+    *,
+    database_url: str,
+    owner_user_id: int,
+    payload: dict[str, Any],
+) -> PlaygroundExecutionRequest:
     playground_kind = _normalize_playground_kind(payload.get("playground_kind"))
-    prompt_text = normalize_prompt(payload.get("prompt"))
+    user_content_parts = _normalize_user_content_parts(
+        database_url=database_url,
+        owner_user_id=owner_user_id,
+        prompt=payload.get("prompt"),
+        content_parts=payload.get("content_parts"),
+    )
+    prompt_text = _execution_prompt_for_parts(user_content_parts)
+    user_content_text = content_text(user_content_parts, allow_image_parts=True)
     history_messages = _normalize_temporary_history(payload.get("messages"))
     return PlaygroundExecutionRequest(
         playground_kind=playground_kind,
@@ -502,10 +555,41 @@ def _build_temporary_execution_request(*, payload: dict[str, Any]) -> Playground
         model_id=_normalize_model_id(payload.get("model_selection", payload.get("model_id"))),
         knowledge_base_id=_normalize_knowledge_base_id(payload.get("knowledge_binding", payload.get("knowledge_base_id"))),
         prompt=prompt_text,
+        user_content_parts=user_content_parts,
         history=history_messages,
-        conversation_title=_temporary_title(payload, prompt_text, history_messages),
+        conversation_title=_temporary_title(payload, user_content_text or "Image message", history_messages),
         title_source=DEFAULT_TITLE_SOURCE,
     )
+
+
+def _normalize_user_content_parts(
+    *,
+    database_url: str,
+    owner_user_id: int,
+    prompt: Any,
+    content_parts: Any,
+) -> list[dict[str, Any]]:
+    parts = _normalize_temporary_content_parts(prompt=prompt, content_parts=content_parts)
+    try:
+        validate_owned_image_references(database_url, owner_user_id=owner_user_id, parts=parts)
+    except ChatAttachmentError as exc:
+        raise PlaygroundSessionValidationError(exc.code, exc.message) from exc
+    return parts
+
+
+def _normalize_temporary_content_parts(*, prompt: Any, content_parts: Any) -> list[dict[str, Any]]:
+    fallback_text = str(prompt or "").strip()
+    parts = normalize_content_parts(content_parts, fallback_text=fallback_text, allow_image_parts=True)
+    if not parts:
+        raise PlaygroundSessionValidationError("invalid_message_content", "Message text or an image attachment is required")
+    return parts
+
+
+def _execution_prompt_for_parts(parts: list[dict[str, Any]]) -> str:
+    text = content_text(parts, allow_image_parts=True)
+    if text:
+        return normalize_prompt(text)
+    return IMAGE_ONLY_EXECUTION_PROMPT
 
 
 def _normalize_temporary_history(raw_messages: Any) -> list[dict[str, Any]]:
@@ -518,9 +602,9 @@ def _normalize_temporary_history(raw_messages: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         role = str(item.get("role") or "").strip().lower()
-        parts = message_content_parts(item)
-        content = content_text(parts)
-        if role not in {"user", "assistant"} or not content:
+        parts = message_content_parts(item, allow_image_parts=True)
+        content = content_text(parts, allow_image_parts=True)
+        if role not in {"user", "assistant"} or not parts:
             continue
         metadata = item.get("metadata")
         messages.append({
@@ -621,6 +705,7 @@ def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExec
     return PlaygroundExecutionResult(
         output=output,
         response=llm_response,
+        content_parts=[text_part(output)],
     )
 
 
@@ -631,7 +716,17 @@ def _persist_execution_result(
     request: PlaygroundExecutionRequest,
     result: PlaygroundExecutionResult,
 ) -> dict[str, Any]:
+    user_text = content_text(request.user_content_parts, allow_image_parts=True)
+    user_metadata = {MESSAGE_CONTENT_METADATA_KEY: request.user_content_parts}
+    assistant_parts = result.content_parts or ([text_part(result.output)] if result.output else [])
+    try:
+        validate_owned_image_references(database_url, owner_user_id=owner_user_id, parts=assistant_parts)
+    except ChatAttachmentError as exc:
+        raise PlaygroundSessionValidationError(exc.code, exc.message) from exc
     assistant_metadata = {"statuses": result.statuses} if result.statuses else None
+    if _has_image_parts(assistant_parts):
+        assistant_metadata = dict(assistant_metadata or {})
+        assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
     if result.workflow_status:
         assistant_metadata = dict(assistant_metadata or {})
         assistant_metadata["workflow_status"] = result.workflow_status
@@ -643,14 +738,17 @@ def _persist_execution_result(
             "retrieval": result.retrieval,
             "knowledge_base_id": result.knowledge_base_id,
         }
+        if _has_image_parts(assistant_parts):
+            assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
         if result.statuses:
             assistant_metadata["statuses"] = result.statuses
     persisted = playgrounds_repository.append_message_pair(
         database_url,
         owner_user_id=owner_user_id,
         conversation_id=request.session_id,
-        user_content=request.prompt,
+        user_content=user_text,
         assistant_content=result.output,
+        user_metadata=user_metadata,
         assistant_metadata=assistant_metadata,
         conversation_title=request.conversation_title,
         title_source=request.title_source,
@@ -658,6 +756,22 @@ def _persist_execution_result(
     )
     if persisted is None:
         raise PlaygroundSessionNotFoundError
+    user_message = persisted["messages"][0] if persisted.get("messages") else {}
+    assistant_message = persisted["messages"][1] if len(persisted.get("messages") or []) > 1 else {}
+    bind_message_attachments(
+        database_url,
+        owner_user_id=owner_user_id,
+        parts=request.user_content_parts,
+        conversation_id=request.session_id,
+        message_id=str(user_message.get("id") or ""),
+    )
+    bind_message_attachments(
+        database_url,
+        owner_user_id=owner_user_id,
+        parts=assistant_parts,
+        conversation_id=request.session_id,
+        message_id=str(assistant_message.get("id") or ""),
+    )
     if request.assistant_ref and result.workflow_state is not None:
         upsert_workflow_run(
             database_url,
@@ -836,7 +950,12 @@ def _stream_llm_chat_execution(
             )
             yield {"event": "status", "data": _record_status(statuses, completed_waiting)}
 
-        return PlaygroundExecutionResult(output=output, response=llm_response, statuses=_status_values(statuses))
+        return PlaygroundExecutionResult(
+            output=output,
+            response=llm_response,
+            statuses=_status_values(statuses),
+            content_parts=[text_part(output)],
+        )
 
     yield {
         "event": "error",
@@ -1036,9 +1155,14 @@ def _serialize_temporary_execution_response(
         }
     if result.statuses:
         metadata["statuses"] = result.statuses
+    user_text = content_text(request.user_content_parts, allow_image_parts=True)
+    user_metadata = {MESSAGE_CONTENT_METADATA_KEY: request.user_content_parts}
+    assistant_parts = result.content_parts or ([text_part(result.output)] if result.output else [])
+    if _has_image_parts(assistant_parts):
+        metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
     messages = [
         *_temporary_history_to_messages(request.history),
-        _temporary_message("temporary-user", "user", request.prompt),
+        _temporary_message("temporary-user", "user", user_text, metadata=user_metadata),
         _temporary_message("temporary-assistant", "assistant", result.output, metadata=metadata),
     ]
     session = {
@@ -1067,15 +1191,21 @@ def _serialize_temporary_execution_response(
 
 
 def _temporary_history_to_messages(history: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        _temporary_message(
-            f"temporary-history-{index}",
-            str(item.get("role") or ""),
-            str(item.get("content") or ""),
-            metadata=item.get("metadata") if isinstance(item.get("metadata"), dict) else None,
+    messages: list[dict[str, Any]] = []
+    for index, item in enumerate(history):
+        metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+        parts = item.get("content_parts") if isinstance(item.get("content_parts"), list) else []
+        if parts:
+            metadata = {**metadata, MESSAGE_CONTENT_METADATA_KEY: parts}
+        messages.append(
+            _temporary_message(
+                f"temporary-history-{index}",
+                str(item.get("role") or ""),
+                str(item.get("content") or ""),
+                metadata=metadata,
+            )
         )
-        for index, item in enumerate(history)
-    ]
+    return messages
 
 
 def _temporary_message(
@@ -1089,6 +1219,7 @@ def _temporary_message(
         "id": message_id,
         "role": role,
         "content": content,
+        "content_parts": message_content_parts({"content": content, "metadata": metadata or {}}, allow_image_parts=True),
         "metadata": metadata or {},
         "createdAt": None,
     }

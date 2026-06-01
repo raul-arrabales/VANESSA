@@ -6,6 +6,7 @@ import {
   streamPlaygroundMessage,
   streamTemporaryPlaygroundMessage,
   updatePlaygroundSession,
+  type PlaygroundMessageContentPart,
 } from "../../../api/playgrounds";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { messageContentParts } from "../messageContent";
@@ -36,6 +37,9 @@ type UsePlaygroundSessionActionsParams = {
   options: PlaygroundWorkspaceOptions;
   draft: string;
   setDraft: (value: string) => void;
+  pendingContentParts: PlaygroundMessageContentPart[];
+  setPendingContentParts: (parts: PlaygroundMessageContentPart[]) => void;
+  clearPendingContentParts: () => void;
   savedSessions: PlaygroundSessionViewModel[];
   setSavedSessions: Dispatch<SetStateAction<PlaygroundSessionViewModel[]>>;
   activeSession: PlaygroundSessionViewModel | null;
@@ -50,6 +54,7 @@ type UsePlaygroundSessionActionsParams = {
 function buildTemporaryMessagePayload(
   session: PlaygroundSessionViewModel,
   prompt: string,
+  contentParts: PlaygroundMessageContentPart[],
 ) {
   return {
     session_id: session.id,
@@ -67,6 +72,7 @@ function buildTemporaryMessagePayload(
         metadata: message.metadata,
       })),
     prompt,
+    content_parts: contentParts,
   };
 }
 
@@ -76,6 +82,9 @@ export function usePlaygroundSessionActions({
   options,
   draft,
   setDraft,
+  pendingContentParts,
+  setPendingContentParts,
+  clearPendingContentParts,
   savedSessions,
   setSavedSessions,
   activeSession,
@@ -334,7 +343,12 @@ export function usePlaygroundSessionActions({
   };
 
   const sendPrompt = async (): Promise<void> => {
-    if (!token || !activeSession || !draft.trim()) {
+    const prompt = draft.trim();
+    const outgoingContentParts: PlaygroundMessageContentPart[] = [
+      ...(prompt ? [{ type: "text" as const, text: prompt }] : []),
+      ...pendingContentParts,
+    ];
+    if (!token || !activeSession || outgoingContentParts.length === 0) {
       return;
     }
     if (!activeSession.selectorState.modelId) {
@@ -346,7 +360,6 @@ export function usePlaygroundSessionActions({
       return;
     }
 
-    const prompt = draft.trim();
     const isDraftSession = activeSession.persistence === "draft";
     const isTemporarySession = activeSession.persistence === "temporary";
     const draftSnapshot = isDraftSession ? { ...activeSession, messages: [...activeSession.messages] } : null;
@@ -383,13 +396,14 @@ export function usePlaygroundSessionActions({
         details: {},
       };
       const optimisticMessages = updateTransientAssistantStatus(
-        createOptimisticMessages(previousMessages, prompt, userMessageId, assistantMessageId),
+        createOptimisticMessages(previousMessages, prompt, userMessageId, assistantMessageId, outgoingContentParts),
         assistantMessageId,
         initialStatus,
       );
       const controller = new AbortController();
       streamAbortRef.current = controller;
       setDraft("");
+      clearPendingContentParts();
       pinToBottomOnNextUpdate("smooth");
       setActiveSession((current) => (
         current && current.id === sessionId
@@ -425,13 +439,13 @@ export function usePlaygroundSessionActions({
         };
         const result = isTemporarySession
           ? await streamTemporaryPlaygroundMessage(
-            buildTemporaryMessagePayload(targetSession, prompt),
+            buildTemporaryMessagePayload(targetSession, prompt, outgoingContentParts),
             token,
             streamOptions,
           )
           : await streamPlaygroundMessage(
             sessionId,
-            { prompt },
+            { prompt, content_parts: outgoingContentParts },
             token,
             streamOptions,
           );
@@ -456,6 +470,7 @@ export function usePlaygroundSessionActions({
           ));
           setDraft(prompt);
         }
+        setPendingContentParts(pendingContentParts);
         showErrorFeedback(requestError, config.feedback.sendError);
       } finally {
         streamAbortRef.current = null;

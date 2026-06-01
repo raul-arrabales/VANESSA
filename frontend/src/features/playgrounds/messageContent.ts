@@ -49,3 +49,10 @@ export function messageText(message: Pick<PlaygroundMessage, "content" | "conten
     .join("\n")
     || message.content;
 }
+
+export function messageImageParts(
+  message: Pick<PlaygroundMessage, "content" | "content_parts" | "metadata">,
+): Extract<PlaygroundMessageContentPart, { type: "image" }>[] {
+  return messageContentParts(message)
+    .filter((part): part is Extract<PlaygroundMessageContentPart, { type: "image" }> => part.type === "image");
+}

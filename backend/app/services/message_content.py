@@ -5,12 +5,12 @@ from typing import Any
 TEXT_PART_TYPE = "text"
 IMAGE_PART_TYPE = "image"
 MESSAGE_CONTENT_METADATA_KEY = "content_parts"
-SUPPORTED_MESSAGE_PART_TYPES = {TEXT_PART_TYPE}
 MESSAGE_CONTENT_CONTRACT = (
     "Persist content TEXT as the text-only summary. Persist rich message parts "
-    f"in metadata_json.{MESSAGE_CONTENT_METADATA_KEY}. Image parts use image_ref metadata "
-    "and are disabled until upload/storage validation is enabled."
+    f"in metadata_json.{MESSAGE_CONTENT_METADATA_KEY}. Image parts use backend-owned "
+    "attachment:// references and are retained for UI display, not text-only LLM prompts."
 )
+SUPPORTED_MESSAGE_PART_TYPES = {TEXT_PART_TYPE, IMAGE_PART_TYPE}
 
 
 def text_part(text: Any) -> dict[str, str]:
@@ -21,14 +21,43 @@ def text_message(role: str, text: Any) -> dict[str, Any]:
     return {"role": role, "content": [text_part(text)]}
 
 
-def image_ref_part(*, image_ref: str, mime_type: str, alt_text: str | None = None) -> dict[str, Any]:
+def image_ref_part(
+    *,
+    image_ref: str,
+    mime_type: str,
+    attachment_id: str | None = None,
+    alt_text: str | None = None,
+    byte_size: Any = None,
+    width: Any = None,
+    height: Any = None,
+    sha256: Any = None,
+) -> dict[str, Any]:
     part: dict[str, Any] = {"type": IMAGE_PART_TYPE, "image_ref": image_ref, "mime_type": mime_type}
+    if attachment_id:
+        part["attachment_id"] = attachment_id
     if alt_text:
         part["alt_text"] = alt_text
+    for key, value in {"byte_size": byte_size, "width": width, "height": height}.items():
+        if value is None:
+            continue
+        try:
+            normalized_value = int(value)
+        except (TypeError, ValueError):
+            continue
+        if normalized_value > 0:
+            part[key] = normalized_value
+    normalized_sha = str(sha256 or "").strip()
+    if normalized_sha:
+        part["sha256"] = normalized_sha
     return part
 
 
-def normalize_content_parts(value: Any, *, fallback_text: Any = "", allow_image_parts: bool = False) -> list[dict[str, Any]]:
+def normalize_content_parts(
+    value: Any,
+    *,
+    fallback_text: Any = "",
+    allow_image_parts: bool = False,
+) -> list[dict[str, Any]]:
     if isinstance(value, list):
         parts: list[dict[str, Any]] = []
         for item in value:
@@ -46,7 +75,12 @@ def normalize_content_parts(value: Any, *, fallback_text: Any = "", allow_image_
                     parts.append(image_ref_part(
                         image_ref=image_ref,
                         mime_type=mime_type,
+                        attachment_id=str(item.get("attachment_id") or "").strip() or None,
                         alt_text=str(item.get("alt_text") or "").strip() or None,
+                        byte_size=item.get("byte_size"),
+                        width=item.get("width"),
+                        height=item.get("height"),
+                        sha256=item.get("sha256"),
                     ))
         if parts:
             return parts
@@ -54,12 +88,16 @@ def normalize_content_parts(value: Any, *, fallback_text: Any = "", allow_image_
     return [text_part(text)] if text else []
 
 
-def content_text(parts_or_message: Any) -> str:
-    parts = message_content_parts(parts_or_message) if isinstance(parts_or_message, dict) else normalize_content_parts(parts_or_message)
+def content_text(parts_or_message: Any, *, allow_image_parts: bool = False) -> str:
+    parts = (
+        message_content_parts(parts_or_message, allow_image_parts=allow_image_parts)
+        if isinstance(parts_or_message, dict)
+        else normalize_content_parts(parts_or_message, allow_image_parts=allow_image_parts)
+    )
     return "\n".join(str(part.get("text") or "") for part in parts if str(part.get("type") or "") == TEXT_PART_TYPE).strip()
 
 
-def message_content_parts(message: dict[str, Any]) -> list[dict[str, Any]]:
+def message_content_parts(message: dict[str, Any], *, allow_image_parts: bool = False) -> list[dict[str, Any]]:
     metadata = message.get("metadata") if isinstance(message.get("metadata"), dict) else message.get("metadata_json")
     metadata = metadata if isinstance(metadata, dict) else {}
     raw_content = message.get("content")
@@ -69,6 +107,7 @@ def message_content_parts(message: dict[str, Any]) -> list[dict[str, Any]]:
     return normalize_content_parts(
         raw_parts,
         fallback_text="" if isinstance(raw_content, list) else raw_content,
+        allow_image_parts=allow_image_parts,
     )
 
 

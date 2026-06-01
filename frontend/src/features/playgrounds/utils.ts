@@ -6,8 +6,9 @@ import type {
   PlaygroundMessageViewModel,
   PlaygroundRunStatus,
 } from "./types";
+import type { PlaygroundMessageContentPart } from "../../api/playgrounds";
 import { hasSelector } from "./selectorConfig";
-import { textContentPart } from "./messageContent";
+import { messageText, textContentPart } from "./messageContent";
 
 export function sortSessions(sessions: PlaygroundSessionViewModel[]): PlaygroundSessionViewModel[] {
   return [...sessions].sort((left, right) => {
@@ -51,15 +52,17 @@ export function createOptimisticMessages(
   prompt: string,
   userMessageId: string,
   assistantMessageId: string,
+  contentParts: PlaygroundMessageContentPart[] = prompt ? [textContentPart(prompt)] : [],
 ): PlaygroundMessageViewModel[] {
+  const userContent = prompt || messageText({ content: "", content_parts: contentParts, metadata: {} });
   return [
     ...previousMessages,
     {
       id: userMessageId,
       role: "user",
-      content: prompt,
-      content_parts: [textContentPart(prompt)],
-      metadata: {},
+      content: userContent,
+      content_parts: contentParts,
+      metadata: { content_parts: contentParts },
       createdAt: null,
     },
     {

@@ -25,6 +25,7 @@ from ...application.playgrounds_service import (
 from ...authz import require_role
 from ...config import get_auth_config
 from ...services.agent_engine_client import AgentEngineClientError
+from ...services.chat_attachments import ChatAttachmentError, resolve_chat_attachment_file, save_chat_image_attachment
 from ...services.knowledge_source_files import resolve_knowledge_source_file
 from ...services.platform_types import PlatformControlPlaneError
 
@@ -156,6 +157,7 @@ def post_playground_message_route(session_id: str):
             owner_role=str(g.current_user.get("role", "user")),
             session_id=session_id,
             prompt=payload.get("prompt"),
+            content_parts=payload.get("content_parts"),
         )
     except PlaygroundSessionNotFoundError:
         return _json_error(404, "session_not_found", "Playground session not found")
@@ -215,6 +217,7 @@ def post_playground_message_stream_route(session_id: str):
             owner_role=str(g.current_user.get("role", "user")),
             session_id=session_id,
             prompt=payload.get("prompt"),
+            content_parts=payload.get("content_parts"),
         )
     except PlaygroundSessionNotFoundError:
         return _json_error(404, "session_not_found", "Playground session not found")
@@ -246,6 +249,63 @@ def post_playground_message_stream_route(session_id: str):
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@bp.post("/v1/playgrounds/attachments/images")
+@require_role("user")
+def post_playground_image_attachment_route():
+    try:
+        image = save_chat_image_attachment(
+            _database_url(),
+            config=_config(),
+            owner_user_id=int(g.current_user["id"]),
+            file=request.files.get("image"),
+        )
+    except ChatAttachmentError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    return jsonify({"image": image}), 201
+
+
+@bp.get("/v1/playgrounds/attachments/<attachment_id>")
+@require_role("user")
+def get_playground_attachment_route(attachment_id: str):
+    try:
+        resolved = resolve_chat_attachment_file(
+            _database_url(),
+            config=_config(),
+            owner_user_id=int(g.current_user["id"]),
+            attachment_id=attachment_id,
+        )
+    except ChatAttachmentError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    return send_file(
+        resolved.path,
+        mimetype=resolved.mime_type,
+        as_attachment=False,
+        download_name=resolved.download_name,
+        conditional=True,
+    )
+
+
+@bp.get("/v1/playgrounds/attachments/<attachment_id>/download")
+@require_role("user")
+def download_playground_attachment_route(attachment_id: str):
+    try:
+        resolved = resolve_chat_attachment_file(
+            _database_url(),
+            config=_config(),
+            owner_user_id=int(g.current_user["id"]),
+            attachment_id=attachment_id,
+        )
+    except ChatAttachmentError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message)
+    return send_file(
+        resolved.path,
+        mimetype=resolved.mime_type,
+        as_attachment=True,
+        download_name=resolved.download_name,
+        conditional=True,
     )
 
 

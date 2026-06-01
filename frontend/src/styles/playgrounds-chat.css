@@ -554,6 +554,126 @@
   margin: 0;
 }
 
+.chatbot-message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chatbot-message-image,
+.chatbot-composer-attachment {
+  position: relative;
+  margin: 0;
+}
+
+.chatbot-message-image-button,
+.chatbot-composer-attachment-preview,
+.chatbot-image-viewer-image {
+  border: 0;
+  padding: 0;
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+  cursor: pointer;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chatbot-message-image-button {
+  width: 9rem;
+  height: 6.5rem;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border-muted) 84%, transparent);
+}
+
+.chatbot-message-image-button img,
+.chatbot-composer-attachment-preview img,
+.chatbot-image-viewer-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.chatbot-image-placeholder {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.chatbot-image-download {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--bg-surface) 74%, transparent);
+  color: var(--text-primary);
+  opacity: 0;
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  transition: opacity var(--duration-fast) var(--easing-standard);
+}
+
+.chatbot-message-image:hover .chatbot-image-download,
+.chatbot-message-image:focus-within .chatbot-image-download {
+  opacity: 1;
+}
+
+.chatbot-image-download svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chatbot-image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.chatbot-image-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, black 62%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.chatbot-image-viewer-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-3);
+  justify-items: center;
+}
+
+.chatbot-image-viewer-image {
+  width: min(88vw, 72rem);
+  height: min(78vh, 48rem);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
+}
+
+.chatbot-image-viewer-image img {
+  object-fit: contain;
+}
+
+.chatbot-image-viewer-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .chatbot-message-text {
   margin: 0;
   white-space: pre-wrap;
@@ -969,12 +1089,103 @@
   align-items: end;
 }
 
+.chatbot-composer-attachments {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chatbot-composer-attachment-preview {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
+.chatbot-composer-attachment-remove {
+  position: absolute;
+  right: -0.4rem;
+  top: -0.4rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--danger-fg, #b42318) 88%, black 12%);
+  color: white;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.chatbot-composer-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+}
+
+.chatbot-composer-add {
+  position: absolute;
+  left: var(--space-2);
+  bottom: 0.7rem;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.chatbot-composer-add svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.chatbot-composer-add-menu {
+  position: absolute;
+  left: var(--space-2);
+  bottom: 3.15rem;
+  z-index: 4;
+  min-width: 8rem;
+  padding: var(--space-1);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.chatbot-composer-add-menu button {
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chatbot-composer-add-menu button:hover,
+.chatbot-composer-add-menu button:focus-visible {
+  background: color-mix(in oklab, var(--bg-subtle) 82%, transparent);
+}
+
 .chatbot-composer-input {
   resize: none;
   min-height: 3.25rem;
   max-height: calc((1.5rem * 5) + var(--space-5));
   overflow-y: hidden;
+  padding-left: 3rem;
   padding-right: var(--space-4);
+  width: 100%;
 }
 
 .chatbot-composer-action {

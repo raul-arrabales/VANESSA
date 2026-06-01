@@ -549,18 +549,22 @@ def run_quotes_schema_migration(database_url: str) -> None:
 
 
 def run_chat_conversations_schema_migration(database_url: str) -> None:
-    migration_file = (
+    migration_root = (
         Path(__file__).resolve().parents[2]
         / "infra"
         / "postgres"
         / "init"
-        / "007_chat_conversations.sql"
     )
-    migration_sql = migration_file.read_text(encoding="utf-8")
+    migration_files = [
+        migration_root / "007_chat_conversations.sql",
+        migration_root / "020_chat_attachments.sql",
+    ]
 
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(migration_sql)
+            for migration_file in migration_files:
+                migration_sql = migration_file.read_text(encoding="utf-8")
+                cursor.execute(migration_sql)
 
 
 def run_agent_projects_schema_migration(database_url: str) -> None:

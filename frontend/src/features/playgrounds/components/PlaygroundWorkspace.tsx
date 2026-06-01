@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ModalDialog from "../../../components/ModalDialog";
 import { useAuth } from "../../../auth/AuthProvider";
+import { uploadPlaygroundImage, type PlaygroundImageContentPart } from "../../../api/playgrounds";
 import { useStickyChatScroll } from "../../../hooks/useStickyChatScroll";
 import AssistantSelector from "./AssistantSelector";
 import Composer from "./Composer";
@@ -59,6 +60,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
+  const [pendingContentParts, setPendingContentParts] = useState<PlaygroundImageContentPart[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [pendingDialog, setPendingDialog] = useState<{ kind: "rename" | "delete"; sessionId: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -74,7 +77,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     }
 
     return `${sessionState.activeSession.id}:${sessionState.activeSession.messages.map((message) => (
-      `${message.id}:${message.content.length}:${JSON.stringify(message.metadata.statuses ?? [])}`
+      `${message.id}:${message.content.length}:${JSON.stringify(message.content_parts ?? [])}:${JSON.stringify(message.metadata.statuses ?? [])}`
     )).join("|")}`;
   }, [sessionState.activeSession]);
   const {
@@ -99,6 +102,9 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     },
     draft: preferences.draft,
     setDraft: preferences.setDraft,
+    pendingContentParts,
+    setPendingContentParts: (parts) => setPendingContentParts(parts.filter((part): part is PlaygroundImageContentPart => part.type === "image")),
+    clearPendingContentParts: () => setPendingContentParts([]),
     savedSessions: sessionState.savedSessions,
     setSavedSessions: sessionState.setSavedSessions,
     activeSession: sessionState.activeSession,
@@ -110,6 +116,26 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     pinToBottomOnNextUpdate,
   });
   abortActiveStreamRef.current = actions.abortActiveStream;
+
+  const handleAddImages = async (files: FileList): Promise<void> => {
+    if (!token || files.length === 0) {
+      return;
+    }
+    setIsUploadingAttachment(true);
+    try {
+      const remainingSlots = Math.max(0, 5 - pendingContentParts.length);
+      const selectedFiles = Array.from(files).slice(0, remainingSlots);
+      const uploaded = await Promise.all(selectedFiles.map((file) => uploadPlaygroundImage(file, token)));
+      setPendingContentParts((current) => [
+        ...current,
+        ...uploaded.map((image) => ({ type: "image" as const, ...image })),
+      ].slice(0, 5));
+    } catch (uploadError) {
+      sessionState.setActiveError(uploadError instanceof Error ? uploadError.message : "Image upload failed");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
 
   useEffect(() => () => {
     abortActiveStreamRef.current();
@@ -233,11 +259,17 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
               busyLabel={config.messaging.busyLabel}
               stopLabel={config.messaging.stopLabel}
               isSending={isSending}
+              isUploadingAttachment={isUploadingAttachment}
               canStop={config.messaging.mode === "stream" && isSending}
               placeholder={config.draftPlaceholder}
+              pendingImages={pendingContentParts}
               onDraftChange={preferences.setDraft}
               onSubmit={() => void actions.sendPrompt()}
               onCancel={actions.abortActiveStream}
+              onAddImages={(files) => void handleAddImages(files)}
+              onRemoveImage={(imageRef) => {
+                setPendingContentParts((current) => current.filter((image) => image.image_ref !== imageRef));
+              }}
               onHeightChange={(height) => {
                 if (height > 0) {
                   setComposerHeight(height);

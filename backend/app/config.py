@@ -36,6 +36,7 @@ DEFAULT_PRODUCT_RAG_TOP_K = 5
 DEFAULT_CONTEXT_SOURCE_ROOTS = "/context_sources"
 DEFAULT_CLOUD_TRAFFIC_LOG_PATH = "/var/log/vanessa/cloud-traffic.jsonl"
 DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES = 10_485_760
+DEFAULT_CHAT_ATTACHMENTS_ROOT = "/var/lib/vanessa/chat-attachments"
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class BackendRuntimeConfig:
     cloud_traffic_log_enabled: bool = True
     cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
     cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
+    chat_attachments_root: str = DEFAULT_CHAT_ATTACHMENTS_ROOT
 
 
 @dataclass(frozen=True)
@@ -299,6 +301,10 @@ def get_auth_config() -> AuthConfig:
         cloud_traffic_log_max_bytes=_get_int_env(
             "CLOUD_TRAFFIC_LOG_MAX_BYTES",
             DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES,
+        ),
+        chat_attachments_root=(
+            os.getenv("CHAT_ATTACHMENTS_ROOT", DEFAULT_CHAT_ATTACHMENTS_ROOT).strip()
+            or DEFAULT_CHAT_ATTACHMENTS_ROOT
         ),
     )
 

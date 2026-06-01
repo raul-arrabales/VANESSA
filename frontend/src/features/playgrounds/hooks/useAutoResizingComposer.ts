@@ -12,6 +12,7 @@ type UseAutoResizingComposerOptions = {
   onSubmit: () => void;
   onCancel: () => void;
   onHeightChange?: (height: number) => void;
+  canSubmit?: boolean;
   defaultLineHeight?: number;
   maxVisibleRows?: number;
 };
@@ -33,6 +34,7 @@ export function useAutoResizingComposer({
   onSubmit,
   onCancel,
   onHeightChange,
+  canSubmit,
   defaultLineHeight = DEFAULT_COMPOSER_LINE_HEIGHT,
   maxVisibleRows = DEFAULT_MAX_VISIBLE_ROWS,
 }: UseAutoResizingComposerOptions): UseAutoResizingComposerResult {
@@ -91,7 +93,7 @@ export function useAutoResizingComposer({
       && !event.nativeEvent.isComposing
       && !disabled
       && !isSending
-      && draft.trim()
+      && (canSubmit ?? Boolean(draft.trim()))
     ) {
       event.preventDefault();
       onSubmit();
@@ -111,7 +113,7 @@ export function useAutoResizingComposer({
     textareaRef,
     handleKeyDown,
     handleActionClick,
-    isActionDisabled: isSending ? !canStop : (disabled || !draft.trim()),
+    isActionDisabled: isSending ? !canStop : (disabled || !(canSubmit ?? Boolean(draft.trim()))),
     isTextareaDisabled: disabled || isSending,
   };
 }

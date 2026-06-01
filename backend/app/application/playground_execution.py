@@ -10,7 +10,7 @@ from ..config import AuthConfig
 from ..services.agent_engine_client import AgentEngineClientError, create_execution, stream_execution
 from ..services.context_management import list_active_runtime_knowledge_bases, resolve_runtime_knowledge_base_selection
 from ..services.knowledge_chat_bootstrap import KNOWLEDGE_CHAT_AGENT_ID, ensure_knowledge_chat_agent
-from ..services.message_content import coerce_llm_messages, content_text, message_content_parts, text_message
+from ..services.message_content import coerce_llm_messages, content_text, message_content_parts, normalize_content_parts, text_message, text_part
 from ..services.modelops_common import ModelOpsError
 from ..services.modelops_runtime import ensure_model_invokable
 from ..services.platform_service import get_active_platform_runtime
@@ -43,6 +43,7 @@ class PlaygroundExecutionRequest:
     model_id: str | None
     knowledge_base_id: str | None
     prompt: str
+    user_content_parts: list[dict[str, Any]] = field(default_factory=list)
     history: list[dict[str, Any]] = field(default_factory=list)
     conversation_title: str | None = None
     title_source: str | None = None
@@ -60,13 +61,14 @@ class PlaygroundExecutionResult:
     statuses: list[dict[str, Any]] = field(default_factory=list)
     workflow_state: dict[str, Any] | None = None
     workflow_status: str | None = None
+    content_parts: list[dict[str, Any]] = field(default_factory=list)
 
 
 def serialize_message(row: dict[str, Any]) -> dict[str, Any]:
     metadata = row.get("metadata_json")
     if not isinstance(metadata, dict):
         metadata = {}
-    content_parts = message_content_parts({"content": row.get("content", ""), "metadata": metadata})
+    content_parts = message_content_parts({"content": row.get("content", ""), "metadata": metadata}, allow_image_parts=True)
     return {
         "id": str(row.get("id", "")),
         "role": str(row.get("role", "")),
@@ -224,6 +226,17 @@ def add_missing_reference_citation(output: str, references: list[dict[str, Any]]
     return f"{normalized} [{citation_numbers}]"
 
 
+def assistant_content_parts_from_result(result_payload: dict[str, Any], *, fallback_text: str) -> list[dict[str, Any]]:
+    parts = normalize_content_parts(
+        result_payload.get("content_parts"),
+        fallback_text=fallback_text,
+        allow_image_parts=True,
+    )
+    if parts:
+        return parts
+    return [text_part(fallback_text)] if fallback_text else []
+
+
 def resolve_model_for_inference(
     database_url: str,
     *,
@@ -361,6 +374,7 @@ def execute_knowledge_request(
         references=references,
         retrieval=retrieval,
         knowledge_base_id=str(selected_knowledge_base["id"]),
+        content_parts=[text_part(output)] if output else [],
     )
 
 
@@ -419,6 +433,10 @@ def execute_agent_chat_request(
         response=execution_payload,
         workflow_state=result_payload.get("workflow_state") if isinstance(result_payload.get("workflow_state"), dict) else None,
         workflow_status=str(result_payload.get("workflow_status") or "").strip() or None,
+        content_parts=assistant_content_parts_from_result(
+            result_payload,
+            fallback_text=str(result_payload.get("output_text", "")).strip(),
+        ),
     )
 
 
@@ -528,6 +546,7 @@ def stream_knowledge_request(
                 retrieval=retrieval,
                 knowledge_base_id=str(selected_knowledge_base["id"]),
                 statuses=statuses,
+                content_parts=[text_part(output)] if output else [],
             ),
         }
         return
@@ -615,6 +634,7 @@ def stream_agent_chat_request(
                 statuses=statuses,
                 workflow_state=result_payload.get("workflow_state") if isinstance(result_payload.get("workflow_state"), dict) else None,
                 workflow_status=str(result_payload.get("workflow_status") or "").strip() or None,
+                content_parts=assistant_content_parts_from_result(result_payload, fallback_text=output),
             ),
         }
         return

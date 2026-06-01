@@ -139,6 +139,7 @@ The product-facing AI surface now has its own domain split, separate from the co
   - Canonical user-facing workspace for both plain chat and knowledge-grounded chat.
   - Frontend entrypoints now live under the `AI Playground` section at `/playgrounds`, with dedicated `/playgrounds/chat` and `/playgrounds/knowledge` routes.
   - Backend persists one session model with `playground_kind`, `assistant_ref`, `model_selection`, `knowledge_binding`, and `messages`.
+  - Chat messages support rich `content_parts` for backend-owned image attachments. V1 stores and displays images while text-only LLM execution continues to use only text content.
   - Public API lives under `/v1/playgrounds/*`.
 
 - `agent-projects`

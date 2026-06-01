@@ -1,4 +1,7 @@
+import { useRef, useState } from "react";
+import type { PlaygroundImageContentPart } from "../../../api/playgrounds";
 import { useAutoResizingComposer } from "../hooks/useAutoResizingComposer";
+import AttachmentImage from "./AttachmentImage";
 
 type ComposerProps = {
   draft: string;
@@ -8,11 +11,15 @@ type ComposerProps = {
   busyLabel: string;
   stopLabel: string;
   isSending: boolean;
+  isUploadingAttachment?: boolean;
   canStop: boolean;
   placeholder: string;
+  pendingImages?: PlaygroundImageContentPart[];
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  onAddImages?: (files: FileList) => void;
+  onRemoveImage?: (imageRef: string) => void;
   onHeightChange?: (height: number) => void;
 };
 
@@ -24,13 +31,20 @@ export default function Composer({
   busyLabel,
   stopLabel,
   isSending,
+  isUploadingAttachment = false,
   canStop,
   placeholder,
+  pendingImages = [],
   onDraftChange,
   onSubmit,
   onCancel,
+  onAddImages,
+  onRemoveImage,
   onHeightChange,
 }: ComposerProps): JSX.Element {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const canSubmit = Boolean(draft.trim()) || pendingImages.length > 0;
   const {
     shellRef,
     textareaRef,
@@ -46,6 +60,7 @@ export default function Composer({
     onSubmit,
     onCancel,
     onHeightChange,
+    canSubmit,
   });
 
   const actionLabel = isSending
@@ -54,19 +69,78 @@ export default function Composer({
 
   return (
     <div ref={shellRef} className="chatbot-composer-shell">
+      {pendingImages.length > 0 ? (
+        <div className="chatbot-composer-attachments" aria-label="Images ready to send">
+          {pendingImages.map((image) => (
+            <figure key={image.image_ref} className="chatbot-composer-attachment">
+              <AttachmentImage image={image} className="chatbot-composer-attachment-preview" />
+              <button
+                type="button"
+                className="chatbot-composer-attachment-remove"
+                onClick={() => onRemoveImage?.(image.image_ref)}
+                aria-label="Remove image"
+                disabled={isSending}
+              >
+                x
+              </button>
+            </figure>
+          ))}
+        </div>
+      ) : null}
       <label className="sr-only" htmlFor="prompt">Message</label>
-      <textarea
-        ref={textareaRef}
-        id="prompt"
-        aria-label="Message"
-        className="field-input chatbot-composer-input"
-        value={draft}
-        onChange={(event) => onDraftChange(event.currentTarget.value)}
-        onKeyDown={handleKeyDown}
-        rows={1}
-        placeholder={placeholder}
-        disabled={isTextareaDisabled}
-      />
+      <div className="chatbot-composer-input-wrap">
+        <button
+          type="button"
+          className="chatbot-composer-add"
+          aria-label="Add content"
+          aria-expanded={isAddMenuOpen}
+          onClick={() => setIsAddMenuOpen((current) => !current)}
+          disabled={disabled || isSending || isUploadingAttachment}
+        >
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        {isAddMenuOpen ? (
+          <div className="chatbot-composer-add-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setIsAddMenuOpen(false);
+                fileInputRef.current?.click();
+              }}
+            >
+              Image
+            </button>
+          </div>
+        ) : null}
+        <input
+          ref={fileInputRef}
+          className="sr-only"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          multiple
+          onChange={(event) => {
+            if (event.currentTarget.files?.length) {
+              onAddImages?.(event.currentTarget.files);
+            }
+            event.currentTarget.value = "";
+          }}
+        />
+        <textarea
+          ref={textareaRef}
+          id="prompt"
+          aria-label="Message"
+          className="field-input chatbot-composer-input"
+          value={draft}
+          onChange={(event) => onDraftChange(event.currentTarget.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          placeholder={placeholder}
+          disabled={isTextareaDisabled}
+        />
+      </div>
 
       <button
         type="button"
@@ -93,6 +167,7 @@ export default function Composer({
       </button>
 
       {error ? <p className="status-text error-text">{error}</p> : null}
+      {isUploadingAttachment ? <p className="status-text">Uploading image...</p> : null}
     </div>
   );
 }

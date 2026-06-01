@@ -101,7 +101,7 @@ The product-facing AI surface is split into clear domains:
 - `Vanessa AI`: first-party Vanessa behavior on top of shared execution seams
 - `Platform Control`: provider, deployment, runtime, and capability governance
 
-Canonical product APIs live under `/v1/playgrounds/*` and `/v1/agent-projects/*`, while admin and platform surfaces live under the backend-owned `backend/app/api/http` domain modules.
+Canonical product APIs live under `/v1/playgrounds/*` and `/v1/agent-projects/*`, while admin and platform surfaces live under the backend-owned `backend/app/api/http` domain modules. Playground chat supports backend-owned image attachments through structured `content_parts`; v1 stores and displays images without sending image bytes to text-only LLM inference.
 
 ## Local Staging
 

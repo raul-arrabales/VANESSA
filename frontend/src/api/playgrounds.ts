@@ -332,9 +332,16 @@ export type TemporaryPlaygroundMessagePayload = {
   messages: Array<{
     role: "user" | "assistant";
     content: string;
+    content_parts?: PlaygroundMessageContentPart[];
     metadata?: PlaygroundMessageMetadata;
   }>;
-  prompt: string;
+  prompt?: string;
+  content_parts?: PlaygroundMessageContentPart[];
+};
+
+export type SendPlaygroundMessagePayload = {
+  prompt?: string;
+  content_parts?: PlaygroundMessageContentPart[];
 };
 
 export async function listPlaygroundSessions(
@@ -422,7 +429,7 @@ export async function deletePlaygroundSession(sessionId: string, token: string):
 
 export async function sendPlaygroundMessage(
   sessionId: string,
-  payload: { prompt: string },
+  payload: SendPlaygroundMessagePayload,
   token: string,
 ): Promise<SendPlaygroundMessageResult> {
   return requestJson<SendPlaygroundMessageResult>(
@@ -448,7 +455,7 @@ export async function sendTemporaryPlaygroundMessage(
 
 export async function streamPlaygroundMessage(
   sessionId: string,
-  payload: { prompt: string },
+  payload: SendPlaygroundMessagePayload,
   token: string,
   options: StreamPlaygroundMessageOptions = {},
 ): Promise<SendPlaygroundMessageResult> {
@@ -574,6 +581,34 @@ export async function getPlaygroundModelOptions(
 
 export async function getPlaygroundKnowledgeBaseOptions(token: string): Promise<PlaygroundKnowledgeBaseOptions> {
   return requestJson<PlaygroundKnowledgeBaseOptions>("/v1/playgrounds/knowledge-base-options", { token });
+}
+
+export async function uploadPlaygroundImage(file: File, token: string): Promise<PlaygroundImageUploadResult> {
+  const body = new FormData();
+  body.append("image", file);
+  const response = await fetch(buildUrl("/v1/playgrounds/attachments/images"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body,
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    throw new ApiError(
+      String(payload.message ?? payload.error ?? `HTTP ${response.status}`),
+      response.status,
+      payload.error ? String(payload.error) : undefined,
+    );
+  }
+  const payload = await response.json() as { image: PlaygroundImageUploadResult };
+  return payload.image;
+}
+
+export function playgroundAttachmentUrl(imageRef: string, options: { download?: boolean } = {}): string {
+  const attachmentId = imageRef.startsWith("attachment://") ? imageRef.slice("attachment://".length) : imageRef;
+  const suffix = options.download ? "/download" : "";
+  return `/v1/playgrounds/attachments/${encodeURIComponent(attachmentId)}${suffix}`;
 }
 
 function parseSseEvent(rawEvent: string): { event: string; data: Record<string, unknown> } | null {

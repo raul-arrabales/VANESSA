@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
 
 from app.api.http import playgrounds as playground_routes  # noqa: E402
@@ -160,11 +162,11 @@ def test_post_playground_message_route_returns_service_payload(client, monkeypat
         is_active=True,
     )
     token = _login(test_client, user["username"], "msg-pass-123").get_json()["access_token"]
+    captured: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        playground_routes,
-        "send_playground_message",
-        lambda *_args, **_kwargs: {
+    def _send_message(*_args, **kwargs):
+        captured.update(kwargs)
+        return {
             "session": _session_detail("sess-1", playground_kind="knowledge", knowledge_base_id="kb-primary"),
             "messages": [
                 {"id": "m1", "role": "user", "content": "hello", "metadata": {}, "createdAt": "2026-03-18T11:00:00+00:00"},
@@ -173,13 +175,20 @@ def test_post_playground_message_route_returns_service_payload(client, monkeypat
             "output": "answer",
             "sources": [],
             "retrieval": {"index": "knowledge_base", "result_count": 0},
-        },
-    )
+        }
+
+    monkeypatch.setattr(playground_routes, "send_playground_message", _send_message)
 
     response = test_client.post(
         "/v1/playgrounds/sessions/sess-1/messages",
         headers=_auth(token),
-        json={"prompt": "hello"},
+        json={
+            "prompt": "hello",
+            "content_parts": [
+                {"type": "text", "text": "hello"},
+                {"type": "image", "image_ref": "attachment://image-1", "mime_type": "image/png"},
+            ],
+        },
     )
 
     assert response.status_code == 200
@@ -187,6 +196,43 @@ def test_post_playground_message_route_returns_service_payload(client, monkeypat
     assert payload["output"] == "answer"
     assert payload["session"]["id"] == "sess-1"
     assert payload["messages"][1]["content"] == "answer"
+    assert captured["content_parts"][1]["image_ref"] == "attachment://image-1"
+
+
+def test_image_attachment_upload_route_returns_reference(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="image@example.com",
+        username="image-user",
+        password_hash=hash_password("image-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "image-pass-123").get_json()["access_token"]
+
+    monkeypatch.setattr(
+        playground_routes,
+        "save_chat_image_attachment",
+        lambda *_args, **_kwargs: {
+            "attachment_id": "image-1",
+            "image_ref": "attachment://image-1",
+            "mime_type": "image/png",
+            "byte_size": 8,
+            "width": 1,
+            "height": 1,
+        },
+    )
+
+    response = test_client.post(
+        "/v1/playgrounds/attachments/images",
+        headers=_auth(token),
+        data={"image": (BytesIO(b"fake-png"), "diagram.png")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()["image"]["image_ref"] == "attachment://image-1"
 
 
 def test_stream_playground_message_route_returns_sse_events(client, monkeypatch: pytest.MonkeyPatch):

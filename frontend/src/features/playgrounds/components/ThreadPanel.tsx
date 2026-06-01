@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import ChatMessageBody from "../../../components/ChatMessageBody";
+import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { getPlaygroundMessageReferences, getPlaygroundMessageSources } from "../../../api/playgrounds";
 import KnowledgeReferencesList from "../../ai-shared/KnowledgeReferencesList";
 import { buildPlaygroundKnowledgeReferencesFromSources } from "../../ai-shared/retrieval";
 import AssistantStatusTimeline from "./AssistantStatusTimeline";
-import { messageText } from "../messageContent";
+import AttachmentImage, { downloadAttachmentImage } from "./AttachmentImage";
+import { messageImageParts, messageText } from "../messageContent";
+import type { PlaygroundImageContentPart } from "../../../api/playgrounds";
 import type { PlaygroundRunStatus, PlaygroundSessionViewModel } from "../types";
 
 type ThreadPanelProps = {
@@ -47,6 +50,31 @@ function TemporaryConversationIndicator(): JSX.Element {
   );
 }
 
+function ImageDownloadButton({ image }: { image: PlaygroundImageContentPart }): JSX.Element {
+  const { token } = useAuth();
+  const { showErrorFeedback } = useActionFeedback();
+  return (
+    <button
+      type="button"
+      className="chatbot-image-download"
+      aria-label="Download image"
+      title="Download image"
+      onClick={() => {
+        if (!token) {
+          return;
+        }
+        void downloadAttachmentImage(image, token).catch((error) => {
+          showErrorFeedback(error, "Image download failed");
+        });
+      }}
+    >
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M12 4v10m0 0 4-4m-4 4-4-4M5 20h14" />
+      </svg>
+    </button>
+  );
+}
+
 export default function ThreadPanel({
   activeSession,
   isBootstrapping,
@@ -64,6 +92,7 @@ export default function ThreadPanel({
   const { t } = useTranslation("common");
   const { showErrorFeedback } = useActionFeedback();
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [viewerImage, setViewerImage] = useState<PlaygroundImageContentPart | null>(null);
   const copiedResetTimeoutRef = useRef<number | null>(null);
   const shellStyle = {
     ["--chatbot-composer-height" as string]: `${composerHeight}px`,
@@ -137,6 +166,7 @@ export default function ThreadPanel({
         {activeSession?.messages.length
           ? activeSession.messages.map((message) => {
             const text = messageText(message);
+            const images = messageImageParts(message);
             const storedReferences = getPlaygroundMessageReferences(message.metadata);
             const references = storedReferences.length > 0
               ? storedReferences
@@ -163,6 +193,20 @@ export default function ThreadPanel({
                       content={text}
                       renderMarkdown={message.role === "assistant"}
                     />
+                  ) : null}
+                  {images.length > 0 ? (
+                    <div className="chatbot-message-images" aria-label="Attached images">
+                      {images.map((image) => (
+                        <figure key={image.image_ref} className="chatbot-message-image">
+                          <AttachmentImage
+                            image={image}
+                            className="chatbot-message-image-button"
+                            onClick={() => setViewerImage(image)}
+                          />
+                          <ImageDownloadButton image={image} />
+                        </figure>
+                      ))}
+                    </div>
                   ) : null}
                   {!isLiveAssistantStatus ? statusTimeline : null}
                   {message.role === "assistant" && references.length > 0 ? (
@@ -218,6 +262,24 @@ export default function ThreadPanel({
           </button>
         )
         : null}
+      {viewerImage ? (
+        <div className="chatbot-image-viewer" role="dialog" aria-modal="true" aria-label="Image preview">
+          <div className="chatbot-image-viewer-backdrop" onClick={() => setViewerImage(null)} />
+          <div className="chatbot-image-viewer-panel">
+            <AttachmentImage image={viewerImage} className="chatbot-image-viewer-image" />
+            <div className="chatbot-image-viewer-actions">
+              <ImageDownloadButton image={viewerImage} />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setViewerImage(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

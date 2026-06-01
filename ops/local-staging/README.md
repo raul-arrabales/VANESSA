@@ -129,6 +129,7 @@ Supported launcher variables:
 - `CLOUD_TRAFFIC_LOG_ENABLED` (default: `true`; writes sanitized cloud/external traffic metadata only)
 - `CLOUD_TRAFFIC_LOG_PATH` (default: `/var/log/vanessa/cloud-traffic.jsonl`; mounted from repo-local `logs/` in compose)
 - `CLOUD_TRAFFIC_LOG_MAX_BYTES` (default: `10485760`; rotates the active log to `.1`)
+- `CHAT_ATTACHMENTS_ROOT` (default: `/var/lib/vanessa/chat-attachments`; mounted from repo-local `chat_attachments/` in compose)
 - `CONTEXT_SOURCE_ROOTS` (default: `/context_sources`; allowlisted backend-visible roots for managed knowledge-base directory sources)
 
 Config source of truth in code:

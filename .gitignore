@@ -29,3 +29,6 @@ context_sources/
 
 # Local operational logs
 logs/
+
+# Local chat attachment storage
+chat_attachments/
