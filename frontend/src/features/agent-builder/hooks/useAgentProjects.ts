@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { createAgentProject, getAgentProjectDefaults, listAgentProjects, type AgentProject } from "../../../api/agentProjects";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, useRouteActionFeedback, withActionFeedbackState } from "../../../feedback/ActionFeedbackProvider";
-import { buildDefaultAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../types";
+import { buildDefaultAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../../catalog-admin/userAgentProjectForm";
 
 type UseAgentProjectsResult = {
   projects: AgentProject[];

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { CatalogMcpServer } from "../../../api/catalog";
 import type { WorkflowAction, WorkflowVariableDefinition } from "../../../api/agentProjects";
 import type { ModelCatalogItem } from "../../../api/modelops";
-import type { AgentProjectFormState } from "../../agent-builder/types";
+import type { AgentProjectFormState } from "../userAgentProjectForm";
 
 type Props = {
   form: AgentProjectFormState;

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.application import agent_projects_service
 from app.services.agent_prompt_defaults import default_agent_runtime_prompts
 
@@ -138,6 +140,45 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
     assert created_specs[0]["runtime_prompts"] == default_agent_runtime_prompts()
     assert created_specs[0]["instructions"] == ""
     assert project["spec"]["runtime_prompts"] == default_agent_runtime_prompts()
+
+
+def test_create_agent_project_rejects_legacy_workflow_steps(monkeypatch):
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(agent_projects_service.AgentProjectError) as exc_info:
+        agent_projects_service.create_agent_project(
+            "postgresql://ignored",
+            owner_user_id=10,
+            payload={
+                "id": "proj-legacy",
+                "visibility": "private",
+                "name": "Legacy Agent",
+                "description": "Uses the retired workflow shape.",
+                "instructions": "",
+                "default_model_ref": None,
+                "tool_refs": [],
+                "mcp_server_refs": [],
+                "agent_type": "workflow",
+                "channel_type": "vanessa_webapp",
+                "interface_type": "chat",
+                "workflow_definition": {
+                    "steps": [
+                        {
+                            "id": "step_1",
+                            "name": "Old MCP step",
+                            "mcp_server_slug": "support_search",
+                            "exposed_tool_name": "support_search",
+                            "arguments": {},
+                        },
+                    ],
+                },
+                "tool_policy": {"allow_user_tools": False},
+                "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+            },
+        )
+
+    assert exc_info.value.code == "invalid_workflow_definition"
+    assert "steps is retired" in exc_info.value.message
 
 
 def test_publish_agent_project_compiles_catalog_payload_and_persists_published_agent_id(monkeypatch):

@@ -16,7 +16,7 @@ import {
   buildGuidedUserAgentCreateForm,
   toAgentProjectMutationInput,
   type AgentProjectFormState,
-} from "../../agent-builder/types";
+} from "../userAgentProjectForm";
 
 type UseUserAgentProjectsControlResult = {
   projects: AgentProject[];

@@ -12,7 +12,7 @@ import {
 } from "../../../api/agentProjects";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useActionFeedback, useRouteActionFeedback } from "../../../feedback/ActionFeedbackProvider";
-import { buildAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../types";
+import { buildAgentProjectForm, toAgentProjectMutationInput, type AgentProjectFormState } from "../../catalog-admin/userAgentProjectForm";
 
 type UseAgentProjectEditorResult = {
   projectId: string;

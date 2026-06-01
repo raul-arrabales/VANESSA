@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
-import type { AgentProjectFormState } from "../types";
+import type { AgentProjectFormState } from "../../catalog-admin/userAgentProjectForm";
 
 type Props = {
   form: AgentProjectFormState;

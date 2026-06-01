@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PreviewableAssistantExperience } from "./assistantExperience";
-import { buildAgentProjectPreview, DEFAULT_AGENT_PROJECT_FORM } from "../agent-builder/types";
+import { buildAgentProjectPreview, DEFAULT_AGENT_PROJECT_FORM } from "../catalog-admin/userAgentProjectForm";
 import { VANESSA_CORE_ASSISTANT_EXPERIENCE } from "../vanessa-core/assistantExperience";
 
 describe("assistant experience contract", () => {
@@ -15,15 +15,19 @@ describe("assistant experience contract", () => {
       assistant_ref: "agent.project.proj-1",
       playground_kind: "chat",
       default_model_ref: "safe-small",
-      tool_refs: ["tool.web_search", "tool.files"],
+      tool_refs: [],
       mcp_server_refs: [],
       agent_domain: "default",
+      agent_type: "workflow",
+      channel_type: "vanessa_webapp",
+      interface_type: "chat",
       runtime_constraints: {
         internet_required: false,
         sandbox_required: false,
       },
       workflow_definition: {
-        entrypoint: "assistant",
+        version: 2,
+        actions: [],
       },
     });
     expect("assistantRef" in preview).toBe(false);

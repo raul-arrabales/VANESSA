@@ -180,26 +180,10 @@ function normalizeWorkflowActions(workflowDefinition: unknown): WorkflowAction[]
     return [];
   }
   const definition = workflowDefinition as Record<string, unknown>;
-  if (definition.version === 2 && Array.isArray(definition.actions)) {
-    return definition.actions.filter((item): item is WorkflowAction => Boolean(item && typeof item === "object" && "type" in item));
+  if (definition.version !== 2 || !Array.isArray(definition.actions)) {
+    return [];
   }
-  const legacySteps = Array.isArray(definition.steps) ? definition.steps : [];
-  return legacySteps
-    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
-    .map((step, index): WorkflowAction => ({
-      id: String(step.id || `mcp_tool_${index + 1}`),
-      type: "mcp_tool",
-      name: String(step.name || step.exposed_tool_name || `MCP tool ${index + 1}`),
-      mcp_server_slug: String(step.mcp_server_slug || ""),
-      exposed_tool_name: String(step.exposed_tool_name || ""),
-      input_bindings: {},
-      output_variables: [{
-        name: `step_${index + 1}_output`,
-        label: "Step output",
-        type: "text",
-        required: true,
-      }],
-    }));
+  return definition.actions.filter((item): item is WorkflowAction => Boolean(item && typeof item === "object" && "type" in item));
 }
 
 function workflowDefinitionFromForm(form: AgentProjectFormState): WorkflowDefinition {

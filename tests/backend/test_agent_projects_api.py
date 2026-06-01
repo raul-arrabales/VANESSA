@@ -22,6 +22,10 @@ def _login(client, identifier: str, password: str):
     return login(client, identifier, password)
 
 
+def _workflow_definition() -> dict[str, object]:
+    return {"version": 2, "actions": []}
+
+
 def _project(project_id: str = "proj-1") -> dict[str, object]:
     return {
         "id": project_id,
@@ -38,7 +42,7 @@ def _project(project_id: str = "proj-1") -> dict[str, object]:
             "runtime_prompts": {"retrieval_context": "Use retrieved context for support answers."},
             "default_model_ref": "safe-small",
             "tool_refs": ["tool.web_search"],
-            "workflow_definition": {"entrypoint": "assistant"},
+            "workflow_definition": _workflow_definition(),
             "tool_policy": {"allow_user_tools": False},
             "runtime_constraints": {"internet_required": True, "sandbox_required": False},
         },
@@ -78,7 +82,7 @@ def test_create_agent_project_route_returns_service_payload(client, monkeypatch:
             "runtime_prompts": {"retrieval_context": "Use retrieved context for support answers."},
             "default_model_ref": "safe-small",
             "tool_refs": ["tool.web_search"],
-            "workflow_definition": {"entrypoint": "assistant"},
+            "workflow_definition": _workflow_definition(),
             "tool_policy": {"allow_user_tools": False},
             "runtime_constraints": {"internet_required": True, "sandbox_required": False},
         },
