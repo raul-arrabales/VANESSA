@@ -79,6 +79,7 @@ def wake_events():
 def voice_health():
     kws_url = _config().kws_url.rstrip("/")
     kws_health_url = f"{kws_url}/health"
+    kws_enabled = bool(_config().kws_enabled)
 
     return (
         jsonify(
@@ -87,8 +88,9 @@ def voice_health():
                 "service": "backend",
                 "voice": {
                     "kws": {
+                        "enabled": kws_enabled,
                         "url": kws_url,
-                        "reachable": http_json_ok(kws_health_url, timeout_seconds=_DEFAULT_HTTP_TIMEOUT_SECONDS),
+                        "reachable": kws_enabled and http_json_ok(kws_health_url, timeout_seconds=_DEFAULT_HTTP_TIMEOUT_SECONDS),
                     },
                     "stt": {"configured": False},
                     "tts": {"configured": False},

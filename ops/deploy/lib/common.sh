@@ -160,7 +160,7 @@ LLM_LOCAL_MODEL_PATH="${LLM_LOCAL_MODEL_PATH:-/models/llm/Qwen--Qwen2.5-0.5B-Ins
 LLM_INFERENCE_LOCAL_MODEL_PATH="${LLM_INFERENCE_LOCAL_MODEL_PATH:-${LLM_LOCAL_MODEL_PATH}}"
 LLM_EMBEDDINGS_LOCAL_MODEL_PATH="${LLM_EMBEDDINGS_LOCAL_MODEL_PATH:-}"
 VLLM_CPU_OMP_THREADS_BIND_DEFAULT="${VLLM_CPU_OMP_THREADS_BIND:-0-7}"
-VANESSA_ALLOWED_OPTIONAL_SERVICES="${VANESSA_ALLOWED_OPTIONAL_SERVICES:-llama_cpp,qdrant,image_analysis,image_generation,web_search}"
+VANESSA_ALLOWED_OPTIONAL_SERVICES="${VANESSA_ALLOWED_OPTIONAL_SERVICES:-llama_cpp,qdrant,image_analysis,image_generation,web_search,kws}"
 VANESSA_ENABLED_OPTIONAL_SERVICES="${VANESSA_ENABLED_OPTIONAL_SERVICES:-${VANESSA_DEFAULT_OPTIONAL_SERVICES:-web_search}}"
 VANESSA_ALLOW_SAMPLE_USER_SEEDING="${VANESSA_ALLOW_SAMPLE_USER_SEEDING:-false}"
 VANESSA_RUNTIME_ENV_BASE_FILE="${VANESSA_RUNTIME_ENV_BASE_FILE:-.env.example}"
@@ -280,6 +280,7 @@ write_runtime_activation_env() {
   local image_analysis_url="${IMAGE_ANALYSIS_URL:-}"
   local image_generation_url="${IMAGE_GENERATION_URL:-}"
   local web_search_url="${WEB_SEARCH_URL:-}"
+  local kws_enabled_value="false"
   local web_search_enabled_value="false"
 
   if optional_service_enabled "llama_cpp"; then
@@ -308,6 +309,9 @@ write_runtime_activation_env() {
   else
     web_search_url=""
   fi
+  if optional_service_enabled "kws"; then
+    kws_enabled_value="true"
+  fi
 
   printf 'LLAMA_CPP_URL=%s\n' "${llama_cpp_url}" >> "${active_file}"
   printf 'QDRANT_URL=%s\n' "${qdrant_url}" >> "${active_file}"
@@ -315,6 +319,7 @@ write_runtime_activation_env() {
   printf 'IMAGE_GENERATION_URL=%s\n' "${image_generation_url}" >> "${active_file}"
   printf 'WEB_SEARCH_ENABLED=%s\n' "${web_search_enabled_value}" >> "${active_file}"
   printf 'WEB_SEARCH_URL=%s\n' "${web_search_url}" >> "${active_file}"
+  printf 'KWS_ENABLED=%s\n' "${kws_enabled_value}" >> "${active_file}"
 }
 
 validate_optional_services_config
@@ -557,6 +562,10 @@ image_analysis_enabled_requested() {
 
 image_generation_enabled_requested() {
   optional_service_enabled "image_generation"
+}
+
+kws_enabled_requested() {
+  optional_service_enabled "kws"
 }
 
 web_search_enabled_requested() {
@@ -917,6 +926,9 @@ compose() {
   if image_generation_enabled_requested; then
     cmd+=(--profile image_generation)
   fi
+  if kws_enabled_requested; then
+    cmd+=(--profile kws)
+  fi
   local compose_path
   while IFS= read -r -d '' compose_path; do
     cmd+=(-f "${compose_path}")
@@ -966,6 +978,9 @@ stack_services_for_start() {
       if ! image_generation_worker_enabled "${generation_role}"; then
         continue
       fi
+    fi
+    if [[ "${service}" == "kws" ]] && ! kws_enabled_requested; then
+      continue
     fi
     services_to_start+=("${service}")
   done

@@ -130,7 +130,7 @@ Highlights:
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
 - Startup is now mode-driven through `ops/deploy/bin/*`; `ops/local-staging/*` remains as a compatibility wrapper over `VANESSA_DEPLOYMENT_MODE=local_staging`
-- Optional service selection is now explicit through `VANESSA_ENABLED_OPTIONAL_SERVICES=llama_cpp,qdrant,image_analysis,image_generation,web_search`
+- Optional service selection is now explicit through `VANESSA_ENABLED_OPTIONAL_SERVICES=llama_cpp,qdrant,image_analysis,image_generation,web_search,kws`
 - Launcher env lives under `ops/deploy/env/*.env`, while runtime/container env lives under `infra/env/*.env` plus `infra/.env.local` as the legacy local override
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)

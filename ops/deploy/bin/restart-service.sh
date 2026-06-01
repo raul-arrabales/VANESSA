@@ -169,6 +169,9 @@ fi
 if [[ "${target_service}" == "searxng" ]]; then
   web_search_enabled_requested || die "searxng is disabled. Add web_search to VANESSA_ENABLED_OPTIONAL_SERVICES to enable the optional web-search runtime."
 fi
+if [[ "${target_service}" == "kws" ]]; then
+  kws_enabled_requested || die "kws is disabled. Add kws to VANESSA_ENABLED_OPTIONAL_SERVICES to enable the optional wake-word runtime."
+fi
 if [[ "${target_service}" == "image_analysis" ]]; then
   image_analysis_enabled_requested || die "image_analysis is disabled. Add image_analysis to VANESSA_ENABLED_OPTIONAL_SERVICES to enable the optional image-analysis runtime."
   with_deps=true

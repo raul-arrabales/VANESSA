@@ -36,7 +36,7 @@ VANESSA_DEPLOYMENT_MODE=cloud_compose ./ops/deploy/bin/start.sh
 VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
 ```
 
-Expected services include frontend, backend, agent engine, sandbox, required mcp_gateway, optional-by-selection SearXNG web search, llm, llm runtime, kws, weaviate, and postgres, plus optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` when enabled in `VANESSA_ENABLED_OPTIONAL_SERVICES`.
+Expected services include frontend, backend, agent engine, sandbox, required mcp_gateway, llm, llm runtime, weaviate, and postgres, plus optional `llama_cpp`, `qdrant`, `image_analysis`, `image_generation`, `web_search`, and `kws` when enabled in `VANESSA_ENABLED_OPTIONAL_SERVICES`.
 
 ## Documentation Site (MkDocs)
 

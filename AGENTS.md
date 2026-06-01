@@ -180,7 +180,7 @@ Respect these runtime boundaries when generating code or configuration.
    - Image payload bytes must not be logged, stored, or included in telemetry.
 
 13. **Wake-word service (`kws`)**
-   - Offline wake-word detection and wake-event emission.
+   - Optional offline wake-word detection and wake-event emission.
    - Integrates with backend via webhook/event flow.
 
 14. **Weaviate**

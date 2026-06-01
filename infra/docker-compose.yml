@@ -360,6 +360,8 @@ services:
       context: ..
       dockerfile: infra/docker/kws/Dockerfile
     container_name: vanessa-kws
+    profiles:
+      - kws
     ports:
       - "${KWS_BIND_HOST:-127.0.0.1}:${KWS_PUBLISHED_PORT:-10400}:10400"
     depends_on:

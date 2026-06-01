@@ -250,11 +250,15 @@ run_checks() {
     failures=$((failures + 1))
   fi
 
-  if http_ok "$(kws_probe_url)"; then
-    printf 'kws: OK\n'
+  if kws_enabled_requested; then
+    if http_ok "$(kws_probe_url)"; then
+      printf 'kws: OK\n'
+    else
+      printf 'kws: FAIL\n'
+      failures=$((failures + 1))
+    fi
   else
-    printf 'kws: FAIL\n'
-    failures=$((failures + 1))
+    printf 'kws: SKIP (not enabled in VANESSA_ENABLED_OPTIONAL_SERVICES)\n'
   fi
 
   if http_ok "$(frontend_probe_url)"; then
@@ -531,4 +535,3 @@ if run_checks; then
 fi
 
 exit 3
-

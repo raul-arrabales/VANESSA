@@ -70,7 +70,6 @@ def register_system_routes(app: Flask) -> None:
         web_search_url = config.web_search_url.rstrip("/")
         image_analysis_url = config.image_analysis_url.rstrip("/")
         image_generation_url = config.image_generation_url.rstrip("/")
-        kws_url = config.kws_url.rstrip("/")
         weaviate_url = config.weaviate_url.rstrip("/")
         llama_cpp_url = config.llama_cpp_url.rstrip("/")
         qdrant_url = config.qdrant_url.rstrip("/")
@@ -83,10 +82,12 @@ def register_system_routes(app: Flask) -> None:
             {"service": "LLM Runtime Embeddings", "container": "llm_runtime_embeddings", "target": config.llm_embeddings_runtime_url, "reachable": app_module._http_json_ok(llm_embeddings_runtime_url + "/health")},
             {"service": "Agent Engine", "container": "agent_engine", "target": config.agent_engine_url, "reachable": app_module._http_json_ok(agent_engine_url + "/health")},
             {"service": "Sandbox", "container": "sandbox", "target": config.sandbox_url, "reachable": app_module._http_json_ok(sandbox_url + "/health")},
-            {"service": "KWS", "container": "kws", "target": config.kws_url, "reachable": app_module._http_json_ok(kws_url + "/health")},
             {"service": "Weaviate", "container": "weaviate", "target": config.weaviate_url, "reachable": app_module._http_json_ok(weaviate_url + "/v1/.well-known/ready")},
             {"service": "PostgreSQL", "container": "postgres", "target": "postgresql", "reachable": app_module._postgres_ok(config.database_url)},
         ]
+        if config.kws_enabled:
+            kws_url = config.kws_url.rstrip("/")
+            services.insert(len(services) - 2, {"service": "KWS", "container": "kws", "target": config.kws_url, "reachable": app_module._http_json_ok(kws_url + "/health")})
         if config.llama_cpp_url.strip():
             services.insert(4, {"service": "llama.cpp", "container": "llama_cpp", "target": config.llama_cpp_url, "reachable": app_module._http_json_ok(llama_cpp_url + "/v1/models")})
         if config.qdrant_url.strip():

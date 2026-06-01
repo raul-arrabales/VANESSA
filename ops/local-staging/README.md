@@ -10,8 +10,8 @@ Manual scripts to run VANESSA locally in a staging-like mode for human feature c
 - Ubuntu with Docker Engine and Docker Compose plugin (`docker compose`)
 - `curl`
 - Optional: `nc` (netcat) for PostgreSQL liveness checks
-- Host microphone device available at `/dev/snd` for wake-word container
-- Local wake-word model files under `models/kws/` (for example `models/kws/custom/`)
+- Host microphone device available at `/dev/snd` only when `kws` is enabled
+- Local wake-word model files under `models/kws/` only when `kws` is enabled
 
 ## Quickstart
 
@@ -50,9 +50,9 @@ VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
   - Shows `docker compose ps -a` and a short running/exited/total summary.
   - Flag: `--json`
 - `health.sh`
-  - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
+  - Checks frontend, backend, agent engine, sandbox, llm, weaviate, and postgres.
   - Checks optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` when they are enabled through `VANESSA_ENABLED_OPTIONAL_SERVICES`.
-  - Checks `searxng` when `web_search` is enabled and `mcp_gateway` by default.
+  - Checks `searxng` when `web_search` is enabled, `kws` when `kws` is enabled, and `mcp_gateway` by default.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
 - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
 - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
@@ -103,7 +103,7 @@ Supported launcher variables:
 - `COMPOSE_FILE` (default: `infra/docker-compose.yml:infra/docker-compose.local-staging.override.yml`)
 - `START_TIMEOUT_SECONDS` (default: `180`)
 - `LOG_TAIL_LINES` (default: `200`)
-- `VANESSA_ENABLED_OPTIONAL_SERVICES` (default: `web_search`; valid entries: `llama_cpp,qdrant,image_analysis,image_generation,web_search`)
+- `VANESSA_ENABLED_OPTIONAL_SERVICES` (default: `web_search`; valid entries: `llama_cpp,qdrant,image_analysis,image_generation,web_search,kws`)
 - `SAMPLE_SUPERADMIN_USERNAME` (default: `sample-superadmin`)
 - `SAMPLE_SUPERADMIN_EMAIL` (default: `sample-superadmin@local.test`)
 - `SAMPLE_SUPERADMIN_PASSWORD` (default: `sample-superadmin-123`)
@@ -236,6 +236,13 @@ Split local runtime selection:
 - `searxng` stays internal to Docker and is called only by the backend `web_search` adapter.
 - Local config lives in `infra/searxng/settings.yml`; JSON output must remain enabled for web search.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /` inside the container when web search is enabled.
+
+`kws` behavior:
+
+- The optional `kws` service is enabled when `VANESSA_ENABLED_OPTIONAL_SERVICES` includes `kws`.
+- Local-staging scripts automatically add the `kws` compose profile when enabled.
+- When `kws` is disabled, launcher health checks skip it and backend system health does not treat it as a required service.
+- When `kws` is enabled in local staging, keep `/dev/snd` available and ensure `models/kws/` exists on the host.
 
 ## Sample Auth Seeding
 

@@ -58,6 +58,7 @@ class BackendRuntimeConfig:
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
     image_generation_url: str = DEFAULT_IMAGE_GENERATION_URL
     kws_url: str = DEFAULT_KWS_URL
+    kws_enabled: bool = False
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
     qdrant_url: str = DEFAULT_QDRANT_URL
@@ -116,6 +117,7 @@ class AuthConfig:
     image_analysis_url: str = DEFAULT_IMAGE_ANALYSIS_URL
     image_generation_url: str = DEFAULT_IMAGE_GENERATION_URL
     kws_url: str = DEFAULT_KWS_URL
+    kws_enabled: bool = False
     weaviate_url: str = DEFAULT_WEAVIATE_URL
     llama_cpp_url: str = DEFAULT_LLAMA_CPP_URL
     qdrant_url: str = DEFAULT_QDRANT_URL
@@ -283,6 +285,7 @@ def get_auth_config() -> AuthConfig:
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
         image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
+        kws_enabled=_get_bool_env("KWS_ENABLED", False),
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
         qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),
@@ -334,6 +337,7 @@ def get_backend_runtime_config() -> BackendRuntimeConfig:
         image_analysis_url=os.getenv("IMAGE_ANALYSIS_URL", DEFAULT_IMAGE_ANALYSIS_URL).strip(),
         image_generation_url=os.getenv("IMAGE_GENERATION_URL", DEFAULT_IMAGE_GENERATION_URL).strip(),
         kws_url=os.getenv("KWS_URL", DEFAULT_KWS_URL).strip() or DEFAULT_KWS_URL,
+        kws_enabled=_get_bool_env("KWS_ENABLED", False),
         weaviate_url=os.getenv("WEAVIATE_URL", DEFAULT_WEAVIATE_URL).strip() or DEFAULT_WEAVIATE_URL,
         llama_cpp_url=os.getenv("LLAMA_CPP_URL", DEFAULT_LLAMA_CPP_URL).strip(),
         qdrant_url=os.getenv("QDRANT_URL", DEFAULT_QDRANT_URL).strip(),

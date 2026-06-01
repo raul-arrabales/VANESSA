@@ -50,6 +50,7 @@ Use `./ops/local-staging/compose.sh ...` for ad hoc compose commands so local st
 - Optional provider proofs:
   - Add `llama_cpp` to `VANESSA_ENABLED_OPTIONAL_SERVICES` to start the alternate local LLM provider.
   - Add `qdrant` to `VANESSA_ENABLED_OPTIONAL_SERVICES` to start the alternate local vector-store provider.
+  - Add `kws` to `VANESSA_ENABLED_OPTIONAL_SERVICES` to start the optional wake-word service.
 - Env ownership:
   - Launcher env defaults live under `ops/deploy/env/local-staging.env`.
   - Runtime/container env defaults live under `infra/env/local-staging.env`.
