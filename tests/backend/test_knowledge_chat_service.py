@@ -66,6 +66,11 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
         lambda _db, _config: {
             "deployment_profile": {"slug": "local-default"},
             "capabilities": {
+                "llm_inference": {
+                    "slug": "vllm-local",
+                    "resources": [{"id": "safe-small-resolved"}],
+                    "default_resource_id": "safe-small-resolved",
+                },
                 "vector_store": {
                     "resources": [
                         {
@@ -212,6 +217,11 @@ def test_run_knowledge_chat_resolves_model_and_maps_sources(monkeypatch: pytest.
             "platform_runtime": {
                 "deployment_profile": {"slug": "local-default"},
                 "capabilities": {
+                    "llm_inference": {
+                        "slug": "vllm-local",
+                        "resources": [{"id": "safe-small-resolved"}],
+                        "default_resource_id": "safe-small-resolved",
+                    },
                     "vector_store": {
                         "resources": [
                             {
@@ -250,6 +260,11 @@ def test_run_knowledge_chat_keeps_empty_sources_when_retrieval_returns_no_hits(m
         lambda _db, _config: {
             "deployment_profile": {"slug": "local-default"},
             "capabilities": {
+                "llm_inference": {
+                    "slug": "vllm-local",
+                    "resources": [{"id": "safe-small"}],
+                    "default_resource_id": "safe-small",
+                },
                 "vector_store": {
                     "resources": [
                         {
