@@ -131,6 +131,7 @@ class AuthConfig:
     cloud_traffic_log_enabled: bool = True
     cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
     cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
+    chat_attachments_root: str = DEFAULT_CHAT_ATTACHMENTS_ROOT
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
