@@ -22,13 +22,21 @@ npm install
 npm run dev
 ```
 
-## Full Stack (Docker Compose)
+## Full Stack (Deployment Launcher)
 
 ```bash
-docker compose -f infra/docker-compose.yml up --build
+./ops/local-staging/start.sh
 ```
 
-Expected services include frontend, backend, agent engine, sandbox, required mcp_gateway, optional-by-capability SearXNG web search, llm, llm runtime, kws, weaviate, and postgres, plus optional `llama_cpp` and `qdrant` profiles when their corresponding runtime URLs are configured.
+Canonical deployment launcher examples:
+
+```bash
+VANESSA_DEPLOYMENT_MODE=local_staging ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=cloud_compose ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
+```
+
+Expected services include frontend, backend, agent engine, sandbox, required mcp_gateway, optional-by-selection SearXNG web search, llm, llm runtime, kws, weaviate, and postgres, plus optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` when enabled in `VANESSA_ENABLED_OPTIONAL_SERVICES`.
 
 ## Documentation Site (MkDocs)
 

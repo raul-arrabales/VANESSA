@@ -42,6 +42,25 @@ Legend:
 14. Qdrant: optional vector database for alternate retrieval provider binding.
 15. PostgreSQL: persistent relational data for auth and metadata.
 
+## Deployment Launcher Modes
+
+Container topology is now launched through three explicit deployment modes:
+
+- `local_staging`
+- `cloud_compose`
+- `lan_server`
+
+The canonical launcher entrypoints live under `ops/deploy/bin/`.
+`ops/local-staging/*` remains as a compatibility wrapper over `VANESSA_DEPLOYMENT_MODE=local_staging`.
+
+Env ownership is intentionally split:
+
+- launcher env defaults live under `ops/deploy/env/*.env`
+- runtime/container env defaults live under `infra/env/*.env`
+- `infra/.env.local` remains the local-staging compatibility runtime override
+
+Optional service selection is explicit through `VANESSA_ENABLED_OPTIONAL_SERVICES`; runtime URLs remain service wiring, not startup selection flags.
+
 Interaction semantics in the generated graph represent directional runtime communication paths (who calls whom), not Docker Compose startup dependencies:
 
 - Frontend -> Backend API

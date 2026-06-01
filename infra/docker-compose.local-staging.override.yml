@@ -1,0 +1,7 @@
+services:
+  kws:
+    devices:
+      - "/dev/snd:/dev/snd"
+    environment:
+      KWS_REQUIRE_MIC: ${KWS_REQUIRE_MIC:-true}
+

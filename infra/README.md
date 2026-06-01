@@ -1,6 +1,6 @@
 # Infrastructure
 
-Docker assets for local development.
+Docker assets for VANESSA deployment modes.
 
 The split local vLLM runtimes are hardware-adaptive in local staging:
 
@@ -11,8 +11,21 @@ The split local vLLM runtimes are hardware-adaptive in local staging:
 ## Start stack
 
 ```bash
-cd infra
-docker compose up --build
+./ops/local-staging/start.sh
 ```
 
-Services include frontend, backend, agent engine, sandbox, required `mcp_gateway`, optional-by-capability SearXNG for token-free web search, llm (gateway), `llm_runtime_inference` (vLLM text), `llm_runtime_embeddings` (vLLM embeddings), kws, weaviate, postgres, and optional `llama_cpp` and `qdrant` provider runtimes.
+Canonical deployment launcher examples:
+
+```bash
+VANESSA_DEPLOYMENT_MODE=cloud_compose ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
+```
+
+Service inventory stays centralized in `infra/docker-compose.yml`.
+Mode-specific public exposure and host assumptions live in:
+
+- `infra/docker-compose.local-staging.override.yml`
+- `infra/docker-compose.cloud-compose.override.yml`
+- `infra/docker-compose.lan-server.override.yml`
+
+Runtime env defaults live in `infra/env/*.env`, with `infra/.env.local` kept as the local-staging compatibility override.

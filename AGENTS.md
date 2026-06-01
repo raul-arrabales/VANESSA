@@ -242,8 +242,12 @@ Respect these runtime boundaries when generating code or configuration.
   - Compose files, Dockerfiles, architecture metadata, infrastructure wiring.
   - Includes SearXNG config for optional local web search under `infra/searxng/`.
 
+- `ops/deploy/`
+  - Canonical deployment-mode launcher layer.
+  - Owns deployment mode manifests, launcher env defaults, and shared startup/health/stop logic for `local_staging`, `cloud_compose`, and `lan_server`.
+
 - `ops/local-staging/`
-  - Human-facing staging-like local runtime workflow and scripts.
+  - Human-facing staging-like local runtime workflow and compatibility wrappers over `ops/deploy/`.
 
 - `tests/`
   - Backend, frontend, and agent_engine tests.

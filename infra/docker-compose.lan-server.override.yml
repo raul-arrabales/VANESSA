@@ -1,0 +1,4 @@
+services:
+  kws:
+    environment:
+      KWS_REQUIRE_MIC: "false"

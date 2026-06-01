@@ -1,3 +1,13 @@
+x-runtime-env-files: &runtime_env_files
+  - path: ${VANESSA_RUNTIME_ENV_BASE_FILE:-.env.example}
+    required: true
+  - path: ${VANESSA_RUNTIME_ENV_MODE_FILE:-env/local-staging.env}
+    required: false
+  - path: ${VANESSA_RUNTIME_ENV_LEGACY_OVERRIDE_FILE:-.env.local}
+    required: false
+  - path: ${VANESSA_RUNTIME_ENV_ACTIVE_FILE:-/tmp/vanessa-runtime-local-staging.active.env}
+    required: false
+
 services:
   frontend:
     build:
@@ -5,14 +15,10 @@ services:
       dockerfile: infra/docker/frontend/Dockerfile
     container_name: vanessa-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_BIND_HOST:-127.0.0.1}:${FRONTEND_PUBLISHED_PORT:-3000}:3000"
     depends_on:
       - backend
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
 
   backend:
     build:
@@ -20,18 +26,14 @@ services:
       dockerfile: infra/docker/backend/Dockerfile
     container_name: vanessa-backend
     ports:
-      - "5000:5000"
+      - "${BACKEND_BIND_HOST:-127.0.0.1}:${BACKEND_PUBLISHED_PORT:-5000}:5000"
     depends_on:
       - agent_engine
       - weaviate
       - postgres
       - llm
       - sandbox
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     volumes:
       - ../models/llm:/models/llm
       - ../context_sources:/context_sources
@@ -45,12 +47,8 @@ services:
       dockerfile: infra/docker/llm/Dockerfile
     container_name: vanessa-llm
     ports:
-      - "8000:8000"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${LLM_BIND_HOST:-127.0.0.1}:${LLM_PUBLISHED_PORT:-8000}:8000"
+    env_file: *runtime_env_files
     depends_on:
       - llm_runtime_inference
       - llm_runtime_embeddings
@@ -63,11 +61,7 @@ services:
     container_name: vanessa-llm-runtime-inference
     expose:
       - "8000"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       LLM_RUNTIME_SERVICE_NAME: llm_runtime_inference
       LLM_RUNTIME_CAPABILITY: llm_inference
@@ -87,11 +81,7 @@ services:
     container_name: vanessa-llm-runtime-embeddings
     expose:
       - "8000"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       LLM_RUNTIME_SERVICE_NAME: llm_runtime_embeddings
       LLM_RUNTIME_CAPABILITY: embeddings
@@ -109,12 +99,8 @@ services:
     profiles:
       - llama_cpp
     ports:
-      - "8081:8080"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${LLAMA_CPP_BIND_HOST:-127.0.0.1}:${LLAMA_CPP_PUBLISHED_PORT:-8081}:8080"
+    env_file: *runtime_env_files
     environment:
       LLAMA_ARG_MODEL: ${LLAMA_CPP_MODEL_PATH:-}
       LLAMA_ARG_ALIAS: local-llama-cpp-default
@@ -130,12 +116,8 @@ services:
     profiles:
       - qdrant
     ports:
-      - "6333:6333"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${QDRANT_BIND_HOST:-127.0.0.1}:${QDRANT_PUBLISHED_PORT:-6333}:6333"
+    env_file: *runtime_env_files
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -144,11 +126,7 @@ services:
     container_name: vanessa-searxng
     expose:
       - "8080"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me-local-searxng-secret}
     volumes:
@@ -161,12 +139,8 @@ services:
       dockerfile: infra/docker/mcp_gateway/Dockerfile
     container_name: vanessa-mcp-gateway
     ports:
-      - "6100:8080"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${MCP_GATEWAY_BIND_HOST:-127.0.0.1}:${MCP_GATEWAY_PUBLISHED_PORT:-6100}:8080"
+    env_file: *runtime_env_files
     environment:
       MCP_GATEWAY_PORT: 8080
       BACKEND_URL: http://backend:5000
@@ -186,12 +160,8 @@ services:
     profiles:
       - image_analysis
     ports:
-      - "8090:8090"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${IMAGE_ANALYSIS_BIND_HOST:-127.0.0.1}:${IMAGE_ANALYSIS_PUBLISHED_PORT:-8090}:8090"
+    env_file: *runtime_env_files
     environment:
       IMAGE_ANALYSIS_ROLE: gateway
       IMAGE_ANALYSIS_PORT: 8090
@@ -219,11 +189,7 @@ services:
     container_name: vanessa-image-analysis-anpr
     profiles:
       - image_analysis
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       IMAGE_ANALYSIS_ROLE: anpr
       IMAGE_ANALYSIS_PORT: 8091
@@ -247,11 +213,7 @@ services:
     container_name: vanessa-image-analysis-objects
     profiles:
       - image_analysis
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       IMAGE_ANALYSIS_ROLE: objects
       IMAGE_ANALYSIS_PORT: 8092
@@ -276,11 +238,7 @@ services:
     container_name: vanessa-image-analysis-captioning
     profiles:
       - image_analysis
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       IMAGE_ANALYSIS_ROLE: captioning
       IMAGE_ANALYSIS_PORT: 8093
@@ -305,12 +263,8 @@ services:
     profiles:
       - image_generation
     ports:
-      - "8094:8094"
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+      - "${IMAGE_GENERATION_BIND_HOST:-127.0.0.1}:${IMAGE_GENERATION_PUBLISHED_PORT:-8094}:8094"
+    env_file: *runtime_env_files
     environment:
       IMAGE_GENERATION_ROLE: gateway
       IMAGE_GENERATION_PORT: 8094
@@ -337,11 +291,7 @@ services:
     container_name: vanessa-image-generation-text-to-image
     profiles:
       - image_generation
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       IMAGE_GENERATION_ROLE: text_to_image
       IMAGE_GENERATION_PORT: 8095
@@ -368,11 +318,7 @@ services:
     container_name: vanessa-image-generation-plate-logo
     profiles:
       - image_generation
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       IMAGE_GENERATION_ROLE: plate_logo
       IMAGE_GENERATION_PORT: 8096
@@ -391,17 +337,13 @@ services:
       dockerfile: infra/docker/agent_engine/Dockerfile
     container_name: vanessa-agent-engine
     ports:
-      - "7000:7000"
+      - "${AGENT_ENGINE_BIND_HOST:-127.0.0.1}:${AGENT_ENGINE_PUBLISHED_PORT:-7000}:7000"
     depends_on:
       - llm
       - weaviate
       - postgres
       - sandbox
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     environment:
       MCP_GATEWAY_SERVICE_TOKEN: ${MCP_GATEWAY_SERVICE_TOKEN:-dev-mcp-gateway-token}
 
@@ -411,7 +353,7 @@ services:
       dockerfile: infra/docker/sandbox/Dockerfile
     container_name: vanessa-sandbox
     ports:
-      - "6000:6000"
+      - "${SANDBOX_BIND_HOST:-127.0.0.1}:${SANDBOX_PUBLISHED_PORT:-6000}:6000"
 
   kws:
     build:
@@ -419,24 +361,18 @@ services:
       dockerfile: infra/docker/kws/Dockerfile
     container_name: vanessa-kws
     ports:
-      - "10400:10400"
+      - "${KWS_BIND_HOST:-127.0.0.1}:${KWS_PUBLISHED_PORT:-10400}:10400"
     depends_on:
       - backend
-    env_file:
-      - path: .env.example
-        required: true
-      - path: .env.local
-        required: false
+    env_file: *runtime_env_files
     volumes:
       - ../models/kws:/models/kws:ro
-    devices:
-      - "/dev/snd:/dev/snd"
 
   weaviate:
     image: semitechnologies/weaviate:1.27.6
     container_name: vanessa-weaviate
     ports:
-      - "8080:8080"
+      - "${WEAVIATE_BIND_HOST:-127.0.0.1}:${WEAVIATE_PUBLISHED_PORT:-8080}:8080"
     environment:
       QUERY_DEFAULTS_LIMIT: "25"
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
@@ -450,7 +386,7 @@ services:
     image: postgres:16
     container_name: vanessa-postgres
     ports:
-      - "5432:5432"
+      - "${POSTGRES_BIND_HOST:-127.0.0.1}:${POSTGRES_PUBLISHED_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: vanessa
       POSTGRES_PASSWORD: vanessa

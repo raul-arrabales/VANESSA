@@ -38,13 +38,26 @@ Best for: local AI experimentation, agent and tool orchestration, platform gover
 
 ## Quick Start
 
-The fastest way to run VANESSA locally is through the local staging workflow:
+VANESSA now has three first-class deployment launcher modes:
+
+- `local_staging`: localhost-focused staging-like development workflow
+- `cloud_compose`: single-host Docker Compose deployment for a cloud VM/app host
+- `lan_server`: single-host Docker Compose deployment for another machine on the same LAN
+
+The fastest way to run VANESSA locally is still through the local staging workflow:
 
 ```bash
 git clone https://github.com/raul-arrabales/VANESSA.git
 cd VANESSA
 ./ops/local-staging/start.sh
 ./ops/local-staging/health.sh
+```
+
+For canonical mode-aware startup, use `./ops/deploy/bin/*` with `VANESSA_DEPLOYMENT_MODE`.
+
+```bash
+VANESSA_DEPLOYMENT_MODE=cloud_compose ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
 ```
 
 For ad hoc compose commands in local staging, use `./ops/local-staging/compose.sh ...` so the CPU/GPU runtime override files are included.
@@ -116,7 +129,9 @@ Highlights:
 
 - GPU hosts automatically use the GPU local runtime path
 - CPU-only hosts build a compatible local vLLM image for the detected ISA
-- `mcp_gateway` is required and local SearXNG web search is enabled by default via `WEB_SEARCH_ENABLED=true`; optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` profiles can be enabled through environment variables. The image capability profiles run one gateway plus the private task workers selected by their worker env vars.
+- Startup is now mode-driven through `ops/deploy/bin/*`; `ops/local-staging/*` remains as a compatibility wrapper over `VANESSA_DEPLOYMENT_MODE=local_staging`
+- Optional service selection is now explicit through `VANESSA_ENABLED_OPTIONAL_SERVICES=llama_cpp,qdrant,image_analysis,image_generation,web_search`
+- Launcher env lives under `ops/deploy/env/*.env`, while runtime/container env lives under `infra/env/*.env` plus `infra/.env.local` as the legacy local override
 
 Full guide: [docs/local-staging.md](docs/local-staging.md) and [ops/local-staging/README.md](ops/local-staging/README.md)
 
@@ -149,6 +164,7 @@ Published docs site: `https://raul-arrabales.github.io/VANESSA/`
 - `image_generation/`: optional local image generation gateway/workers for text-to-image and license plate logo replacement tasks
 - `infra/searxng/`: local SearXNG configuration used by the optional backend-owned web-search capability
 - `infra/`: Dockerfiles, compose wiring, and architecture metadata
+- `ops/deploy/`: canonical deployment-mode launchers, mode manifests, and launcher env defaults
 - `docs/`: architecture, setup, service docs, and contributor guidance
 - `ops/local-staging/`: staging-like launcher and health workflows
 

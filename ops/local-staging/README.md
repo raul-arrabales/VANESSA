@@ -2,6 +2,9 @@
 
 Manual scripts to run VANESSA locally in a staging-like mode for human feature checks.
 
+`ops/local-staging/*` now wraps the canonical deployment launcher with
+`VANESSA_DEPLOYMENT_MODE=local_staging`.
+
 ## Prerequisites
 
 - Ubuntu with Docker Engine and Docker Compose plugin (`docker compose`)
@@ -26,6 +29,14 @@ python scripts/generate_architecture.py --write
 
 Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose operations. The wrapper adds the resolved CPU/GPU override files; raw `docker compose -f infra/docker-compose.yml ...` uses the base GPU runtime definition and can recreate the split vLLM runtime containers with the wrong image on CPU-only hosts.
 
+Canonical mode-aware equivalents:
+
+```bash
+VANESSA_DEPLOYMENT_MODE=local_staging ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=cloud_compose ./ops/deploy/bin/start.sh
+VANESSA_DEPLOYMENT_MODE=lan_server ./ops/deploy/bin/start.sh
+```
+
 ## Scripts
 
 - `start.sh`
@@ -40,10 +51,8 @@ Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose op
   - Flag: `--json`
 - `health.sh`
   - Checks frontend, backend, agent engine, sandbox, kws, llm, weaviate, and postgres.
-  - Checks optional `llama_cpp` when `LLAMA_CPP_URL` is configured.
-  - Checks optional `qdrant` when `QDRANT_URL` is configured.
-  - Checks optional `image_analysis` and `image_generation` when their provider URLs are configured.
-  - Checks `searxng` and `mcp_gateway` by default.
+  - Checks optional `llama_cpp`, `qdrant`, `image_analysis`, and `image_generation` when they are enabled through `VANESSA_ENABLED_OPTIONAL_SERVICES`.
+  - Checks `searxng` when `web_search` is enabled and `mcp_gateway` by default.
   - Also checks `llm_runtime_inference` and `llm_runtime_embeddings` when `LLM_ROUTING_MODE=local_only`.
 - LLM check validates `GET /health` and a lightweight contract check with `GET /v1/models`.
 - When the embeddings provider slot has a persisted loaded model, also validates that `llm_runtime_embeddings` and `llm` both advertise that embeddings model. A healthy `/health` alone is not enough.
@@ -73,6 +82,16 @@ Use the local-staging scripts or `./ops/local-staging/compose.sh` for compose op
 
 ## Optional Local Configuration
 
+Launcher and runtime env now have separate canonical homes:
+
+- Launcher env: `ops/deploy/env/local-staging.env`
+- Runtime env: `infra/env/local-staging.env`
+
+Local compatibility overrides still exist:
+
+- `ops/local-staging/.env.local`
+- `infra/.env.local`
+
 You can create `ops/local-staging/.env.local` from `.env.local.example`.
 
 ```bash
@@ -81,9 +100,10 @@ cp ops/local-staging/.env.local.example ops/local-staging/.env.local
 
 Supported launcher variables:
 
-- `COMPOSE_FILE` (default: `infra/docker-compose.yml`)
+- `COMPOSE_FILE` (default: `infra/docker-compose.yml:infra/docker-compose.local-staging.override.yml`)
 - `START_TIMEOUT_SECONDS` (default: `180`)
 - `LOG_TAIL_LINES` (default: `200`)
+- `VANESSA_ENABLED_OPTIONAL_SERVICES` (default: `web_search`; valid entries: `llama_cpp,qdrant,image_analysis,image_generation,web_search`)
 - `SAMPLE_SUPERADMIN_USERNAME` (default: `sample-superadmin`)
 - `SAMPLE_SUPERADMIN_EMAIL` (default: `sample-superadmin@local.test`)
 - `SAMPLE_SUPERADMIN_PASSWORD` (default: `sample-superadmin-123`)
@@ -105,17 +125,18 @@ Supported launcher variables:
 - `LLM_REQUEST_TIMEOUT_SECONDS` (default: `60`; shared backend->`llm` and `llm`->runtime HTTP timeout budget)
 - `LLM_RUNTIME_CPU_VARIANT` (default: `auto`; values: `auto|avx2|avx512`)
 - `LLM_RUNTIME_DISABLE_LOCAL_ON_UNSUPPORTED_CPU` (default: `false`)
-- `LLAMA_CPP_URL` (blank by default; when set, enables the optional `llama_cpp` compose profile and backend bootstrap profile)
+- Optional runtime/provider URLs now belong in `infra/env/local-staging.env` or `infra/.env.local`.
+- `LLAMA_CPP_URL` (blank by default; used as runtime wiring when `llama_cpp` is enabled)
 - `LLAMA_CPP_MODEL_PATH` (required when `LLAMA_CPP_URL` is set; must point to a GGUF file under `models/llm/` or an absolute host path)
 - `LLAMA_CPP_CONTEXT_SIZE` (default: `4096`)
-- `QDRANT_URL` (blank by default; when set, enables the optional `qdrant` compose profile and backend bootstrap profile)
-- `IMAGE_ANALYSIS_URL` (blank by default; set to `http://image_analysis:8090` to enable the optional `image_analysis` compose profile and backend bootstrap binding)
+- `QDRANT_URL` (blank by default; used as runtime wiring when `qdrant` is enabled)
+- `IMAGE_ANALYSIS_URL` (blank by default; used as runtime wiring when `image_analysis` is enabled)
 - `IMAGE_ANALYSIS_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
 - `IMAGE_ANALYSIS_WORKERS` (default: `anpr,objects,captioning`; set comma-separated worker roles or `none` to start only the gateway)
 - `IMAGE_ANALYSIS_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real task-specific vision model dependencies in the private workers)
 - `IMAGE_ANALYSIS_REQUEST_TIMEOUT_SECONDS` (default: `300`; increase for first-run Florence/RF-DETR model downloads on slow machines)
 - `IMAGE_ANALYSIS_ANPR_URL`, `IMAGE_ANALYSIS_OBJECTS_URL`, `IMAGE_ANALYSIS_CAPTIONING_URL` (default to the private Compose worker service URLs)
-- `IMAGE_GENERATION_URL` (blank by default; set to `http://image_generation:8094` to enable the optional `image_generation` compose profile and backend bootstrap binding)
+- `IMAGE_GENERATION_URL` (blank by default; used as runtime wiring when `image_generation` is enabled)
 - `IMAGE_GENERATION_FAKE_MODE` (default: `0`; set to `1` for deterministic lightweight smoke-test output)
 - `IMAGE_GENERATION_WORKERS` (default: `text_to_image,plate_logo`; set comma-separated worker roles or `none` to start only the gateway)
 - `IMAGE_GENERATION_INSTALL_RUNTIME_DEPS` (default: `0`; set to `1` and rebuild to install real Diffusers/OpenCV dependencies in the private workers)
@@ -137,7 +158,13 @@ Config source of truth in code:
 - Backend: `backend/app/config.py`
 - Agent engine: `agent_engine/app/config.py`
 
-Note: service runtime environment still comes from compose/env files (for example `infra/.env.example` or your compose env override).
+Note: service runtime environment now layers:
+
+- `infra/.env.example`
+- `infra/env/local-staging.env`
+- `infra/.env.local`
+- generated deployment activation env for explicit optional-service enablement
+
 `VANESSA_RUNTIME_PROFILE` is a startup seed, not a permanent override. After bootstrap the navbar/settings controls read and update the DB-backed runtime profile unless `VANESSA_RUNTIME_PROFILE_FORCE` is set.
 For local secrets and runtime overrides (including `HF_TOKEN`), use `infra/.env.local` (copy from `infra/.env.local.example`).
 When running the frontend dev server directly on the host, keep browser requests on `/api` and set `VITE_DEV_PROXY_TARGET=http://127.0.0.1:5000` so Vite proxies to the local-staging backend instead of the Docker-only `backend` hostname.
@@ -161,21 +188,21 @@ Split local runtime selection:
 
 `llama_cpp` selection:
 
-- The optional `llama_cpp` service is enabled only when `LLAMA_CPP_URL` is non-empty.
+- The optional `llama_cpp` service is enabled when `VANESSA_ENABLED_OPTIONAL_SERVICES` includes `llama_cpp`.
 - Local-staging scripts automatically add the `llama_cpp` compose profile when enabled.
-- When `LLAMA_CPP_URL` is unset, `docker compose config` and `./ops/local-staging/start.sh` should not warn about `LLAMA_CPP_MODEL_PATH`.
+- `LLAMA_CPP_URL` remains runtime wiring only.
 - `LLAMA_CPP_MODEL_PATH` must point to a GGUF file that exists on the host.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /v1/models` inside the container.
 
 `qdrant` selection:
 
-- The optional `qdrant` service is enabled only when `QDRANT_URL` is non-empty.
+- The optional `qdrant` service is enabled when `VANESSA_ENABLED_OPTIONAL_SERVICES` includes `qdrant`.
 - Local-staging scripts automatically add the `qdrant` compose profile when enabled.
 - `health.sh` and `restart-service.sh` validate readiness using `GET /healthz` inside the container.
 
 `image_analysis` selection:
 
-- The optional `image_analysis` gateway and private worker services are enabled only when `IMAGE_ANALYSIS_URL` is non-empty.
+- The optional `image_analysis` gateway and private worker services are enabled when `VANESSA_ENABLED_OPTIONAL_SERVICES` includes `image_analysis`.
 - Local-staging scripts automatically add the `image_analysis` compose profile when enabled.
 - `IMAGE_ANALYSIS_WORKERS` chooses which private workers are launched. Valid values are comma-separated `anpr`, `objects`, and `captioning`, or `none` to start only the gateway.
 - The gateway mounts `models/image_analysis`, exposes the selected local plate recognition, object detection, and captioning resources through the `image_analysis` platform capability, and delegates to the enabled worker containers.
@@ -187,7 +214,7 @@ Split local runtime selection:
 
 `image_generation` selection:
 
-- The optional `image_generation` gateway and private worker services are enabled only when `IMAGE_GENERATION_URL` is non-empty.
+- The optional `image_generation` gateway and private worker services are enabled when `VANESSA_ENABLED_OPTIONAL_SERVICES` includes `image_generation`.
 - Local-staging scripts automatically add the `image_generation` compose profile when enabled.
 - `IMAGE_GENERATION_WORKERS` chooses which private workers are launched. Valid values are comma-separated `text_to_image` and `plate_logo`, or `none` to start only the gateway.
 - The gateway mounts `models/image_generation`, exposes text-to-image and plate-logo replacement resources through the `image_generation` platform capability, and delegates to the enabled worker containers.
@@ -203,7 +230,8 @@ Split local runtime selection:
 
 `searxng` behavior:
 
-- `WEB_SEARCH_ENABLED` defaults to `true`; set it to `false` to skip the optional web-search provider while keeping MCP Gateway available.
+- `web_search` is enabled by default because `VANESSA_ENABLED_OPTIONAL_SERVICES` defaults to `web_search`.
+- Remove `web_search` from `VANESSA_ENABLED_OPTIONAL_SERVICES` to skip the optional web-search provider while keeping MCP Gateway available.
 - `WEB_SEARCH_URL` defaults to `http://searxng:8080`.
 - `searxng` stays internal to Docker and is called only by the backend `web_search` adapter.
 - Local config lives in `infra/searxng/settings.yml`; JSON output must remain enabled for web search.
@@ -267,6 +295,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `llama.cpp local`, activate `Local llama.cpp`, and confirm inference still succeeds
 18. Optional Qdrant provider proof:
+   - keep `qdrant` in `VANESSA_ENABLED_OPTIONAL_SERVICES`
    - set `QDRANT_URL=http://qdrant:6333`
    - run `./ops/local-staging/start.sh`
    - login as `sample-superadmin`, open Platform control, validate `Qdrant local`, activate `Local Qdrant`, and confirm retrieval still succeeds
@@ -277,6 +306,7 @@ Override these defaults in `ops/local-staging/.env.local` if needed.
    - test `tool.web_search` from Catalog Control and confirm real URLs are returned
    - execute an agent that references `tool.web_search` while the runtime profile is `online`
 20. Optional image-analysis proof:
+   - keep `image_analysis` in `VANESSA_ENABLED_OPTIONAL_SERVICES`
    - set `IMAGE_ANALYSIS_URL=http://image_analysis:8090`
    - start the stack, then validate `Image analysis local` from Platform control
    - confirm the four bootstrapped image ModelOps resources are active and bound as task defaults

@@ -14,6 +14,8 @@ Local staging scripts provide a consistent Ubuntu workflow for staging-like vali
 
 Use `./ops/local-staging/compose.sh ...` for ad hoc compose commands so local staging keeps the same CPU/GPU runtime override resolution as the launcher scripts. Raw `docker compose -f infra/docker-compose.yml ...` can recreate split vLLM runtime containers with the wrong image on CPU-only hosts.
 
+`ops/local-staging/*` is now a compatibility wrapper over the canonical deployment launcher with `VANESSA_DEPLOYMENT_MODE=local_staging`.
+
 ## Useful Operations
 
 - Restart one service quickly:
@@ -46,10 +48,14 @@ Use `./ops/local-staging/compose.sh ...` for ad hoc compose commands so local st
 - Logs:
   - `./ops/local-staging/logs.sh --tail 200`
 - Optional provider proofs:
-  - Set `LLAMA_CPP_URL` to enable the alternate local LLM provider.
-  - Set `QDRANT_URL` to enable the alternate local vector-store provider.
+  - Add `llama_cpp` to `VANESSA_ENABLED_OPTIONAL_SERVICES` to start the alternate local LLM provider.
+  - Add `qdrant` to `VANESSA_ENABLED_OPTIONAL_SERVICES` to start the alternate local vector-store provider.
+- Env ownership:
+  - Launcher env defaults live under `ops/deploy/env/local-staging.env`.
+  - Runtime/container env defaults live under `infra/env/local-staging.env`.
+  - `ops/local-staging/.env.local` and `infra/.env.local` are still supported as local compatibility overrides.
 - MCP gateway is required in local staging for authorized MCP server exposures such as `mcp.web_search` and `mcp.python_exec`. It is exposed on `http://localhost:6100` on the host so it does not collide with Weaviate on `8080`.
-- SearXNG is enabled by default as the token-free provider for the optional backend-owned `web_search` capability. It stays internal to Docker at `http://searxng:8080`; only backend should call it. Search requires internet access even though both services run locally. Set `WEB_SEARCH_ENABLED=false` to skip it.
+- SearXNG is enabled by default through `VANESSA_ENABLED_OPTIONAL_SERVICES=web_search`. It stays internal to Docker at `http://searxng:8080`; only backend should call it. Search requires internet access even though both services run locally. Remove `web_search` from `VANESSA_ENABLED_OPTIONAL_SERVICES` to skip it.
 
 For complete script flags, environment variables, and troubleshooting details, see the canonical guide in [`ops/local-staging/README.md`](https://github.com/raul-arrabales/VANESSA/blob/main/ops/local-staging/README.md).
 
