@@ -76,6 +76,9 @@ export type McpServerFormState = CatalogMcpServerMutationInput & {
 function agentRuntimePromptsFromDefaults(defaults: CatalogDefaults | null): CatalogAgentMutationInput["runtime_prompts"] {
   return {
     retrieval_context: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+    workflow_input_extraction: defaults?.agent.runtime_prompts.workflow_input_extraction ?? "",
+    workflow_tool_arguments: defaults?.agent.runtime_prompts.workflow_tool_arguments ?? "",
+    workflow_output_response: defaults?.agent.runtime_prompts.workflow_output_response ?? "",
   };
 }
 
@@ -206,6 +209,9 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
     instructions: agent.spec.instructions,
     runtime_prompts: {
       retrieval_context: agent.spec.runtime_prompts?.retrieval_context ?? "",
+      workflow_input_extraction: agent.spec.runtime_prompts?.workflow_input_extraction ?? "",
+      workflow_tool_arguments: agent.spec.runtime_prompts?.workflow_tool_arguments ?? "",
+      workflow_output_response: agent.spec.runtime_prompts?.workflow_output_response ?? "",
     },
     default_model_ref: agent.spec.default_model_ref,
     tool_refs: agent.spec.tool_refs,
@@ -404,6 +410,9 @@ export function useCatalogControl(token: string) {
         instructions: agentForm.instructions,
         runtime_prompts: {
           retrieval_context: agentForm.runtime_prompts.retrieval_context,
+          workflow_input_extraction: agentForm.runtime_prompts.workflow_input_extraction,
+          workflow_tool_arguments: agentForm.runtime_prompts.workflow_tool_arguments,
+          workflow_output_response: agentForm.runtime_prompts.workflow_output_response,
         },
         default_model_ref: agentForm.default_model_ref,
         tool_refs: agentForm.tool_refs,
@@ -497,6 +506,9 @@ export function useCatalogControl(token: string) {
         instructions: agentForm.instructions,
         runtime_prompts: {
           retrieval_context: agentForm.runtime_prompts.retrieval_context,
+          workflow_input_extraction: agentForm.runtime_prompts.workflow_input_extraction,
+          workflow_tool_arguments: agentForm.runtime_prompts.workflow_tool_arguments,
+          workflow_output_response: agentForm.runtime_prompts.workflow_output_response,
         },
         default_model_ref: agentForm.default_model_ref?.trim() ? agentForm.default_model_ref.trim() : null,
         tool_refs: agentForm.tool_refs,

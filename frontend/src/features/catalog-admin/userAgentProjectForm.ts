@@ -9,6 +9,9 @@ export type AgentProjectFormState = {
   description: string;
   instructions: string;
   retrievalContext: string;
+  workflowInputExtractionPrompt: string;
+  workflowToolArgumentsPrompt: string;
+  workflowOutputResponsePrompt: string;
   defaultModelRef: string;
   agentType: "" | "workflow" | "planner" | "react";
   channelType: "" | "vanessa_webapp";
@@ -39,6 +42,18 @@ function normalizeName(value: string): string {
 
 function workflowRetrievalContext(): string {
   return "";
+}
+
+function workflowInputExtractionPrompt(defaults: CatalogDefaults | null): string {
+  return defaults?.agent.runtime_prompts.workflow_input_extraction ?? "";
+}
+
+function workflowToolArgumentsPrompt(defaults: CatalogDefaults | null): string {
+  return defaults?.agent.runtime_prompts.workflow_tool_arguments ?? "";
+}
+
+function workflowOutputResponsePrompt(defaults: CatalogDefaults | null): string {
+  return defaults?.agent.runtime_prompts.workflow_output_response ?? "";
 }
 
 function nextAvailableNumberedValue(prefix: string, existingValues: string[], normalize: (value: string) => string, separator: "-" | " "): string {
@@ -78,6 +93,9 @@ export function buildDefaultAgentProjectForm(
     description: DEFAULT_WORKFLOW_AGENT_DESCRIPTION,
     instructions: "",
     retrievalContext: workflowRetrievalContext(),
+    workflowInputExtractionPrompt: workflowInputExtractionPrompt(_defaults),
+    workflowToolArgumentsPrompt: workflowToolArgumentsPrompt(_defaults),
+    workflowOutputResponsePrompt: workflowOutputResponsePrompt(_defaults),
     defaultModelRef: "",
     agentType: "workflow",
     channelType: "vanessa_webapp",
@@ -121,6 +139,9 @@ export function buildGuidedUserAgentCreateForm(
     description: "",
     instructions: "",
     retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+    workflowInputExtractionPrompt: workflowInputExtractionPrompt(defaults),
+    workflowToolArgumentsPrompt: workflowToolArgumentsPrompt(defaults),
+    workflowOutputResponsePrompt: workflowOutputResponsePrompt(defaults),
     defaultModelRef: "",
     agentType: "",
     channelType: "",
@@ -164,6 +185,9 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     description: project.spec.description,
     instructions: project.spec.instructions,
     retrievalContext: project.spec.runtime_prompts.retrieval_context ?? "",
+    workflowInputExtractionPrompt: project.spec.runtime_prompts.workflow_input_extraction ?? workflowInputExtractionPrompt(null),
+    workflowToolArgumentsPrompt: project.spec.runtime_prompts.workflow_tool_arguments ?? workflowToolArgumentsPrompt(null),
+    workflowOutputResponsePrompt: project.spec.runtime_prompts.workflow_output_response ?? workflowOutputResponsePrompt(null),
     defaultModelRef: project.spec.default_model_ref ?? "",
     agentType: project.spec.agent_type,
     channelType: project.spec.channel_type,
@@ -223,19 +247,21 @@ export function toAgentProjectMutationInput(
   const interfaceType = (form.interfaceType || "chat") as "chat";
   const workflowDefinition = workflowDefinitionFromForm(form);
   const trimmedRetrievalContext = form.retrievalContext.trim();
+  const trimmedWorkflowInputExtractionPrompt = form.workflowInputExtractionPrompt.trim();
+  const trimmedWorkflowToolArgumentsPrompt = form.workflowToolArgumentsPrompt.trim();
+  const trimmedWorkflowOutputResponsePrompt = form.workflowOutputResponsePrompt.trim();
   return {
     ...(includeId && id ? { id } : {}),
     visibility: form.visibility,
     name: form.name.trim(),
     description: form.description.trim(),
     instructions: agentType === "workflow" ? "" : form.instructions.trim(),
-    ...(agentType === "workflow" && !trimmedRetrievalContext
-      ? {}
-      : {
-          runtime_prompts: {
-            retrieval_context: trimmedRetrievalContext,
-          },
-        }),
+    runtime_prompts: {
+      retrieval_context: trimmedRetrievalContext,
+      workflow_input_extraction: trimmedWorkflowInputExtractionPrompt,
+      workflow_tool_arguments: trimmedWorkflowToolArgumentsPrompt,
+      workflow_output_response: trimmedWorkflowOutputResponsePrompt,
+    },
     default_model_ref: form.defaultModelRef.trim() || null,
     tool_refs: [],
     mcp_server_refs: mcpServerRefsFromWorkflow(workflowDefinition.actions),

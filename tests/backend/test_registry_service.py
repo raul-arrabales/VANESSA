@@ -53,6 +53,8 @@ def test_agent_spec_rejects_empty_runtime_prompt():
 
 
 def test_workflow_agent_spec_accepts_empty_runtime_prompt(monkeypatch: pytest.MonkeyPatch):
+    created_specs: list[dict[str, object]] = []
+
     monkeypatch.setattr(
         registry_service,
         "create_registry_entity",
@@ -61,7 +63,7 @@ def test_workflow_agent_spec_accepts_empty_runtime_prompt(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         registry_service,
         "create_registry_version",
-        lambda *_args, **_kwargs: {"entity_id": "agent.workflow", "version": "v1"},
+        lambda *_args, spec_json, **_kwargs: created_specs.append(spec_json) or {"entity_id": "agent.workflow", "version": "v1"},
     )
 
     created = registry_service.create_entity_with_version(
@@ -85,6 +87,7 @@ def test_workflow_agent_spec_accepts_empty_runtime_prompt(monkeypatch: pytest.Mo
     )
 
     assert created["entity"]["entity_type"] == "agent"
+    assert created_specs[0]["runtime_prompts"] == {"retrieval_context": ""}
 
 
 def test_tool_spec_accepts_web_search_execution_backend(monkeypatch: pytest.MonkeyPatch):

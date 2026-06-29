@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.application import agent_projects_service
+from app.services.agent_prompt_defaults import normalize_agent_runtime_prompts
 
 
 def _project_row() -> dict[str, object]:
@@ -17,7 +18,10 @@ def _project_row() -> dict[str, object]:
         "name": "Support Agent",
         "description": "Handles support workflows.",
         "instructions": "Be helpful.",
-        "runtime_prompts": {"retrieval_context": "Use retrieved context for support answers."},
+        "runtime_prompts": normalize_agent_runtime_prompts(
+            {"retrieval_context": "Use retrieved context for support answers."},
+            agent_type="workflow",
+        ),
         "default_model_ref": "safe-small",
         "tool_refs": ["tool.web_search"],
         "mcp_server_refs": ["support_search"],
@@ -136,9 +140,9 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
         },
     )
 
-    assert created_specs[0]["runtime_prompts"] == {"retrieval_context": ""}
+    assert created_specs[0]["runtime_prompts"] == normalize_agent_runtime_prompts({}, agent_type="workflow")
     assert created_specs[0]["instructions"] == ""
-    assert project["spec"]["runtime_prompts"] == {"retrieval_context": ""}
+    assert project["spec"]["runtime_prompts"] == normalize_agent_runtime_prompts({}, agent_type="workflow")
 
 
 def test_create_agent_project_allows_empty_workflow_retrieval_context(monkeypatch):
@@ -174,8 +178,8 @@ def test_create_agent_project_allows_empty_workflow_retrieval_context(monkeypatc
         },
     )
 
-    assert created_specs[0]["runtime_prompts"] == {"retrieval_context": ""}
-    assert project["spec"]["runtime_prompts"] == {"retrieval_context": ""}
+    assert created_specs[0]["runtime_prompts"] == normalize_agent_runtime_prompts({"retrieval_context": ""}, agent_type="workflow")
+    assert project["spec"]["runtime_prompts"] == normalize_agent_runtime_prompts({"retrieval_context": ""}, agent_type="workflow")
 
 
 def test_create_agent_project_rejects_legacy_workflow_steps(monkeypatch):
@@ -241,7 +245,10 @@ def test_publish_agent_project_compiles_catalog_payload_and_persists_published_a
     )
 
     assert create_calls[0]["owner_user_id"] == 10
-    assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": "Use retrieved context for support answers."}
+    assert create_calls[0]["payload"]["runtime_prompts"] == normalize_agent_runtime_prompts(
+        {"retrieval_context": "Use retrieved context for support answers."},
+        agent_type="workflow",
+    )
     assert create_calls[0]["payload"]["tool_refs"] == ["tool.web_search"]
     assert create_calls[0]["payload"]["agent_type"] == "workflow"
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
@@ -276,7 +283,7 @@ def test_publish_workflow_agent_project_allows_empty_instructions_and_retrieval_
     )
 
     assert create_calls[0]["payload"]["instructions"] == ""
-    assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": ""}
+    assert create_calls[0]["payload"]["runtime_prompts"] == normalize_agent_runtime_prompts({}, agent_type="workflow")
     assert create_calls[0]["payload"]["agent_type"] == "workflow"
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
 

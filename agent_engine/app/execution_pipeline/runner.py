@@ -27,6 +27,7 @@ from ..services.runtime_client import (
     LlmRuntimeClientError,
     build_llm_runtime_client,
 )
+from backend.app.services.agent_prompt_defaults import normalize_agent_runtime_prompts
 from ..tool_runtime.dispatch import (
     build_tool_definition,
     invoke_tool_call,
@@ -108,7 +109,10 @@ def _prepend_agent_instructions(messages: list[dict[str, Any]], *, agent_spec: d
 
 
 def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
-    runtime_prompts = agent_spec.get("runtime_prompts") if isinstance(agent_spec.get("runtime_prompts"), dict) else {}
+    runtime_prompts = normalize_agent_runtime_prompts(
+        agent_spec.get("runtime_prompts"),
+        agent_type=agent_spec.get("agent_type"),
+    )
     retrieval_context = str(runtime_prompts.get("retrieval_context") or "").strip()
     return retrieval_context or None
 
@@ -239,6 +243,62 @@ def _store_output_variables(state: dict[str, Any], action: dict[str, Any], tool_
         variables[name] = extracted if isinstance(extracted, str) else compact_payload(extracted)
 
 
+def _workflow_runtime_prompts(agent_spec: dict[str, Any]) -> dict[str, str]:
+    return normalize_agent_runtime_prompts(
+        agent_spec.get("runtime_prompts"),
+        agent_type=agent_spec.get("agent_type"),
+    )
+
+
+def _workflow_variable_context(
+    *,
+    variables: list[dict[str, Any]],
+    state: dict[str, Any],
+) -> list[dict[str, Any]]:
+    state_variables = state.get("variables") if isinstance(state.get("variables"), dict) else {}
+    context: list[dict[str, Any]] = []
+    for variable in variables:
+        if not isinstance(variable, dict):
+            continue
+        name = str(variable.get("name") or "").strip()
+        if not name:
+            continue
+        payload = {
+            "name": name,
+            "type": str(variable.get("type") or "text").strip() or "text",
+            "label": str(variable.get("label") or name).strip() or name,
+            "required": bool(variable.get("required", True)),
+        }
+        guidance = str(variable.get("guidance") or "").strip()
+        if guidance:
+            payload["guidance"] = guidance
+        if name in state_variables:
+            payload["value"] = state_variables.get(name)
+        context.append(payload)
+    return context
+
+
+def _workflow_reference_guidance() -> str:
+    return "\n".join(
+        [
+            "Workflow variable reference syntax:",
+            "- Treat tokens such as {{user_name}} as references to workflow variables by name.",
+            "- Use the structured workflow variable context below as the source of truth for names, types, labels, guidance, and current values.",
+        ]
+    )
+
+
+def _workflow_available_variables(actions: list[dict[str, Any]], *, before_index: int) -> list[dict[str, Any]]:
+    variables: list[dict[str, Any]] = []
+    for action in actions[:before_index]:
+        action_type = str(action.get("type") or "").strip()
+        if action_type == "get_user_input":
+            variables.extend([dict(variable) for variable in action.get("variables", []) if isinstance(variable, dict)])
+        elif action_type == "mcp_tool":
+            variables.extend([dict(variable) for variable in action.get("output_variables", []) if isinstance(variable, dict)])
+    return variables
+
+
 def _execute_workflow_agent(
     *,
     context: ExecutionContext,
@@ -258,6 +318,7 @@ def _execute_workflow_agent(
     tool_lookup = _tool_entity_lookup(agent_tools)
     runtime_snapshot = context.platform_runtime if isinstance(context.platform_runtime, dict) else {}
     agent_domain = str(agent_spec.get("agent_domain") or "default").strip() or "default"
+    workflow_runtime_prompts = _workflow_runtime_prompts(agent_spec)
     requested_model = str(context.execution_input.get("model") or agent_spec.get("default_model_ref") or "").strip() or None
     state = _workflow_state_from_input(context.execution_input)
     tool_calls: list[dict[str, Any]] = []
@@ -268,36 +329,42 @@ def _execute_workflow_agent(
         action_type = str(action.get("type") or "")
         if action_type == "get_user_input":
             variables = [item for item in action.get("variables", []) if isinstance(item, dict)]
+            variable_context = _workflow_variable_context(variables=variables, state=state)
             missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
             status_id = progress.start(kind="thinking", label=f"Inspecting workflow input {action_index + 1}")
-            try:
-                parsed, model_call = _llm_json(
-                    context=context,
-                    runtime_snapshot=runtime_snapshot,
-                    requested_model=requested_model,
-                    system_prompt=(
-                        "You inspect a chat conversation for required workflow variables. "
-                        "Return only JSON with complete:boolean, variables:object, missing:array, question:string."
-                    ),
-                    user_prompt=(
-                        f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
-                        f"Required variables:\n{dumps(variables)}\n\n"
-                        f"Existing variables:\n{dumps(state['variables'])}"
-                    ),
-                )
-                if model_call:
-                    model_calls.append(model_call)
-            except LlmRuntimeClientError:
-                parsed = {}
-            for name, value in (parsed.get("variables") if isinstance(parsed.get("variables"), dict) else {}).items():
-                if str(name) in missing and str(value).strip():
-                    state["variables"][str(name)] = str(value).strip()
-            missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
+            parsed: dict[str, Any] = {}
+            if missing:
+                try:
+                    parsed, model_call = _llm_json(
+                        context=context,
+                        runtime_snapshot=runtime_snapshot,
+                        requested_model=requested_model,
+                        system_prompt=workflow_runtime_prompts["workflow_input_extraction"],
+                        user_prompt=(
+                            f"Current workflow action prompt:\n{str(action.get('prompt') or '').strip()}\n\n"
+                            f"{_workflow_reference_guidance()}\n\n"
+                            f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+                            f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+                            f"Existing variables:\n{dumps(state['variables'])}"
+                        ),
+                    )
+                    if model_call:
+                        model_calls.append(model_call)
+                except LlmRuntimeClientError:
+                    parsed = {}
+                for name, value in (parsed.get("variables") if isinstance(parsed.get("variables"), dict) else {}).items():
+                    if str(name) in missing and str(value).strip():
+                        state["variables"][str(name)] = str(value).strip()
+                missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
             if missing:
                 question = str(parsed.get("question") or "").strip()
                 if not question:
+                    action_prompt = str(action.get("prompt") or "").strip()
                     labels = [str(item.get("label") or item.get("name") or "").strip() for item in variables if str(item.get("name") or "") in missing]
-                    question = "Please provide: " + ", ".join(labels)
+                    if action_prompt:
+                        question = action_prompt
+                    elif labels:
+                        question = "Please provide: " + ", ".join(labels)
                 state.update({"action_index": action_index, "status": "awaiting_user_input"})
                 progress.complete(status_id, kind="thinking", label="Workflow is awaiting user input", details={"missing": missing})
                 return ExecutionResult(
@@ -332,16 +399,24 @@ def _execute_workflow_agent(
                 if isinstance(binding, dict)
             }
             static_arguments = action.get("static_arguments") if isinstance(action.get("static_arguments"), dict) else {}
+            available_variables = _workflow_available_variables(actions, before_index=action_index)
+            input_variables = _workflow_variable_context(
+                variables=available_variables,
+                state=state,
+            )
             try:
                 parsed, model_call = _llm_json(
                     context=context,
                     runtime_snapshot=runtime_snapshot,
                     requested_model=requested_model,
-                    system_prompt="Create schema-valid MCP tool arguments. Return only a JSON object.",
+                    system_prompt=workflow_runtime_prompts["workflow_tool_arguments"],
                     user_prompt=(
+                        f"Current workflow action name: {str(action.get('name') or tool_name or slug)}\n"
                         f"Tool name: {tool_name}\n"
+                        f"{_workflow_reference_guidance()}\n\n"
                         f"Input schema: {dumps(tool_spec.get('input_schema') or {})}\n"
-                        f"Selected variables: {dumps(bound_values)}"
+                        f"Workflow variable context:\n{dumps(input_variables)}\n\n"
+                        f"Selected variables:\n{dumps(bound_values)}"
                     ),
                 )
                 if model_call:
@@ -383,6 +458,16 @@ def _execute_workflow_agent(
             continue
 
         if action_type == "send_output":
+            available_variables = _workflow_available_variables(actions, before_index=action_index)
+            selected_variable_names = {str(variable_name).strip() for variable_name in action.get("variable_refs", []) if str(variable_name).strip()}
+            selected_variables = _workflow_variable_context(
+                variables=[
+                    variable
+                    for variable in available_variables
+                    if str(variable.get("name") or "").strip() in selected_variable_names
+                ],
+                state=state,
+            )
             selected = {
                 variable: state["variables"].get(str(variable))
                 for variable in action.get("variable_refs", [])
@@ -393,9 +478,11 @@ def _execute_workflow_agent(
                     context=context,
                     runtime_snapshot=runtime_snapshot,
                     requested_model=requested_model,
-                    system_prompt="Compose the final workflow chat response. Return only JSON with response:string.",
+                    system_prompt=workflow_runtime_prompts["workflow_output_response"],
                     user_prompt=(
                         f"Delivery instruction: {str(action.get('instruction') or '')}\n"
+                        f"{_workflow_reference_guidance()}\n\n"
+                        f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
                         f"Variables: {dumps(selected)}\n"
                         f"Conversation:\n{_message_text(context.conversation.messages)}"
                     ),

@@ -8,6 +8,9 @@ export type CatalogAgentSpec = {
   instructions: string;
   runtime_prompts: {
     retrieval_context?: string;
+    workflow_input_extraction?: string;
+    workflow_tool_arguments?: string;
+    workflow_output_response?: string;
   };
   default_model_ref: string | null;
   tool_refs: string[];
@@ -27,6 +30,9 @@ export type CatalogDefaults = {
   agent: {
     runtime_prompts: {
       retrieval_context: string;
+      workflow_input_extraction: string;
+      workflow_tool_arguments: string;
+      workflow_output_response: string;
     };
   };
 };

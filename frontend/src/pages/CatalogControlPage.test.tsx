@@ -57,6 +57,11 @@ vi.mock("../api/agentProjects", () => ({
 
 const modelApi = await import("../api/modelops");
 const apiRetrievalDefault = "Use API-provided retrieval instructions.";
+const workflowPromptDefaults = {
+  workflow_input_extraction: "Extract workflow variables.",
+  workflow_tool_arguments: "Compose workflow tool arguments.",
+  workflow_output_response: "Compose workflow output response.",
+};
 
 const agentFixture = {
   id: "agent.alpha",
@@ -73,6 +78,7 @@ const agentFixture = {
     instructions: "Be concise.",
     runtime_prompts: {
       retrieval_context: "Use retrieved context and cite references.",
+      ...workflowPromptDefaults,
     },
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
@@ -91,7 +97,7 @@ const agentProjectFixture = {
     name: "Agent Alpha",
     description: "Agent description",
     instructions: "Be concise.",
-    runtime_prompts: { retrieval_context: "Use retrieved context and cite references." },
+    runtime_prompts: { retrieval_context: "Use retrieved context and cite references.", ...workflowPromptDefaults },
     default_model_ref: "safe-small",
     tool_refs: [],
     mcp_server_refs: [],
@@ -483,6 +489,7 @@ describe("CatalogControlPage", () => {
       agent: {
         runtime_prompts: {
           retrieval_context: apiRetrievalDefault,
+          ...workflowPromptDefaults,
         },
       },
     });
@@ -635,6 +642,7 @@ describe("CatalogControlPage", () => {
     await user.selectOptions(screen.getByLabelText("Add workflow action"), "get_user_input");
     await user.type(screen.getByLabelText("Variable name"), "search_query");
     await user.type(screen.getByLabelText("Variable label"), "Search query");
+    await user.click(screen.getByRole("button", { name: "Insert variable token search_query" }));
     await user.selectOptions(screen.getByLabelText("Add workflow action"), "mcp_tool");
     await user.selectOptions(screen.getByLabelText("MCP server"), "web_search");
     await user.selectOptions(screen.getByLabelText("query"), "search_query");
@@ -646,17 +654,16 @@ describe("CatalogControlPage", () => {
 
     await waitFor(() => {
       expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          runtime_prompts: expect.anything(),
-        }),
-        "token",
-      );
-      expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "workflow-agent-1",
           name: "Workflow Agent Support",
           description: "Catalog agent",
           instructions: "",
+          runtime_prompts: expect.objectContaining({
+            workflow_input_extraction: expect.stringContaining("{{search_query}}"),
+            workflow_tool_arguments: expect.any(String),
+            workflow_output_response: expect.any(String),
+          }),
           agent_type: "workflow",
           channel_type: "vanessa_webapp",
           interface_type: "chat",

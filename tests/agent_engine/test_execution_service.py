@@ -27,6 +27,11 @@ def _workflow_agent_spec() -> dict[str, Any]:
             "agent_type": "workflow",
             "default_model_ref": "model.alpha",
             "mcp_server_refs": [],
+            "runtime_prompts": {
+                "workflow_input_extraction": "Custom input extraction prompt.",
+                "workflow_tool_arguments": "Custom tool argument prompt.",
+                "workflow_output_response": "Custom output response prompt.",
+            },
             "workflow_definition": {
                 "version": 2,
                 "actions": [
@@ -59,6 +64,8 @@ def test_workflow_agent_pauses_when_user_input_is_missing(monkeypatch: pytest.Mo
 
     class FakeClient:
         def chat_completion(self, **kwargs):
+            assert kwargs["messages"][0]["content"][0]["text"] == "Custom input extraction prompt."
+            assert "Required workflow variables" in kwargs["messages"][-1]["content"][0]["text"]
             return {
                 "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "question": "What is your name?"}',
                 "status_code": 200,
@@ -95,12 +102,15 @@ def test_workflow_agent_resumes_and_completes_from_stored_state(monkeypatch: pyt
     class FakeClient:
         def chat_completion(self, **kwargs):
             prompt = kwargs["messages"][-1]["content"][0]["text"]
-            if "Required variables" in prompt:
+            if "Required workflow variables" in prompt:
+                assert kwargs["messages"][0]["content"][0]["text"] == "Custom input extraction prompt."
+                assert "{{user_name}}" in prompt
                 return {
                     "output_text": '{"complete": true, "variables": {"user_name": "Ada"}, "missing": [], "question": ""}',
                     "status_code": 200,
                     "requested_model": kwargs["requested_model"],
                 }
+            assert kwargs["messages"][0]["content"][0]["text"] == "Custom output response prompt."
             return {
                 "output_text": '{"response": "Hello Ada."}',
                 "status_code": 200,
@@ -129,6 +139,189 @@ def test_workflow_agent_resumes_and_completes_from_stored_state(monkeypatch: pyt
     assert result["output_text"] == "Hello Ada."
     assert result["workflow_status"] == "completed"
     assert result["workflow_state"]["variables"]["user_name"] == "Ada"
+
+
+def test_workflow_agent_remains_awaiting_input_when_llm_does_not_extract_missing_variable(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(execution_service, "resolve_agent_spec", lambda *, agent_id: _workflow_agent_spec())
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def chat_completion(self, **kwargs):
+            prompt = kwargs["messages"][-1]["content"][0]["text"]
+            if "Required workflow variables" in prompt:
+                return {
+                    "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "question": "What is your name?"}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            return {
+                "output_text": '{"response": "Hello Ada."}',
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "Ada",
+                "messages": [
+                    {"role": "assistant", "content": [{"type": "text", "text": "What is your name?"}]},
+                    {"role": "user", "content": [{"type": "text", "text": "Ada"}]},
+                ],
+                "workflow_state": {"version": 2, "action_index": 0, "variables": {}, "action_outputs": {}, "status": "awaiting_user_input"},
+            },
+            "platform_runtime": {"capabilities": {"llm_inference": {"slug": "vllm", "provider_key": "vllm_local"}}},
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "What is your name?"
+    assert result["workflow_status"] == "awaiting_user_input"
+    assert result["workflow_state"]["variables"] == {}
+
+
+def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {
+            "entity_id": "agent.workflow",
+            "current_version": "v1",
+            "current_spec": {
+                "agent_type": "workflow",
+                "default_model_ref": "model.alpha",
+                "mcp_server_refs": ["web_search"],
+                "runtime_prompts": {
+                    "workflow_input_extraction": "Custom input extraction prompt.",
+                    "workflow_tool_arguments": "Custom tool argument prompt.",
+                    "workflow_output_response": "Custom output response prompt.",
+                },
+                "workflow_definition": {
+                    "version": 2,
+                    "actions": [
+                        {
+                            "id": "input_1",
+                            "type": "get_user_input",
+                            "name": "Collect query",
+                            "prompt": "What should I search for?",
+                            "variables": [{"name": "query_text", "label": "Query text", "type": "text", "required": True}],
+                        },
+                        {
+                            "id": "tool_1",
+                            "type": "mcp_tool",
+                            "name": "Run search",
+                            "mcp_server_slug": "web_search",
+                            "exposed_tool_name": "web_search",
+                            "input_bindings": {"query": {"variable": "query_text"}},
+                            "output_variables": [{"name": "search_results", "label": "Search results", "type": "text", "required": True}],
+                        },
+                        {
+                            "id": "output_1",
+                            "type": "send_output",
+                            "name": "Respond",
+                            "instruction": "Summarize the search results.",
+                            "variable_refs": ["search_results"],
+                        },
+                    ],
+                },
+                "runtime_constraints": {},
+            },
+        },
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_tools",
+        lambda **_kwargs: [
+            {
+                "current_spec": {
+                    "slug": "web_search",
+                    "name": "Web search",
+                    "exposed_tool_name": "web_search",
+                    "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
+                    "enabled": True,
+                },
+                "backing_tool": {
+                    "current_spec": {
+                        "execution_backend": "mcp_gateway_web_search",
+                        "offline_compatible": False,
+                    }
+                },
+            }
+        ],
+    )
+
+    class FakeClient:
+        def chat_completion(self, **kwargs):
+            system_prompt = kwargs["messages"][0]["content"][0]["text"]
+            user_prompt = kwargs["messages"][-1]["content"][0]["text"]
+            if "Required workflow variables" in user_prompt:
+                return {
+                    "output_text": '{"complete": true, "variables": {"query_text": "coffee beans"}, "missing": [], "question": ""}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            if "Input schema" in user_prompt:
+                assert system_prompt == "Custom tool argument prompt."
+                assert '"name": "query_text"' in user_prompt
+                assert "{{user_name}}" in user_prompt
+                return {
+                    "output_text": '{"query": "coffee beans"}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            assert system_prompt == "Custom output response prompt."
+            return {
+                "output_text": '{"response": "Found coffee bean results."}',
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(
+        execution_service,
+        "invoke_tool_call",
+        lambda **_kwargs: (
+            {"status_code": 200, "tool_name": "web_search"},
+            {"output_text": "Coffee bean result set"},
+        ),
+    )
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "Search for coffee beans",
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "Search for coffee beans"}]}],
+            },
+            "platform_runtime": {
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm", "provider_key": "vllm_local"},
+                    "mcp_runtime": {"slug": "mcp", "provider_key": "mcp_gateway_local"},
+                }
+            },
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "Found coffee bean results."
+    assert result["workflow_status"] == "completed"
 
 
 def test_execution_state_machine_success(monkeypatch: pytest.MonkeyPatch):

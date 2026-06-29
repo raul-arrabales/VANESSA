@@ -873,8 +873,13 @@ def test_preview_catalog_workflow_agent_prompt_omits_retrieval_context():
         }
     )
 
-    assert preview["prompt_preview"]["messages"] == []
-    assert preview["prompt_preview"]["text"] == ""
+    labels = [message["label"] for message in preview["prompt_preview"]["messages"]]
+    assert labels == [
+        "workflow_input_extraction",
+        "workflow_tool_arguments",
+        "workflow_output_response",
+    ]
+    assert "workflow input extraction" in preview["prompt_preview"]["text"]
 
 
 def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(monkeypatch: pytest.MonkeyPatch):

@@ -162,7 +162,16 @@ vi.mock("./api/playgrounds", () => ({
   streamPlaygroundMessage: vi.fn(),
 }));
 vi.mock("./api/catalog", () => ({
-  getCatalogDefaults: vi.fn(async () => ({ agent: { runtime_prompts: { retrieval_context: "API retrieval default" } } })),
+  getCatalogDefaults: vi.fn(async () => ({
+    agent: {
+      runtime_prompts: {
+        retrieval_context: "API retrieval default",
+        workflow_input_extraction: "Extract workflow variables.",
+        workflow_tool_arguments: "Compose workflow tool arguments.",
+        workflow_output_response: "Compose workflow output response.",
+      },
+    },
+  })),
   listCatalogAgents: vi.fn(async () => []),
   createCatalogAgent: vi.fn(),
   updateCatalogAgent: vi.fn(),
