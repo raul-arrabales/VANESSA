@@ -114,7 +114,29 @@ def create_agent_project(
                     created_at,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, NULL, 1, %s, %s)
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s::jsonb,
+                    %s,
+                    %s::jsonb,
+                    %s::jsonb,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s::jsonb,
+                    %s::jsonb,
+                    %s::jsonb,
+                    %s,
+                    NULL,
+                    1,
+                    %s,
+                    %s
+                )
                 """,
                 (
                     project_id,
