@@ -27,7 +27,6 @@ from ..services.runtime_client import (
     LlmRuntimeClientError,
     build_llm_runtime_client,
 )
-from backend.app.services.agent_prompt_defaults import normalize_agent_runtime_prompts
 from ..tool_runtime.dispatch import (
     build_tool_definition,
     invoke_tool_call,
@@ -41,6 +40,38 @@ from .progress import ProgressRecorder, compact_payload, summarize_results, trim
 from .types import ConversationState, ExecutionContext, ExecutionResult
 
 _MAX_TOOL_CALL_ROUNDS = 3
+_WORKFLOW_AGENT_TYPE = "workflow"
+_DEFAULT_RETRIEVAL_CONTEXT_PROMPT = "\n".join(
+    [
+        "Use the following retrieved context if it is relevant to the user's request.",
+        "When you use retrieved context, cite the supporting reference inline with bracketed numeric citations such as [1] or [1, 2].",
+        "Do not cite a reference unless it supports the sentence that uses the citation.",
+    ]
+)
+_DEFAULT_WORKFLOW_INPUT_EXTRACTION_PROMPT = "\n".join(
+    [
+        "Inspect the workflow conversation and populate the required workflow variables from user-provided information.",
+        "Use the workflow variable context exactly as provided, including variable names, types, labels, guidance, and current values.",
+        "When the prompt references a token such as {{user_name}}, treat it as the workflow variable named user_name.",
+        "Return only JSON with complete:boolean, variables:object, missing:array, question:string.",
+    ]
+)
+_DEFAULT_WORKFLOW_TOOL_ARGUMENTS_PROMPT = "\n".join(
+    [
+        "Create schema-valid MCP tool arguments for the current workflow action.",
+        "Use the workflow variable context exactly as provided, including variable names, types, labels, guidance, and current values.",
+        "When the prompt references a token such as {{user_name}}, treat it as the workflow variable named user_name.",
+        "Return only a JSON object that matches the tool input schema.",
+    ]
+)
+_DEFAULT_WORKFLOW_OUTPUT_RESPONSE_PROMPT = "\n".join(
+    [
+        "Compose the final workflow chat response for the user.",
+        "Use the workflow variable context exactly as provided, including variable names, types, labels, guidance, and current values.",
+        "When the prompt references a token such as {{user_name}}, treat it as the workflow variable named user_name.",
+        "Return only JSON with response:string.",
+    ]
+)
 
 
 def _iso_now() -> str:
@@ -101,6 +132,29 @@ def _agent_current_spec(agent_entity: dict[str, Any]) -> dict[str, Any]:
     return current_spec if isinstance(current_spec, dict) else {}
 
 
+def _normalize_agent_runtime_prompts(value: Any, *, agent_type: Any = None) -> dict[str, str]:
+    runtime_prompts = value if isinstance(value, dict) else {}
+    normalized_agent_type = str(agent_type or "").strip().lower()
+    defaults = {
+        "retrieval_context": "" if normalized_agent_type == _WORKFLOW_AGENT_TYPE else _DEFAULT_RETRIEVAL_CONTEXT_PROMPT,
+        "workflow_input_extraction": _DEFAULT_WORKFLOW_INPUT_EXTRACTION_PROMPT,
+        "workflow_tool_arguments": _DEFAULT_WORKFLOW_TOOL_ARGUMENTS_PROMPT,
+        "workflow_output_response": _DEFAULT_WORKFLOW_OUTPUT_RESPONSE_PROMPT,
+    }
+    return {
+        "retrieval_context": str(runtime_prompts.get("retrieval_context") or defaults["retrieval_context"]).strip(),
+        "workflow_input_extraction": str(
+            runtime_prompts.get("workflow_input_extraction") or defaults["workflow_input_extraction"]
+        ).strip(),
+        "workflow_tool_arguments": str(
+            runtime_prompts.get("workflow_tool_arguments") or defaults["workflow_tool_arguments"]
+        ).strip(),
+        "workflow_output_response": str(
+            runtime_prompts.get("workflow_output_response") or defaults["workflow_output_response"]
+        ).strip(),
+    }
+
+
 def _prepend_agent_instructions(messages: list[dict[str, Any]], *, agent_spec: dict[str, Any]) -> list[dict[str, Any]]:
     instructions = str(agent_spec.get("instructions") or "").strip()
     if not instructions:
@@ -109,7 +163,7 @@ def _prepend_agent_instructions(messages: list[dict[str, Any]], *, agent_spec: d
 
 
 def _agent_retrieval_instructions(agent_spec: dict[str, Any]) -> str | None:
-    runtime_prompts = normalize_agent_runtime_prompts(
+    runtime_prompts = _normalize_agent_runtime_prompts(
         agent_spec.get("runtime_prompts"),
         agent_type=agent_spec.get("agent_type"),
     )
@@ -244,7 +298,7 @@ def _store_output_variables(state: dict[str, Any], action: dict[str, Any], tool_
 
 
 def _workflow_runtime_prompts(agent_spec: dict[str, Any]) -> dict[str, str]:
-    return normalize_agent_runtime_prompts(
+    return _normalize_agent_runtime_prompts(
         agent_spec.get("runtime_prompts"),
         agent_type=agent_spec.get("agent_type"),
     )
