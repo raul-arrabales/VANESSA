@@ -288,3 +288,16 @@ def set_published_agent_id(
             if cursor.rowcount == 0:
                 return None
     return get_agent_project(database_url, project_id=project_id)
+
+
+def delete_agent_project(database_url: str, *, project_id: str) -> bool:
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM agent_projects
+                WHERE id = %s
+                """,
+                (project_id,),
+            )
+            return cursor.rowcount > 0

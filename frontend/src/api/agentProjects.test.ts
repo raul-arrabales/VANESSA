@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_TOKEN_STORAGE_KEY } from "../auth/storage";
-import { createAgentProject, listAgentProjects } from "./agentProjects";
+import { createAgentProject, deleteAgentProject, listAgentProjects } from "./agentProjects";
 
 describe("agentProjects api", () => {
   beforeEach(() => {
@@ -86,6 +86,25 @@ describe("agentProjects api", () => {
       "/api/v1/agent-projects",
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer stored-token" }),
+        credentials: "same-origin",
+      }),
+    );
+  });
+
+  it("deletes a project through the agent projects endpoint", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ deleted: true }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await deleteAgentProject("proj-1", "inline-token");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/agent-projects/proj-1",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({ Authorization: "Bearer inline-token" }),
         credentials: "same-origin",
       }),
     );

@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import {
   createAgentProject,
+  deleteAgentProject,
   listAgentProjects,
   publishAgentProject,
   updateAgentProject,
@@ -24,6 +25,7 @@ type UseUserAgentProjectsControlResult = {
   saving: boolean;
   validatingProjectId: string;
   publishingProjectId: string;
+  deletingProjectId: string;
   selectedProjectId: string | null;
   form: AgentProjectFormState;
   setForm: Dispatch<SetStateAction<AgentProjectFormState>>;
@@ -35,6 +37,7 @@ type UseUserAgentProjectsControlResult = {
   submitForm: () => Promise<AgentProject | null>;
   validateProject: (projectId: string) => Promise<void>;
   publishProject: (projectId: string) => Promise<void>;
+  deleteProject: (project: AgentProject) => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -46,6 +49,7 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   const [saving, setSaving] = useState(false);
   const [validatingProjectId, setValidatingProjectId] = useState("");
   const [publishingProjectId, setPublishingProjectId] = useState("");
+  const [deletingProjectId, setDeletingProjectId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [form, setForm] = useState<AgentProjectFormState>(() => buildGuidedUserAgentCreateForm(null, { existingAgentNames }));
   const [validations, setValidations] = useState<Record<string, AgentProjectValidation>>({});
@@ -182,12 +186,40 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
     }
   };
 
+  const deleteProject = async (project: AgentProject): Promise<void> => {
+    setDeletingProjectId(project.id);
+    try {
+      await deleteAgentProject(project.id, token);
+      setProjects((current) => current.filter((item) => item.id !== project.id));
+      setValidations((current) => {
+        const next = { ...current };
+        delete next[project.id];
+        return next;
+      });
+      setPublishResults((current) => {
+        const next = { ...current };
+        delete next[project.id];
+        return next;
+      });
+      if (selectedProjectId === project.id) {
+        setSelectedProjectId(null);
+        setForm(buildCreateDefaults(projects.filter((item) => item.id !== project.id)));
+      }
+      showSuccessFeedback(t("catalogControl.agents.userProjects.deleted", { name: project.spec.name }));
+    } catch (error) {
+      showErrorFeedback(error, t("catalogControl.agents.userProjects.deleteFailed"));
+    } finally {
+      setDeletingProjectId("");
+    }
+  };
+
   return {
     projects,
     loading,
     saving,
     validatingProjectId,
     publishingProjectId,
+    deletingProjectId,
     selectedProjectId,
     form,
     setForm,
@@ -199,6 +231,7 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
     submitForm,
     validateProject,
     publishProject,
+    deleteProject,
     refresh,
   };
 }

@@ -11,6 +11,7 @@ export type ActionIconName =
   | "lifecycle"
   | "metadata"
   | "open"
+  | "publish"
   | "register"
   | "sync"
   | "test"
@@ -84,6 +85,13 @@ export default function ActionIcon({ name }: { name: ActionIconName }): JSX.Elem
     return (
       <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
         <path d="M5 5h7v2H7v10h10v-5h2v7H5V5Zm9 0h5v5h-2V8.41l-6.3 6.3-1.4-1.42 6.29-6.29H14V5Z" />
+      </svg>
+    );
+  }
+  if (name === "publish") {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+        <path d="M11 20V8.83l-3.59 3.58L6 11l6-6 6 6-1.41 1.41L13 8.83V20h-2Z" />
       </svg>
     );
   }

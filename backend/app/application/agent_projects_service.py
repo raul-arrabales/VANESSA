@@ -5,6 +5,7 @@ from typing import Any
 
 from ..repositories.agent_projects import (
     create_agent_project as create_project_row,
+    delete_agent_project as delete_project_row,
     get_agent_project,
     list_agent_projects as list_project_rows,
     set_published_agent_id,
@@ -95,6 +96,19 @@ def update_agent_project(
     if row is None:
         raise AgentProjectError("project_not_found", "Agent project not found", status_code=404)
     return _serialize_project(row)
+
+
+def delete_agent_project(
+    database_url: str,
+    *,
+    project_id: str,
+    actor_user_id: int,
+    actor_role: str,
+) -> None:
+    _require_project(database_url, project_id=project_id, actor_user_id=actor_user_id, actor_role=actor_role)
+    deleted = delete_project_row(database_url, project_id=project_id)
+    if not deleted:
+        raise AgentProjectError("project_not_found", "Agent project not found", status_code=404)
 
 
 def validate_agent_project(

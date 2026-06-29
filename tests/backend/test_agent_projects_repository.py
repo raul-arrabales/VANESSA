@@ -91,3 +91,16 @@ def test_create_agent_project_insert_query_matches_parameter_count(monkeypatch):
     insert_query, insert_params = cursor.executions[0]
     assert "INSERT INTO agent_projects" in insert_query
     assert insert_query.count("%s") == len(insert_params)
+
+
+def test_delete_agent_project_issues_delete_statement(monkeypatch):
+    cursor = _FakeCursor()
+
+    monkeypatch.setattr(agent_projects_repo, "get_connection", lambda _db: _FakeConnection(cursor))
+
+    deleted = agent_projects_repo.delete_agent_project("ignored", project_id="workflow-agent-1")
+
+    assert deleted is True
+    delete_query, delete_params = cursor.executions[0]
+    assert "DELETE FROM agent_projects" in delete_query
+    assert delete_params == ("workflow-agent-1",)

@@ -200,3 +200,10 @@ export async function publishAgentProject(projectId: string, token?: string): Pr
     token: requireToken(token),
   });
 }
+
+export async function deleteAgentProject(projectId: string, token?: string): Promise<void> {
+  await requestJson<{ deleted: boolean }>(`/v1/agent-projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+    token: requireToken(token),
+  });
+}

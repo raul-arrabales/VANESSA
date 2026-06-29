@@ -181,3 +181,23 @@ def test_publish_agent_project_route_returns_publish_result(client, monkeypatch:
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
+
+
+def test_delete_agent_project_route_returns_deleted_flag(client, monkeypatch: pytest.MonkeyPatch):
+    test_client, users = client
+    user = users.create_user(
+        "ignored",
+        email="delete@example.com",
+        username="deleter",
+        password_hash=hash_password("delete-pass-123"),
+        role="user",
+        is_active=True,
+    )
+    token = _login(test_client, user["username"], "delete-pass-123").get_json()["access_token"]
+
+    delete_spy = monkeypatch.setattr(agent_project_routes, "delete_agent_project", lambda *_args, **_kwargs: None)
+
+    response = test_client.delete("/v1/agent-projects/proj-1", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert response.get_json() == {"deleted": True}

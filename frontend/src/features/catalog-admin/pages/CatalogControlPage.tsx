@@ -92,6 +92,7 @@ export default function CatalogControlPage(): JSX.Element {
     saving: userAgentProjectSaving,
     validatingProjectId,
     publishingProjectId,
+    deletingProjectId,
     form: userAgentForm,
     setForm: setUserAgentForm,
     validations: userAgentValidations,
@@ -101,6 +102,7 @@ export default function CatalogControlPage(): JSX.Element {
     submitForm,
     validateProject,
     publishProject,
+    deleteProject,
   } = useUserAgentProjectsControl(token, allCatalogAgentNames);
   const selectedTestTool = tools.find((tool) => tool.id === activeToolId) ?? null;
   const platformAgents = useMemo(
@@ -297,6 +299,7 @@ export default function CatalogControlPage(): JSX.Element {
           loading={userAgentProjectsLoading}
           validatingProjectId={validatingProjectId}
           publishingProjectId={publishingProjectId}
+          deletingProjectId={deletingProjectId}
           validations={userAgentValidations}
           onEdit={(project) => {
             selectProject(project);
@@ -304,6 +307,7 @@ export default function CatalogControlPage(): JSX.Element {
           }}
           onValidate={(projectId) => void validateProject(projectId)}
           onPublish={(projectId) => void publishProject(projectId)}
+          onDelete={(project) => void deleteProject(project)}
         />
       ) : null}
 

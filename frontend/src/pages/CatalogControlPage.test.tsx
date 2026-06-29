@@ -52,6 +52,7 @@ vi.mock("../api/agentProjects", () => ({
   updateAgentProject: vi.fn(),
   validateAgentProject: vi.fn(),
   publishAgentProject: vi.fn(),
+  deleteAgentProject: vi.fn(),
 }));
 
 const modelApi = await import("../api/modelops");
@@ -695,9 +696,12 @@ describe("CatalogControlPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Agent Alpha" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Knowledge Chat" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Validate" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Publish app" })).toBeVisible();
+    expectCompactRegistryRowForHeading("Agent Alpha");
+    expectNamedIconAction("button", "Edit Agent Alpha");
+    expectNamedIconAction("button", "Validate Agent Alpha");
+    expectNamedIconAction("button", "Publish Agent Alpha");
+    expectNamedIconAction("button", "Delete Agent Alpha");
+    expectNoGenericCompactActions(["Edit", "Validate", "Publish app", "Delete"]);
   });
 
   it("publishes a user agent project from the directory", async () => {
@@ -705,10 +709,22 @@ describe("CatalogControlPage", () => {
 
     await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=user-agents" });
 
-    await user.click(await screen.findByRole("button", { name: "Publish app" }));
+    await user.click(await screen.findByRole("button", { name: "Publish Agent Alpha" }));
 
     await waitFor(() => {
       expect(agentProjectsApi.publishAgentProject).toHaveBeenCalledWith("proj-1", "token");
+    });
+  });
+
+  it("deletes a user agent project from the directory", async () => {
+    const user = userEvent.setup();
+
+    await renderWithAppProviders(<CatalogControlPage />, { route: "/control/catalog?section=agents&view=user-agents" });
+
+    await user.click(await screen.findByRole("button", { name: "Delete Agent Alpha" }));
+
+    await waitFor(() => {
+      expect(agentProjectsApi.deleteAgentProject).toHaveBeenCalledWith("proj-1", "token");
     });
   });
 

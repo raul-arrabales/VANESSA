@@ -5,6 +5,7 @@ from flask import Blueprint, g, jsonify, request
 from ...application.agent_projects_service import (
     AgentProjectError,
     create_agent_project,
+    delete_agent_project,
     get_agent_project_detail,
     list_agent_projects,
     publish_agent_project,
@@ -88,6 +89,21 @@ def update_agent_project_route(project_id: str):
     except AgentProjectError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"agent_project": project}), 200
+
+
+@bp.delete("/v1/agent-projects/<project_id>")
+@require_role("user")
+def delete_agent_project_route(project_id: str):
+    try:
+        delete_agent_project(
+            _database_url(),
+            project_id=project_id,
+            actor_user_id=int(g.current_user["id"]),
+            actor_role=str(g.current_user.get("role", "user")),
+        )
+    except AgentProjectError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"deleted": True}), 200
 
 
 @bp.post("/v1/agent-projects/<project_id>/validate")
