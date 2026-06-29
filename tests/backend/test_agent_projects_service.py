@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 
 from app.application import agent_projects_service
-from app.services.agent_prompt_defaults import default_agent_runtime_prompts
 
 
 def _project_row() -> dict[str, object]:
@@ -137,9 +136,46 @@ def test_create_agent_project_defaults_runtime_prompts_when_omitted(monkeypatch)
         },
     )
 
-    assert created_specs[0]["runtime_prompts"] == default_agent_runtime_prompts()
+    assert created_specs[0]["runtime_prompts"] == {"retrieval_context": ""}
     assert created_specs[0]["instructions"] == ""
-    assert project["spec"]["runtime_prompts"] == default_agent_runtime_prompts()
+    assert project["spec"]["runtime_prompts"] == {"retrieval_context": ""}
+
+
+def test_create_agent_project_allows_empty_workflow_retrieval_context(monkeypatch):
+    created_specs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        agent_projects_service,
+        "create_project_row",
+        lambda _database_url, *, project_id, owner_user_id, spec, visibility: created_specs.append(spec)
+        or {**_project_row(), **spec, "id": project_id, "owner_user_id": owner_user_id, "visibility": visibility},
+    )
+
+    project = agent_projects_service.create_agent_project(
+        "postgresql://ignored",
+        owner_user_id=10,
+        payload={
+            "id": "proj-empty-retrieval",
+            "visibility": "private",
+            "name": "Support Agent",
+            "description": "Handles support workflows.",
+            "instructions": "",
+            "runtime_prompts": {"retrieval_context": ""},
+            "default_model_ref": None,
+            "tool_refs": [],
+            "mcp_server_refs": [],
+            "agent_type": "workflow",
+            "channel_type": "vanessa_webapp",
+            "interface_type": "chat",
+            "workflow_definition": _project_row()["workflow_definition"],
+            "tool_policy": {"allow_user_tools": False},
+            "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+        },
+    )
+
+    assert created_specs[0]["runtime_prompts"] == {"retrieval_context": ""}
+    assert project["spec"]["runtime_prompts"] == {"retrieval_context": ""}
 
 
 def test_create_agent_project_rejects_legacy_workflow_steps(monkeypatch):
@@ -207,6 +243,40 @@ def test_publish_agent_project_compiles_catalog_payload_and_persists_published_a
     assert create_calls[0]["owner_user_id"] == 10
     assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": "Use retrieved context for support answers."}
     assert create_calls[0]["payload"]["tool_refs"] == ["tool.web_search"]
+    assert create_calls[0]["payload"]["agent_type"] == "workflow"
+    assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
+
+
+def test_publish_workflow_agent_project_allows_empty_instructions_and_retrieval_context(monkeypatch):
+    create_calls: list[dict[str, object]] = []
+    project_row = {
+        **_project_row(),
+        "instructions": "",
+        "runtime_prompts": {},
+    }
+
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: project_row)
+    monkeypatch.setattr(agent_projects_service, "find_registry_entity", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        agent_projects_service,
+        "create_catalog_agent",
+        lambda _database_url, *, payload, owner_user_id: create_calls.append({"payload": payload, "owner_user_id": owner_user_id}) or {"id": payload["id"], "name": payload["name"]},
+    )
+    monkeypatch.setattr(
+        agent_projects_service,
+        "set_published_agent_id",
+        lambda *_args, **_kwargs: {**project_row, "published_agent_id": "agent.project.proj-1"},
+    )
+
+    payload = agent_projects_service.publish_agent_project(
+        "postgresql://ignored",
+        project_id="proj-1",
+        actor_user_id=10,
+        actor_role="user",
+    )
+
+    assert create_calls[0]["payload"]["instructions"] == ""
+    assert create_calls[0]["payload"]["runtime_prompts"] == {"retrieval_context": ""}
     assert create_calls[0]["payload"]["agent_type"] == "workflow"
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
 

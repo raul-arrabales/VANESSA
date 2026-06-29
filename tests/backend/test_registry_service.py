@@ -52,6 +52,41 @@ def test_agent_spec_rejects_empty_runtime_prompt():
     assert str(exc_info.value) == "invalid_agent_field:runtime_prompts.retrieval_context is required"
 
 
+def test_workflow_agent_spec_accepts_empty_runtime_prompt(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        registry_service,
+        "create_registry_entity",
+        lambda *_args, **_kwargs: {"entity_id": "agent.workflow", "entity_type": "agent"},
+    )
+    monkeypatch.setattr(
+        registry_service,
+        "create_registry_version",
+        lambda *_args, **_kwargs: {"entity_id": "agent.workflow", "version": "v1"},
+    )
+
+    created = registry_service.create_entity_with_version(
+        "ignored",
+        entity_type="agent",
+        entity_id="agent.workflow",
+        owner_user_id=1,
+        visibility="private",
+        spec={
+            "name": "Workflow Agent",
+            "description": "workflow agent",
+            "instructions": "",
+            "runtime_prompts": {"retrieval_context": ""},
+            "default_model_ref": "model.default",
+            "tool_refs": [],
+            "agent_type": "workflow",
+            "runtime_constraints": {"internet_required": False, "sandbox_required": True},
+        },
+        version="v1",
+        publish=False,
+    )
+
+    assert created["entity"]["entity_type"] == "agent"
+
+
 def test_tool_spec_accepts_web_search_execution_backend(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         registry_service,

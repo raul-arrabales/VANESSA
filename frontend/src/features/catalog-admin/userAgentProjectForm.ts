@@ -37,6 +37,10 @@ function normalizeName(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function workflowRetrievalContext(): string {
+  return "";
+}
+
 function nextAvailableNumberedValue(prefix: string, existingValues: string[], normalize: (value: string) => string, separator: "-" | " "): string {
   const join = (counter: number) => `${prefix}${separator}${counter}`;
   const used = new Set(existingValues.map(normalize).filter(Boolean));
@@ -57,7 +61,7 @@ function nextAvailableNumberedName(base: string, existingNames: string[]): strin
 }
 
 export function buildDefaultAgentProjectForm(
-  defaults: CatalogDefaults | null,
+  _defaults: CatalogDefaults | null,
   options: {
     existingProjectIds?: string[];
     existingAgentNames?: string[];
@@ -73,7 +77,7 @@ export function buildDefaultAgentProjectForm(
     name,
     description: DEFAULT_WORKFLOW_AGENT_DESCRIPTION,
     instructions: "",
-    retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
+    retrievalContext: workflowRetrievalContext(),
     defaultModelRef: "",
     agentType: "workflow",
     channelType: "vanessa_webapp",
@@ -159,7 +163,7 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     name: project.spec.name,
     description: project.spec.description,
     instructions: project.spec.instructions,
-    retrievalContext: project.spec.runtime_prompts.retrieval_context,
+    retrievalContext: project.spec.runtime_prompts.retrieval_context ?? "",
     defaultModelRef: project.spec.default_model_ref ?? "",
     agentType: project.spec.agent_type,
     channelType: project.spec.channel_type,
@@ -218,15 +222,20 @@ export function toAgentProjectMutationInput(
   const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
   const interfaceType = (form.interfaceType || "chat") as "chat";
   const workflowDefinition = workflowDefinitionFromForm(form);
+  const trimmedRetrievalContext = form.retrievalContext.trim();
   return {
     ...(includeId && id ? { id } : {}),
     visibility: form.visibility,
     name: form.name.trim(),
     description: form.description.trim(),
     instructions: agentType === "workflow" ? "" : form.instructions.trim(),
-    runtime_prompts: {
-      retrieval_context: form.retrievalContext.trim(),
-    },
+    ...(agentType === "workflow" && !trimmedRetrievalContext
+      ? {}
+      : {
+          runtime_prompts: {
+            retrieval_context: trimmedRetrievalContext,
+          },
+        }),
     default_model_ref: form.defaultModelRef.trim() || null,
     tool_refs: [],
     mcp_server_refs: mcpServerRefsFromWorkflow(workflowDefinition.actions),

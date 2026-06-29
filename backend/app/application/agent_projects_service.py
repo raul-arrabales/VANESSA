@@ -357,7 +357,10 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
             "name": str(row.get("name", "")),
             "description": str(row.get("description", "")),
             "instructions": str(row.get("instructions", "")),
-            "runtime_prompts": normalize_agent_runtime_prompts(row.get("runtime_prompts")),
+            "runtime_prompts": normalize_agent_runtime_prompts(
+                row.get("runtime_prompts"),
+                agent_type=row.get("agent_type"),
+            ),
             "default_model_ref": _string_or_none(row.get("default_model_ref")),
             "tool_refs": list(row.get("tool_refs") or []),
             "mcp_server_refs": list(row.get("mcp_server_refs") or []),
@@ -381,9 +384,18 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
     if not description:
         raise AgentProjectError("invalid_description", "description is required")
     try:
+        agent_type = coerce_user_agent_type(payload.get("agent_type"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_agent_type", str(exc)) from exc
+    if agent_type not in CREATABLE_USER_AGENT_TYPES:
+        raise AgentProjectError("unsupported_agent_type", f"agent_type '{agent_type}' is not supported yet")
+    if agent_type != "workflow" and not instructions:
+        raise AgentProjectError("invalid_instructions", "instructions is required")
+    try:
         coerced_runtime_prompts = coerce_agent_runtime_prompts(
             payload.get("runtime_prompts"),
             default_when_missing=True,
+            agent_type=agent_type,
         )
     except ValueError as exc:
         raise AgentProjectError("invalid_runtime_prompts", str(exc)) from exc
@@ -400,14 +412,6 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.internet_required must be a boolean")
     if not isinstance(runtime_constraints.get("sandbox_required"), bool):
         raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.sandbox_required must be a boolean")
-    try:
-        agent_type = coerce_user_agent_type(payload.get("agent_type"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_agent_type", str(exc)) from exc
-    if agent_type not in CREATABLE_USER_AGENT_TYPES:
-        raise AgentProjectError("unsupported_agent_type", f"agent_type '{agent_type}' is not supported yet")
-    if agent_type != "workflow" and not instructions:
-        raise AgentProjectError("invalid_instructions", "instructions is required")
     try:
         channel_type = coerce_channel_type(payload.get("channel_type"))
     except ValueError as exc:
@@ -510,16 +514,20 @@ def _coerce_visibility(raw_value: Any) -> str:
 
 def _compile_catalog_payload(project: dict[str, Any]) -> dict[str, Any]:
     spec = dict(project["spec"])
+    agent_type = str(spec.get("agent_type") or "workflow")
     return {
         "name": spec["name"],
         "description": spec["description"],
         "instructions": spec["instructions"],
-        "runtime_prompts": normalize_agent_runtime_prompts(spec.get("runtime_prompts")),
+        "runtime_prompts": normalize_agent_runtime_prompts(
+            spec.get("runtime_prompts"),
+            agent_type=agent_type,
+        ),
         "default_model_ref": spec.get("default_model_ref"),
         "tool_refs": list(spec.get("tool_refs", [])),
         "mcp_server_refs": list(spec.get("mcp_server_refs", [])),
         "agent_domain": str(spec.get("agent_domain") or "default"),
-        "agent_type": str(spec.get("agent_type") or "workflow"),
+        "agent_type": agent_type,
         "channel_type": str(spec.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
         "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),

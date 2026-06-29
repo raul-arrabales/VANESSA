@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .user_agent_types import USER_AGENT_TYPE_WORKFLOW
+
 DEFAULT_RETRIEVAL_CONTEXT_PROMPT = "\n".join(
     [
         "Use the following retrieved context if it is relevant to the user's request.",
@@ -23,28 +25,44 @@ def default_agent_runtime_prompts() -> dict[str, str]:
     return {"retrieval_context": DEFAULT_RETRIEVAL_CONTEXT_PROMPT}
 
 
-def normalize_agent_runtime_prompts(value: Any) -> dict[str, str]:
+def _retrieval_context_required(agent_type: Any) -> bool:
+    normalized = str(agent_type or "").strip().lower()
+    return normalized != USER_AGENT_TYPE_WORKFLOW
+
+
+def _default_runtime_prompts_for_agent_type(agent_type: Any) -> dict[str, str]:
+    if _retrieval_context_required(agent_type):
+        return default_agent_runtime_prompts()
+    return {"retrieval_context": ""}
+
+
+def normalize_agent_runtime_prompts(value: Any, *, agent_type: Any = None) -> dict[str, str]:
     runtime_prompts = value if isinstance(value, dict) else {}
     retrieval_context = str(runtime_prompts.get("retrieval_context") or "").strip()
-    return {"retrieval_context": retrieval_context or DEFAULT_RETRIEVAL_CONTEXT_PROMPT}
+    if retrieval_context:
+        return {"retrieval_context": retrieval_context}
+    return _default_runtime_prompts_for_agent_type(agent_type)
 
 
-def coerce_agent_runtime_prompts(value: Any, *, default_when_missing: bool) -> dict[str, str]:
+def coerce_agent_runtime_prompts(value: Any, *, default_when_missing: bool, agent_type: Any = None) -> dict[str, str]:
     if value is None:
         if default_when_missing:
-            return default_agent_runtime_prompts()
+            return _default_runtime_prompts_for_agent_type(agent_type)
         raise ValueError("runtime_prompts is required")
     if not isinstance(value, dict):
         raise ValueError("runtime_prompts must be an object")
 
     retrieval_context = str(value.get("retrieval_context", "")).strip()
-    if not retrieval_context:
+    if not retrieval_context and _retrieval_context_required(agent_type):
         raise ValueError("runtime_prompts.retrieval_context is required")
     return {"retrieval_context": retrieval_context}
 
 
 def build_agent_system_prompt_preview(spec: dict[str, Any]) -> dict[str, Any]:
-    runtime_prompts = normalize_agent_runtime_prompts(spec.get("runtime_prompts"))
+    runtime_prompts = normalize_agent_runtime_prompts(
+        spec.get("runtime_prompts"),
+        agent_type=spec.get("agent_type"),
+    )
     messages: list[dict[str, str]] = []
     text_sections: list[str] = []
 

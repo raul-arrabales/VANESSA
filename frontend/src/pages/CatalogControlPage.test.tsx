@@ -645,6 +645,12 @@ describe("CatalogControlPage", () => {
 
     await waitFor(() => {
       expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          runtime_prompts: expect.anything(),
+        }),
+        "token",
+      );
+      expect(agentProjectsApi.createAgentProject).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "workflow-agent-1",
           name: "Workflow Agent Support",

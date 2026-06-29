@@ -60,7 +60,7 @@ export type AgentProjectSpec = {
   description: string;
   instructions: string;
   runtime_prompts: {
-    retrieval_context: string;
+    retrieval_context?: string;
   };
   default_model_ref: string | null;
   tool_refs: string[];
@@ -88,10 +88,13 @@ export type AgentProject = {
   spec: AgentProjectSpec;
 };
 
-export type AgentProjectMutationInput = {
+export type AgentProjectMutationInput = Omit<AgentProjectSpec, "runtime_prompts"> & {
   id?: string;
   visibility?: AgentProjectVisibility;
-} & AgentProjectSpec;
+  runtime_prompts?: {
+    retrieval_context?: string;
+  };
+};
 
 export type AgentProjectValidation = {
   agent_project: AgentProject;

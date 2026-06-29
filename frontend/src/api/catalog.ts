@@ -7,7 +7,7 @@ export type CatalogAgentSpec = {
   description: string;
   instructions: string;
   runtime_prompts: {
-    retrieval_context: string;
+    retrieval_context?: string;
   };
   default_model_ref: string | null;
   tool_refs: string[];

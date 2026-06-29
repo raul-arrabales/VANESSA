@@ -44,7 +44,11 @@ def _validate_spec(entity_type: str, spec: dict[str, Any]) -> None:
             if key not in spec:
                 raise ValueError(f"missing_agent_field:{key}")
         try:
-            coerce_agent_runtime_prompts(spec.get("runtime_prompts"), default_when_missing=False)
+            coerce_agent_runtime_prompts(
+                spec.get("runtime_prompts"),
+                default_when_missing=False,
+                agent_type=spec.get("agent_type"),
+            )
         except ValueError as exc:
             raise ValueError(f"invalid_agent_field:{exc}") from exc
     elif entity_type == "tool":

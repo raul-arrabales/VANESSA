@@ -364,7 +364,7 @@ export function useCatalogControl(token: string) {
         if (current.mode !== "create") {
           return current;
         }
-        const currentRetrievalContext = current.runtime_prompts.retrieval_context.trim();
+        const currentRetrievalContext = (current.runtime_prompts.retrieval_context ?? "").trim();
         const previousRetrievalDefault = previousDefaults?.agent.runtime_prompts.retrieval_context.trim() ?? "";
         if (currentRetrievalContext && currentRetrievalContext !== previousRetrievalDefault) {
           return current;

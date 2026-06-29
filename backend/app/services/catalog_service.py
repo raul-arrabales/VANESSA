@@ -896,9 +896,14 @@ def preview_catalog_agent_prompt(database_url: str, *, agent_id: str) -> dict[st
 
 
 def preview_catalog_agent_prompt_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    agent_type = str(payload.get("agent_type") or "workflow").strip() or "workflow"
     spec = {
+        "agent_type": agent_type,
         "instructions": str(payload.get("instructions") or ""),
-        "runtime_prompts": normalize_agent_runtime_prompts(payload.get("runtime_prompts")),
+        "runtime_prompts": normalize_agent_runtime_prompts(
+            payload.get("runtime_prompts"),
+            agent_type=agent_type,
+        ),
     }
     return {"prompt_preview": build_agent_system_prompt_preview(spec)}
 
@@ -956,9 +961,12 @@ def _is_platform_agent(agent_id: str) -> bool:
 
 def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(spec)
-    normalized["runtime_prompts"] = normalize_agent_runtime_prompts(normalized.get("runtime_prompts"))
-    normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
     normalized["agent_type"] = str(normalized.get("agent_type") or "workflow").strip() or "workflow"
+    normalized["runtime_prompts"] = normalize_agent_runtime_prompts(
+        normalized.get("runtime_prompts"),
+        agent_type=normalized["agent_type"],
+    )
+    normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
     normalized["channel_type"] = str(normalized.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP).strip() or CHANNEL_TYPE_VANESSA_WEBAPP
     normalized["interface_type"] = str(normalized.get("interface_type") or INTERFACE_TYPE_CHAT).strip() or INTERFACE_TYPE_CHAT
     normalized["tool_refs"] = list(normalized.get("tool_refs") or [])
@@ -1332,8 +1340,6 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         raise CatalogError("invalid_name", "name is required")
     if not description:
         raise CatalogError("invalid_description", "description is required")
-    if not instructions:
-        raise CatalogError("invalid_instructions", "instructions is required")
     tool_refs_raw = payload.get("tool_refs", [])
     if not isinstance(tool_refs_raw, list):
         raise CatalogError("invalid_tool_refs", "tool_refs must be an array")
@@ -1347,6 +1353,8 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         agent_type = coerce_user_agent_type(payload.get("agent_type"))
     except ValueError as exc:
         raise CatalogError("invalid_agent_type", str(exc)) from exc
+    if agent_type != "workflow" and not instructions:
+        raise CatalogError("invalid_instructions", "instructions is required")
     try:
         channel_type = coerce_channel_type(payload.get("channel_type"))
     except ValueError as exc:
@@ -1366,6 +1374,7 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         coerced_runtime_prompts = coerce_agent_runtime_prompts(
             payload.get("runtime_prompts"),
             default_when_missing=True,
+            agent_type=agent_type,
         )
     except ValueError as exc:
         raise CatalogError("invalid_runtime_prompts", str(exc)) from exc

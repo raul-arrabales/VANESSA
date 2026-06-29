@@ -610,6 +610,77 @@ def test_create_and_update_catalog_agent_use_registry_versions(monkeypatch: pyte
     assert updated["status"] == "published"
 
 
+def test_create_catalog_workflow_agent_allows_empty_instructions_and_retrieval_prompt(monkeypatch: pytest.MonkeyPatch):
+    entities: dict[str, dict] = {}
+
+    def _find_registry_entity(_db: str, *, entity_type: str, entity_id: str):
+        return entities.get(f"{entity_type}:{entity_id}")
+
+    def _create_registry_entity(_db: str, *, entity_id: str, entity_type: str, owner_user_id: int, visibility: str, status: str):
+        row = {
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "owner_user_id": owner_user_id,
+            "visibility": visibility,
+            "status": status,
+            "current_version": None,
+            "current_spec": None,
+            "published_at": None,
+        }
+        entities[f"{entity_type}:{entity_id}"] = row
+        return row
+
+    def _create_registry_version(_db: str, *, entity_id: str, version: str, spec_json: dict, set_current: bool, published: bool):
+        row = entities[f"agent:{entity_id}"]
+        row["current_version"] = version
+        row["current_spec"] = spec_json
+        row["published_at"] = "2026-01-01T00:00:00+00:00" if published else None
+        return {"entity_id": entity_id, "version": version, "spec_json": spec_json}
+
+    monkeypatch.setattr(catalog_service, "find_registry_entity", _find_registry_entity)
+    monkeypatch.setattr(catalog_service, "create_registry_entity", _create_registry_entity)
+    monkeypatch.setattr(catalog_service, "create_registry_version", _create_registry_version)
+
+    created = catalog_service.create_catalog_agent(
+        "ignored",
+        owner_user_id=3,
+        payload={
+            "id": "agent.workflow",
+            "publish": False,
+            "name": "Workflow Agent",
+            "description": "desc",
+            "instructions": "",
+            "runtime_prompts": {"retrieval_context": ""},
+            "default_model_ref": None,
+            "tool_refs": [],
+            "agent_type": "workflow",
+            "workflow_definition": {"version": 2, "actions": []},
+            "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+        },
+    )
+
+    assert created["spec"]["instructions"] == ""
+    assert created["spec"]["runtime_prompts"]["retrieval_context"] == ""
+
+
+def test_create_catalog_non_workflow_agent_requires_retrieval_context():
+    with pytest.raises(catalog_service.CatalogError) as exc_info:
+        catalog_service._coerce_agent_spec(
+            {
+                "name": "Planner Agent",
+                "description": "desc",
+                "instructions": "Plan carefully.",
+                "runtime_prompts": {"retrieval_context": ""},
+                "default_model_ref": None,
+                "tool_refs": [],
+                "agent_type": "planner",
+                "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+            }
+        )
+
+    assert exc_info.value.code == "invalid_runtime_prompts"
+
+
 def test_delete_catalog_agent_blocks_platform_agent_and_allows_owner(monkeypatch: pytest.MonkeyPatch):
     rows = {
         "agent:agent.knowledge_chat": {
@@ -767,14 +838,15 @@ def test_preview_catalog_agent_prompt_uses_normalized_runtime_prompts(monkeypatc
             "status": "draft",
             "current_version": "v1",
             "published_at": None,
-            "current_spec": {
-                "name": "Agent Alpha",
-                "description": "desc",
-                "instructions": "Answer from catalog instructions.",
-                "default_model_ref": None,
-                "tool_refs": [],
-                "runtime_constraints": {"internet_required": False, "sandbox_required": False},
-            },
+                "current_spec": {
+                    "name": "Agent Alpha",
+                    "description": "desc",
+                    "instructions": "Answer from catalog instructions.",
+                    "agent_type": "planner",
+                    "default_model_ref": None,
+                    "tool_refs": [],
+                    "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+                },
         },
     )
 
@@ -790,6 +862,19 @@ def test_preview_catalog_agent_prompt_uses_normalized_runtime_prompts(monkeypatc
     assert "Use the following retrieved context" in stored_preview["prompt_preview"]["text"]
     assert draft_preview["prompt_preview"]["messages"][0]["content"] == "Draft instructions."
     assert "Draft retrieval instructions." in draft_preview["prompt_preview"]["messages"][1]["content"]
+
+
+def test_preview_catalog_workflow_agent_prompt_omits_retrieval_context():
+    preview = catalog_service.preview_catalog_agent_prompt_payload(
+        {
+            "agent_type": "workflow",
+            "instructions": "",
+            "runtime_prompts": {},
+        }
+    )
+
+    assert preview["prompt_preview"]["messages"] == []
+    assert preview["prompt_preview"]["text"] == ""
 
 
 def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(monkeypatch: pytest.MonkeyPatch):
