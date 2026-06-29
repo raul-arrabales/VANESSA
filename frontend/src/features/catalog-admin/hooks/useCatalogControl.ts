@@ -37,6 +37,7 @@ import {
 } from "../../../api/catalog";
 import { listEnabledModels, type ModelCatalogItem } from "../../../api/modelops";
 import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
+import { workflowRuntimePromptsFromDefaults, workflowRuntimePromptsFromSpec } from "../workflowRuntimePrompts";
 import { useCatalogToolTesting } from "./useCatalogToolTesting";
 
 export type CatalogLoadState = "idle" | "loading" | "success" | "error";
@@ -74,12 +75,7 @@ export type McpServerFormState = CatalogMcpServerMutationInput & {
 };
 
 function agentRuntimePromptsFromDefaults(defaults: CatalogDefaults | null): CatalogAgentMutationInput["runtime_prompts"] {
-  return {
-    retrieval_context: defaults?.agent.runtime_prompts.retrieval_context ?? "",
-    workflow_input_extraction: defaults?.agent.runtime_prompts.workflow_input_extraction ?? "",
-    workflow_tool_arguments: defaults?.agent.runtime_prompts.workflow_tool_arguments ?? "",
-    workflow_output_response: defaults?.agent.runtime_prompts.workflow_output_response ?? "",
-  };
+  return workflowRuntimePromptsFromDefaults(defaults);
 }
 
 export function buildDefaultAgentForm(defaults: CatalogDefaults | null): AgentFormState {
@@ -207,12 +203,7 @@ export function buildAgentForm(agent: CatalogAgent): AgentFormState {
     name: agent.spec.name,
     description: agent.spec.description,
     instructions: agent.spec.instructions,
-    runtime_prompts: {
-      retrieval_context: agent.spec.runtime_prompts?.retrieval_context ?? "",
-      workflow_input_extraction: agent.spec.runtime_prompts?.workflow_input_extraction ?? "",
-      workflow_tool_arguments: agent.spec.runtime_prompts?.workflow_tool_arguments ?? "",
-      workflow_output_response: agent.spec.runtime_prompts?.workflow_output_response ?? "",
-    },
+    runtime_prompts: workflowRuntimePromptsFromSpec(agent.spec.runtime_prompts),
     default_model_ref: agent.spec.default_model_ref,
     tool_refs: agent.spec.tool_refs,
     mcp_server_refs: agent.spec.mcp_server_refs ?? [],

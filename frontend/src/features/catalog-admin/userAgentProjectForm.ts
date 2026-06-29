@@ -1,6 +1,7 @@
 import type { AgentProject, AgentProjectMutationInput, AgentProjectVisibility, WorkflowAction, WorkflowDefinition } from "../../api/agentProjects";
 import type { CatalogDefaults } from "../../api/catalog";
 import type { PreviewableAssistantExperience } from "../ai-shared/assistantExperience";
+import { workflowRuntimePromptsFromDefaults, workflowRuntimePromptsFromSpec } from "./workflowRuntimePrompts";
 
 export type AgentProjectFormState = {
   id: string;
@@ -44,18 +45,6 @@ function workflowRetrievalContext(): string {
   return "";
 }
 
-function workflowInputExtractionPrompt(defaults: CatalogDefaults | null): string {
-  return defaults?.agent.runtime_prompts.workflow_input_extraction ?? "";
-}
-
-function workflowToolArgumentsPrompt(defaults: CatalogDefaults | null): string {
-  return defaults?.agent.runtime_prompts.workflow_tool_arguments ?? "";
-}
-
-function workflowOutputResponsePrompt(defaults: CatalogDefaults | null): string {
-  return defaults?.agent.runtime_prompts.workflow_output_response ?? "";
-}
-
 function nextAvailableNumberedValue(prefix: string, existingValues: string[], normalize: (value: string) => string, separator: "-" | " "): string {
   const join = (counter: number) => `${prefix}${separator}${counter}`;
   const used = new Set(existingValues.map(normalize).filter(Boolean));
@@ -86,6 +75,7 @@ export function buildDefaultAgentProjectForm(
   const baseName = "Workflow Agent";
   const id = nextAvailableNumberedValue(baseId, options.existingProjectIds ?? [], normalizeId, "-");
   const name = nextAvailableNumberedName(baseName, options.existingAgentNames ?? []);
+  const runtimePrompts = workflowRuntimePromptsFromDefaults(_defaults);
   return {
     id,
     visibility: "private",
@@ -93,9 +83,9 @@ export function buildDefaultAgentProjectForm(
     description: DEFAULT_WORKFLOW_AGENT_DESCRIPTION,
     instructions: "",
     retrievalContext: workflowRetrievalContext(),
-    workflowInputExtractionPrompt: workflowInputExtractionPrompt(_defaults),
-    workflowToolArgumentsPrompt: workflowToolArgumentsPrompt(_defaults),
-    workflowOutputResponsePrompt: workflowOutputResponsePrompt(_defaults),
+    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
+    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
+    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: "",
     agentType: "workflow",
     channelType: "vanessa_webapp",
@@ -122,6 +112,7 @@ export function buildGuidedUserAgentCreateForm(
   } = {},
 ): AgentProjectFormState {
   const selectedAgentType = options.agentType ?? "";
+  const runtimePrompts = workflowRuntimePromptsFromDefaults(defaults);
   if (selectedAgentType === "workflow") {
     const workflowDefaults = buildDefaultAgentProjectForm(defaults, options);
     return {
@@ -138,10 +129,10 @@ export function buildGuidedUserAgentCreateForm(
     name: "",
     description: "",
     instructions: "",
-    retrievalContext: defaults?.agent.runtime_prompts.retrieval_context ?? "",
-    workflowInputExtractionPrompt: workflowInputExtractionPrompt(defaults),
-    workflowToolArgumentsPrompt: workflowToolArgumentsPrompt(defaults),
-    workflowOutputResponsePrompt: workflowOutputResponsePrompt(defaults),
+    retrievalContext: runtimePrompts.retrieval_context,
+    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
+    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
+    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: "",
     agentType: "",
     channelType: "",
@@ -178,16 +169,17 @@ export function parseJsonObject(text: string, errorMessage: string): Record<stri
 }
 
 export function buildAgentProjectForm(project: AgentProject): AgentProjectFormState {
+  const runtimePrompts = workflowRuntimePromptsFromSpec(project.spec.runtime_prompts);
   return {
     id: project.id,
     visibility: project.visibility,
     name: project.spec.name,
     description: project.spec.description,
     instructions: project.spec.instructions,
-    retrievalContext: project.spec.runtime_prompts.retrieval_context ?? "",
-    workflowInputExtractionPrompt: project.spec.runtime_prompts.workflow_input_extraction ?? workflowInputExtractionPrompt(null),
-    workflowToolArgumentsPrompt: project.spec.runtime_prompts.workflow_tool_arguments ?? workflowToolArgumentsPrompt(null),
-    workflowOutputResponsePrompt: project.spec.runtime_prompts.workflow_output_response ?? workflowOutputResponsePrompt(null),
+    retrievalContext: runtimePrompts.retrieval_context,
+    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
+    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
+    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: project.spec.default_model_ref ?? "",
     agentType: project.spec.agent_type,
     channelType: project.spec.channel_type,
