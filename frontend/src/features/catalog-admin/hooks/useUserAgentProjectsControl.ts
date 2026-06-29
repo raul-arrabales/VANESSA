@@ -125,9 +125,6 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   };
 
   const submitForm = async (): Promise<AgentProject | null> => {
-    if (!token) {
-      return null;
-    }
     setSaving(true);
     try {
       const payload = toAgentProjectMutationInput(form, {
@@ -156,9 +153,6 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   };
 
   const validateProject = async (projectId: string): Promise<void> => {
-    if (!token) {
-      return;
-    }
     setValidatingProjectId(projectId);
     try {
       const payload = await validateAgentProject(projectId, token);
@@ -172,9 +166,6 @@ export function useUserAgentProjectsControl(token: string, existingAgentNames: s
   };
 
   const publishProject = async (projectId: string): Promise<void> => {
-    if (!token) {
-      return;
-    }
     setPublishingProjectId(projectId);
     try {
       const payload = await publishAgentProject(projectId, token);

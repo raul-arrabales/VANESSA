@@ -8,6 +8,7 @@ import type {
   UpdateRoleResult,
   UsersResult,
 } from "./types";
+import { readStoredToken } from "./storage";
 
 
 
@@ -48,18 +49,20 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   const headers: HeadersInit = {
     Accept: "application/json",
   };
+  const activeToken = (options.token ?? readStoredToken()).trim();
 
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
-  if (options.token) {
-    headers.Authorization = `Bearer ${options.token}`;
+  if (activeToken) {
+    headers.Authorization = `Bearer ${activeToken}`;
   }
 
   const response = await fetch(buildUrl(path), {
     method: options.method ?? "GET",
     headers,
+    credentials: "same-origin",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
