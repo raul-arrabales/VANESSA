@@ -331,6 +331,69 @@ def test_workflow_agent_repairs_non_json_input_extraction_and_populates_variable
     assert result["workflow_state"]["variables"]["user_name"] == "Raul"
 
 
+def test_workflow_agent_repairs_non_json_send_output_and_completes(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(execution_service, "resolve_agent_spec", lambda *, agent_id: _workflow_agent_spec())
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def chat_completion(self, **kwargs):
+            self.calls += 1
+            system_prompt = kwargs["messages"][0]["content"][0]["text"]
+            user_prompt = kwargs["messages"][-1]["content"][0]["text"]
+            if self.calls == 1:
+                assert system_prompt == "Custom input extraction prompt."
+                return {
+                    "output_text": '{"complete": true, "variables": {"user_name": "Raul"}, "missing": [], "response": ""}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            if self.calls == 2:
+                assert system_prompt == "Custom output response prompt."
+                assert "Return only JSON" in user_prompt
+                return {
+                    "output_text": "Great! Your name is Raul. We're ready to begin the workflow now.",
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            assert system_prompt.startswith("You compose final workflow chat responses.")
+            assert "Previous model output to normalize" in user_prompt
+            return {
+                "output_text": "{\"response\": \"Great! Your name is Raul. We're ready to begin the workflow now.\", \"complete\": true}",
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    fake_client = FakeClient()
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: fake_client)
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "My name is Raul",
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "My name is Raul"}]}],
+            },
+            "platform_runtime": {"capabilities": {"llm_inference": {"slug": "vllm", "provider_key": "vllm_local"}}},
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "Great! Your name is Raul. We're ready to begin the workflow now."
+    assert result["workflow_status"] == "completed"
+    assert result["workflow_state"]["action_index"] == 2
+    assert result["workflow_state"]["variables"]["user_name"] == "Raul"
+
+
 def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
     monkeypatch.setattr(
