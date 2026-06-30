@@ -187,6 +187,88 @@ def test_workflow_agent_remains_awaiting_input_when_llm_does_not_extract_missing
     assert result["workflow_state"]["variables"] == {}
 
 
+def test_workflow_agent_generates_user_facing_follow_up_when_extraction_response_is_missing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {
+            "entity_id": "agent.workflow",
+            "current_version": "v1",
+            "current_spec": {
+                "agent_type": "workflow",
+                "default_model_ref": "model.alpha",
+                "mcp_server_refs": [],
+                "runtime_prompts": {"retrieval_context": ""},
+                "workflow_definition": {
+                    "version": 2,
+                    "actions": [
+                        {
+                            "id": "input_1",
+                            "type": "get_user_input",
+                            "name": "Collect name",
+                            "prompt": "Ask the user for their name {{user_name}}.",
+                            "variables": [{"name": "user_name", "label": "User name", "type": "text", "required": True}],
+                        },
+                        {
+                            "id": "output_1",
+                            "type": "send_output",
+                            "name": "Send greeting",
+                            "prompt": "Custom output response prompt.",
+                            "variable_refs": ["user_name"],
+                        },
+                    ],
+                },
+                "runtime_constraints": {},
+            },
+        },
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v1", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def chat_completion(self, **kwargs):
+            self.calls += 1
+            prompt = kwargs["messages"][-1]["content"][0]["text"]
+            if self.calls == 1:
+                assert "Return only JSON" in prompt
+                return {
+                    "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"]}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            assert "Write the next assistant message for the user." in prompt
+            return {
+                "output_text": "What is your name?",
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    fake_client = FakeClient()
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: fake_client)
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.workflow",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {"prompt": "", "messages": []},
+            "platform_runtime": {"capabilities": {"llm_inference": {"slug": "vllm", "provider_key": "vllm_local"}}},
+        }
+    )
+
+    result = payload["execution"]["result"]
+    assert status == 201
+    assert result["output_text"] == "What is your name?"
+    assert result["output_text"] != "Ask the user for their name {{user_name}}."
+    assert result["workflow_status"] == "awaiting_user_input"
+
+
 def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
     monkeypatch.setattr(

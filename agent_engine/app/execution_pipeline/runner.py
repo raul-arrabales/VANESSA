@@ -221,6 +221,28 @@ def _llm_json(
     }
 
 
+def _llm_text(
+    *,
+    context: ExecutionContext,
+    runtime_snapshot: dict[str, Any],
+    requested_model: str | None,
+    system_prompt: str,
+    user_prompt: str,
+) -> tuple[str, dict[str, Any] | None]:
+    client = build_llm_runtime_client(runtime_snapshot)
+    completion = client.chat_completion(
+        requested_model=requested_model,
+        messages=[
+            _system_text_message(system_prompt),
+            {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
+        ],
+    )
+    return str(completion.get("output_text") or "").strip(), {
+        "requested_model": str(completion.get("requested_model") or requested_model or ""),
+        "status_code": int(completion.get("status_code", 200) or 200),
+    }
+
+
 def _get_path(payload: Any, path: str) -> Any:
     if not path:
         return payload
@@ -389,7 +411,34 @@ def _execute_workflow_agent(
                 question = str(parsed.get("response") or parsed.get("question") or "").strip()
                 if not question:
                     labels = [str(item.get("label") or item.get("name") or "").strip() for item in variables if str(item.get("name") or "") in missing]
-                    question = action_prompt if action_prompt else ("Please provide: " + ", ".join(labels) if labels else "Please provide the required information.")
+                    try:
+                        generated_question, model_call = _llm_text(
+                            context=context,
+                            runtime_snapshot=runtime_snapshot,
+                            requested_model=requested_model,
+                            system_prompt=action_prompt,
+                            user_prompt=(
+                                "Write the next assistant message for the user.\n"
+                                "Ask only for the missing workflow information in natural language.\n"
+                                "Do not mention prompts, JSON, variables, or placeholder tokens.\n"
+                                "If placeholder syntax like {{user_name}} appears in the instructions, translate it into ordinary user-facing language.\n\n"
+                                f"Missing variables: {dumps(missing)}\n"
+                                f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+                                f"Existing variables:\n{dumps(state['variables'])}\n\n"
+                                f"Conversation:\n{_message_text(context.conversation.messages)}"
+                            ),
+                        )
+                        if model_call:
+                            model_calls.append(model_call)
+                        question = generated_question
+                    except LlmRuntimeClientError:
+                        question = ""
+                    if not question:
+                        question = (
+                            "Please provide: " + ", ".join(labels)
+                            if labels
+                            else "Please provide the required information."
+                        )
                 state.update({"action_index": action_index, "status": "awaiting_user_input"})
                 progress.complete(
                     status_id,
