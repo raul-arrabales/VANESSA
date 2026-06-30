@@ -121,4 +121,82 @@ describe("SessionSidebar", () => {
     await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
     expect(onClearSearch).toHaveBeenCalled();
   });
+
+  it("shows workflow session badges for closed chats and active loop cycles", async () => {
+    await renderWithAppProviders(
+      <SessionSidebar
+        title="Chat"
+        introText=""
+        historyLoadingText="Loading"
+        newSessionLabel="New chat"
+        temporarySessionLabel="Temporary chat"
+        settingsLabel="Chat settings"
+        showSettings
+        isSearchOpen={false}
+        searchFilters={{}}
+        isSearchActive={false}
+        sessions={[
+          {
+            id: "session-closed",
+            playgroundKind: "chat",
+            title: "Closed workflow",
+            titleSource: "manual",
+            selectorState: {
+              assistantRef: "assistant-1",
+              modelId: null,
+              knowledgeBaseId: null,
+            },
+            messageCount: 4,
+            createdAt: "2026-03-18T11:00:00Z",
+            updatedAt: "2026-03-18T11:15:00Z",
+            messages: [],
+            persistence: "saved",
+            workflowExecutionMode: "one_time",
+            workflowSessionState: "closed",
+            workflowCycle: 1,
+          },
+          {
+            id: "session-loop",
+            playgroundKind: "chat",
+            title: "Loop workflow",
+            titleSource: "manual",
+            selectorState: {
+              assistantRef: "assistant-2",
+              modelId: null,
+              knowledgeBaseId: null,
+            },
+            messageCount: 8,
+            createdAt: "2026-03-18T10:00:00Z",
+            updatedAt: "2026-03-18T11:20:00Z",
+            messages: [],
+            persistence: "saved",
+            workflowExecutionMode: "loop",
+            workflowSessionState: "active",
+            workflowCycle: 3,
+          },
+        ]}
+        activeSessionId="session-closed"
+        canCreateSession
+        isInteractionLocked={false}
+        isCollapsed={false}
+        isHistoryLoading={false}
+        historyError=""
+        onToggleCollapsed={vi.fn()}
+        onCreateSession={vi.fn()}
+        onCreateTemporarySession={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onToggleSearch={vi.fn()}
+        onSearchFiltersChange={vi.fn()}
+        onClearSearch={vi.fn()}
+        onSelectSession={vi.fn()}
+        onRenameSession={vi.fn()}
+        onDeleteSession={vi.fn()}
+        canRenameSession
+        canDeleteSession
+      />,
+    );
+
+    expect(screen.getByText("Closed")).toBeVisible();
+    expect(screen.getByText("Loop 3")).toBeVisible();
+  });
 });

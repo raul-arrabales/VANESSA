@@ -494,7 +494,10 @@
     "updatedToLabel": "Actualizado hasta",
     "clearSearch": "Limpiar busqueda",
     "noSearchResults": "Ninguna conversacion coincide con estos filtros.",
-    "actionsFor": "Acciones de la conversación para {{title}}"
+    "actionsFor": "Acciones de la conversación para {{title}}",
+    "workflowClosed": "Cerrado",
+    "workflowLoop": "Bucle",
+    "workflowLoopCycle": "Bucle {{cycle}}"
   },
   "contextManagement": {
     "title": "Gestion de contexto",

@@ -499,7 +499,10 @@
     "updatedToLabel": "Updated to",
     "clearSearch": "Clear search",
     "noSearchResults": "No conversations match these filters.",
-    "actionsFor": "Conversation actions for {{title}}"
+    "actionsFor": "Conversation actions for {{title}}",
+    "workflowClosed": "Closed",
+    "workflowLoop": "Loop",
+    "workflowLoopCycle": "Loop {{cycle}}"
   },
   "contextManagement": {
     "eyebrow": "Knowledge base workspace",

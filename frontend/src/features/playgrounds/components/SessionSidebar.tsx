@@ -79,6 +79,27 @@ export default function SessionSidebar({
     activeSessionId,
   });
 
+  const getWorkflowBadge = (session: PlaygroundSessionViewModel): {
+    label: string;
+    tone: "closed" | "loop";
+  } | null => {
+    if (session.workflowSessionState === "closed") {
+      return {
+        label: t("playgroundSessionSidebar.workflowClosed"),
+        tone: "closed",
+      };
+    }
+    if (session.workflowExecutionMode === "loop" && session.workflowSessionState === "active") {
+      return {
+        label: session.workflowCycle && session.workflowCycle > 1
+          ? t("playgroundSessionSidebar.workflowLoopCycle", { cycle: session.workflowCycle })
+          : t("playgroundSessionSidebar.workflowLoop"),
+        tone: "loop",
+      };
+    }
+    return null;
+  };
+
   return (
     <aside
       className="chatbot-sidebar"
@@ -179,6 +200,7 @@ export default function SessionSidebar({
           {sessions.map((session) => {
             const actionsLabel = t("playgroundSessionSidebar.actionsFor", { title: session.title });
             const rowMenuOpen = isMenuOpen(session.id);
+            const workflowBadge = getWorkflowBadge(session);
 
             return (
               <div
@@ -196,7 +218,17 @@ export default function SessionSidebar({
                   disabled={isInteractionLocked}
                   title={session.title}
                 >
-                  <strong className="chatbot-conversation-item-title" title={session.title}>{session.title}</strong>
+                  <span className="chatbot-conversation-item-heading">
+                    <strong className="chatbot-conversation-item-title" title={session.title}>{session.title}</strong>
+                    {workflowBadge ? (
+                      <span
+                        className="chatbot-conversation-item-badge"
+                        data-tone={workflowBadge.tone}
+                      >
+                        {workflowBadge.label}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="chatbot-conversation-item-timestamp">{formatTimestamp(session.updatedAt)}</span>
                 </button>
                 {canRenameSession || canDeleteSession ? (
