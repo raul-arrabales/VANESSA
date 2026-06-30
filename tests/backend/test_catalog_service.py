@@ -209,6 +209,56 @@ def test_list_catalog_tools_hides_image_tools_without_enabled_worker(monkeypatch
     assert [tool["id"] for tool in tools] == ["tool.web_search", "tool.image_license_plate_recognition"]
 
 
+def test_normalize_agent_spec_for_response_upgrades_legacy_workflow_action_prompts():
+    normalized = catalog_service._normalize_agent_spec_for_response(
+        {
+            "agent_type": "workflow",
+            "runtime_prompts": {
+                "retrieval_context": "",
+                "workflow_input_extraction": "Collect the order number and confirm it.",
+                "workflow_tool_arguments": "Map the order number into tool arguments.",
+                "workflow_output_response": "Reply with the final status.",
+            },
+            "workflow_definition": {
+                "version": 2,
+                "actions": [
+                    {
+                        "id": "input_1",
+                        "type": "get_user_input",
+                        "name": "Collect order number",
+                        "variables": [
+                            {"name": "order_number", "label": "Order number", "type": "text", "required": True},
+                        ],
+                    },
+                    {
+                        "id": "tool_1",
+                        "type": "mcp_tool",
+                        "name": "Look up order",
+                        "mcp_server_slug": "orders",
+                        "exposed_tool_name": "lookup_order",
+                        "input_bindings": {"order_number": {"variable": "order_number"}},
+                        "output_variables": [
+                            {"name": "order_status", "label": "Order status", "type": "text", "required": True},
+                        ],
+                    },
+                    {
+                        "id": "output_1",
+                        "type": "send_output",
+                        "name": "Send result",
+                        "instruction": "Tell the user the order status clearly.",
+                        "variable_refs": ["order_status"],
+                    },
+                ],
+            },
+        }
+    )
+
+    actions = normalized["workflow_definition"]["actions"]
+    assert actions[0]["prompt"] == "Collect the order number and confirm it."
+    assert actions[1]["prompt"] == "Map the order number into tool arguments."
+    assert actions[2]["prompt"] == "Tell the user the order status clearly."
+
+
 def test_list_catalog_mcp_servers_hides_image_servers_without_enabled_worker(monkeypatch: pytest.MonkeyPatch):
     tool_rows = {
         "tool.image_license_plate_recognition": _catalog_row(

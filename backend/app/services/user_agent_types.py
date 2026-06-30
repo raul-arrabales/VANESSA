@@ -22,6 +22,18 @@ WORKFLOW_VARIABLE_TYPE_TEXT = "text"
 SUPPORTED_WORKFLOW_VARIABLE_TYPES = {WORKFLOW_VARIABLE_TYPE_TEXT}
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_LEGACY_WORKFLOW_INPUT_PROMPT = (
+    "Collect the declared workflow variables from the conversation, ask follow-up "
+    "questions when required values are missing, and stay on this action until all "
+    "required variables are complete."
+)
+_LEGACY_WORKFLOW_TOOL_PROMPT = (
+    "Build the tool arguments from the declared workflow variables, call the tool, "
+    "and populate the declared output variables from the tool result before moving on."
+)
+_LEGACY_WORKFLOW_OUTPUT_PROMPT = (
+    "Compose the user-facing response from the declared workflow variables."
+)
 
 
 def default_workflow_definition() -> dict[str, Any]:
@@ -135,6 +147,57 @@ def normalize_workflow_definition(value: Any) -> dict[str, Any]:
             "variable_refs": [str(variable).strip() for variable in variable_refs_raw if str(variable).strip()],
         })
     return {"version": 2, "actions": actions}
+
+
+def normalize_workflow_definition_for_response(
+    value: Any,
+    *,
+    runtime_prompts: Any = None,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return normalize_workflow_definition(value)
+
+    actions_raw = value.get("actions")
+    if not isinstance(actions_raw, list):
+        return normalize_workflow_definition(value)
+
+    runtime_prompt_values = runtime_prompts if isinstance(runtime_prompts, dict) else {}
+    upgraded_actions: list[Any] = []
+    for item in actions_raw:
+        if not isinstance(item, dict):
+            upgraded_actions.append(item)
+            continue
+
+        upgraded = dict(item)
+        if str(upgraded.get("prompt") or "").strip():
+            upgraded_actions.append(upgraded)
+            continue
+
+        action_type = str(upgraded.get("type") or "").strip()
+        legacy_instruction = str(upgraded.get("instruction") or "").strip()
+        if action_type == "get_user_input":
+            upgraded["prompt"] = (
+                legacy_instruction
+                or str(runtime_prompt_values.get("workflow_input_extraction") or "").strip()
+                or _LEGACY_WORKFLOW_INPUT_PROMPT
+            )
+        elif action_type == "mcp_tool":
+            upgraded["prompt"] = (
+                legacy_instruction
+                or str(runtime_prompt_values.get("workflow_tool_arguments") or "").strip()
+                or _LEGACY_WORKFLOW_TOOL_PROMPT
+            )
+        elif action_type == "send_output":
+            upgraded["prompt"] = (
+                legacy_instruction
+                or str(runtime_prompt_values.get("workflow_output_response") or "").strip()
+                or _LEGACY_WORKFLOW_OUTPUT_PROMPT
+            )
+        upgraded_actions.append(upgraded)
+
+    upgraded_definition = dict(value)
+    upgraded_definition["actions"] = upgraded_actions
+    return normalize_workflow_definition(upgraded_definition)
 
 
 def _normalize_workflow_variables(value: Any, path: str, produced_variables: set[str], *, allow_path: bool = False) -> list[dict[str, Any]]:

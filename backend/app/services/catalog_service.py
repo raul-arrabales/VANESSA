@@ -65,6 +65,7 @@ from .user_agent_types import (
     coerce_interface_type,
     coerce_user_agent_type,
     normalize_workflow_definition,
+    normalize_workflow_definition_for_response,
     workflow_actions,
     workflow_mcp_server_slugs,
 )
@@ -962,9 +963,10 @@ def _is_platform_agent(agent_id: str) -> bool:
 
 def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(spec)
+    raw_runtime_prompts = normalized.get("runtime_prompts")
     normalized["agent_type"] = str(normalized.get("agent_type") or "workflow").strip() or "workflow"
     normalized["runtime_prompts"] = normalize_agent_runtime_prompts(
-        normalized.get("runtime_prompts"),
+        raw_runtime_prompts,
         agent_type=normalized["agent_type"],
     )
     normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
@@ -972,7 +974,10 @@ def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized["interface_type"] = str(normalized.get("interface_type") or INTERFACE_TYPE_CHAT).strip() or INTERFACE_TYPE_CHAT
     normalized["tool_refs"] = list(normalized.get("tool_refs") or [])
     normalized["mcp_server_refs"] = list(normalized.get("mcp_server_refs") or [])
-    normalized["workflow_definition"] = normalize_workflow_definition(normalized.get("workflow_definition"))
+    normalized["workflow_definition"] = normalize_workflow_definition_for_response(
+        normalized.get("workflow_definition"),
+        runtime_prompts=raw_runtime_prompts,
+    )
     return normalized
 
 
