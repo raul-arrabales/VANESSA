@@ -766,6 +766,139 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
     assert connected_status["details"]["provider_origin"] == "cloud"
 
 
+def test_stream_workflow_message_persists_completed_workflow_metadata(monkeypatch):
+    captured: dict[str, object] = {}
+    workflow_runs: list[dict[str, object]] = []
+
+    def _get_session(_database_url: str, *, owner_user_id: int, conversation_id: str, conversation_kind: str):
+        if conversation_kind == "plain":
+            return {
+                "id": conversation_id,
+                "conversation_kind": "plain",
+                "title": "Workflow session",
+                "title_source": "auto",
+                "model_id": "safe-small",
+                "knowledge_base_id": None,
+                "assistant_ref": "agent.project.workflow-agent-1",
+            }
+        return None
+
+    def _fake_stream_agent_chat_request(**_kwargs):
+        yield {
+            "event": "status",
+            "data": {
+                "id": "status-input-complete",
+                "kind": "thinking",
+                "label": "Collected workflow input 1",
+                "state": "completed",
+                "started_at": "2026-03-18T11:00:00Z",
+                "completed_at": "2026-03-18T11:00:01Z",
+                "duration_ms": 1000,
+                "summary": None,
+                "details": {
+                    "workflow_action_index": 1,
+                    "workflow_action_name": "Collect user name",
+                    "workflow_status": "running",
+                    "workflow_variables": {"user_name": "Raul"},
+                },
+            },
+        }
+        yield {
+            "event": "status",
+            "data": {
+                "id": "status-output-complete",
+                "kind": "thinking",
+                "label": "Completed workflow output 2",
+                "state": "completed",
+                "started_at": "2026-03-18T11:00:01Z",
+                "completed_at": "2026-03-18T11:00:02Z",
+                "duration_ms": 1000,
+                "summary": None,
+                "details": {
+                    "workflow_action_index": 2,
+                    "workflow_action_name": "Send greeting",
+                    "workflow_status": "completed",
+                    "workflow_variables": {"user_name": "Raul"},
+                },
+            },
+        }
+        yield {
+            "event": "complete",
+            "data": playground_execution.PlaygroundExecutionResult(
+                output="Great! Your name is Raul. We're ready to begin the workflow now.",
+                response={"id": "exec-1"},
+                statuses=[],
+                workflow_state={
+                    "version": 2,
+                    "action_index": 2,
+                    "variables": {"user_name": "Raul"},
+                    "action_outputs": {},
+                    "status": "completed",
+                },
+                workflow_status="completed",
+                content_parts=[{"type": "text", "text": "Great! Your name is Raul. We're ready to begin the workflow now."}],
+            ),
+        }
+
+    def _append_message_pair(_database_url: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation": {"id": kwargs["conversation_id"]},
+            "messages": [
+                {"id": "msg-user", "role": "user", "content": kwargs["user_content"], "metadata_json": {}, "created_at": "2026-03-18T11:00:00+00:00"},
+                {"id": "msg-assistant", "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
+            ],
+        }
+
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "get_session", _get_session)
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(playgrounds_service, "stream_agent_chat_request", _fake_stream_agent_chat_request)
+    monkeypatch.setattr(playgrounds_service, "get_workflow_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "append_message_pair", _append_message_pair)
+    monkeypatch.setattr(playgrounds_service, "bind_message_attachments", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "upsert_workflow_run",
+        lambda *_args, **kwargs: workflow_runs.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_playground_session_detail",
+        lambda *_args, **_kwargs: {"id": "sess-workflow", "playground_kind": "chat", "messages": []},
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    events = list(playgrounds_service.stream_playground_message(
+        "postgresql://ignored",
+        config=config,
+        request_id="req-workflow-stream",
+        owner_user_id=10,
+        owner_role="user",
+        session_id="sess-workflow",
+        prompt="my name is Raul",
+    ))
+
+    assert [event["event"] for event in events] == ["status", "status", "complete"]
+    assert captured["assistant_metadata"]["workflow_status"] == "completed"
+    assert captured["assistant_metadata"]["statuses"][-1]["label"] == "Completed workflow output 2"
+    assert workflow_runs[0]["status"] == "completed"
+    assert workflow_runs[0]["workflow_state"]["action_index"] == 2
+    assert workflow_runs[0]["workflow_state"]["variables"] == {"user_name": "Raul"}
+    assert events[-1]["data"]["statuses"][-1]["details"]["workflow_status"] == "completed"
+
+
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):
     monkeypatch.setattr(
         playgrounds_service,

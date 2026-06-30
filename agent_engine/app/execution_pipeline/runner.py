@@ -244,6 +244,52 @@ def _llm_text(
     }
 
 
+def _workflow_json_with_repair(
+    *,
+    context: ExecutionContext,
+    runtime_snapshot: dict[str, Any],
+    requested_model: str | None,
+    system_prompt: str,
+    initial_user_prompt: str,
+    repair_system_prompt: str,
+    repair_user_prompt: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+    model_calls: list[dict[str, Any]] = []
+    parsed: dict[str, Any] = {}
+    raw_output = ""
+    try:
+        parsed, model_call, raw_output = _llm_json(
+            context=context,
+            runtime_snapshot=runtime_snapshot,
+            requested_model=requested_model,
+            system_prompt=system_prompt,
+            user_prompt=initial_user_prompt,
+        )
+        if model_call:
+            model_calls.append(model_call)
+    except LlmRuntimeClientError:
+        parsed = {}
+
+    if parsed:
+        return parsed, model_calls, raw_output
+    if not raw_output:
+        return parsed, model_calls, raw_output
+
+    try:
+        repaired, model_call, _ = _llm_json(
+            context=context,
+            runtime_snapshot=runtime_snapshot,
+            requested_model=requested_model,
+            system_prompt=repair_system_prompt,
+            user_prompt=f"{repair_user_prompt}\n\nPrevious model output to normalize:\n{raw_output}",
+        )
+        if model_call:
+            model_calls.append(model_call)
+        return repaired, model_calls, raw_output
+    except LlmRuntimeClientError:
+        return parsed, model_calls, raw_output
+
+
 def _workflow_extract_variables_with_repair(
     *,
     context: ExecutionContext,
@@ -253,58 +299,33 @@ def _workflow_extract_variables_with_repair(
     variable_context: list[dict[str, Any]],
     state: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    model_calls: list[dict[str, Any]] = []
-    parsed: dict[str, Any] = {}
-    raw_output = ""
-    try:
-        parsed, model_call, raw_output = _llm_json(
-            context=context,
-            runtime_snapshot=runtime_snapshot,
-            requested_model=requested_model,
-            system_prompt=action_prompt,
-            user_prompt=(
-                "Inspect the conversation and populate the declared workflow variables.\n"
-                "Return only JSON with complete:boolean, variables:object, missing:array, response:string.\n\n"
-                f"{_workflow_reference_guidance()}\n\n"
-                f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
-                f"Required workflow variables:\n{dumps(variable_context)}\n\n"
-                f"Existing variables:\n{dumps(state['variables'])}"
-            ),
-        )
-        if model_call:
-            model_calls.append(model_call)
-    except LlmRuntimeClientError:
-        parsed = {}
-
-    if parsed:
-        return parsed, model_calls
-    if not raw_output:
-        return parsed, model_calls
-
-    try:
-        repaired, model_call, _ = _llm_json(
-            context=context,
-            runtime_snapshot=runtime_snapshot,
-            requested_model=requested_model,
-            system_prompt=(
-                "You extract workflow state from a conversation.\n"
-                "Return only valid JSON with complete:boolean, variables:object, missing:array, response:string.\n"
-                "Do not write conversational prose outside the JSON object."
-            ),
-            user_prompt=(
-                f"Workflow action prompt:\n{action_prompt}\n\n"
-                f"{_workflow_reference_guidance()}\n\n"
-                f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
-                f"Required workflow variables:\n{dumps(variable_context)}\n\n"
-                f"Existing variables:\n{dumps(state['variables'])}\n\n"
-                f"Previous model output to normalize:\n{raw_output}"
-            ),
-        )
-        if model_call:
-            model_calls.append(model_call)
-        return repaired, model_calls
-    except LlmRuntimeClientError:
-        return parsed, model_calls
+    parsed, model_calls, _ = _workflow_json_with_repair(
+        context=context,
+        runtime_snapshot=runtime_snapshot,
+        requested_model=requested_model,
+        system_prompt=action_prompt,
+        initial_user_prompt=(
+            "Inspect the conversation and populate the declared workflow variables.\n"
+            "Return only JSON with complete:boolean, variables:object, missing:array, response:string.\n\n"
+            f"{_workflow_reference_guidance()}\n\n"
+            f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+            f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+            f"Existing variables:\n{dumps(state['variables'])}"
+        ),
+        repair_system_prompt=(
+            "You extract workflow state from a conversation.\n"
+            "Return only valid JSON with complete:boolean, variables:object, missing:array, response:string.\n"
+            "Do not write conversational prose outside the JSON object."
+        ),
+        repair_user_prompt=(
+            f"Workflow action prompt:\n{action_prompt}\n\n"
+            f"{_workflow_reference_guidance()}\n\n"
+            f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+            f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+            f"Existing variables:\n{dumps(state['variables'])}"
+        ),
+    )
+    return parsed, model_calls
 
 
 def _workflow_compose_output_with_repair(
@@ -316,60 +337,37 @@ def _workflow_compose_output_with_repair(
     selected_variables: list[dict[str, Any]],
     selected_values: dict[str, Any],
 ) -> tuple[str, list[dict[str, Any]]]:
-    model_calls: list[dict[str, Any]] = []
-    raw_output = ""
-    try:
-        parsed, model_call, raw_output = _llm_json(
-            context=context,
-            runtime_snapshot=runtime_snapshot,
-            requested_model=requested_model,
-            system_prompt=action_prompt,
-            user_prompt=(
-                "Compose the final workflow chat response.\n"
-                "Return only JSON with response:string, complete:boolean.\n\n"
-                f"{_workflow_reference_guidance()}\n\n"
-                f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
-                f"Variables: {dumps(selected_values)}\n"
-                f"Conversation:\n{_message_text(context.conversation.messages)}"
-            ),
-        )
-        if model_call:
-            model_calls.append(model_call)
-        response = str(parsed.get("response") or "").strip()
-        if response:
-            return response, model_calls
-    except LlmRuntimeClientError:
-        pass
-
+    parsed, model_calls, raw_output = _workflow_json_with_repair(
+        context=context,
+        runtime_snapshot=runtime_snapshot,
+        requested_model=requested_model,
+        system_prompt=action_prompt,
+        initial_user_prompt=(
+            "Compose the final workflow chat response.\n"
+            "Return only JSON with response:string, complete:boolean.\n\n"
+            f"{_workflow_reference_guidance()}\n\n"
+            f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
+            f"Variables: {dumps(selected_values)}\n"
+            f"Conversation:\n{_message_text(context.conversation.messages)}"
+        ),
+        repair_system_prompt=(
+            "You compose final workflow chat responses.\n"
+            "Return only valid JSON with response:string, complete:boolean.\n"
+            "Do not write conversational prose outside the JSON object."
+        ),
+        repair_user_prompt=(
+            f"Workflow action prompt:\n{action_prompt}\n\n"
+            f"{_workflow_reference_guidance()}\n\n"
+            f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
+            f"Variables: {dumps(selected_values)}\n"
+            f"Conversation:\n{_message_text(context.conversation.messages)}"
+        ),
+    )
+    response = str(parsed.get("response") or "").strip()
+    if response:
+        return response, model_calls
     if raw_output.strip():
-        try:
-            repaired, model_call, _ = _llm_json(
-                context=context,
-                runtime_snapshot=runtime_snapshot,
-                requested_model=requested_model,
-                system_prompt=(
-                    "You compose final workflow chat responses.\n"
-                    "Return only valid JSON with response:string, complete:boolean.\n"
-                    "Do not write conversational prose outside the JSON object."
-                ),
-                user_prompt=(
-                    f"Workflow action prompt:\n{action_prompt}\n\n"
-                    f"{_workflow_reference_guidance()}\n\n"
-                    f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
-                    f"Variables: {dumps(selected_values)}\n"
-                    f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
-                    f"Previous model output to normalize:\n{raw_output}"
-                ),
-            )
-            if model_call:
-                model_calls.append(model_call)
-            response = str(repaired.get("response") or "").strip()
-            if response:
-                return response, model_calls
-        except LlmRuntimeClientError:
-            pass
         return raw_output.strip(), model_calls
-
     return "", model_calls
 
 
@@ -469,6 +467,58 @@ def _workflow_action_prompt(action: dict[str, Any]) -> str:
     return str(action.get("prompt") or "").strip()
 
 
+def _start_workflow_status(
+    *,
+    progress: ProgressRecorder,
+    kind: str,
+    label: str,
+    state: dict[str, Any],
+    action_index: int,
+    action: dict[str, Any],
+    workflow_status: str,
+    extra: dict[str, Any] | None = None,
+) -> str:
+    return progress.start(
+        kind=kind,
+        label=label,
+        details=_workflow_status_details(
+            state=state,
+            action_index=action_index,
+            action=action,
+            workflow_status=workflow_status,
+            extra=extra,
+        ),
+    )
+
+
+def _complete_workflow_status(
+    *,
+    progress: ProgressRecorder,
+    status_id: str,
+    kind: str,
+    label: str,
+    state: dict[str, Any],
+    action_index: int,
+    action: dict[str, Any],
+    workflow_status: str,
+    summary: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    progress.complete(
+        status_id,
+        kind=kind,
+        label=label,
+        summary=summary,
+        details=_workflow_status_details(
+            state=state,
+            action_index=action_index,
+            action=action,
+            workflow_status=workflow_status,
+            extra=extra,
+        ),
+    )
+
+
 def _execute_workflow_agent(
     *,
     context: ExecutionContext,
@@ -507,10 +557,14 @@ def _execute_workflow_agent(
             variables = [item for item in action.get("variables", []) if isinstance(item, dict)]
             variable_context = _workflow_variable_context(variables=variables, state=state)
             missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
-            status_id = progress.start(
+            status_id = _start_workflow_status(
+                progress=progress,
                 kind="thinking",
                 label=f"Inspecting workflow input {action_index + 1}",
-                details=_workflow_status_details(state=state, action_index=action_index + 1, action=action, workflow_status="running"),
+                state=state,
+                action_index=action_index + 1,
+                action=action,
+                workflow_status="running",
             )
             parsed: dict[str, Any] = {}
             if missing:
@@ -563,17 +617,16 @@ def _execute_workflow_agent(
                             else "Please provide the required information."
                         )
                 state.update({"action_index": action_index, "status": "awaiting_user_input"})
-                progress.complete(
-                    status_id,
+                _complete_workflow_status(
+                    progress=progress,
+                    status_id=status_id,
                     kind="thinking",
                     label="Workflow is awaiting user input",
-                    details=_workflow_status_details(
-                        state=state,
-                        action_index=action_index + 1,
-                        action=action,
-                        workflow_status="awaiting_user_input",
-                        extra={"missing": missing},
-                    ),
+                    state=state,
+                    action_index=action_index + 1,
+                    action=action,
+                    workflow_status="awaiting_user_input",
+                    extra={"missing": missing},
                 )
                 return ExecutionResult(
                     output_text=question,
@@ -582,11 +635,15 @@ def _execute_workflow_agent(
                     workflow_state=state,
                     workflow_status="awaiting_user_input",
                 ), requested_model
-            progress.complete(
-                status_id,
+            _complete_workflow_status(
+                progress=progress,
+                status_id=status_id,
                 kind="thinking",
                 label=f"Collected workflow input {action_index + 1}",
-                details=_workflow_status_details(state=state, action_index=action_index + 1, action=action, workflow_status="running"),
+                state=state,
+                action_index=action_index + 1,
+                action=action,
+                workflow_status="running",
             )
             action_index += 1
             state["action_index"] = action_index
@@ -612,7 +669,7 @@ def _execute_workflow_agent(
                 variables=available_variables,
                 state=state,
             )
-            completed_action = False
+            action_completed = False
             for iteration in range(1, _MAX_WORKFLOW_ACTION_ITERATIONS + 1):
                 bound_values = {
                     field: state["variables"].get(str(binding.get("variable") or ""))
@@ -641,16 +698,15 @@ def _execute_workflow_agent(
                 except LlmRuntimeClientError:
                     parsed = {}
                 arguments = parsed.get("arguments") if isinstance(parsed.get("arguments"), dict) else bound_values
-                status_id = progress.start(
+                status_id = _start_workflow_status(
+                    progress=progress,
                     kind="running_tool",
                     label=f"Running workflow action {action_index + 1}: {str(action.get('name') or tool_name or slug)}",
-                    details=_workflow_status_details(
-                        state=state,
-                        action_index=action_index + 1,
-                        action=action,
-                        workflow_status="running",
-                        extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
-                    ),
+                    state=state,
+                    action_index=action_index + 1,
+                    action=action,
+                    workflow_status="running",
+                    extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
                 )
                 tool_call = {
                     "id": f"workflow-action-{action_index + 1}-{iteration}",
@@ -666,18 +722,17 @@ def _execute_workflow_agent(
                     delegated_user_id=context.requested_by_user_id,
                     delegated_user_role=context.requested_by_role,
                 )
-                progress.complete(
-                    status_id,
+                _complete_workflow_status(
+                    progress=progress,
+                    status_id=status_id,
                     kind="running_tool",
                     label=f"Completed workflow action {action_index + 1}",
                     summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
-                    details=_workflow_status_details(
-                        state=state,
-                        action_index=action_index + 1,
-                        action=action,
-                        workflow_status="running",
-                        extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
-                    ),
+                    state=state,
+                    action_index=action_index + 1,
+                    action=action,
+                    workflow_status="running",
+                    extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
                 )
                 tool_calls.append(call_record)
                 state.setdefault("action_outputs", {})[str(action.get("id") or f"action_{action_index + 1}")] = tool_payload
@@ -704,9 +759,9 @@ def _execute_workflow_agent(
                     if str(name).strip() and str(value).strip():
                         state["variables"][str(name).strip()] = str(value).strip()
                 if bool(evaluation.get("complete", True)):
-                    completed_action = True
+                    action_completed = True
                     break
-            if not completed_action:
+            if not action_completed:
                 raise ExecutionBlockedError(
                     code="EXEC_WORKFLOW_ACTION_BLOCKED",
                     message=f"Workflow action '{str(action.get('name') or tool_name or slug)}' did not complete safely",
@@ -734,15 +789,14 @@ def _execute_workflow_agent(
                 for variable in action.get("variable_refs", [])
                 if str(variable) in state["variables"]
             }
-            status_id = progress.start(
+            status_id = _start_workflow_status(
+                progress=progress,
                 kind="thinking",
                 label=f"Composing workflow output {action_index + 1}",
-                details=_workflow_status_details(
-                    state=state,
-                    action_index=action_index + 1,
-                    action=action,
-                    workflow_status="running",
-                ),
+                state=state,
+                action_index=action_index + 1,
+                action=action,
+                workflow_status="running",
             )
             output, output_model_calls = _workflow_compose_output_with_repair(
                 context=context,
@@ -756,16 +810,15 @@ def _execute_workflow_agent(
             if not output:
                 output = "\n".join(f"{key}: {compact_payload(value)}" for key, value in selected.items()) or "Workflow completed."
             state.update({"action_index": len(actions), "status": "completed"})
-            progress.complete(
-                status_id,
+            _complete_workflow_status(
+                progress=progress,
+                status_id=status_id,
                 kind="thinking",
                 label=f"Completed workflow output {action_index + 1}",
-                details=_workflow_status_details(
-                    state=state,
-                    action_index=len(actions),
-                    action=action,
-                    workflow_status="completed",
-                ),
+                state=state,
+                action_index=len(actions),
+                action=action,
+                workflow_status="completed",
             )
             return ExecutionResult(
                 output_text=output,
