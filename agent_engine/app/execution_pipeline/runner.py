@@ -7,7 +7,7 @@ from threading import Thread
 from typing import Any, Iterator
 from uuid import uuid4
 
-from workflow_prompt_contract import normalize_agent_runtime_prompts
+from vanessa_shared.workflow_prompt_contract import normalize_agent_runtime_prompts
 
 from ..policies.runtime_policy import (
     require_agent_execute_permission_stage as require_agent_execute_permission,

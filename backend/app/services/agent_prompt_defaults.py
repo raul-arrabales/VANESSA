@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .user_agent_types import USER_AGENT_TYPE_WORKFLOW
-from workflow_prompt_contract import (
+from vanessa_shared.workflow_prompt_contract import (
     default_agent_runtime_prompts as shared_default_agent_runtime_prompts,
     default_runtime_prompts_for_agent_type as shared_default_runtime_prompts_for_agent_type,
     normalize_agent_runtime_prompts as shared_normalize_agent_runtime_prompts,
