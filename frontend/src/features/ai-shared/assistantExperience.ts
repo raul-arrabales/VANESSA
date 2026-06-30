@@ -10,6 +10,7 @@ export type PreviewableAssistantExperience = {
   agent_type?: "workflow" | "planner" | "react";
   channel_type?: "vanessa_webapp";
   interface_type?: "chat";
+  workflow_execution_mode?: "one_time" | "loop";
   runtime_constraints: {
     internet_required: boolean;
     sandbox_required: boolean;

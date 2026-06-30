@@ -50,6 +50,17 @@ function TemporaryConversationIndicator(): JSX.Element {
   );
 }
 
+
+function ClosedWorkflowIndicator(): JSX.Element {
+  return (
+    <div className="chatbot-temporary-indicator-wrap">
+      <span className="chatbot-temporary-indicator" role="status" aria-live="polite">
+        Workflow finished. Start a new chat to run it again.
+      </span>
+    </div>
+  );
+}
+
 export default function ThreadPanel({
   activeSession,
   isBootstrapping,
@@ -80,6 +91,7 @@ export default function ThreadPanel({
     && !isBootstrapping
     && !isSending;
   const isTemporarySession = activeSession?.persistence === "temporary";
+  const isClosedWorkflowSession = activeSession?.workflowSessionState === "closed";
 
   useEffect(() => () => {
     if (copiedResetTimeoutRef.current !== null) {
@@ -118,6 +130,7 @@ export default function ThreadPanel({
         data-temporary={isTemporarySession ? "true" : "false"}
       >
         {isTemporarySession ? <TemporaryConversationIndicator /> : null}
+        {isClosedWorkflowSession ? <ClosedWorkflowIndicator /> : null}
         <div className="chatbot-starter-composer">
           {composer}
         </div>
@@ -134,6 +147,7 @@ export default function ThreadPanel({
       data-temporary={isTemporarySession ? "true" : "false"}
     >
       {isTemporarySession ? <TemporaryConversationIndicator /> : null}
+      {isClosedWorkflowSession ? <ClosedWorkflowIndicator /> : null}
       <div
         className="chatbot-thread"
         aria-live="polite"

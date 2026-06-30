@@ -253,7 +253,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           composer={(
             <Composer
               draft={preferences.draft}
-              error={viewState.composerError}
+              error={viewState.composerDisabledReason || viewState.composerError}
               disabled={!viewState.isWorkspaceReady}
               submitLabel={config.messaging.submitLabel}
               busyLabel={config.messaging.busyLabel}

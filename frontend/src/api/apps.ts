@@ -8,6 +8,7 @@ export type VanessaApp = {
   interface_type: "chat";
   channel_type: "vanessa_webapp";
   agent_type: "workflow" | "planner" | "react";
+  workflow_execution_mode?: "one_time" | "loop";
   published_at: string | null;
   updated_at: string | null;
 };

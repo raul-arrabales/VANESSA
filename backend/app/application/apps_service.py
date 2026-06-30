@@ -26,6 +26,7 @@ def list_published_apps(database_url: str) -> list[dict[str, Any]]:
                 "interface_type": "chat",
                 "channel_type": "vanessa_webapp",
                 "agent_type": str(spec.get("agent_type") or "workflow"),
+                "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
                 "published_at": agent.get("published_at"),
                 "updated_at": agent.get("updated_at"),
             }

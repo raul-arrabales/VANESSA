@@ -20,6 +20,7 @@ from ..services.user_agent_types import (
     INTERFACE_TYPE_CHAT,
     coerce_channel_type,
     coerce_interface_type,
+    coerce_workflow_execution_mode,
     coerce_user_agent_type,
     normalize_workflow_definition,
     workflow_actions,
@@ -350,6 +351,7 @@ def build_agent_project_preview(
         "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),
+        "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
     }
 
 
@@ -393,6 +395,7 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
             "channel_type": str(row.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
             "interface_type": str(row.get("interface_type") or INTERFACE_TYPE_CHAT),
             "workflow_definition": dict(row.get("workflow_definition") or {}),
+            "workflow_execution_mode": str(row.get("workflow_execution_mode") or "one_time"),
             "tool_policy": dict(row.get("tool_policy") or {}),
             "runtime_constraints": dict(row.get("runtime_constraints") or {}),
         },
@@ -448,6 +451,10 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
     except ValueError as exc:
         raise AgentProjectError("invalid_workflow_definition", str(exc)) from exc
+    try:
+        workflow_execution_mode = coerce_workflow_execution_mode(payload.get("workflow_execution_mode"))
+    except ValueError as exc:
+        raise AgentProjectError("invalid_workflow_execution_mode", str(exc)) from exc
     workflow_shape_errors = _validate_workflow_shape(workflow_definition) if agent_type == "workflow" else []
     if workflow_shape_errors:
         raise AgentProjectError("invalid_workflow_definition", workflow_shape_errors[0], details={"errors": workflow_shape_errors})
@@ -471,6 +478,7 @@ def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "channel_type": channel_type,
         "interface_type": interface_type,
         "workflow_definition": workflow_definition,
+        "workflow_execution_mode": workflow_execution_mode,
         "tool_policy": tool_policy,
         "runtime_constraints": {
             "internet_required": bool(runtime_constraints["internet_required"]),
@@ -555,6 +563,7 @@ def _compile_catalog_payload(project: dict[str, Any]) -> dict[str, Any]:
         "channel_type": str(spec.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
         "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),
+        "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "visibility": str(project.get("visibility", "private")),
         "publish": True,

@@ -63,6 +63,7 @@ from .user_agent_types import (
     INTERFACE_TYPE_CHAT,
     coerce_channel_type,
     coerce_interface_type,
+    coerce_workflow_execution_mode,
     coerce_user_agent_type,
     normalize_workflow_definition,
     normalize_workflow_definition_for_response,
@@ -972,6 +973,7 @@ def _normalize_agent_spec_for_response(spec: dict[str, Any]) -> dict[str, Any]:
     normalized["agent_domain"] = str(normalized.get("agent_domain") or "default").strip() or "default"
     normalized["channel_type"] = str(normalized.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP).strip() or CHANNEL_TYPE_VANESSA_WEBAPP
     normalized["interface_type"] = str(normalized.get("interface_type") or INTERFACE_TYPE_CHAT).strip() or INTERFACE_TYPE_CHAT
+    normalized["workflow_execution_mode"] = str(normalized.get("workflow_execution_mode") or "one_time").strip() or "one_time"
     normalized["tool_refs"] = list(normalized.get("tool_refs") or [])
     normalized["mcp_server_refs"] = list(normalized.get("mcp_server_refs") or [])
     normalized["workflow_definition"] = normalize_workflow_definition_for_response(
@@ -1388,6 +1390,10 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
     except ValueError as exc:
         raise CatalogError("invalid_workflow_definition", str(exc)) from exc
+    try:
+        workflow_execution_mode = coerce_workflow_execution_mode(payload.get("workflow_execution_mode"))
+    except ValueError as exc:
+        raise CatalogError("invalid_workflow_execution_mode", str(exc)) from exc
     default_model_ref_raw = payload.get("default_model_ref")
     default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
     if channel_type == CHANNEL_TYPE_VANESSA_WEBAPP and interface_type != INTERFACE_TYPE_CHAT:
@@ -1405,6 +1411,7 @@ def _coerce_agent_spec(payload: dict[str, Any]) -> dict[str, Any]:
         "channel_type": channel_type,
         "interface_type": interface_type,
         "workflow_definition": workflow_definition,
+        "workflow_execution_mode": workflow_execution_mode,
         "runtime_constraints": {
             "internet_required": bool(runtime_constraints["internet_required"]),
             "sandbox_required": bool(runtime_constraints["sandbox_required"]),

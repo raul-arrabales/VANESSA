@@ -56,6 +56,8 @@ export type WorkflowDefinition = {
   actions: WorkflowAction[];
 };
 
+export type WorkflowExecutionMode = "one_time" | "loop";
+
 export type AgentProjectSpec = {
   name: string;
   description: string;
@@ -70,6 +72,7 @@ export type AgentProjectSpec = {
   agent_type: "workflow" | "planner" | "react";
   channel_type: "vanessa_webapp";
   interface_type: "chat";
+  workflow_execution_mode?: WorkflowExecutionMode;
   workflow_definition: WorkflowDefinition;
   tool_policy: Record<string, unknown>;
   runtime_constraints: {

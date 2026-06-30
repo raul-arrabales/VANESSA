@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.application import playground_execution, playgrounds_service
 from app.config import AuthConfig
 
@@ -897,6 +899,220 @@ def test_stream_workflow_message_persists_completed_workflow_metadata(monkeypatc
     assert workflow_runs[0]["workflow_state"]["action_index"] == 2
     assert workflow_runs[0]["workflow_state"]["variables"] == {"user_name": "Raul"}
     assert events[-1]["data"]["statuses"][-1]["details"]["workflow_status"] == "completed"
+
+
+def test_send_playground_message_blocks_closed_one_time_workflow_sessions(monkeypatch):
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "get_session",
+        lambda _database_url, *, owner_user_id, conversation_id, conversation_kind: {
+            "id": conversation_id,
+            "conversation_kind": "plain",
+            "title": "Workflow session",
+            "title_source": "auto",
+            "model_id": "safe-small",
+            "knowledge_base_id": None,
+            "assistant_ref": "agent.project.workflow-agent-1",
+        } if conversation_kind == "plain" else None,
+    )
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_workflow_assistant_settings",
+        lambda *_args, **_kwargs: {
+            "assistant_ref": "agent.project.workflow-agent-1",
+            "workflow_execution_mode": "one_time",
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_workflow_run",
+        lambda *_args, **_kwargs: {
+            "session_state": "closed",
+            "workflow_cycle": 1,
+            "cycle_started_message_index": 0,
+            "workflow_state": {"version": 2, "action_index": 2, "variables": {}, "action_outputs": {}, "status": "completed"},
+        },
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    with pytest.raises(playgrounds_service.PlaygroundSessionValidationError) as exc_info:
+        playgrounds_service.send_playground_message(
+            "postgresql://ignored",
+            config=config,
+            request_id="req-workflow-closed",
+            owner_user_id=10,
+            owner_role="user",
+            session_id="sess-workflow",
+            prompt="hello again",
+        )
+
+    assert exc_info.value.code == "workflow_session_closed"
+
+
+def test_build_execution_request_uses_workflow_cycle_boundary(monkeypatch):
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_workflow_assistant_settings",
+        lambda *_args, **_kwargs: {
+            "assistant_ref": "agent.project.workflow-agent-1",
+            "workflow_execution_mode": "loop",
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_workflow_run",
+        lambda *_args, **_kwargs: {
+            "session_state": "active",
+            "workflow_cycle": 3,
+            "cycle_started_message_index": 5,
+            "workflow_state": {"version": 2, "action_index": 0, "variables": {}, "action_outputs": {}, "status": "awaiting_user_input"},
+        },
+    )
+
+    request = playgrounds_service._build_execution_request(
+        database_url="postgresql://ignored",
+        owner_user_id=10,
+        row={
+            "id": "sess-workflow",
+            "conversation_kind": "plain",
+            "title": "Workflow session",
+            "title_source": "auto",
+            "model_id": "safe-small",
+            "knowledge_base_id": None,
+            "assistant_ref": "agent.project.workflow-agent-1",
+        },
+        history_messages=[
+            {"message_index": 0, "role": "assistant", "content": "old cycle prompt", "metadata_json": {}},
+            {"message_index": 1, "role": "user", "content": "old cycle answer", "metadata_json": {}},
+            {"message_index": 5, "role": "assistant", "content": "fresh cycle prompt", "metadata_json": {}},
+            {"message_index": 6, "role": "user", "content": "fresh cycle answer", "metadata_json": {}},
+        ],
+        prompt="fresh cycle answer",
+    )
+
+    assert [message["content"] for message in request.history] == [
+        "fresh cycle prompt",
+        "fresh cycle answer",
+    ]
+    assert request.workflow_execution_mode == "loop"
+    assert request.workflow_cycle == 3
+    assert request.workflow_session_state == "active"
+
+
+def test_send_playground_message_restarts_loop_workflow_with_next_cycle(monkeypatch):
+    bootstrap_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "get_session",
+        lambda _database_url, *, owner_user_id, conversation_id, conversation_kind: {
+            "id": conversation_id,
+            "conversation_kind": "plain",
+            "title": "Loop workflow",
+            "title_source": "auto",
+            "model_id": "safe-small",
+            "knowledge_base_id": None,
+            "assistant_ref": "agent.project.workflow-agent-1",
+        } if conversation_kind == "plain" else None,
+    )
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "list_messages", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_workflow_assistant_settings",
+        lambda *_args, **_kwargs: {
+            "assistant_ref": "agent.project.workflow-agent-1",
+            "workflow_execution_mode": "loop",
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_workflow_run",
+        lambda *_args, **_kwargs: {
+            "session_state": "active",
+            "workflow_cycle": 2,
+            "cycle_started_message_index": 4,
+            "workflow_state": {"version": 2, "action_index": 1, "variables": {"name": "Raul"}, "action_outputs": {}, "status": "running"},
+        },
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "execute_agent_chat_request",
+        lambda **_kwargs: playgrounds_service.PlaygroundExecutionResult(
+            output="Cycle complete.",
+            workflow_state={"version": 2, "action_index": 2, "variables": {"name": "Raul"}, "action_outputs": {}, "status": "completed"},
+            workflow_status="completed",
+            content_parts=[{"type": "text", "text": "Cycle complete."}],
+        ),
+    )
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "append_message_pair",
+        lambda *_args, **kwargs: {
+            "conversation": {
+                "id": kwargs["conversation_id"],
+                "conversation_kind": "plain",
+                "title": "Loop workflow",
+                "title_source": "auto",
+                "assistant_ref": "agent.project.workflow-agent-1",
+                "model_id": "safe-small",
+                "knowledge_base_id": None,
+            },
+            "messages": [
+                {"id": "msg-user", "message_index": 5, "role": "user", "content": kwargs["user_content"], "metadata_json": {}, "created_at": "2026-03-18T11:00:00+00:00"},
+                {"id": "msg-assistant", "message_index": 6, "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
+            ],
+        },
+    )
+    monkeypatch.setattr(playgrounds_service, "bind_message_attachments", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_maybe_bootstrap_workflow_session",
+        lambda *_args, **kwargs: bootstrap_calls.append(dict(kwargs)),
+    )
+    monkeypatch.setattr(
+        playgrounds_service,
+        "get_playground_session_detail",
+        lambda *_args, **_kwargs: {"id": "sess-workflow", "playground_kind": "chat", "messages": []},
+    )
+
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+
+    playgrounds_service.send_playground_message(
+        "postgresql://ignored",
+        config=config,
+        request_id="req-loop",
+        owner_user_id=10,
+        owner_role="user",
+        session_id="sess-workflow",
+        prompt="continue",
+    )
+
+    assert bootstrap_calls[0]["workflow_execution_mode"] == "loop"
+    assert bootstrap_calls[0]["workflow_cycle"] == 3
 
 
 def test_send_temporary_playground_message_does_not_persist(monkeypatch):

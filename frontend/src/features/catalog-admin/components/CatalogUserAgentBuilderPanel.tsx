@@ -154,6 +154,17 @@ export default function CatalogUserAgentBuilderPanel({
                 ))}
               </select>
             </label>
+            <label className="card-stack">
+              <span className="field-label">Workflow execution mode</span>
+              <select
+                className="field-input"
+                value={form.workflowExecutionMode}
+                onChange={(event) => onChange({ ...form, workflowExecutionMode: event.currentTarget.value as AgentProjectFormState["workflowExecutionMode"] })}
+              >
+                <option value="one_time">One-time execution</option>
+                <option value="loop">Loop execution</option>
+              </select>
+            </label>
           </section>
         ) : null}
 

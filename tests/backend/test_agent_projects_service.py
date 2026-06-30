@@ -183,6 +183,43 @@ def test_create_agent_project_allows_empty_workflow_retrieval_context(monkeypatc
     assert project["spec"]["runtime_prompts"] == normalize_agent_runtime_prompts({"retrieval_context": ""}, agent_type="workflow")
 
 
+def test_create_agent_project_persists_workflow_execution_mode(monkeypatch):
+    created_specs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        agent_projects_service,
+        "create_project_row",
+        lambda _database_url, *, project_id, owner_user_id, spec, visibility: created_specs.append(spec)
+        or {**_project_row(), **spec, "id": project_id, "owner_user_id": owner_user_id, "visibility": visibility},
+    )
+
+    project = agent_projects_service.create_agent_project(
+        "postgresql://ignored",
+        owner_user_id=10,
+        payload={
+            "id": "proj-loop",
+            "visibility": "private",
+            "name": "Loop Agent",
+            "description": "Repeats the workflow in the same chat.",
+            "instructions": "",
+            "default_model_ref": None,
+            "tool_refs": [],
+            "mcp_server_refs": [],
+            "agent_type": "workflow",
+            "channel_type": "vanessa_webapp",
+            "interface_type": "chat",
+            "workflow_execution_mode": "loop",
+            "workflow_definition": _project_row()["workflow_definition"],
+            "tool_policy": {"allow_user_tools": False},
+            "runtime_constraints": {"internet_required": False, "sandbox_required": False},
+        },
+    )
+
+    assert created_specs[0]["workflow_execution_mode"] == "loop"
+    assert project["spec"]["workflow_execution_mode"] == "loop"
+
+
 def test_create_agent_project_rejects_legacy_workflow_steps(monkeypatch):
     monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: None)
 
@@ -361,6 +398,7 @@ def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypat
         "agent_type": "workflow",
         "channel_type": "vanessa_webapp",
         "interface_type": "chat",
+        "workflow_execution_mode": "one_time",
         "runtime_constraints": {"internet_required": False, "sandbox_required": False},
         "workflow_definition": _project_row()["workflow_definition"],
     }

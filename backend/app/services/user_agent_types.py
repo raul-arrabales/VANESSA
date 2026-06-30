@@ -20,6 +20,12 @@ INTERFACE_TYPE_CHAT = "chat"
 SUPPORTED_INTERFACE_TYPES = {INTERFACE_TYPE_CHAT}
 WORKFLOW_VARIABLE_TYPE_TEXT = "text"
 SUPPORTED_WORKFLOW_VARIABLE_TYPES = {WORKFLOW_VARIABLE_TYPE_TEXT}
+WORKFLOW_EXECUTION_MODE_ONE_TIME = "one_time"
+WORKFLOW_EXECUTION_MODE_LOOP = "loop"
+SUPPORTED_WORKFLOW_EXECUTION_MODES = {
+    WORKFLOW_EXECUTION_MODE_ONE_TIME,
+    WORKFLOW_EXECUTION_MODE_LOOP,
+}
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _LEGACY_WORKFLOW_INPUT_PROMPT = (
@@ -58,6 +64,13 @@ def coerce_interface_type(value: Any) -> str:
     normalized = str(value or INTERFACE_TYPE_CHAT).strip().lower() or INTERFACE_TYPE_CHAT
     if normalized not in SUPPORTED_INTERFACE_TYPES:
         raise ValueError("interface_type must be chat")
+    return normalized
+
+
+def coerce_workflow_execution_mode(value: Any) -> str:
+    normalized = str(value or WORKFLOW_EXECUTION_MODE_ONE_TIME).strip().lower() or WORKFLOW_EXECUTION_MODE_ONE_TIME
+    if normalized not in SUPPORTED_WORKFLOW_EXECUTION_MODES:
+        raise ValueError("workflow_execution_mode must be one_time or loop")
     return normalized
 
 

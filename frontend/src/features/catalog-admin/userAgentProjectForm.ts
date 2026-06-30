@@ -14,6 +14,7 @@ export type AgentProjectFormState = {
   agentType: "" | "workflow" | "planner" | "react";
   channelType: "" | "vanessa_webapp";
   interfaceType: "" | "chat";
+  workflowExecutionMode: "one_time" | "loop";
   agentDomain: string;
   workflowActions: WorkflowAction[];
   toolRefsText: string;
@@ -84,6 +85,7 @@ export function buildDefaultAgentProjectForm(
     agentType: "workflow",
     channelType: "vanessa_webapp",
     interfaceType: "chat",
+    workflowExecutionMode: "one_time",
     agentDomain: "default",
     workflowActions: [],
     toolRefsText: "",
@@ -111,10 +113,11 @@ export function buildGuidedUserAgentCreateForm(
     const workflowDefaults = buildDefaultAgentProjectForm(defaults, options);
     return {
       ...workflowDefaults,
-      agentType: "workflow",
-      channelType: "vanessa_webapp",
-      interfaceType: "chat",
-    };
+    agentType: "workflow",
+    channelType: "vanessa_webapp",
+    interfaceType: "chat",
+    workflowExecutionMode: "one_time",
+  };
   }
 
   return {
@@ -128,6 +131,7 @@ export function buildGuidedUserAgentCreateForm(
     agentType: "",
     channelType: "",
     interfaceType: "",
+    workflowExecutionMode: "one_time",
     agentDomain: "default",
     workflowActions: [],
     toolRefsText: "",
@@ -172,6 +176,7 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     agentType: project.spec.agent_type,
     channelType: project.spec.channel_type,
     interfaceType: project.spec.interface_type,
+    workflowExecutionMode: project.spec.workflow_execution_mode ?? "one_time",
     agentDomain: project.spec.agent_domain ?? "default",
     workflowActions: normalizeWorkflowActions(project.spec.workflow_definition),
     toolRefsText: JSON.stringify(project.spec.tool_refs, null, 2),
@@ -225,6 +230,7 @@ export function toAgentProjectMutationInput(
   const agentType = (form.agentType || "workflow") as "workflow" | "planner" | "react";
   const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
   const interfaceType = (form.interfaceType || "chat") as "chat";
+  const workflowExecutionMode = form.workflowExecutionMode;
   const workflowDefinition = workflowDefinitionFromForm(form);
   const trimmedRetrievalContext = form.retrievalContext.trim();
   return {
@@ -243,6 +249,7 @@ export function toAgentProjectMutationInput(
     agent_type: agentType,
     channel_type: channelType,
     interface_type: interfaceType,
+    workflow_execution_mode: workflowExecutionMode,
     workflow_definition: workflowDefinition,
     tool_policy: parseJsonObject(form.toolPolicyText, invalidToolPolicyMessage),
     runtime_constraints: {
@@ -256,6 +263,7 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
   const agentType = (form.agentType || "workflow") as "workflow" | "planner" | "react";
   const channelType = (form.channelType || "vanessa_webapp") as "vanessa_webapp";
   const interfaceType = (form.interfaceType || "chat") as "chat";
+  const workflowExecutionMode = form.workflowExecutionMode;
   const defaultModelRef = String(form.defaultModelRef ?? "").trim();
   const agentDomain = String(form.agentDomain ?? "").trim();
   const workflowDefinition = workflowDefinitionFromForm(form);
@@ -270,6 +278,7 @@ export function buildAgentProjectPreview(projectId: string, form: AgentProjectFo
     agent_type: agentType,
     channel_type: channelType,
     interface_type: interfaceType,
+    workflow_execution_mode: workflowExecutionMode,
     runtime_constraints: {
       internet_required: form.internetRequired,
       sandbox_required: form.sandboxRequired,

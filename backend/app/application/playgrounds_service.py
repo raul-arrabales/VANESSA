@@ -68,6 +68,10 @@ DEFAULT_KNOWLEDGE_TITLE = "New knowledge session"
 TEMPORARY_CHAT_TITLE = "Temporary chat"
 IMAGE_ONLY_EXECUTION_PROMPT = "User sent image attachment(s)."
 SESSION_UNSET = playgrounds_repository.UNSET
+WORKFLOW_EXECUTION_MODE_ONE_TIME = "one_time"
+WORKFLOW_EXECUTION_MODE_LOOP = "loop"
+WORKFLOW_SESSION_STATE_ACTIVE = "active"
+WORKFLOW_SESSION_STATE_CLOSED = "closed"
 
 PlaygroundSessionValidationError = PlaygroundExecutionValidationError
 list_knowledge_chat_knowledge_bases = list_runtime_knowledge_base_options
@@ -82,6 +86,15 @@ class PlaygroundChatExecutionError(RuntimeError):
         super().__init__(str(payload.get("message") or payload.get("error") or "playground_chat_failed"))
         self.payload = payload
         self.status_code = status_code
+
+def _workflow_execution_mode(value: Any) -> str:
+    normalized = str(value or WORKFLOW_EXECUTION_MODE_ONE_TIME).strip().lower() or WORKFLOW_EXECUTION_MODE_ONE_TIME
+    return normalized if normalized in {WORKFLOW_EXECUTION_MODE_ONE_TIME, WORKFLOW_EXECUTION_MODE_LOOP} else WORKFLOW_EXECUTION_MODE_ONE_TIME
+
+
+def _workflow_session_state(value: Any) -> str:
+    normalized = str(value or WORKFLOW_SESSION_STATE_ACTIVE).strip().lower() or WORKFLOW_SESSION_STATE_ACTIVE
+    return normalized if normalized in {WORKFLOW_SESSION_STATE_ACTIVE, WORKFLOW_SESSION_STATE_CLOSED} else WORKFLOW_SESSION_STATE_ACTIVE
 
 
 def _record_status(statuses: dict[str, dict[str, Any]], status: dict[str, Any]) -> dict[str, Any]:
@@ -124,7 +137,14 @@ def list_playground_sessions(
             assistant_ref=string_or_none(assistant_ref),
             **filters,
         )
-        return [_serialize_session_summary(row) for row in rows]
+        return [
+            _serialize_session_summary(
+                database_url,
+                owner_user_id=owner_user_id,
+                row=row,
+            )
+            for row in rows
+        ]
 
     items: list[dict[str, Any]] = []
     for conversation_kind in ("plain", "knowledge"):
@@ -135,7 +155,14 @@ def list_playground_sessions(
             assistant_ref=string_or_none(assistant_ref),
             **filters,
         )
-        items.extend(_serialize_session_summary(row) for row in rows)
+        items.extend(
+            _serialize_session_summary(
+                database_url,
+                owner_user_id=owner_user_id,
+                row=row,
+            )
+            for row in rows
+        )
     items.sort(key=lambda row: row.get("updated_at") or "", reverse=True)
     return items
 
@@ -186,7 +213,12 @@ def get_playground_session_detail(
         session_id=session_id,
         playground_kind=playground_kind,
     )
-    return _serialize_session_detail(row, messages)
+    return _serialize_session_detail(
+        database_url,
+        owner_user_id=owner_user_id,
+        row=row,
+        messages=messages,
+    )
 
 
 def update_playground_session(
@@ -211,7 +243,11 @@ def update_playground_session(
     )
     if updated is None:
         raise PlaygroundSessionNotFoundError
-    return _serialize_session_summary(updated)
+    return _serialize_session_summary(
+        database_url,
+        owner_user_id=owner_user_id,
+        row=updated,
+    )
 
 
 def delete_playground_session(
@@ -266,7 +302,9 @@ def send_playground_message(
     )
     persisted = _persist_execution_result(
         database_url,
+        config=config,
         owner_user_id=owner_user_id,
+        owner_role=owner_role,
         request=request,
         result=result,
     )
@@ -511,6 +549,28 @@ def _build_execution_request(
     content_parts: Any = None,
 ) -> PlaygroundExecutionRequest:
     playground_kind = playground_kind_for_conversation_kind(str(row.get("conversation_kind", "")))
+    assistant_ref = string_or_none(row.get("assistant_ref"))
+    workflow_settings = (
+        _workflow_assistant_settings(database_url, assistant_ref=assistant_ref)
+        if playground_kind == CHAT_PLAYGROUND_KIND and assistant_ref
+        else None
+    )
+    workflow_run = (
+        get_workflow_run(
+            database_url,
+            owner_user_id=owner_user_id,
+            conversation_id=str(row.get("id", "")),
+            assistant_ref=assistant_ref,
+        )
+        if workflow_settings and assistant_ref
+        else None
+    )
+    cycle_boundary = int((workflow_run or {}).get("cycle_started_message_index", 0) or 0)
+    filtered_history_messages = [
+        item
+        for item in history_messages
+        if int(item.get("message_index", 0) or 0) >= cycle_boundary
+    ]
     user_content_parts = _normalize_user_content_parts(
         database_url=database_url,
         owner_user_id=owner_user_id,
@@ -524,11 +584,15 @@ def _build_execution_request(
     if not history_messages and str(row.get("title_source") or DEFAULT_TITLE_SOURCE) == DEFAULT_TITLE_SOURCE:
         conversation_title = auto_title_from_prompt(user_content_text or "Image message")
         title_source = DEFAULT_TITLE_SOURCE
+    runtime_metadata = _workflow_runtime_metadata(
+        workflow_run=workflow_run,
+        workflow_execution_mode=(workflow_settings or {}).get("workflow_execution_mode", WORKFLOW_EXECUTION_MODE_ONE_TIME),
+    ) if workflow_settings else {}
     return PlaygroundExecutionRequest(
         playground_kind=playground_kind,
         session_id=str(row.get("id", "")),
         conversation_kind=str(row.get("conversation_kind", "")),
-        assistant_ref=string_or_none(row.get("assistant_ref")),
+        assistant_ref=assistant_ref,
         model_id=string_or_none(row.get("model_id")),
         knowledge_base_id=string_or_none(row.get("knowledge_base_id")),
         prompt=prompt_text,
@@ -540,10 +604,14 @@ def _build_execution_request(
                 "content_parts": message_content_parts(item, allow_image_parts=True),
                 "metadata": item.get("metadata_json") if isinstance(item.get("metadata_json"), dict) else {},
             }
-            for item in history_messages
+            for item in filtered_history_messages
         ],
         conversation_title=conversation_title,
         title_source=title_source,
+        workflow_state=workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None,
+        workflow_execution_mode=runtime_metadata.get("workflow_execution_mode"),
+        workflow_session_state=runtime_metadata.get("workflow_session_state"),
+        workflow_cycle=runtime_metadata.get("workflow_cycle"),
     )
 
 
@@ -652,13 +720,11 @@ def _execute_request(
 ) -> PlaygroundExecutionResult:
     if request.playground_kind == CHAT_PLAYGROUND_KIND:
         if str(request.assistant_ref or "").strip().startswith("agent."):
-            workflow_run = get_workflow_run(
-                database_url,
-                owner_user_id=owner_user_id,
-                conversation_id=request.session_id,
-                assistant_ref=str(request.assistant_ref or ""),
-            )
-            request.workflow_state = workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None
+            if request.workflow_session_state == WORKFLOW_SESSION_STATE_CLOSED:
+                raise PlaygroundSessionValidationError(
+                    "workflow_session_closed",
+                    "This workflow chat has finished. Start a new chat to run it again.",
+                )
             try:
                 return execute_agent_chat_request(
                     database_url=database_url,
@@ -690,15 +756,63 @@ def _execute_request(
 
 
 def _is_workflow_assistant(database_url: str, *, assistant_ref: str | None) -> bool:
+    return _workflow_assistant_settings(database_url, assistant_ref=assistant_ref) is not None
+
+
+def _workflow_assistant_settings(database_url: str, *, assistant_ref: str | None) -> dict[str, Any] | None:
     normalized = str(assistant_ref or "").strip()
     if not normalized or not normalized.startswith("agent."):
-        return False
+        return None
     try:
         agent = get_catalog_agent(database_url, agent_id=normalized)
-    except CatalogError:
-        return False
+    except Exception:
+        return None
     spec = agent.get("spec") if isinstance(agent.get("spec"), dict) else {}
-    return str(spec.get("agent_type") or "").strip().lower() == "workflow"
+    if str(spec.get("agent_type") or "").strip().lower() != "workflow":
+        return None
+    return {
+        "assistant_ref": normalized,
+        "workflow_execution_mode": _workflow_execution_mode(spec.get("workflow_execution_mode")),
+    }
+
+
+def _workflow_runtime_metadata(
+    *,
+    workflow_run: dict[str, Any] | None,
+    workflow_execution_mode: str,
+) -> dict[str, Any]:
+    run = workflow_run if isinstance(workflow_run, dict) else {}
+    return {
+        "workflow_execution_mode": workflow_execution_mode,
+        "workflow_session_state": _workflow_session_state(run.get("session_state")),
+        "workflow_cycle": int(run.get("workflow_cycle", 1) or 1),
+    }
+
+
+def _upsert_workflow_runtime_state(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    request: PlaygroundExecutionRequest,
+    result: PlaygroundExecutionResult,
+    session_state: str,
+    workflow_cycle: int,
+    cycle_started_message_index: int,
+) -> None:
+    if not request.assistant_ref or result.workflow_state is None:
+        return
+    upsert_workflow_run(
+        database_url,
+        owner_user_id=owner_user_id,
+        conversation_id=request.session_id,
+        assistant_ref=request.assistant_ref,
+        status=result.workflow_status or "running",
+        workflow_execution_mode=_workflow_execution_mode(request.workflow_execution_mode),
+        session_state=_workflow_session_state(session_state),
+        workflow_cycle=max(1, int(workflow_cycle or 1)),
+        cycle_started_message_index=max(0, int(cycle_started_message_index or 0)),
+        workflow_state=result.workflow_state,
+    )
 
 
 def _build_assistant_metadata_for_result(
@@ -736,12 +850,18 @@ def _maybe_bootstrap_workflow_session(
     owner_user_id: int,
     owner_role: str,
     session_row: dict[str, Any],
+    workflow_execution_mode: str | None = None,
+    workflow_cycle: int = 1,
 ) -> None:
     assistant_ref = string_or_none(session_row.get("assistant_ref"))
     if str(session_row.get("conversation_kind") or "") != "plain":
         return
     if not _is_workflow_assistant(database_url, assistant_ref=assistant_ref):
         return
+    workflow_settings = _workflow_assistant_settings(database_url, assistant_ref=assistant_ref) or {}
+    resolved_workflow_execution_mode = _workflow_execution_mode(
+        workflow_execution_mode or workflow_settings.get("workflow_execution_mode"),
+    )
     request = PlaygroundExecutionRequest(
         playground_kind=CHAT_PLAYGROUND_KIND,
         session_id=str(session_row.get("id") or ""),
@@ -754,6 +874,9 @@ def _maybe_bootstrap_workflow_session(
         history=[],
         conversation_title=str(session_row.get("title") or DEFAULT_CHAT_TITLE),
         title_source=str(session_row.get("title_source") or DEFAULT_TITLE_SOURCE),
+        workflow_execution_mode=resolved_workflow_execution_mode,
+        workflow_session_state=WORKFLOW_SESSION_STATE_ACTIVE,
+        workflow_cycle=max(1, int(workflow_cycle or 1)),
     )
     result = _execute_request(
         database_url,
@@ -787,6 +910,7 @@ def _maybe_bootstrap_workflow_session(
     if persisted is None:
         raise PlaygroundSessionNotFoundError
     assistant_message = persisted["messages"][0] if persisted.get("messages") else {}
+    cycle_started_message_index = int(assistant_message.get("message_index", 0) or 0)
     bind_message_attachments(
         database_url,
         owner_user_id=owner_user_id,
@@ -794,15 +918,15 @@ def _maybe_bootstrap_workflow_session(
         conversation_id=request.session_id,
         message_id=str(assistant_message.get("id") or ""),
     )
-    if request.assistant_ref and result.workflow_state is not None:
-        upsert_workflow_run(
-            database_url,
-            owner_user_id=owner_user_id,
-            conversation_id=request.session_id,
-            assistant_ref=request.assistant_ref,
-            status=result.workflow_status or "running",
-            workflow_state=result.workflow_state,
-        )
+    _upsert_workflow_runtime_state(
+        database_url,
+        owner_user_id=owner_user_id,
+        request=request,
+        result=result,
+        session_state=WORKFLOW_SESSION_STATE_ACTIVE,
+        workflow_cycle=max(1, int(workflow_cycle or 1)),
+        cycle_started_message_index=cycle_started_message_index,
+    )
 
 
 def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExecutionResult:
@@ -844,7 +968,9 @@ def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExec
 def _persist_execution_result(
     database_url: str,
     *,
+    config: AuthConfig,
     owner_user_id: int,
+    owner_role: str,
     request: PlaygroundExecutionRequest,
     result: PlaygroundExecutionResult,
 ) -> dict[str, Any]:
@@ -891,14 +1017,41 @@ def _persist_execution_result(
         message_id=str(assistant_message.get("id") or ""),
     )
     if request.assistant_ref and result.workflow_state is not None:
-        upsert_workflow_run(
-            database_url,
-            owner_user_id=owner_user_id,
-            conversation_id=request.session_id,
-            assistant_ref=request.assistant_ref,
-            status=result.workflow_status or "running",
-            workflow_state=result.workflow_state,
-        )
+        workflow_cycle = max(1, int(request.workflow_cycle or 1))
+        workflow_execution_mode = _workflow_execution_mode(request.workflow_execution_mode)
+        current_cycle_boundary = 0
+        if workflow_execution_mode == WORKFLOW_EXECUTION_MODE_LOOP and result.workflow_status == "completed":
+            _maybe_bootstrap_workflow_session(
+                database_url,
+                config=config,
+                owner_user_id=owner_user_id,
+                owner_role=owner_role,
+                session_row=persisted.get("conversation") if isinstance(persisted.get("conversation"), dict) else {},
+                workflow_execution_mode=workflow_execution_mode,
+                workflow_cycle=workflow_cycle + 1,
+            )
+        else:
+            existing_run = get_workflow_run(
+                database_url,
+                owner_user_id=owner_user_id,
+                conversation_id=request.session_id,
+                assistant_ref=request.assistant_ref,
+            )
+            current_cycle_boundary = int((existing_run or {}).get("cycle_started_message_index", 0) or 0)
+            session_state = (
+                WORKFLOW_SESSION_STATE_CLOSED
+                if workflow_execution_mode == WORKFLOW_EXECUTION_MODE_ONE_TIME and result.workflow_status == "completed"
+                else WORKFLOW_SESSION_STATE_ACTIVE
+            )
+            _upsert_workflow_runtime_state(
+                database_url,
+                owner_user_id=owner_user_id,
+                request=request,
+                result=result,
+                session_state=session_state,
+                workflow_cycle=workflow_cycle,
+                cycle_started_message_index=current_cycle_boundary,
+            )
     return persisted
 
 
@@ -1097,13 +1250,11 @@ def _stream_chat_request(
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
         if str(request.assistant_ref or "").strip().startswith("agent."):
-            workflow_run = get_workflow_run(
-                database_url,
-                owner_user_id=owner_user_id,
-                conversation_id=request.session_id,
-                assistant_ref=str(request.assistant_ref or ""),
-            )
-            request.workflow_state = workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None
+            if request.workflow_session_state == WORKFLOW_SESSION_STATE_CLOSED:
+                raise PlaygroundSessionValidationError(
+                    "workflow_session_closed",
+                    "This workflow chat has finished. Start a new chat to run it again.",
+                )
             for event in stream_agent_chat_request(
                 database_url=database_url,
                 config=config,
@@ -1127,7 +1278,9 @@ def _stream_chat_request(
                     result.statuses = _status_values(statuses)
                     persisted = _persist_execution_result(
                         database_url,
+                        config=config,
                         owner_user_id=owner_user_id,
+                        owner_role=owner_role,
                         request=request,
                         result=result,
                     )
@@ -1155,7 +1308,9 @@ def _stream_chat_request(
         result.statuses = _status_values(statuses)
         persisted = _persist_execution_result(
             database_url,
+            config=config,
             owner_user_id=owner_user_id,
+            owner_role=owner_role,
             request=request,
             result=result,
         )
@@ -1378,7 +1533,9 @@ def _stream_knowledge_playground_message(
         result.statuses = _status_values(statuses)
         persisted = _persist_execution_result(
             database_url,
+            config=config,
             owner_user_id=owner_user_id,
+            owner_role=owner_role,
             request=request,
             result=result,
         )
@@ -1516,9 +1673,14 @@ def _normalize_session_filters(
     }
 
 
-def _serialize_session_summary(row: dict[str, Any]) -> dict[str, Any]:
+def _serialize_session_summary(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    row: dict[str, Any],
+) -> dict[str, Any]:
     playground_kind = playground_kind_for_conversation_kind(str(row.get("conversation_kind", "")))
-    return {
+    payload = {
         "id": str(row.get("id", "")),
         "playground_kind": playground_kind,
         "assistant_ref": string_or_none(row.get("assistant_ref")) or default_assistant_ref_for_kind(playground_kind),
@@ -1530,13 +1692,38 @@ def _serialize_session_summary(row: dict[str, Any]) -> dict[str, Any]:
         "created_at": serialize_datetime(row.get("created_at")),
         "updated_at": serialize_datetime(row.get("updated_at")),
     }
+    assistant_ref = string_or_none(row.get("assistant_ref"))
+    workflow_settings = (
+        _workflow_assistant_settings(database_url, assistant_ref=assistant_ref)
+        if playground_kind == CHAT_PLAYGROUND_KIND and assistant_ref
+        else None
+    )
+    if workflow_settings and assistant_ref:
+        workflow_run = get_workflow_run(
+            database_url,
+            owner_user_id=owner_user_id,
+            conversation_id=str(row.get("id", "")),
+            assistant_ref=assistant_ref,
+        )
+        payload.update(_workflow_runtime_metadata(
+            workflow_run=workflow_run,
+            workflow_execution_mode=workflow_settings.get("workflow_execution_mode"),
+        ))
+    return payload
 
 
 def _serialize_session_detail(
+    database_url: str,
+    *,
+    owner_user_id: int,
     row: dict[str, Any],
     messages: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
-    payload = _serialize_session_summary(row)
+    payload = _serialize_session_summary(
+        database_url,
+        owner_user_id=owner_user_id,
+        row=row,
+    )
     payload["messages"] = [serialize_message(message) for message in messages]
     return payload
 

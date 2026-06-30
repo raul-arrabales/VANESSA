@@ -35,6 +35,7 @@ export type UsePlaygroundWorkspaceViewStateParams = {
 export type PlaygroundWorkspaceViewState = {
   activeSession: PlaygroundSessionViewModel | null;
   composerError: string;
+  composerDisabledReason: string;
   isInteractionLocked: boolean;
   isWorkspaceReady: boolean;
   isThreadBootstrapping: boolean;
@@ -81,6 +82,10 @@ export function buildPlaygroundWorkspaceViewState({
       && optionsState.knowledgeBases.length > 0
     );
   const isWorkspaceReady = Boolean(activeSession) && hasUsableModels && hasUsableKnowledgeBases;
+  const isClosedWorkflowSession = activeSession?.workflowSessionState === "closed";
+  const composerDisabledReason = isClosedWorkflowSession
+    ? "This workflow chat has finished. Start a new chat to run it again."
+    : sessionState.activeError;
   const threadStatusText = sessionState.isActiveSessionLoading
     ? config.loadingText
     : !optionsState.hasLoadedModels
@@ -95,8 +100,9 @@ export function buildPlaygroundWorkspaceViewState({
   return {
     activeSession,
     composerError: sessionState.activeError,
+    composerDisabledReason,
     isInteractionLocked,
-    isWorkspaceReady,
+    isWorkspaceReady: isWorkspaceReady && !isClosedWorkflowSession,
     isThreadBootstrapping: !isWorkspaceReady || sessionState.isActiveSessionLoading,
     threadStatusText,
     hasUsableModels,

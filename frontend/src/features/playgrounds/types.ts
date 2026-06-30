@@ -38,6 +38,9 @@ export type PlaygroundSessionViewModel = {
   updatedAt: string | null;
   messages: PlaygroundMessageViewModel[];
   persistence: PlaygroundSessionPersistence;
+  workflowExecutionMode?: "one_time" | "loop" | null;
+  workflowSessionState?: "active" | "closed" | null;
+  workflowCycle?: number | null;
 };
 
 export type PlaygroundSelectorKind = "assistant" | "knowledgeBase" | "model";
@@ -124,6 +127,9 @@ export function mapPlaygroundSessionSummary(
     updatedAt: session.updated_at,
     messages: [],
     persistence: "saved",
+    workflowExecutionMode: session.workflow_execution_mode ?? null,
+    workflowSessionState: session.workflow_session_state ?? null,
+    workflowCycle: typeof session.workflow_cycle === "number" ? session.workflow_cycle : null,
   };
 }
 

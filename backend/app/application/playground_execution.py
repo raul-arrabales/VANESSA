@@ -49,6 +49,9 @@ class PlaygroundExecutionRequest:
     conversation_title: str | None = None
     title_source: str | None = None
     workflow_state: dict[str, Any] | None = None
+    workflow_execution_mode: str | None = None
+    workflow_session_state: str | None = None
+    workflow_cycle: int | None = None
 
 
 @dataclass(slots=True)

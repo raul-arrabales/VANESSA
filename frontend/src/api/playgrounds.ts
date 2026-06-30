@@ -120,6 +120,9 @@ export type PlaygroundSessionSummary = {
   message_count: number;
   created_at: string | null;
   updated_at: string | null;
+  workflow_execution_mode?: "one_time" | "loop";
+  workflow_session_state?: "active" | "closed";
+  workflow_cycle?: number;
 };
 
 export type PlaygroundSessionDetail = PlaygroundSessionSummary & {

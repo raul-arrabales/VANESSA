@@ -151,6 +151,9 @@ export function createDraftSession(
     updatedAt: null,
     messages: [],
     persistence: "draft",
+    workflowExecutionMode: source?.workflowExecutionMode ?? null,
+    workflowSessionState: null,
+    workflowCycle: null,
   };
 }
 
