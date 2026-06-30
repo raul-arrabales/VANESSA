@@ -27,11 +27,6 @@ type EditableWorkflowVariable = WorkflowVariableDefinition & {
   path?: string;
 };
 
-type WorkflowPromptField =
-  | "workflowInputExtractionPrompt"
-  | "workflowToolArgumentsPrompt"
-  | "workflowOutputResponsePrompt";
-
 type PromptVariableScope = {
   actionId: string;
   actionName: string;
@@ -58,62 +53,6 @@ export default function CatalogUserAgentBuilderPanel({
     && Boolean(form.id.trim() && form.name.trim() && form.description.trim());
   const enabledMcpServers = useMemo(() => mcpServers.filter((server) => server.spec.enabled), [mcpServers]);
   const workflowComplete = isWorkflowComplete(form.workflowActions, enabledMcpServers);
-  const promptFieldRefs = useRef<Record<WorkflowPromptField, HTMLTextAreaElement | null>>({
-    workflowInputExtractionPrompt: null,
-    workflowToolArgumentsPrompt: null,
-    workflowOutputResponsePrompt: null,
-  });
-  const inputPromptScopes = useMemo(
-    () =>
-      form.workflowActions
-        .filter((action): action is Extract<WorkflowAction, { type: "get_user_input" }> => action.type === "get_user_input")
-        .map((action) => ({
-          actionId: action.id,
-          actionName: action.name,
-          variables: action.variables
-            .filter((variable) => VARIABLE_NAME_PATTERN.test(variable.name))
-            .map((variable) => ({ name: variable.name, label: variable.label, type: variable.type })),
-        }))
-        .filter((scope) => scope.variables.length > 0),
-    [form.workflowActions],
-  );
-  const toolPromptScopes = useMemo(
-    () =>
-      form.workflowActions
-        .map((action, index) => ({
-          action,
-          index,
-          variables: action.type === "mcp_tool" ? variablesBeforeAction(form.workflowActions, index) : [],
-        }))
-        .filter((item): item is { action: Extract<WorkflowAction, { type: "mcp_tool" }>; index: number; variables: AvailableVariable[] } =>
-          item.action.type === "mcp_tool" && item.variables.length > 0)
-        .map((item) => ({
-          actionId: item.action.id,
-          actionName: item.action.name,
-          variables: item.variables,
-        })),
-    [form.workflowActions],
-  );
-  const outputPromptScopes = useMemo(
-    () =>
-      form.workflowActions
-        .map((action, index) => {
-          if (action.type !== "send_output") {
-            return null;
-          }
-          const availableByName = new Map(variablesBeforeAction(form.workflowActions, index).map((variable) => [variable.name, variable]));
-          const variables = action.variable_refs
-            .map((variableName) => availableByName.get(variableName))
-            .filter((variable): variable is AvailableVariable => Boolean(variable));
-          return {
-            actionId: action.id,
-            actionName: action.name,
-            variables,
-          };
-        })
-        .filter((scope): scope is PromptVariableScope => Boolean(scope && scope.variables.length > 0)),
-    [form.workflowActions],
-  );
 
   const updateAction = (index: number, action: WorkflowAction): void => {
     onChange({
@@ -133,26 +72,6 @@ export default function CatalogUserAgentBuilderPanel({
     onChange({
       ...form,
       workflowActions: [...form.workflowActions, buildNewAction(type, form.workflowActions.length)],
-    });
-  };
-
-  const insertPromptVariable = (field: WorkflowPromptField, variableName: string): void => {
-    const token = `{{${variableName}}}`;
-    const currentValue = form[field];
-    const textarea = promptFieldRefs.current[field];
-    const selectionStart = textarea ? textarea.selectionStart : currentValue.length;
-    const selectionEnd = textarea ? textarea.selectionEnd : currentValue.length;
-    const { nextValue, cursorPosition } = insertTokenAtSelection(currentValue, token, selectionStart, selectionEnd);
-    onChange({
-      ...form,
-      [field]: nextValue,
-    });
-    window.requestAnimationFrame(() => {
-      const target = promptFieldRefs.current[field];
-      if (target) {
-        target.focus();
-        target.setSelectionRange(cursorPosition, cursorPosition);
-      }
     });
   };
 
@@ -242,43 +161,6 @@ export default function CatalogUserAgentBuilderPanel({
           <section className="panel panel-nested card-stack">
             <h4 className="section-title">{t("catalogControl.agents.userProjects.stepWorkflow")}</h4>
             <p className="status-text">{t("catalogControl.agents.userProjects.workflowHelp")}</p>
-            <section className="panel panel-nested card-stack">
-              <h5 className="section-title">{t("catalogControl.agents.userProjects.workflowPromptsTitle")}</h5>
-              <p className="status-text">{t("catalogControl.agents.userProjects.workflowPromptsDescription")}</p>
-              <WorkflowPromptEditor
-                label={t("catalogControl.agents.userProjects.workflowInputExtractionPrompt")}
-                value={form.workflowInputExtractionPrompt}
-                scopes={inputPromptScopes}
-                emptyMessage={t("catalogControl.agents.userProjects.noInputVariables")}
-                textareaRef={(node) => {
-                  promptFieldRefs.current.workflowInputExtractionPrompt = node;
-                }}
-                onChange={(value) => onChange({ ...form, workflowInputExtractionPrompt: value })}
-                onInsertVariable={(variableName) => insertPromptVariable("workflowInputExtractionPrompt", variableName)}
-              />
-              <WorkflowPromptEditor
-                label={t("catalogControl.agents.userProjects.workflowToolArgumentsPrompt")}
-                value={form.workflowToolArgumentsPrompt}
-                scopes={toolPromptScopes}
-                emptyMessage={t("catalogControl.agents.userProjects.noToolVariables")}
-                textareaRef={(node) => {
-                  promptFieldRefs.current.workflowToolArgumentsPrompt = node;
-                }}
-                onChange={(value) => onChange({ ...form, workflowToolArgumentsPrompt: value })}
-                onInsertVariable={(variableName) => insertPromptVariable("workflowToolArgumentsPrompt", variableName)}
-              />
-              <WorkflowPromptEditor
-                label={t("catalogControl.agents.userProjects.workflowOutputResponsePrompt")}
-                value={form.workflowOutputResponsePrompt}
-                scopes={outputPromptScopes}
-                emptyMessage={t("catalogControl.agents.userProjects.noOutputVariables")}
-                textareaRef={(node) => {
-                  promptFieldRefs.current.workflowOutputResponsePrompt = node;
-                }}
-                onChange={(value) => onChange({ ...form, workflowOutputResponsePrompt: value })}
-                onInsertVariable={(variableName) => insertPromptVariable("workflowOutputResponsePrompt", variableName)}
-              />
-            </section>
             <div className="card-stack">
               {form.workflowActions.map((action, index) => (
                 <WorkflowActionEditor
@@ -343,11 +225,47 @@ function WorkflowActionEditor({
   onRemove: () => void;
 }): JSX.Element {
   const { t } = useTranslation("common");
+  const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedServer = action.type === "mcp_tool"
     ? enabledMcpServers.find((server) => server.spec.slug === action.mcp_server_slug) ?? null
     : null;
   const requiredInputs = selectedServer ? requiredSchemaFields(selectedServer.spec.input_schema) : [];
   const outputFields = selectedServer ? schemaPropertyNames(selectedServer.spec.output_schema) : [];
+  const promptScopes: PromptVariableScope[] = action.type === "get_user_input"
+    ? [{
+      actionId: action.id,
+      actionName: action.name,
+      variables: action.variables
+        .filter((variable) => VARIABLE_NAME_PATTERN.test(variable.name))
+        .map((variable) => ({ name: variable.name, label: variable.label, type: variable.type })),
+    }].filter((scope) => scope.variables.length > 0)
+    : action.type === "mcp_tool"
+      ? [{
+        actionId: action.id,
+        actionName: action.name,
+        variables: availableVariables,
+      }].filter((scope) => scope.variables.length > 0)
+      : [{
+        actionId: action.id,
+        actionName: action.name,
+        variables: availableVariables.filter((variable) => action.variable_refs.includes(variable.name)),
+      }].filter((scope) => scope.variables.length > 0);
+
+  const insertPromptVariable = (variableName: string): void => {
+    const token = `{{${variableName}}}`;
+    const textarea = promptRef.current;
+    const selectionStart = textarea ? textarea.selectionStart : action.prompt.length;
+    const selectionEnd = textarea ? textarea.selectionEnd : action.prompt.length;
+    const { nextValue, cursorPosition } = insertTokenAtSelection(action.prompt, token, selectionStart, selectionEnd);
+    onChange({ ...action, prompt: nextValue });
+    window.requestAnimationFrame(() => {
+      const target = promptRef.current;
+      if (target) {
+        target.focus();
+        target.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    });
+  };
 
   return (
     <section className="panel panel-nested card-stack">
@@ -361,10 +279,17 @@ function WorkflowActionEditor({
       </label>
       {action.type === "get_user_input" ? (
         <>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.agents.userProjects.userInputPrompt")}</span>
-            <textarea className="field-input form-textarea" value={action.prompt} onChange={(event) => onChange({ ...action, prompt: event.currentTarget.value })} />
-          </label>
+          <WorkflowPromptEditor
+            label={t("catalogControl.agents.userProjects.userInputPrompt")}
+            value={action.prompt}
+            scopes={promptScopes}
+            emptyMessage={t("catalogControl.agents.userProjects.noInputVariables")}
+            textareaRef={(node) => {
+              promptRef.current = node;
+            }}
+            onChange={(value) => onChange({ ...action, prompt: value })}
+            onInsertVariable={insertPromptVariable}
+          />
           <div className="card-stack">
             <span className="field-label">{t("catalogControl.agents.userProjects.outputVariables")}</span>
             <WorkflowVariableListEditor
@@ -377,6 +302,17 @@ function WorkflowActionEditor({
       ) : null}
       {action.type === "mcp_tool" ? (
         <>
+          <WorkflowPromptEditor
+            label={t("catalogControl.agents.userProjects.workflowToolArgumentsPrompt")}
+            value={action.prompt}
+            scopes={promptScopes}
+            emptyMessage={t("catalogControl.agents.userProjects.noToolVariables")}
+            textareaRef={(node) => {
+              promptRef.current = node;
+            }}
+            onChange={(value) => onChange({ ...action, prompt: value })}
+            onInsertVariable={insertPromptVariable}
+          />
           <div className="form-grid">
             <label className="card-stack">
               <span className="field-label">{t("catalogControl.agents.userProjects.workflowMcp")}</span>
@@ -436,10 +372,17 @@ function WorkflowActionEditor({
       ) : null}
       {action.type === "send_output" ? (
         <>
-          <label className="card-stack">
-            <span className="field-label">{t("catalogControl.agents.userProjects.deliveryInstruction")}</span>
-            <textarea className="field-input form-textarea" value={action.instruction} onChange={(event) => onChange({ ...action, instruction: event.currentTarget.value })} />
-          </label>
+          <WorkflowPromptEditor
+            label={t("catalogControl.agents.userProjects.deliveryInstruction")}
+            value={action.prompt}
+            scopes={promptScopes}
+            emptyMessage={t("catalogControl.agents.userProjects.noOutputVariables")}
+            textareaRef={(node) => {
+              promptRef.current = node;
+            }}
+            onChange={(value) => onChange({ ...action, prompt: value })}
+            onInsertVariable={insertPromptVariable}
+          />
           <div className="card-stack">
             <span className="field-label">{t("catalogControl.agents.userProjects.variablesToSend")}</span>
             {availableVariables.map((variable) => (
@@ -619,6 +562,7 @@ function buildNewAction(type: WorkflowAction["type"], index: number): WorkflowAc
       name: "Invoke MCP tool",
       mcp_server_slug: "",
       exposed_tool_name: "",
+      prompt: "Use the available workflow variables to compose valid tool arguments and capture the declared outputs.",
       input_bindings: {},
       output_variables: [{ name: "", label: "", type: "text", required: true }],
     };
@@ -627,7 +571,7 @@ function buildNewAction(type: WorkflowAction["type"], index: number): WorkflowAc
     id: `send_output_${index + 1}`,
     type,
     name: "Send output",
-    instruction: "Compose a concise chat response for the user.",
+    prompt: "Compose a concise chat response for the user using the selected workflow variables.",
     variable_refs: [],
   };
 }
@@ -671,15 +615,15 @@ function actionProducesValidVariables(action: WorkflowAction): boolean {
 function isActionComplete(action: WorkflowAction, actionIndex: number, actions: WorkflowAction[], enabledMcpServers: CatalogMcpServer[]): boolean {
   if (!action.name.trim()) return false;
   if (action.type === "get_user_input") {
-    return actionProducesValidVariables(action);
+    return action.prompt.trim().length > 0 && actionProducesValidVariables(action);
   }
   if (action.type === "mcp_tool") {
     const server = enabledMcpServers.find((item) => item.spec.slug === action.mcp_server_slug);
-    if (!server || !action.exposed_tool_name.trim() || !actionProducesValidVariables(action)) return false;
+    if (!server || !action.exposed_tool_name.trim() || !action.prompt.trim() || !actionProducesValidVariables(action)) return false;
     const available = new Set(variablesBeforeAction(actions, actionIndex).map((variable) => variable.name));
     return requiredSchemaFields(server.spec.input_schema).every((field) => available.has(action.input_bindings[field]?.variable ?? ""));
   }
-  return action.instruction.trim().length > 0
+  return action.prompt.trim().length > 0
     && action.variable_refs.length > 0
     && action.variable_refs.every((variable) => variablesBeforeAction(actions, actionIndex).some((item) => item.name === variable));
 }

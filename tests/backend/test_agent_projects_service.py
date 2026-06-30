@@ -45,6 +45,7 @@ def _project_row() -> dict[str, object]:
                     "name": "Support search",
                     "mcp_server_slug": "support_search",
                     "exposed_tool_name": "support_search",
+                    "prompt": "Use the query variable to call support search and capture the search results.",
                     "input_bindings": {"query": {"variable": "query"}},
                     "output_variables": [{"name": "search_results", "label": "Search results", "type": "text", "required": True}],
                 },
@@ -52,7 +53,7 @@ def _project_row() -> dict[str, object]:
                     "id": "output_1",
                     "type": "send_output",
                     "name": "Send response",
-                    "instruction": "Summarize the result.",
+                    "prompt": "Summarize the result.",
                     "variable_refs": ["search_results"],
                 },
             ]

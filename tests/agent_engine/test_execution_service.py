@@ -27,11 +27,7 @@ def _workflow_agent_spec() -> dict[str, Any]:
             "agent_type": "workflow",
             "default_model_ref": "model.alpha",
             "mcp_server_refs": [],
-            "runtime_prompts": {
-                "workflow_input_extraction": "Custom input extraction prompt.",
-                "workflow_tool_arguments": "Custom tool argument prompt.",
-                "workflow_output_response": "Custom output response prompt.",
-            },
+            "runtime_prompts": {"retrieval_context": ""},
             "workflow_definition": {
                 "version": 2,
                 "actions": [
@@ -39,13 +35,14 @@ def _workflow_agent_spec() -> dict[str, Any]:
                         "id": "input_1",
                         "type": "get_user_input",
                         "name": "Collect name",
+                        "prompt": "Custom input extraction prompt.",
                         "variables": [{"name": "user_name", "label": "User name", "type": "text", "required": True}],
                     },
                     {
                         "id": "output_1",
                         "type": "send_output",
                         "name": "Send greeting",
-                        "instruction": "Greet the user.",
+                        "prompt": "Custom output response prompt.",
                         "variable_refs": ["user_name"],
                     },
                 ],
@@ -67,7 +64,7 @@ def test_workflow_agent_pauses_when_user_input_is_missing(monkeypatch: pytest.Mo
             assert kwargs["messages"][0]["content"][0]["text"] == "Custom input extraction prompt."
             assert "Required workflow variables" in kwargs["messages"][-1]["content"][0]["text"]
             return {
-                "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "question": "What is your name?"}',
+                "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "response": "What is your name?"}',
                 "status_code": 200,
                 "requested_model": kwargs["requested_model"],
             }
@@ -106,7 +103,7 @@ def test_workflow_agent_resumes_and_completes_from_stored_state(monkeypatch: pyt
                 assert kwargs["messages"][0]["content"][0]["text"] == "Custom input extraction prompt."
                 assert "{{user_name}}" in prompt
                 return {
-                    "output_text": '{"complete": true, "variables": {"user_name": "Ada"}, "missing": [], "question": ""}',
+                    "output_text": '{"complete": true, "variables": {"user_name": "Ada"}, "missing": [], "response": ""}',
                     "status_code": 200,
                     "requested_model": kwargs["requested_model"],
                 }
@@ -153,7 +150,7 @@ def test_workflow_agent_remains_awaiting_input_when_llm_does_not_extract_missing
             prompt = kwargs["messages"][-1]["content"][0]["text"]
             if "Required workflow variables" in prompt:
                 return {
-                    "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "question": "What is your name?"}',
+                    "output_text": '{"complete": false, "variables": {}, "missing": ["user_name"], "response": "What is your name?"}',
                     "status_code": 200,
                     "requested_model": kwargs["requested_model"],
                 }
@@ -198,18 +195,14 @@ def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(mo
         lambda *, agent_id: {
             "entity_id": "agent.workflow",
             "current_version": "v1",
-            "current_spec": {
-                "agent_type": "workflow",
-                "default_model_ref": "model.alpha",
-                "mcp_server_refs": ["web_search"],
-                "runtime_prompts": {
-                    "workflow_input_extraction": "Custom input extraction prompt.",
-                    "workflow_tool_arguments": "Custom tool argument prompt.",
-                    "workflow_output_response": "Custom output response prompt.",
-                },
-                "workflow_definition": {
-                    "version": 2,
-                    "actions": [
+                "current_spec": {
+                    "agent_type": "workflow",
+                    "default_model_ref": "model.alpha",
+                    "mcp_server_refs": ["web_search"],
+                    "runtime_prompts": {"retrieval_context": ""},
+                    "workflow_definition": {
+                        "version": 2,
+                        "actions": [
                         {
                             "id": "input_1",
                             "type": "get_user_input",
@@ -219,21 +212,22 @@ def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(mo
                         },
                         {
                             "id": "tool_1",
-                            "type": "mcp_tool",
-                            "name": "Run search",
-                            "mcp_server_slug": "web_search",
-                            "exposed_tool_name": "web_search",
-                            "input_bindings": {"query": {"variable": "query_text"}},
-                            "output_variables": [{"name": "search_results", "label": "Search results", "type": "text", "required": True}],
-                        },
-                        {
-                            "id": "output_1",
-                            "type": "send_output",
-                            "name": "Respond",
-                            "instruction": "Summarize the search results.",
-                            "variable_refs": ["search_results"],
-                        },
-                    ],
+                                "type": "mcp_tool",
+                                "name": "Run search",
+                                "mcp_server_slug": "web_search",
+                                "exposed_tool_name": "web_search",
+                                "prompt": "Custom tool argument prompt.",
+                                "input_bindings": {"query": {"variable": "query_text"}},
+                                "output_variables": [{"name": "search_results", "label": "Search results", "type": "text", "required": True}],
+                            },
+                            {
+                                "id": "output_1",
+                                "type": "send_output",
+                                "name": "Respond",
+                                "prompt": "Custom output response prompt.",
+                                "variable_refs": ["search_results"],
+                            },
+                        ],
                 },
                 "runtime_constraints": {},
             },
@@ -269,16 +263,22 @@ def test_workflow_agent_uses_custom_tool_argument_prompt_and_variable_context(mo
             user_prompt = kwargs["messages"][-1]["content"][0]["text"]
             if "Required workflow variables" in user_prompt:
                 return {
-                    "output_text": '{"complete": true, "variables": {"query_text": "coffee beans"}, "missing": [], "question": ""}',
+                    "output_text": '{"complete": true, "variables": {"query_text": "coffee beans"}, "missing": [], "response": ""}',
                     "status_code": 200,
                     "requested_model": kwargs["requested_model"],
                 }
             if "Input schema" in user_prompt:
                 assert system_prompt == "Custom tool argument prompt."
                 assert '"name": "query_text"' in user_prompt
-                assert "{{user_name}}" in user_prompt
                 return {
-                    "output_text": '{"query": "coffee beans"}',
+                    "output_text": '{"arguments": {"query": "coffee beans"}, "complete": false}',
+                    "status_code": 200,
+                    "requested_model": kwargs["requested_model"],
+                }
+            if "Tool result" in user_prompt:
+                assert system_prompt == "Custom tool argument prompt."
+                return {
+                    "output_text": '{"complete": true, "variables": {"search_results": "Coffee bean result set"}}',
                     "status_code": 200,
                     "requested_model": kwargs["requested_model"],
                 }

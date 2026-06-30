@@ -36,6 +36,7 @@ export type WorkflowMcpToolAction = {
   name: string;
   mcp_server_slug: string;
   exposed_tool_name: string;
+  prompt: string;
   input_bindings: Record<string, WorkflowVariableReference>;
   output_variables: Array<WorkflowVariableDefinition & { path?: string }>;
 };
@@ -44,7 +45,7 @@ export type WorkflowSendOutputAction = {
   id: string;
   type: "send_output";
   name: string;
-  instruction: string;
+  prompt: string;
   variable_refs: string[];
 };
 
@@ -61,9 +62,6 @@ export type AgentProjectSpec = {
   instructions: string;
   runtime_prompts: {
     retrieval_context?: string;
-    workflow_input_extraction?: string;
-    workflow_tool_arguments?: string;
-    workflow_output_response?: string;
   };
   default_model_ref: string | null;
   tool_refs: string[];
@@ -96,9 +94,6 @@ export type AgentProjectMutationInput = Omit<AgentProjectSpec, "runtime_prompts"
   visibility?: AgentProjectVisibility;
   runtime_prompts?: {
     retrieval_context?: string;
-    workflow_input_extraction?: string;
-    workflow_tool_arguments?: string;
-    workflow_output_response?: string;
   };
 };
 
@@ -141,9 +136,6 @@ export type AgentProjectDefaults = {
   agent: {
     runtime_prompts: {
       retrieval_context: string;
-      workflow_input_extraction: string;
-      workflow_tool_arguments: string;
-      workflow_output_response: string;
     };
   };
 };

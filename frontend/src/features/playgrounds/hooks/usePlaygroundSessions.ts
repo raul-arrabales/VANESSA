@@ -41,6 +41,9 @@ export function usePlaygroundSessions({
   const [historyError, setHistoryError] = useState("");
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isActiveSessionLoading, setIsActiveSessionLoading] = useState(false);
+  const isWorkflowAssistantRef = (assistantRef: string | null | undefined): boolean => (
+    config.playgroundKind === "chat" && String(assistantRef ?? "").startsWith("agent.")
+  );
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -309,6 +312,78 @@ export function usePlaygroundSessions({
     isOptionsLoading,
     options.models.length,
     savedSessions,
+  ]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      return;
+    }
+    if (config.sessionBootstrap.mode !== "draft-first") {
+      return;
+    }
+    if (isOptionsLoading || !hasLoadedOptions) {
+      return;
+    }
+    if (!activeSession || activeSession.persistence !== "draft") {
+      return;
+    }
+    if (!isWorkflowAssistantRef(activeSession.selectorState.assistantRef)) {
+      return;
+    }
+
+    let cancelled = false;
+    const persistWorkflowDraft = async (): Promise<void> => {
+      setIsActiveSessionLoading(true);
+      try {
+        const created = await createPlaygroundSession(
+          {
+            playground_kind: config.playgroundKind,
+            assistant_ref: activeSession.selectorState.assistantRef ?? options.defaultAssistantRef ?? undefined,
+            model_selection: { model_id: activeSession.selectorState.modelId ?? options.models[0]?.id ?? null },
+            knowledge_binding: {
+              knowledge_base_id: hasKnowledgeBaseSelector
+                ? activeSession.selectorState.knowledgeBaseId ?? options.defaultKnowledgeBaseId
+                : null,
+            },
+          },
+          token,
+        );
+        if (cancelled) {
+          return;
+        }
+        const persistedSession = mapPlaygroundSessionDetail(created);
+        setSavedSessions((existing) => upsertSession(existing, persistedSession));
+        setActiveSessionId(persistedSession.id);
+        setActiveSession(persistedSession);
+        setActiveError("");
+      } catch (requestError) {
+        if (!cancelled) {
+          setActiveError(requestError instanceof Error ? requestError.message : config.feedback.createError);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsActiveSessionLoading(false);
+        }
+      }
+    };
+
+    void persistWorkflowDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSession,
+    config.feedback.createError,
+    config.playgroundKind,
+    config.sessionBootstrap.mode,
+    hasKnowledgeBaseSelector,
+    hasLoadedOptions,
+    isAuthenticated,
+    isOptionsLoading,
+    options.defaultAssistantRef,
+    options.defaultKnowledgeBaseId,
+    options.models,
+    token,
   ]);
 
   return {

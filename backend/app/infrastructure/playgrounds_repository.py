@@ -140,3 +140,24 @@ def append_message_pair(
         title_source=title_source,
         conversation_kind=conversation_kind,
     )
+
+
+def append_messages(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    conversation_id: str,
+    messages: list[dict[str, Any]],
+    conversation_title: str | None = None,
+    title_source: str | None = None,
+    conversation_kind: str,
+) -> dict[str, Any] | None:
+    return chat_repository.append_messages(
+        database_url,
+        owner_user_id=owner_user_id,
+        conversation_id=conversation_id,
+        messages=messages,
+        conversation_title=conversation_title,
+        title_source=title_source,
+        conversation_kind=conversation_kind,
+    )

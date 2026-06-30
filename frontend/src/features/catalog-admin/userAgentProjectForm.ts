@@ -10,9 +10,6 @@ export type AgentProjectFormState = {
   description: string;
   instructions: string;
   retrievalContext: string;
-  workflowInputExtractionPrompt: string;
-  workflowToolArgumentsPrompt: string;
-  workflowOutputResponsePrompt: string;
   defaultModelRef: string;
   agentType: "" | "workflow" | "planner" | "react";
   channelType: "" | "vanessa_webapp";
@@ -83,9 +80,6 @@ export function buildDefaultAgentProjectForm(
     description: DEFAULT_WORKFLOW_AGENT_DESCRIPTION,
     instructions: "",
     retrievalContext: workflowRetrievalContext(),
-    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
-    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
-    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: "",
     agentType: "workflow",
     channelType: "vanessa_webapp",
@@ -130,9 +124,6 @@ export function buildGuidedUserAgentCreateForm(
     description: "",
     instructions: "",
     retrievalContext: runtimePrompts.retrieval_context,
-    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
-    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
-    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: "",
     agentType: "",
     channelType: "",
@@ -177,9 +168,6 @@ export function buildAgentProjectForm(project: AgentProject): AgentProjectFormSt
     description: project.spec.description,
     instructions: project.spec.instructions,
     retrievalContext: runtimePrompts.retrieval_context,
-    workflowInputExtractionPrompt: runtimePrompts.workflow_input_extraction,
-    workflowToolArgumentsPrompt: runtimePrompts.workflow_tool_arguments,
-    workflowOutputResponsePrompt: runtimePrompts.workflow_output_response,
     defaultModelRef: project.spec.default_model_ref ?? "",
     agentType: project.spec.agent_type,
     channelType: project.spec.channel_type,
@@ -239,9 +227,6 @@ export function toAgentProjectMutationInput(
   const interfaceType = (form.interfaceType || "chat") as "chat";
   const workflowDefinition = workflowDefinitionFromForm(form);
   const trimmedRetrievalContext = form.retrievalContext.trim();
-  const trimmedWorkflowInputExtractionPrompt = form.workflowInputExtractionPrompt.trim();
-  const trimmedWorkflowToolArgumentsPrompt = form.workflowToolArgumentsPrompt.trim();
-  const trimmedWorkflowOutputResponsePrompt = form.workflowOutputResponsePrompt.trim();
   return {
     ...(includeId && id ? { id } : {}),
     visibility: form.visibility,
@@ -250,9 +235,6 @@ export function toAgentProjectMutationInput(
     instructions: agentType === "workflow" ? "" : form.instructions.trim(),
     runtime_prompts: {
       retrieval_context: trimmedRetrievalContext,
-      workflow_input_extraction: trimmedWorkflowInputExtractionPrompt,
-      workflow_tool_arguments: trimmedWorkflowToolArgumentsPrompt,
-      workflow_output_response: trimmedWorkflowOutputResponsePrompt,
     },
     default_model_ref: form.defaultModelRef.trim() || null,
     tool_refs: [],

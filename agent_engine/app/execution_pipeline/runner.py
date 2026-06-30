@@ -42,6 +42,7 @@ from .progress import ProgressRecorder, compact_payload, summarize_results, trim
 from .types import ConversationState, ExecutionContext, ExecutionResult
 
 _MAX_TOOL_CALL_ROUNDS = 3
+_MAX_WORKFLOW_ACTION_ITERATIONS = 5
 
 
 def _iso_now() -> str:
@@ -244,13 +245,6 @@ def _store_output_variables(state: dict[str, Any], action: dict[str, Any], tool_
         variables[name] = extracted if isinstance(extracted, str) else compact_payload(extracted)
 
 
-def _workflow_runtime_prompts(agent_spec: dict[str, Any]) -> dict[str, str]:
-    return normalize_agent_runtime_prompts(
-        agent_spec.get("runtime_prompts"),
-        agent_type=agent_spec.get("agent_type"),
-    )
-
-
 def _workflow_variable_context(
     *,
     variables: list[dict[str, Any]],
@@ -300,6 +294,29 @@ def _workflow_available_variables(actions: list[dict[str, Any]], *, before_index
     return variables
 
 
+def _workflow_status_details(
+    *,
+    state: dict[str, Any],
+    action_index: int,
+    action: dict[str, Any],
+    workflow_status: str,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    details = {
+        "workflow_action_index": action_index,
+        "workflow_action_name": str(action.get("name") or action.get("type") or f"action_{action_index + 1}"),
+        "workflow_status": workflow_status,
+        "workflow_variables": compact_payload(state.get("variables") if isinstance(state.get("variables"), dict) else {}),
+    }
+    if extra:
+        details.update(extra)
+    return details
+
+
+def _workflow_action_prompt(action: dict[str, Any]) -> str:
+    return str(action.get("prompt") or "").strip()
+
+
 def _execute_workflow_agent(
     *,
     context: ExecutionContext,
@@ -319,7 +336,6 @@ def _execute_workflow_agent(
     tool_lookup = _tool_entity_lookup(agent_tools)
     runtime_snapshot = context.platform_runtime if isinstance(context.platform_runtime, dict) else {}
     agent_domain = str(agent_spec.get("agent_domain") or "default").strip() or "default"
-    workflow_runtime_prompts = _workflow_runtime_prompts(agent_spec)
     requested_model = str(context.execution_input.get("model") or agent_spec.get("default_model_ref") or "").strip() or None
     state = _workflow_state_from_input(context.execution_input)
     tool_calls: list[dict[str, Any]] = []
@@ -328,11 +344,22 @@ def _execute_workflow_agent(
     while action_index < len(actions):
         action = actions[action_index]
         action_type = str(action.get("type") or "")
+        action_prompt = _workflow_action_prompt(action)
+        if not action_prompt:
+            raise ExecutionBlockedError(
+                code="EXEC_INVALID_AGENT",
+                message=f"Workflow action {action_index + 1} is missing a prompt",
+                status_code=422,
+            )
         if action_type == "get_user_input":
             variables = [item for item in action.get("variables", []) if isinstance(item, dict)]
             variable_context = _workflow_variable_context(variables=variables, state=state)
             missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
-            status_id = progress.start(kind="thinking", label=f"Inspecting workflow input {action_index + 1}")
+            status_id = progress.start(
+                kind="thinking",
+                label=f"Inspecting workflow input {action_index + 1}",
+                details=_workflow_status_details(state=state, action_index=action_index + 1, action=action, workflow_status="running"),
+            )
             parsed: dict[str, Any] = {}
             if missing:
                 try:
@@ -340,9 +367,10 @@ def _execute_workflow_agent(
                         context=context,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
-                        system_prompt=workflow_runtime_prompts["workflow_input_extraction"],
+                        system_prompt=action_prompt,
                         user_prompt=(
-                            f"Current workflow action prompt:\n{str(action.get('prompt') or '').strip()}\n\n"
+                            "Inspect the conversation and populate the declared workflow variables.\n"
+                            "Return only JSON with complete:boolean, variables:object, missing:array, response:string.\n\n"
                             f"{_workflow_reference_guidance()}\n\n"
                             f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
                             f"Required workflow variables:\n{dumps(variable_context)}\n\n"
@@ -358,16 +386,23 @@ def _execute_workflow_agent(
                         state["variables"][str(name)] = str(value).strip()
                 missing = [str(item.get("name") or "") for item in variables if not state["variables"].get(str(item.get("name") or ""))]
             if missing:
-                question = str(parsed.get("question") or "").strip()
+                question = str(parsed.get("response") or parsed.get("question") or "").strip()
                 if not question:
-                    action_prompt = str(action.get("prompt") or "").strip()
                     labels = [str(item.get("label") or item.get("name") or "").strip() for item in variables if str(item.get("name") or "") in missing]
-                    if action_prompt:
-                        question = action_prompt
-                    elif labels:
-                        question = "Please provide: " + ", ".join(labels)
+                    question = action_prompt if action_prompt else ("Please provide: " + ", ".join(labels) if labels else "Please provide the required information.")
                 state.update({"action_index": action_index, "status": "awaiting_user_input"})
-                progress.complete(status_id, kind="thinking", label="Workflow is awaiting user input", details={"missing": missing})
+                progress.complete(
+                    status_id,
+                    kind="thinking",
+                    label="Workflow is awaiting user input",
+                    details=_workflow_status_details(
+                        state=state,
+                        action_index=action_index + 1,
+                        action=action,
+                        workflow_status="awaiting_user_input",
+                        extra={"missing": missing},
+                    ),
+                )
                 return ExecutionResult(
                     output_text=question,
                     tool_calls=tool_calls,
@@ -375,9 +410,15 @@ def _execute_workflow_agent(
                     workflow_state=state,
                     workflow_status="awaiting_user_input",
                 ), requested_model
-            progress.complete(status_id, kind="thinking", label=f"Collected workflow input {action_index + 1}")
+            progress.complete(
+                status_id,
+                kind="thinking",
+                label=f"Collected workflow input {action_index + 1}",
+                details=_workflow_status_details(state=state, action_index=action_index + 1, action=action, workflow_status="running"),
+            )
             action_index += 1
             state["action_index"] = action_index
+            state["status"] = "running"
             continue
 
         if action_type == "mcp_tool":
@@ -394,68 +435,115 @@ def _execute_workflow_agent(
             runtime_capability = runtime_capability_for_tool_spec(tool_spec)
             resolve_tool_runtime_binding(platform_runtime=runtime_snapshot, capability_key=runtime_capability)
             input_bindings = action.get("input_bindings") if isinstance(action.get("input_bindings"), dict) else {}
-            bound_values = {
-                field: state["variables"].get(str(binding.get("variable") or ""))
-                for field, binding in input_bindings.items()
-                if isinstance(binding, dict)
-            }
-            static_arguments = action.get("static_arguments") if isinstance(action.get("static_arguments"), dict) else {}
             available_variables = _workflow_available_variables(actions, before_index=action_index)
             input_variables = _workflow_variable_context(
                 variables=available_variables,
                 state=state,
             )
-            try:
-                parsed, model_call = _llm_json(
-                    context=context,
-                    runtime_snapshot=runtime_snapshot,
-                    requested_model=requested_model,
-                    system_prompt=workflow_runtime_prompts["workflow_tool_arguments"],
-                    user_prompt=(
-                        f"Current workflow action name: {str(action.get('name') or tool_name or slug)}\n"
-                        f"Tool name: {tool_name}\n"
-                        f"{_workflow_reference_guidance()}\n\n"
-                        f"Input schema: {dumps(tool_spec.get('input_schema') or {})}\n"
-                        f"Workflow variable context:\n{dumps(input_variables)}\n\n"
-                        f"Selected variables:\n{dumps(bound_values)}"
+            completed_action = False
+            for iteration in range(1, _MAX_WORKFLOW_ACTION_ITERATIONS + 1):
+                bound_values = {
+                    field: state["variables"].get(str(binding.get("variable") or ""))
+                    for field, binding in input_bindings.items()
+                    if isinstance(binding, dict)
+                }
+                try:
+                    parsed, model_call = _llm_json(
+                        context=context,
+                        runtime_snapshot=runtime_snapshot,
+                        requested_model=requested_model,
+                        system_prompt=action_prompt,
+                        user_prompt=(
+                            "Create tool arguments for this workflow action.\n"
+                            "Return only JSON with arguments:object, complete:boolean, variables:object, follow_up_message:string.\n\n"
+                            f"Current workflow action name: {str(action.get('name') or tool_name or slug)}\n"
+                            f"Tool name: {tool_name}\n"
+                            f"{_workflow_reference_guidance()}\n\n"
+                            f"Input schema: {dumps(tool_spec.get('input_schema') or {})}\n"
+                            f"Workflow variable context:\n{dumps(input_variables)}\n\n"
+                            f"Selected variables:\n{dumps(bound_values)}"
+                        ),
+                    )
+                    if model_call:
+                        model_calls.append(model_call)
+                except LlmRuntimeClientError:
+                    parsed = {}
+                arguments = parsed.get("arguments") if isinstance(parsed.get("arguments"), dict) else bound_values
+                status_id = progress.start(
+                    kind="running_tool",
+                    label=f"Running workflow action {action_index + 1}: {str(action.get('name') or tool_name or slug)}",
+                    details=_workflow_status_details(
+                        state=state,
+                        action_index=action_index + 1,
+                        action=action,
+                        workflow_status="running",
+                        extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
                     ),
                 )
-                if model_call:
-                    model_calls.append(model_call)
-                arguments = parsed or bound_values or static_arguments
-            except LlmRuntimeClientError:
-                arguments = bound_values or static_arguments
-            status_id = progress.start(
-                kind="running_tool",
-                label=f"Running workflow action {action_index + 1}: {str(action.get('name') or tool_name or slug)}",
-                details={"action": action_index + 1, "tool_name": tool_name, "mcp_server_slug": slug, "arguments": compact_payload(arguments)},
-            )
-            tool_call = {
-                "id": f"workflow-action-{action_index + 1}",
-                "type": "function",
-                "function": {"name": tool_name, "arguments": compact_payload(arguments)},
-            }
-            call_record, tool_payload = invoke_tool_call(
-                tool_entity=tool_entity,
-                tool_call=tool_call,
-                platform_runtime=runtime_snapshot,
-                agent_id=context.agent_id,
-                agent_domain=agent_domain,
-                delegated_user_id=context.requested_by_user_id,
-                delegated_user_role=context.requested_by_role,
-            )
-            progress.complete(
-                status_id,
-                kind="running_tool",
-                label=f"Completed workflow action {action_index + 1}",
-                summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
-                details={"action": action_index + 1, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
-            )
-            tool_calls.append(call_record)
-            state.setdefault("action_outputs", {})[str(action.get("id") or f"action_{action_index + 1}")] = tool_payload
-            _store_output_variables(state, action, tool_payload)
+                tool_call = {
+                    "id": f"workflow-action-{action_index + 1}-{iteration}",
+                    "type": "function",
+                    "function": {"name": tool_name, "arguments": compact_payload(arguments)},
+                }
+                call_record, tool_payload = invoke_tool_call(
+                    tool_entity=tool_entity,
+                    tool_call=tool_call,
+                    platform_runtime=runtime_snapshot,
+                    agent_id=context.agent_id,
+                    agent_domain=agent_domain,
+                    delegated_user_id=context.requested_by_user_id,
+                    delegated_user_role=context.requested_by_role,
+                )
+                progress.complete(
+                    status_id,
+                    kind="running_tool",
+                    label=f"Completed workflow action {action_index + 1}",
+                    summary=f"HTTP {int(call_record.get('status_code', 200) or 200)}",
+                    details=_workflow_status_details(
+                        state=state,
+                        action_index=action_index + 1,
+                        action=action,
+                        workflow_status="running",
+                        extra={"iteration": iteration, "tool_name": tool_name, "mcp_server_slug": slug, "result": compact_payload(tool_payload)},
+                    ),
+                )
+                tool_calls.append(call_record)
+                state.setdefault("action_outputs", {})[str(action.get("id") or f"action_{action_index + 1}")] = tool_payload
+                _store_output_variables(state, action, tool_payload)
+                try:
+                    evaluation, model_call = _llm_json(
+                        context=context,
+                        runtime_snapshot=runtime_snapshot,
+                        requested_model=requested_model,
+                        system_prompt=action_prompt,
+                        user_prompt=(
+                            "Decide whether the workflow action is complete.\n"
+                            "Return only JSON with complete:boolean, variables:object, follow_up_message:string.\n\n"
+                            f"{_workflow_reference_guidance()}\n\n"
+                            f"Workflow variable context:\n{dumps(_workflow_variable_context(variables=_workflow_available_variables(actions, before_index=action_index + 1), state=state))}\n\n"
+                            f"Tool result:\n{compact_payload(tool_payload)}"
+                        ),
+                    )
+                    if model_call:
+                        model_calls.append(model_call)
+                except LlmRuntimeClientError:
+                    evaluation = {}
+                for name, value in (evaluation.get("variables") if isinstance(evaluation.get("variables"), dict) else {}).items():
+                    if str(name).strip() and str(value).strip():
+                        state["variables"][str(name).strip()] = str(value).strip()
+                if bool(evaluation.get("complete", True)):
+                    completed_action = True
+                    break
+            if not completed_action:
+                raise ExecutionBlockedError(
+                    code="EXEC_WORKFLOW_ACTION_BLOCKED",
+                    message=f"Workflow action '{str(action.get('name') or tool_name or slug)}' did not complete safely",
+                    status_code=422,
+                    details=_workflow_status_details(state=state, action_index=action_index + 1, action=action, workflow_status="blocked"),
+                )
             action_index += 1
             state["action_index"] = action_index
+            state["status"] = "running"
             continue
 
         if action_type == "send_output":
@@ -479,9 +567,10 @@ def _execute_workflow_agent(
                     context=context,
                     runtime_snapshot=runtime_snapshot,
                     requested_model=requested_model,
-                    system_prompt=workflow_runtime_prompts["workflow_output_response"],
+                    system_prompt=action_prompt,
                     user_prompt=(
-                        f"Delivery instruction: {str(action.get('instruction') or '')}\n"
+                        "Compose the final workflow chat response.\n"
+                        "Return only JSON with response:string, complete:boolean.\n\n"
                         f"{_workflow_reference_guidance()}\n\n"
                         f"Workflow variable context:\n{dumps(selected_variables)}\n\n"
                         f"Variables: {dumps(selected)}\n"

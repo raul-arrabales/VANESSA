@@ -25,6 +25,7 @@ MAX_CONTEXT_MESSAGES = 14
 CONTEXT_CHAR_BUDGET = 8000
 _AGENT_ENGINE_TIMEOUT_BUFFER_SECONDS = 10.0
 _PROMPT_CACHE_PREFIX_ROLES = {"system", "developer"}
+WORKFLOW_AUTOSTART_PROMPT = "Start the workflow."
 
 
 class PlaygroundExecutionValidationError(ValueError):
@@ -394,7 +395,7 @@ def execute_agent_chat_request(
     get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
     resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
 
-    prompt = normalize_prompt(request.prompt)
+    prompt = normalize_prompt(request.prompt) if str(request.prompt or "").strip() else WORKFLOW_AUTOSTART_PROMPT
     platform_runtime = get_active_platform_runtime_for_dispatch(
         database_url,
         config,
@@ -574,7 +575,7 @@ def stream_agent_chat_request(
     get_active_platform_runtime_impl = get_active_platform_runtime_fn or get_active_platform_runtime
     resolve_runtime_profile_impl = resolve_runtime_profile_fn or resolve_runtime_profile
 
-    prompt = normalize_prompt(request.prompt)
+    prompt = normalize_prompt(request.prompt) if str(request.prompt or "").strip() else WORKFLOW_AUTOSTART_PROMPT
     platform_runtime = get_active_platform_runtime_for_dispatch(
         database_url,
         config,

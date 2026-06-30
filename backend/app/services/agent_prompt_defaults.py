@@ -51,9 +51,6 @@ def coerce_agent_runtime_prompts(value: Any, *, default_when_missing: bool, agen
     normalized = normalize_agent_runtime_prompts(value, agent_type=agent_type)
     return {
         "retrieval_context": retrieval_context if retrieval_context else normalized["retrieval_context"],
-        "workflow_input_extraction": normalized["workflow_input_extraction"],
-        "workflow_tool_arguments": normalized["workflow_tool_arguments"],
-        "workflow_output_response": normalized["workflow_output_response"],
     }
 
 
@@ -89,22 +86,24 @@ def build_agent_system_prompt_preview(spec: dict[str, Any]) -> dict[str, Any]:
         text_sections.append("\n".join(["System message: retrieval context", retrieval_content]))
 
     if str(spec.get("agent_type") or "").strip().lower() == USER_AGENT_TYPE_WORKFLOW:
-        workflow_messages = [
-            ("workflow_input_extraction", "workflow input extraction", runtime_prompts["workflow_input_extraction"]),
-            ("workflow_tool_arguments", "workflow tool arguments", runtime_prompts["workflow_tool_arguments"]),
-            ("workflow_output_response", "workflow output response", runtime_prompts["workflow_output_response"]),
-        ]
-        for label, heading, content in workflow_messages:
-            if not content:
+        workflow_definition = spec.get("workflow_definition") if isinstance(spec.get("workflow_definition"), dict) else {}
+        actions = workflow_definition.get("actions") if isinstance(workflow_definition.get("actions"), list) else []
+        for index, action in enumerate(actions):
+            if not isinstance(action, dict):
                 continue
+            prompt = str(action.get("prompt") or "").strip()
+            if not prompt:
+                continue
+            name = str(action.get("name") or action.get("type") or f"action_{index + 1}").strip() or f"action_{index + 1}"
+            label = f"workflow_action_prompt_{index + 1}"
             messages.append(
                 {
                     "role": "system",
                     "label": label,
-                    "content": content,
+                    "content": prompt,
                 }
             )
-            text_sections.append("\n".join([f"System message: {heading}", content]))
+            text_sections.append("\n".join([f"Workflow action prompt: {name}", prompt]))
 
     return {
         "messages": messages,

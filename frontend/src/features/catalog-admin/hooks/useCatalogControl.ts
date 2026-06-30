@@ -401,9 +401,6 @@ export function useCatalogControl(token: string) {
         instructions: agentForm.instructions,
         runtime_prompts: {
           retrieval_context: agentForm.runtime_prompts.retrieval_context,
-          workflow_input_extraction: agentForm.runtime_prompts.workflow_input_extraction,
-          workflow_tool_arguments: agentForm.runtime_prompts.workflow_tool_arguments,
-          workflow_output_response: agentForm.runtime_prompts.workflow_output_response,
         },
         default_model_ref: agentForm.default_model_ref,
         tool_refs: agentForm.tool_refs,
@@ -497,9 +494,6 @@ export function useCatalogControl(token: string) {
         instructions: agentForm.instructions,
         runtime_prompts: {
           retrieval_context: agentForm.runtime_prompts.retrieval_context,
-          workflow_input_extraction: agentForm.runtime_prompts.workflow_input_extraction,
-          workflow_tool_arguments: agentForm.runtime_prompts.workflow_tool_arguments,
-          workflow_output_response: agentForm.runtime_prompts.workflow_output_response,
         },
         default_model_ref: agentForm.default_model_ref?.trim() ? agentForm.default_model_ref.trim() : null,
         tool_refs: agentForm.tool_refs,

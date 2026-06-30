@@ -904,6 +904,7 @@ def preview_catalog_agent_prompt_payload(payload: dict[str, Any]) -> dict[str, A
             payload.get("runtime_prompts"),
             agent_type=agent_type,
         ),
+        "workflow_definition": normalize_workflow_definition(payload.get("workflow_definition")),
     }
     return {"prompt_preview": build_agent_system_prompt_preview(spec)}
 

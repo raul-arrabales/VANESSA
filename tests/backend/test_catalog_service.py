@@ -870,16 +870,22 @@ def test_preview_catalog_workflow_agent_prompt_omits_retrieval_context():
             "agent_type": "workflow",
             "instructions": "",
             "runtime_prompts": {},
+            "workflow_definition": {
+                "version": 2,
+                "actions": [
+                    {"id": "input_1", "type": "get_user_input", "name": "Collect", "prompt": "Ask for the value.", "variables": [{"name": "value", "label": "Value", "type": "text"}]},
+                    {"id": "output_1", "type": "send_output", "name": "Send", "prompt": "Respond with the value.", "variable_refs": ["value"]},
+                ],
+            },
         }
     )
 
     labels = [message["label"] for message in preview["prompt_preview"]["messages"]]
     assert labels == [
-        "workflow_input_extraction",
-        "workflow_tool_arguments",
-        "workflow_output_response",
+        "workflow_action_prompt_1",
+        "workflow_action_prompt_2",
     ]
-    assert "workflow input extraction" in preview["prompt_preview"]["text"]
+    assert "Workflow action prompt: Collect" in preview["prompt_preview"]["text"]
 
 
 def test_validate_catalog_tool_requires_active_runtime_and_discovers_mcp_tools(monkeypatch: pytest.MonkeyPatch):

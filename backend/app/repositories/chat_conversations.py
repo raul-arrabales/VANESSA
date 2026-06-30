@@ -398,3 +398,123 @@ def append_message_pair(
         "conversation": dict(conversation),
         "messages": [user_message, assistant_message],
     }
+
+
+def append_messages(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    conversation_id: str,
+    messages: list[dict[str, Any]],
+    conversation_title: str | None = None,
+    title_source: str | None = None,
+    conversation_kind: str = PLAIN_CONVERSATION_KIND,
+) -> dict[str, Any] | None:
+    if not messages:
+        raise ValueError("messages must be non-empty")
+    now = datetime.now(tz=timezone.utc)
+    message_records: list[dict[str, Any]] = []
+
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id
+                FROM chat_conversations
+                WHERE id = %s AND owner_user_id = %s AND conversation_kind = %s
+                FOR UPDATE
+                """,
+                (conversation_id, owner_user_id, conversation_kind),
+            )
+            locked_row = cursor.fetchone()
+            if locked_row is None:
+                return None
+
+            cursor.execute(
+                """
+                SELECT COALESCE(MAX(message_index), -1) AS max_index
+                FROM chat_messages
+                WHERE conversation_id = %s
+                """,
+                (conversation_id,),
+            )
+            max_index_row = cursor.fetchone() or {"max_index": -1}
+            next_index = int(max_index_row["max_index"]) + 1
+
+            update_assignments = ["updated_at = %s"]
+            update_params: list[object] = [now]
+            if conversation_title is not None:
+                update_assignments.append("title = %s")
+                update_params.append(conversation_title)
+            if title_source is not None:
+                update_assignments.append("title_source = %s")
+                update_params.append(title_source)
+            update_params.extend((conversation_id, owner_user_id, conversation_kind))
+
+            cursor.execute(
+                f"""
+                UPDATE chat_conversations
+                SET {", ".join(update_assignments)}
+                WHERE id = %s AND owner_user_id = %s AND conversation_kind = %s
+                """,
+                update_params,
+            )
+
+            for offset, message in enumerate(messages):
+                role = str(message.get("role") or "").strip().lower()
+                if role not in {"user", "assistant"}:
+                    raise ValueError("message role must be user or assistant")
+                message_id = str(uuid4())
+                content = str(message.get("content") or "")
+                metadata = message.get("metadata")
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                cursor.execute(
+                    """
+                    INSERT INTO chat_messages (
+                        id,
+                        conversation_id,
+                        message_index,
+                        role,
+                        content,
+                        metadata_json,
+                        created_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s)
+                    RETURNING
+                        id,
+                        conversation_id,
+                        message_index,
+                        role,
+                        content,
+                        metadata_json,
+                        created_at
+                    """,
+                    (
+                        message_id,
+                        conversation_id,
+                        next_index + offset,
+                        role,
+                        content,
+                        psycopg.types.json.Jsonb(metadata),
+                        now,
+                    ),
+                )
+                message_records.append(dict(cursor.fetchone() or {}))
+
+            cursor.execute(
+                _conversation_select_sql()
+                + """
+                    WHERE c.id = %s AND c.owner_user_id = %s AND c.conversation_kind = %s
+                """,
+                (conversation_id, owner_user_id, conversation_kind),
+            )
+            conversation = cursor.fetchone()
+
+    if conversation is None:
+        return None
+
+    return {
+        "conversation": dict(conversation),
+        "messages": message_records,
+    }

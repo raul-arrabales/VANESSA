@@ -73,21 +73,27 @@ def normalize_workflow_definition(value: Any) -> dict[str, Any]:
         name = str(item.get("name") or action_type.replace("_", " ")).strip() or action_type
         if action_type == "get_user_input":
             variables = _normalize_workflow_variables(item.get("variables"), f"workflow_definition.actions[{index}].variables", produced_variables)
+            prompt = str(item.get("prompt") or "").strip()
+            if not prompt:
+                raise ValueError(f"workflow_definition.actions[{index}].prompt is required")
             actions.append({
                 "id": action_id,
                 "type": action_type,
                 "name": name,
-                "prompt": str(item.get("prompt") or "").strip(),
+                "prompt": prompt,
                 "variables": variables,
             })
             continue
         if action_type == "mcp_tool":
             mcp_server_slug = str(item.get("mcp_server_slug") or "").strip()
             exposed_tool_name = str(item.get("exposed_tool_name") or "").strip()
+            prompt = str(item.get("prompt") or "").strip()
             if not mcp_server_slug:
                 raise ValueError(f"workflow_definition.actions[{index}].mcp_server_slug is required")
             if not exposed_tool_name:
                 raise ValueError(f"workflow_definition.actions[{index}].exposed_tool_name is required")
+            if not prompt:
+                raise ValueError(f"workflow_definition.actions[{index}].prompt is required")
             input_bindings = item.get("input_bindings")
             if not isinstance(input_bindings, dict):
                 raise ValueError(f"workflow_definition.actions[{index}].input_bindings must be an object")
@@ -110,18 +116,22 @@ def normalize_workflow_definition(value: Any) -> dict[str, Any]:
                 "name": name,
                 "mcp_server_slug": mcp_server_slug,
                 "exposed_tool_name": exposed_tool_name,
+                "prompt": prompt,
                 "input_bindings": normalized_bindings,
                 "output_variables": output_variables,
             })
             continue
         variable_refs_raw = item.get("variable_refs", [])
+        prompt = str(item.get("prompt") or "").strip()
         if not isinstance(variable_refs_raw, list):
             raise ValueError(f"workflow_definition.actions[{index}].variable_refs must be an array")
+        if not prompt:
+            raise ValueError(f"workflow_definition.actions[{index}].prompt is required")
         actions.append({
             "id": action_id,
             "type": action_type,
             "name": name,
-            "instruction": str(item.get("instruction") or "").strip(),
+            "prompt": prompt,
             "variable_refs": [str(variable).strip() for variable in variable_refs_raw if str(variable).strip()],
         })
     return {"version": 2, "actions": actions}

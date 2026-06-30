@@ -254,8 +254,8 @@ def _validate_workflow_actions(workflow_definition: dict[str, Any], mcp_specs_by
             for variable in variable_refs:
                 if str(variable).strip() not in available_variables:
                     errors.append(f"Workflow action {index + 1} references unknown variable '{variable}'.")
-            if not str(action.get("instruction") or "").strip():
-                errors.append(f"Workflow action {index + 1} requires a delivery instruction.")
+        if not str(action.get("prompt") or "").strip():
+            errors.append(f"Workflow action {index + 1} requires a prompt.")
     return errors
 
 

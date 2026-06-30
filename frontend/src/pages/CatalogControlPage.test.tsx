@@ -57,11 +57,6 @@ vi.mock("../api/agentProjects", () => ({
 
 const modelApi = await import("../api/modelops");
 const apiRetrievalDefault = "Use API-provided retrieval instructions.";
-const workflowPromptDefaults = {
-  workflow_input_extraction: "Extract workflow variables.",
-  workflow_tool_arguments: "Compose workflow tool arguments.",
-  workflow_output_response: "Compose workflow output response.",
-};
 
 const agentFixture = {
   id: "agent.alpha",
@@ -78,7 +73,6 @@ const agentFixture = {
     instructions: "Be concise.",
     runtime_prompts: {
       retrieval_context: "Use retrieved context and cite references.",
-      ...workflowPromptDefaults,
     },
     default_model_ref: "safe-small",
     tool_refs: ["tool.web_search"],
@@ -97,7 +91,7 @@ const agentProjectFixture = {
     name: "Agent Alpha",
     description: "Agent description",
     instructions: "Be concise.",
-    runtime_prompts: { retrieval_context: "Use retrieved context and cite references.", ...workflowPromptDefaults },
+    runtime_prompts: { retrieval_context: "Use retrieved context and cite references." },
     default_model_ref: "safe-small",
     tool_refs: [],
     mcp_server_refs: [],
@@ -489,7 +483,6 @@ describe("CatalogControlPage", () => {
       agent: {
         runtime_prompts: {
           retrieval_context: apiRetrievalDefault,
-          ...workflowPromptDefaults,
         },
       },
     });
@@ -659,20 +652,16 @@ describe("CatalogControlPage", () => {
           name: "Workflow Agent Support",
           description: "Catalog agent",
           instructions: "",
-          runtime_prompts: expect.objectContaining({
-            workflow_input_extraction: expect.stringContaining("{{search_query}}"),
-            workflow_tool_arguments: expect.any(String),
-            workflow_output_response: expect.any(String),
-          }),
+          runtime_prompts: { retrieval_context: "" },
           agent_type: "workflow",
           channel_type: "vanessa_webapp",
           interface_type: "chat",
           workflow_definition: expect.objectContaining({
             version: 2,
             actions: expect.arrayContaining([
-              expect.objectContaining({ type: "get_user_input" }),
-              expect.objectContaining({ type: "mcp_tool", mcp_server_slug: "web_search" }),
-              expect.objectContaining({ type: "send_output" }),
+              expect.objectContaining({ type: "get_user_input", prompt: expect.stringContaining("{{search_query}}") }),
+              expect.objectContaining({ type: "mcp_tool", mcp_server_slug: "web_search", prompt: expect.any(String) }),
+              expect.objectContaining({ type: "send_output", prompt: expect.any(String) }),
             ]),
           }),
         }),

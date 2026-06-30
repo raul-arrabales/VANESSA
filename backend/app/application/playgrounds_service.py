@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any
 
 from ..config import AuthConfig
+from ..config import get_auth_config
 from ..domain.playgrounds import (
     CHAT_PLAYGROUND_KIND,
     KNOWLEDGE_PLAYGROUND_KIND,
@@ -15,6 +16,8 @@ from ..domain.playgrounds import (
 )
 from ..infrastructure import playgrounds_repository
 from ..repositories.agent_workflow_runs import get_workflow_run, upsert_workflow_run
+from ..services.catalog_errors import CatalogError
+from ..services.catalog_service import get_catalog_agent
 from ..services.agent_engine_client import AgentEngineClientError
 from ..services.chat_inference import (
     chat_completion_stream_with_allowed_model,
@@ -154,7 +157,19 @@ def create_playground_session(
         knowledge_base_id=_normalize_knowledge_base_id(payload.get("knowledge_binding", payload.get("knowledge_base_id"))),
         conversation_kind=conversation_kind,
     )
-    return _serialize_session_detail(row, [])
+    _maybe_bootstrap_workflow_session(
+        database_url,
+        config=get_auth_config(),
+        owner_user_id=owner_user_id,
+        owner_role="user",
+        session_row=row,
+    )
+    return get_playground_session_detail(
+        database_url,
+        owner_user_id=owner_user_id,
+        session_id=str(row.get("id") or ""),
+        playground_kind=playground_kind,
+    )
 
 
 def get_playground_session_detail(
@@ -673,6 +688,122 @@ def _execute_request(
         raise PlaygroundSessionValidationError(exc.code, exc.message) from exc
 
 
+def _is_workflow_assistant(database_url: str, *, assistant_ref: str | None) -> bool:
+    normalized = str(assistant_ref or "").strip()
+    if not normalized or not normalized.startswith("agent."):
+        return False
+    try:
+        agent = get_catalog_agent(database_url, agent_id=normalized)
+    except CatalogError:
+        return False
+    spec = agent.get("spec") if isinstance(agent.get("spec"), dict) else {}
+    return str(spec.get("agent_type") or "").strip().lower() == "workflow"
+
+
+def _build_assistant_metadata_for_result(
+    *,
+    request: PlaygroundExecutionRequest,
+    result: PlaygroundExecutionResult,
+    assistant_parts: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    assistant_metadata = {"statuses": result.statuses} if result.statuses else None
+    if _has_image_parts(assistant_parts):
+        assistant_metadata = dict(assistant_metadata or {})
+        assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
+    if result.workflow_status:
+        assistant_metadata = dict(assistant_metadata or {})
+        assistant_metadata["workflow_status"] = result.workflow_status
+    if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
+        assistant_metadata = {
+            "response": result.response,
+            "sources": result.sources,
+            "references": result.references,
+            "retrieval": result.retrieval,
+            "knowledge_base_id": result.knowledge_base_id,
+        }
+        if _has_image_parts(assistant_parts):
+            assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
+        if result.statuses:
+            assistant_metadata["statuses"] = result.statuses
+    return assistant_metadata
+
+
+def _maybe_bootstrap_workflow_session(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    owner_user_id: int,
+    owner_role: str,
+    session_row: dict[str, Any],
+) -> None:
+    assistant_ref = string_or_none(session_row.get("assistant_ref"))
+    if str(session_row.get("conversation_kind") or "") != "plain":
+        return
+    if not _is_workflow_assistant(database_url, assistant_ref=assistant_ref):
+        return
+    request = PlaygroundExecutionRequest(
+        playground_kind=CHAT_PLAYGROUND_KIND,
+        session_id=str(session_row.get("id") or ""),
+        conversation_kind=str(session_row.get("conversation_kind") or "plain"),
+        assistant_ref=assistant_ref,
+        model_id=string_or_none(session_row.get("model_id")),
+        knowledge_base_id=string_or_none(session_row.get("knowledge_base_id")),
+        prompt="",
+        user_content_parts=[],
+        history=[],
+        conversation_title=str(session_row.get("title") or DEFAULT_CHAT_TITLE),
+        title_source=str(session_row.get("title_source") or DEFAULT_TITLE_SOURCE),
+    )
+    result = _execute_request(
+        database_url,
+        config=config,
+        request_id=str(uuid4()),
+        owner_user_id=owner_user_id,
+        owner_role=owner_role,
+        request=request,
+    )
+    assistant_parts = result.content_parts or ([text_part(result.output)] if result.output else [])
+    assistant_metadata = _build_assistant_metadata_for_result(
+        request=request,
+        result=result,
+        assistant_parts=assistant_parts,
+    )
+    persisted = playgrounds_repository.append_messages(
+        database_url,
+        owner_user_id=owner_user_id,
+        conversation_id=request.session_id,
+        messages=[
+            {
+                "role": "assistant",
+                "content": result.output,
+                "metadata": assistant_metadata or {},
+            }
+        ],
+        conversation_title=request.conversation_title,
+        title_source=request.title_source,
+        conversation_kind=request.conversation_kind,
+    )
+    if persisted is None:
+        raise PlaygroundSessionNotFoundError
+    assistant_message = persisted["messages"][0] if persisted.get("messages") else {}
+    bind_message_attachments(
+        database_url,
+        owner_user_id=owner_user_id,
+        parts=assistant_parts,
+        conversation_id=request.session_id,
+        message_id=str(assistant_message.get("id") or ""),
+    )
+    if request.assistant_ref and result.workflow_state is not None:
+        upsert_workflow_run(
+            database_url,
+            owner_user_id=owner_user_id,
+            conversation_id=request.session_id,
+            assistant_ref=request.assistant_ref,
+            status=result.workflow_status or "running",
+            workflow_state=result.workflow_state,
+        )
+
+
 def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExecutionResult:
     if not request.model_id:
         raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
@@ -723,25 +854,11 @@ def _persist_execution_result(
         validate_owned_image_references(database_url, owner_user_id=owner_user_id, parts=assistant_parts)
     except ChatAttachmentError as exc:
         raise PlaygroundSessionValidationError(exc.code, exc.message) from exc
-    assistant_metadata = {"statuses": result.statuses} if result.statuses else None
-    if _has_image_parts(assistant_parts):
-        assistant_metadata = dict(assistant_metadata or {})
-        assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
-    if result.workflow_status:
-        assistant_metadata = dict(assistant_metadata or {})
-        assistant_metadata["workflow_status"] = result.workflow_status
-    if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
-        assistant_metadata = {
-            "response": result.response,
-            "sources": result.sources,
-            "references": result.references,
-            "retrieval": result.retrieval,
-            "knowledge_base_id": result.knowledge_base_id,
-        }
-        if _has_image_parts(assistant_parts):
-            assistant_metadata[MESSAGE_CONTENT_METADATA_KEY] = assistant_parts
-        if result.statuses:
-            assistant_metadata["statuses"] = result.statuses
+    assistant_metadata = _build_assistant_metadata_for_result(
+        request=request,
+        result=result,
+        assistant_parts=assistant_parts,
+    )
     persisted = playgrounds_repository.append_message_pair(
         database_url,
         owner_user_id=owner_user_id,
