@@ -7,17 +7,23 @@ import type { PlaygroundWorkspaceConfig } from "../../playgrounds/types";
 
 export default function AppDetailPage(): JSX.Element {
   const { appId = "" } = useParams<{ appId: string }>();
-  const { token } = useAuth();
+  const { token, isLoading: isAuthLoading } = useAuth();
   const [app, setApp] = useState<VanessaApp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
     if (!token || !appId) {
+      setApp(null);
+      setError("");
       setLoading(false);
       return;
     }
     let cancelled = false;
+    setLoading(true);
     void getApp(appId, token)
       .then((item) => {
         if (!cancelled) {
@@ -38,7 +44,7 @@ export default function AppDetailPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [appId, token]);
+  }, [appId, isAuthLoading, token]);
 
   const config = useMemo<PlaygroundWorkspaceConfig | null>(() => {
     if (!app) {

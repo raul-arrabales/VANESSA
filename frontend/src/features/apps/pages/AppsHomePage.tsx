@@ -4,17 +4,23 @@ import { useAuth } from "../../../auth/AuthProvider";
 import { listApps, type VanessaApp } from "../../../api/apps";
 
 export default function AppsHomePage(): JSX.Element {
-  const { token } = useAuth();
+  const { token, isLoading: isAuthLoading } = useAuth();
   const [apps, setApps] = useState<VanessaApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
     if (!token) {
+      setApps([]);
+      setError("");
       setLoading(false);
       return;
     }
     let cancelled = false;
+    setLoading(true);
     void listApps(token)
       .then((items) => {
         if (!cancelled) {
@@ -35,7 +41,7 @@ export default function AppsHomePage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [isAuthLoading, token]);
 
   return (
     <section className="card-stack">

@@ -17,7 +17,8 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   const headers: HeadersInit = {
     Accept: "application/json",
   };
-  const activeToken = (options.token ?? readStoredToken()).trim();
+  const requestedToken = typeof options.token === "string" ? options.token.trim() : "";
+  const activeToken = requestedToken || readStoredToken().trim();
 
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
