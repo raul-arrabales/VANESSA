@@ -867,3 +867,67 @@ def test_update_playground_session_preserves_unchanged_fields_when_binding_kb(mo
     assert updated["knowledge_binding"]["knowledge_base_id"] == "kb-primary"
     assert updated["title"] == "Knowledge session"
     assert updated["model_selection"]["model_id"] == "safe-small"
+
+
+def test_maybe_bootstrap_workflow_session_persists_initial_assistant_message(monkeypatch):
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+    )
+    appended_payloads: list[dict[str, object]] = []
+    workflow_runs: list[dict[str, object]] = []
+
+    monkeypatch.setattr(playgrounds_service, "_is_workflow_assistant", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_execute_request",
+        lambda *_args, **_kwargs: playgrounds_service.PlaygroundExecutionResult(
+            output="Please share your order number.",
+            content_parts=[{"type": "text", "text": "Please share your order number."}],
+            workflow_state={"version": 2, "action_index": 0, "variables": {}, "action_outputs": {}, "status": "awaiting_user_input"},
+            workflow_status="awaiting_user_input",
+        ),
+    )
+    monkeypatch.setattr(
+        playgrounds_service.playgrounds_repository,
+        "append_messages",
+        lambda *_args, **kwargs: appended_payloads.extend(kwargs["messages"]) or {
+            "messages": [{"id": "msg-1", **kwargs["messages"][0]}],
+        },
+    )
+    monkeypatch.setattr(playgrounds_service, "bind_message_attachments", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        playgrounds_service,
+        "upsert_workflow_run",
+        lambda *_args, **kwargs: workflow_runs.append(dict(kwargs)),
+    )
+
+    playgrounds_service._maybe_bootstrap_workflow_session(
+        "postgresql://ignored",
+        config=config,
+        owner_user_id=10,
+        owner_role="user",
+        session_row={
+            "id": "sess-1",
+            "conversation_kind": "plain",
+            "assistant_ref": "agent.project.workflow-agent-1",
+            "model_id": "safe-small",
+            "knowledge_base_id": None,
+            "title": "New chat session",
+            "title_source": "auto",
+        },
+    )
+
+    assert appended_payloads[0]["role"] == "assistant"
+    assert appended_payloads[0]["content"] == "Please share your order number."
+    assert workflow_runs[0]["conversation_id"] == "sess-1"
+    assert workflow_runs[0]["assistant_ref"] == "agent.project.workflow-agent-1"
+    assert workflow_runs[0]["status"] == "awaiting_user_input"

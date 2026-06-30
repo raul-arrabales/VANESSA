@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Generator, Iterator, Sequence
 from datetime import date
 from typing import Any
+from uuid import uuid4
 
 from ..config import AuthConfig
 from ..config import get_auth_config
