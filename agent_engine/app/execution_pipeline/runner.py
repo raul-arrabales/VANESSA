@@ -206,7 +206,7 @@ def _llm_json(
     requested_model: str | None,
     system_prompt: str,
     user_prompt: str,
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
+) -> tuple[dict[str, Any], dict[str, Any] | None, str]:
     client = build_llm_runtime_client(runtime_snapshot)
     completion = client.chat_completion(
         requested_model=requested_model,
@@ -215,10 +215,11 @@ def _llm_json(
             {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
         ],
     )
-    return _parse_json_object(completion.get("output_text")), {
+    output_text = str(completion.get("output_text") or "").strip()
+    return _parse_json_object(output_text), {
         "requested_model": str(completion.get("requested_model") or requested_model or ""),
         "status_code": int(completion.get("status_code", 200) or 200),
-    }
+    }, output_text
 
 
 def _llm_text(
@@ -241,6 +242,69 @@ def _llm_text(
         "requested_model": str(completion.get("requested_model") or requested_model or ""),
         "status_code": int(completion.get("status_code", 200) or 200),
     }
+
+
+def _workflow_extract_variables_with_repair(
+    *,
+    context: ExecutionContext,
+    runtime_snapshot: dict[str, Any],
+    requested_model: str | None,
+    action_prompt: str,
+    variable_context: list[dict[str, Any]],
+    state: dict[str, Any],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    model_calls: list[dict[str, Any]] = []
+    parsed: dict[str, Any] = {}
+    raw_output = ""
+    try:
+        parsed, model_call, raw_output = _llm_json(
+            context=context,
+            runtime_snapshot=runtime_snapshot,
+            requested_model=requested_model,
+            system_prompt=action_prompt,
+            user_prompt=(
+                "Inspect the conversation and populate the declared workflow variables.\n"
+                "Return only JSON with complete:boolean, variables:object, missing:array, response:string.\n\n"
+                f"{_workflow_reference_guidance()}\n\n"
+                f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+                f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+                f"Existing variables:\n{dumps(state['variables'])}"
+            ),
+        )
+        if model_call:
+            model_calls.append(model_call)
+    except LlmRuntimeClientError:
+        parsed = {}
+
+    if parsed:
+        return parsed, model_calls
+    if not raw_output:
+        return parsed, model_calls
+
+    try:
+        repaired, model_call, _ = _llm_json(
+            context=context,
+            runtime_snapshot=runtime_snapshot,
+            requested_model=requested_model,
+            system_prompt=(
+                "You extract workflow state from a conversation.\n"
+                "Return only valid JSON with complete:boolean, variables:object, missing:array, response:string.\n"
+                "Do not write conversational prose outside the JSON object."
+            ),
+            user_prompt=(
+                f"Workflow action prompt:\n{action_prompt}\n\n"
+                f"{_workflow_reference_guidance()}\n\n"
+                f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
+                f"Required workflow variables:\n{dumps(variable_context)}\n\n"
+                f"Existing variables:\n{dumps(state['variables'])}\n\n"
+                f"Previous model output to normalize:\n{raw_output}"
+            ),
+        )
+        if model_call:
+            model_calls.append(model_call)
+        return repaired, model_calls
+    except LlmRuntimeClientError:
+        return parsed, model_calls
 
 
 def _get_path(payload: Any, path: str) -> Any:
@@ -385,22 +449,15 @@ def _execute_workflow_agent(
             parsed: dict[str, Any] = {}
             if missing:
                 try:
-                    parsed, model_call = _llm_json(
+                    parsed, extraction_model_calls = _workflow_extract_variables_with_repair(
                         context=context,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
-                        system_prompt=action_prompt,
-                        user_prompt=(
-                            "Inspect the conversation and populate the declared workflow variables.\n"
-                            "Return only JSON with complete:boolean, variables:object, missing:array, response:string.\n\n"
-                            f"{_workflow_reference_guidance()}\n\n"
-                            f"Conversation:\n{_message_text(context.conversation.messages)}\n\n"
-                            f"Required workflow variables:\n{dumps(variable_context)}\n\n"
-                            f"Existing variables:\n{dumps(state['variables'])}"
-                        ),
+                        action_prompt=action_prompt,
+                        variable_context=variable_context,
+                        state=state,
                     )
-                    if model_call:
-                        model_calls.append(model_call)
+                    model_calls.extend(extraction_model_calls)
                 except LlmRuntimeClientError:
                     parsed = {}
                 for name, value in (parsed.get("variables") if isinstance(parsed.get("variables"), dict) else {}).items():
@@ -497,7 +554,7 @@ def _execute_workflow_agent(
                     if isinstance(binding, dict)
                 }
                 try:
-                    parsed, model_call = _llm_json(
+                    parsed, model_call, _ = _llm_json(
                         context=context,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
@@ -560,7 +617,7 @@ def _execute_workflow_agent(
                 state.setdefault("action_outputs", {})[str(action.get("id") or f"action_{action_index + 1}")] = tool_payload
                 _store_output_variables(state, action, tool_payload)
                 try:
-                    evaluation, model_call = _llm_json(
+                    evaluation, model_call, _ = _llm_json(
                         context=context,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
@@ -612,7 +669,7 @@ def _execute_workflow_agent(
                 if str(variable) in state["variables"]
             }
             try:
-                parsed, model_call = _llm_json(
+                parsed, model_call, _ = _llm_json(
                     context=context,
                     runtime_snapshot=runtime_snapshot,
                     requested_model=requested_model,
