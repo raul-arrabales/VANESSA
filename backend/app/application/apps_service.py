@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ..services.catalog_service import list_catalog_agents
+from ..services.user_agent_specs import serialize_user_agent_spec
 
 
 def list_published_apps(database_url: str) -> list[dict[str, Any]]:
@@ -17,16 +16,17 @@ def list_published_apps(database_url: str) -> list[dict[str, Any]]:
             continue
         if str(spec.get("interface_type") or "").strip().lower() != "chat":
             continue
+        normalized_spec = serialize_user_agent_spec(spec)
         apps.append(
             {
                 "id": str(agent.get("id", "")),
                 "agent_id": str(agent.get("id", "")),
-                "name": str(spec.get("name", "")).strip(),
-                "description": str(spec.get("description", "")).strip(),
-                "interface_type": "chat",
-                "channel_type": "vanessa_webapp",
-                "agent_type": str(spec.get("agent_type") or "workflow"),
-                "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
+                "name": normalized_spec["name"].strip(),
+                "description": normalized_spec["description"].strip(),
+                "interface_type": normalized_spec["interface_type"],
+                "channel_type": normalized_spec["channel_type"],
+                "agent_type": normalized_spec["agent_type"],
+                "workflow_execution_mode": normalized_spec["workflow_execution_mode"],
                 "published_at": agent.get("published_at"),
                 "updated_at": agent.get("updated_at"),
             }

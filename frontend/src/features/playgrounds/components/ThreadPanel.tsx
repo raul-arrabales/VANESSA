@@ -11,6 +11,7 @@ import MessageImageGrid from "./MessageImageGrid";
 import { messageImageParts, messageText } from "../messageContent";
 import type { PlaygroundImageContentPart } from "../../../api/playgrounds";
 import type { PlaygroundRunStatus, PlaygroundSessionViewModel } from "../types";
+import { getWorkflowSessionDisplayState } from "../workflowSessionDisplay";
 
 type ThreadPanelProps = {
   activeSession: PlaygroundSessionViewModel | null;
@@ -91,7 +92,8 @@ export default function ThreadPanel({
     && !isBootstrapping
     && !isSending;
   const isTemporarySession = activeSession?.persistence === "temporary";
-  const isClosedWorkflowSession = activeSession?.workflowSessionState === "closed";
+  const workflowDisplay = getWorkflowSessionDisplayState(activeSession);
+  const isClosedWorkflowSession = workflowDisplay.isClosed;
 
   useEffect(() => () => {
     if (copiedResetTimeoutRef.current !== null) {

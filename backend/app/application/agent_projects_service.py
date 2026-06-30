@@ -13,16 +13,15 @@ from ..repositories.agent_projects import (
 )
 from ..repositories.model_access import find_model_definition
 from ..repositories.registry import find_registry_entity
-from ..services.agent_prompt_defaults import coerce_agent_runtime_prompts, normalize_agent_runtime_prompts
+from ..services.user_agent_specs import (
+    UserAgentSpecValidationError,
+    coerce_user_agent_common_spec,
+    serialize_user_agent_spec,
+)
 from ..services.user_agent_types import (
     CHANNEL_TYPE_VANESSA_WEBAPP,
     CREATABLE_USER_AGENT_TYPES,
     INTERFACE_TYPE_CHAT,
-    coerce_channel_type,
-    coerce_interface_type,
-    coerce_workflow_execution_mode,
-    coerce_user_agent_type,
-    normalize_workflow_definition,
     workflow_actions,
     workflow_mcp_server_slugs,
 )
@@ -337,7 +336,7 @@ def build_agent_project_preview(
         actor_user_id=actor_user_id,
         actor_role=actor_role,
     )
-    spec = dict(project["spec"])
+    spec = serialize_user_agent_spec(dict(project["spec"]))
     return {
         "project_id": project["id"],
         "assistant_ref": str(project.get("published_agent_id") or f"agent.project.{project['id']}"),
@@ -351,7 +350,7 @@ def build_agent_project_preview(
         "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
         "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
         "workflow_definition": dict(spec.get("workflow_definition") or {}),
-        "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
+        "workflow_execution_mode": spec["workflow_execution_mode"],
     }
 
 
@@ -379,112 +378,26 @@ def _serialize_project(row: dict[str, Any]) -> dict[str, Any]:
         "visibility": str(row.get("visibility", "private")),
         "created_at": _serialize_datetime(row.get("created_at")),
         "updated_at": _serialize_datetime(row.get("updated_at")),
-        "spec": {
-            "name": str(row.get("name", "")),
-            "description": str(row.get("description", "")),
-            "instructions": str(row.get("instructions", "")),
-            "runtime_prompts": normalize_agent_runtime_prompts(
-                row.get("runtime_prompts"),
-                agent_type=row.get("agent_type"),
-            ),
-            "default_model_ref": _string_or_none(row.get("default_model_ref")),
-            "tool_refs": list(row.get("tool_refs") or []),
-            "mcp_server_refs": list(row.get("mcp_server_refs") or []),
-            "agent_domain": str(row.get("agent_domain") or "default"),
-            "agent_type": str(row.get("agent_type") or "workflow"),
-            "channel_type": str(row.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
-            "interface_type": str(row.get("interface_type") or INTERFACE_TYPE_CHAT),
-            "workflow_definition": dict(row.get("workflow_definition") or {}),
-            "workflow_execution_mode": str(row.get("workflow_execution_mode") or "one_time"),
-            "tool_policy": dict(row.get("tool_policy") or {}),
-            "runtime_constraints": dict(row.get("runtime_constraints") or {}),
-        },
+        "spec": serialize_user_agent_spec(row, include_tool_policy=True),
     }
 
 
 def _coerce_project_spec(payload: dict[str, Any]) -> dict[str, Any]:
-    name = str(payload.get("name", "")).strip()
-    description = str(payload.get("description", "")).strip()
-    instructions = str(payload.get("instructions", "")).strip()
-    if not name:
-        raise AgentProjectError("invalid_name", "name is required")
-    if not description:
-        raise AgentProjectError("invalid_description", "description is required")
     try:
-        agent_type = coerce_user_agent_type(payload.get("agent_type"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_agent_type", str(exc)) from exc
+        spec = coerce_user_agent_common_spec(payload)
+    except UserAgentSpecValidationError as exc:
+        raise AgentProjectError(exc.code, exc.message) from exc
+    agent_type = spec["agent_type"]
     if agent_type not in CREATABLE_USER_AGENT_TYPES:
         raise AgentProjectError("unsupported_agent_type", f"agent_type '{agent_type}' is not supported yet")
-    if agent_type != "workflow" and not instructions:
-        raise AgentProjectError("invalid_instructions", "instructions is required")
-    try:
-        coerced_runtime_prompts = coerce_agent_runtime_prompts(
-            payload.get("runtime_prompts"),
-            default_when_missing=True,
-            agent_type=agent_type,
-        )
-    except ValueError as exc:
-        raise AgentProjectError("invalid_runtime_prompts", str(exc)) from exc
-    tool_refs_raw = payload.get("tool_refs", [])
-    if not isinstance(tool_refs_raw, list):
-        raise AgentProjectError("invalid_tool_refs", "tool_refs must be an array")
-    mcp_server_refs_raw = payload.get("mcp_server_refs", [])
-    if not isinstance(mcp_server_refs_raw, list):
-        raise AgentProjectError("invalid_mcp_server_refs", "mcp_server_refs must be an array")
-    runtime_constraints = payload.get("runtime_constraints")
-    if not isinstance(runtime_constraints, dict):
-        raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints must be an object")
-    if not isinstance(runtime_constraints.get("internet_required"), bool):
-        raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.internet_required must be a boolean")
-    if not isinstance(runtime_constraints.get("sandbox_required"), bool):
-        raise AgentProjectError("invalid_runtime_constraints", "runtime_constraints.sandbox_required must be a boolean")
-    try:
-        channel_type = coerce_channel_type(payload.get("channel_type"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_channel_type", str(exc)) from exc
-    try:
-        interface_type = coerce_interface_type(payload.get("interface_type"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_interface_type", str(exc)) from exc
-    try:
-        workflow_definition = normalize_workflow_definition(payload.get("workflow_definition"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_workflow_definition", str(exc)) from exc
-    try:
-        workflow_execution_mode = coerce_workflow_execution_mode(payload.get("workflow_execution_mode"))
-    except ValueError as exc:
-        raise AgentProjectError("invalid_workflow_execution_mode", str(exc)) from exc
-    workflow_shape_errors = _validate_workflow_shape(workflow_definition) if agent_type == "workflow" else []
+    workflow_shape_errors = _validate_workflow_shape(spec["workflow_definition"]) if agent_type == "workflow" else []
     if workflow_shape_errors:
         raise AgentProjectError("invalid_workflow_definition", workflow_shape_errors[0], details={"errors": workflow_shape_errors})
     tool_policy = payload.get("tool_policy", {})
     if not isinstance(tool_policy, dict):
         raise AgentProjectError("invalid_tool_policy", "tool_policy must be an object")
-    if channel_type == CHANNEL_TYPE_VANESSA_WEBAPP and interface_type != INTERFACE_TYPE_CHAT:
-        raise AgentProjectError("invalid_interface_type", "channel_type vanessa_webapp currently requires interface_type chat")
-    default_model_ref_raw = payload.get("default_model_ref")
-    default_model_ref = str(default_model_ref_raw).strip() if default_model_ref_raw is not None else None
-    return {
-        "name": name,
-        "description": description,
-        "instructions": instructions,
-        "runtime_prompts": coerced_runtime_prompts,
-        "default_model_ref": default_model_ref or None,
-        "tool_refs": [str(item).strip() for item in tool_refs_raw if str(item).strip()],
-        "mcp_server_refs": [str(item).strip() for item in mcp_server_refs_raw if str(item).strip()],
-        "agent_domain": str(payload.get("agent_domain") or "default").strip() or "default",
-        "agent_type": agent_type,
-        "channel_type": channel_type,
-        "interface_type": interface_type,
-        "workflow_definition": workflow_definition,
-        "workflow_execution_mode": workflow_execution_mode,
-        "tool_policy": tool_policy,
-        "runtime_constraints": {
-            "internet_required": bool(runtime_constraints["internet_required"]),
-            "sandbox_required": bool(runtime_constraints["sandbox_required"]),
-        },
-    }
+    spec["tool_policy"] = tool_policy
+    return spec
 
 
 def _validate_workflow_shape(workflow_definition: dict[str, Any]) -> list[str]:
@@ -545,26 +458,9 @@ def _coerce_visibility(raw_value: Any) -> str:
 
 
 def _compile_catalog_payload(project: dict[str, Any]) -> dict[str, Any]:
-    spec = dict(project["spec"])
-    agent_type = str(spec.get("agent_type") or "workflow")
+    spec = serialize_user_agent_spec(dict(project["spec"]))
     return {
-        "name": spec["name"],
-        "description": spec["description"],
-        "instructions": spec["instructions"],
-        "runtime_prompts": normalize_agent_runtime_prompts(
-            spec.get("runtime_prompts"),
-            agent_type=agent_type,
-        ),
-        "default_model_ref": spec.get("default_model_ref"),
-        "tool_refs": list(spec.get("tool_refs", [])),
-        "mcp_server_refs": list(spec.get("mcp_server_refs", [])),
-        "agent_domain": str(spec.get("agent_domain") or "default"),
-        "agent_type": agent_type,
-        "channel_type": str(spec.get("channel_type") or CHANNEL_TYPE_VANESSA_WEBAPP),
-        "interface_type": str(spec.get("interface_type") or INTERFACE_TYPE_CHAT),
-        "workflow_definition": dict(spec.get("workflow_definition") or {}),
-        "workflow_execution_mode": str(spec.get("workflow_execution_mode") or "one_time"),
-        "runtime_constraints": dict(spec.get("runtime_constraints") or {}),
+        **spec,
         "visibility": str(project.get("visibility", "private")),
         "publish": True,
     }
@@ -574,10 +470,3 @@ def _serialize_datetime(value: Any) -> str | None:
     if isinstance(value, datetime):
         return value.isoformat()
     return str(value) if value is not None else None
-
-
-def _string_or_none(value: Any) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip()
-    return normalized or None

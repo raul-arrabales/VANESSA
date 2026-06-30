@@ -61,6 +61,16 @@ from .playground_execution import (
     stream_agent_chat_request,
     stream_knowledge_request,
 )
+from .playground_workflow_lifecycle import (
+    WORKFLOW_EXECUTION_MODE_ONE_TIME,
+    WORKFLOW_SESSION_STATE_ACTIVE,
+    build_workflow_runtime_state,
+    filter_history_for_current_workflow_cycle,
+    is_closed_workflow_session,
+    normalize_workflow_execution_mode,
+    normalize_workflow_session_state,
+    resolve_workflow_lifecycle_outcome,
+)
 
 DEFAULT_TITLE_SOURCE = "auto"
 DEFAULT_CHAT_TITLE = "New chat session"
@@ -68,10 +78,6 @@ DEFAULT_KNOWLEDGE_TITLE = "New knowledge session"
 TEMPORARY_CHAT_TITLE = "Temporary chat"
 IMAGE_ONLY_EXECUTION_PROMPT = "User sent image attachment(s)."
 SESSION_UNSET = playgrounds_repository.UNSET
-WORKFLOW_EXECUTION_MODE_ONE_TIME = "one_time"
-WORKFLOW_EXECUTION_MODE_LOOP = "loop"
-WORKFLOW_SESSION_STATE_ACTIVE = "active"
-WORKFLOW_SESSION_STATE_CLOSED = "closed"
 
 PlaygroundSessionValidationError = PlaygroundExecutionValidationError
 list_knowledge_chat_knowledge_bases = list_runtime_knowledge_base_options
@@ -86,15 +92,6 @@ class PlaygroundChatExecutionError(RuntimeError):
         super().__init__(str(payload.get("message") or payload.get("error") or "playground_chat_failed"))
         self.payload = payload
         self.status_code = status_code
-
-def _workflow_execution_mode(value: Any) -> str:
-    normalized = str(value or WORKFLOW_EXECUTION_MODE_ONE_TIME).strip().lower() or WORKFLOW_EXECUTION_MODE_ONE_TIME
-    return normalized if normalized in {WORKFLOW_EXECUTION_MODE_ONE_TIME, WORKFLOW_EXECUTION_MODE_LOOP} else WORKFLOW_EXECUTION_MODE_ONE_TIME
-
-
-def _workflow_session_state(value: Any) -> str:
-    normalized = str(value or WORKFLOW_SESSION_STATE_ACTIVE).strip().lower() or WORKFLOW_SESSION_STATE_ACTIVE
-    return normalized if normalized in {WORKFLOW_SESSION_STATE_ACTIVE, WORKFLOW_SESSION_STATE_CLOSED} else WORKFLOW_SESSION_STATE_ACTIVE
 
 
 def _record_status(statuses: dict[str, dict[str, Any]], status: dict[str, Any]) -> dict[str, Any]:
@@ -565,12 +562,14 @@ def _build_execution_request(
         if workflow_settings and assistant_ref
         else None
     )
-    cycle_boundary = int((workflow_run or {}).get("cycle_started_message_index", 0) or 0)
-    filtered_history_messages = [
-        item
-        for item in history_messages
-        if int(item.get("message_index", 0) or 0) >= cycle_boundary
-    ]
+    runtime_state = build_workflow_runtime_state(
+        workflow_run=workflow_run,
+        workflow_execution_mode=(workflow_settings or {}).get("workflow_execution_mode", WORKFLOW_EXECUTION_MODE_ONE_TIME),
+    ) if workflow_settings else None
+    filtered_history_messages = filter_history_for_current_workflow_cycle(
+        history_messages,
+        cycle_started_message_index=runtime_state.cycle_started_message_index if runtime_state else 0,
+    )
     user_content_parts = _normalize_user_content_parts(
         database_url=database_url,
         owner_user_id=owner_user_id,
@@ -584,10 +583,6 @@ def _build_execution_request(
     if not history_messages and str(row.get("title_source") or DEFAULT_TITLE_SOURCE) == DEFAULT_TITLE_SOURCE:
         conversation_title = auto_title_from_prompt(user_content_text or "Image message")
         title_source = DEFAULT_TITLE_SOURCE
-    runtime_metadata = _workflow_runtime_metadata(
-        workflow_run=workflow_run,
-        workflow_execution_mode=(workflow_settings or {}).get("workflow_execution_mode", WORKFLOW_EXECUTION_MODE_ONE_TIME),
-    ) if workflow_settings else {}
     return PlaygroundExecutionRequest(
         playground_kind=playground_kind,
         session_id=str(row.get("id", "")),
@@ -609,9 +604,9 @@ def _build_execution_request(
         conversation_title=conversation_title,
         title_source=title_source,
         workflow_state=workflow_run.get("workflow_state") if isinstance(workflow_run, dict) else None,
-        workflow_execution_mode=runtime_metadata.get("workflow_execution_mode"),
-        workflow_session_state=runtime_metadata.get("workflow_session_state"),
-        workflow_cycle=runtime_metadata.get("workflow_cycle"),
+        workflow_execution_mode=runtime_state.execution_mode if runtime_state else None,
+        workflow_session_state=runtime_state.session_state if runtime_state else None,
+        workflow_cycle=runtime_state.workflow_cycle if runtime_state else None,
     )
 
 
@@ -717,10 +712,10 @@ def _execute_request(
     owner_user_id: int,
     owner_role: str,
     request: PlaygroundExecutionRequest,
-) -> PlaygroundExecutionResult:
+    ) -> PlaygroundExecutionResult:
     if request.playground_kind == CHAT_PLAYGROUND_KIND:
         if str(request.assistant_ref or "").strip().startswith("agent."):
-            if request.workflow_session_state == WORKFLOW_SESSION_STATE_CLOSED:
+            if is_closed_workflow_session(request.workflow_session_state):
                 raise PlaygroundSessionValidationError(
                     "workflow_session_closed",
                     "This workflow chat has finished. Start a new chat to run it again.",
@@ -772,20 +767,7 @@ def _workflow_assistant_settings(database_url: str, *, assistant_ref: str | None
         return None
     return {
         "assistant_ref": normalized,
-        "workflow_execution_mode": _workflow_execution_mode(spec.get("workflow_execution_mode")),
-    }
-
-
-def _workflow_runtime_metadata(
-    *,
-    workflow_run: dict[str, Any] | None,
-    workflow_execution_mode: str,
-) -> dict[str, Any]:
-    run = workflow_run if isinstance(workflow_run, dict) else {}
-    return {
-        "workflow_execution_mode": workflow_execution_mode,
-        "workflow_session_state": _workflow_session_state(run.get("session_state")),
-        "workflow_cycle": int(run.get("workflow_cycle", 1) or 1),
+        "workflow_execution_mode": normalize_workflow_execution_mode(spec.get("workflow_execution_mode")),
     }
 
 
@@ -807,8 +789,8 @@ def _upsert_workflow_runtime_state(
         conversation_id=request.session_id,
         assistant_ref=request.assistant_ref,
         status=result.workflow_status or "running",
-        workflow_execution_mode=_workflow_execution_mode(request.workflow_execution_mode),
-        session_state=_workflow_session_state(session_state),
+        workflow_execution_mode=normalize_workflow_execution_mode(request.workflow_execution_mode),
+        session_state=normalize_workflow_session_state(session_state),
         workflow_cycle=max(1, int(workflow_cycle or 1)),
         cycle_started_message_index=max(0, int(cycle_started_message_index or 0)),
         workflow_state=result.workflow_state,
@@ -859,7 +841,7 @@ def _maybe_bootstrap_workflow_session(
     if not _is_workflow_assistant(database_url, assistant_ref=assistant_ref):
         return
     workflow_settings = _workflow_assistant_settings(database_url, assistant_ref=assistant_ref) or {}
-    resolved_workflow_execution_mode = _workflow_execution_mode(
+    resolved_workflow_execution_mode = normalize_workflow_execution_mode(
         workflow_execution_mode or workflow_settings.get("workflow_execution_mode"),
     )
     request = PlaygroundExecutionRequest(
@@ -1017,40 +999,41 @@ def _persist_execution_result(
         message_id=str(assistant_message.get("id") or ""),
     )
     if request.assistant_ref and result.workflow_state is not None:
-        workflow_cycle = max(1, int(request.workflow_cycle or 1))
-        workflow_execution_mode = _workflow_execution_mode(request.workflow_execution_mode)
-        current_cycle_boundary = 0
-        if workflow_execution_mode == WORKFLOW_EXECUTION_MODE_LOOP and result.workflow_status == "completed":
+        existing_run = get_workflow_run(
+            database_url,
+            owner_user_id=owner_user_id,
+            conversation_id=request.session_id,
+            assistant_ref=request.assistant_ref,
+        )
+        runtime_state = build_workflow_runtime_state(
+            workflow_run=existing_run,
+            workflow_execution_mode=request.workflow_execution_mode,
+        )
+        lifecycle_outcome = resolve_workflow_lifecycle_outcome(
+            workflow_execution_mode=request.workflow_execution_mode,
+            workflow_status=result.workflow_status,
+            workflow_cycle=request.workflow_cycle or runtime_state.workflow_cycle,
+            cycle_started_message_index=runtime_state.cycle_started_message_index,
+        )
+        if lifecycle_outcome.should_bootstrap_next_cycle:
             _maybe_bootstrap_workflow_session(
                 database_url,
                 config=config,
                 owner_user_id=owner_user_id,
                 owner_role=owner_role,
                 session_row=persisted.get("conversation") if isinstance(persisted.get("conversation"), dict) else {},
-                workflow_execution_mode=workflow_execution_mode,
-                workflow_cycle=workflow_cycle + 1,
+                workflow_execution_mode=runtime_state.execution_mode,
+                workflow_cycle=lifecycle_outcome.bootstrap_workflow_cycle or runtime_state.workflow_cycle + 1,
             )
         else:
-            existing_run = get_workflow_run(
-                database_url,
-                owner_user_id=owner_user_id,
-                conversation_id=request.session_id,
-                assistant_ref=request.assistant_ref,
-            )
-            current_cycle_boundary = int((existing_run or {}).get("cycle_started_message_index", 0) or 0)
-            session_state = (
-                WORKFLOW_SESSION_STATE_CLOSED
-                if workflow_execution_mode == WORKFLOW_EXECUTION_MODE_ONE_TIME and result.workflow_status == "completed"
-                else WORKFLOW_SESSION_STATE_ACTIVE
-            )
             _upsert_workflow_runtime_state(
                 database_url,
                 owner_user_id=owner_user_id,
                 request=request,
                 result=result,
-                session_state=session_state,
-                workflow_cycle=workflow_cycle,
-                cycle_started_message_index=current_cycle_boundary,
+                session_state=lifecycle_outcome.persisted_session_state or WORKFLOW_SESSION_STATE_ACTIVE,
+                workflow_cycle=lifecycle_outcome.persisted_workflow_cycle or runtime_state.workflow_cycle,
+                cycle_started_message_index=lifecycle_outcome.cycle_started_message_index,
             )
     return persisted
 
@@ -1250,7 +1233,7 @@ def _stream_chat_request(
     def _stream() -> Iterator[dict[str, Any]]:
         statuses: dict[str, dict[str, Any]] = {}
         if str(request.assistant_ref or "").strip().startswith("agent."):
-            if request.workflow_session_state == WORKFLOW_SESSION_STATE_CLOSED:
+            if is_closed_workflow_session(request.workflow_session_state):
                 raise PlaygroundSessionValidationError(
                     "workflow_session_closed",
                     "This workflow chat has finished. Start a new chat to run it again.",
@@ -1705,10 +1688,17 @@ def _serialize_session_summary(
             conversation_id=str(row.get("id", "")),
             assistant_ref=assistant_ref,
         )
-        payload.update(_workflow_runtime_metadata(
+        runtime_state = build_workflow_runtime_state(
             workflow_run=workflow_run,
             workflow_execution_mode=workflow_settings.get("workflow_execution_mode"),
-        ))
+        )
+        payload.update(
+            {
+                "workflow_execution_mode": runtime_state.execution_mode,
+                "workflow_session_state": runtime_state.session_state,
+                "workflow_cycle": runtime_state.workflow_cycle,
+            }
+        )
     return payload
 
 

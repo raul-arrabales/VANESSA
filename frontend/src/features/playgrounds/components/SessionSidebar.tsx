@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useSessionSidebarMenu } from "../hooks/useSessionSidebarMenu";
 import type { PlaygroundSessionFilters, PlaygroundSessionViewModel } from "../types";
 import { formatTimestamp } from "../utils";
+import { getWorkflowSessionDisplayState } from "../workflowSessionDisplay";
 import SessionSidebarHeader from "./SessionSidebarHeader";
 
 type SessionSidebarProps = {
@@ -78,27 +79,6 @@ export default function SessionSidebar({
     isInteractionLocked,
     activeSessionId,
   });
-
-  const getWorkflowBadge = (session: PlaygroundSessionViewModel): {
-    label: string;
-    tone: "closed" | "loop";
-  } | null => {
-    if (session.workflowSessionState === "closed") {
-      return {
-        label: t("playgroundSessionSidebar.workflowClosed"),
-        tone: "closed",
-      };
-    }
-    if (session.workflowExecutionMode === "loop" && session.workflowSessionState === "active") {
-      return {
-        label: session.workflowCycle && session.workflowCycle > 1
-          ? t("playgroundSessionSidebar.workflowLoopCycle", { cycle: session.workflowCycle })
-          : t("playgroundSessionSidebar.workflowLoop"),
-        tone: "loop",
-      };
-    }
-    return null;
-  };
 
   return (
     <aside
@@ -200,7 +180,14 @@ export default function SessionSidebar({
           {sessions.map((session) => {
             const actionsLabel = t("playgroundSessionSidebar.actionsFor", { title: session.title });
             const rowMenuOpen = isMenuOpen(session.id);
-            const workflowBadge = getWorkflowBadge(session);
+            const workflowDisplay = getWorkflowSessionDisplayState(session);
+            const workflowBadgeLabel = workflowDisplay.badgeKind === "closed"
+              ? t("playgroundSessionSidebar.workflowClosed")
+              : workflowDisplay.badgeKind === "loop"
+                ? (workflowDisplay.workflowCycle && workflowDisplay.workflowCycle > 1
+                  ? t("playgroundSessionSidebar.workflowLoopCycle", { cycle: workflowDisplay.workflowCycle })
+                  : t("playgroundSessionSidebar.workflowLoop"))
+                : null;
 
             return (
               <div
@@ -220,12 +207,12 @@ export default function SessionSidebar({
                 >
                   <span className="chatbot-conversation-item-heading">
                     <strong className="chatbot-conversation-item-title" title={session.title}>{session.title}</strong>
-                    {workflowBadge ? (
+                    {workflowDisplay.badgeKind && workflowBadgeLabel ? (
                       <span
                         className="chatbot-conversation-item-badge"
-                        data-tone={workflowBadge.tone}
+                        data-tone={workflowDisplay.badgeKind}
                       >
-                        {workflowBadge.label}
+                        {workflowBadgeLabel}
                       </span>
                     ) : null}
                   </span>
