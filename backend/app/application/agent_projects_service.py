@@ -25,7 +25,7 @@ from ..services.user_agent_types import (
     workflow_actions,
     workflow_mcp_server_slugs,
 )
-from .catalog_management_service import create_catalog_agent, update_catalog_agent
+from .catalog_management_service import create_catalog_agent, delete_catalog_agent, update_catalog_agent
 
 _VALID_VISIBILITIES = {"private", "unlisted", "public"}
 
@@ -105,7 +105,17 @@ def delete_agent_project(
     actor_user_id: int,
     actor_role: str,
 ) -> None:
-    _require_project(database_url, project_id=project_id, actor_user_id=actor_user_id, actor_role=actor_role)
+    project = _require_project(database_url, project_id=project_id, actor_user_id=actor_user_id, actor_role=actor_role)
+    published_agent_id = str(project.get("published_agent_id") or "").strip()
+    if published_agent_id:
+        existing_agent = find_registry_entity(database_url, entity_type="agent", entity_id=published_agent_id)
+        if existing_agent is not None:
+            delete_catalog_agent(
+                database_url,
+                agent_id=published_agent_id,
+                actor_user_id=actor_user_id,
+                actor_role=actor_role,
+            )
     deleted = delete_project_row(database_url, project_id=project_id)
     if not deleted:
         raise AgentProjectError("project_not_found", "Agent project not found", status_code=404)

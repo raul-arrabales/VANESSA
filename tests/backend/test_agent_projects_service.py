@@ -289,6 +289,57 @@ def test_publish_workflow_agent_project_allows_empty_instructions_and_retrieval_
     assert payload["publish_result"]["agent_id"] == "agent.project.proj-1"
 
 
+def test_delete_agent_project_removes_published_catalog_agent_when_present(monkeypatch):
+    delete_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        agent_projects_service,
+        "get_agent_project",
+        lambda *_args, **_kwargs: {**_project_row(), "published_agent_id": "agent.project.proj-1"},
+    )
+    monkeypatch.setattr(
+        agent_projects_service,
+        "find_registry_entity",
+        lambda *_args, **_kwargs: {"entity_id": "agent.project.proj-1", "owner_user_id": 10},
+    )
+    monkeypatch.setattr(
+        agent_projects_service,
+        "delete_catalog_agent",
+        lambda _database_url, *, agent_id, actor_user_id, actor_role: delete_calls.append(
+            {"agent_id": agent_id, "actor_user_id": actor_user_id, "actor_role": actor_role}
+        ),
+    )
+    monkeypatch.setattr(agent_projects_service, "delete_project_row", lambda *_args, **_kwargs: True)
+
+    agent_projects_service.delete_agent_project(
+        "postgresql://ignored",
+        project_id="proj-1",
+        actor_user_id=10,
+        actor_role="user",
+    )
+
+    assert delete_calls == [
+        {"agent_id": "agent.project.proj-1", "actor_user_id": 10, "actor_role": "user"},
+    ]
+
+
+def test_delete_agent_project_skips_catalog_delete_when_no_published_agent_exists(monkeypatch):
+    monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: _project_row())
+    monkeypatch.setattr(
+        agent_projects_service,
+        "delete_catalog_agent",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("delete_catalog_agent should not be called")),
+    )
+    monkeypatch.setattr(agent_projects_service, "delete_project_row", lambda *_args, **_kwargs: True)
+
+    agent_projects_service.delete_agent_project(
+        "postgresql://ignored",
+        project_id="proj-1",
+        actor_user_id=10,
+        actor_role="user",
+    )
+
+
 def test_build_agent_project_preview_returns_previewable_runtime_shape(monkeypatch):
     monkeypatch.setattr(agent_projects_service, "get_agent_project", lambda *_args, **_kwargs: _project_row())
 
