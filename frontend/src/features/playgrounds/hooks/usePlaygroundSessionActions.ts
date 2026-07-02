@@ -260,26 +260,10 @@ export function usePlaygroundSessionActions({
 
       if (remaining.length === 0) {
         setSavedSessions([]);
+        setActiveSessionId(null);
+        setActiveSession(null);
         if (config.sessionBootstrap.mode === "draft-first") {
           createOrResetDraftSession();
-        } else {
-          const created = await createPlaygroundSession(
-            {
-              playground_kind: config.playgroundKind,
-              assistant_ref: options.defaultAssistantRef ?? undefined,
-              model_selection: { model_id: options.models[0]?.id ?? null },
-              knowledge_binding: {
-                knowledge_base_id: hasKnowledgeBaseSelector
-                  ? options.defaultKnowledgeBaseId
-                  : null,
-              },
-            },
-            token,
-          );
-          const nextSession = mapPlaygroundSessionDetail(created);
-          setSavedSessions([nextSession]);
-          setActiveSessionId(nextSession.id);
-          setActiveSession(nextSession);
         }
       } else {
         const sorted = sortSessions(remaining);

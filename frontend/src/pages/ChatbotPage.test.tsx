@@ -9,6 +9,8 @@ import type {
   SendPlaygroundMessageResult,
 } from "../api/playgrounds";
 import type { AuthUser } from "../auth/types";
+import PlaygroundWorkspace from "../features/playgrounds/components/PlaygroundWorkspace";
+import { chatPlaygroundConfig } from "../features/playgrounds/configs";
 import ChatPlaygroundPage from "../features/playgrounds/pages/ChatPlaygroundPage";
 import KnowledgePlaygroundPage from "../features/playgrounds/pages/KnowledgePlaygroundPage";
 import { renderWithAppProviders } from "../test/renderWithAppProviders";
@@ -137,6 +139,24 @@ async function renderChatPlayground() {
 
 async function renderKnowledgePlayground() {
   return await renderWithAppProviders(<KnowledgePlaygroundPage />);
+}
+
+async function renderAgentAppWorkspace() {
+  return await renderWithAppProviders(
+    <PlaygroundWorkspace
+      config={{
+        ...chatPlaygroundConfig,
+        title: "Workflow Agent",
+        panelAriaLabel: "Workflow Agent app workspace",
+        sessionBootstrap: {
+          mode: "saved-first",
+          historyLoadingText: "Loading Workflow Agent sessions...",
+        },
+        defaultAssistantRef: "agent.project.workflow-agent-1",
+        fixedAssistantRef: "agent.project.workflow-agent-1",
+      }}
+    />,
+  );
 }
 
 function getChatShell(container: HTMLElement): HTMLElement {
@@ -683,6 +703,50 @@ describe("ChatPlaygroundPage", () => {
 
     await waitForDraftReady();
     expect(playgroundApiMocks.createPlaygroundSession).not.toHaveBeenCalled();
+  });
+
+  it("clears a deleted agent app thread even when creating its replacement fails", async () => {
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("app-conv-1", "Workflow run", {
+        assistant_ref: "agent.project.workflow-agent-1",
+        message_count: 1,
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("app-conv-1", "Workflow run", {
+        assistant_ref: "agent.project.workflow-agent-1",
+        message_count: 1,
+        messages: [
+          {
+            id: "msg-workflow",
+            role: "assistant",
+            content: "Deleted workflow response",
+            metadata: {},
+            createdAt: "2026-03-18T11:00:00Z",
+          },
+        ],
+      }),
+    );
+    playgroundApiMocks.createPlaygroundSession.mockRejectedValueOnce(new Error("Replacement failed"));
+
+    await renderAgentAppWorkspace();
+
+    expect(await screen.findByText("Deleted workflow response")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Conversation actions for Workflow run" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete conversation" }));
+
+    await waitFor(() => expect(playgroundApiMocks.deletePlaygroundSession).toHaveBeenCalledWith("app-conv-1", "token"));
+    await waitFor(() => expect(playgroundApiMocks.createPlaygroundSession).toHaveBeenCalledWith(
+      expect.objectContaining({ assistant_ref: "agent.project.workflow-agent-1" }),
+      "token",
+    ));
+    expect(screen.queryByText("Deleted workflow response")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Workflow run/i })).toBeNull();
+    expect(feedbackMocks.showErrorFeedback).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "Unable to delete conversation.",
+    );
   });
 
   it("uses a local fallback for stale saved conversation models without touching updated_at", async () => {

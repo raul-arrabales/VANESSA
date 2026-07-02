@@ -72,7 +72,7 @@ def upsert_workflow_run(
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
             ON CONFLICT (conversation_id, assistant_ref)
             DO UPDATE SET
                 status = EXCLUDED.status,
