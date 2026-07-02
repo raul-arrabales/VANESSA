@@ -208,6 +208,7 @@ export const appRoutes: AppRouteDefinition[] = [
     showInBreadcrumbs: true,
     requiresAuth: true,
     minimumRole: "user",
+    mainContentLayout: "full-bleed",
     element: <AppDetailPage />,
   },
   {

@@ -135,8 +135,11 @@ describe("AppChrome", () => {
     expect(sidebar).toHaveAttribute("data-drawer-open", "false");
   });
 
-  it("uses a full-bleed content layout for final chat workspaces", async () => {
-    await renderShell("/playgrounds/chat");
+  it.each([
+    "/playgrounds/chat",
+    "/apps/agent.project.workflow-agent-1",
+  ])("uses a full-bleed content layout for the chat workspace at %s", async (route) => {
+    await renderShell(route);
 
     expect(screen.getByRole("main")).toHaveAttribute("data-layout", "full-bleed");
   });
