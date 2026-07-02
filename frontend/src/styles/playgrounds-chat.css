@@ -221,6 +221,37 @@
   }
 }
 
+.playground-session-starting-modal {
+  width: min(30rem, 100%);
+}
+
+.playground-session-starting-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--accent-primary) 8%, var(--bg-surface));
+  color: var(--text-secondary);
+}
+
+.playground-session-starting-icon {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  color: var(--accent-primary);
+  animation: chatbot-history-spin 1.1s linear infinite;
+}
+
+.playground-session-starting-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 .chatbot-conversation-item {
   display: grid;
   gap: var(--space-1);

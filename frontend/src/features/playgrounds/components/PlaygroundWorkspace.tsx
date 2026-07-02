@@ -60,6 +60,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   });
   const [isSending, setIsSending] = useState(false);
   const [isSessionBusy, setIsSessionBusy] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [pendingContentParts, setPendingContentParts] = useState<PlaygroundImageContentPart[]>([]);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -185,7 +186,12 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
         isHistoryLoading={sessionState.isHistoryLoading}
         historyError={sessionState.historyError}
         onToggleCollapsed={preferences.toggleSidebar}
-        onCreateSession={() => void actions.createSession()}
+        onCreateSession={() => {
+          setIsCreatingSession(true);
+          void actions.createSession().finally(() => {
+            setIsCreatingSession(false);
+          });
+        }}
         onCreateTemporarySession={() => {
           pinToBottomOnNextUpdate("auto");
           actions.createTemporaryChat();
@@ -302,6 +308,24 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
             }
           }}
         />
+      ) : null}
+      {isCreatingSession && config.sessionBootstrap.createProgress ? (
+        <ModalDialog
+          className="playground-session-starting-modal"
+          title={config.sessionBootstrap.createProgress.title}
+          description={config.sessionBootstrap.createProgress.description}
+          onClose={() => undefined}
+          closeDisabled
+        >
+          <div className="playground-session-starting-status" role="status" aria-live="polite">
+            <span className="playground-session-starting-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3a9 9 0 1 0 8.49 12H18.4a7 7 0 1 1-1.55-7.31L14 10h7V3l-2.72 2.72A8.96 8.96 0 0 0 12 3Z" />
+              </svg>
+            </span>
+            <span>{config.sessionBootstrap.createProgress.statusText}</span>
+          </div>
+        </ModalDialog>
       ) : null}
       {pendingDialog?.kind === "rename" ? (
         <ModalDialog

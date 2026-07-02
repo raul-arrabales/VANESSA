@@ -74,6 +74,11 @@ export type PlaygroundWorkspaceConfig = {
   sessionBootstrap: {
     mode: "saved-first" | "draft-first";
     historyLoadingText: string;
+    createProgress?: {
+      title: string;
+      description: string;
+      statusText: string;
+    };
   };
   prompts: {
     rename: string;

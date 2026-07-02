@@ -151,6 +151,11 @@ async function renderAgentAppWorkspace() {
         sessionBootstrap: {
           mode: "saved-first",
           historyLoadingText: "Loading Workflow Agent sessions...",
+          createProgress: {
+            title: "Starting Workflow Agent",
+            description: "The agent is initializing its workflow and tools. This can take a few seconds.",
+            statusText: "Please wait while the new chat becomes ready.",
+          },
         },
         defaultAssistantRef: "agent.project.workflow-agent-1",
         fixedAssistantRef: "agent.project.workflow-agent-1",
@@ -747,6 +752,45 @@ describe("ChatPlaygroundPage", () => {
       expect.anything(),
       "Unable to delete conversation.",
     );
+  });
+
+  it("shows a blocking progress dialog while an agent app starts a new chat", async () => {
+    let resolveCreation: (session: PlaygroundSessionDetail) => void = () => undefined;
+    playgroundApiMocks.listPlaygroundSessions.mockResolvedValueOnce([
+      sessionSummary("app-conv-1", "Workflow run", {
+        assistant_ref: "agent.project.workflow-agent-1",
+        message_count: 1,
+      }),
+    ]);
+    playgroundApiMocks.getPlaygroundSession.mockResolvedValueOnce(
+      sessionDetail("app-conv-1", "Workflow run", {
+        assistant_ref: "agent.project.workflow-agent-1",
+        message_count: 1,
+      }),
+    );
+    playgroundApiMocks.createPlaygroundSession.mockImplementationOnce(
+      async () => await new Promise<PlaygroundSessionDetail>((resolve) => {
+        resolveCreation = resolve;
+      }),
+    );
+
+    await renderAgentAppWorkspace();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "New chat" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+
+    const progressDialog = await screen.findByRole("dialog", { name: "Starting Workflow Agent" });
+    expect(progressDialog).toBeVisible();
+    expect(screen.getByText("The agent is initializing its workflow and tools. This can take a few seconds.")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Please wait while the new chat becomes ready.");
+    await userEvent.keyboard("{Escape}");
+    expect(progressDialog).toBeVisible();
+
+    resolveCreation(sessionDetail("app-conv-2", "New workflow run", {
+      assistant_ref: "agent.project.workflow-agent-1",
+    }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Starting Workflow Agent" })).toBeNull());
   });
 
   it("uses a local fallback for stale saved conversation models without touching updated_at", async () => {

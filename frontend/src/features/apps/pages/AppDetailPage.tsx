@@ -79,6 +79,11 @@ export default function AppDetailPage(): JSX.Element {
       sessionBootstrap: {
         mode: "saved-first",
         historyLoadingText: `Loading ${app.name} sessions...`,
+        createProgress: {
+          title: `Starting ${app.name}`,
+          description: "The agent is initializing its workflow and tools. This can take a few seconds.",
+          statusText: "Please wait while the new chat becomes ready.",
+        },
       },
       prompts: {
         rename: `Rename ${app.name} session`,
