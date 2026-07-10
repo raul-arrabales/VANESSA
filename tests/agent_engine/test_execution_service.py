@@ -668,6 +668,61 @@ def test_execution_progress_recorder_emits_model_statuses(monkeypatch: pytest.Mo
     assert isinstance(progress_events[-1]["duration_ms"], int)
 
 
+def test_execution_debug_traces_emit_llm_call_status(monkeypatch: pytest.MonkeyPatch):
+    progress_events: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(execution_service, "resolve_runtime_profile", lambda _p: "offline")
+    monkeypatch.setattr(
+        execution_service,
+        "resolve_agent_spec",
+        lambda *, agent_id: {"entity_id": agent_id, "current_version": "v2", "current_spec": {"tool_refs": []}},
+    )
+    monkeypatch.setattr(execution_service, "require_agent_execute_permission", lambda **_kwargs: None)
+    monkeypatch.setattr(execution_service, "validate_runtime_and_dependencies", lambda **_kwargs: ("v2", "model.alpha"))
+    monkeypatch.setattr(execution_service, "resolve_agent_tools", lambda **_kwargs: [])
+
+    class FakeClient:
+        def chat_completion(self, **kwargs):
+            return {
+                "output_text": "model output",
+                "status_code": 200,
+                "requested_model": kwargs["requested_model"],
+            }
+
+    monkeypatch.setattr(execution_service, "build_llm_runtime_client", lambda _runtime: FakeClient())
+    monkeypatch.setattr(execution_service.executions_repo, "save_execution", lambda *_args, **_kwargs: None)
+
+    payload, status = execution_service.create_execution(
+        {
+            "agent_id": "agent.alpha",
+            "requested_by_user_id": 123,
+            "runtime_profile": "offline",
+            "input": {
+                "prompt": "hello",
+                "debug_llm_traces": True,
+                "messages": [{"role": "user", "content": [{"type": "text", "text": "hello"}]}],
+            },
+            "platform_runtime": {
+                "deployment_profile": {"slug": "local-default"},
+                "capabilities": {
+                    "llm_inference": {"slug": "vllm-local-gateway", "provider_key": "vllm_local", "provider_origin": "local"},
+                },
+            },
+        },
+        progress_emit=progress_events.append,
+    )
+
+    assert status == 201
+    assert payload["execution"]["result"]["output_text"] == "model output"
+    llm_events = [event for event in progress_events if event["kind"] == "llm_call"]
+    assert [event["state"] for event in llm_events] == ["running", "completed"]
+    debug = llm_events[-1]["details"]["llm_debug"]
+    assert debug["agent_id"] == "agent.alpha"
+    assert debug["messages"] == [{"role": "user", "text": "hello"}]
+    assert debug["raw_response_text"] == "model output"
+    assert debug["provider_slug"] == "vllm-local-gateway"
+
+
 def test_streamed_execution_emits_model_deltas_and_stream_statuses(monkeypatch: pytest.MonkeyPatch):
     progress_events: list[dict[str, Any]] = []
     delta_events: list[dict[str, Any]] = []

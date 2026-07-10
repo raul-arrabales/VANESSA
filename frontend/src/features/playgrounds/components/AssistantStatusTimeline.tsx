@@ -32,6 +32,45 @@ function detailText(value: unknown): string {
   }
 }
 
+function debugText(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function copyToClipboard(text: string): void {
+  if (!text || typeof navigator === "undefined" || !navigator.clipboard) {
+    return;
+  }
+  void navigator.clipboard.writeText(text);
+}
+
+function llmMessagesText(messages: unknown): string {
+  if (!Array.isArray(messages)) {
+    return "";
+  }
+  return messages
+    .map((message) => {
+      if (!message || typeof message !== "object") {
+        return "";
+      }
+      const raw = message as Record<string, unknown>;
+      const role = String(raw.role ?? "message");
+      const text = String(raw.text ?? "");
+      return `${role.toUpperCase()}\n${text}`;
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function statusLabel(status: PlaygroundRunStatus): string {
   const duration = formatDuration(status.duration_ms);
   return duration && status.state !== "running" ? `${status.label} - ${duration}` : status.label;
@@ -165,7 +204,11 @@ function AssistantStatusItem({
 }): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const details = status.details && typeof status.details === "object" ? status.details : {};
+  const llmDebug = details.llm_debug && typeof details.llm_debug === "object"
+    ? details.llm_debug as Record<string, unknown>
+    : null;
   const detailEntries = Object.entries(details)
+    .filter(([key]) => key !== "llm_debug")
     .map(([key, value]) => [key, detailText(value)] as const)
     .filter(([, value]) => value.length > 0);
   const detailsId = `assistant-status-${messageId}-${status.id}`;
@@ -198,6 +241,85 @@ function AssistantStatusItem({
           ))}
         </dl>
       ) : null}
+      {llmDebug ? <AssistantLlmDebugDetails debug={llmDebug} /> : null}
     </details>
+  );
+}
+
+function AssistantLlmDebugDetails({ debug }: { debug: Record<string, unknown> }): JSX.Element {
+  const messagesText = llmMessagesText(debug.messages);
+  const rawResponseText = debugText(debug.raw_response_text);
+  const metaEntries = [
+    ["call", debug.call_label ?? debug.call_id],
+    ["agent", debug.agent_id ?? debug.assistant_ref],
+    ["model", debug.requested_model],
+    ["provider", debug.provider_slug ?? debug.provider_key],
+    ["deployment", debug.deployment_profile_slug],
+    ["status", debug.status_code],
+  ]
+    .map(([key, value]) => [key, detailText(value)] as const)
+    .filter(([, value]) => value.length > 0);
+  const extraEntries = [
+    ["tools", debug.tools],
+    ["tool calls", debug.tool_calls],
+    ["parsed json", debug.parsed_json],
+  ]
+    .map(([key, value]) => [key, debugText(value)] as const)
+    .filter(([, value]) => value.length > 0);
+
+  return (
+    <div className="assistant-status-llm-debug">
+      {metaEntries.length > 0 ? (
+        <dl className="assistant-status-debug-meta">
+          {metaEntries.map(([key, value]) => (
+            <div key={key} className="assistant-status-detail-row">
+              <dt>{key}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {messagesText ? (
+        <DebugBlock title="Messages sent to LLM" text={messagesText} />
+      ) : null}
+      {rawResponseText ? (
+        <DebugBlock title="Raw model reply" text={rawResponseText} />
+      ) : null}
+      {extraEntries.map(([key, value]) => (
+        <DebugBlock key={key} title={key} text={value} />
+      ))}
+    </div>
+  );
+}
+
+function DebugBlock({ title, text }: { title: string; text: string }): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setCopied(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <section className="assistant-status-debug-block">
+      <div className="assistant-status-debug-block-header">
+        <span>{title}</span>
+        <button
+          type="button"
+          className="assistant-status-debug-copy"
+          aria-label={copied ? `Copied ${title}` : `Copy ${title}`}
+          onClick={() => {
+            copyToClipboard(text);
+            setCopied(true);
+          }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <pre>{text}</pre>
+    </section>
   );
 }

@@ -266,7 +266,7 @@ describe("ThreadPanel", () => {
       />,
     );
 
-    const generationSummary = screen.getByText("Generation (1.0s)").closest("summary");
+    const generationSummary = screen.getByText(/Generation \(1\.0s/).closest("summary");
     expect(generationSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Retrieved information from: docs - 1.2s")).not.toBeVisible();
 
@@ -294,6 +294,97 @@ describe("ThreadPanel", () => {
 
     expect(generationSummary).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Retrieved information from: docs - 1.2s")).not.toBeVisible();
+  });
+
+  it("renders collapsed LLM debug details with copy controls", async () => {
+    const session = {
+      ...buildSession(),
+      messages: [
+        {
+          id: "m-user",
+          role: "user" as const,
+          content: "hello",
+          metadata: {},
+          createdAt: "2026-03-18T11:00:00Z",
+        },
+        {
+          id: "m-assistant",
+          role: "assistant" as const,
+          content: "Hi there",
+          metadata: {
+            statuses: [
+              {
+                id: "llm-call-1",
+                kind: "llm_call",
+                label: "LLM call completed",
+                state: "completed",
+                started_at: "2026-03-18T11:00:00Z",
+                completed_at: "2026-03-18T11:00:01Z",
+                duration_ms: 1000,
+                details: {
+                  llm_debug: {
+                    call_id: "chat",
+                    call_label: "LLM call",
+                    requested_model: "safe-small",
+                    messages: [
+                      { role: "system", text: "Internal instructions" },
+                      { role: "user", text: "hello" },
+                    ],
+                    raw_response_text: "Hi there",
+                    status_code: 200,
+                  },
+                },
+              },
+            ],
+          },
+          createdAt: "2026-03-18T11:00:01Z",
+        },
+      ],
+    };
+
+    await renderWithAppProviders(
+      <ThreadPanel
+        activeSession={session}
+        isBootstrapping={false}
+        isSending={false}
+        loadingText="Loading..."
+        emptyStateText="Empty"
+        threadRef={{ current: null }}
+        handleScroll={() => undefined}
+        hasUnreadContentBelow={false}
+        isPinnedToBottom
+        scrollToBottom={() => undefined}
+        composer={<div />}
+        composerHeight={96}
+      />,
+    );
+
+    const generationSummary = screen.getByText(/Generation \(1\.0s/).closest("summary");
+    expect(screen.getByText("LLM call completed - 1.0s")).not.toBeVisible();
+    expect(screen.getByText(/Internal instructions/)).not.toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(generationSummary as HTMLElement);
+    });
+
+    const statusSummary = screen.getByText("LLM call completed - 1.0s").closest("summary");
+    expect(screen.getByText(/Internal instructions/)).not.toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(statusSummary as HTMLElement);
+    });
+
+    expect(screen.getByText("Messages sent to LLM")).toBeVisible();
+    expect(screen.getByText(/Internal instructions/)).toBeVisible();
+    expect(screen.getByText("Raw model reply")).toBeVisible();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Copy Messages sent to LLM" }));
+      await Promise.resolve();
+    });
+
+    expect(clipboardMocks.writeText).toHaveBeenCalledWith("SYSTEM\nInternal instructions\n\nUSER\nhello");
+    expect(screen.getByRole("button", { name: "Copied Messages sent to LLM" })).toBeVisible();
   });
 
   it("collapses older assistant generation statuses behind generation details", async () => {

@@ -22,6 +22,40 @@ def test_build_context_messages_keeps_stable_prompt_prefix_ahead_of_recent_histo
     assert len(messages) == playground_execution.MAX_CONTEXT_MESSAGES + 2
 
 
+def test_llm_debug_traces_require_flag_and_privileged_role():
+    config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+        playground_llm_debug_traces_enabled=True,
+    )
+    disabled_config = AuthConfig(
+        database_url="postgresql://ignored",
+        jwt_secret="test-secret-key-with-at-least-32-bytes",
+        model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+        jwt_algorithm="HS256",
+        access_token_ttl_seconds=28_800,
+        allow_self_register=True,
+        bootstrap_superadmin_email="",
+        bootstrap_superadmin_username="",
+        bootstrap_superadmin_password="",
+        flask_env="development",
+        playground_llm_debug_traces_enabled=False,
+    )
+
+    assert playground_execution.should_include_llm_debug_traces(config, "admin") is True
+    assert playground_execution.should_include_llm_debug_traces(config, "superadmin") is True
+    assert playground_execution.should_include_llm_debug_traces(config, "user") is False
+    assert playground_execution.should_include_llm_debug_traces(disabled_config, "admin") is False
+
+
 def test_get_playground_options_returns_runtime_models_and_bound_knowledge_bases(monkeypatch):
     config = AuthConfig(
         database_url="postgresql://ignored",
@@ -736,6 +770,7 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
         bootstrap_superadmin_username="",
         bootstrap_superadmin_password="",
         flask_env="development",
+        playground_llm_debug_traces_enabled=True,
     )
 
     events = list(playgrounds_service.stream_playground_message(
@@ -743,12 +778,14 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
         config=config,
         request_id="req-chat-stream",
         owner_user_id=10,
-        owner_role="user",
+        owner_role="admin",
         session_id="sess-chat",
         prompt="hello",
     ))
 
     labels = [event["data"]["label"] for event in events if event["event"] == "status"]
+    assert "LLM call" in labels
+    assert "LLM call completed" in labels
     assert "Opening upstream stream" in labels
     assert "Provider queueing and stream setup complete" in labels
     assert "Waiting for first token" in labels
@@ -757,7 +794,14 @@ def test_stream_chat_message_splits_first_token_wait_from_token_streaming(monkey
     assert "Streamed response" in labels
     assert [event["data"]["text"] for event in events if event["event"] == "delta"] == ["Hello", " world"]
     assert events[-1]["event"] == "complete"
-    assert captured["assistant_metadata"]["statuses"][-1]["label"] == "Streamed response"
+    assert any(status["label"] == "Streamed response" for status in captured["assistant_metadata"]["statuses"])
+    llm_status = next(
+        status
+        for status in captured["assistant_metadata"]["statuses"]
+        if status["kind"] == "llm_call" and status["state"] == "completed"
+    )
+    assert llm_status["details"]["llm_debug"]["messages"] == [{"role": "user", "text": "hello"}]
+    assert llm_status["details"]["llm_debug"]["raw_response_text"] == "Hello world"
     connected_status = next(
         status
         for status in captured["assistant_metadata"]["statuses"]

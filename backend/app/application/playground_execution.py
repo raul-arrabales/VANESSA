@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Iterator
 
+from vanessa_shared.llm_debug_traces import build_llm_debug_payload, llm_debug_details
+
 from ..config import AuthConfig
 from ..services.agent_engine_client import AgentEngineClientError, create_execution, stream_execution
 from ..services.context_management import list_active_runtime_knowledge_bases, resolve_runtime_knowledge_base_selection
@@ -52,6 +54,7 @@ class PlaygroundExecutionRequest:
     workflow_execution_mode: str | None = None
     workflow_session_state: str | None = None
     workflow_cycle: int | None = None
+    include_llm_debug_traces: bool = False
 
 
 @dataclass(slots=True)
@@ -136,6 +139,43 @@ def complete_status(status: dict[str, Any], *, label: str | None = None, summary
 
 def public_status(status: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in status.items() if not key.startswith("_")}
+
+
+def should_include_llm_debug_traces(config: AuthConfig, actor_user_role: str) -> bool:
+    if not bool(getattr(config, "playground_llm_debug_traces_enabled", False)):
+        return False
+    return str(actor_user_role or "").strip().lower() in {"admin", "superadmin"}
+
+
+def build_playground_llm_debug_details(
+    *,
+    call_id: str,
+    call_label: str,
+    messages: list[dict[str, Any]],
+    requested_model: str | None,
+    provider_telemetry: dict[str, Any] | None = None,
+    assistant_ref: str | None = None,
+    raw_response_text: str | None = None,
+    tools: Any = None,
+    tool_calls: Any = None,
+    parsed_json: Any = None,
+    status_code: int | None = None,
+) -> dict[str, Any]:
+    return llm_debug_details(
+        build_llm_debug_payload(
+            call_id=call_id,
+            call_label=call_label,
+            assistant_ref=assistant_ref,
+            messages=messages,
+            requested_model=requested_model,
+            provider_telemetry=provider_telemetry,
+            raw_response_text=raw_response_text,
+            tools=tools,
+            tool_calls=tool_calls,
+            parsed_json=parsed_json,
+            status_code=status_code,
+        )
+    )
 
 
 def normalize_prompt(value: Any) -> str:
@@ -344,6 +384,7 @@ def execute_knowledge_request(
         execution_input={
             "prompt": prompt,
             "model": str(resolved_model.get("id") or request.model_id),
+            "debug_llm_traces": bool(request.include_llm_debug_traces),
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
             "retrieval": {
                 "index": str(selected_knowledge_base["index_name"]),
@@ -414,6 +455,7 @@ def execute_agent_chat_request(
         execution_input={
             "prompt": prompt,
             "model": request.model_id,
+            "debug_llm_traces": bool(request.include_llm_debug_traces),
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
             "workflow_state": request.workflow_state,
         },
@@ -497,6 +539,7 @@ def stream_knowledge_request(
         execution_input={
             "prompt": prompt,
             "model": str(resolved_model.get("id") or request.model_id),
+            "debug_llm_traces": bool(request.include_llm_debug_traces),
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
             "retrieval": {
                 "index": str(selected_knowledge_base["index_name"]),
@@ -596,6 +639,7 @@ def stream_agent_chat_request(
         execution_input={
             "prompt": prompt,
             "model": request.model_id,
+            "debug_llm_traces": bool(request.include_llm_debug_traces),
             "messages": build_engine_messages(prompt=prompt, history_payload=request.history),
             "workflow_state": request.workflow_state,
         },

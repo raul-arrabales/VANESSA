@@ -52,10 +52,12 @@ from .playground_execution import (
     execute_agent_chat_request,
     execute_knowledge_request,
     list_runtime_knowledge_base_options,
+    build_playground_llm_debug_details,
     normalize_prompt,
     public_status,
     serialize_message,
     serialize_datetime,
+    should_include_llm_debug_traces,
     start_status,
     string_or_none,
     stream_agent_chat_request,
@@ -289,6 +291,7 @@ def send_playground_message(
         prompt=prompt,
         content_parts=content_parts,
     )
+    request.include_llm_debug_traces = should_include_llm_debug_traces(config, owner_role)
     result = _execute_request(
         database_url,
         config=config,
@@ -343,6 +346,7 @@ def stream_playground_message(
         prompt=prompt,
         content_parts=content_parts,
     )
+    request.include_llm_debug_traces = should_include_llm_debug_traces(config, owner_role)
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         return _stream_knowledge_playground_message(
             database_url,
@@ -377,6 +381,7 @@ def send_temporary_playground_message(
         owner_user_id=owner_user_id,
         payload=payload,
     )
+    request.include_llm_debug_traces = should_include_llm_debug_traces(config, owner_role)
     result = _execute_request(
         database_url,
         config=config,
@@ -402,6 +407,7 @@ def stream_temporary_playground_message(
         owner_user_id=owner_user_id,
         payload=payload,
     )
+    request.include_llm_debug_traces = should_include_llm_debug_traces(config, owner_role)
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         return _stream_temporary_knowledge_playground_message(
             database_url,
@@ -915,11 +921,12 @@ def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExec
     if not request.model_id:
         raise PlaygroundSessionValidationError("invalid_model_id", "model_selection.model_id is required before sending messages")
 
+    messages = build_context_messages(request.history, prompt=request.prompt)
     llm_response, status_code = chat_completion_with_allowed_model(
         requested_model_id=request.model_id,
         org_id=None,
         group_id=None,
-        messages=build_context_messages(request.history, prompt=request.prompt),
+        messages=messages,
         max_tokens=None,
         temperature=None,
     )
@@ -943,6 +950,27 @@ def _execute_chat_request(request: PlaygroundExecutionRequest) -> PlaygroundExec
     return PlaygroundExecutionResult(
         output=output,
         response=llm_response,
+        statuses=[
+            {
+                "id": "llm-call-chat",
+                "kind": "llm_call",
+                "label": "LLM call",
+                "state": "completed",
+                "started_at": None,
+                "completed_at": None,
+                "duration_ms": None,
+                "summary": f"{len(output)} characters",
+                "details": build_playground_llm_debug_details(
+                    call_id="chat",
+                    call_label="LLM call",
+                    assistant_ref=request.assistant_ref,
+                    messages=messages,
+                    requested_model=request.model_id,
+                    raw_response_text=output,
+                    status_code=status_code,
+                ),
+            }
+        ] if request.include_llm_debug_traces else [],
         content_parts=[text_part(output)],
     )
 
@@ -1043,6 +1071,7 @@ def _stream_llm_chat_execution(
     statuses: dict[str, dict[str, Any]],
 ) -> Generator[dict[str, Any], None, PlaygroundExecutionResult | None]:
     base_details = {"model_id": request.model_id}
+    request_messages = build_context_messages(request.history, prompt=request.prompt)
     thinking = start_status("thinking", "Thinking", details=base_details)
     yield {"event": "status", "data": _record_status(statuses, thinking)}
     completed_thinking = complete_status(thinking, label="Prepared request")
@@ -1054,7 +1083,7 @@ def _stream_llm_chat_execution(
         requested_model_id=str(request.model_id or ""),
         org_id=None,
         group_id=None,
-        messages=build_context_messages(request.history, prompt=request.prompt),
+        messages=request_messages,
         max_tokens=None,
         temperature=None,
     )
@@ -1076,6 +1105,21 @@ def _stream_llm_chat_execution(
 
     opening = start_status("opening_stream", STREAM_STATUS_LABEL_OPENING, details=_model_details())
     yield {"event": "status", "data": _record_status(statuses, opening)}
+    llm_debug_status: dict[str, Any] | None = None
+    if request.include_llm_debug_traces:
+        llm_debug_status = start_status(
+            "llm_call",
+            "LLM call",
+            details=build_playground_llm_debug_details(
+                call_id="chat",
+                call_label="LLM call",
+                assistant_ref=request.assistant_ref,
+                messages=request_messages,
+                requested_model=request.model_id,
+                provider_telemetry=provider_telemetry,
+            ),
+        )
+        yield {"event": "status", "data": _record_status(statuses, llm_debug_status)}
     waiting: dict[str, Any] | None = None
     streaming_status: dict[str, Any] | None = None
     assistant_output_parts: list[str] = []
@@ -1158,6 +1202,23 @@ def _stream_llm_chat_execution(
 
         if event_type == "error":
             payload = event.get("payload")
+            if llm_debug_status is not None:
+                failed_debug = complete_status(
+                    llm_debug_status,
+                    label="LLM call failed",
+                    details=build_playground_llm_debug_details(
+                        call_id="chat",
+                        call_label="LLM call",
+                        assistant_ref=request.assistant_ref,
+                        messages=request_messages,
+                        requested_model=request.model_id,
+                        provider_telemetry=provider_telemetry,
+                        raw_response_text=str(payload or ""),
+                        status_code=status_code,
+                    ),
+                )
+                failed_debug["state"] = "failed"
+                yield {"event": "status", "data": _record_status(statuses, failed_debug)}
             yield {"event": "status", "data": _record_status(statuses, _fail_running_generation("Response generation failed"))}
             yield {
                 "event": "error",
@@ -1203,6 +1264,23 @@ def _stream_llm_chat_execution(
                 details={**_model_details(), "delta_count": 0},
             )
             yield {"event": "status", "data": _record_status(statuses, completed_waiting)}
+        if llm_debug_status is not None:
+            completed_debug = complete_status(
+                llm_debug_status,
+                label="LLM call completed",
+                summary=f"{len(output)} characters",
+                details=build_playground_llm_debug_details(
+                    call_id="chat",
+                    call_label="LLM call",
+                    assistant_ref=request.assistant_ref,
+                    messages=request_messages,
+                    requested_model=request.model_id,
+                    provider_telemetry=provider_telemetry,
+                    raw_response_text=output,
+                    status_code=int(event.get("status_code", 200) or 200),
+                ),
+            )
+            yield {"event": "status", "data": _record_status(statuses, completed_debug)}
 
         return PlaygroundExecutionResult(
             output=output,

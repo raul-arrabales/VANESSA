@@ -37,14 +37,40 @@ export type PlaygroundKnowledgeReference = {
 
 export type PlaygroundRunStatus = {
   id: string;
-  kind: "thinking" | "connecting" | "retrieving" | "searching_web" | "running_tool" | "generating" | string;
+  kind: "thinking" | "connecting" | "retrieving" | "searching_web" | "running_tool" | "generating" | "llm_call" | string;
   label: string;
   state: "running" | "completed" | "failed" | string;
   started_at?: string | null;
   completed_at?: string | null;
   duration_ms?: number | null;
   summary?: string | null;
-  details?: Record<string, unknown>;
+  details?: PlaygroundRunStatusDetails;
+};
+
+export type PlaygroundLlmDebugMessage = {
+  role: string;
+  text: string;
+};
+
+export type PlaygroundLlmDebugDetails = {
+  call_id?: string;
+  call_label?: string;
+  agent_id?: string;
+  assistant_ref?: string;
+  requested_model?: string | null;
+  provider_slug?: string | null;
+  provider_key?: string | null;
+  deployment_profile_slug?: string | null;
+  messages?: PlaygroundLlmDebugMessage[];
+  tools?: unknown;
+  raw_response_text?: string;
+  tool_calls?: unknown;
+  parsed_json?: unknown;
+  status_code?: number;
+};
+
+export type PlaygroundRunStatusDetails = Record<string, unknown> & {
+  llm_debug?: PlaygroundLlmDebugDetails;
 };
 
 export type PlaygroundMessageMetadata = Record<string, unknown> & {

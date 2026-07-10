@@ -37,6 +37,7 @@ DEFAULT_CONTEXT_SOURCE_ROOTS = "/context_sources"
 DEFAULT_CLOUD_TRAFFIC_LOG_PATH = "/var/log/vanessa/cloud-traffic.jsonl"
 DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES = 10_485_760
 DEFAULT_CHAT_ATTACHMENTS_ROOT = "/var/lib/vanessa/chat-attachments"
+DEFAULT_PLAYGROUND_LLM_DEBUG_TRACES_ENABLED = True
 
 
 def _shared_runtime_config_kwargs() -> dict[str, object]:
@@ -90,6 +91,10 @@ def _shared_runtime_config_kwargs() -> dict[str, object]:
         "chat_attachments_root": (
             os.getenv("CHAT_ATTACHMENTS_ROOT", DEFAULT_CHAT_ATTACHMENTS_ROOT).strip()
             or DEFAULT_CHAT_ATTACHMENTS_ROOT
+        ),
+        "playground_llm_debug_traces_enabled": _get_bool_env(
+            "PLAYGROUND_LLM_DEBUG_TRACES_ENABLED",
+            DEFAULT_PLAYGROUND_LLM_DEBUG_TRACES_ENABLED,
         ),
     }
 
@@ -153,6 +158,7 @@ class BackendRuntimeConfig:
     cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
     cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
     chat_attachments_root: str = DEFAULT_CHAT_ATTACHMENTS_ROOT
+    playground_llm_debug_traces_enabled: bool = DEFAULT_PLAYGROUND_LLM_DEBUG_TRACES_ENABLED
 
 
 @dataclass(frozen=True)
@@ -215,6 +221,7 @@ class AuthConfig:
     cloud_traffic_log_path: str = DEFAULT_CLOUD_TRAFFIC_LOG_PATH
     cloud_traffic_log_max_bytes: int = DEFAULT_CLOUD_TRAFFIC_LOG_MAX_BYTES
     chat_attachments_root: str = DEFAULT_CHAT_ATTACHMENTS_ROOT
+    playground_llm_debug_traces_enabled: bool = DEFAULT_PLAYGROUND_LLM_DEBUG_TRACES_ENABLED
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
@@ -320,6 +327,7 @@ SHARED_RUNTIME_CONFIG_FIELD_NAMES = frozenset(
         "cloud_traffic_log_path",
         "cloud_traffic_log_max_bytes",
         "chat_attachments_root",
+        "playground_llm_debug_traces_enabled",
     }
 )
 AUTH_RUNTIME_EXTENSION_FIELD_NAMES = frozenset(

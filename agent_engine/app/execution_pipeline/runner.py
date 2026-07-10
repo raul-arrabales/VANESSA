@@ -7,6 +7,11 @@ from threading import Thread
 from typing import Any, Iterator
 from uuid import uuid4
 
+from vanessa_shared.llm_debug_traces import (
+    LLM_DEBUG_STATUS_KIND,
+    build_llm_debug_payload,
+    llm_debug_details,
+)
 from vanessa_shared.workflow_prompt_contract import normalize_agent_runtime_prompts
 
 from ..policies.runtime_policy import (
@@ -191,6 +196,146 @@ def _message_text(messages: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _debug_enabled(context: ExecutionContext) -> bool:
+    return bool(context.execution_input.get("debug_llm_traces"))
+
+
+class LlmTraceRecorder:
+    def __init__(self, *, context: ExecutionContext, progress: ProgressRecorder) -> None:
+        self._context = context
+        self._progress = progress
+
+    def enabled(self) -> bool:
+        return _debug_enabled(self._context)
+
+    def start(
+        self,
+        *,
+        runtime_snapshot: dict[str, Any],
+        call_id: str,
+        call_label: str,
+        messages: list[dict[str, Any]],
+        requested_model: str | None,
+        tools: Any = None,
+    ) -> str | None:
+        if not self.enabled():
+            return None
+        return self._progress.start(
+            kind=LLM_DEBUG_STATUS_KIND,
+            label=call_label,
+            details=self._details(
+                runtime_snapshot=runtime_snapshot,
+                call_id=call_id,
+                call_label=call_label,
+                messages=messages,
+                requested_model=requested_model,
+                tools=tools,
+            ),
+        )
+
+    def complete(
+        self,
+        status_id: str | None,
+        *,
+        runtime_snapshot: dict[str, Any],
+        call_id: str,
+        call_label: str,
+        messages: list[dict[str, Any]],
+        requested_model: str | None,
+        raw_response_text: str,
+        tools: Any = None,
+        tool_calls: Any = None,
+        parsed_json: Any = None,
+        status_code: int | None = None,
+    ) -> None:
+        if status_id is None:
+            return
+        self._progress.complete(
+            status_id,
+            kind=LLM_DEBUG_STATUS_KIND,
+            label=f"{call_label} completed",
+            summary=f"{len(raw_response_text)} characters",
+            details=self._details(
+                runtime_snapshot=runtime_snapshot,
+                call_id=call_id,
+                call_label=call_label,
+                messages=messages,
+                requested_model=requested_model,
+                raw_response_text=raw_response_text,
+                tools=tools,
+                tool_calls=tool_calls,
+                parsed_json=parsed_json,
+                status_code=status_code,
+            ),
+        )
+
+    def fail(
+        self,
+        status_id: str | None,
+        *,
+        runtime_snapshot: dict[str, Any],
+        call_id: str,
+        call_label: str,
+        messages: list[dict[str, Any]],
+        requested_model: str | None,
+        raw_response_text: str = "",
+        tools: Any = None,
+        tool_calls: Any = None,
+        parsed_json: Any = None,
+        status_code: int | None = None,
+    ) -> None:
+        if status_id is None:
+            return
+        self._progress.fail(
+            status_id,
+            kind=LLM_DEBUG_STATUS_KIND,
+            label=f"{call_label} failed",
+            summary=f"{len(raw_response_text)} characters" if raw_response_text else None,
+            details=self._details(
+                runtime_snapshot=runtime_snapshot,
+                call_id=call_id,
+                call_label=call_label,
+                messages=messages,
+                requested_model=requested_model,
+                raw_response_text=raw_response_text,
+                tools=tools,
+                tool_calls=tool_calls,
+                parsed_json=parsed_json,
+                status_code=status_code,
+            ),
+        )
+
+    def _details(
+        self,
+        *,
+        runtime_snapshot: dict[str, Any],
+        call_id: str,
+        call_label: str,
+        messages: list[dict[str, Any]],
+        requested_model: str | None,
+        raw_response_text: str | None = None,
+        tools: Any = None,
+        tool_calls: Any = None,
+        parsed_json: Any = None,
+        status_code: int | None = None,
+    ) -> dict[str, Any]:
+        return llm_debug_details(
+            build_llm_debug_payload(
+                call_id=call_id,
+                call_label=call_label,
+                agent_id=self._context.agent_id,
+                messages=messages,
+                requested_model=requested_model,
+                provider_telemetry=model_status_details(runtime_snapshot, requested_model),
+                raw_response_text=raw_response_text,
+                tools=tools,
+                tool_calls=tool_calls,
+                parsed_json=parsed_json,
+                status_code=status_code,
+            )
+        )
+
+
 def _parse_json_object(text: Any) -> dict[str, Any]:
     try:
         parsed = loads(str(text or "").strip())
@@ -202,57 +347,135 @@ def _parse_json_object(text: Any) -> dict[str, Any]:
 def _llm_json(
     *,
     context: ExecutionContext,
+    progress: ProgressRecorder,
     runtime_snapshot: dict[str, Any],
     requested_model: str | None,
     system_prompt: str,
     user_prompt: str,
+    call_label: str,
+    call_id: str,
 ) -> tuple[dict[str, Any], dict[str, Any] | None, str]:
     client = build_llm_runtime_client(runtime_snapshot)
-    completion = client.chat_completion(
+    messages = [
+        _system_text_message(system_prompt),
+        {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
+    ]
+    trace = LlmTraceRecorder(context=context, progress=progress)
+    debug_status_id = trace.start(
+        runtime_snapshot=runtime_snapshot,
+        call_id=call_id,
+        call_label=call_label,
+        messages=messages,
         requested_model=requested_model,
-        messages=[
-            _system_text_message(system_prompt),
-            {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
-        ],
     )
+    try:
+        completion = client.chat_completion(
+            requested_model=requested_model,
+            messages=messages,
+        )
+    except LlmRuntimeClientError as exc:
+        trace.fail(
+            debug_status_id,
+            runtime_snapshot=runtime_snapshot,
+            call_id=call_id,
+            call_label=call_label,
+            messages=messages,
+            requested_model=requested_model,
+            raw_response_text=str(exc.details or ""),
+            status_code=exc.status_code,
+        )
+        raise
     output_text = str(completion.get("output_text") or "").strip()
-    return _parse_json_object(output_text), {
+    parsed = _parse_json_object(output_text)
+    status_code = int(completion.get("status_code", 200) or 200)
+    trace.complete(
+        debug_status_id,
+        runtime_snapshot=runtime_snapshot,
+        call_id=call_id,
+        call_label=call_label,
+        messages=messages,
+        requested_model=str(completion.get("requested_model") or requested_model or "") or requested_model,
+        raw_response_text=output_text,
+        parsed_json=parsed,
+        status_code=status_code,
+    )
+    return parsed, {
         "requested_model": str(completion.get("requested_model") or requested_model or ""),
-        "status_code": int(completion.get("status_code", 200) or 200),
+        "status_code": status_code,
     }, output_text
 
 
 def _llm_text(
     *,
     context: ExecutionContext,
+    progress: ProgressRecorder,
     runtime_snapshot: dict[str, Any],
     requested_model: str | None,
     system_prompt: str,
     user_prompt: str,
+    call_label: str,
+    call_id: str,
 ) -> tuple[str, dict[str, Any] | None]:
     client = build_llm_runtime_client(runtime_snapshot)
-    completion = client.chat_completion(
+    messages = [
+        _system_text_message(system_prompt),
+        {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
+    ]
+    trace = LlmTraceRecorder(context=context, progress=progress)
+    debug_status_id = trace.start(
+        runtime_snapshot=runtime_snapshot,
+        call_id=call_id,
+        call_label=call_label,
+        messages=messages,
         requested_model=requested_model,
-        messages=[
-            _system_text_message(system_prompt),
-            {"role": "user", "content": [{"type": "text", "text": user_prompt}]},
-        ],
     )
-    return str(completion.get("output_text") or "").strip(), {
+    try:
+        completion = client.chat_completion(
+            requested_model=requested_model,
+            messages=messages,
+        )
+    except LlmRuntimeClientError as exc:
+        trace.fail(
+            debug_status_id,
+            runtime_snapshot=runtime_snapshot,
+            call_id=call_id,
+            call_label=call_label,
+            messages=messages,
+            requested_model=requested_model,
+            raw_response_text=str(exc.details or ""),
+            status_code=exc.status_code,
+        )
+        raise
+    output_text = str(completion.get("output_text") or "").strip()
+    status_code = int(completion.get("status_code", 200) or 200)
+    trace.complete(
+        debug_status_id,
+        runtime_snapshot=runtime_snapshot,
+        call_id=call_id,
+        call_label=call_label,
+        messages=messages,
+        requested_model=str(completion.get("requested_model") or requested_model or "") or requested_model,
+        raw_response_text=output_text,
+        status_code=status_code,
+    )
+    return output_text, {
         "requested_model": str(completion.get("requested_model") or requested_model or ""),
-        "status_code": int(completion.get("status_code", 200) or 200),
+        "status_code": status_code,
     }
 
 
 def _workflow_json_with_repair(
     *,
     context: ExecutionContext,
+    progress: ProgressRecorder,
     runtime_snapshot: dict[str, Any],
     requested_model: str | None,
     system_prompt: str,
     initial_user_prompt: str,
     repair_system_prompt: str,
     repair_user_prompt: str,
+    call_label: str,
+    call_id: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
     model_calls: list[dict[str, Any]] = []
     parsed: dict[str, Any] = {}
@@ -260,10 +483,13 @@ def _workflow_json_with_repair(
     try:
         parsed, model_call, raw_output = _llm_json(
             context=context,
+            progress=progress,
             runtime_snapshot=runtime_snapshot,
             requested_model=requested_model,
             system_prompt=system_prompt,
             user_prompt=initial_user_prompt,
+            call_label=call_label,
+            call_id=call_id,
         )
         if model_call:
             model_calls.append(model_call)
@@ -278,10 +504,13 @@ def _workflow_json_with_repair(
     try:
         repaired, model_call, _ = _llm_json(
             context=context,
+            progress=progress,
             runtime_snapshot=runtime_snapshot,
             requested_model=requested_model,
             system_prompt=repair_system_prompt,
             user_prompt=f"{repair_user_prompt}\n\nPrevious model output to normalize:\n{raw_output}",
+            call_label="Repair workflow JSON",
+            call_id=f"{call_id}.repair",
         )
         if model_call:
             model_calls.append(model_call)
@@ -293,6 +522,7 @@ def _workflow_json_with_repair(
 def _workflow_extract_variables_with_repair(
     *,
     context: ExecutionContext,
+    progress: ProgressRecorder,
     runtime_snapshot: dict[str, Any],
     requested_model: str | None,
     action_prompt: str,
@@ -301,6 +531,7 @@ def _workflow_extract_variables_with_repair(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     parsed, model_calls, _ = _workflow_json_with_repair(
         context=context,
+        progress=progress,
         runtime_snapshot=runtime_snapshot,
         requested_model=requested_model,
         system_prompt=action_prompt,
@@ -324,6 +555,8 @@ def _workflow_extract_variables_with_repair(
             f"Required workflow variables:\n{dumps(variable_context)}\n\n"
             f"Existing variables:\n{dumps(state['variables'])}"
         ),
+        call_label="Extract workflow variables",
+        call_id="workflow.extract_variables",
     )
     return parsed, model_calls
 
@@ -331,6 +564,7 @@ def _workflow_extract_variables_with_repair(
 def _workflow_compose_output_with_repair(
     *,
     context: ExecutionContext,
+    progress: ProgressRecorder,
     runtime_snapshot: dict[str, Any],
     requested_model: str | None,
     action_prompt: str,
@@ -339,6 +573,7 @@ def _workflow_compose_output_with_repair(
 ) -> tuple[str, list[dict[str, Any]]]:
     parsed, model_calls, raw_output = _workflow_json_with_repair(
         context=context,
+        progress=progress,
         runtime_snapshot=runtime_snapshot,
         requested_model=requested_model,
         system_prompt=action_prompt,
@@ -362,6 +597,8 @@ def _workflow_compose_output_with_repair(
             f"Variables: {dumps(selected_values)}\n"
             f"Conversation:\n{_message_text(context.conversation.messages)}"
         ),
+        call_label="Compose workflow output",
+        call_id="workflow.compose_output",
     )
     response = str(parsed.get("response") or "").strip()
     if response:
@@ -571,6 +808,7 @@ def _execute_workflow_agent(
                 try:
                     parsed, extraction_model_calls = _workflow_extract_variables_with_repair(
                         context=context,
+                        progress=progress,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
                         action_prompt=action_prompt,
@@ -591,6 +829,7 @@ def _execute_workflow_agent(
                     try:
                         generated_question, model_call = _llm_text(
                             context=context,
+                            progress=progress,
                             runtime_snapshot=runtime_snapshot,
                             requested_model=requested_model,
                             system_prompt=action_prompt,
@@ -604,6 +843,8 @@ def _execute_workflow_agent(
                                 f"Existing variables:\n{dumps(state['variables'])}\n\n"
                                 f"Conversation:\n{_message_text(context.conversation.messages)}"
                             ),
+                            call_label="Generate workflow follow-up",
+                            call_id="workflow.generate_follow_up",
                         )
                         if model_call:
                             model_calls.append(model_call)
@@ -679,6 +920,7 @@ def _execute_workflow_agent(
                 try:
                     parsed, model_call, _ = _llm_json(
                         context=context,
+                        progress=progress,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
                         system_prompt=action_prompt,
@@ -692,6 +934,8 @@ def _execute_workflow_agent(
                             f"Workflow variable context:\n{dumps(input_variables)}\n\n"
                             f"Selected variables:\n{dumps(bound_values)}"
                         ),
+                        call_label="Create workflow tool arguments",
+                        call_id=f"workflow.tool_arguments.{action_index + 1}.{iteration}",
                     )
                     if model_call:
                         model_calls.append(model_call)
@@ -740,6 +984,7 @@ def _execute_workflow_agent(
                 try:
                     evaluation, model_call, _ = _llm_json(
                         context=context,
+                        progress=progress,
                         runtime_snapshot=runtime_snapshot,
                         requested_model=requested_model,
                         system_prompt=action_prompt,
@@ -750,6 +995,8 @@ def _execute_workflow_agent(
                             f"Workflow variable context:\n{dumps(_workflow_variable_context(variables=_workflow_available_variables(actions, before_index=action_index + 1), state=state))}\n\n"
                             f"Tool result:\n{compact_payload(tool_payload)}"
                         ),
+                        call_label="Evaluate workflow action",
+                        call_id=f"workflow.evaluate_action.{action_index + 1}.{iteration}",
                     )
                     if model_call:
                         model_calls.append(model_call)
@@ -800,6 +1047,7 @@ def _execute_workflow_agent(
             )
             output, output_model_calls = _workflow_compose_output_with_repair(
                 context=context,
+                progress=progress,
                 runtime_snapshot=runtime_snapshot,
                 requested_model=requested_model,
                 action_prompt=action_prompt,
@@ -962,7 +1210,18 @@ def _execute_model_call(
         label="Generating response",
         details=model_status_details(runtime_snapshot, effective_requested_model),
     )
+    trace = LlmTraceRecorder(context=context, progress=progress)
     for _round_index in range(_MAX_TOOL_CALL_ROUNDS):
+        call_id = f"agent.model_call.{_round_index + 1}"
+        call_label = "LLM call"
+        debug_status_id = trace.start(
+            runtime_snapshot=runtime_snapshot,
+            call_id=call_id,
+            call_label=call_label,
+            messages=effective_messages,
+            requested_model=effective_requested_model,
+            tools=tool_definitions or None,
+        )
         try:
             if delta_emit is not None and not tool_definitions:
                 completion = stream_model_completion(
@@ -980,6 +1239,17 @@ def _execute_model_call(
                     tools=tool_definitions or None,
                 )
         except LlmRuntimeClientError as exc:
+            trace.fail(
+                debug_status_id,
+                runtime_snapshot=runtime_snapshot,
+                call_id=call_id,
+                call_label=call_label,
+                messages=effective_messages,
+                requested_model=effective_requested_model,
+                raw_response_text=str(exc.details or ""),
+                tools=tool_definitions or None,
+                status_code=exc.status_code,
+            )
             progress.fail(
                 generation_status_id,
                 kind="generating",
@@ -992,6 +1262,18 @@ def _execute_model_call(
                 raise ExecutionBlockedError(code="EXEC_UPSTREAM_UNAVAILABLE", message="Upstream LLM/tool dependency unavailable", status_code=503, details=exc.details) from exc
             raise ExecutionBlockedError(code="EXEC_INTERNAL_ERROR", message="Execution failed internally", status_code=500, details=exc.details) from exc
         effective_model = str(completion.get("requested_model", "")).strip() or effective_requested_model
+        trace.complete(
+            debug_status_id,
+            runtime_snapshot=runtime_snapshot,
+            call_id=call_id,
+            call_label=call_label,
+            messages=effective_messages,
+            requested_model=effective_model,
+            raw_response_text=str(completion.get("output_text", "")),
+            tools=tool_definitions or None,
+            tool_calls=completion.get("tool_calls") if isinstance(completion.get("tool_calls"), list) else [],
+            status_code=int(completion.get("status_code", 200) or 200),
+        )
         model_calls.append(
             {
                 "provider_slug": llm_binding.get("slug"),

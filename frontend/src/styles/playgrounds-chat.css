@@ -913,6 +913,75 @@
   overflow-wrap: anywhere;
 }
 
+.assistant-status-llm-debug {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0 1.15rem;
+  min-width: 0;
+}
+
+.assistant-status-debug-meta {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid color-mix(in oklab, var(--accent-primary) 48%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-surface) 60%, transparent);
+}
+
+.assistant-status-debug-block {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-subtle) 70%, var(--bg-surface));
+}
+
+.assistant-status-debug-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  color: color-mix(in oklab, var(--text-secondary) 78%, transparent);
+  font-weight: 600;
+}
+
+.assistant-status-debug-block-header span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-status-debug-copy {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.45rem;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.assistant-status-debug-copy:hover {
+  background: color-mix(in oklab, var(--bg-subtle) 86%, transparent);
+}
+
+.assistant-status-debug-block pre {
+  max-height: min(32rem, 55vh);
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 @keyframes assistant-status-pulse {
   0%,
   100% {
