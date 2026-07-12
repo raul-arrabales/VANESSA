@@ -7,6 +7,7 @@ import {
   createDeploymentProfile,
   createPlatformProvider,
   deleteDeploymentProfile,
+  deleteDeploymentBinding,
   deletePlatformProvider,
   listPlatformActivationAudit,
   listPlatformCapabilities,
@@ -23,6 +24,32 @@ import {
 describe("platform api", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("deletes one deployment binding", async () => {
+    const deployment = {
+      id: "deployment-1",
+      slug: "profile-a",
+      display_name: "Profile A",
+      description: "",
+      is_active: false,
+      bindings: [],
+      configuration_status: { is_ready: true, incomplete_capabilities: [], summary: "Ready." },
+    };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ deployment_profile: deployment }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteDeploymentBinding("deployment-1", "web_search", "token")).resolves.toEqual(deployment);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/platform/deployments/deployment-1/bindings/web_search",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
   });
 
   it("fetches platform capabilities with auth headers", async () => {

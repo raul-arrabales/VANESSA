@@ -39,6 +39,7 @@ vi.mock("../api/platform", () => ({
   listPlatformActivationAudit: vi.fn(),
   patchDeploymentProfileIdentity: vi.fn(),
   upsertDeploymentBinding: vi.fn(),
+  deleteDeploymentBinding: vi.fn(),
   cloneDeploymentProfile: vi.fn(),
   deleteDeploymentProfile: vi.fn(),
   activateDeploymentProfile: vi.fn(),
@@ -638,5 +639,73 @@ describe("PlatformDeploymentDetailPage", () => {
     );
 
     expect((await screen.findAllByText(await t("platformControl.deployments.notFound"))).length).toBeGreaterThan(0);
+  });
+
+  it("confirms optional binding removal and preserves other unsaved form edits", async () => {
+    const webSearchCapability = {
+      capability: "web_search",
+      display_name: "Web search",
+      description: "Search provider.",
+      required: false,
+      active_provider: null,
+    };
+    const webSearchProvider = {
+      id: "provider-search",
+      slug: "searxng-local",
+      provider_key: "searxng_local",
+      provider_origin: "local" as const,
+      capability: "web_search",
+      adapter_kind: "searxng_http",
+      display_name: "SearXNG local",
+      description: "Local search.",
+      endpoint_url: "http://searxng:8080",
+      healthcheck_url: "http://searxng:8080/healthz",
+      enabled: true,
+      config: {},
+      secret_refs: {},
+    };
+    const deployment = {
+      ...deploymentsFixture[1],
+      bindings: [
+        ...deploymentsFixture[1].bindings,
+        {
+          capability: "web_search",
+          provider: webSearchProvider,
+          resources: [],
+          default_resource_id: null,
+          default_resource: null,
+          resource_policy: {},
+          config: {},
+          configuration_status: { is_ready: true, issues: [], summary: "Ready." },
+        },
+      ],
+    };
+    const updated = { ...deployment, bindings: deployment.bindings.filter((item) => item.capability !== "web_search") };
+    vi.mocked(platformApi.listPlatformCapabilities).mockResolvedValue([...capabilitiesFixture, webSearchCapability]);
+    vi.mocked(platformApi.listPlatformProviders).mockResolvedValue([...buildDeploymentProviders(), webSearchProvider]);
+    vi.mocked(platformApi.listPlatformDeployments).mockResolvedValue([deploymentsFixture[0], deployment]);
+    vi.mocked(platformApi.deleteDeploymentBinding).mockResolvedValue(updated);
+
+    await renderWithAppProviders(
+      <Routes>
+        <Route path="/control/platform/deployments/:deploymentId" element={<PlatformDeploymentDetailPage />} />
+      </Routes>,
+      { route: "/control/platform/deployments/deployment-2" },
+    );
+
+    const [description] = await screen.findAllByDisplayValue(deployment.description);
+    await userEvent.clear(description);
+    await userEvent.type(description, "Unsaved deployment description");
+    await userEvent.click(screen.getByRole("button", { name: await t("platformControl.actions.removeBinding") }));
+    const dialog = await screen.findByRole("dialog", { name: "Remove Web search binding?" });
+    expect(dialog).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("button", { name: await t("platformControl.actions.confirmRemoveBinding") }));
+
+    await waitFor(() => {
+      expect(platformApi.deleteDeploymentBinding).toHaveBeenCalledWith("deployment-2", "web_search", "token");
+    });
+    expect(screen.getByDisplayValue("Unsaved deployment description")).toBeVisible();
+    expect(screen.queryByTestId("deployment-binding-row-web_search")).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Web search" })).toBeInTheDocument();
   });
 });

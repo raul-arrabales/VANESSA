@@ -701,9 +701,27 @@ def delete_deployment_binding(
     *,
     deployment_profile_id: str,
     capability_key: str,
-) -> bool:
+    updated_by_user_id: int,
+) -> str:
     with get_connection(database_url) as connection:
-        row = connection.execute(
+        profile = connection.execute(
+            """
+            SELECT
+              p.id,
+              a.deployment_profile_id IS NOT NULL AS is_active
+            FROM platform_deployment_profiles p
+            LEFT JOIN platform_active_deployment a
+              ON a.singleton_key = 'active' AND a.deployment_profile_id = p.id
+            WHERE p.id = %s
+            FOR UPDATE OF p
+            """,
+            (deployment_profile_id.strip(),),
+        ).fetchone()
+        if profile is None:
+            return "deployment_not_found"
+        if bool(profile["is_active"]):
+            return "active_deployment"
+        deleted = connection.execute(
             """
             DELETE FROM platform_deployment_bindings
             WHERE deployment_profile_id = %s AND capability_key = %s
@@ -711,7 +729,17 @@ def delete_deployment_binding(
             """,
             (deployment_profile_id.strip(), capability_key.strip().lower()),
         ).fetchone()
-    return row is not None
+        if deleted is None:
+            return "binding_not_found"
+        connection.execute(
+            """
+            UPDATE platform_deployment_profiles
+            SET updated_by_user_id = %s, updated_at = NOW()
+            WHERE id = %s
+            """,
+            (updated_by_user_id, deployment_profile_id.strip()),
+        )
+    return "deleted"
 
 
 def list_deployment_profiles(database_url: str) -> list[dict[str, Any]]:

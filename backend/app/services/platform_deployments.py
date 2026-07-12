@@ -195,43 +195,34 @@ def delete_deployment_profile_binding(
     updated_by_user_id: int,
 ) -> dict[str, object]:
     ensure_platform_bootstrap_state(database_url, config)
-    existing = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
-    if existing is None:
-        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
     normalized_capability = capability_key.strip().lower()
-    if bool(existing.get("is_active")):
-        raise PlatformControlPlaneError(
-            "active_deployment_binding_removal_forbidden",
-            "Bindings cannot be removed from the active deployment profile",
-            status_code=409,
-        )
     if normalized_capability in REQUIRED_CAPABILITIES:
         raise PlatformControlPlaneError(
             "required_binding_removal_forbidden",
             "Required capability bindings cannot be removed",
             status_code=409,
         )
-    existing_bindings = platform_repo.list_deployment_bindings(
-        database_url, deployment_profile_id=deployment_profile_id
-    )
-    if not any(str(item.get("capability_key") or "").strip().lower() == normalized_capability for item in existing_bindings):
-        raise PlatformControlPlaneError("deployment_binding_not_found", "Deployment binding not found", status_code=404)
-    if not platform_repo.delete_deployment_binding(
+    result = platform_repo.delete_deployment_binding(
         database_url,
         deployment_profile_id=deployment_profile_id,
         capability_key=normalized_capability,
-    ):
-        raise PlatformControlPlaneError("deployment_binding_not_found", "Deployment binding not found", status_code=404)
-    updated = platform_repo.update_deployment_profile_identity(
-        database_url,
-        deployment_profile_id=deployment_profile_id,
-        slug=str(existing.get("slug") or ""),
-        display_name=str(existing.get("display_name") or ""),
-        description=str(existing.get("description") or ""),
         updated_by_user_id=updated_by_user_id,
     )
+    if result == "deployment_not_found":
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    if result == "active_deployment":
+        raise PlatformControlPlaneError(
+            "active_deployment_binding_removal_forbidden",
+            "Bindings cannot be removed from the active deployment profile",
+            status_code=409,
+        )
+    if result == "binding_not_found":
+        raise PlatformControlPlaneError("deployment_binding_not_found", "Deployment binding not found", status_code=404)
+    updated = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
+    if updated is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
     bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=deployment_profile_id)
-    return serialize_deployment_profile_with_status(database_url, updated or existing, bindings)
+    return serialize_deployment_profile_with_status(database_url, updated, bindings)
 
 
 def clone_deployment_profile(

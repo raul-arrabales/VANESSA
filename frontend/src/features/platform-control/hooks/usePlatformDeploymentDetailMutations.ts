@@ -17,8 +17,8 @@ import { withActionFeedbackState } from "../../../feedback/ActionFeedbackProvide
 import { withDeploymentSeedState } from "../deploymentRouteState";
 import {
   buildDeploymentBindingMutationInput,
-  buildDeploymentForm,
   buildDeploymentIdentityMutationInput,
+  removeCapabilityFromDeploymentForm,
   validateDeploymentForm,
   type DeploymentCloneFormState,
   type DeploymentFormState,
@@ -47,13 +47,12 @@ type UsePlatformDeploymentDetailMutationsParams = {
 type UsePlatformDeploymentDetailMutationsResult = {
   errorMessage: string;
   savingIdentity: boolean;
-  savingCapabilityKeys: Record<string, boolean>;
+  capabilityMutationByKey: Record<string, "saving" | "removing">;
   cloning: boolean;
   activating: boolean;
   confirmActivate: boolean;
   confirmDelete: boolean;
   bindingToRemove: string | null;
-  removingBindingKey: string | null;
   setConfirmActivate: React.Dispatch<React.SetStateAction<boolean>>;
   setConfirmDelete: React.Dispatch<React.SetStateAction<boolean>>;
   setBindingToRemove: React.Dispatch<React.SetStateAction<string | null>>;
@@ -84,13 +83,23 @@ export function usePlatformDeploymentDetailMutations({
 }: UsePlatformDeploymentDetailMutationsParams): UsePlatformDeploymentDetailMutationsResult {
   const [errorMessage, setErrorMessage] = useState("");
   const [savingIdentity, setSavingIdentity] = useState(false);
-  const [savingCapabilityKeys, setSavingCapabilityKeys] = useState<Record<string, boolean>>({});
+  const [capabilityMutationByKey, setCapabilityMutationByKey] = useState<Record<string, "saving" | "removing">>({});
   const [cloning, setCloning] = useState(false);
   const [activating, setActivating] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [bindingToRemove, setBindingToRemove] = useState<string | null>(null);
-  const [removingBindingKey, setRemovingBindingKey] = useState<string | null>(null);
+
+  function setCapabilityMutation(capabilityKey: string, mutation: "saving" | "removing" | null): void {
+    setCapabilityMutationByKey((current) => {
+      if (mutation) {
+        return { ...current, [capabilityKey]: mutation };
+      }
+      const remaining = { ...current };
+      delete remaining[capabilityKey];
+      return remaining;
+    });
+  }
 
   async function handleSaveIdentity(): Promise<void> {
     if (!token || !deployment || !form) {
@@ -115,7 +124,7 @@ export function usePlatformDeploymentDetailMutations({
   }
 
   async function handleSaveCapability(capabilityKey: string): Promise<void> {
-    if (!token || !deployment || !form) {
+    if (!token || !deployment || !form || capabilityMutationByKey[capabilityKey]) {
       return;
     }
     const capability = capabilities.find((item) => item.capability === capabilityKey);
@@ -150,7 +159,7 @@ export function usePlatformDeploymentDetailMutations({
       return;
     }
 
-    setSavingCapabilityKeys((current) => ({ ...current, [capabilityKey]: true }));
+    setCapabilityMutation(capabilityKey, "saving");
     setErrorMessage("");
     try {
       const updated = await upsertDeploymentBinding(
@@ -169,7 +178,7 @@ export function usePlatformDeploymentDetailMutations({
     } catch (error) {
       showErrorFeedback(error, t("platformControl.feedback.deploymentSaveFailed"));
     } finally {
-      setSavingCapabilityKeys((current) => ({ ...current, [capabilityKey]: false }));
+      setCapabilityMutation(capabilityKey, null);
     }
   }
 
@@ -245,16 +254,16 @@ export function usePlatformDeploymentDetailMutations({
   }
 
   async function handleRemoveBinding(): Promise<void> {
-    if (!token || !deployment || !bindingToRemove || removingBindingKey) {
+    if (!token || !deployment || !bindingToRemove || capabilityMutationByKey[bindingToRemove]) {
       return;
     }
     const capability = capabilities.find((item) => item.capability === bindingToRemove);
-    setRemovingBindingKey(bindingToRemove);
+    setCapabilityMutation(bindingToRemove, "removing");
     setErrorMessage("");
     try {
       const updated = await deleteDeploymentBinding(deployment.id, bindingToRemove, token);
       setLocalDeployment(updated);
-      setForm(buildDeploymentForm(updated, capabilities.filter((item) => item.required)));
+      setForm((current) => current ? removeCapabilityFromDeploymentForm(current, bindingToRemove) : current);
       setBindingToRemove(null);
       showSuccessFeedback(t("platformControl.feedback.deploymentBindingRemoved", {
         capability: capability?.display_name ?? bindingToRemove,
@@ -263,20 +272,19 @@ export function usePlatformDeploymentDetailMutations({
     } catch (error) {
       showErrorFeedback(error, t("platformControl.feedback.deploymentBindingRemoveFailed"));
     } finally {
-      setRemovingBindingKey(null);
+      setCapabilityMutation(bindingToRemove, null);
     }
   }
 
   return {
     errorMessage,
     savingIdentity,
-    savingCapabilityKeys,
+    capabilityMutationByKey,
     cloning,
     activating,
     confirmActivate,
     confirmDelete,
     bindingToRemove,
-    removingBindingKey,
     setConfirmActivate,
     setConfirmDelete,
     setBindingToRemove,

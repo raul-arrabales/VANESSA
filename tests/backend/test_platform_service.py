@@ -10,11 +10,84 @@ from app.services import (  # noqa: E402
     platform_bootstrap,
     platform_credential_refs,
     platform_deployment_status,
+    platform_deployments,
     platform_preflight,
     platform_service,
     provider_origin_policy,
 )
 from app.services.platform_types import DeploymentBindingInput, PlatformControlPlaneError  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("repository_result", "expected_code", "expected_status"),
+    [
+        ("deployment_not_found", "deployment_profile_not_found", 404),
+        ("active_deployment", "active_deployment_binding_removal_forbidden", 409),
+        ("binding_not_found", "deployment_binding_not_found", 404),
+    ],
+)
+def test_delete_deployment_binding_maps_atomic_repository_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    repository_result: str,
+    expected_code: str,
+    expected_status: int,
+):
+    monkeypatch.setattr(platform_deployments, "ensure_platform_bootstrap_state", lambda *_args: None)
+    monkeypatch.setattr(platform_deployments.platform_repo, "delete_deployment_binding", lambda *_args, **_kwargs: repository_result)
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_deployments.delete_deployment_profile_binding(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            deployment_profile_id="deployment-1",
+            capability_key="web_search",
+            updated_by_user_id=7,
+        )
+
+    assert exc_info.value.code == expected_code
+    assert exc_info.value.status_code == expected_status
+
+
+def test_delete_deployment_binding_rejects_required_capability_before_repository(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(platform_deployments, "ensure_platform_bootstrap_state", lambda *_args: None)
+    delete = pytest.fail
+    monkeypatch.setattr(platform_deployments.platform_repo, "delete_deployment_binding", delete)
+
+    with pytest.raises(PlatformControlPlaneError) as exc_info:
+        platform_deployments.delete_deployment_profile_binding(
+            "ignored",
+            config=object(),  # type: ignore[arg-type]
+            deployment_profile_id="deployment-1",
+            capability_key="llm_inference",
+            updated_by_user_id=7,
+        )
+
+    assert exc_info.value.code == "required_binding_removal_forbidden"
+    assert exc_info.value.status_code == 409
+
+
+def test_delete_deployment_binding_returns_updated_profile(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(platform_deployments, "ensure_platform_bootstrap_state", lambda *_args: None)
+    monkeypatch.setattr(platform_deployments.platform_repo, "delete_deployment_binding", lambda *_args, **_kwargs: "deleted")
+    monkeypatch.setattr(
+        platform_deployments.platform_repo,
+        "get_deployment_profile",
+        lambda *_args: {"id": "deployment-1", "slug": "test", "display_name": "Test", "description": "", "is_active": False},
+    )
+    monkeypatch.setattr(platform_deployments.platform_repo, "list_deployment_bindings", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(platform_deployments, "serialize_deployment_profile_with_status", lambda _db, profile, bindings: {**profile, "bindings": bindings})
+
+    result = platform_deployments.delete_deployment_profile_binding(
+        "ignored",
+        config=object(),  # type: ignore[arg-type]
+        deployment_profile_id="deployment-1",
+        capability_key="web_search",
+        updated_by_user_id=7,
+    )
+
+    assert result["bindings"] == []
 
 
 def _db_shaped_embeddings_model_row() -> dict[str, object]:

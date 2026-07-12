@@ -403,6 +403,22 @@ export function addCapabilityToDeploymentForm(
   };
 }
 
+export function removeCapabilityFromDeploymentForm(
+  form: DeploymentFormState,
+  capabilityKey: string,
+): DeploymentFormState {
+  const omitCapability = <T,>(values: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(Object.entries(values).filter(([key]) => key !== capabilityKey));
+  return {
+    ...form,
+    capabilityKeys: form.capabilityKeys.filter((key) => key !== capabilityKey),
+    providerIdsByCapability: omitCapability(form.providerIdsByCapability),
+    resourceIdsByCapability: omitCapability(form.resourceIdsByCapability),
+    defaultResourceIdsByCapability: omitCapability(form.defaultResourceIdsByCapability),
+    resourcePolicyByCapability: omitCapability(form.resourcePolicyByCapability),
+  };
+}
+
 export function getVisibleDeploymentCapabilities(
   allCapabilities: PlatformCapability[],
   form: DeploymentFormState,
