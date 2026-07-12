@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -520,18 +521,23 @@ def append_messages(
     }
 
 
-def claim_message_action(
+class MessageActionTransitionResult(StrEnum):
+    UPDATED = "updated"
+    MISSING = "missing"
+    ACTION_NOT_FOUND = "action_not_found"
+    STATE_MISMATCH = "state_mismatch"
+
+
+def transition_message_action(
     database_url: str,
     *,
     owner_user_id: int,
     conversation_id: str,
     message_id: str,
     action_id: str,
-) -> str:
-    """Atomically consume an enabled assistant-message action.
-
-    Returns claimed, consumed, missing, or invalid.
-    """
+    expected_states: set[str],
+    next_state: str,
+) -> MessageActionTransitionResult:
     with get_connection(database_url) as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -547,45 +553,26 @@ def claim_message_action(
             )
             row = cursor.fetchone()
             if row is None:
-                return "missing"
+                return MessageActionTransitionResult.MISSING
             metadata = dict(row.get("metadata_json") or {})
             actions = metadata.get("actions")
             if not isinstance(actions, list):
-                return "invalid"
+                return MessageActionTransitionResult.ACTION_NOT_FOUND
             matched = None
             for action in actions:
                 if isinstance(action, dict) and str(action.get("id") or "") == action_id:
                     matched = action
                     break
             if matched is None:
-                return "invalid"
-            if str(matched.get("state") or "") != "enabled":
-                return "consumed"
-            matched["state"] = "consumed"
+                return MessageActionTransitionResult.ACTION_NOT_FOUND
+            if str(matched.get("state") or "") not in expected_states:
+                return MessageActionTransitionResult.STATE_MISMATCH
+            matched["state"] = next_state
+            timestamp_key = "executing_at" if next_state == "executing" else "consumed_at" if next_state == "consumed" else None
+            if timestamp_key:
+                matched[timestamp_key] = datetime.now(tz=timezone.utc).isoformat()
             cursor.execute(
                 "UPDATE chat_messages SET metadata_json = %s::jsonb WHERE id = %s",
                 (psycopg.types.json.Jsonb(metadata), message_id),
             )
-    return "claimed"
-
-
-def release_message_action(
-    database_url: str, *, message_id: str, action_id: str
-) -> None:
-    with get_connection(database_url) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT metadata_json FROM chat_messages WHERE id = %s FOR UPDATE", (message_id,))
-            row = cursor.fetchone()
-            if row is None:
-                return
-            metadata = dict(row.get("metadata_json") or {})
-            actions = metadata.get("actions")
-            if not isinstance(actions, list):
-                return
-            for action in actions:
-                if isinstance(action, dict) and str(action.get("id") or "") == action_id and action.get("state") == "consumed":
-                    action["state"] = "enabled"
-            cursor.execute(
-                "UPDATE chat_messages SET metadata_json = %s::jsonb WHERE id = %s",
-                (psycopg.types.json.Jsonb(metadata), message_id),
-            )
+    return MessageActionTransitionResult.UPDATED

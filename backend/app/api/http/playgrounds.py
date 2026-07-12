@@ -11,7 +11,6 @@ from ...application.playgrounds_service import (
     PlaygroundSessionValidationError,
     create_playground_session,
     delete_playground_session,
-    execute_playground_message_action,
     get_playground_knowledge_base_options,
     get_playground_model_options,
     get_playground_options,
@@ -23,6 +22,7 @@ from ...application.playgrounds_service import (
     stream_temporary_playground_message,
     update_playground_session,
 )
+from ...application.playground_conversation_actions_service import execute_playground_message_action
 from ...authz import require_role
 from ...config import get_auth_config
 from ...services.agent_engine_client import AgentEngineClientError
@@ -191,7 +191,12 @@ def post_playground_message_action_route(session_id: str, message_id: str, actio
     except PlaygroundSessionNotFoundError:
         return _json_error(404, "session_not_found", "Playground session not found")
     except PlaygroundSessionValidationError as exc:
-        status = 409 if exc.code in {"conversation_action_consumed", "conversation_action_stale", "conversation_action_closed"} else 400
+        status = 409 if exc.code in {
+            "conversation_action_consumed",
+            "conversation_action_in_progress",
+            "conversation_action_stale",
+            "conversation_action_closed",
+        } else 400
         return _json_error(status, exc.code, exc.message)
     except Exception as exc:  # pragma: no cover
         current_app.logger.exception("Playground message action failed: %s", exc)

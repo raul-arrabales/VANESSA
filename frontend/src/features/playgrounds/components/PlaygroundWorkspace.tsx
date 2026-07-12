@@ -123,7 +123,10 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   abortActiveStreamRef.current = actions.abortActiveStream;
 
   const handleMessageAction = async (messageId: string, action: PlaygroundConversationAction): Promise<void> => {
-    if (!token || !sessionState.activeSession || action.state !== "enabled") {
+    const canRetryExpiredExecution = action.state === "executing"
+      && Boolean(action.executing_at)
+      && Date.now() - Date.parse(action.executing_at as string) >= 120_000;
+    if (!token || !sessionState.activeSession || (action.state !== "enabled" && !canRetryExpiredExecution)) {
       return;
     }
     const sessionId = sessionState.activeSession.id;

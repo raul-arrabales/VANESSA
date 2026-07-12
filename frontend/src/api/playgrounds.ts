@@ -84,9 +84,13 @@ export type PlaygroundMessageMetadata = Record<string, unknown> & {
 export type PlaygroundConversationAction = {
   id: string;
   type: "start_workflow_cycle" | string;
+  label_key?: string;
   label: string;
   emphasis: "primary" | "secondary" | string;
-  state: "enabled" | "consumed" | "disabled" | string;
+  state: "enabled" | "executing" | "consumed" | "disabled" | string;
+  executing_at?: string;
+  consumed_at?: string;
+  workflow_cycle?: number;
 };
 
 export type PlaygroundTextContentPart = {

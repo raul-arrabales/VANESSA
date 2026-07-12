@@ -163,9 +163,5 @@ def append_messages(
     )
 
 
-def claim_message_action(database_url: str, **kwargs: Any) -> str:
-    return chat_repository.claim_message_action(database_url, **kwargs)
-
-
-def release_message_action(database_url: str, **kwargs: Any) -> None:
-    chat_repository.release_message_action(database_url, **kwargs)
+def transition_message_action(database_url: str, **kwargs: Any) -> chat_repository.MessageActionTransitionResult:
+    return chat_repository.transition_message_action(database_url, **kwargs)

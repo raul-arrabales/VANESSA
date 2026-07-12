@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.application import playground_execution, playgrounds_service
+from app.application import playground_conversation_actions_service, playground_execution, playgrounds_service
 from app.config import AuthConfig
 
 
@@ -1166,7 +1166,7 @@ def test_send_playground_message_pauses_completed_loop_with_start_action(monkeyp
 
 
 def test_execute_message_action_claims_and_bootstraps_next_workflow_cycle(monkeypatch):
-    action = {"id": "action-1", "type": "start_workflow_cycle", "state": "enabled"}
+    action = {"id": "action-1", "type": "start_workflow_cycle", "state": "enabled", "workflow_cycle": 2}
     monkeypatch.setattr(
         playgrounds_service,
         "_load_session_and_messages",
@@ -1178,15 +1178,19 @@ def test_execute_message_action_claims_and_bootstraps_next_workflow_cycle(monkey
     monkeypatch.setattr(playgrounds_service, "_workflow_assistant_settings", lambda *_args, **_kwargs: {
         "assistant_ref": "agent.project.workflow-agent-1", "workflow_execution_mode": "loop",
     })
-    monkeypatch.setattr(playgrounds_service, "get_workflow_run", lambda *_args, **_kwargs: {
+    monkeypatch.setattr(playground_conversation_actions_service, "get_workflow_run", lambda *_args, **_kwargs: {
         "status": "completed", "session_state": "active", "workflow_cycle": 2, "cycle_started_message_index": 4,
     })
-    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "claim_message_action", lambda *_args, **_kwargs: "claimed")
+    monkeypatch.setattr(
+        playground_conversation_actions_service.playgrounds_repository,
+        "transition_message_action",
+        lambda *_args, **_kwargs: playground_conversation_actions_service.MessageActionTransitionResult.UPDATED,
+    )
     bootstrap_calls: list[dict[str, object]] = []
     monkeypatch.setattr(playgrounds_service, "_maybe_bootstrap_workflow_session", lambda *_args, **kwargs: bootstrap_calls.append(kwargs))
     monkeypatch.setattr(playgrounds_service, "get_playground_session_detail", lambda *_args, **_kwargs: {"id": "session-1"})
 
-    result = playgrounds_service.execute_playground_message_action(
+    result = playground_conversation_actions_service.execute_playground_message_action(
         "postgresql://ignored",
         config=AuthConfig(
             database_url="postgresql://ignored",

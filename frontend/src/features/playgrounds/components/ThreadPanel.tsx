@@ -6,6 +6,7 @@ import { getPlaygroundMessageReferences, getPlaygroundMessageSources } from "../
 import KnowledgeReferencesList from "../../ai-shared/KnowledgeReferencesList";
 import { buildPlaygroundKnowledgeReferencesFromSources } from "../../ai-shared/retrieval";
 import AssistantStatusTimeline from "./AssistantStatusTimeline";
+import ConversationActions from "./ConversationActions";
 import ImageViewer from "./ImageViewer";
 import MessageImageGrid from "./MessageImageGrid";
 import { messageImageParts, messageText } from "../messageContent";
@@ -197,33 +198,13 @@ export default function ThreadPanel({
                   {message.role === "assistant" && references.length > 0 ? (
                     <KnowledgeReferencesList references={references} messageId={message.id} />
                   ) : null}
-                  {conversationActions.length > 0 ? (
-                    <div className="chatbot-conversation-actions" aria-label={t("playgrounds.messageActions.availableActions")}>
-                      {conversationActions.map((action) => {
-                        const actionKey = `${message.id}:${action.id}`;
-                        const isActive = activeActionKey === actionKey;
-                        const isDisabled = action.state !== "enabled" || isSending || activeActionKey !== null;
-                        return (
-                          <button
-                            key={action.id}
-                            type="button"
-                            className={`btn ${action.emphasis === "primary" ? "btn-primary" : "btn-secondary"}`}
-                            disabled={isDisabled}
-                            aria-busy={isActive ? "true" : undefined}
-                            onClick={() => void onMessageAction(message.id, action)}
-                          >
-                            {isActive
-                              ? t("playgrounds.messageActions.runningAction")
-                              : action.state === "consumed"
-                                ? t("playgrounds.messageActions.actionUsed")
-                                : action.type === "start_workflow_cycle"
-                                  ? t("playgrounds.messageActions.startNextLoop")
-                                  : action.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
+                  <ConversationActions
+                    messageId={message.id}
+                    actions={conversationActions}
+                    activeActionKey={activeActionKey}
+                    disabled={isSending}
+                    onAction={onMessageAction}
+                  />
                   {message.role === "assistant" && text.trim() ? (
                     <div
                       className="chatbot-message-actions"

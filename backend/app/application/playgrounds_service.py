@@ -15,6 +15,7 @@ from ..domain.playgrounds import (
     default_assistant_ref_for_kind,
     playground_kind_for_conversation_kind,
 )
+from ..domain.conversation_actions import build_start_workflow_cycle_action
 from ..infrastructure import playgrounds_repository
 from ..repositories.agent_workflow_runs import get_workflow_run, upsert_workflow_run
 from ..services.catalog_errors import CatalogError
@@ -95,88 +96,6 @@ class PlaygroundChatExecutionError(RuntimeError):
         super().__init__(str(payload.get("message") or payload.get("error") or "playground_chat_failed"))
         self.payload = payload
         self.status_code = status_code
-
-
-def execute_playground_message_action(
-    database_url: str,
-    *,
-    config: AuthConfig,
-    owner_user_id: int,
-    owner_role: str,
-    session_id: str,
-    message_id: str,
-    action_id: str,
-) -> dict[str, Any]:
-    row, messages = _load_session_and_messages(
-        database_url,
-        owner_user_id=owner_user_id,
-        session_id=session_id,
-        playground_kind=CHAT_PLAYGROUND_KIND,
-    )
-    message = next((item for item in messages if str(item.get("id") or "") == message_id), None)
-    if message is None or str(message.get("role") or "") != "assistant":
-        raise PlaygroundSessionValidationError("conversation_action_not_found", "Conversation action not found")
-    metadata = message.get("metadata_json") if isinstance(message.get("metadata_json"), dict) else {}
-    actions = metadata.get("actions") if isinstance(metadata, dict) else None
-    action = next(
-        (
-            item for item in actions
-            if isinstance(item, dict) and str(item.get("id") or "") == action_id
-        ),
-        None,
-    ) if isinstance(actions, list) else None
-    if action is None or str(action.get("type") or "") != "start_workflow_cycle":
-        raise PlaygroundSessionValidationError("conversation_action_not_found", "Conversation action not found")
-
-    settings = _workflow_assistant_settings(database_url, assistant_ref=string_or_none(row.get("assistant_ref")))
-    if not settings or settings.get("workflow_execution_mode") != WORKFLOW_EXECUTION_MODE_LOOP:
-        raise PlaygroundSessionValidationError("conversation_action_invalid", "This action requires a loop workflow")
-    assistant_ref = str(settings["assistant_ref"])
-    workflow_run = get_workflow_run(
-        database_url,
-        owner_user_id=owner_user_id,
-        conversation_id=session_id,
-        assistant_ref=assistant_ref,
-    )
-    runtime_state = build_workflow_runtime_state(
-        workflow_run=workflow_run,
-        workflow_execution_mode=settings.get("workflow_execution_mode"),
-    )
-    if runtime_state.session_state != WORKFLOW_SESSION_STATE_ACTIVE:
-        raise PlaygroundSessionValidationError("conversation_action_closed", "Workflow session is closed")
-    if not workflow_run or str(workflow_run.get("status") or "").lower() != "completed":
-        raise PlaygroundSessionValidationError("conversation_action_stale", "The workflow is not waiting to start another loop")
-
-    claim = playgrounds_repository.claim_message_action(
-        database_url,
-        owner_user_id=owner_user_id,
-        conversation_id=session_id,
-        message_id=message_id,
-        action_id=action_id,
-    )
-    if claim == "consumed":
-        raise PlaygroundSessionValidationError("conversation_action_consumed", "This conversation action was already used")
-    if claim != "claimed":
-        raise PlaygroundSessionValidationError("conversation_action_not_found", "Conversation action not found")
-    try:
-        _maybe_bootstrap_workflow_session(
-            database_url,
-            config=config,
-            owner_user_id=owner_user_id,
-            owner_role=owner_role,
-            session_row=row,
-            workflow_execution_mode=WORKFLOW_EXECUTION_MODE_LOOP,
-            workflow_cycle=runtime_state.workflow_cycle + 1,
-        )
-    except Exception:
-        playgrounds_repository.release_message_action(database_url, message_id=message_id, action_id=action_id)
-        raise
-    return get_playground_session_detail(
-        database_url,
-        owner_user_id=owner_user_id,
-        session_id=session_id,
-        playground_kind=CHAT_PLAYGROUND_KIND,
-    )
 
 
 def _record_status(statuses: dict[str, dict[str, Any]], status: dict[str, Any]) -> dict[str, Any]:
@@ -904,13 +823,7 @@ def _build_assistant_metadata_for_result(
             and str(result.workflow_status).strip().lower() == "completed"
         ):
             assistant_metadata["actions"] = [
-                {
-                    "id": str(uuid4()),
-                    "type": "start_workflow_cycle",
-                    "label": "Start next loop",
-                    "emphasis": "primary",
-                    "state": "enabled",
-                }
+                build_start_workflow_cycle_action(workflow_cycle=request.workflow_cycle or 1)
             ]
     if request.playground_kind == KNOWLEDGE_PLAYGROUND_KIND:
         assistant_metadata = {

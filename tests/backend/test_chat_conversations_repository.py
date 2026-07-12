@@ -245,3 +245,35 @@ def test_delete_conversation_uses_owner_and_kind_scope(monkeypatch):
     assert deleted is True
     assert "DELETE FROM chat_conversations" in fake_cursor.executed[0][0]
     assert fake_cursor.executed[0][1] == ("conv-9", 13, "plain")
+
+
+def test_transition_message_action_scopes_and_updates_expected_state(monkeypatch):
+    fake_cursor = _FakeCursor([{
+        "metadata_json": {"actions": [{"id": "action-1", "state": "enabled"}]},
+    }])
+
+    class _FakeConnection:
+        def cursor(self):
+            return fake_cursor
+
+    @contextmanager
+    def _fake_get_connection(_database_url: str) -> Iterator[_FakeConnection]:
+        yield _FakeConnection()
+
+    monkeypatch.setattr(chat_conversations, "get_connection", _fake_get_connection)
+    result = chat_conversations.transition_message_action(
+        "postgresql://ignored",
+        owner_user_id=13,
+        conversation_id="conv-9",
+        message_id="message-1",
+        action_id="action-1",
+        expected_states={"enabled"},
+        next_state="executing",
+    )
+
+    assert result == chat_conversations.MessageActionTransitionResult.UPDATED
+    assert "c.owner_user_id = %s" in fake_cursor.executed[0][0]
+    assert fake_cursor.executed[0][1] == ("message-1", "conv-9", 13)
+    updated_metadata = fake_cursor.executed[1][1][0].obj
+    assert updated_metadata["actions"][0]["state"] == "executing"
+    assert updated_metadata["actions"][0]["executing_at"]
