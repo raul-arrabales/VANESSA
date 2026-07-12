@@ -161,3 +161,11 @@ def append_messages(
         title_source=title_source,
         conversation_kind=conversation_kind,
     )
+
+
+def claim_message_action(database_url: str, **kwargs: Any) -> str:
+    return chat_repository.claim_message_action(database_url, **kwargs)
+
+
+def release_message_action(database_url: str, **kwargs: Any) -> None:
+    chat_repository.release_message_action(database_url, **kwargs)

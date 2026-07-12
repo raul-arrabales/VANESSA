@@ -518,3 +518,74 @@ def append_messages(
         "conversation": dict(conversation),
         "messages": message_records,
     }
+
+
+def claim_message_action(
+    database_url: str,
+    *,
+    owner_user_id: int,
+    conversation_id: str,
+    message_id: str,
+    action_id: str,
+) -> str:
+    """Atomically consume an enabled assistant-message action.
+
+    Returns claimed, consumed, missing, or invalid.
+    """
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT m.metadata_json
+                FROM chat_messages m
+                JOIN chat_conversations c ON c.id = m.conversation_id
+                WHERE m.id = %s AND m.conversation_id = %s AND m.role = 'assistant'
+                  AND c.owner_user_id = %s AND c.conversation_kind = 'plain'
+                FOR UPDATE
+                """,
+                (message_id, conversation_id, owner_user_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return "missing"
+            metadata = dict(row.get("metadata_json") or {})
+            actions = metadata.get("actions")
+            if not isinstance(actions, list):
+                return "invalid"
+            matched = None
+            for action in actions:
+                if isinstance(action, dict) and str(action.get("id") or "") == action_id:
+                    matched = action
+                    break
+            if matched is None:
+                return "invalid"
+            if str(matched.get("state") or "") != "enabled":
+                return "consumed"
+            matched["state"] = "consumed"
+            cursor.execute(
+                "UPDATE chat_messages SET metadata_json = %s::jsonb WHERE id = %s",
+                (psycopg.types.json.Jsonb(metadata), message_id),
+            )
+    return "claimed"
+
+
+def release_message_action(
+    database_url: str, *, message_id: str, action_id: str
+) -> None:
+    with get_connection(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT metadata_json FROM chat_messages WHERE id = %s FOR UPDATE", (message_id,))
+            row = cursor.fetchone()
+            if row is None:
+                return
+            metadata = dict(row.get("metadata_json") or {})
+            actions = metadata.get("actions")
+            if not isinstance(actions, list):
+                return
+            for action in actions:
+                if isinstance(action, dict) and str(action.get("id") or "") == action_id and action.get("state") == "consumed":
+                    action["state"] = "enabled"
+            cursor.execute(
+                "UPDATE chat_messages SET metadata_json = %s::jsonb WHERE id = %s",
+                (psycopg.types.json.Jsonb(metadata), message_id),
+            )

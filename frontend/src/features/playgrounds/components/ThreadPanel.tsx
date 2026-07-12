@@ -9,7 +9,7 @@ import AssistantStatusTimeline from "./AssistantStatusTimeline";
 import ImageViewer from "./ImageViewer";
 import MessageImageGrid from "./MessageImageGrid";
 import { messageImageParts, messageText } from "../messageContent";
-import type { PlaygroundImageContentPart } from "../../../api/playgrounds";
+import type { PlaygroundConversationAction, PlaygroundImageContentPart } from "../../../api/playgrounds";
 import type { PlaygroundRunStatus, PlaygroundSessionViewModel } from "../types";
 import { getWorkflowSessionDisplayState } from "../workflowSessionDisplay";
 
@@ -26,6 +26,8 @@ type ThreadPanelProps = {
   scrollToBottom: (options?: { behavior?: ScrollBehavior; force?: boolean }) => void;
   composer: ReactNode;
   composerHeight: number;
+  activeActionKey?: string | null;
+  onMessageAction?: (messageId: string, action: PlaygroundConversationAction) => Promise<void>;
 };
 
 function getMessageStatuses(metadata: Record<string, unknown>): PlaygroundRunStatus[] {
@@ -75,6 +77,8 @@ export default function ThreadPanel({
   scrollToBottom,
   composer,
   composerHeight,
+  activeActionKey = null,
+  onMessageAction = async () => undefined,
 }: ThreadPanelProps): JSX.Element {
   const { t } = useTranslation("common");
   const { showErrorFeedback } = useActionFeedback();
@@ -163,6 +167,9 @@ export default function ThreadPanel({
               ? storedReferences
               : buildPlaygroundKnowledgeReferencesFromSources(getPlaygroundMessageSources(message.metadata));
             const statuses = message.role === "assistant" ? getMessageStatuses(message.metadata) : [];
+            const conversationActions = message.role === "assistant" && Array.isArray(message.metadata.actions)
+              ? message.metadata.actions as PlaygroundConversationAction[]
+              : [];
             const isLiveAssistantStatus = statuses.length > 0 && isSending && Boolean(message.metadata.transient);
             const statusTimeline = statuses.length > 0 ? (
               <AssistantStatusTimeline
@@ -189,6 +196,33 @@ export default function ThreadPanel({
                   {!isLiveAssistantStatus ? statusTimeline : null}
                   {message.role === "assistant" && references.length > 0 ? (
                     <KnowledgeReferencesList references={references} messageId={message.id} />
+                  ) : null}
+                  {conversationActions.length > 0 ? (
+                    <div className="chatbot-conversation-actions" aria-label={t("playgrounds.messageActions.availableActions")}>
+                      {conversationActions.map((action) => {
+                        const actionKey = `${message.id}:${action.id}`;
+                        const isActive = activeActionKey === actionKey;
+                        const isDisabled = action.state !== "enabled" || isSending || activeActionKey !== null;
+                        return (
+                          <button
+                            key={action.id}
+                            type="button"
+                            className={`btn ${action.emphasis === "primary" ? "btn-primary" : "btn-secondary"}`}
+                            disabled={isDisabled}
+                            aria-busy={isActive ? "true" : undefined}
+                            onClick={() => void onMessageAction(message.id, action)}
+                          >
+                            {isActive
+                              ? t("playgrounds.messageActions.runningAction")
+                              : action.state === "consumed"
+                                ? t("playgrounds.messageActions.actionUsed")
+                                : action.type === "start_workflow_cycle"
+                                  ? t("playgrounds.messageActions.startNextLoop")
+                                  : action.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   ) : null}
                   {message.role === "assistant" && text.trim() ? (
                     <div

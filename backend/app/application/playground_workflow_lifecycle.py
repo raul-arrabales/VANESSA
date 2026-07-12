@@ -80,10 +80,10 @@ def resolve_workflow_lifecycle_outcome(
     completed = str(workflow_status or "").strip().lower() == "completed"
     if normalized_execution_mode == WORKFLOW_EXECUTION_MODE_LOOP and completed:
         return WorkflowLifecycleOutcome(
-            should_bootstrap_next_cycle=True,
-            bootstrap_workflow_cycle=normalized_workflow_cycle + 1,
-            persisted_session_state=None,
-            persisted_workflow_cycle=None,
+            should_bootstrap_next_cycle=False,
+            bootstrap_workflow_cycle=None,
+            persisted_session_state=WORKFLOW_SESSION_STATE_ACTIVE,
+            persisted_workflow_cycle=normalized_workflow_cycle,
             cycle_started_message_index=normalized_cycle_boundary,
         )
     return WorkflowLifecycleOutcome(

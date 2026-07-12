@@ -394,7 +394,12 @@
     "messageActions": {
       "copy": "Copy response",
       "copied": "Copied",
-      "copyFailed": "Unable to copy message content."
+      "copyFailed": "Unable to copy message content.",
+      "availableActions": "Available response actions",
+      "startNextLoop": "Start next loop",
+      "runningAction": "Starting next loop...",
+      "actionUsed": "Loop started",
+      "actionFailed": "Unable to run this conversation action."
     },
     "references": {
       "toggle": "References ({{count}})",

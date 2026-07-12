@@ -547,6 +547,18 @@
   gap: var(--space-2);
 }
 
+.chatbot-conversation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.chatbot-conversation-actions .btn {
+  min-height: 2.25rem;
+}
+
 .chatbot-message-copy-button {
   border: 0;
   background: transparent;

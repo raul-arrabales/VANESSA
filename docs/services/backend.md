@@ -60,6 +60,7 @@ Catalog orchestration now resolves through the application-layer catalog-managem
 - `DELETE /v1/playgrounds/sessions/{id}` (authenticated)
 - `POST /v1/playgrounds/sessions/{id}/messages` (authenticated)
 - `POST /v1/playgrounds/sessions/{id}/messages/stream` (authenticated)
+- `POST /v1/playgrounds/sessions/{id}/messages/{message_id}/actions/{action_id}` (authenticated)
 - `POST /v1/playgrounds/attachments/images` (authenticated multipart upload)
 - `GET /v1/playgrounds/attachments/{id}` (authenticated inline image)
 - `GET /v1/playgrounds/attachments/{id}/download` (authenticated image download)
@@ -70,6 +71,7 @@ Playground semantics:
 - `playground_kind=chat` and `playground_kind=knowledge` are variants of the same canonical session model.
 - Session payloads carry `assistant_ref`, `model_selection`, `knowledge_binding`, persisted `messages`, and timestamps.
 - Message payloads may include text and backend-owned image `content_parts`; image bytes are stored under `CHAT_ATTACHMENTS_ROOT` and are not sent to text-only LLM prompts in v1.
+- Assistant-message metadata may expose backend-owned inline actions. Loop workflows pause after a completed cycle and expose `start_workflow_cycle`; invoking it atomically consumes the action and bootstraps the next cycle without adding a synthetic user message.
 - Knowledge playground sessions are backend-owned and persisted; browser-only local storage is no longer the source of truth for user conversations.
 
 ### Agent Projects

@@ -78,6 +78,15 @@ export type PlaygroundMessageMetadata = Record<string, unknown> & {
   references?: PlaygroundKnowledgeReference[];
   statuses?: PlaygroundRunStatus[];
   content_parts?: PlaygroundMessageContentPart[];
+  actions?: PlaygroundConversationAction[];
+};
+
+export type PlaygroundConversationAction = {
+  id: string;
+  type: "start_workflow_cycle" | string;
+  label: string;
+  emphasis: "primary" | "secondary" | string;
+  state: "enabled" | "consumed" | "disabled" | string;
 };
 
 export type PlaygroundTextContentPart = {
@@ -493,6 +502,18 @@ export async function streamPlaygroundMessage(
     payload,
     token,
     options,
+  );
+}
+
+export async function executePlaygroundMessageAction(
+  sessionId: string,
+  messageId: string,
+  actionId: string,
+  token: string,
+): Promise<{ session: PlaygroundSessionDetail }> {
+  return requestJson<{ session: PlaygroundSessionDetail }>(
+    `/v1/playgrounds/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}/actions/${encodeURIComponent(actionId)}`,
+    { method: "POST", token },
   );
 }
 

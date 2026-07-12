@@ -389,7 +389,12 @@
     "messageActions": {
       "copy": "Copiar respuesta",
       "copied": "Copiado",
-      "copyFailed": "No se pudo copiar el contenido del mensaje."
+      "copyFailed": "No se pudo copiar el contenido del mensaje.",
+      "availableActions": "Acciones de respuesta disponibles",
+      "startNextLoop": "Iniciar siguiente bucle",
+      "runningAction": "Iniciando siguiente bucle...",
+      "actionUsed": "Bucle iniciado",
+      "actionFailed": "No se pudo ejecutar esta accion de conversacion."
     },
     "references": {
       "toggle": "Referencias ({{count}})",

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ModalDialog from "../../../components/ModalDialog";
 import { useAuth } from "../../../auth/AuthProvider";
-import { uploadPlaygroundImage, type PlaygroundImageContentPart } from "../../../api/playgrounds";
+import { executePlaygroundMessageAction, uploadPlaygroundImage, type PlaygroundConversationAction, type PlaygroundImageContentPart } from "../../../api/playgrounds";
+import { useActionFeedback } from "../../../feedback/ActionFeedbackProvider";
 import { useStickyChatScroll } from "../../../hooks/useStickyChatScroll";
 import AssistantSelector from "./AssistantSelector";
 import Composer from "./Composer";
@@ -16,7 +17,8 @@ import { usePlaygroundSessions } from "../hooks/usePlaygroundSessions";
 import { usePlaygroundWorkspaceViewState } from "../hooks/usePlaygroundWorkspaceViewState";
 import { useSessionHistorySearch } from "../hooks/useSessionHistorySearch";
 import { hasInlineSelector, hasSelector } from "../selectorConfig";
-import type { PlaygroundWorkspaceConfig } from "../types";
+import { mapPlaygroundSessionDetail, type PlaygroundWorkspaceConfig } from "../types";
+import { upsertSession } from "../utils";
 
 type PlaygroundWorkspaceProps = {
   config: PlaygroundWorkspaceConfig;
@@ -25,6 +27,7 @@ type PlaygroundWorkspaceProps = {
 export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps): JSX.Element {
   const { t } = useTranslation("common");
   const { token, isAuthenticated } = useAuth();
+  const { showErrorFeedback } = useActionFeedback();
   const preferences = usePlaygroundPreferences(config.playgroundKind);
   const hasKnowledgeBaseSelector = hasSelector(config, "knowledgeBase");
   const hasAssistantInlineSelector = hasInlineSelector(config, "assistant");
@@ -68,6 +71,7 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
   const [renameValue, setRenameValue] = useState("");
   const [isDialogSubmitting, setIsDialogSubmitting] = useState(false);
   const [composerHeight, setComposerHeight] = useState(96);
+  const [activeActionKey, setActiveActionKey] = useState<string | null>(null);
   const abortActiveStreamRef = useRef<() => void>(() => undefined);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
@@ -117,6 +121,27 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
     pinToBottomOnNextUpdate,
   });
   abortActiveStreamRef.current = actions.abortActiveStream;
+
+  const handleMessageAction = async (messageId: string, action: PlaygroundConversationAction): Promise<void> => {
+    if (!token || !sessionState.activeSession || action.state !== "enabled") {
+      return;
+    }
+    const sessionId = sessionState.activeSession.id;
+    setActiveActionKey(`${messageId}:${action.id}`);
+    setIsSessionBusy(true);
+    try {
+      const result = await executePlaygroundMessageAction(sessionId, messageId, action.id, token);
+      const nextSession = mapPlaygroundSessionDetail(result.session);
+      sessionState.setSavedSessions((existing) => upsertSession(existing, nextSession));
+      sessionState.setActiveSession(nextSession);
+      pinToBottomOnNextUpdate("smooth");
+    } catch (error) {
+      showErrorFeedback(error, t("playgrounds.messageActions.actionFailed"));
+    } finally {
+      setActiveActionKey(null);
+      setIsSessionBusy(false);
+    }
+  };
 
   const handleAddImages = async (files: FileList): Promise<void> => {
     if (!token || files.length === 0) {
@@ -256,6 +281,8 @@ export default function PlaygroundWorkspace({ config }: PlaygroundWorkspaceProps
           isPinnedToBottom={isPinnedToBottom}
           scrollToBottom={scrollToBottom}
           composerHeight={composerHeight}
+          activeActionKey={activeActionKey}
+          onMessageAction={handleMessageAction}
           composer={(
             <Composer
               draft={preferences.draft}

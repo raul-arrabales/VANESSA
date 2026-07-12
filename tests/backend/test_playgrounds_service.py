@@ -1056,8 +1056,10 @@ def test_build_execution_request_uses_workflow_cycle_boundary(monkeypatch):
     assert request.workflow_session_state == "active"
 
 
-def test_send_playground_message_restarts_loop_workflow_with_next_cycle(monkeypatch):
+def test_send_playground_message_pauses_completed_loop_with_start_action(monkeypatch):
     bootstrap_calls: list[dict[str, object]] = []
+    workflow_runs: list[dict[str, object]] = []
+    assistant_metadata: dict[str, object] = {}
 
     monkeypatch.setattr(
         playgrounds_service.playgrounds_repository,
@@ -1116,11 +1118,12 @@ def test_send_playground_message_restarts_loop_workflow_with_next_cycle(monkeypa
             },
             "messages": [
                 {"id": "msg-user", "message_index": 5, "role": "user", "content": kwargs["user_content"], "metadata_json": {}, "created_at": "2026-03-18T11:00:00+00:00"},
-                {"id": "msg-assistant", "message_index": 6, "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
+                    {"id": "msg-assistant", "message_index": 6, "role": "assistant", "content": kwargs["assistant_content"], "metadata_json": assistant_metadata.update(kwargs["assistant_metadata"]) or kwargs["assistant_metadata"], "created_at": "2026-03-18T11:00:01+00:00"},
             ],
         },
     )
     monkeypatch.setattr(playgrounds_service, "bind_message_attachments", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(playgrounds_service, "upsert_workflow_run", lambda *_args, **kwargs: workflow_runs.append(dict(kwargs)))
     monkeypatch.setattr(
         playgrounds_service,
         "_maybe_bootstrap_workflow_session",
@@ -1155,7 +1158,56 @@ def test_send_playground_message_restarts_loop_workflow_with_next_cycle(monkeypa
         prompt="continue",
     )
 
-    assert bootstrap_calls[0]["workflow_execution_mode"] == "loop"
+    assert bootstrap_calls == []
+    assert workflow_runs[0]["workflow_cycle"] == 2
+    assert workflow_runs[0]["status"] == "completed"
+    assert assistant_metadata["actions"][0]["type"] == "start_workflow_cycle"
+    assert assistant_metadata["actions"][0]["state"] == "enabled"
+
+
+def test_execute_message_action_claims_and_bootstraps_next_workflow_cycle(monkeypatch):
+    action = {"id": "action-1", "type": "start_workflow_cycle", "state": "enabled"}
+    monkeypatch.setattr(
+        playgrounds_service,
+        "_load_session_and_messages",
+        lambda *_args, **_kwargs: (
+            {"id": "session-1", "conversation_kind": "plain", "assistant_ref": "agent.project.workflow-agent-1"},
+            [{"id": "message-1", "role": "assistant", "metadata_json": {"actions": [action]}}],
+        ),
+    )
+    monkeypatch.setattr(playgrounds_service, "_workflow_assistant_settings", lambda *_args, **_kwargs: {
+        "assistant_ref": "agent.project.workflow-agent-1", "workflow_execution_mode": "loop",
+    })
+    monkeypatch.setattr(playgrounds_service, "get_workflow_run", lambda *_args, **_kwargs: {
+        "status": "completed", "session_state": "active", "workflow_cycle": 2, "cycle_started_message_index": 4,
+    })
+    monkeypatch.setattr(playgrounds_service.playgrounds_repository, "claim_message_action", lambda *_args, **_kwargs: "claimed")
+    bootstrap_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(playgrounds_service, "_maybe_bootstrap_workflow_session", lambda *_args, **kwargs: bootstrap_calls.append(kwargs))
+    monkeypatch.setattr(playgrounds_service, "get_playground_session_detail", lambda *_args, **_kwargs: {"id": "session-1"})
+
+    result = playgrounds_service.execute_playground_message_action(
+        "postgresql://ignored",
+        config=AuthConfig(
+            database_url="postgresql://ignored",
+            jwt_secret="test-secret-key-with-at-least-32-bytes",
+            model_credentials_encryption_key="test-credential-secret-key-with-at-least-32-bytes",
+            jwt_algorithm="HS256",
+            access_token_ttl_seconds=28_800,
+            allow_self_register=True,
+            bootstrap_superadmin_email="",
+            bootstrap_superadmin_username="",
+            bootstrap_superadmin_password="",
+            flask_env="development",
+        ),
+        owner_user_id=10,
+        owner_role="user",
+        session_id="session-1",
+        message_id="message-1",
+        action_id="action-1",
+    )
+
+    assert result == {"id": "session-1"}
     assert bootstrap_calls[0]["workflow_cycle"] == 3
 
 

@@ -11,6 +11,7 @@ from ...application.playgrounds_service import (
     PlaygroundSessionValidationError,
     create_playground_session,
     delete_playground_session,
+    execute_playground_message_action,
     get_playground_knowledge_base_options,
     get_playground_model_options,
     get_playground_options,
@@ -172,6 +173,30 @@ def post_playground_message_route(session_id: str):
         current_app.logger.exception("Playground message request failed: %s", exc)
         return _json_error(500, "playground_message_failed", "Playground message request failed.")
     return jsonify(response_payload), 200
+
+
+@bp.post("/v1/playgrounds/sessions/<session_id>/messages/<message_id>/actions/<action_id>")
+@require_role("user")
+def post_playground_message_action_route(session_id: str, message_id: str, action_id: str):
+    try:
+        session = execute_playground_message_action(
+            _database_url(),
+            config=_config(),
+            owner_user_id=int(g.current_user["id"]),
+            owner_role=str(g.current_user.get("role", "user")),
+            session_id=session_id,
+            message_id=message_id,
+            action_id=action_id,
+        )
+    except PlaygroundSessionNotFoundError:
+        return _json_error(404, "session_not_found", "Playground session not found")
+    except PlaygroundSessionValidationError as exc:
+        status = 409 if exc.code in {"conversation_action_consumed", "conversation_action_stale", "conversation_action_closed"} else 400
+        return _json_error(status, exc.code, exc.message)
+    except Exception as exc:  # pragma: no cover
+        current_app.logger.exception("Playground message action failed: %s", exc)
+        return _json_error(500, "conversation_action_failed", "Conversation action failed.")
+    return jsonify({"session": session}), 200
 
 
 @bp.post("/v1/playgrounds/temporary/messages")
