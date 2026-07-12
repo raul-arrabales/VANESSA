@@ -448,6 +448,18 @@ export async function upsertDeploymentBinding(
   return result.deployment_profile;
 }
 
+export async function deleteDeploymentBinding(
+  deploymentId: string,
+  capability: string,
+  token: string,
+): Promise<PlatformDeploymentProfile> {
+  const result = await requestJson<{ deployment_profile: PlatformDeploymentProfile }>(
+    `/v1/platform/deployments/${encodeURIComponent(deploymentId)}/bindings/${encodeURIComponent(capability)}`,
+    { method: "DELETE", token },
+  );
+  return result.deployment_profile;
+}
+
 export async function cloneDeploymentProfile(
   deploymentId: string,
   input: Pick<PlatformDeploymentMutationInput, "slug" | "display_name" | "description">,

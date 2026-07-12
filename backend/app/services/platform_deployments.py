@@ -13,7 +13,7 @@ from .platform_bootstrap import ensure_platform_bootstrap_state
 from .platform_deployment_status import serialize_deployment_profile_with_status
 from .provider_origin_policy import assert_bindings_allowed_for_runtime_profile
 from .platform_serialization import _serialize_activation_audit_row
-from .platform_types import PlatformControlPlaneError
+from .platform_types import PlatformControlPlaneError, REQUIRED_CAPABILITIES
 from .runtime_profile_service import resolve_runtime_profile
 
 
@@ -174,6 +174,54 @@ def upsert_deployment_profile_binding(
         binding_config=dict(resolved_binding.get("binding_config") or {}),
         resource_policy=dict(resolved_binding.get("resource_policy") or {}),
     )
+    updated = platform_repo.update_deployment_profile_identity(
+        database_url,
+        deployment_profile_id=deployment_profile_id,
+        slug=str(existing.get("slug") or ""),
+        display_name=str(existing.get("display_name") or ""),
+        description=str(existing.get("description") or ""),
+        updated_by_user_id=updated_by_user_id,
+    )
+    bindings = platform_repo.list_deployment_bindings(database_url, deployment_profile_id=deployment_profile_id)
+    return serialize_deployment_profile_with_status(database_url, updated or existing, bindings)
+
+
+def delete_deployment_profile_binding(
+    database_url: str,
+    *,
+    config: AuthConfig,
+    deployment_profile_id: str,
+    capability_key: str,
+    updated_by_user_id: int,
+) -> dict[str, object]:
+    ensure_platform_bootstrap_state(database_url, config)
+    existing = platform_repo.get_deployment_profile(database_url, deployment_profile_id)
+    if existing is None:
+        raise PlatformControlPlaneError("deployment_profile_not_found", "Deployment profile not found", status_code=404)
+    normalized_capability = capability_key.strip().lower()
+    if bool(existing.get("is_active")):
+        raise PlatformControlPlaneError(
+            "active_deployment_binding_removal_forbidden",
+            "Bindings cannot be removed from the active deployment profile",
+            status_code=409,
+        )
+    if normalized_capability in REQUIRED_CAPABILITIES:
+        raise PlatformControlPlaneError(
+            "required_binding_removal_forbidden",
+            "Required capability bindings cannot be removed",
+            status_code=409,
+        )
+    existing_bindings = platform_repo.list_deployment_bindings(
+        database_url, deployment_profile_id=deployment_profile_id
+    )
+    if not any(str(item.get("capability_key") or "").strip().lower() == normalized_capability for item in existing_bindings):
+        raise PlatformControlPlaneError("deployment_binding_not_found", "Deployment binding not found", status_code=404)
+    if not platform_repo.delete_deployment_binding(
+        database_url,
+        deployment_profile_id=deployment_profile_id,
+        capability_key=normalized_capability,
+    ):
+        raise PlatformControlPlaneError("deployment_binding_not_found", "Deployment binding not found", status_code=404)
     updated = platform_repo.update_deployment_profile_identity(
         database_url,
         deployment_profile_id=deployment_profile_id,

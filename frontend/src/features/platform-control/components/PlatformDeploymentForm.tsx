@@ -34,6 +34,11 @@ type PlatformDeploymentFormProps = {
     savingByCapability: Record<string, boolean>;
     onClick: (capability: string) => void;
   };
+  bindingRemovalAction?: {
+    persistedCapabilityKeys: Set<string>;
+    pendingCapabilityKey: string | null;
+    onClick: (capability: string) => void;
+  };
   isSubmitting?: boolean;
   submitLabel?: string;
   submitBusyLabel?: string;
@@ -55,6 +60,7 @@ export default function PlatformDeploymentForm({
   bindingStatusByCapability = {},
   identityAction,
   capabilityAction,
+  bindingRemovalAction,
   isSubmitting,
   submitLabel,
   submitBusyLabel,
@@ -268,6 +274,13 @@ export default function PlatformDeploymentForm({
                 isSaving: Boolean(capabilityAction.savingByCapability[section.capabilityKey]),
                 onSave: () => capabilityAction.onClick(section.capabilityKey),
               } : undefined}
+              removeAction={bindingRemovalAction
+                && !capability.required
+                && bindingRemovalAction.persistedCapabilityKeys.has(section.capabilityKey) ? {
+                  label: t("platformControl.actions.removeBinding"),
+                  isPending: bindingRemovalAction.pendingCapabilityKey === section.capabilityKey,
+                  onRemove: () => bindingRemovalAction.onClick(section.capabilityKey),
+                } : undefined}
             />
           );
         })}

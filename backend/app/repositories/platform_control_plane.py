@@ -696,6 +696,24 @@ def upsert_deployment_binding(
     return dict(row)
 
 
+def delete_deployment_binding(
+    database_url: str,
+    *,
+    deployment_profile_id: str,
+    capability_key: str,
+) -> bool:
+    with get_connection(database_url) as connection:
+        row = connection.execute(
+            """
+            DELETE FROM platform_deployment_bindings
+            WHERE deployment_profile_id = %s AND capability_key = %s
+            RETURNING id
+            """,
+            (deployment_profile_id.strip(), capability_key.strip().lower()),
+        ).fetchone()
+    return row is not None
+
+
 def list_deployment_profiles(database_url: str) -> list[dict[str, Any]]:
     with get_connection(database_url) as connection:
         rows = connection.execute(

@@ -5,6 +5,7 @@ import {
   activateDeploymentProfile,
   cloneDeploymentProfile,
   deleteDeploymentProfile,
+  deleteDeploymentBinding,
   patchDeploymentProfileIdentity,
   upsertDeploymentBinding,
   type PlatformCapability,
@@ -16,6 +17,7 @@ import { withActionFeedbackState } from "../../../feedback/ActionFeedbackProvide
 import { withDeploymentSeedState } from "../deploymentRouteState";
 import {
   buildDeploymentBindingMutationInput,
+  buildDeploymentForm,
   buildDeploymentIdentityMutationInput,
   validateDeploymentForm,
   type DeploymentCloneFormState,
@@ -34,6 +36,7 @@ type UsePlatformDeploymentDetailMutationsParams = {
   providersByCapability: Record<string, PlatformProvider[]>;
   modelResourcesByCapability: Record<string, ManagedModel[]>;
   setLocalDeployment: React.Dispatch<React.SetStateAction<PlatformDeploymentProfile | null>>;
+  setForm: React.Dispatch<React.SetStateAction<DeploymentFormState | null>>;
   reload: () => Promise<void>;
   navigate: NavigateFunction;
   showErrorFeedback: (errorOrMessage: unknown, fallbackMessage?: string) => void;
@@ -49,13 +52,17 @@ type UsePlatformDeploymentDetailMutationsResult = {
   activating: boolean;
   confirmActivate: boolean;
   confirmDelete: boolean;
+  bindingToRemove: string | null;
+  removingBindingKey: string | null;
   setConfirmActivate: React.Dispatch<React.SetStateAction<boolean>>;
   setConfirmDelete: React.Dispatch<React.SetStateAction<boolean>>;
+  setBindingToRemove: React.Dispatch<React.SetStateAction<string | null>>;
   handleSaveIdentity: () => Promise<void>;
   handleSaveCapability: (capabilityKey: string) => Promise<void>;
   handleClone: () => Promise<void>;
   handleActivate: () => Promise<void>;
   handleDelete: () => Promise<void>;
+  handleRemoveBinding: () => Promise<void>;
 };
 
 export function usePlatformDeploymentDetailMutations({
@@ -68,6 +75,7 @@ export function usePlatformDeploymentDetailMutations({
   providersByCapability,
   modelResourcesByCapability,
   setLocalDeployment,
+  setForm,
   reload,
   navigate,
   showErrorFeedback,
@@ -81,6 +89,8 @@ export function usePlatformDeploymentDetailMutations({
   const [activating, setActivating] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bindingToRemove, setBindingToRemove] = useState<string | null>(null);
+  const [removingBindingKey, setRemovingBindingKey] = useState<string | null>(null);
 
   async function handleSaveIdentity(): Promise<void> {
     if (!token || !deployment || !form) {
@@ -234,6 +244,29 @@ export function usePlatformDeploymentDetailMutations({
     }
   }
 
+  async function handleRemoveBinding(): Promise<void> {
+    if (!token || !deployment || !bindingToRemove || removingBindingKey) {
+      return;
+    }
+    const capability = capabilities.find((item) => item.capability === bindingToRemove);
+    setRemovingBindingKey(bindingToRemove);
+    setErrorMessage("");
+    try {
+      const updated = await deleteDeploymentBinding(deployment.id, bindingToRemove, token);
+      setLocalDeployment(updated);
+      setForm(buildDeploymentForm(updated, capabilities.filter((item) => item.required)));
+      setBindingToRemove(null);
+      showSuccessFeedback(t("platformControl.feedback.deploymentBindingRemoved", {
+        capability: capability?.display_name ?? bindingToRemove,
+        name: updated.display_name,
+      }));
+    } catch (error) {
+      showErrorFeedback(error, t("platformControl.feedback.deploymentBindingRemoveFailed"));
+    } finally {
+      setRemovingBindingKey(null);
+    }
+  }
+
   return {
     errorMessage,
     savingIdentity,
@@ -242,12 +275,16 @@ export function usePlatformDeploymentDetailMutations({
     activating,
     confirmActivate,
     confirmDelete,
+    bindingToRemove,
+    removingBindingKey,
     setConfirmActivate,
     setConfirmDelete,
+    setBindingToRemove,
     handleSaveIdentity,
     handleSaveCapability,
     handleClone,
     handleActivate,
     handleDelete,
+    handleRemoveBinding,
   };
 }

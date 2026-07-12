@@ -292,6 +292,24 @@ def upsert_deployment_profile_binding(
     )
 
 
+def delete_deployment_profile_binding(
+    database_url: str,
+    *,
+    config,
+    deployment_profile_id: str,
+    capability_key: str,
+    updated_by_user_id: int,
+):
+    _sync_platform_helpers()
+    return _platform_deployments_module.delete_deployment_profile_binding(
+        database_url,
+        config=config,
+        deployment_profile_id=deployment_profile_id,
+        capability_key=capability_key,
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
 def clone_deployment_profile(
     database_url: str,
     *,

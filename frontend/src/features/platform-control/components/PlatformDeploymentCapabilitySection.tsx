@@ -15,6 +15,11 @@ type PlatformDeploymentCapabilitySectionProps = {
     isSaving: boolean;
     onSave: () => void;
   };
+  removeAction?: {
+    label: string;
+    isPending: boolean;
+    onRemove: () => void;
+  };
 };
 
 type ModelCapabilityFieldsProps = {
@@ -238,6 +243,7 @@ export default function PlatformDeploymentCapabilitySection({
   onVectorSelectionModeChange,
   onNamespacePrefixChange,
   saveAction,
+  removeAction,
 }: PlatformDeploymentCapabilitySectionProps): JSX.Element {
   const { t } = useTranslation("common");
   const rowTitleId = useId();
@@ -312,6 +318,16 @@ export default function PlatformDeploymentCapabilitySection({
           >
             {saveAction.isSaving ? saveAction.busyLabel : saveAction.label}
           </button>
+          {removeAction ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={removeAction.onRemove}
+              disabled={removeAction.isPending || saveAction.isSaving}
+            >
+              {removeAction.label}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>

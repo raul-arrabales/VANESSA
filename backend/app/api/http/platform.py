@@ -12,6 +12,7 @@ from ...application.platform_control_service import (
     create_platform_deployment,
     create_platform_provider,
     delete_platform_deployment,
+    delete_platform_deployment_binding,
     delete_platform_provider,
     delete_platform_vector_documents,
     embed_platform_inputs_request,
@@ -55,6 +56,7 @@ clone_deployment_profile = clone_platform_deployment
 activate_deployment_profile = activate_platform_deployment
 delete_deployment_profile = delete_platform_deployment
 upsert_deployment_binding = upsert_platform_deployment_binding
+delete_deployment_binding = delete_platform_deployment_binding
 ensure_vector_index = ensure_platform_vector_index
 embed_platform_inputs = embed_platform_inputs_request
 analyze_platform_image = analyze_platform_image_request
@@ -304,6 +306,22 @@ def upsert_platform_deployment_binding_route(deployment_profile_id: str, capabil
         )
     except PlatformControlRequestError as exc:
         return _json_error(exc.status_code, exc.code, exc.message)
+    except PlatformControlPlaneError as exc:
+        return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
+    return jsonify({"deployment_profile": deployment}), 200
+
+
+@bp.delete("/v1/platform/deployments/<deployment_profile_id>/bindings/<capability_key>")
+@require_role("superadmin")
+def delete_platform_deployment_binding_route(deployment_profile_id: str, capability_key: str):
+    try:
+        deployment = delete_deployment_binding(
+            _database_url(),
+            config=_config(),
+            deployment_profile_id=deployment_profile_id,
+            capability_key=capability_key,
+            updated_by_user_id=int(g.current_user["id"]),
+        )
     except PlatformControlPlaneError as exc:
         return _json_error(exc.status_code, exc.code, exc.message, details=exc.details or None)
     return jsonify({"deployment_profile": deployment}), 200

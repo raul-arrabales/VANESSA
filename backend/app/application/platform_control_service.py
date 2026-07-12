@@ -13,6 +13,7 @@ from ..services.platform_service import (
     create_deployment_profile as _create_deployment_profile,
     create_provider as _create_provider,
     delete_deployment_profile as _delete_deployment_profile,
+    delete_deployment_profile_binding as _delete_deployment_profile_binding,
     delete_provider as _delete_provider,
     list_capabilities as _list_capabilities,
     list_deployment_activation_audit as _list_deployment_activation_audit,
@@ -185,6 +186,23 @@ def upsert_platform_deployment_binding(
         deployment_profile_id=deployment_profile_id,
         capability_key=capability_key,
         payload=_require_json_object(payload),
+        updated_by_user_id=updated_by_user_id,
+    )
+
+
+def delete_platform_deployment_binding(
+    database_url: str,
+    *,
+    config,
+    deployment_profile_id: str,
+    capability_key: str,
+    updated_by_user_id: int,
+):
+    return _delete_deployment_profile_binding(
+        database_url,
+        config=config,
+        deployment_profile_id=deployment_profile_id,
+        capability_key=capability_key,
         updated_by_user_id=updated_by_user_id,
     )
 

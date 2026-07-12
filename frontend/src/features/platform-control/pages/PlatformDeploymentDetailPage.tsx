@@ -4,6 +4,7 @@ import PageSubmenuBar from "../../../components/PageSubmenuBar";
 import { useAuth } from "../../../auth/AuthProvider";
 import PlatformDeploymentAuditTable from "../components/PlatformDeploymentAuditTable";
 import PlatformDeploymentActivationDialog from "../components/PlatformDeploymentActivationDialog";
+import PlatformDeploymentBindingRemovalDialog from "../components/PlatformDeploymentBindingRemovalDialog";
 import PlatformDeploymentCloneSection from "../components/PlatformDeploymentCloneSection";
 import PlatformDeploymentDangerSection from "../components/PlatformDeploymentDangerSection";
 import PlatformDeploymentForm from "../components/PlatformDeploymentForm";
@@ -23,6 +24,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     cloning,
     confirmActivate,
     confirmDelete,
+    bindingToRemove,
     deployment,
     deploymentAudit,
     deployments,
@@ -31,6 +33,7 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     handleActivate,
     handleClone,
     handleDelete,
+    handleRemoveBinding,
     handleSaveCapability,
     handleSaveIdentity,
     knowledgeBases,
@@ -40,9 +43,11 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
     resetForm,
     savingCapabilityKeys,
     savingIdentity,
+    removingBindingKey,
     setCloneForm,
     setConfirmActivate,
     setConfirmDelete,
+    setBindingToRemove,
     setForm,
     state,
   } = usePlatformDeploymentDetail({
@@ -141,9 +146,16 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 capabilityAction={{
                   label: t("platformControl.actions.saveBinding"),
                   busyLabel: t("platformControl.actions.saving"),
-                  savingByCapability: savingCapabilityKeys,
+                  savingByCapability: removingBindingKey
+                    ? { ...savingCapabilityKeys, [removingBindingKey]: true }
+                    : savingCapabilityKeys,
                   onClick: (capability) => void handleSaveCapability(capability),
                 }}
+                bindingRemovalAction={!deployment.is_active ? {
+                  persistedCapabilityKeys: new Set(deployment.bindings.map((binding) => binding.capability)),
+                  pendingCapabilityKey: removingBindingKey,
+                  onClick: setBindingToRemove,
+                } : undefined}
                 secondaryAction={{
                   label: t("platformControl.actions.reset"),
                   onClick: resetForm,
@@ -151,6 +163,15 @@ export default function PlatformDeploymentDetailPage(): JSX.Element {
                 onChange={setForm}
               />
             </article>
+          ) : null}
+
+          {bindingToRemove ? (
+            <PlatformDeploymentBindingRemovalDialog
+              capabilityName={capabilityLabelByKey.get(bindingToRemove) ?? bindingToRemove}
+              isPending={removingBindingKey === bindingToRemove}
+              onCancel={() => setBindingToRemove(null)}
+              onConfirm={() => void handleRemoveBinding()}
+            />
           ) : null}
 
           {cloneForm ? (
